@@ -1,0 +1,25 @@
+{
+  "formatter": {
+    "language_server": {
+      "name": "biome"
+    }
+  },
+  "lsp": {
+    "biome": {
+      "settings": {
+        "require_config_file": true
+      }
+    }
+  },
+  "code_actions_on_format": {
+    "source.fixAll.biome": true
+  },
+  "languages": {
+    "TypeScript": {
+      "format_on_save": "on"
+    },
+    "TSX": {
+      "format_on_save": "on"
+    }
+  }
+}
