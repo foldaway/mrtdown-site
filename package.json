@@ -18,6 +18,7 @@
     "react-router": "^7.1.5"
   },
   "devDependencies": {
+    "@biomejs/biome": "1.9.4",
     "@react-router/dev": "^7.1.5",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^20",
