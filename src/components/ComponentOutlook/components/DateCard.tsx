@@ -39,6 +39,7 @@ export const DateCard: React.FC<Props> = (props) => {
       <Popover.Trigger
         onMouseEnter={() => setIsOpen(true)}
         onMouseLeave={() => setIsOpen(false)}
+        className="outline-none"
       >
         <div
           className={classNames(
@@ -56,7 +57,7 @@ export const DateCard: React.FC<Props> = (props) => {
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          className="flex w-64 flex-col rounded border border-gray-300 bg-gray-100 px-4 py-2 dark:border-gray-600 dark:bg-gray-700"
+          className="flex w-64 flex-col rounded border border-gray-300 bg-gray-100 px-4 py-2 outline-none dark:border-gray-600 dark:bg-gray-700"
           onMouseEnter={() => setIsOpen(true)}
           onMouseLeave={() => setIsOpen(false)}
         >
