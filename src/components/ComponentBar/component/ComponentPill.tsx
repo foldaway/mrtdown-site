@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { Component } from '../../../../../types';
+import type { Component } from '../../../types';
 
 interface Props {
   componentId: string;

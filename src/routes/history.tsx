@@ -1,9 +1,13 @@
+import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/16/solid';
 import { useQuery } from '@tanstack/react-query';
+import { DateTime } from 'luxon';
+import { useEffect, useMemo, useState } from 'react';
+import { IssuesHistoryPageViewer } from '../components/IssuesHistoryPageViewer';
 import { IssueSkeleton } from '../components/IssueSkeleton';
 import type { IssuesHistory, IssuesHistoryPage } from '../types';
-import { useState } from 'react';
-import { IssueViewer } from '../components/IssueViewer';
-import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/16/solid';
+import classNames from 'classnames';
+import { useViewport } from '../hooks/useViewport';
+import { useSearchParams } from 'react-router';
 
 interface HistoryContentProps {
   pageCount: number;
@@ -12,7 +16,21 @@ interface HistoryContentProps {
 const HistoryContent: React.FC<HistoryContentProps> = (props) => {
   const { pageCount } = props;
 
-  const [page, setPage] = useState(1);
+  const viewport = useViewport();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [page, setPage] = useState(() => {
+    const paramPage = searchParams.get('page');
+    if (paramPage != null) {
+      try {
+        return Number.parseInt(paramPage, 10);
+      } catch (e) {}
+    }
+    return pageCount;
+  });
+  useEffect(() => {
+    setSearchParams({ page: page.toString() });
+  }, [page, setSearchParams]);
 
   const fetchIssues = (pageNo = 1) =>
     fetch(
@@ -24,48 +42,87 @@ const HistoryContent: React.FC<HistoryContentProps> = (props) => {
     queryFn: () => fetchIssues(page),
   });
 
+  const maximumPaginationButtonCount = useMemo(
+    () => (viewport === 'xs' ? 11 : 21),
+    [viewport],
+  );
+
+  const pageNumbers = useMemo(() => {
+    if (pageCount < maximumPaginationButtonCount) {
+      return Array.from({ length: pageCount }, (_, x) =>
+        Math.round(lowestPageIndex + x),
+      );
+    }
+    const lowestPageIndex = Math.floor(page - maximumPaginationButtonCount / 2);
+    if (lowestPageIndex < 0) {
+      return Array.from(
+        { length: maximumPaginationButtonCount },
+        (_, x) => 0 + x,
+      );
+    }
+    const highestPageIndex = Math.ceil(page + maximumPaginationButtonCount / 2);
+    if (highestPageIndex > pageCount) {
+      return Array.from(
+        { length: maximumPaginationButtonCount },
+        (_, x) => pageCount - (maximumPaginationButtonCount - x),
+      );
+    }
+    return Array.from(
+      { length: maximumPaginationButtonCount },
+      (_, x) => lowestPageIndex + x,
+    );
+  }, [page, pageCount, maximumPaginationButtonCount]);
+
   return (
     <div className="flex flex-col gap-y-3">
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          className="rounded p-1 text-gray-700 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-700"
-          onClick={() => setPage((old) => Math.max(old - 1, 0))}
-          disabled={page === 1}
-        >
-          <ArrowLeftIcon className="size-4" />
-        </button>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
+        <h1 className="text-center font-bold text-2xl text-gray-800 dark:text-gray-100">
+          Incident History
+        </h1>
+        <div className="flex items-center gap-x-3">
+          <button
+            type="button"
+            className="rounded p-1 text-gray-700 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-700"
+            onClick={() => setPage((old) => Math.max(old - 1, 0))}
+            disabled={page === 1}
+          >
+            <ArrowLeftIcon className="size-4" />
+          </button>
 
-        <div className="flex flex-col items-center">
-          <h1 className="font-bold text-gray-800 text-lg dark:text-gray-100">
-            Incident History
-          </h1>
-          <span className="text-gray-500 text-xs dark:text-gray-400">
-            Page {page} of {pageCount}
-          </span>
+          <div className="flex w-48 flex-col items-center">
+            {data != null && (
+              <span className="font-bold text-base text-gray-800 dark:text-gray-100">
+                {new Intl.DateTimeFormat(undefined, {
+                  year: 'numeric',
+                  month: 'long',
+                }).formatRange(
+                  DateTime.fromISO(data.startAt).toJSDate(),
+                  DateTime.fromISO(data.endAt).toJSDate(),
+                )}
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="rounded p-1 text-gray-700 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-700"
+            onClick={() => {
+              if (page < pageCount) {
+                setPage((old) => old + 1);
+              }
+            }}
+            disabled={page >= pageCount}
+          >
+            <ArrowRightIcon className="size-4" />
+          </button>
         </div>
-
-        <button
-          type="button"
-          className="rounded p-1 text-gray-700 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-700"
-          onClick={() => {
-            if (page < pageCount) {
-              setPage((old) => old + 1);
-            }
-          }}
-          disabled={page >= pageCount}
-        >
-          <ArrowRightIcon className="size-4" />
-        </button>
       </div>
 
-      {data?.issues.map((issue) => (
-        <IssueViewer key={issue.id} issue={issue} />
-      ))}
+      {data != null && <IssuesHistoryPageViewer page={data} />}
 
       {(isFetching || isPending) && <IssueSkeleton />}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-center">
         <button
           type="button"
           className="rounded p-1 text-gray-700 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-700"
@@ -75,11 +132,21 @@ const HistoryContent: React.FC<HistoryContentProps> = (props) => {
           <ArrowLeftIcon className="size-4" />
         </button>
 
-        <div className="flex flex-col items-center">
-          <span className="text-gray-500 text-xs dark:text-gray-400">
-            Page {page} of {pageCount}
-          </span>
-        </div>
+        {pageNumbers.map((i) => (
+          <button
+            key={i}
+            type="button"
+            className={classNames(
+              'size-8 rounded text-gray-700 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-700',
+              {
+                'bg-gray-200 font-bold dark:bg-gray-700': i + 1 === page,
+              },
+            )}
+            onClick={() => setPage(i + 1)}
+          >
+            {i + 1}
+          </button>
+        ))}
 
         <button
           type="button"

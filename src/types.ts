@@ -62,7 +62,11 @@ export type IssueType = 'disruption' | 'maintenance' | 'infra';
 
 export interface IssueRef {
   id: string;
+  type: IssueType;
   title: string;
+  componentIdsAffected: string[];
+  startAt: string;
+  endAt: string;
 }
 
 export interface DateSummary {
@@ -87,6 +91,14 @@ export interface IssuesHistory {
 }
 
 export interface IssuesHistoryPage {
-  pageNo: number;
-  issues: Issue[];
+  startAt: string;
+  endAt: string;
+  sections: IssuesHistoryPageSection[];
+}
+
+export interface IssuesHistoryPageSection {
+  id: string;
+  sectionStartAt: string;
+  sectionEndAt: string;
+  issueRefs: IssueRef[];
 }

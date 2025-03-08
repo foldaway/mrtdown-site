@@ -3,7 +3,7 @@ import type { IssueInfra } from '../../../../types';
 import { Update } from './components/Update';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
-import { ComponentBar } from '../ComponentBar';
+import { ComponentBar } from '../../../ComponentBar';
 import { BuildingOfficeIcon } from '@heroicons/react/24/solid';
 
 interface Props {
