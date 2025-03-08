@@ -1,1 +1,26 @@
 @import "tailwindcss";
+
+html {
+    font-family: "Radio Canada Big", sans-serif;
+}
+
+@theme {
+    --color-disruption-major-light: var(--color-red-600);
+    --color-disruption-major-dark: var(--color-red-800);
+
+    --color-disruption-minor-light: var(--color-amber-600);
+    --color-disruption-minor-dark: var(--color-amber-700);
+
+    --color-maintenance-light: var(--color-cyan-600);
+    --color-maintenance-dark: var(--color-cyan-700);
+
+    --color-infra-light: var(--color-indigo-600);
+    --color-infra-dark: var(--color-indigo-700);
+
+    --color-operational-light: var(--color-green-500);
+    --color-operational-dark: var(--color-green-600);
+}
+
+body {
+    @apply bg-gray-50 dark:bg-gray-900;
+}
