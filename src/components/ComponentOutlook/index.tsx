@@ -25,7 +25,20 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
   }, [component.startedAt]);
 
   const viewport = useViewport();
-  const dateCount = useMemo(() => (viewport === 'xs' ? 30 : 90), [viewport]);
+  const dateCount = useMemo<number>(() => {
+    switch (viewport) {
+      case 'xs': {
+        return 30;
+      }
+      case 'sm':
+      case 'md': {
+        return 60;
+      }
+      default: {
+        return 90;
+      }
+    }
+  }, [viewport]);
 
   const dateIsos = useMemo(() => {
     const now = DateTime.now();
@@ -98,7 +111,9 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
         <span className="text-gray-500 text-xs dark:text-gray-400">
           {dateIsos[0].toLocaleString(DateTime.DATE_MED)}
         </span>
-        <span className="text-gray-500 text-xs dark:text-gray-400">Today</span>
+        <span className="text-gray-500 text-xs capitalize dark:text-gray-400">
+          {dateIsos[dateIsos.length - 1].toRelativeCalendar()}
+        </span>
       </div>
     </div>
   );
