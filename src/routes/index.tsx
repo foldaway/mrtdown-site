@@ -35,6 +35,9 @@ const HomePage: React.FC = () => (
         <NavLink to="/history" className={navLinkClassNameFunction}>
           History
         </NavLink>
+        <NavLink to="/statistics" className={navLinkClassNameFunction}>
+          Statistics
+        </NavLink>
       </div>
     </header>
     <main className="mx-4 flex max-w-5xl flex-col bg-gray-50 lg:mx-auto dark:bg-gray-900">

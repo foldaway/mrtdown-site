@@ -22,6 +22,10 @@ const routes: RouteObject[] = [
         path: 'history',
         children: [{ index: true, lazy: () => import('./routes/history') }],
       },
+      {
+        path: 'statistics',
+        children: [{ index: true, lazy: () => import('./routes/statistics') }],
+      },
     ],
   },
 ];
