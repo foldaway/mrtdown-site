@@ -1,6 +1,19 @@
+import classNames from 'classnames';
 import { DateTime } from 'luxon';
+import type { NavLinkProps } from 'react-router';
+import { NavLink } from 'react-router';
 import { Link } from 'react-router';
 import { Outlet } from 'react-router';
+
+const navLinkClassNameFunction: NavLinkProps['className'] = ({ isActive }) => {
+  return classNames(
+    'rounded-md px-4 py-1 text-base font-medium hover:bg-gray-200 dark:hover:bg-gray-800',
+    {
+      'bg-gray-300 dark:bg-gray-700 text-gray-900 dark:text-gray-200': isActive,
+      'text-gray-600 dark:text-gray-400': !isActive,
+    },
+  );
+};
 
 const HomePage: React.FC = () => (
   <>
@@ -14,6 +27,15 @@ const HomePage: React.FC = () => (
         unofficial community resource tracking official announcements and
         community reports
       </p>
+
+      <div className="mt-6 flex items-center gap-x-2">
+        <NavLink to="/" className={navLinkClassNameFunction}>
+          Home
+        </NavLink>
+        <NavLink to="/history" className={navLinkClassNameFunction}>
+          History
+        </NavLink>
+      </div>
     </header>
     <main className="mx-4 flex max-w-5xl flex-col bg-gray-50 lg:mx-auto dark:bg-gray-900">
       <Outlet />

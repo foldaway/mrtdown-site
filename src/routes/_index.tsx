@@ -1,8 +1,6 @@
-import { ArrowLeftIcon } from '@heroicons/react/16/solid';
 import { useQuery } from '@tanstack/react-query';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
-import { Link } from 'react-router';
 import { ComponentOutlook } from '../components/ComponentOutlook';
 import { ComponentOutlookSkeleton } from '../components/ComponentOutlookSkeleton';
 import { IssueSkeleton } from '../components/IssueSkeleton';
@@ -60,7 +58,7 @@ const HomePage: React.FC = () => {
       )}
 
       {data != null && (
-        <div className="mt-4">
+        <div className="">
           {data.issuesOngoing.map((issue) => (
             <IssueViewer key={issue.id} issue={issue} />
           ))}
@@ -81,13 +79,6 @@ const HomePage: React.FC = () => {
           </div>
         </div>
       )}
-
-      <Link
-        className="flex items-center gap-x-2 text-gray-400 text-sm hover:underline dark:text-gray-500"
-        to="/history"
-      >
-        <ArrowLeftIcon className="size-4" /> Incident History
-      </Link>
     </div>
   );
 };

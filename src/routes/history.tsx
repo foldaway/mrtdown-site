@@ -76,10 +76,7 @@ const HistoryContent: React.FC<HistoryContentProps> = (props) => {
   return (
     <div className="flex flex-col gap-y-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
-        <h1 className="text-center font-bold text-2xl text-gray-800 dark:text-gray-100">
-          Incident History
-        </h1>
-        <div className="flex items-center gap-x-3">
+        <div className="flex grow items-center justify-center gap-x-3">
           <button
             type="button"
             className="rounded p-1 text-gray-700 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-700"
