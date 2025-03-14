@@ -29,7 +29,7 @@ const HistoryContent: React.FC<HistoryContentProps> = (props) => {
     return pageCount;
   });
   useEffect(() => {
-    setSearchParams({ page: page.toString() });
+    setSearchParams({ page: page.toString() }, { replace: true });
   }, [page, setSearchParams]);
 
   const fetchIssues = (pageNo = 1) =>
