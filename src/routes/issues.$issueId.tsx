@@ -3,6 +3,7 @@ import { useParams } from 'react-router';
 import type { Issue } from '../types';
 import { IssueViewer } from '../components/IssueViewer';
 import { IssueSkeleton } from '../components/IssueSkeleton';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const IssuePage: React.FC = () => {
   const { issueId } = useParams();
@@ -14,6 +15,8 @@ const IssuePage: React.FC = () => {
         `https://data.mrtdown.foldaway.space/source/issue/${issueId}.json`,
       ).then((r) => r.json()),
   });
+
+  useDocumentTitle(`${data != null ? data.title : 'Issue'} | mrtdown`);
 
   return (
     <div className="flex flex-col">

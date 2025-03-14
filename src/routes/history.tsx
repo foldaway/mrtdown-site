@@ -8,6 +8,7 @@ import type { IssuesHistory, IssuesHistoryPage } from '../types';
 import classNames from 'classnames';
 import { useViewport } from '../hooks/useViewport';
 import { useSearchParams } from 'react-router';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 interface HistoryContentProps {
   pageCount: number;
@@ -31,6 +32,8 @@ const HistoryContent: React.FC<HistoryContentProps> = (props) => {
   useEffect(() => {
     setSearchParams({ page: page.toString() }, { replace: true });
   }, [page, setSearchParams]);
+
+  useDocumentTitle('Incident History | mrtdown');
 
   const fetchIssues = (pageNo = 1) =>
     fetch(

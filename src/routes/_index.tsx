@@ -5,6 +5,7 @@ import { ComponentOutlook } from '../components/ComponentOutlook';
 import { ComponentOutlookSkeleton } from '../components/ComponentOutlookSkeleton';
 import { IssueSkeleton } from '../components/IssueSkeleton';
 import { IssueViewer } from '../components/IssueViewer';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useViewport } from '../hooks/useViewport';
 import type { Overview } from '../types';
 
@@ -16,6 +17,8 @@ const HomePage: React.FC = () => {
         (r) => r.json(),
       ),
   });
+
+  useDocumentTitle('mrtdown');
 
   const viewport = useViewport();
   const dateCount = useMemo<number>(() => {
