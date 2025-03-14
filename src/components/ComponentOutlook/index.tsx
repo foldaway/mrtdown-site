@@ -5,7 +5,6 @@ import { DateCard } from './components/DateCard';
 import { computeStatus } from './helpers/computeStatus';
 import { assert } from '../../util/assert';
 import classNames from 'classnames';
-import { useViewport } from '../../hooks/useViewport';
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
   issueTypesDurationMs: {},
@@ -14,43 +13,19 @@ const DATE_OVERVIEW_DEFAULT: DateSummary = {
 
 interface Props {
   entry: OverviewComponent;
+  dateTimes: DateTime[];
 }
 
 export const ComponentOutlook: React.FC<Props> = (props) => {
-  const { entry } = props;
+  const { entry, dateTimes } = props;
   const { component, dates } = entry;
 
   const componentStartedAtDateTime = useMemo(() => {
     return DateTime.fromISO(component.startedAt);
   }, [component.startedAt]);
 
-  const viewport = useViewport();
-  const dateCount = useMemo<number>(() => {
-    switch (viewport) {
-      case 'xs': {
-        return 30;
-      }
-      case 'sm':
-      case 'md': {
-        return 60;
-      }
-      default: {
-        return 90;
-      }
-    }
-  }, [viewport]);
-
-  const dateIsos = useMemo(() => {
-    const now = DateTime.now();
-    const results: DateTime[] = [];
-    for (let i = 0; i < dateCount; i++) {
-      results.unshift(now.minus({ days: i }));
-    }
-    return results;
-  }, [dateCount]);
-
   const statusToday = useMemo(() => {
-    const now = DateTime.now();
+    const now = dateTimes[dateTimes.length - 1];
     if (now < componentStartedAtDateTime) {
       return 'not operational';
     }
@@ -60,7 +35,7 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
       computeStatus(dates[nowIsoDate]?.issueTypesDurationMs ?? {}) ??
       'operational'
     );
-  }, [dates, componentStartedAtDateTime]);
+  }, [dateTimes, dates, componentStartedAtDateTime]);
 
   return (
     <div className="flex flex-col rounded-lg bg-gray-100 px-4 py-2 dark:bg-gray-800">
@@ -93,7 +68,7 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
       </div>
 
       <div className="flex items-center justify-between gap-x-1">
-        {dateIsos.map((dateTime) => {
+        {dateTimes.map((dateTime) => {
           const dateTimeIsoDate = dateTime.toISODate();
           assert(dateTimeIsoDate != null);
           return (
@@ -109,10 +84,10 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
 
       <div className="mt-1 flex items-center justify-between gap-x-1">
         <span className="text-gray-500 text-xs dark:text-gray-400">
-          {dateIsos[0].toLocaleString(DateTime.DATE_MED)}
+          {dateTimes[0].toLocaleString(DateTime.DATE_MED)}
         </span>
         <span className="text-gray-500 text-xs capitalize dark:text-gray-400">
-          {dateIsos[dateIsos.length - 1].toRelativeCalendar()}
+          {dateTimes[dateTimes.length - 1].toRelativeCalendar()}
         </span>
       </div>
     </div>

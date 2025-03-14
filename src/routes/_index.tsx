@@ -1,11 +1,14 @@
-import { Link } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
-import type { Overview } from '../types';
-import { ComponentOutlook } from '../components/ComponentOutlook';
-import { IssueViewer } from '../components/IssueViewer';
-import { IssueSkeleton } from '../components/IssueSkeleton';
 import { ArrowLeftIcon } from '@heroicons/react/16/solid';
+import { useQuery } from '@tanstack/react-query';
+import { DateTime } from 'luxon';
+import { useMemo } from 'react';
+import { Link } from 'react-router';
+import { ComponentOutlook } from '../components/ComponentOutlook';
 import { ComponentOutlookSkeleton } from '../components/ComponentOutlookSkeleton';
+import { IssueSkeleton } from '../components/IssueSkeleton';
+import { IssueViewer } from '../components/IssueViewer';
+import { useViewport } from '../hooks/useViewport';
+import type { Overview } from '../types';
 
 const HomePage: React.FC = () => {
   const { data, isLoading, error } = useQuery<Overview>({
@@ -16,8 +19,33 @@ const HomePage: React.FC = () => {
       ),
   });
 
+  const viewport = useViewport();
+  const dateCount = useMemo<number>(() => {
+    switch (viewport) {
+      case 'xs': {
+        return 30;
+      }
+      case 'sm':
+      case 'md': {
+        return 60;
+      }
+      default: {
+        return 90;
+      }
+    }
+  }, [viewport]);
+
+  const dateTimes = useMemo(() => {
+    const dateRangeEnd = DateTime.now();
+    const results: DateTime[] = [];
+    for (let i = 0; i < dateCount; i++) {
+      results.unshift(dateRangeEnd.minus({ days: i }));
+    }
+    return results;
+  }, [dateCount]);
+
   return (
-    <div className="flex flex-col gap-y-8">
+    <div className="flex flex-col">
       {error != null && (
         <span className="text-red-500 text-sm">{error.message}</span>
       )}
@@ -32,7 +60,7 @@ const HomePage: React.FC = () => {
       )}
 
       {data != null && (
-        <>
+        <div className="mt-4">
           {data.issuesOngoing.map((issue) => (
             <IssueViewer key={issue.id} issue={issue} />
           ))}
@@ -41,12 +69,17 @@ const HomePage: React.FC = () => {
               All Systems Operational
             </h2>
           )}
-          <div className="flex flex-col gap-y-6">
+
+          <div className="mt-8 flex flex-col gap-y-6">
             {Object.values(data.components).map((entry) => (
-              <ComponentOutlook key={entry.component.id} entry={entry} />
+              <ComponentOutlook
+                key={entry.component.id}
+                entry={entry}
+                dateTimes={dateTimes}
+              />
             ))}
           </div>
-        </>
+        </div>
       )}
 
       <Link
