@@ -66,7 +66,7 @@ export interface IssueRef {
   title: string;
   componentIdsAffected: string[];
   startAt: string;
-  endAt: string;
+  endAt: string | null;
 }
 
 export interface DateSummary {

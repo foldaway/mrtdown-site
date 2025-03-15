@@ -8,14 +8,23 @@ import { IssueViewer } from '../components/IssueViewer';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useViewport } from '../hooks/useViewport';
 import type { Overview } from '../types';
+import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
 
 const HomePage: React.FC = () => {
   const { data, isLoading, error } = useQuery<Overview>({
     queryKey: ['overview'],
-    queryFn: () =>
-      fetch('https://data.mrtdown.foldaway.space/product/overview.json').then(
-        (r) => r.json(),
-      ),
+    queryFn: async () => {
+      const response: Overview = await fetch(
+        'https://data.mrtdown.foldaway.space/product/overview.json',
+      ).then((r) => r.json());
+      for (const component of Object.values(response.components)) {
+        const issuesOngoing = response.issuesOngoing.filter((issue) => {
+          return issue.componentIdsAffected.includes(component.component.id);
+        });
+        patchDatesForOngoingIssues(component.dates, issuesOngoing);
+      }
+      return response;
+    },
   });
 
   useDocumentTitle('mrtdown');
