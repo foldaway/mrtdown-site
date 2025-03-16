@@ -80,6 +80,15 @@ export interface Overview {
   issuesOngoing: Issue[];
 }
 
+export interface Statistics {
+  dates: Record<string, DateSummary>;
+  issuesOngoing: Issue[];
+  issuesDisruptionHistoricalCount: number;
+  issuesDisruptionDurationTotalDays: number;
+  issuesDisruptionLongest: IssueRef[];
+  componentsIssuesDisruptionCount: Record<string, number>;
+}
+
 export interface IssuesHistory {
   pageCount: number;
   fileNames: string[];
