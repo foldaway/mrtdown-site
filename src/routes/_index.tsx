@@ -9,6 +9,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useViewport } from '../hooks/useViewport';
 import type { Overview } from '../types';
 import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
+import { computeComponentBreakdown } from '../components/ComponentOutlook/helpers/computeComponentBreakdowns';
 
 const HomePage: React.FC = () => {
   const { data, isLoading, error } = useQuery<Overview>({
@@ -17,12 +18,7 @@ const HomePage: React.FC = () => {
       const response: Overview = await fetch(
         'https://data.mrtdown.foldaway.space/product/overview.json',
       ).then((r) => r.json());
-      for (const component of Object.values(response.components)) {
-        const issuesOngoing = response.issuesOngoing.filter((issue) => {
-          return issue.componentIdsAffected.includes(component.component.id);
-        });
-        patchDatesForOngoingIssues(component.dates, issuesOngoing);
-      }
+      patchDatesForOngoingIssues(response.dates, response.issuesOngoing);
       return response;
     },
   });
@@ -54,6 +50,13 @@ const HomePage: React.FC = () => {
     return results;
   }, [dateCount]);
 
+  const componentBreakdowns = useMemo(() => {
+    if (data == null) {
+      return [];
+    }
+    return computeComponentBreakdown(data);
+  }, [data]);
+
   return (
     <div className="flex flex-col">
       {error != null && (
@@ -81,10 +84,10 @@ const HomePage: React.FC = () => {
           )}
 
           <div className="mt-8 flex flex-col gap-y-6">
-            {Object.values(data.components).map((entry) => (
+            {componentBreakdowns.map((componentBreakdown) => (
               <ComponentOutlook
-                key={entry.component.id}
-                entry={entry}
+                key={componentBreakdown.component.id}
+                breakdown={componentBreakdown}
                 dateTimes={dateTimes}
               />
             ))}

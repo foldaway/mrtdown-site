@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
-import type { OverviewComponent, DateSummary } from '../../types';
+import type { DateSummary } from '../../types';
 import { DateTime } from 'luxon';
 import { DateCard } from './components/DateCard';
 import { computeStatus } from './helpers/computeStatus';
 import { assert } from '../../util/assert';
 import classNames from 'classnames';
+import type { ComponentBreakdown } from './helpers/computeComponentBreakdowns';
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
   issueTypesDurationMs: {},
@@ -12,13 +13,13 @@ const DATE_OVERVIEW_DEFAULT: DateSummary = {
 };
 
 interface Props {
-  entry: OverviewComponent;
+  breakdown: ComponentBreakdown;
   dateTimes: DateTime[];
 }
 
 export const ComponentOutlook: React.FC<Props> = (props) => {
-  const { entry, dateTimes } = props;
-  const { component, dates } = entry;
+  const { breakdown, dateTimes } = props;
+  const { component, dates } = breakdown;
 
   const componentStartedAtDateTime = useMemo(() => {
     return DateTime.fromISO(component.startedAt);

@@ -74,15 +74,10 @@ export interface DateSummary {
   issues: IssueRef[];
 }
 
-export interface OverviewComponent {
-  component: Component;
-  dates: Record<string, DateSummary>;
-}
-
 export interface Overview {
-  components: Record<string, OverviewComponent>;
-  issuesOngoing: Issue[];
+  components: Component[];
   dates: Record<string, DateSummary>;
+  issuesOngoing: Issue[];
 }
 
 export interface IssuesHistory {
