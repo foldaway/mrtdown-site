@@ -4,6 +4,7 @@ import { CountTrendCards } from './components/CountTrendCards';
 import { DurationCards } from './components/DurationCards';
 import { LongestDisruptionsCard } from './components/LongestDisruptionsCard';
 import { ComponentDisruptionsCountCard } from './components/ComponentDisruptionsCountCard';
+import { DurationTrendCards } from './components/DurationTrendCards';
 
 interface Props {
   statistics: Statistics;
@@ -18,6 +19,7 @@ export const StatisticsGrid: React.FC<Props> = (props) => {
       <ComponentDisruptionsCountCard statistics={statistics} />
       <LongestDisruptionsCard statistics={statistics} />
       <DurationCards statistics={statistics} />
+      <DurationTrendCards statistics={statistics} />
     </div>
   );
 };
