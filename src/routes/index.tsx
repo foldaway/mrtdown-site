@@ -24,8 +24,7 @@ const HomePage: React.FC = () => (
         </h1>
       </Link>
       <p className="max-w-4xl text-center text-gray-500 text-sm dark:text-gray-400">
-        unofficial community resource tracking official announcements and
-        community reports
+        community-run transit monitoring
       </p>
 
       <div className="mt-6 flex items-center gap-x-2">
@@ -49,6 +48,10 @@ const HomePage: React.FC = () => (
     <footer className="flex flex-col items-center p-10">
       <span className="text-gray-500 text-sm">
         &copy; {DateTime.now().toFormat('y')} mrtdown
+      </span>
+      <span className="text-gray-500 text-sm italic">
+        This is an independent platform not affiliated with any public transport
+        operator.
       </span>
     </footer>
   </>
