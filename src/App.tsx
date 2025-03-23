@@ -26,6 +26,10 @@ const routes: RouteObject[] = [
         path: 'statistics',
         children: [{ index: true, lazy: () => import('./routes/statistics') }],
       },
+      {
+        path: 'about',
+        children: [{ index: true, lazy: () => import('./routes/about') }],
+      },
     ],
   },
 ];
