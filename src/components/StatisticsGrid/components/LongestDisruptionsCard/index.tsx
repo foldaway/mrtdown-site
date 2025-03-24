@@ -10,9 +10,9 @@ export const LongestDisruptionsCard: React.FC<Props> = (props) => {
   const { statistics } = props;
 
   return (
-    <div className="flex flex-col rounded-lg overflow-hidden sm:row-span-2 border border-gray-300 p-6 shadow-lg dark:border-gray-700">
+    <div className='flex flex-col overflow-hidden rounded-lg border border-gray-300 p-6 shadow-lg sm:row-span-2 dark:border-gray-700'>
       <span className="text-base">Longest Disruptions</span>
-      <div className="flex mt-2.5 flex-col max-h-40 sm:max-h-[450px] overflow-y-scroll gap-y-2.5">
+      <div className='mt-2.5 flex max-h-40 flex-col gap-y-2.5 overflow-y-scroll sm:max-h-[450px]'>
         {statistics.issuesDisruptionLongest.map((issueRef) => (
           <Item key={issueRef.id} issueRef={issueRef} />
         ))}

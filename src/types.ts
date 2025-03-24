@@ -71,6 +71,10 @@ export interface IssueRef {
 
 export interface DateSummary {
   issueTypesDurationMs: Partial<Record<IssueType, number>>;
+  componentIdsIssueTypesDurationMs: Record<
+    string,
+    Partial<Record<IssueType, number>>
+  >;
   issues: IssueRef[];
 }
 

@@ -37,7 +37,8 @@ export const DurationCards: React.FC<Props> = (props) => {
             .toHuman({ unitDisplay: 'short' })}
         </span>
         <span className="text-gray-400 text-sm dark:text-gray-500">
-          over {statistics.issuesDisruptionHistoricalCount} issues
+          across {statistics.issuesDisruptionHistoricalCount} issues, within
+          service hours
         </span>
       </div>
       <div className="flex flex-col rounded-lg border border-gray-300 p-6 shadow-lg dark:border-gray-700">
@@ -51,7 +52,8 @@ export const DurationCards: React.FC<Props> = (props) => {
             .toHuman({ unitDisplay: 'short' })}
         </span>
         <span className="text-gray-400 text-sm dark:text-gray-500">
-          over {statistics.issuesDisruptionHistoricalCount} issues
+          across {statistics.issuesDisruptionHistoricalCount} issues, within
+          service hours
         </span>
       </div>
     </>

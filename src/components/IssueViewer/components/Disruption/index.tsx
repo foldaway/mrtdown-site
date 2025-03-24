@@ -7,6 +7,7 @@ import { DateTime } from 'luxon';
 import { ComponentBar } from '../../../ComponentBar';
 import { ExclamationCircleIcon } from '@heroicons/react/24/solid';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/solid';
+import { calculateDurationWithinServiceHours } from '../../../../helpers/calculateDurationWithinServiceHours';
 
 interface Props {
   issue: IssueDisruption;
@@ -26,6 +27,13 @@ export const Disruption: React.FC<Props> = (props) => {
 
     return DateTime.fromISO(issue.endAt);
   }, [issue.endAt]);
+
+  const durationWithinServiceHours = useMemo(() => {
+    if (endAt == null) {
+      return null;
+    }
+    return calculateDurationWithinServiceHours(startAt, endAt);
+  }, [startAt, endAt]);
 
   return (
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
@@ -68,13 +76,12 @@ export const Disruption: React.FC<Props> = (props) => {
                 minute: 'numeric',
               }).formatRange(startAt.toJSDate(), endAt.toJSDate())}{' '}
               (
-              {endAt
-                .diff(startAt)
+              {durationWithinServiceHours!
                 .rescale()
                 .set({ seconds: 0 })
                 .rescale()
-                .toHuman({ unitDisplay: 'short' })}
-              )
+                .toHuman({ unitDisplay: 'short' })}{' '}
+              within service hours)
             </>
           )}
         </span>

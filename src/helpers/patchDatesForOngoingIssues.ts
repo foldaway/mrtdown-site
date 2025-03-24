@@ -1,6 +1,7 @@
-import { DateTime } from 'luxon';
+import { DateTime, Interval } from 'luxon';
 import type { DateSummary, Issue } from '../types';
 import { assert } from '../util/assert';
+import { splitIntervalByServiceHours } from './splitIntervalByServiceHours';
 
 export function patchDatesForOngoingIssues(
   dates: Record<string, DateSummary>,
@@ -8,23 +9,23 @@ export function patchDatesForOngoingIssues(
 ) {
   for (const issue of issuesOngoing) {
     const startAt = DateTime.fromISO(issue.startAt);
-    const diffDays = DateTime.now().diff(startAt).as('days');
+    assert(startAt.isValid);
+    const interval = Interval.fromDateTimes(
+      startAt,
+      DateTime.now().plus({ hours: 5 }),
+    );
+    for (const segment of splitIntervalByServiceHours(interval)) {
+      assert(segment.start != null);
+      assert(segment.end != null);
 
-    for (let i = 0; i < diffDays; i++) {
-      const segmentStart = startAt.plus({ days: i });
-      const segmentEnd = DateTime.min(
-        DateTime.now(),
-        segmentStart.plus({ days: 1 }),
-      );
-      const durationMs = segmentEnd.diff(segmentStart).as('milliseconds');
-      const segmentStartIsoDate = segmentStart.toISODate();
+      const segmentStartIsoDate = segment.start.toISODate();
       assert(segmentStartIsoDate != null);
       const dateSummary = dates[segmentStartIsoDate] ?? {
         issueTypesDurationMs: {},
         issues: [],
       };
       let issueTypeDuration = dateSummary.issueTypesDurationMs[issue.type] ?? 0;
-      issueTypeDuration += durationMs;
+      issueTypeDuration += segment.toDuration().as('milliseconds');
       dateSummary.issueTypesDurationMs[issue.type] = issueTypeDuration;
       dateSummary.issues.push({
         id: issue.id,

@@ -70,20 +70,20 @@ export const DateCard: React.FC<Props> = (props) => {
               No downtime recorded on this day.
             </span>
           )}
-          {Object.entries(issueTypesDurationMs).map(
-            ([issueType, durationMs]) => (
+          {Object.entries(issueTypesDurationMs)
+            .filter(([, durationMs]) => durationMs > 0)
+            .map(([issueType, durationMs]) => (
               <div key={issueType} className="flex items-center">
                 <div
                   className={classNames(
                     'me-1 size-3 rounded-full hover:opacity-55',
                     {
                       'bg-disruption-major-light dark:bg-disruption-major-dark':
-                        status === 'disruption',
+                        issueType === 'disruption',
                       'bg-maintenance-light dark:bg-maintenance-dark':
-                        status === 'maintenance',
-                      'bg-infra-light dark:bg-infra-dark': status === 'infra',
-                      'bg-operational-light dark:bg-operational-dark':
-                        status == null,
+                        issueType === 'maintenance',
+                      'bg-infra-light dark:bg-infra-dark':
+                        issueType === 'infra',
                     },
                   )}
                 />
@@ -98,8 +98,7 @@ export const DateCard: React.FC<Props> = (props) => {
                     .toHuman({ unitDisplay: 'narrow' })}
                 </span>
               </div>
-            ),
-          )}
+            ))}
           {issues.length > 0 && (
             <span className="mt-4 mb-1 text-gray-400 text-xs uppercase dark:text-gray-400">
               Related

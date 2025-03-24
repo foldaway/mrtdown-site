@@ -1,4 +1,3 @@
-import { DateTime } from 'luxon';
 import type { Component, DateSummary, Overview } from '../../../types';
 
 export interface ComponentBreakdown {
@@ -16,25 +15,15 @@ export function computeComponentBreakdown(
 
   for (const [dateIso, dateSummary] of Object.entries(overview.dates)) {
     for (const issueRef of dateSummary.issues) {
-      const startAt = DateTime.fromISO(issueRef.startAt);
-      const endAt =
-        issueRef.endAt != null
-          ? DateTime.fromISO(issueRef.endAt)
-          : startAt.endOf('day');
-      const durationMs = endAt.diff(startAt).as('milliseconds');
-
       for (const componentId of issueRef.componentIdsAffected) {
         const dateSummaries = dateSummariesByComponentId[componentId] ?? {};
-        const dateSummary = dateSummaries[dateIso] ?? {
-          issueTypesDurationMs: {},
+        const dateSummaryComponent = dateSummaries[dateIso] ?? {
+          issueTypesDurationMs:
+            dateSummary.componentIdsIssueTypesDurationMs[componentId] ?? {},
           issues: [],
         };
-        let issueTypeDurationMs =
-          dateSummary.issueTypesDurationMs[issueRef.type] ?? 0;
-        issueTypeDurationMs += durationMs;
-        dateSummary.issueTypesDurationMs[issueRef.type] = issueTypeDurationMs;
-        dateSummary.issues.push(issueRef);
-        dateSummaries[dateIso] = dateSummary;
+        dateSummaryComponent.issues.push(issueRef);
+        dateSummaries[dateIso] = dateSummaryComponent;
         dateSummariesByComponentId[componentId] = dateSummaries;
       }
     }

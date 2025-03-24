@@ -9,6 +9,7 @@ import {
   CogIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/20/solid';
+import { calculateDurationWithinServiceHours } from '../../../helpers/calculateDurationWithinServiceHours';
 
 interface Props {
   issueRef: IssueRef;
@@ -28,6 +29,13 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
 
     return DateTime.fromISO(issueRef.endAt);
   }, [issueRef.endAt]);
+
+  const durationWithinServiceHours = useMemo(() => {
+    if (endAt == null) {
+      return null;
+    }
+    return calculateDurationWithinServiceHours(startAt, endAt);
+  }, [startAt, endAt]);
 
   return (
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
@@ -74,13 +82,12 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
                 minute: 'numeric',
               }).formatRange(startAt.toJSDate(), endAt.toJSDate())}{' '}
               (
-              {endAt
-                .diff(startAt)
+              {durationWithinServiceHours!
                 .rescale()
                 .set({ seconds: 0 })
                 .rescale()
-                .toHuman({ unitDisplay: 'short' })}
-              )
+                .toHuman({ unitDisplay: 'short' })}{' '}
+              within service hours)
             </>
           )}
         </span>

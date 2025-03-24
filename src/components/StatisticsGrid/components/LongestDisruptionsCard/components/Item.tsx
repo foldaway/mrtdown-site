@@ -4,6 +4,7 @@ import { DateTime } from 'luxon';
 import { assert } from '../../../../../util/assert';
 import { ComponentBar } from '../../../../ComponentBar';
 import { Link } from 'react-router';
+import { calculateDurationWithinServiceHours } from '../../../../../helpers/calculateDurationWithinServiceHours';
 
 interface Props {
   issueRef: IssueRef;
@@ -25,12 +26,16 @@ export const Item: React.FC<Props> = (props) => {
     return dateTime;
   }, [issueRef.endAt]);
 
+  const durationWithinServiceHours = useMemo(() => {
+    return calculateDurationWithinServiceHours(startAt, endAt);
+  }, [startAt, endAt]);
+
   return (
     <Link className="flex flex-col py-1" to={`/issues/${issueRef.id}`}>
-      <span className="text-gray-700 line-clamp-1 text-sm dark:text-gray-200">
+      <span className="line-clamp-1 text-gray-700 text-sm dark:text-gray-200">
         {issueRef.title}
       </span>
-      <time className="mb-1.5 mt-0.5 text-gray-400 dark:text-gray-500 text-xs">
+      <time className="mt-0.5 mb-1.5 text-gray-400 text-xs dark:text-gray-500">
         {new Intl.DateTimeFormat(undefined, {
           month: 'short',
           day: 'numeric',
@@ -39,12 +44,12 @@ export const Item: React.FC<Props> = (props) => {
           minute: 'numeric',
         }).formatRange(startAt.toJSDate(), endAt.toJSDate())}
         <br />
-        {endAt
-          .diff(startAt)
+        {durationWithinServiceHours
           .rescale()
           .set({ seconds: 0, milliseconds: 0 })
           .rescale()
-          .toHuman()}
+          .toHuman({ unitDisplay: 'short' })}{' '}
+        within service hours
       </time>
       <ComponentBar componentIds={issueRef.componentIdsAffected} />
     </Link>
