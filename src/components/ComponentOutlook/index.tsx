@@ -1,20 +1,22 @@
+import classNames from 'classnames';
+import { DateTime } from 'luxon';
 import { useMemo } from 'react';
 import type { DateSummary } from '../../types';
-import { DateTime } from 'luxon';
-import { DateCard } from './components/DateCard';
-import { computeStatus } from './helpers/computeStatus';
 import { assert } from '../../util/assert';
-import classNames from 'classnames';
+import { DateCard } from './components/DateCard';
+import { UptimeCard } from './components/UptimeCard';
 import type { ComponentBreakdown } from './helpers/computeComponentBreakdowns';
+import { computeStatus } from './helpers/computeStatus';
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
   issueTypesDurationMs: {},
   issues: [],
+  componentIdsIssueTypesDurationMs: {},
 };
 
 interface Props {
   breakdown: ComponentBreakdown;
-  dateTimes: DateTime[];
+  dateTimes: DateTime<true>[];
 }
 
 export const ComponentOutlook: React.FC<Props> = (props) => {
@@ -25,22 +27,25 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
     return DateTime.fromISO(component.startedAt);
   }, [component.startedAt]);
 
+  const now = dateTimes[dateTimes.length - 1];
+
+  const isOperational = useMemo(() => {
+    return componentStartedAtDateTime < now;
+  }, [now, componentStartedAtDateTime]);
+
   const statusToday = useMemo(() => {
-    const now = dateTimes[dateTimes.length - 1];
-    if (now < componentStartedAtDateTime) {
-      return 'not operational';
-    }
     const nowIsoDate = now.toISODate();
     assert(nowIsoDate != null);
+
     return (
       computeStatus(dates[nowIsoDate]?.issueTypesDurationMs ?? {}) ??
       'operational'
     );
-  }, [dateTimes, dates, componentStartedAtDateTime]);
+  }, [dates, now]);
 
   return (
     <div className="flex flex-col rounded-lg bg-gray-100 px-4 py-2 dark:bg-gray-800">
-      <div className="mb-1 flex items-center">
+      <div className="mb-1.5 flex items-center">
         <span
           className="rounded-sm px-2 py-0.5 font-semibold text-white text-xs"
           style={{ backgroundColor: component.color }}
@@ -51,27 +56,35 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
           {component.title}
         </span>
 
-        <span
-          className={classNames('ms-auto text-sm capitalize', {
-            'text-disruption-major-light dark:text-disruption-major-dark':
-              statusToday === 'disruption',
-            'text-maintenance-light dark:text-maintenance-dark':
-              statusToday === 'maintenance',
-            'text-infra-light dark:text-infra-dark': statusToday === 'infra',
-            'text-operational-light dark:text-operational-dark':
-              statusToday === 'operational',
-            'text-gray-400 dark:text-gray-600':
-              statusToday === 'not operational',
-          })}
-        >
-          {statusToday}
-        </span>
+        <div className="ms-auto flex">
+          {isOperational ? (
+            <>
+              <span
+                className={classNames('ms-auto text-sm capitalize', {
+                  'text-disruption-major-light dark:text-disruption-major-dark':
+                    statusToday === 'disruption',
+                  'text-maintenance-light dark:text-maintenance-dark':
+                    statusToday === 'maintenance',
+                  'text-infra-light dark:text-infra-dark':
+                    statusToday === 'infra',
+                  'text-operational-light dark:text-operational-dark':
+                    statusToday === 'operational',
+                })}
+              >
+                {statusToday}
+              </span>
+            </>
+          ) : (
+            <span className="text-gray-400 text-sm dark:text-gray-500">
+              Not Operational
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-x-1">
         {dateTimes.map((dateTime) => {
           const dateTimeIsoDate = dateTime.toISODate();
-          assert(dateTimeIsoDate != null);
           return (
             <DateCard
               key={dateTime.valueOf()}
@@ -83,10 +96,15 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
         })}
       </div>
 
-      <div className="mt-1 flex items-center justify-between gap-x-1">
+      <div className="mt-1.5 flex items-center justify-between gap-x-1">
         <span className="text-gray-500 text-xs dark:text-gray-400">
           {dateTimes[0].toLocaleString(DateTime.DATE_MED)}
         </span>
+        {isOperational && (
+          <div className="flex items-center">
+            <UptimeCard dates={dates} dateTimes={dateTimes} />
+          </div>
+        )}
         <span className="text-gray-500 text-xs capitalize dark:text-gray-400">
           {dateTimes[dateTimes.length - 1].toRelativeCalendar()}
         </span>

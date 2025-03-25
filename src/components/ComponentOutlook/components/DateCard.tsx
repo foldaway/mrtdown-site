@@ -30,7 +30,7 @@ export const DateCard: React.FC<Props> = (props) => {
 
   if (isBeforeComponentStartDate) {
     return (
-      <div className="h-5 w-1.5 shrink-0 rounded-xs bg-gray-400 dark:bg-gray-600" />
+      <div className="h-7 w-1.5 shrink-0 rounded-xs bg-gray-400 dark:bg-gray-600" />
     );
   }
 
@@ -43,7 +43,7 @@ export const DateCard: React.FC<Props> = (props) => {
       >
         <div
           className={classNames(
-            'h-5 w-1.5 rounded-xs transition-transform hover:scale-150',
+            'h-7 w-1.5 rounded-xs transition-transform hover:scale-150',
             {
               'bg-disruption-major-light dark:bg-disruption-major-dark':
                 status === 'disruption',
