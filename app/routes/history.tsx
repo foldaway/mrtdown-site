@@ -7,8 +7,25 @@ import { IssueSkeleton } from '../components/IssueSkeleton';
 import type { IssuesHistory, IssuesHistoryPage } from '../types';
 import classNames from 'classnames';
 import { useViewport } from '../hooks/useViewport';
-import { useSearchParams } from 'react-router';
-import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { type MetaFunction, useSearchParams } from 'react-router';
+
+import type { Route } from './+types/history';
+
+export async function loader() {
+  const res = await fetch(
+    'https://data.mrtdown.foldaway.space/product/issues_history.json',
+  );
+  const history: IssuesHistory = await res.json();
+  return history;
+}
+
+export const meta: MetaFunction = () => {
+  return [
+    {
+      title: 'Incident History | mrtdown',
+    },
+  ];
+};
 
 interface HistoryContentProps {
   pageCount: number;
@@ -32,8 +49,6 @@ const HistoryContent: React.FC<HistoryContentProps> = (props) => {
   useEffect(() => {
     setSearchParams({ page: page.toString() }, { replace: true });
   }, [page, setSearchParams]);
-
-  useDocumentTitle('Incident History | mrtdown');
 
   const fetchIssues = (pageNo = 1) =>
     fetch(
@@ -165,26 +180,12 @@ const HistoryContent: React.FC<HistoryContentProps> = (props) => {
   );
 };
 
-const HistoryPage: React.FC = () => {
-  const { isLoading, data } = useQuery<IssuesHistory>({
-    queryKey: ['issues-history'],
-    queryFn: () =>
-      fetch(
-        'https://data.mrtdown.foldaway.space/product/issues_history.json',
-      ).then((r) => r.json()),
-  });
+const HistoryPage: React.FC<Route.ComponentProps> = (props) => {
+  const { loaderData } = props;
 
   return (
     <div className="flex flex-col gap-y-3">
-      {isLoading && (
-        <>
-          <IssueSkeleton issueType="disruption" />
-          <IssueSkeleton issueType="maintenance" />
-          <IssueSkeleton issueType="infra" />
-        </>
-      )}
-
-      {data != null && <HistoryContent pageCount={data.pageCount} />}
+      <HistoryContent pageCount={loaderData.pageCount} />
     </div>
   );
 };

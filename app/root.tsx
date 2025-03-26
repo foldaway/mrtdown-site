@@ -10,11 +10,14 @@ import {
   NavLink,
   Link,
   type NavLinkProps,
+  useNavigation,
 } from 'react-router';
 
 import stylesheet from './index.css?url';
+import type { Route } from './+types/root';
 import { DateTime } from 'luxon';
 import classNames from 'classnames';
+import Spinner from './components/Spinner';
 
 export const links: LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -61,6 +64,9 @@ const navLinkClassNameFunction: NavLinkProps['className'] = ({ isActive }) => {
 };
 
 export default function App() {
+  const navigation = useNavigation();
+  const isNavigating = Boolean(navigation.location);
+
   return (
     <QueryClientProvider client={queryClient}>
       <header className="flex w-full flex-col items-center p-10">
@@ -90,6 +96,12 @@ export default function App() {
       </header>
       <main className="mx-4 flex max-w-5xl flex-col bg-gray-50 lg:mx-auto dark:bg-gray-900">
         <Outlet />
+
+        {isNavigating && (
+          <div className="fixed right-4 bottom-4">
+            <Spinner size="medium" />
+          </div>
+        )}
       </main>
       <footer className="flex flex-col items-center p-10">
         <span className="text-gray-500 text-sm">
@@ -104,10 +116,9 @@ export default function App() {
   );
 }
 
-export function ErrorBoundary({ error }: ErrorBoundaryProps) {
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let message = 'Oops!';
   let details = 'An unexpected error occurred.';
-  let stack: string | undefined;
 
   if (isRouteErrorResponse(error)) {
     message = error.status === 404 ? '404' : 'Error';
@@ -117,18 +128,12 @@ export function ErrorBoundary({ error }: ErrorBoundaryProps) {
         : error.statusText || details;
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message;
-    stack = error.stack;
   }
 
   return (
-    <main className="container mx-auto p-4 pt-16">
-      <h1>{message}</h1>
+    <main className="container mx-auto p-4 pt-16 text-gray-900 dark:text-gray-50">
+      <h1 className="font-bold">{message}</h1>
       <p>{details}</p>
-      {stack && (
-        <pre className="w-full overflow-x-auto p-4">
-          <code>{stack}</code>
-        </pre>
-      )}
     </main>
   );
 }

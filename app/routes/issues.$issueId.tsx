@@ -1,30 +1,40 @@
-import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router';
 import type { Issue } from '../types';
 import { IssueViewer } from '../components/IssueViewer';
 import { IssueSkeleton } from '../components/IssueSkeleton';
-import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
-const IssuePage: React.FC = () => {
-  const { issueId } = useParams();
+import type { Route } from './+types/issues.$issueId';
+import { assert } from '../util/assert';
 
-  const { isLoading, error, data } = useQuery<Issue>({
-    queryKey: ['issues', issueId],
-    queryFn: () =>
-      fetch(
-        `https://data.mrtdown.foldaway.space/source/issue/${issueId}.json`,
-      ).then((r) => r.json()),
-  });
+export async function loader({ params }: Route.LoaderArgs) {
+  const { issueId } = params;
 
-  useDocumentTitle(`${data != null ? data.title : 'Issue'} | mrtdown`);
+  const res = await fetch(
+    `https://data.mrtdown.foldaway.space/source/issue/${issueId}.json`,
+  );
+  assert(res.ok, res.statusText);
+  const issue: Issue = await res.json();
+  return issue;
+}
+
+export const meta: Route.MetaFunction = ({ data }) => {
+  return [
+    {
+      title: `${data.title} | mrtdown`,
+    },
+  ];
+};
+
+// HydrateFallback is rendered while the client loader is running
+export function HydrateFallback() {
+  return <IssueSkeleton />;
+}
+
+const IssuePage: React.FC<Route.ComponentProps> = (props) => {
+  const { loaderData } = props;
 
   return (
     <div className="flex flex-col">
-      {error != null && (
-        <span className="text-red-500 text-sm">{error.message}</span>
-      )}
-      {isLoading && <IssueSkeleton />}
-      {data != null && <IssueViewer issue={data} />}
+      <IssueViewer issue={loaderData} />
     </div>
   );
 };

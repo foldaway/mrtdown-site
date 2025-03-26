@@ -1,4 +1,13 @@
 import type React from 'react';
+import type { MetaFunction } from 'react-router';
+
+export const meta: MetaFunction = () => {
+  return [
+    {
+      title: 'About | mrtdown',
+    },
+  ];
+};
 
 const AboutPage: React.FC = () => (
   <div className="flex w-full flex-col items-center py-8">
