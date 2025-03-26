@@ -30,4 +30,4 @@ const StatisticsPage: React.FC = () => {
   );
 };
 
-export const Component = StatisticsPage;
+export default StatisticsPage;

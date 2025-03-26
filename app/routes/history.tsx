@@ -189,4 +189,4 @@ const HistoryPage: React.FC = () => {
   );
 };
 
-export const Component = HistoryPage;
+export default HistoryPage;

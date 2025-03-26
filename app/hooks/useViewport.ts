@@ -22,9 +22,18 @@ function computeViewport(width: number): Viewport {
 }
 
 export function useViewport() {
-  const [viewport, setViewport] = useState(computeViewport(window.innerWidth));
+  const [viewport, setViewport] = useState<Viewport>(() => {
+    if (typeof window === 'undefined') {
+      return 'sm';
+    }
+    return computeViewport(window.innerWidth);
+  });
 
   useLayoutEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     const handleWindowSizeChange = () => {
       setViewport(computeViewport(window.innerWidth));
     };

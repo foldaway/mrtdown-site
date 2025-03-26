@@ -98,4 +98,4 @@ const HomePage: React.FC = () => {
   );
 };
 
-export const Component = HomePage;
+export default HomePage;

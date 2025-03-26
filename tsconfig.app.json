@@ -20,9 +20,14 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    "rootDirs": [
+      ".",
+      "./.react-router/types"
+    ]
   },
   "include": [
-    "src"
+    "app",
+    ".react-router/types/**/*"
   ]
 }

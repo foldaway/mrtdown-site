@@ -29,4 +29,4 @@ const IssuePage: React.FC = () => {
   );
 };
 
-export const Component = IssuePage;
+export default IssuePage;

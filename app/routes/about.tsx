@@ -107,4 +107,4 @@ const AboutPage: React.FC = () => (
   </div>
 );
 
-export const Component = AboutPage;
+export default AboutPage;
