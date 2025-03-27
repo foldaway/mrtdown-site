@@ -6,6 +6,7 @@ import { computeStatus } from '../helpers/computeStatus';
 import { Link } from 'react-router';
 import classNames from 'classnames';
 import { useDebounce } from 'use-debounce';
+import { useHydrated } from '../../../hooks/useHydrated';
 
 interface Props {
   dateTime: DateTime;
@@ -20,13 +21,11 @@ export const DateCard: React.FC<Props> = (props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isOpenDebounced] = useDebounce(isOpen, 100);
 
-  const dateHumanFormat = useMemo(() => {
-    return dateTime.toLocaleString(DateTime.DATE_FULL);
-  }, [dateTime]);
-
   const status = useMemo(() => {
     return computeStatus(issueTypesDurationMs);
   }, [issueTypesDurationMs]);
+
+  const isHydrated = useHydrated();
 
   if (isBeforeComponentStartDate) {
     return (
@@ -62,7 +61,9 @@ export const DateCard: React.FC<Props> = (props) => {
           onMouseLeave={() => setIsOpen(false)}
         >
           <span className="font-bold text-gray-600 text-sm dark:text-gray-300">
-            {dateHumanFormat}
+            {isHydrated
+              ? dateTime.toLocaleString(DateTime.DATE_FULL)
+              : dateTime.toISO()}
           </span>
 
           {status == null && (
@@ -91,11 +92,13 @@ export const DateCard: React.FC<Props> = (props) => {
                   {issueType}
                 </span>
                 <span className="ms-auto text-gray-400 text-sm">
-                  {Duration.fromObject({ milliseconds: durationMs })
-                    .rescale()
-                    .set({ seconds: 0 })
-                    .rescale()
-                    .toHuman({ unitDisplay: 'narrow' })}
+                  {isHydrated
+                    ? Duration.fromObject({ milliseconds: durationMs })
+                        .rescale()
+                        .set({ seconds: 0 })
+                        .rescale()
+                        .toHuman({ unitDisplay: 'narrow' })
+                    : Duration.fromObject({ milliseconds: durationMs }).toISO()}
                 </span>
               </div>
             ))}

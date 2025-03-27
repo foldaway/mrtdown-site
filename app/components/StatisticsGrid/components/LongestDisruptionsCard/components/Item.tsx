@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import type { IssueRef } from '../../../../../types';
-import { DateTime } from 'luxon';
+import { DateTime, Interval } from 'luxon';
 import { assert } from '../../../../../util/assert';
 import { ComponentBar } from '../../../../ComponentBar';
 import { Link } from 'react-router';
 import { calculateDurationWithinServiceHours } from '../../../../../helpers/calculateDurationWithinServiceHours';
+import { useHydrated } from '../../../../../hooks/useHydrated';
 
 interface Props {
   issueRef: IssueRef;
@@ -26,6 +27,12 @@ export const Item: React.FC<Props> = (props) => {
     return dateTime;
   }, [issueRef.endAt]);
 
+  const interval = useMemo(
+    () => Interval.fromDateTimes(startAt, endAt),
+    [startAt, endAt],
+  );
+  const isHydrated = useHydrated();
+
   const durationWithinServiceHours = useMemo(() => {
     return calculateDurationWithinServiceHours(startAt, endAt);
   }, [startAt, endAt]);
@@ -36,19 +43,23 @@ export const Item: React.FC<Props> = (props) => {
         {issueRef.title}
       </span>
       <time className="mt-0.5 mb-1.5 text-gray-400 text-xs dark:text-gray-500">
-        {new Intl.DateTimeFormat(undefined, {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          hour: 'numeric',
-          minute: 'numeric',
-        }).formatRange(startAt.toJSDate(), endAt.toJSDate())}
+        {isHydrated
+          ? interval.toLocaleString({
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+              hour: 'numeric',
+              minute: 'numeric',
+            })
+          : interval.toISO()}
         <br />
-        {durationWithinServiceHours
-          .rescale()
-          .set({ seconds: 0, milliseconds: 0 })
-          .rescale()
-          .toHuman({ unitDisplay: 'short' })}{' '}
+        {isHydrated
+          ? durationWithinServiceHours
+              .rescale()
+              .set({ seconds: 0, milliseconds: 0 })
+              .rescale()
+              .toHuman({ unitDisplay: 'short' })
+          : durationWithinServiceHours.toISO()}{' '}
         within service hours
       </time>
       <ComponentBar componentIds={issueRef.componentIdsAffected} />

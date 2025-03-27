@@ -49,7 +49,7 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
   }, [viewport]);
 
   const dateTimes = useMemo(() => {
-    const dateRangeEnd = DateTime.now();
+    const dateRangeEnd = DateTime.now().startOf('hour').setZone('Etc/UTC');
     const results: DateTime[] = [];
     for (let i = 0; i < dateCount; i++) {
       results.unshift(dateRangeEnd.minus({ days: i }));

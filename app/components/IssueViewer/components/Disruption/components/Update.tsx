@@ -7,6 +7,7 @@ import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import { UserCircleIcon } from '@heroicons/react/24/solid';
 import { NewspaperIcon } from '@heroicons/react/24/solid';
 import { useMemo } from 'react';
+import { useHydrated } from '../../../../../hooks/useHydrated';
 
 interface Props {
   update: IssueDisruptionUpdate;
@@ -19,6 +20,8 @@ export const Update: React.FC<Props> = (props) => {
     () => DateTime.fromISO(update.createdAt),
     [update.createdAt],
   );
+
+  const isHydrated = useHydrated();
 
   return (
     <div className="flex gap-x-2">
@@ -47,8 +50,14 @@ export const Update: React.FC<Props> = (props) => {
           className="text-gray-500 text-xs dark:text-gray-400"
           dateTime={update.createdAt}
         >
-          {createdAt.toLocaleString(DateTime.DATETIME_MED)} (
-          {createdAt.toRelative()})
+          {isHydrated ? (
+            <>
+              {createdAt.toLocaleString(DateTime.DATETIME_MED)} (
+              {createdAt.toRelative()})
+            </>
+          ) : (
+            <>{createdAt.toISO()}</>
+          )}
         </time>
 
         <span className="text-gray-900 text-sm dark:text-gray-300">

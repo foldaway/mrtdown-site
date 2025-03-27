@@ -22,17 +22,15 @@ function computeViewport(width: number): Viewport {
 }
 
 export function useViewport() {
-  const [viewport, setViewport] = useState<Viewport>(() => {
-    if (typeof window === 'undefined') {
-      return 'sm';
-    }
-    return computeViewport(window.innerWidth);
-  });
+  const [viewport, setViewport] = useState<Viewport>('xs');
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
+
+    // Initial value, set here to run this only during client hydration
+    setViewport(computeViewport(window.innerWidth));
 
     const handleWindowSizeChange = () => {
       setViewport(computeViewport(window.innerWidth));

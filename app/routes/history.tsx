@@ -1,6 +1,6 @@
 import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/16/solid';
 import { useQuery } from '@tanstack/react-query';
-import { DateTime } from 'luxon';
+import { DateTime, Interval } from 'luxon';
 import { useEffect, useMemo, useState } from 'react';
 import { IssuesHistoryPageViewer } from '../components/IssuesHistoryPageViewer';
 import { IssueSkeleton } from '../components/IssueSkeleton';
@@ -10,6 +10,7 @@ import { useViewport } from '../hooks/useViewport';
 import { type MetaFunction, useSearchParams } from 'react-router';
 
 import type { Route } from './+types/history';
+import { useHydrated } from '../hooks/useHydrated';
 
 export async function loader() {
   const res = await fetch(
@@ -91,6 +92,19 @@ const HistoryContent: React.FC<HistoryContentProps> = (props) => {
     );
   }, [page, pageCount, maximumPaginationButtonCount]);
 
+  const interval = useMemo(() => {
+    if (data == null) {
+      return null;
+    }
+
+    return Interval.fromDateTimes(
+      DateTime.fromISO(data.startAt),
+      DateTime.fromISO(data.endAt),
+    );
+  }, [data]);
+
+  const isHydrated = useHydrated();
+
   return (
     <div className="flex flex-col gap-y-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
@@ -105,15 +119,14 @@ const HistoryContent: React.FC<HistoryContentProps> = (props) => {
           </button>
 
           <div className="flex w-48 flex-col items-center">
-            {data != null && (
+            {interval != null && (
               <span className="font-bold text-base text-gray-800 dark:text-gray-100">
-                {new Intl.DateTimeFormat(undefined, {
-                  year: 'numeric',
-                  month: 'long',
-                }).formatRange(
-                  DateTime.fromISO(data.startAt).toJSDate(),
-                  DateTime.fromISO(data.endAt).toJSDate(),
-                )}
+                {isHydrated
+                  ? interval.toLocaleString({
+                      year: 'numeric',
+                      month: 'long',
+                    })
+                  : interval.toISO()}
               </span>
             )}
           </div>

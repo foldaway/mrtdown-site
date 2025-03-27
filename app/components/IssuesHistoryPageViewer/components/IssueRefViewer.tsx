@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import type { IssueRef } from '../../../types';
 import { useMemo } from 'react';
-import { DateTime } from 'luxon';
+import { DateTime, Interval } from 'luxon';
 import { ComponentBar } from '../../ComponentBar';
 import classNames from 'classnames';
 import {
@@ -10,6 +10,7 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/20/solid';
 import { calculateDurationWithinServiceHours } from '../../../helpers/calculateDurationWithinServiceHours';
+import { useHydrated } from '../../../hooks/useHydrated';
 
 interface Props {
   issueRef: IssueRef;
@@ -30,12 +31,20 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
     return DateTime.fromISO(issueRef.endAt);
   }, [issueRef.endAt]);
 
-  const durationWithinServiceHours = useMemo(() => {
+  const dateTimeInfo = useMemo(() => {
     if (endAt == null) {
       return null;
     }
-    return calculateDurationWithinServiceHours(startAt, endAt);
+    return {
+      interval: Interval.fromDateTimes(startAt, endAt),
+      durationWithinServiceHours: calculateDurationWithinServiceHours(
+        startAt,
+        endAt,
+      ),
+    };
   }, [startAt, endAt]);
+
+  const isHydrated = useHydrated();
 
   return (
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
@@ -70,23 +79,27 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
           <ComponentBar componentIds={issueRef.componentIdsAffected} />
         </div>
         <span className="text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
-          {endAt == null ? (
+          {dateTimeInfo == null ? (
             'Ongoing'
           ) : (
             <>
-              {new Intl.DateTimeFormat(undefined, {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-                hour: 'numeric',
-                minute: 'numeric',
-              }).formatRange(startAt.toJSDate(), endAt.toJSDate())}{' '}
+              {isHydrated
+                ? dateTimeInfo.interval.toLocaleString({
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: 'numeric',
+                  })
+                : dateTimeInfo.interval.toISO()}{' '}
               (
-              {durationWithinServiceHours!
-                .rescale()
-                .set({ seconds: 0 })
-                .rescale()
-                .toHuman({ unitDisplay: 'short' })}{' '}
+              {isHydrated
+                ? dateTimeInfo.durationWithinServiceHours
+                    .rescale()
+                    .set({ seconds: 0 })
+                    .rescale()
+                    .toHuman({ unitDisplay: 'short' })
+                : dateTimeInfo.durationWithinServiceHours.toISO()}{' '}
               within service hours)
             </>
           )}

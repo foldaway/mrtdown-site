@@ -7,6 +7,7 @@ import { DateCard } from './components/DateCard';
 import { UptimeCard } from './components/UptimeCard';
 import type { ComponentBreakdown } from './helpers/computeComponentBreakdowns';
 import { computeStatus } from './helpers/computeStatus';
+import { useHydrated } from '../../hooks/useHydrated';
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
   issueTypesDurationMs: {},
@@ -42,6 +43,8 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
       'operational'
     );
   }, [dates, now]);
+
+  const isHydrated = useHydrated();
 
   return (
     <div className="flex flex-col rounded-lg bg-gray-100 px-4 py-2 dark:bg-gray-800">
@@ -98,7 +101,9 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
 
       <div className="mt-1.5 flex items-center justify-between gap-x-1">
         <span className="text-gray-500 text-xs dark:text-gray-400">
-          {dateTimes[0].toLocaleString(DateTime.DATE_MED)}
+          {isHydrated
+            ? dateTimes[0].toLocaleString(DateTime.DATE_MED)
+            : dateTimes[0].toISO()}
         </span>
         {isOperational && (
           <div className="flex items-center">
@@ -106,7 +111,9 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
           </div>
         )}
         <span className="text-gray-500 text-xs capitalize dark:text-gray-400">
-          {dateTimes[dateTimes.length - 1].toRelativeCalendar()}
+          {isHydrated
+            ? dateTimes[dateTimes.length - 1].toRelativeCalendar()
+            : dateTimes[dateTimes.length - 1].toISO()}
         </span>
       </div>
     </div>
