@@ -35,6 +35,15 @@ export function patchDatesForOngoingIssues(
         startAt: issue.startAt,
         endAt: issue.endAt,
       });
+      for (const componentId of issue.componentIdsAffected) {
+        const componentIssueTypeDurationMs =
+          dateSummary.componentIdsIssueTypesDurationMs[componentId] ?? {};
+        let durationMs = componentIssueTypeDurationMs[issue.type] ?? 0;
+        durationMs += segment.toDuration().as('milliseconds');
+        componentIssueTypeDurationMs[issue.type] = durationMs;
+        dateSummary.componentIdsIssueTypesDurationMs[componentId] =
+          componentIssueTypeDurationMs;
+      }
       dates[segmentStartIsoDate] = dateSummary;
     }
   }
