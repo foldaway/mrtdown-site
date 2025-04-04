@@ -1,0 +1,10 @@
+[functions]
+node_bundler = "esbuild"
+external_node_modules = [
+    "@heroicons/react/24/outline",
+    "@heroicons/react/24/solid",
+    "@heroicons/react/20/solid",
+    "@heroicons/react/16/solid",
+    "@radix-ui/react-popover",
+    "aria-hidden",
+]
