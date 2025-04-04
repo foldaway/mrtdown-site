@@ -38,7 +38,6 @@
     "globals": "^15.15.0",
     "typescript": "~5.7.2",
     "vite": "^6.2.5",
-    "vitest": "^3.0.9",
-    "wrangler": "^3.114.3"
+    "vitest": "^3.0.9"
   }
 }
