@@ -16,6 +16,12 @@ export async function loader({ params }: Route.LoaderArgs) {
   return issue;
 }
 
+export function headers() {
+  return {
+    'Cache-Control': 'max-age=60, s-maxage=60',
+  };
+}
+
 export const meta: Route.MetaFunction = ({ data }) => {
   return [
     {
