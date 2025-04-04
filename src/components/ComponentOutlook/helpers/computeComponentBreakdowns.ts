@@ -19,7 +19,7 @@ export function computeComponentBreakdown(
         const dateSummaries = dateSummariesByComponentId[componentId] ?? {};
         const dateSummaryComponent = dateSummaries[dateIso] ?? {
           issueTypesDurationMs:
-            dateSummary.componentIdsIssueTypesDurationMs[componentId] ?? {},
+            dateSummary.componentIdsIssueTypesDurationMs?.[componentId] ?? {},
           issues: [],
         };
         dateSummaryComponent.issues.push(issueRef);
