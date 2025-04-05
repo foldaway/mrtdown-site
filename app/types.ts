@@ -60,6 +60,7 @@ export type Issue = IssueDisruption | IssueMaintenance | IssueInfra;
 export interface Component {
   id: string;
   title: string;
+  title_translations: Record<string, string>;
   color: string;
   startedAt: string;
 }
@@ -119,3 +120,5 @@ export interface IssuesHistoryPageSection {
 }
 
 export type StationIndex = Record<string, string[]>;
+
+export type StationTranslatedNames = Record<string, string>;

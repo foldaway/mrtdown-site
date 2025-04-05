@@ -9,7 +9,9 @@ import type { IssuesHistory, IssuesHistoryPage } from '../types';
 
 import { useHydrated } from '../hooks/useHydrated';
 import { assert } from '../util/assert';
-import type { Route } from './+types/history.page.$pageNum';
+import type { Route } from './+types/($lang).history.page.$pageNum';
+import { createIntl, FormattedDateTimeRange } from 'react-intl';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 export async function loader({ params }: Route.LoaderArgs) {
   const { pageNum } = params;
@@ -24,7 +26,11 @@ export async function loader({ params }: Route.LoaderArgs) {
   const page: IssuesHistoryPage = await fetch(
     `https://data.mrtdown.foldaway.space/product/issues_history_page_${pageNumber}.json`,
   ).then((r) => r.json());
-  return { history, page };
+
+  const { lang = 'en-SG' } = params;
+  const { default: messages } = await import(`../../lang/${lang}.json`);
+
+  return { history, page, messages };
 }
 
 export function headers() {
@@ -33,17 +39,32 @@ export function headers() {
   };
 }
 
-export const meta: Route.MetaFunction = ({ params }) => {
+export const meta: Route.MetaFunction = ({ data, params }) => {
+  const { lang = 'en-SG' } = params;
+
+  const intl = createIntl({
+    locale: lang,
+    messages: data.messages,
+  });
+
   return [
     {
-      title: `Incident History - Page ${params.pageNum} | mrtdown`,
+      title: `${intl.formatMessage(
+        {
+          id: 'site.title_history',
+          defaultMessage: 'Incident History - Page {num}',
+        },
+        {
+          num: params.pageNum,
+        },
+      )} | mrtdown`,
     },
   ];
 };
 
 const HistoryPage: React.FC<Route.ComponentProps> = (props) => {
   const { loaderData, params } = props;
-  const { pageNum } = params;
+  const { lang, pageNum } = params;
   const pageNumber = Number.parseInt(pageNum, 10);
   const { history, page } = loaderData;
   const { pageCount } = history;
@@ -103,7 +124,9 @@ const HistoryPage: React.FC<Route.ComponentProps> = (props) => {
             className="rounded p-1 text-gray-700 hover:bg-gray-200 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-700"
             disabled={pageNumber === 1}
           >
-            <Link to={`/history/page/${pageNumber - 1}`}>
+            <Link
+              to={buildLocaleAwareLink(`/history/page/${pageNumber - 1}`, lang)}
+            >
               <ArrowLeftIcon className="size-4" />
             </Link>
           </button>
@@ -111,12 +134,16 @@ const HistoryPage: React.FC<Route.ComponentProps> = (props) => {
           <div className="flex min-w-48 flex-col items-center">
             {interval != null && (
               <span className="font-bold text-base text-gray-800 dark:text-gray-100">
-                {isHydrated
-                  ? interval.toLocaleString({
-                      year: 'numeric',
-                      month: 'long',
-                    })
-                  : interval.toISO()}
+                {isHydrated ? (
+                  <FormattedDateTimeRange
+                    from={interval.start!.toJSDate()}
+                    to={interval.end!.toJSDate()}
+                    month="long"
+                    year="numeric"
+                  />
+                ) : (
+                  interval.toISO()
+                )}
               </span>
             )}
           </div>
@@ -126,7 +153,9 @@ const HistoryPage: React.FC<Route.ComponentProps> = (props) => {
             className="rounded p-1 text-gray-700 hover:bg-gray-200 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-700"
             disabled={pageNumber >= pageCount}
           >
-            <Link to={`/history/page/${pageNumber + 1}`}>
+            <Link
+              to={buildLocaleAwareLink(`/history/page/${pageNumber + 1}`, lang)}
+            >
               <ArrowRightIcon className="size-4" />
             </Link>
           </button>
@@ -141,7 +170,9 @@ const HistoryPage: React.FC<Route.ComponentProps> = (props) => {
           className="rounded p-1 text-gray-700 hover:bg-gray-200 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-700"
           disabled={pageNumber === 1}
         >
-          <Link to={`/history/page/${pageNumber - 1}`}>
+          <Link
+            to={buildLocaleAwareLink(`/history/page/${pageNumber - 1}`, lang)}
+          >
             <ArrowLeftIcon className="size-4" />
           </Link>
         </button>
@@ -157,7 +188,9 @@ const HistoryPage: React.FC<Route.ComponentProps> = (props) => {
               },
             )}
           >
-            <Link to={`/history/page/${i + 1}`}>{i + 1}</Link>
+            <Link to={buildLocaleAwareLink(`/history/page/${i + 1}`, lang)}>
+              {i + 1}
+            </Link>
           </button>
         ))}
 
@@ -166,7 +199,9 @@ const HistoryPage: React.FC<Route.ComponentProps> = (props) => {
           className="rounded p-1 text-gray-700 hover:bg-gray-200 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-700"
           disabled={pageNumber >= pageCount}
         >
-          <Link to={`/history/page/${pageNumber + 1}`}>
+          <Link
+            to={buildLocaleAwareLink(`/history/page/${pageNumber + 1}`, lang)}
+          >
             <ArrowRightIcon className="size-4" />
           </Link>
         </button>

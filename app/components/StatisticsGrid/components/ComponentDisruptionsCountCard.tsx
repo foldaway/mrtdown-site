@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { FormattedMessage } from 'react-intl';
 
 interface Data {
   line: string;
@@ -95,8 +96,13 @@ export const ComponentDisruptionsCountCard: React.FC<Props> = (props) => {
   }, [statistics.componentsIssuesDisruptionCount]);
 
   return (
-    <div className="flex flex-col justify-between rounded-lg sm:col-span-2 border border-gray-300 p-6 shadow-lg dark:border-gray-700">
-      <span className="text-base">Disruptions by Line</span>
+    <div className="flex flex-col justify-between rounded-lg border border-gray-300 p-6 shadow-lg sm:col-span-2 dark:border-gray-700">
+      <span className="text-base">
+        <FormattedMessage
+          id="general.disruptions_by_line"
+          defaultMessage="Disruptions by line"
+        />
+      </span>
       <div className="h-48">
         <ResponsiveContainer>
           <BarChart

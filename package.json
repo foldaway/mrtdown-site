@@ -10,7 +10,8 @@
     "start": "wrangler dev",
     "deploy": "npm run build && wrangler deploy",
     "typecheck": "wrangler types && react-router typegen && tsc -b",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "i18n:extract": "formatjs extract 'app/**/*.tsx' --out-file lang/en-SG.json --format simple"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

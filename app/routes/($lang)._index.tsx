@@ -9,7 +9,8 @@ import { useViewport } from '../hooks/useViewport';
 import type { Overview } from '../types';
 
 import { assert } from '../util/assert';
-import type { Route } from './+types/_index';
+import type { Route } from './+types/($lang)._index';
+import { StatusBanner } from '~/components/StatusBanner';
 
 export async function loader() {
   const res = await fetch(
@@ -75,11 +76,7 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
         {loaderData.issuesOngoing.map((issue) => (
           <IssueViewer key={issue.id} issue={issue} />
         ))}
-        {loaderData.issuesOngoing.length === 0 && (
-          <h2 className="rounded bg-operational-light px-4 py-2 font-bold text-gray-50 text-lg dark:bg-operational-dark dark:text-gray-100">
-            All Systems Operational
-          </h2>
-        )}
+        <StatusBanner hasOngoingIssues={loaderData.issuesOngoing.length > 0} />
 
         <div className="mt-8 flex flex-col gap-y-6">
           {componentBreakdowns.map((componentBreakdown) => (

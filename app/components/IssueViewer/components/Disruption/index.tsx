@@ -8,6 +8,9 @@ import type { IssueDisruption } from '../../../../types';
 import { ComponentBar } from '../../../ComponentBar';
 import { Update } from './components/Update';
 import { StationMap } from '../../../StationMap';
+import { FormattedDateTimeRange, FormattedMessage } from 'react-intl';
+import { FormattedDuration } from '~/components/FormattedDuration';
+import { BetaPill } from '../BetaPill';
 
 interface Props {
   issue: IssueDisruption;
@@ -57,7 +60,10 @@ export const Disruption: React.FC<Props> = (props) => {
       <div className="flex flex-col justify-between gap-1.5 bg-gray-200 px-4 py-2 sm:flex-row sm:items-center dark:bg-gray-700">
         <div className="inline-flex items-center">
           <span className="text-gray-500 text-xs dark:text-gray-400">
-            Affected:&nbsp;
+            <FormattedMessage
+              id="general.affected_components_stations"
+              defaultMessage="Affected:"
+            />
           </span>
           <ComponentBar componentIds={issue.componentIdsAffected} />
         </div>
@@ -66,24 +72,39 @@ export const Disruption: React.FC<Props> = (props) => {
             'Ongoing'
           ) : (
             <>
-              {isHydrated
-                ? dateTimeInfo.interval.toLocaleString({
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: 'numeric',
-                    minute: 'numeric',
-                  })
-                : dateTimeInfo.interval.toISO()}{' '}
-              (
-              {isHydrated
-                ? dateTimeInfo.durationWithinServiceHours
-                    .rescale()
-                    .set({ seconds: 0 })
-                    .rescale()
-                    .toHuman({ unitDisplay: 'short' })
-                : dateTimeInfo.durationWithinServiceHours.toISO()}{' '}
-              within service hours)
+              {isHydrated ? (
+                <FormattedDateTimeRange
+                  from={startAt.toJSDate()}
+                  to={endAt!.toJSDate()}
+                  month="short"
+                  day="numeric"
+                  year="numeric"
+                  hour="numeric"
+                  minute="numeric"
+                />
+              ) : (
+                dateTimeInfo.interval.toISO()
+              )}{' '}
+              [
+              {isHydrated ? (
+                <FormattedMessage
+                  id="general.uptime_duration_display"
+                  defaultMessage="{duration} within service hours"
+                  values={{
+                    duration: (
+                      <FormattedDuration
+                        duration={dateTimeInfo.durationWithinServiceHours
+                          .rescale()
+                          .set({ seconds: 0 })
+                          .rescale()}
+                      />
+                    ),
+                  }}
+                />
+              ) : (
+                dateTimeInfo.durationWithinServiceHours.toISO()
+              )}
+              ]
             </>
           )}
         </span>
@@ -95,9 +116,15 @@ export const Disruption: React.FC<Props> = (props) => {
       </div>
 
       <div className="flex flex-col gap-y-4 bg-gray-200 p-4 dark:bg-gray-700">
-        <h3 className="font-bold text-gray-500 text-sm group-hover:underline dark:text-gray-400">
-          Affected Stations (beta)
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-gray-500 text-sm group-hover:underline dark:text-gray-400">
+            <FormattedMessage
+              id="general.affected_stations"
+              defaultMessage="Affected Stations"
+            />
+          </h3>
+          <BetaPill />
+        </div>
         <StationMap
           componentIdsAffected={issue.componentIdsAffected}
           stationIdsAffected={issue.stationIdsAffected}

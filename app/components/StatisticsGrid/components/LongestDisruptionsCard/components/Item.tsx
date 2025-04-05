@@ -6,6 +6,8 @@ import { ComponentBar } from '../../../../ComponentBar';
 import { Link } from 'react-router';
 import { calculateDurationWithinServiceHours } from '../../../../../helpers/calculateDurationWithinServiceHours';
 import { useHydrated } from '../../../../../hooks/useHydrated';
+import { FormattedDateTimeRange, FormattedMessage } from 'react-intl';
+import { FormattedDuration } from '~/components/FormattedDuration';
 
 interface Props {
   issueRef: IssueRef;
@@ -43,24 +45,38 @@ export const Item: React.FC<Props> = (props) => {
         {issueRef.title}
       </span>
       <time className="mt-0.5 mb-1.5 text-gray-400 text-xs dark:text-gray-500">
-        {isHydrated
-          ? interval.toLocaleString({
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-              hour: 'numeric',
-              minute: 'numeric',
-            })
-          : interval.toISO()}
+        {isHydrated ? (
+          <FormattedDateTimeRange
+            from={startAt.toJSDate()}
+            to={endAt.toJSDate()}
+            month="short"
+            day="numeric"
+            year="numeric"
+            hour="numeric"
+            minute="numeric"
+          />
+        ) : (
+          interval.toISO()
+        )}
         <br />
-        {isHydrated
-          ? durationWithinServiceHours
-              .rescale()
-              .set({ seconds: 0, milliseconds: 0 })
-              .rescale()
-              .toHuman({ unitDisplay: 'short' })
-          : durationWithinServiceHours.toISO()}{' '}
-        within service hours
+        {isHydrated ? (
+          <FormattedMessage
+            id="general.uptime_duration_display"
+            defaultMessage="{duration} within service hours"
+            values={{
+              duration: (
+                <FormattedDuration
+                  duration={durationWithinServiceHours
+                    .rescale()
+                    .set({ seconds: 0, milliseconds: 0 })
+                    .rescale()}
+                />
+              ),
+            }}
+          />
+        ) : (
+          durationWithinServiceHours.toISO()
+        )}
       </time>
       <ComponentBar componentIds={issueRef.componentIdsAffected} />
     </Link>

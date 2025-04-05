@@ -1,12 +1,14 @@
 import * as Popover from '@radix-ui/react-popover';
-import type { DateSummary } from '../../../types';
-import { DateTime, Duration } from 'luxon';
+import type { DateSummary, Issue } from '../../../types';
+import { type DateTime, Duration } from 'luxon';
 import { useMemo, useState } from 'react';
 import { computeStatus } from '../helpers/computeStatus';
 import { Link } from 'react-router';
 import classNames from 'classnames';
 import { useDebounce } from 'use-debounce';
 import { useHydrated } from '../../../hooks/useHydrated';
+import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 interface Props {
   dateTime: DateTime;
@@ -25,6 +27,7 @@ export const DateCard: React.FC<Props> = (props) => {
   }, [issueTypesDurationMs]);
 
   const isHydrated = useHydrated();
+  const intl = useIntl();
 
   return (
     <Popover.Root open={isOpenDebounced} onOpenChange={setIsOpen}>
@@ -54,56 +57,88 @@ export const DateCard: React.FC<Props> = (props) => {
           onMouseLeave={() => setIsOpen(false)}
         >
           <span className="font-bold text-gray-600 text-sm dark:text-gray-300">
-            {isHydrated
-              ? dateTime.toLocaleString(DateTime.DATE_FULL)
-              : dateTime.toISO()}
+            {isHydrated ? (
+              <FormattedDate
+                value={dateTime.toJSDate()}
+                day="numeric"
+                month="long"
+                year="numeric"
+              />
+            ) : (
+              dateTime.toISO()
+            )}
           </span>
 
           {status == null && (
             <span className="text-gray-500 text-sm dark:text-gray-400">
-              No downtime recorded on this day.
+              <FormattedMessage
+                id="general.no_downtime_on_this_day"
+                defaultMessage="No downtime recorded on this day."
+              />
             </span>
           )}
           {Object.entries(issueTypesDurationMs)
             .filter(([, durationMs]) => durationMs > 0)
-            .map(([issueType, durationMs]) => (
-              <div key={issueType} className="flex items-center">
-                <div
-                  className={classNames(
-                    'me-1 size-3 rounded-full hover:opacity-55',
-                    {
-                      'bg-disruption-light dark:bg-disruption-dark':
-                        issueType === 'disruption',
-                      'bg-maintenance-light dark:bg-maintenance-dark':
-                        issueType === 'maintenance',
-                      'bg-infra-light dark:bg-infra-dark':
-                        issueType === 'infra',
-                    },
-                  )}
-                />
-                <span className="text-gray-400 text-sm capitalize">
-                  {issueType}
-                </span>
-                <span className="ms-auto text-gray-400 text-sm">
-                  {isHydrated
-                    ? Duration.fromObject({ milliseconds: durationMs })
-                        .rescale()
-                        .set({ seconds: 0 })
-                        .rescale()
-                        .toHuman({ unitDisplay: 'narrow' })
-                    : Duration.fromObject({ milliseconds: durationMs }).toISO()}
-                </span>
-              </div>
-            ))}
+            .map(([key, durationMs]) => {
+              const issueType = key as Issue['type'];
+              return (
+                <div key={issueType} className="flex items-center">
+                  <div
+                    className={classNames(
+                      'me-1 size-3 rounded-full hover:opacity-55',
+                      {
+                        'bg-disruption-light dark:bg-disruption-dark':
+                          issueType === 'disruption',
+                        'bg-maintenance-light dark:bg-maintenance-dark':
+                          issueType === 'maintenance',
+                        'bg-infra-light dark:bg-infra-dark':
+                          issueType === 'infra',
+                      },
+                    )}
+                  />
+                  <span className="text-gray-400 text-sm capitalize">
+                    {issueType === 'disruption' && (
+                      <FormattedMessage
+                        id="general.disruption"
+                        defaultMessage="Disruption"
+                      />
+                    )}
+                    {issueType === 'maintenance' && (
+                      <FormattedMessage
+                        id="general.maintenance"
+                        defaultMessage="Maintenance"
+                      />
+                    )}
+                    {issueType === 'infra' && (
+                      <FormattedMessage
+                        id="general.infrastructure"
+                        defaultMessage="Infrastructure"
+                      />
+                    )}
+                  </span>
+                  <span className="ms-auto text-gray-400 text-sm">
+                    {isHydrated
+                      ? Duration.fromObject({ milliseconds: durationMs })
+                          .rescale()
+                          .set({ seconds: 0 })
+                          .rescale()
+                          .toHuman({ unitDisplay: 'narrow' })
+                      : Duration.fromObject({
+                          milliseconds: durationMs,
+                        }).toISO()}
+                  </span>
+                </div>
+              );
+            })}
           {issues.length > 0 && (
             <span className="mt-4 mb-1 text-gray-400 text-xs uppercase dark:text-gray-400">
-              Related
+              <FormattedMessage id="general.related" defaultMessage="Related" />
             </span>
           )}
           {issues.map((issueRef) => (
             <Link
               key={issueRef.id}
-              to={`/issues/${issueRef.id}`}
+              to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
               className="text-gray-600 text-sm hover:underline dark:text-gray-300"
             >
               {issueRef.title}

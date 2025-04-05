@@ -14,6 +14,12 @@ import { assert } from '../../../../util/assert';
 import classNames from 'classnames';
 import type { Data, DataPartial } from './types';
 import { CustomTooltip } from './components/CustomTooltip';
+import {
+  FormattedMessage,
+  FormattedNumber,
+  FormattedRelativeTime,
+  useIntl,
+} from 'react-intl';
 
 type Bucket = {
   display?: {
@@ -70,6 +76,8 @@ const BUCKETS: Bucket[] = [
 export const CountTrendCards: React.FC<Props> = (props) => {
   const { statistics } = props;
 
+  const intl = useIntl();
+
   const [bucket, setBucket] = useState<Bucket>({
     data: {
       unit: 'month',
@@ -104,7 +112,9 @@ export const CountTrendCards: React.FC<Props> = (props) => {
       });
       const bucketIso = bucketDateTime.toISODate();
       dataByBucket[bucketIso] = {
-        bucketLabel: bucketDateTime.toFormat(format),
+        bucketLabel: bucketDateTime
+          .reconfigure({ locale: intl.locale })
+          .toFormat(format),
         issueIdsByIssueType: {
           disruption: new Set(),
           maintenance: new Set(),
@@ -127,7 +137,9 @@ export const CountTrendCards: React.FC<Props> = (props) => {
       const bucketIso = bucketDateTime.toISODate();
       for (const issue of dateSummary.issues) {
         const bucketData = dataByBucket[bucketIso] ?? {
-          bucketLabel: bucketDateTime.toFormat(format),
+          bucketLabel: bucketDateTime
+            .reconfigure({ locale: intl.locale })
+            .toFormat(format),
           issueIdsByIssueType: {},
         };
         bucketData.issueIdsByIssueType[issue.type].add(issue.id);
@@ -162,31 +174,57 @@ export const CountTrendCards: React.FC<Props> = (props) => {
     }
 
     return data;
-  }, [statistics, bucket]);
+  }, [statistics, bucket, intl.locale]);
 
   return (
     <div className="flex flex-col rounded-lg border border-gray-300 p-6 shadow-lg sm:col-span-3 dark:border-gray-700">
       <span className="text-base">
-        Issues{' '}
-        {new Intl.RelativeTimeFormat(undefined, {
-          numeric: 'auto',
-        }).format(0, bucket.data.unit)}
+        <FormattedMessage
+          id="general.issues_this_period"
+          defaultMessage="Issues {period}"
+          values={{
+            period: (
+              <FormattedRelativeTime
+                value={0}
+                unit={bucket.data.unit}
+                numeric="auto"
+              />
+            ),
+          }}
+        />
       </span>
       <span className="mt-2.5 font-bold text-4xl">
-        {chartData[chartData.length - 1].countByIssueType.disruption}{' '}
-        disruptions
+        <FormattedMessage
+          id="general.disruption_count"
+          defaultMessage="{count, plural, one { {count} disruption } other { {count} disruptions }}"
+          values={{
+            count: chartData[chartData.length - 1].countByIssueType.disruption,
+          }}
+        />
       </span>
       <span className="text-gray-400 text-sm dark:text-gray-500">
-        {new Intl.NumberFormat(undefined, {
-          signDisplay: 'always',
-        }).format(
-          chartData[chartData.length - 1].countByIssueType.disruption -
-            chartData[chartData.length - 2].countByIssueType.disruption,
-        )}{' '}
-        from{' '}
-        {new Intl.RelativeTimeFormat(undefined, {
-          numeric: 'auto',
-        }).format(-1, bucket.data.unit)}
+        <FormattedMessage
+          id="general.change_since_last_period"
+          defaultMessage="{change} from {period}"
+          values={{
+            change: (
+              <FormattedNumber
+                value={
+                  chartData[chartData.length - 1].countByIssueType.disruption -
+                  chartData[chartData.length - 2].countByIssueType.disruption
+                }
+                signDisplay="always"
+              />
+            ),
+            period: (
+              <FormattedRelativeTime
+                value={-1}
+                unit={bucket.data.unit}
+                numeric="auto"
+              />
+            ),
+          }}
+        />
       </span>
       <div className="mt-4 h-48">
         <ResponsiveContainer>
@@ -250,10 +288,11 @@ export const CountTrendCards: React.FC<Props> = (props) => {
             type="button"
             onClick={() => setBucket(optionBucket)}
           >
-            {new Intl.NumberFormat(undefined, {
-              style: 'unit',
-              unit: optionBucket.display?.unit ?? optionBucket.data.unit,
-            }).format(optionBucket.display?.count ?? optionBucket.data.count)}
+            <FormattedNumber
+              style="unit"
+              unit={optionBucket.display?.unit ?? optionBucket.data.unit}
+              value={optionBucket.display?.count ?? optionBucket.data.count}
+            />
           </button>
         ))}
       </div>

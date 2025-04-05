@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import type { IssuesHistoryPage } from '../../types';
 import { IssueRefViewer } from './components/IssueRefViewer';
+import { FormattedDate } from 'react-intl';
 
 interface Props {
   page: IssuesHistoryPage;
@@ -14,7 +15,11 @@ export const IssuesHistoryPageViewer: React.FC<Props> = (props) => {
       {page.sections.map((section) => (
         <div key={section.id} className="flex flex-col gap-y-2">
           <span className="font-bold text-gray-700 text-lg dark:text-gray-50">
-            {DateTime.fromISO(section.sectionStartAt).toFormat('MMMM yyyy')}
+            <FormattedDate
+              value={DateTime.fromISO(section.sectionStartAt).toJSDate()}
+              month="long"
+              year="numeric"
+            />
           </span>
           {section.issueRefs.map((issueRef) => (
             <IssueRefViewer key={issueRef.id} issueRef={issueRef} />

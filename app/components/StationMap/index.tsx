@@ -1,7 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { IssueStationEntry, StationIndex } from '~/types';
+import { FormattedMessage, useIntl } from 'react-intl';
+import type {
+  IssueStationEntry,
+  StationIndex,
+  StationTranslatedNames,
+} from '~/types';
+import { segmentText } from './helpers/segmentText';
 
 interface Props {
   stationIdsAffected: IssueStationEntry[];
@@ -11,7 +17,9 @@ interface Props {
 export const StationMap: React.FC<Props> = (props) => {
   const { stationIdsAffected, componentIdsAffected } = props;
 
-  const { data } = useQuery<StationIndex>({
+  const intl = useIntl();
+
+  const stationIndexQuery = useQuery<StationIndex>({
     queryKey: ['station-index'],
     queryFn: () =>
       fetch(
@@ -19,9 +27,21 @@ export const StationMap: React.FC<Props> = (props) => {
       ).then((r) => r.json()),
   });
 
+  const stationTranslatedNamesQuery = useQuery<StationTranslatedNames>({
+    queryKey: ['station-translated-names'],
+    queryFn: () =>
+      fetch(
+        `https://data.mrtdown.foldaway.space/product/station_names_${intl.locale}.json`,
+      ).then((r) => r.json()),
+  });
+
   const stationCodes = useMemo(() => {
-    return data ?? {};
-  }, [data]);
+    return stationIndexQuery.data ?? {};
+  }, [stationIndexQuery.data]);
+
+  const stationTranslatedNames = useMemo(() => {
+    return stationTranslatedNamesQuery.data ?? {};
+  }, [stationTranslatedNamesQuery.data]);
 
   const [ref, setRef] = useState<SVGElement | null>(null);
 
@@ -114,11 +134,40 @@ export const StationMap: React.FC<Props> = (props) => {
     if (labelsElement != null) {
       const labelElements = [...labelsElement.querySelectorAll('text')];
       for (const labelElement of labelElements) {
+        const stationId = labelElement.id.replace(/^label_/, '').toUpperCase();
+        const tspans = [...labelElement.querySelectorAll('tspan')];
+        if (!(stationId in stationTranslatedNames)) {
+          continue;
+        }
+        const segments = segmentText(
+          stationTranslatedNames[stationId],
+          intl.locale,
+        );
+        for (let i = 0; i < tspans.length; i++) {
+          const tspan = tspans[i];
+          switch (i) {
+            case tspans.length - 1: {
+              tspan.textContent = segments.slice(i).join('');
+              break;
+            }
+            default: {
+              tspan.textContent = segments[i];
+              break;
+            }
+          }
+        }
         labelElement.removeAttribute('fill');
         labelElement.classList.add('fill-gray-800', 'dark:fill-gray-300');
       }
     }
-  }, [ref, stationIdsAffected, componentIdsAffected, stationCodes]);
+  }, [
+    ref,
+    stationIdsAffected,
+    componentIdsAffected,
+    stationCodes,
+    stationTranslatedNames,
+    intl.locale,
+  ]);
 
   return (
     <div className="flex flex-col overflow-scroll fill-gray-800 dark:fill-gray-50">
@@ -2945,7 +2994,7 @@ export const StationMap: React.FC<Props> = (props) => {
               </tspan>
             </text>
             <text
-              id="label_sdm_2"
+              id="label_nch"
               fill="#2D2A26"
               font-family="Radio Canada Big"
               font-size="20"
@@ -3068,7 +3117,7 @@ export const StationMap: React.FC<Props> = (props) => {
               </tspan>
             </text>
             <text
-              id="label_sgk"
+              id="label_skg"
               fill="#2D2A26"
               font-family="Radio Canada Big"
               font-size="20"
@@ -9216,7 +9265,13 @@ export const StationMap: React.FC<Props> = (props) => {
         </defs>
       </svg>
       <span className="text-gray-400 text-sm italic dark:text-gray-500">
-        {stationCount} affected stations
+        <FormattedMessage
+          id="general.station_count"
+          defaultMessage="{count, plural, one { {count} stations } other { {count} stations }}"
+          values={{
+            count: stationCount,
+          }}
+        />
       </span>
     </div>
   );
