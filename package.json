@@ -30,7 +30,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
-    "@cloudflare/workers-types": "^4.20250327.0",
     "@react-router/dev": "^7.5.0",
     "@react-router/fs-routes": "^7.5.0",
     "@tailwindcss/vite": "^4.0.9",
