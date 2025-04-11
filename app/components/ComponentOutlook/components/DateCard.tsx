@@ -44,7 +44,7 @@ export const DateCard: React.FC<Props> = (props) => {
           className={classNames(
             'h-7 w-1.5 rounded-xs transition-transform hover:scale-150',
             {
-              'bg-disruption-major-light dark:bg-disruption-major-dark':
+              'bg-disruption-light dark:bg-disruption-dark':
                 status === 'disruption',
               'bg-maintenance-light dark:bg-maintenance-dark':
                 status === 'maintenance',
@@ -79,7 +79,7 @@ export const DateCard: React.FC<Props> = (props) => {
                   className={classNames(
                     'me-1 size-3 rounded-full hover:opacity-55',
                     {
-                      'bg-disruption-major-light dark:bg-disruption-major-dark':
+                      'bg-disruption-light dark:bg-disruption-dark':
                         issueType === 'disruption',
                       'bg-maintenance-light dark:bg-maintenance-dark':
                         issueType === 'maintenance',

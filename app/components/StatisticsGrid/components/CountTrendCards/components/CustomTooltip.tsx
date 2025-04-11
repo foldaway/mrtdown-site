@@ -28,7 +28,7 @@ export const CustomTooltip: React.FC<Props> = (props) => {
       </span>
       <div className="flex items-center justify-between gap-x-2">
         <div className="flex items-center">
-          <div className="size-2 rounded-full bg-disruption-major-light dark:bg-disruption-major-dark" />
+          <div className="size-2 rounded-full bg-disruption-light dark:bg-disruption-dark" />
         </div>
         <span className="text-gray-400 text-xs dark:text-gray-500">
           Disruption

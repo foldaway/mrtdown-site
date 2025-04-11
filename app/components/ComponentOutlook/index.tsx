@@ -64,7 +64,7 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
             <>
               <span
                 className={classNames('ms-auto text-sm capitalize', {
-                  'text-disruption-major-light dark:text-disruption-major-dark':
+                  'text-disruption-light dark:text-disruption-dark':
                     statusToday === 'disruption',
                   'text-maintenance-light dark:text-maintenance-dark':
                     statusToday === 'maintenance',

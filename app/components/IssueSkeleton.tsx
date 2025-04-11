@@ -12,7 +12,7 @@ export const IssueSkeleton: React.FC<Props> = (props) => {
     <div className="flex flex-col">
       <div
         className={classNames('animate-pulse text-lg text-transparent', {
-          'bg-disruption-major-light dark:bg-disruption-major-dark':
+          'bg-disruption-light dark:bg-disruption-dark':
             issueType === 'disruption',
           'bg-maintenance-light dark:bg-maintenance-dark':
             issueType === 'maintenance',

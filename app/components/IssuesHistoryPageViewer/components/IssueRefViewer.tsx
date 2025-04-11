@@ -50,7 +50,7 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
       <Link
         className={classNames('group flex items-center gap-x-2 px-4 py-2', {
-          'bg-disruption-major-light dark:bg-disruption-major-dark':
+          'bg-disruption-light dark:bg-disruption-dark':
             issueRef.type === 'disruption',
           'bg-maintenance-light dark:bg-maintenance-dark':
             issueRef.type === 'maintenance',

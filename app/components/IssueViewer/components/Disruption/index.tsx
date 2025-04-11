@@ -1,14 +1,12 @@
-import { Link } from 'react-router';
-import type { IssueDisruption } from '../../../../types';
-import { Update } from './components/Update';
-import classNames from 'classnames';
-import { useMemo } from 'react';
-import { DateTime, Interval } from 'luxon';
-import { ComponentBar } from '../../../ComponentBar';
-import { ExclamationCircleIcon } from '@heroicons/react/24/solid';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/solid';
+import { DateTime, Interval } from 'luxon';
+import { useMemo } from 'react';
+import { Link } from 'react-router';
 import { calculateDurationWithinServiceHours } from '../../../../helpers/calculateDurationWithinServiceHours';
 import { useHydrated } from '../../../../hooks/useHydrated';
+import type { IssueDisruption } from '../../../../types';
+import { ComponentBar } from '../../../ComponentBar';
+import { Update } from './components/Update';
 
 interface Props {
   issue: IssueDisruption;
@@ -47,20 +45,10 @@ export const Disruption: React.FC<Props> = (props) => {
   return (
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
       <Link
-        className={classNames('group flex items-center gap-x-2 px-4 py-2', {
-          'bg-disruption-major-light dark:bg-disruption-major-dark':
-            issue.severity === 'major',
-          'bg-disruption-minor-light dark:bg-disruption-minor-dark':
-            issue.severity === 'minor',
-        })}
+        className="group flex items-center gap-x-2 bg-disruption-light px-4 py-2 dark:bg-disruption-dark"
         to={`/issues/${issue.id}`}
       >
-        {issue.severity === 'major' && (
-          <ExclamationTriangleIcon className="size-5 text-gray-50 dark:text-gray-200" />
-        )}
-        {issue.severity === 'minor' && (
-          <ExclamationCircleIcon className="size-5 text-gray-50 dark:text-gray-200" />
-        )}
+        <ExclamationTriangleIcon className="size-5 text-gray-50 dark:text-gray-200" />
         <h2 className="font-bold text-base text-gray-50 group-hover:underline dark:text-gray-200">
           {issue.title}
         </h2>

@@ -5,11 +5,8 @@ html {
 }
 
 @theme {
-    --color-disruption-major-light: var(--color-red-600);
-    --color-disruption-major-dark: var(--color-red-800);
-
-    --color-disruption-minor-light: var(--color-amber-600);
-    --color-disruption-minor-dark: var(--color-amber-700);
+    --color-disruption-light: var(--color-red-600);
+    --color-disruption-dark: var(--color-red-800);
 
     --color-maintenance-light: var(--color-cyan-600);
     --color-maintenance-dark: var(--color-cyan-700);

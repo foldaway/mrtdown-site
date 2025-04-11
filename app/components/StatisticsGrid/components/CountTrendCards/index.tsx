@@ -175,7 +175,7 @@ export const CountTrendCards: React.FC<Props> = (props) => {
             />
             <Line
               dataKey="countByIssueType.disruption"
-              className="stroke-disruption-major-light dark:stroke-disruption-major-dark"
+              className="stroke-disruption-light dark:stroke-disruption-dark"
               stroke=""
               radius={5}
               type="monotone"
