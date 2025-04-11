@@ -20,10 +20,13 @@ export function patchDatesForOngoingIssues(
 
       const segmentStartIsoDate = segment.start.toISODate();
       assert(segmentStartIsoDate != null);
-      const dateSummary = dates[segmentStartIsoDate] ?? {
-        issueTypesDurationMs: {},
-        issues: [],
-      };
+      const dateSummary =
+        dates[segmentStartIsoDate] ??
+        ({
+          componentIdsIssueTypesDurationMs: {},
+          issueTypesDurationMs: {},
+          issues: [],
+        } satisfies DateSummary);
       let issueTypeDuration = dateSummary.issueTypesDurationMs[issue.type] ?? 0;
       issueTypeDuration += segment.toDuration().as('milliseconds');
       dateSummary.issueTypesDurationMs[issue.type] = issueTypeDuration;
