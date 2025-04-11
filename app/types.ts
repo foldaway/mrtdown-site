@@ -4,6 +4,7 @@ interface IssueBase {
   startAt: string;
   endAt: string | null;
   componentIdsAffected: string[];
+  stationIdsAffected: string[];
 }
 
 export interface IssueDisruptionUpdate {
@@ -21,7 +22,6 @@ export interface IssueDisruptionUpdate {
 
 export interface IssueDisruption extends IssueBase {
   type: 'disruption';
-  severity: 'minor' | 'major';
   updates: IssueDisruptionUpdate[];
 }
 

@@ -8,6 +8,8 @@ import { UptimeCard } from './components/UptimeCard';
 import type { ComponentBreakdown } from './helpers/computeComponentBreakdowns';
 import { computeStatus } from './helpers/computeStatus';
 import { useHydrated } from '../../hooks/useHydrated';
+import { NonOperationalDateCard } from './components/NonOperationalDateCard';
+import { ServiceEndedDateCard } from './components/ServiceEndedDateCard';
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
   issueTypesDurationMs: {},
@@ -29,8 +31,12 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
   }, [component.startedAt]);
 
   const now = dateTimes[dateTimes.length - 1];
+  const serviceStartToday = useMemo(
+    () => now.set({ hour: 5, minute: 30 }),
+    [now],
+  );
 
-  const isOperational = useMemo(() => {
+  const isComponentInService = useMemo(() => {
     return componentStartedAtDateTime < now;
   }, [now, componentStartedAtDateTime]);
 
@@ -38,11 +44,15 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
     const nowIsoDate = now.toISODate();
     assert(nowIsoDate != null);
 
+    if (now < serviceStartToday) {
+      return 'service ended';
+    }
+
     return (
       computeStatus(dates[nowIsoDate]?.issueTypesDurationMs ?? {}) ??
       'operational'
     );
-  }, [dates, now]);
+  }, [dates, now, serviceStartToday]);
 
   const isHydrated = useHydrated();
 
@@ -60,7 +70,7 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
         </span>
 
         <div className="ms-auto flex">
-          {isOperational ? (
+          {isComponentInService ? (
             <>
               <span
                 className={classNames('ms-auto text-sm capitalize', {
@@ -72,6 +82,8 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
                     statusToday === 'infra',
                   'text-operational-light dark:text-operational-dark':
                     statusToday === 'operational',
+                  'text-gray-400 dark:text-gray-500':
+                    statusToday === 'service ended',
                 })}
               >
                 {statusToday}
@@ -79,7 +91,7 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
             </>
           ) : (
             <span className="text-gray-400 text-sm dark:text-gray-500">
-              Not Operational
+              Not In Service
             </span>
           )}
         </div>
@@ -88,12 +100,17 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
       <div className="flex items-center justify-between gap-x-1">
         {dateTimes.map((dateTime) => {
           const dateTimeIsoDate = dateTime.toISODate();
+          if (dateTime < componentStartedAtDateTime) {
+            return <NonOperationalDateCard />;
+          }
+          if (dateTime.hasSame(now, 'day') && now < serviceStartToday) {
+            return <ServiceEndedDateCard dateTime={dateTime} />;
+          }
           return (
             <DateCard
               key={dateTime.valueOf()}
               dateTime={dateTime}
               dateOverview={dates[dateTimeIsoDate] ?? DATE_OVERVIEW_DEFAULT}
-              isBeforeComponentStartDate={dateTime < componentStartedAtDateTime}
             />
           );
         })}
@@ -105,7 +122,7 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
             ? dateTimes[0].toLocaleString(DateTime.DATE_MED)
             : dateTimes[0].toISO()}
         </span>
-        {isOperational && (
+        {isComponentInService && (
           <div className="flex items-center">
             <UptimeCard dates={dates} dateTimes={dateTimes} />
           </div>

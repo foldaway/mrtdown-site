@@ -11,11 +11,10 @@ import { useHydrated } from '../../../hooks/useHydrated';
 interface Props {
   dateTime: DateTime;
   dateOverview: DateSummary;
-  isBeforeComponentStartDate: boolean;
 }
 
 export const DateCard: React.FC<Props> = (props) => {
-  const { dateTime, dateOverview, isBeforeComponentStartDate } = props;
+  const { dateTime, dateOverview } = props;
   const { issues, issueTypesDurationMs } = dateOverview;
 
   const [isOpen, setIsOpen] = useState(false);
@@ -26,12 +25,6 @@ export const DateCard: React.FC<Props> = (props) => {
   }, [issueTypesDurationMs]);
 
   const isHydrated = useHydrated();
-
-  if (isBeforeComponentStartDate) {
-    return (
-      <div className="h-7 w-1.5 shrink-0 rounded-xs bg-gray-400 dark:bg-gray-600" />
-    );
-  }
 
   return (
     <Popover.Root open={isOpenDebounced} onOpenChange={setIsOpen}>
