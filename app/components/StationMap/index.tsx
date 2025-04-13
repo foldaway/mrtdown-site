@@ -736,12 +736,12 @@ export const StationMap: React.FC<Props> = (props) => {
               </text>
             </switch>
             <switch>
-              <text id="lbns6" x="292" y="175">
+              <text id="lbns5" x="292" y="175">
                 <tspan id="trsvg99">Yew Tee</tspan>
               </text>
             </switch>
             <switch>
-              <text id="lbns5" x="204" y="125" fill="#aaaaaa">
+              <text id="lbns6" x="204" y="125" fill="#aaaaaa">
                 <tspan id="trsvg100">Sungei Kadut</tspan>
               </text>
             </switch>
