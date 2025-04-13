@@ -55,7 +55,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 const navLinkClassNameFunction: NavLinkProps['className'] = ({ isActive }) => {
   return classNames(
-    'rounded-md px-4 py-1 text-base font-medium hover:bg-gray-200 dark:hover:bg-gray-800',
+    'text-center rounded-md px-4 py-1 text-base font-medium hover:bg-gray-200 dark:hover:bg-gray-800',
     {
       'bg-gray-300 dark:bg-gray-700 text-gray-900 dark:text-gray-200': isActive,
       'text-gray-600 dark:text-gray-400': !isActive,
@@ -79,7 +79,7 @@ export default function App() {
           community-run transit monitoring
         </p>
 
-        <div className="mt-6 flex items-center gap-x-2">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 sm:flex-row">
           <NavLink to="/" className={navLinkClassNameFunction}>
             Home
           </NavLink>
@@ -88,6 +88,9 @@ export default function App() {
           </NavLink>
           <NavLink to="/statistics" className={navLinkClassNameFunction}>
             Statistics
+          </NavLink>
+          <NavLink to="/system-map" className={navLinkClassNameFunction}>
+            System Map
           </NavLink>
           <NavLink to="/about" className={navLinkClassNameFunction}>
             About

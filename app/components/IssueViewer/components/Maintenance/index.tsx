@@ -7,6 +7,7 @@ import { ComponentBar } from '../../../ComponentBar';
 import { CogIcon } from '@heroicons/react/24/solid';
 import { calculateDurationWithinServiceHours } from '../../../../helpers/calculateDurationWithinServiceHours';
 import { useHydrated } from '../../../../hooks/useHydrated';
+import { StationMap } from '~/components/StationMap';
 
 interface Props {
   issue: IssueMaintenance;
@@ -91,6 +92,13 @@ export const Maintenance: React.FC<Props> = (props) => {
         {issue.updates.map((update) => (
           <Update key={update.sourceUrl} update={update} />
         ))}
+      </div>
+
+      <div className="flex flex-col gap-y-4 bg-gray-200 p-4 dark:bg-gray-700">
+        <StationMap
+          componentIdsAffected={issue.componentIdsAffected}
+          stationIdsAffected={issue.stationIdsAffected}
+        />
       </div>
     </div>
   );

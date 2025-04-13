@@ -65,6 +65,7 @@ export interface IssueRef {
   type: IssueType;
   title: string;
   componentIdsAffected: string[];
+  stationIdsAffected: string[];
   startAt: string;
   endAt: string | null;
 }
@@ -110,3 +111,5 @@ export interface IssuesHistoryPageSection {
   sectionEndAt: string;
   issueRefs: IssueRef[];
 }
+
+export type StationIndex = Record<string, string[]>;

@@ -77,6 +77,9 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
             Affected:&nbsp;
           </span>
           <ComponentBar componentIds={issueRef.componentIdsAffected} />
+          <span className="text-gray-500 dark:text-gray-400 text-xs ms-1">
+            ({issueRef.stationIdsAffected.length} stations)
+          </span>
         </div>
         <span className="text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
           {dateTimeInfo == null ? (
