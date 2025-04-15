@@ -2205,8 +2205,15 @@ export const StationMap: React.FC<Props> = (props) => {
         </g>
       </svg>
       <span className="text-gray-400 text-sm italic dark:text-gray-500">
-        Adapted from
-        https://commons.wikimedia.org/wiki/File:Singapore_MRT_and_LRT_System_Map.svg
+        Adapted from{' '}
+        <a
+          className="underline"
+          target="_blank"
+          href="https://commons.wikimedia.org/wiki/File:Singapore_MRT_and_LRT_System_Map.svg"
+          rel="noreferrer"
+        >
+          Wikipedia
+        </a>
       </span>
     </div>
   );
