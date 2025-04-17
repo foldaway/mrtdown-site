@@ -1,10 +1,16 @@
+export interface IssueStationEntry {
+  componentId: string;
+  branchName: string;
+  stationIds: string[];
+}
+
 interface IssueBase {
   id: string;
   title: string;
   startAt: string;
   endAt: string | null;
   componentIdsAffected: string[];
-  stationIdsAffected: string[];
+  stationIdsAffected: IssueStationEntry[];
 }
 
 export interface IssueDisruptionUpdate {
@@ -65,7 +71,7 @@ export interface IssueRef {
   type: IssueType;
   title: string;
   componentIdsAffected: string[];
-  stationIdsAffected: string[];
+  stationIdsAffected: IssueStationEntry[];
   startAt: string;
   endAt: string | null;
 }

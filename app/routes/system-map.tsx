@@ -1,12 +1,11 @@
-import type { Overview, Statistics } from '../types';
-import { StatisticsGrid } from '../components/StatisticsGrid';
-import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
 import type { MetaFunction } from 'react-router';
+import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
+import type { Overview } from '../types';
 
-import type { Route } from './+types/statistics';
-import { assert } from '../util/assert';
-import { StationMap } from '~/components/StationMap';
 import { useMemo } from 'react';
+import { StationMap } from '~/components/StationMap';
+import { assert } from '../util/assert';
+import type { Route } from './+types/statistics';
 
 export async function loader() {
   const res = await fetch(
@@ -55,11 +54,19 @@ const SystemMapPage: React.FC<Route.ComponentProps> = (props) => {
   }, [loaderData.issuesOngoing]);
 
   return (
-    <div className="flex flex-col">
-      <StationMap
-        stationIdsAffected={stationIdsAffected}
-        componentIdsAffected={componentIdsAffected}
-      />
+    <div className="flex flex-col gap-y-2">
+      <div className="flex flex-col bg-gray-200 p-4 dark:bg-gray-700">
+        <StationMap
+          stationIdsAffected={stationIdsAffected}
+          componentIdsAffected={componentIdsAffected}
+        />
+      </div>
+
+      <span className="text-gray-600 text-sm dark:text-gray-400">
+        Among {loaderData.issuesOngoing.length} ongoing issues, there are{' '}
+        {stationIdsAffected.length} affected stations and{' '}
+        {componentIdsAffected.length} affected lines.
+      </span>
     </div>
   );
 };
