@@ -26,7 +26,7 @@ export function headers() {
 export const meta: MetaFunction = () => {
   return [
     {
-      title: 'Statistics | mrtdown',
+      title: 'System Map | mrtdown',
     },
   ];
 };
