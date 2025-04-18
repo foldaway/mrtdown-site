@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import tsconfigPaths from 'vite-tsconfig-paths';
 import { getLoadContext } from './server/load-context';
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
@@ -15,5 +16,6 @@ export default defineConfig({
     }),
     reactRouter(),
     tailwindcss(),
+    tsconfigPaths(),
   ],
 });

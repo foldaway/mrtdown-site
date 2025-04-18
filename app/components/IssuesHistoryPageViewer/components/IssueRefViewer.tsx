@@ -46,6 +46,16 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
 
   const isHydrated = useHydrated();
 
+  const stationCount = useMemo(() => {
+    const result = new Set<string>();
+    for (const entry of issueRef.stationIdsAffected) {
+      for (const stationId of entry.stationIds) {
+        result.add(stationId);
+      }
+    }
+    return result.size;
+  }, [issueRef.stationIdsAffected]);
+
   return (
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
       <Link
@@ -77,6 +87,9 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
             Affected:&nbsp;
           </span>
           <ComponentBar componentIds={issueRef.componentIdsAffected} />
+          <span className="ms-1 text-gray-500 text-xs dark:text-gray-400">
+            ({stationCount} stations)
+          </span>
         </div>
         <span className="text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
           {dateTimeInfo == null ? (

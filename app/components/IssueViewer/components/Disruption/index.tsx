@@ -7,6 +7,7 @@ import { useHydrated } from '../../../../hooks/useHydrated';
 import type { IssueDisruption } from '../../../../types';
 import { ComponentBar } from '../../../ComponentBar';
 import { Update } from './components/Update';
+import { StationMap } from '../../../StationMap';
 
 interface Props {
   issue: IssueDisruption;
@@ -91,6 +92,16 @@ export const Disruption: React.FC<Props> = (props) => {
         {issue.updates.map((update) => (
           <Update key={update.sourceUrl} update={update} />
         ))}
+      </div>
+
+      <div className="flex flex-col gap-y-4 bg-gray-200 p-4 dark:bg-gray-700">
+        <h3 className="font-bold text-gray-500 text-sm group-hover:underline dark:text-gray-400">
+          Affected Stations (beta)
+        </h3>
+        <StationMap
+          componentIdsAffected={issue.componentIdsAffected}
+          stationIdsAffected={issue.stationIdsAffected}
+        />
       </div>
     </div>
   );
