@@ -16,8 +16,14 @@ import type { Data, DataPartial } from './types';
 import { CustomTooltip } from './components/CustomTooltip';
 
 type Bucket = {
-  unit: 'day' | 'month' | 'year';
-  count: number;
+  display?: {
+    unit: 'day' | 'month' | 'year';
+    count: number;
+  };
+  data: {
+    unit: 'day' | 'month' | 'year';
+    count: number;
+  };
 };
 
 interface Props {
@@ -26,24 +32,38 @@ interface Props {
 
 const BUCKETS: Bucket[] = [
   {
-    unit: 'day',
-    count: 7,
+    data: {
+      unit: 'day',
+      count: 7,
+    },
   },
   {
-    unit: 'day',
-    count: 28,
+    display: {
+      unit: 'month',
+      count: 1,
+    },
+    data: {
+      unit: 'day',
+      count: 28,
+    },
   },
   {
-    unit: 'month',
-    count: 6,
+    data: {
+      unit: 'month',
+      count: 6,
+    },
   },
   {
-    unit: 'year',
-    count: 10,
+    data: {
+      unit: 'year',
+      count: 10,
+    },
   },
   {
-    unit: 'year',
-    count: 20,
+    data: {
+      unit: 'year',
+      count: 20,
+    },
   },
 ];
 
@@ -51,17 +71,19 @@ export const CountTrendCards: React.FC<Props> = (props) => {
   const { statistics } = props;
 
   const [bucket, setBucket] = useState<Bucket>({
-    unit: 'month',
-    count: 6,
+    data: {
+      unit: 'month',
+      count: 6,
+    },
   });
 
   const chartData = useMemo<Data[]>(() => {
     const dataByBucket: Record<string, DataPartial> = {};
 
-    const currentBucketDateTime = DateTime.now().startOf(bucket.unit);
+    const currentBucketDateTime = DateTime.now().startOf(bucket.data.unit);
 
     let format: string;
-    switch (bucket.unit) {
+    switch (bucket.data.unit) {
       case 'day': {
         format = 'd/M';
         break;
@@ -76,8 +98,10 @@ export const CountTrendCards: React.FC<Props> = (props) => {
       }
     }
 
-    for (let i = 0; i < bucket.count; i++) {
-      const bucketDateTime = currentBucketDateTime.minus({ [bucket.unit]: i });
+    for (let i = 0; i < bucket.data.count; i++) {
+      const bucketDateTime = currentBucketDateTime.minus({
+        [bucket.data.unit]: i,
+      });
       const bucketIso = bucketDateTime.toISODate();
       dataByBucket[bucketIso] = {
         bucketLabel: bucketDateTime.toFormat(format),
@@ -94,12 +118,12 @@ export const CountTrendCards: React.FC<Props> = (props) => {
       assert(dateTime.isValid);
       if (
         currentBucketDateTime
-          .diff(dateTime.startOf(bucket.unit))
-          .as(bucket.unit) >= bucket.count
+          .diff(dateTime.startOf(bucket.data.unit))
+          .as(bucket.data.unit) >= bucket.data.count
       ) {
         continue;
       }
-      const bucketDateTime = dateTime.startOf(bucket.unit);
+      const bucketDateTime = dateTime.startOf(bucket.data.unit);
       const bucketIso = bucketDateTime.toISODate();
       for (const issue of dateSummary.issues) {
         const bucketData = dataByBucket[bucketIso] ?? {
@@ -142,7 +166,12 @@ export const CountTrendCards: React.FC<Props> = (props) => {
 
   return (
     <div className="flex flex-col rounded-lg border border-gray-300 p-6 shadow-lg sm:col-span-3 dark:border-gray-700">
-      <span className="text-base">Issues this {bucket.unit}</span>
+      <span className="text-base">
+        Issues{' '}
+        {new Intl.RelativeTimeFormat(undefined, {
+          numeric: 'auto',
+        }).format(0, bucket.data.unit)}
+      </span>
       <span className="mt-2.5 font-bold text-4xl">
         {chartData[chartData.length - 1].countByIssueType.disruption}{' '}
         disruptions
@@ -154,7 +183,10 @@ export const CountTrendCards: React.FC<Props> = (props) => {
           chartData[chartData.length - 1].countByIssueType.disruption -
             chartData[chartData.length - 2].countByIssueType.disruption,
         )}{' '}
-        from last {bucket.unit}
+        from{' '}
+        {new Intl.RelativeTimeFormat(undefined, {
+          numeric: 'auto',
+        }).format(-1, bucket.data.unit)}
       </span>
       <div className="mt-4 h-48">
         <ResponsiveContainer>
@@ -207,11 +239,11 @@ export const CountTrendCards: React.FC<Props> = (props) => {
       <div className="flex items-center divide-x divide-gray-300 self-start rounded-md border border-gray-300 dark:divide-gray-600 dark:border-gray-600">
         {BUCKETS.map((optionBucket) => (
           <button
-            key={`${optionBucket.unit}:${optionBucket.count}`}
+            key={`${optionBucket.data.unit}:${optionBucket.data.count}`}
             className={classNames(
               'px-2 py-0.5 text-xs',
-              optionBucket.unit === bucket.unit &&
-                optionBucket.count === bucket.count
+              optionBucket.data.unit === bucket.data.unit &&
+                optionBucket.data.count === bucket.data.count
                 ? 'bg-gray-400 text-gray-50 dark:bg-gray-500 dark:text-gray-200'
                 : 'text-gray-400 dark:text-gray-500',
             )}
@@ -220,8 +252,8 @@ export const CountTrendCards: React.FC<Props> = (props) => {
           >
             {new Intl.NumberFormat(undefined, {
               style: 'unit',
-              unit: optionBucket.unit,
-            }).format(optionBucket.count)}
+              unit: optionBucket.display?.unit ?? optionBucket.data.unit,
+            }).format(optionBucket.display?.count ?? optionBucket.data.count)}
           </button>
         ))}
       </div>
