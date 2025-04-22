@@ -72,21 +72,22 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
 
   return (
     <div className="flex flex-col">
-      <div className="">
-        {loaderData.issuesOngoing.map((issue) => (
-          <IssueViewer key={issue.id} issue={issue} />
-        ))}
+      <div className="mb-3 flex flex-col">
         <StatusBanner hasOngoingIssues={loaderData.issuesOngoing.length > 0} />
+      </div>
 
-        <div className="mt-8 flex flex-col gap-y-6">
-          {componentBreakdowns.map((componentBreakdown) => (
-            <ComponentOutlook
-              key={componentBreakdown.component.id}
-              breakdown={componentBreakdown}
-              dateTimes={dateTimes}
-            />
-          ))}
-        </div>
+      {loaderData.issuesOngoing.map((issue) => (
+        <IssueViewer key={issue.id} issue={issue} />
+      ))}
+
+      <div className="mt-5 flex flex-col gap-y-6">
+        {componentBreakdowns.map((componentBreakdown) => (
+          <ComponentOutlook
+            key={componentBreakdown.component.id}
+            breakdown={componentBreakdown}
+            dateTimes={dateTimes}
+          />
+        ))}
       </div>
     </div>
   );
