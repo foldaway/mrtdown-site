@@ -1,5 +1,6 @@
 import type React from 'react';
 import type { Data } from '../types';
+import { FormattedMessage } from 'react-intl';
 
 interface Props {
   active?: boolean;
@@ -31,7 +32,10 @@ export const CustomTooltip: React.FC<Props> = (props) => {
           <div className="size-2 rounded-full bg-disruption-light dark:bg-disruption-dark" />
         </div>
         <span className="text-gray-400 text-xs dark:text-gray-500">
-          Disruption
+          <FormattedMessage
+            id="general.disruption"
+            defaultMessage="Disruption"
+          />
         </span>
         <span className="ms-auto text-xs">
           {formatter.format(data?.countByIssueType?.disruption ?? 0)}
@@ -42,7 +46,10 @@ export const CustomTooltip: React.FC<Props> = (props) => {
           <div className="size-2 rounded-full bg-maintenance-light dark:bg-maintenance-dark" />
         </div>
         <span className="text-gray-400 text-xs dark:text-gray-500">
-          Maintenance
+          <FormattedMessage
+            id="general.maintenance"
+            defaultMessage="Maintenance"
+          />
         </span>
         <span className="ms-auto text-xs">
           {formatter.format(data?.countByIssueType?.maintenance ?? 0)}
@@ -52,7 +59,12 @@ export const CustomTooltip: React.FC<Props> = (props) => {
         <div className="flex items-center">
           <div className="size-2 rounded-full bg-infra-light dark:bg-infra-dark" />
         </div>
-        <span className="text-gray-400 text-xs dark:text-gray-500">Infra</span>
+        <span className="text-gray-400 text-xs dark:text-gray-500">
+          <FormattedMessage
+            id="general.infrastructure"
+            defaultMessage="Infrastructure"
+          />
+        </span>
         <span className="ms-auto text-xs">
           {formatter.format(data?.countByIssueType?.infra ?? 0)}
         </span>

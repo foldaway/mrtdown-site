@@ -11,6 +11,9 @@ import {
 } from '@heroicons/react/20/solid';
 import { calculateDurationWithinServiceHours } from '../../../helpers/calculateDurationWithinServiceHours';
 import { useHydrated } from '../../../hooks/useHydrated';
+import { FormattedDateTimeRange, FormattedMessage, useIntl } from 'react-intl';
+import { FormattedDuration } from '~/components/FormattedDuration';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 interface Props {
   issueRef: IssueRef;
@@ -45,6 +48,7 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
   }, [startAt, endAt]);
 
   const isHydrated = useHydrated();
+  const intl = useIntl();
 
   const stationCount = useMemo(() => {
     const result = new Set<string>();
@@ -66,7 +70,7 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
             issueRef.type === 'maintenance',
           'bg-infra-light dark:bg-infra-dark': issueRef.type === 'infra',
         })}
-        to={`/issues/${issueRef.id}`}
+        to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
       >
         {issueRef.type === 'disruption' && (
           <ExclamationTriangleIcon className="size-5 shrink-0 text-gray-50 dark:text-gray-200" />
@@ -83,12 +87,19 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
       </Link>
       <div className="flex flex-col justify-between gap-1.5 bg-gray-200 px-4 py-2 sm:flex-row sm:items-center dark:bg-gray-700">
         <div className="inline-flex items-center">
-          <span className="text-gray-500 text-xs dark:text-gray-400">
-            Affected:&nbsp;
+          <span className="me-1 text-gray-500 text-xs dark:text-gray-400">
+            <FormattedMessage
+              id="general.affected_components_stations"
+              defaultMessage="Affected:"
+            />
           </span>
           <ComponentBar componentIds={issueRef.componentIdsAffected} />
           <span className="ms-1 text-gray-500 text-xs dark:text-gray-400">
-            ({stationCount} stations)
+            <FormattedMessage
+              id="general.station_count"
+              defaultMessage="{count, plural, one { {count} stations } other { {count} stations }}"
+              values={{ count: stationCount }}
+            />
           </span>
         </div>
         <span className="text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
@@ -96,24 +107,39 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
             'Ongoing'
           ) : (
             <>
-              {isHydrated
-                ? dateTimeInfo.interval.toLocaleString({
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: 'numeric',
-                    minute: 'numeric',
-                  })
-                : dateTimeInfo.interval.toISO()}{' '}
-              (
-              {isHydrated
-                ? dateTimeInfo.durationWithinServiceHours
-                    .rescale()
-                    .set({ seconds: 0 })
-                    .rescale()
-                    .toHuman({ unitDisplay: 'short' })
-                : dateTimeInfo.durationWithinServiceHours.toISO()}{' '}
-              within service hours)
+              {isHydrated ? (
+                <FormattedDateTimeRange
+                  from={startAt.toJSDate()}
+                  to={endAt!.toJSDate()}
+                  month="short"
+                  day="numeric"
+                  year="numeric"
+                  hour="numeric"
+                  minute="numeric"
+                />
+              ) : (
+                dateTimeInfo.interval.toISO()
+              )}{' '}
+              [
+              {isHydrated ? (
+                <FormattedMessage
+                  id="general.uptime_duration_display"
+                  defaultMessage="{duration} within service hours"
+                  values={{
+                    duration: (
+                      <FormattedDuration
+                        duration={dateTimeInfo.durationWithinServiceHours
+                          .rescale()
+                          .set({ seconds: 0 })
+                          .rescale()}
+                      />
+                    ),
+                  }}
+                />
+              ) : (
+                dateTimeInfo.durationWithinServiceHours.toISO()
+              )}
+              ]
             </>
           )}
         </span>

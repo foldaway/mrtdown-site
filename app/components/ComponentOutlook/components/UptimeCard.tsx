@@ -4,6 +4,8 @@ import { type DateTime, Duration } from 'luxon';
 import { useMemo, useState } from 'react';
 import { useDebounce } from 'use-debounce';
 import type { DateSummary } from '../../../types';
+import { FormattedMessage, FormattedNumber } from 'react-intl';
+import { FormattedDuration } from '~/components/FormattedDuration';
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
   issueTypesDurationMs: {},
@@ -49,15 +51,22 @@ export const UptimeCard: React.FC<Props> = (props) => {
 
   const percentage = downtimeDuration.toMillis() / totalDuration.toMillis();
 
-  const uptimeFormatted = new Intl.NumberFormat(undefined, {
-    style: 'percent',
-    maximumFractionDigits: 2,
-  }).format(1 - percentage);
-
   return (
     <>
       <span className="text-gray-500 text-xs dark:text-gray-400">
-        {uptimeFormatted} uptime
+        <FormattedMessage
+          id="general.uptime_percent_display"
+          defaultMessage="{percent} uptime"
+          values={{
+            percent: (
+              <FormattedNumber
+                value={1 - percentage}
+                style="percent"
+                maximumFractionDigits={2}
+              />
+            ),
+          }}
+        />
       </span>
       {downtimeDuration.toMillis() > 0 && (
         <Popover.Root open={isOpenDebounced} onOpenChange={setIsOpen}>
@@ -77,8 +86,13 @@ export const UptimeCard: React.FC<Props> = (props) => {
               <Popover.Arrow className="fill-gray-300 dark:fill-gray-600" />
 
               <span className="text-gray-600 text-xs dark:text-gray-300">
-                {downtimeDuration.toHuman({ unitDisplay: 'short' })} of downtime
-                within service hours
+                <FormattedMessage
+                  id="general.uptime_duration_display"
+                  defaultMessage="{duration} within service hours"
+                  values={{
+                    duration: <FormattedDuration duration={downtimeDuration} />,
+                  }}
+                />
               </span>
             </Popover.Content>
           </Popover.Portal>

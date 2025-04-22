@@ -1,5 +1,5 @@
 import classNames from 'classnames';
-import { DateTime } from 'luxon';
+import { DateTime, Duration } from 'luxon';
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import {
@@ -15,6 +15,13 @@ import { assert } from '../../../../util/assert';
 import { CustomTooltip } from './components/CustomTooltip';
 import { changeMsFormatter, displayMsFormatter } from './helpers/formatters';
 import type { Data } from './types';
+import {
+  FormattedMessage,
+  FormattedNumber,
+  FormattedRelativeTime,
+  useIntl,
+} from 'react-intl';
+import { FormattedDuration } from '~/components/FormattedDuration';
 
 type Bucket = {
   display?: {
@@ -77,6 +84,8 @@ const BUCKETS: Bucket[] = [
 export const DurationTrendCards: React.FC<Props> = (props) => {
   const { statistics } = props;
 
+  const intl = useIntl();
+
   const [bucket, setBucket] = useState<Bucket>({
     data: {
       unit: 'month',
@@ -111,7 +120,9 @@ export const DurationTrendCards: React.FC<Props> = (props) => {
       });
       const bucketIso = bucketDateTime.toISODate();
       dataByBucket[bucketIso] = {
-        bucketLabel: bucketDateTime.toFormat(format),
+        bucketLabel: bucketDateTime
+          .reconfigure({ locale: intl.locale })
+          .toFormat(format),
         durationMsByIssueType: {
           disruption: 0,
           maintenance: 0,
@@ -138,7 +149,9 @@ export const DurationTrendCards: React.FC<Props> = (props) => {
         'infra',
       ] satisfies IssueType[]) {
         const bucketData = dataByBucket[bucketIso] ?? {
-          bucketLabel: bucketDateTime.toFormat(format),
+          bucketLabel: bucketDateTime
+            .reconfigure({ locale: intl.locale })
+            .toFormat(format),
           durationMsByIssueType: {
             disruption: 0,
             maintenance: 0,
@@ -163,31 +176,69 @@ export const DurationTrendCards: React.FC<Props> = (props) => {
     }
 
     return data;
-  }, [statistics, bucket]);
+  }, [statistics, bucket, intl.locale]);
 
   return (
     <div className="flex flex-col rounded-lg border border-gray-300 p-6 shadow-lg sm:col-span-3 dark:border-gray-700">
       <span className="text-base">
-        Issue time{' '}
-        {new Intl.RelativeTimeFormat(undefined, {
-          numeric: 'auto',
-        }).format(0, bucket.data.unit)}
+        <FormattedMessage
+          id="general.issue_duration_this_period"
+          defaultMessage="Issue duration {period}"
+          values={{
+            period: (
+              <FormattedRelativeTime
+                value={0}
+                unit={bucket.data.unit}
+                numeric="auto"
+              />
+            ),
+          }}
+        />
       </span>
       <span className="mt-2.5 font-bold text-4xl">
-        {displayMsFormatter(
-          chartData[chartData.length - 1].durationMsByIssueType.disruption,
-        )}{' '}
-        of disruption
+        <FormattedMessage
+          id="general.disruption_time_count"
+          defaultMessage="{duration} of disruption"
+          values={{
+            duration: (
+              <FormattedDuration
+                duration={Duration.fromMillis(
+                  chartData[chartData.length - 1].durationMsByIssueType
+                    .disruption,
+                )}
+              />
+            ),
+          }}
+        />
       </span>
       <span className="text-gray-400 text-sm dark:text-gray-500">
-        {changeMsFormatter(
-          chartData[chartData.length - 1].durationMsByIssueType.disruption -
-            chartData[chartData.length - 2].durationMsByIssueType.disruption,
-        )}{' '}
-        from{' '}
-        {new Intl.RelativeTimeFormat(undefined, {
-          numeric: 'auto',
-        }).format(-1, bucket.data.unit)}
+        <FormattedMessage
+          id="general.change_since_last_period"
+          defaultMessage="{change} from {period}"
+          values={{
+            change: (
+              <FormattedDuration
+                signDisplay="always"
+                duration={Duration.fromMillis(
+                  chartData[chartData.length - 1].durationMsByIssueType
+                    .disruption -
+                    chartData[chartData.length - 2].durationMsByIssueType
+                      .disruption,
+                )
+                  .rescale()
+                  .set({ seconds: 0 })
+                  .rescale()}
+              />
+            ),
+            period: (
+              <FormattedRelativeTime
+                value={-1}
+                unit={bucket.data.unit}
+                numeric="auto"
+              />
+            ),
+          }}
+        />
       </span>
       <div className="mt-4 h-48">
         <ResponsiveContainer>
@@ -254,10 +305,11 @@ export const DurationTrendCards: React.FC<Props> = (props) => {
             type="button"
             onClick={() => setBucket(optionBucket)}
           >
-            {new Intl.NumberFormat(undefined, {
-              style: 'unit',
-              unit: optionBucket.display?.unit ?? optionBucket.data.unit,
-            }).format(optionBucket.display?.count ?? optionBucket.data.count)}
+            <FormattedNumber
+              value={optionBucket.display?.count ?? optionBucket.data.count}
+              style="unit"
+              unit={optionBucket.display?.unit ?? optionBucket.data.unit}
+            />
           </button>
         ))}
       </div>

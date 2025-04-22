@@ -1,19 +1,26 @@
 import type { Statistics } from '../types';
 import { StatisticsGrid } from '../components/StatisticsGrid';
 import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
-import type { MetaFunction } from 'react-router';
 
-import type { Route } from './+types/statistics';
+import type { Route } from './+types/($lang).statistics';
 import { assert } from '../util/assert';
+import { createIntl } from 'react-intl';
 
-export async function loader() {
+export async function loader({ params }: Route.LoaderArgs) {
   const res = await fetch(
     'https://data.mrtdown.foldaway.space/product/statistics.json',
   );
   assert(res.ok, res.statusText);
   const statistics: Statistics = await res.json();
   patchDatesForOngoingIssues(statistics.dates, statistics.issuesOngoing);
-  return statistics;
+
+  const { lang = 'en-SG' } = params;
+  const { default: messages } = await import(`../../lang/${lang}.json`);
+
+  return {
+    statistics,
+    messages,
+  };
 }
 
 export function headers() {
@@ -22,10 +29,20 @@ export function headers() {
   };
 }
 
-export const meta: MetaFunction = () => {
+export const meta: Route.MetaFunction = ({ params, data }) => {
+  const { lang = 'en-SG' } = params;
+
+  const intl = createIntl({
+    locale: lang,
+    messages: data.messages,
+  });
+
   return [
     {
-      title: 'Statistics | mrtdown',
+      title: `${intl.formatMessage({
+        id: 'general.statistics',
+        defaultMessage: 'Statistics',
+      })} | mrtdown`,
     },
   ];
 };
@@ -35,7 +52,7 @@ const StatisticsPage: React.FC<Route.ComponentProps> = (props) => {
 
   return (
     <div className="flex flex-col">
-      <StatisticsGrid statistics={loaderData} />
+      <StatisticsGrid statistics={loaderData.statistics} />
     </div>
   );
 };

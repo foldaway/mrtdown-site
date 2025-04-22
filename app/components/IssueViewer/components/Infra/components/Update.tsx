@@ -3,6 +3,7 @@ import type { IssueInfraUpdate } from '../../../../../types';
 import { useMemo } from 'react';
 import { InformationCircleIcon } from '@heroicons/react/16/solid';
 import { useHydrated } from '../../../../../hooks/useHydrated';
+import { FormattedDate, FormattedRelativeTime } from 'react-intl';
 
 interface Props {
   update: IssueInfraUpdate;
@@ -33,8 +34,18 @@ export const Update: React.FC<Props> = (props) => {
         >
           {isHydrated ? (
             <>
-              {createdAt.toLocaleString(DateTime.DATETIME_MED)} (
-              {createdAt.toRelative()})
+              <FormattedDate
+                value={createdAt.toJSDate()}
+                day="numeric"
+                month="long"
+                year="numeric"
+              />{' '}
+              (
+              <FormattedRelativeTime
+                value={Math.round(createdAt.diffNow().as('days'))}
+                unit="day"
+              />
+              )
             </>
           ) : (
             <>{createdAt.toISO()}</>

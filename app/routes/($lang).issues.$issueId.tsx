@@ -2,7 +2,7 @@ import type { Issue } from '../types';
 import { IssueViewer } from '../components/IssueViewer';
 import { IssueSkeleton } from '../components/IssueSkeleton';
 
-import type { Route } from './+types/issues.$issueId';
+import type { Route } from './+types/($lang).issues.$issueId';
 import { assert } from '../util/assert';
 
 export async function loader({ params }: Route.LoaderArgs) {

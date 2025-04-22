@@ -10,6 +10,12 @@ import { computeStatus } from './helpers/computeStatus';
 import { useHydrated } from '../../hooks/useHydrated';
 import { NonOperationalDateCard } from './components/NonOperationalDateCard';
 import { ServiceEndedDateCard } from './components/ServiceEndedDateCard';
+import {
+  FormattedDate,
+  FormattedMessage,
+  FormattedRelativeTime,
+  useIntl,
+} from 'react-intl';
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
   issueTypesDurationMs: {},
@@ -25,6 +31,8 @@ interface Props {
 export const ComponentOutlook: React.FC<Props> = (props) => {
   const { breakdown, dateTimes } = props;
   const { component, dates } = breakdown;
+
+  const intl = useIntl();
 
   const componentStartedAtDateTime = useMemo(() => {
     return DateTime.fromISO(component.startedAt);
@@ -66,7 +74,7 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
           {component.id}
         </span>
         <span className="ms-1.5 font-bold text-base text-gray-700 dark:text-gray-200">
-          {component.title}
+          {component.title_translations[intl.locale] ?? component.title}
         </span>
 
         <div className="ms-auto flex">
@@ -86,12 +94,44 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
                     statusToday === 'service ended',
                 })}
               >
-                {statusToday}
+                {statusToday === 'disruption' && (
+                  <FormattedMessage
+                    id="general.disruption"
+                    defaultMessage="Disruption"
+                  />
+                )}{' '}
+                {statusToday === 'maintenance' && (
+                  <FormattedMessage
+                    id="general.maintenance"
+                    defaultMessage="Maintenance"
+                  />
+                )}
+                {statusToday === 'infra' && (
+                  <FormattedMessage
+                    id="general.infrastructure"
+                    defaultMessage="Infrastructure"
+                  />
+                )}
+                {statusToday === 'operational' && (
+                  <FormattedMessage
+                    id="status.operational"
+                    defaultMessage="Operational"
+                  />
+                )}
+                {statusToday === 'service ended' && (
+                  <FormattedMessage
+                    id="status.service_ended"
+                    defaultMessage="Service Ended"
+                  />
+                )}
               </span>
             </>
           ) : (
             <span className="text-gray-400 text-sm dark:text-gray-500">
-              Not In Service
+              <FormattedMessage
+                id="status.not_in_service"
+                defaultMessage="Not in Service"
+              />
             </span>
           )}
         </div>
@@ -118,9 +158,16 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
 
       <div className="mt-1.5 flex items-center justify-between gap-x-1">
         <span className="text-gray-500 text-xs dark:text-gray-400">
-          {isHydrated
-            ? dateTimes[0].toLocaleString(DateTime.DATE_MED)
-            : dateTimes[0].toISO()}
+          {isHydrated ? (
+            <FormattedDate
+              value={dateTimes[0].toJSDate()}
+              day="numeric"
+              month="short"
+              year="numeric"
+            />
+          ) : (
+            dateTimes[0].toISO()
+          )}
         </span>
         {isComponentInService && (
           <div className="flex items-center">
@@ -128,9 +175,17 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
           </div>
         )}
         <span className="text-gray-500 text-xs capitalize dark:text-gray-400">
-          {isHydrated
-            ? dateTimes[dateTimes.length - 1].toRelativeCalendar()
-            : dateTimes[dateTimes.length - 1].toISO()}
+          {isHydrated ? (
+            <FormattedRelativeTime
+              value={Math.round(
+                dateTimes[dateTimes.length - 1].diffNow('days').as('days'),
+              )}
+              unit="day"
+              numeric="auto"
+            />
+          ) : (
+            dateTimes[dateTimes.length - 1].toISO()
+          )}
         </span>
       </div>
     </div>
