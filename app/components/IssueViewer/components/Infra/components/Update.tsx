@@ -44,6 +44,7 @@ export const Update: React.FC<Props> = (props) => {
               <FormattedRelativeTime
                 value={Math.round(createdAt.diffNow().as('days'))}
                 unit="day"
+                numeric="auto"
               />
               )
             </>
