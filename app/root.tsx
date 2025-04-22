@@ -14,7 +14,7 @@ import {
 } from 'react-router';
 
 import classNames from 'classnames';
-import { DateTime } from 'luxon';
+import { DateTime, Settings } from 'luxon';
 import { useLocation } from 'react-router';
 import type { Route } from './+types/root';
 import { LocaleSwitcher } from './components/LocaleSwitcher';
@@ -81,6 +81,8 @@ const navLinkClassNameFunction: NavLinkProps['className'] = ({ isActive }) => {
 };
 
 export async function loader({ params }: Route.LoaderArgs) {
+  Settings.defaultZone = 'Asia/Singapore';
+
   const { lang = 'en-SG' } = params;
   const { default: messages } = await import(`../lang/${lang}.json`);
 
