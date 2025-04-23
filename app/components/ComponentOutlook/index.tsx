@@ -56,11 +56,15 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
       return 'service ended';
     }
 
+    if (breakdown.issuesOngoingCount === 0) {
+      return 'operational';
+    }
+
     return (
       computeStatus(dates[nowIsoDate]?.issueTypesDurationMs ?? {}) ??
       'operational'
     );
-  }, [dates, now, serviceStartToday]);
+  }, [dates, now, serviceStartToday, breakdown.issuesOngoingCount]);
 
   const isHydrated = useHydrated();
 
