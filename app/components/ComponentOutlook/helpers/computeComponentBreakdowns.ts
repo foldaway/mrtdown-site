@@ -18,11 +18,21 @@ export function computeComponentBreakdown(
     for (const issueRef of dateSummary.issues) {
       for (const componentId of issueRef.componentIdsAffected) {
         const dateSummaries = dateSummariesByComponentId[componentId] ?? {};
-        const dateSummaryComponent = dateSummaries[dateIso] ?? {
-          issueTypesDurationMs:
-            dateSummary.componentIdsIssueTypesDurationMs?.[componentId] ?? {},
-          issues: [],
-        };
+        const dateSummaryComponent =
+          dateSummaries[dateIso] ??
+          ({
+            issueTypesDurationMs:
+              dateSummary.componentIdsIssueTypesDurationMs?.[componentId] ?? {},
+            issueTypesIntervalsNoOverlapMs:
+              dateSummary.componentIdsIssueTypesIntervalsNoOverlapMs?.[
+                componentId
+              ] ?? {},
+            componentIdsIssueTypesIntervalsNoOverlapMs:
+              dateSummary.componentIdsIssueTypesIntervalsNoOverlapMs ?? {},
+            componentIdsIssueTypesDurationMs:
+              dateSummary.componentIdsIssueTypesDurationMs ?? {},
+            issues: [],
+          } satisfies DateSummary);
         dateSummaryComponent.issues.push(issueRef);
         dateSummaries[dateIso] = dateSummaryComponent;
         dateSummariesByComponentId[componentId] = dateSummaries;

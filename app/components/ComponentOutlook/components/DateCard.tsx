@@ -1,6 +1,6 @@
 import * as Popover from '@radix-ui/react-popover';
-import type { DateSummary, Issue } from '../../../types';
-import { type DateTime, Duration } from 'luxon';
+import type { DateSummary, Issue, IssueType } from '../../../types';
+import { type DateTime, Duration, Interval } from 'luxon';
 import { useMemo, useState } from 'react';
 import { computeStatus } from '../helpers/computeStatus';
 import { Link } from 'react-router';
@@ -10,6 +10,7 @@ import { useHydrated } from '../../../hooks/useHydrated';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { FormattedDuration } from '~/components/FormattedDuration';
+import { sumIntervalDuration } from '~/helpers/sumIntervalDuration';
 
 interface Props {
   dateTime: DateTime;
@@ -18,7 +19,8 @@ interface Props {
 
 export const DateCard: React.FC<Props> = (props) => {
   const { dateTime, dateOverview } = props;
-  const { issues, issueTypesDurationMs } = dateOverview;
+  const { issues, issueTypesDurationMs, issueTypesIntervalsNoOverlapMs } =
+    dateOverview;
 
   const [isOpen, setIsOpen] = useState(false);
   const [isOpenDebounced] = useDebounce(isOpen, 100);
@@ -30,6 +32,32 @@ export const DateCard: React.FC<Props> = (props) => {
   const isHydrated = useHydrated();
   const intl = useIntl();
 
+  const percentages = useMemo<Record<IssueType, number>>(() => {
+    const serviceHours = Interval.fromDateTimes(
+      dateTime.startOf('day'),
+      dateTime.startOf('day').plus({ days: 1 }),
+    );
+
+    const result: Record<IssueType, number> = {
+      disruption: 0,
+      maintenance: 0,
+      infra: 0,
+    };
+
+    for (const [issueType, intervalIsos] of Object.entries(
+      issueTypesIntervalsNoOverlapMs,
+    )) {
+      const _issueType = issueType as IssueType;
+      const intervals = intervalIsos.map((iso) => Interval.fromISO(iso));
+      result[_issueType] =
+        (sumIntervalDuration(Interval.merge(intervals)).as('milliseconds') /
+          serviceHours.toDuration().toMillis()) *
+        100;
+    }
+
+    return result;
+  }, [issueTypesIntervalsNoOverlapMs]);
+
   return (
     <Popover.Root open={isOpenDebounced} onOpenChange={setIsOpen}>
       <Popover.Trigger
@@ -37,7 +65,27 @@ export const DateCard: React.FC<Props> = (props) => {
         onMouseLeave={() => setIsOpen(false)}
         className="outline-none"
       >
-        <div
+        <div className="flex h-7 w-1.5 flex-col-reverse rounded-xs bg-operational-light transition-transform hover:scale-150 dark:bg-operational-dark">
+          {Object.entries(percentages).map(
+            ([issueType, percentage]) =>
+              percentage > 0 && (
+                <div
+                  key={issueType}
+                  className={classNames('flex w-1.5 bg-blue-400', {
+                    'bg-disruption-light dark:bg-disruption-dark':
+                      issueType === 'disruption',
+                    'bg-maintenance-light dark:bg-maintenance-dark':
+                      issueType === 'maintenance',
+                    'bg-infra-light dark:bg-infra-dark': status === 'infra',
+                  })}
+                  style={{
+                    flexBasis: `${Math.max(25, percentage).toFixed(1)}%`,
+                  }}
+                />
+              ),
+          )}
+        </div>
+        {/* <div
           className={classNames(
             'h-7 w-1.5 rounded-xs transition-transform hover:scale-150',
             {
@@ -49,7 +97,7 @@ export const DateCard: React.FC<Props> = (props) => {
               'bg-operational-light dark:bg-operational-dark': status == null,
             },
           )}
-        />
+        /> */}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content

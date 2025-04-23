@@ -22,11 +22,20 @@ export function patchDatesForOngoingIssues(
         ({
           componentIdsIssueTypesDurationMs: {},
           issueTypesDurationMs: {},
+          issueTypesIntervalsNoOverlapMs: {},
+          componentIdsIssueTypesIntervalsNoOverlapMs: {},
           issues: [],
         } satisfies DateSummary);
       let issueTypeDuration = dateSummary.issueTypesDurationMs[issue.type] ?? 0;
       issueTypeDuration += segment.toDuration().as('milliseconds');
       dateSummary.issueTypesDurationMs[issue.type] = issueTypeDuration;
+
+      const issueTypeIntervalNoOverlap =
+        dateSummary.issueTypesIntervalsNoOverlapMs[issue.type] ?? [];
+      issueTypeIntervalNoOverlap.push(segment.toISO());
+      dateSummary.issueTypesIntervalsNoOverlapMs[issue.type] =
+        issueTypeIntervalNoOverlap;
+
       dateSummary.issues.push({
         id: issue.id,
         type: issue.type,
@@ -44,6 +53,15 @@ export function patchDatesForOngoingIssues(
         componentIssueTypeDurationMs[issue.type] = durationMs;
         dateSummary.componentIdsIssueTypesDurationMs[componentId] =
           componentIssueTypeDurationMs;
+
+        const intervalsNoOverlapMs =
+          dateSummary.componentIdsIssueTypesIntervalsNoOverlapMs[componentId][
+            issue.type
+          ] ?? [];
+        intervalsNoOverlapMs.push(segment.toISO());
+        dateSummary.componentIdsIssueTypesIntervalsNoOverlapMs[componentId][
+          issue.type
+        ] = intervalsNoOverlapMs;
       }
       dates[segmentStartIsoDate] = dateSummary;
     }

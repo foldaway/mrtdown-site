@@ -19,8 +19,10 @@ import {
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
   issueTypesDurationMs: {},
+  issueTypesIntervalsNoOverlapMs: {},
   issues: [],
   componentIdsIssueTypesDurationMs: {},
+  componentIdsIssueTypesIntervalsNoOverlapMs: {},
 };
 
 interface Props {

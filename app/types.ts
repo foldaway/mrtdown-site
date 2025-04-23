@@ -78,12 +78,17 @@ export interface IssueRef {
 }
 
 export interface DateSummary {
+  issues: IssueRef[];
   issueTypesDurationMs: Partial<Record<IssueType, number>>;
   componentIdsIssueTypesDurationMs: Record<
     string,
     Partial<Record<IssueType, number>>
   >;
-  issues: IssueRef[];
+  issueTypesIntervalsNoOverlapMs: Partial<Record<IssueType, string[]>>;
+  componentIdsIssueTypesIntervalsNoOverlapMs: Record<
+    string,
+    Partial<Record<IssueType, string[]>>
+  >;
 }
 
 export interface Overview {
