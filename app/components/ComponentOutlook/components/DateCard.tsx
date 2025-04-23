@@ -34,7 +34,7 @@ export const DateCard: React.FC<Props> = (props) => {
 
   const percentages = useMemo<Record<IssueType, number>>(() => {
     const serviceHours = Interval.fromDateTimes(
-      dateTime.startOf('day'),
+      dateTime.startOf('day').set({ hour: 5, minute: 30 }),
       dateTime.startOf('day').plus({ days: 1 }),
     );
 
@@ -56,7 +56,7 @@ export const DateCard: React.FC<Props> = (props) => {
     }
 
     return result;
-  }, [issueTypesIntervalsNoOverlapMs]);
+  }, [issueTypesIntervalsNoOverlapMs, dateTime]);
 
   return (
     <Popover.Root open={isOpenDebounced} onOpenChange={setIsOpen}>
