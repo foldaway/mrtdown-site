@@ -9,6 +9,7 @@ import { useDebounce } from 'use-debounce';
 import { useHydrated } from '../../../hooks/useHydrated';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { FormattedDuration } from '~/components/FormattedDuration';
 
 interface Props {
   dateTime: DateTime;
@@ -117,15 +118,20 @@ export const DateCard: React.FC<Props> = (props) => {
                     )}
                   </span>
                   <span className="ms-auto text-gray-400 text-sm">
-                    {isHydrated
-                      ? Duration.fromObject({ milliseconds: durationMs })
+                    {isHydrated ? (
+                      <FormattedDuration
+                        duration={Duration.fromObject({
+                          milliseconds: durationMs,
+                        })
                           .rescale()
                           .set({ seconds: 0 })
-                          .rescale()
-                          .toHuman({ unitDisplay: 'narrow' })
-                      : Duration.fromObject({
-                          milliseconds: durationMs,
-                        }).toISO()}
+                          .rescale()}
+                      />
+                    ) : (
+                      Duration.fromObject({
+                        milliseconds: durationMs,
+                      }).toISO()
+                    )}
                   </span>
                 </div>
               );
