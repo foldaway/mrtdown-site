@@ -1,16 +1,16 @@
 import { ExclamationTriangleIcon } from '@heroicons/react/24/solid';
 import { DateTime, Interval } from 'luxon';
 import { useMemo } from 'react';
+import { FormattedDateTimeRange, FormattedMessage } from 'react-intl';
 import { Link } from 'react-router';
+import { FormattedDuration } from '~/components/FormattedDuration';
 import { calculateDurationWithinServiceHours } from '../../../../helpers/calculateDurationWithinServiceHours';
 import { useHydrated } from '../../../../hooks/useHydrated';
 import type { IssueDisruption } from '../../../../types';
 import { ComponentBar } from '../../../ComponentBar';
-import { Update } from './components/Update';
 import { StationMap } from '../../../StationMap';
-import { FormattedDateTimeRange, FormattedMessage } from 'react-intl';
-import { FormattedDuration } from '~/components/FormattedDuration';
 import { BetaPill } from '../BetaPill';
+import { Update } from './components/Update';
 
 interface Props {
   issue: IssueDisruption;
@@ -69,7 +69,13 @@ export const Disruption: React.FC<Props> = (props) => {
         </div>
         <span className="text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
           {dateTimeInfo == null ? (
-            'Ongoing'
+            <FormattedMessage
+              id="general.ongoing_timestamp"
+              defaultMessage="{start, date, medium} {start, time, short} to present"
+              values={{
+                start: startAt.toJSDate(),
+              }}
+            />
           ) : (
             <>
               {isHydrated ? (

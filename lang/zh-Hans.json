@@ -38,6 +38,7 @@
   "general.longest_disruptions": "最长中断",
   "general.maintenance": "维修作业",
   "general.no_downtime_on_this_day": "该日无地铁/轻轨事故记录。",
+  "general.ongoing_timestamp": "{start, date, medium} {start, time, short} 至今",
   "general.related": "相关",
   "general.station_count": "{count}个地铁站",
   "general.statistics": "统计数据",

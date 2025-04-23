@@ -104,7 +104,13 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
         </div>
         <span className="text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
           {dateTimeInfo == null ? (
-            'Ongoing'
+            <FormattedMessage
+              id="general.ongoing_timestamp"
+              defaultMessage="{start, date, medium} {start, time, short} to present"
+              values={{
+                start: startAt.toJSDate(),
+              }}
+            />
           ) : (
             <>
               {isHydrated ? (

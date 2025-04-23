@@ -38,6 +38,7 @@
   "general.longest_disruptions": "Gangguan Paling Lama",
   "general.maintenance": "Penyelenggaraan",
   "general.no_downtime_on_this_day": "Tiada gangguan direkodkan pada hari ini.",
+  "general.ongoing_timestamp": "{start, date, medium}, {start, time, short} hingga kini",
   "general.related": "Berkaitan",
   "general.station_count": "{count} stesen",
   "general.statistics": "Statistik",

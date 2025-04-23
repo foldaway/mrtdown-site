@@ -38,6 +38,7 @@
   "general.longest_disruptions": "Longest Disruptions",
   "general.maintenance": "Maintenance",
   "general.no_downtime_on_this_day": "No downtime recorded on this day.",
+  "general.ongoing_timestamp": "{start, date, medium} {start, time, short} to present",
   "general.related": "Related",
   "general.station_count": "{count, plural, one { {count} stations } other { {count} stations }}",
   "general.statistics": "Statistics",
