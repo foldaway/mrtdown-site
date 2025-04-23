@@ -3,7 +3,6 @@ import { useMemo } from 'react';
 import type { MetaFunction } from 'react-router';
 import { ComponentOutlook } from '../components/ComponentOutlook';
 import { computeComponentBreakdown } from '../components/ComponentOutlook/helpers/computeComponentBreakdowns';
-import { IssueViewer } from '../components/IssueViewer';
 import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
 import { useViewport } from '../hooks/useViewport';
 import type { Overview } from '../types';
@@ -11,6 +10,7 @@ import type { Overview } from '../types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang)._index';
 import { StatusBanner } from '~/components/StatusBanner';
+import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
 
 export async function loader() {
   const res = await fetch(
@@ -77,7 +77,7 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
       </div>
 
       {loaderData.issuesOngoing.map((issue) => (
-        <IssueViewer key={issue.id} issue={issue} />
+        <IssueRefViewer key={issue.id} issueRef={issue} />
       ))}
 
       <div className="mt-5 flex flex-col gap-y-6">
