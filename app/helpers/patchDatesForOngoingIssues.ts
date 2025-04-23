@@ -12,7 +12,7 @@ export function patchDatesForOngoingIssues(
     assert(startAt.isValid);
     const interval = Interval.fromDateTimes(
       startAt,
-      DateTime.now().plus({ hours: 5 }),
+      DateTime.now(),
     );
     for (const segment of splitIntervalByServiceHours(interval)) {
       assert(segment.start != null);
