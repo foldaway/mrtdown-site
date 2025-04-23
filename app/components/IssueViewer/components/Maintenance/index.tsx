@@ -91,7 +91,7 @@ export const Maintenance: React.FC<Props> = (props) => {
               ) : (
                 dateTimeInfo.interval.toISO()
               )}{' '}
-              (
+              [
               {isHydrated ? (
                 <FormattedMessage
                   id="general.uptime_duration_display"
@@ -109,8 +109,8 @@ export const Maintenance: React.FC<Props> = (props) => {
                 />
               ) : (
                 dateTimeInfo.durationWithinServiceHours.toISO()
-              )}{' '}
-              within service hours)
+              )}
+              ]
             </>
           )}
         </span>
