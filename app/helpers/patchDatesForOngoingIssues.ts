@@ -10,10 +10,7 @@ export function patchDatesForOngoingIssues(
   for (const issue of issuesOngoing) {
     const startAt = DateTime.fromISO(issue.startAt);
     assert(startAt.isValid);
-    const interval = Interval.fromDateTimes(
-      startAt,
-      DateTime.now(),
-    );
+    const interval = Interval.fromDateTimes(startAt, DateTime.now());
     for (const segment of splitIntervalByServiceHours(interval)) {
       assert(segment.start != null);
       assert(segment.end != null);
@@ -35,6 +32,7 @@ export function patchDatesForOngoingIssues(
         type: issue.type,
         title: issue.title,
         componentIdsAffected: issue.componentIdsAffected,
+        stationIdsAffected: issue.stationIdsAffected,
         startAt: issue.startAt,
         endAt: issue.endAt,
       });
