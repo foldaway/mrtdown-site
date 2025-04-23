@@ -1,14 +1,16 @@
+import {
+  CheckCircleIcon,
+  EyeIcon,
+  InformationCircleIcon,
+  NewspaperIcon,
+  UserCircleIcon,
+  WrenchScrewdriverIcon,
+} from '@heroicons/react/24/solid';
 import { DateTime } from 'luxon';
-import type { IssueDisruptionUpdate } from '../../../../../types';
-import { InformationCircleIcon } from '@heroicons/react/24/solid';
-import { WrenchScrewdriverIcon } from '@heroicons/react/24/solid';
-import { EyeIcon } from '@heroicons/react/24/solid';
-import { CheckCircleIcon } from '@heroicons/react/24/solid';
-import { UserCircleIcon } from '@heroicons/react/24/solid';
-import { NewspaperIcon } from '@heroicons/react/24/solid';
 import { useMemo } from 'react';
+import { FormattedDate, useIntl } from 'react-intl';
 import { useHydrated } from '../../../../../hooks/useHydrated';
-import { FormattedDate, FormattedRelativeTime } from 'react-intl';
+import type { IssueDisruptionUpdate } from '../../../../../types';
 
 interface Props {
   update: IssueDisruptionUpdate;
@@ -23,6 +25,7 @@ export const Update: React.FC<Props> = (props) => {
   );
 
   const isHydrated = useHydrated();
+  const intl = useIntl();
 
   return (
     <div className="flex gap-x-2">
@@ -59,13 +62,7 @@ export const Update: React.FC<Props> = (props) => {
                 month="long"
                 year="numeric"
               />{' '}
-              (
-              <FormattedRelativeTime
-                value={Math.round(createdAt.diffNow().as('days'))}
-                unit="day"
-                numeric="auto"
-              />
-              )
+              ({createdAt.reconfigure({ locale: intl.locale }).toRelative()})
             </>
           ) : (
             <>{createdAt.toISO()}</>

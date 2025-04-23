@@ -3,7 +3,7 @@ import type { IssueInfraUpdate } from '../../../../../types';
 import { useMemo } from 'react';
 import { InformationCircleIcon } from '@heroicons/react/16/solid';
 import { useHydrated } from '../../../../../hooks/useHydrated';
-import { FormattedDate, FormattedRelativeTime } from 'react-intl';
+import { FormattedDate, useIntl } from 'react-intl';
 
 interface Props {
   update: IssueInfraUpdate;
@@ -18,6 +18,7 @@ export const Update: React.FC<Props> = (props) => {
   );
 
   const isHydrated = useHydrated();
+  const intl = useIntl();
 
   return (
     <div className="flex gap-x-2">
@@ -40,13 +41,7 @@ export const Update: React.FC<Props> = (props) => {
                 month="long"
                 year="numeric"
               />{' '}
-              (
-              <FormattedRelativeTime
-                value={Math.round(createdAt.diffNow().as('days'))}
-                unit="day"
-                numeric="auto"
-              />
-              )
+              ({createdAt.reconfigure({ locale: intl.locale }).toRelative()})
             </>
           ) : (
             <>{createdAt.toISO()}</>
