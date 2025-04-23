@@ -26,7 +26,7 @@ export const LocaleSwitcher: React.FC = () => {
           key={locale}
           to={buildLocaleAwareLink(
             location.pathname.replace(`/${intl.locale}`, ''),
-            locale === 'en-SG' ? undefined : locale,
+            locale,
           )}
           className={navLinkClassNameFunction}
         >
