@@ -147,10 +147,15 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
         {dateTimes.map((dateTime) => {
           const dateTimeIsoDate = dateTime.toISODate();
           if (dateTime < componentStartedAtDateTime) {
-            return <NonOperationalDateCard />;
+            return <NonOperationalDateCard key={dateTime.valueOf()} />;
           }
           if (dateTime.hasSame(now, 'day') && now < serviceStartToday) {
-            return <ServiceEndedDateCard dateTime={dateTime} />;
+            return (
+              <ServiceEndedDateCard
+                key={dateTime.valueOf()}
+                dateTime={dateTime}
+              />
+            );
           }
           return (
             <DateCard
