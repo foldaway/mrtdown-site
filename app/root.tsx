@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { FormattedMessage, IntlProvider } from 'react-intl';
+import { FormattedDate, FormattedMessage, IntlProvider } from 'react-intl';
 import {
   isRouteErrorResponse,
   Link,
@@ -171,7 +171,9 @@ export default function App(props: Route.ComponentProps) {
           </div>
 
           <span className="text-gray-500 text-sm">
-            &copy; {DateTime.now().toFormat('y')} mrtdown
+            &copy;{' '}
+            <FormattedDate value={DateTime.now().toJSDate()} year="numeric" />{' '}
+            mrtdown
           </span>
           <span className="text-gray-500 text-sm italic">
             <FormattedMessage
