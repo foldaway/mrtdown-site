@@ -40,6 +40,7 @@
   "general.no_downtime_on_this_day": "No downtime recorded on this day.",
   "general.ongoing_timestamp": "{start, date, medium} {start, time, short} to present",
   "general.related": "Related",
+  "general.service_not_started": "Service on this day has not started.",
   "general.station_count": "{count, plural, one { {count} stations } other { {count} stations }}",
   "general.statistics": "Statistics",
   "general.system_map": "System Map",

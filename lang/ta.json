@@ -40,6 +40,7 @@
   "general.no_downtime_on_this_day": "இந்த நாளில் எந்த சேவை தடையும் பதிவாகவில்லை.",
   "general.ongoing_timestamp": "{start, date, medium}, {start, time, short} மணி முதல் தொடர்ந்து நடைபெறுகிறது",
   "general.related": "தொடர்புடையவை",
+  "general.service_not_started": "Perkhidmatan hari ini belum bermula.",
   "general.station_count": "{count, plural, one { {count} நிலையம் } other { {count} நிலையங்கள் }}",
   "general.statistics": "புள்ளிவிவரங்கள்",
   "general.system_map": "முறைகள் வரைபடம்",

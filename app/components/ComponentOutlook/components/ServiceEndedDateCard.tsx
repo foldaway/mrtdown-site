@@ -3,6 +3,7 @@ import { DateTime } from 'luxon';
 import { useState } from 'react';
 import { useDebounce } from 'use-debounce';
 import { useHydrated } from '../../../hooks/useHydrated';
+import { FormattedMessage } from 'react-intl';
 
 interface Props {
   dateTime: DateTime;
@@ -23,7 +24,7 @@ export const ServiceEndedDateCard: React.FC<Props> = (props) => {
         onMouseLeave={() => setIsOpen(false)}
         className="outline-none"
       >
-        <div className="h-7 w-1.5 rounded-xs transition-transform hover:scale-150 bg-gray-400 dark:bg-gray-600" />
+        <div className="h-7 w-1.5 rounded-xs bg-gray-400 transition-transform hover:scale-150 dark:bg-gray-600" />
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
@@ -38,7 +39,10 @@ export const ServiceEndedDateCard: React.FC<Props> = (props) => {
           </span>
 
           <span className="text-gray-500 text-sm dark:text-gray-400">
-            Service on this day has not started.
+            <FormattedMessage
+              id="general.service_not_started"
+              defaultMessage="Service on this day has not started."
+            />
           </span>
 
           <Popover.Arrow className="fill-gray-300 dark:fill-gray-600" />

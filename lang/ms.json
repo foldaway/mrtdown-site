@@ -40,6 +40,7 @@
   "general.no_downtime_on_this_day": "Tiada gangguan direkodkan pada hari ini.",
   "general.ongoing_timestamp": "{start, date, medium}, {start, time, short} hingga kini",
   "general.related": "Berkaitan",
+  "general.service_not_started": "இன்றைய சேவை இன்னும் தொடங்கவில்லை.",
   "general.station_count": "{count} stesen",
   "general.statistics": "Statistik",
   "general.system_map": "Peta Sistem",

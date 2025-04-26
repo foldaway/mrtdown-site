@@ -40,6 +40,7 @@
   "general.no_downtime_on_this_day": "该日无地铁/轻轨事故记录。",
   "general.ongoing_timestamp": "{start, date, medium} {start, time, short} 至今",
   "general.related": "相关",
+  "general.service_not_started": "今日地铁服务尚未开始。",
   "general.station_count": "{count}个地铁站",
   "general.statistics": "统计数据",
   "general.system_map": "地铁路线图",
