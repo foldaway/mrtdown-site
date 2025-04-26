@@ -170,7 +170,7 @@ export const StationMap: React.FC<Props> = (props) => {
   ]);
 
   return (
-    <div className="flex flex-col overflow-scroll fill-gray-800 dark:fill-gray-50">
+    <div className="flex flex-col fill-gray-800 dark:fill-gray-50">
       {/* Tailwind Class trappers */}
       <div className="hidden fill-gray-800 stroke-gray-800 dark:fill-gray-300 dark:stroke-gray-300" />
       <svg
