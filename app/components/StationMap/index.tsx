@@ -28,7 +28,7 @@ export const StationMap: React.FC<Props> = (props) => {
   });
 
   const stationTranslatedNamesQuery = useQuery<StationTranslatedNames>({
-    queryKey: ['station-translated-names'],
+    queryKey: ['station-translated-names', intl.locale],
     queryFn: () =>
       fetch(
         `https://data.mrtdown.foldaway.space/product/station_names_${intl.locale}.json`,
