@@ -42,6 +42,7 @@
   "general.related": "தொடர்புடையவை",
   "general.service_not_started": "Perkhidmatan hari ini belum bermula.",
   "general.station_count": "{count, plural, one { {count} நிலையம் } other { {count} நிலையங்கள் }}",
+  "general.station_issue_counts": "நிலையங்கள் வாரியான பிரச்சனை எண்ணிக்கை",
   "general.statistics": "புள்ளிவிவரங்கள்",
   "general.system_map": "முறைகள் வரைபடம்",
   "general.there_are_ongoing_issues": "சிக்கல்கள் தொடர்கின்றன",

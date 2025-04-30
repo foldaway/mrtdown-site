@@ -42,6 +42,7 @@
   "general.related": "相关",
   "general.service_not_started": "今日地铁服务尚未开始。",
   "general.station_count": "{count}个地铁站",
+  "general.station_issue_counts": "各地铁站事故数量",
   "general.statistics": "统计数据",
   "general.system_map": "地铁路线图",
   "general.there_are_ongoing_issues": "系统故障中",

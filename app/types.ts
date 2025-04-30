@@ -104,6 +104,23 @@ export interface Statistics {
   issuesDisruptionDurationTotalDays: number;
   issuesDisruptionLongest: IssueRef[];
   componentsIssuesDisruptionCount: Record<string, number>;
+  stationIssues: {
+    station: Station;
+    count: number;
+  }[];
+}
+
+export interface StationComponentMember {
+  code: string;
+  startedAt: string;
+  endedAt?: string;
+}
+
+export interface Station {
+  id: string;
+  name: string;
+  name_translations: Record<string, string>;
+  componentMembers: Record<string, StationComponentMember>;
 }
 
 export interface IssuesHistory {

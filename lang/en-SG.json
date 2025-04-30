@@ -42,6 +42,7 @@
   "general.related": "Related",
   "general.service_not_started": "Service on this day has not started.",
   "general.station_count": "{count, plural, one { {count} stations } other { {count} stations }}",
+  "general.station_issue_counts": "Issue Count by Station",
   "general.statistics": "Statistics",
   "general.system_map": "System Map",
   "general.there_are_ongoing_issues": "Issues ongoing",
