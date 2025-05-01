@@ -2,9 +2,11 @@ import type { Route } from './+types/($lang).stations.$stationId';
 import { assert } from '../util/assert';
 import type { StationManifest } from '~/types';
 import { ComponentBar } from '~/components/ComponentBar';
-import { FormattedMessage, useIntl } from 'react-intl';
+import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
+import { DateTime } from 'luxon';
+import { useHydrated } from '~/hooks/useHydrated';
 
 export async function loader({ params }: Route.LoaderArgs) {
   const { stationId } = params;
@@ -38,6 +40,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
   const { station } = loaderData;
 
   const intl = useIntl();
+  const isHydrated = useHydrated();
 
   const stationName = useMemo(() => {
     return station.name_translations[intl.locale] ?? station.name;
@@ -56,9 +59,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-x-2">
-        <ComponentBar
-          componentIds={Object.keys(loaderData.station.componentMembers)}
-        />
+        <ComponentBar componentIds={Object.keys(station.componentMembers)} />
         <span className="font-bold text-gray-800 text-xl dark:text-gray-100">
           {stationName}
         </span>
@@ -77,6 +78,123 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
           }}
         />
       </span>
+
+      <h2 className="mt-4 font-bold text-gray-800 text-lg dark:text-gray-100">
+        <FormattedMessage
+          id="general.station_details"
+          defaultMessage="Station Details"
+        />
+      </h2>
+      <div className="mt-1 flex flex-col overflow-hidden rounded-lg border border-gray-300 dark:border-gray-700">
+        <table className="table-auto">
+          <thead>
+            <tr className="border-gray-300 border-b bg-gray-100 text-gray-500 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+              <th className="p-2 text-start">
+                <FormattedMessage id="general.line" defaultMessage="Line" />
+              </th>
+              <th className="p-2 text-start">
+                <FormattedMessage
+                  id="general.station_code"
+                  defaultMessage="Station Code"
+                />
+              </th>
+              <th className="p-2 text-start">
+                <FormattedMessage id="general.opened" defaultMessage="Opened" />
+              </th>
+              <th className="p-2 text-start">
+                <FormattedMessage id="general.closed" defaultMessage="Closed" />
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-300 dark:divide-gray-700">
+            {Object.entries(station.componentMembers).map(
+              ([componentId, componentMemberEntries]) => (
+                <Fragment key={componentId}>
+                  {componentMemberEntries.map((entry, index) => (
+                    <tr
+                      key={entry.code}
+                      className="text-gray-900 dark:text-gray-200"
+                    >
+                      {index === 0 && (
+                        <td
+                          className="p-2 align-top"
+                          rowSpan={componentMemberEntries.length}
+                        >
+                          <ComponentBar componentIds={[componentId]} showName />
+                        </td>
+                      )}
+
+                      <td className="p-2">
+                        <div className="inline-flex items-center rounded-lg border border-gray-300 px-2 py-0.5 dark:border-gray-700">
+                          <span className="text-gray-500 text-sm leading-none dark:text-gray-400">
+                            {entry.code}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <span className="text-sm">
+                          {isHydrated ? (
+                            <>
+                              {DateTime.fromISO(entry.startedAt)
+                                .diffNow()
+                                .as('days') < 0 ? (
+                                <>
+                                  <FormattedDate
+                                    value={entry.startedAt}
+                                    day="numeric"
+                                    month="long"
+                                    year="numeric"
+                                  />{' '}
+                                  (
+                                  {DateTime.fromISO(entry.startedAt)
+                                    .reconfigure({ locale: intl.locale })
+                                    .toRelative()}
+                                  )
+                                </>
+                              ) : (
+                                '-'
+                              )}
+                            </>
+                          ) : (
+                            entry.startedAt
+                          )}
+                        </span>
+                      </td>
+                      <td className="p-2">
+                        <span className="text-sm">
+                          {entry.endedAt != null ? (
+                            <>
+                              {isHydrated ? (
+                                <>
+                                  <FormattedDate
+                                    value={entry.endedAt}
+                                    day="numeric"
+                                    month="long"
+                                    year="numeric"
+                                  />{' '}
+                                  (
+                                  {DateTime.fromISO(entry.endedAt)
+                                    .reconfigure({ locale: intl.locale })
+                                    .toRelative()}
+                                  )
+                                </>
+                              ) : (
+                                entry.endedAt
+                              )}
+                            </>
+                          ) : (
+                            '-'
+                          )}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
+              ),
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <h2 className="mt-4 font-bold text-gray-800 text-lg dark:text-gray-100">
         <FormattedMessage
