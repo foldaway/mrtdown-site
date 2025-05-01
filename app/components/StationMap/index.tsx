@@ -8,6 +8,8 @@ import type {
   StationTranslatedNames,
 } from '~/types';
 import { segmentText } from './helpers/segmentText';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { useNavigate } from 'react-router';
 
 interface Props {
   stationIdsAffected: IssueStationEntry[];
@@ -18,6 +20,7 @@ export const StationMap: React.FC<Props> = (props) => {
   const { stationIdsAffected, componentIdsAffected } = props;
 
   const intl = useIntl();
+  const navigate = useNavigate();
 
   const stationIndexQuery = useQuery<StationIndex>({
     queryKey: ['station-index'],
@@ -157,7 +160,45 @@ export const StationMap: React.FC<Props> = (props) => {
           }
         }
         labelElement.removeAttribute('fill');
-        labelElement.classList.add('fill-gray-800', 'dark:fill-gray-300');
+        labelElement.classList.add(
+          'fill-gray-800',
+          'dark:fill-gray-300',
+          'hover:underline',
+        );
+
+        // Automatically move into parent <a> tag
+        const parentElement = labelElement.parentElement;
+        if (parentElement != null && parentElement.tagName !== 'A') {
+          const newParentElement = document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            'a',
+          );
+          const href = buildLocaleAwareLink(
+            `/stations/${stationId}`,
+            intl.locale,
+          );
+          newParentElement.setAttributeNS(null, 'href', href);
+          newParentElement.onclick = (e) => {
+            e.preventDefault();
+            navigate(href);
+          };
+          parentElement.removeChild(labelElement);
+          newParentElement.appendChild(labelElement);
+          parentElement.appendChild(newParentElement);
+        }
+
+        // Add title label for native tooltip
+        let titleElement = labelElement.querySelector(
+          'title',
+        ) as SVGTitleElement | null;
+        if (titleElement == null) {
+          titleElement = document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            'title',
+          );
+          labelElement.appendChild(titleElement);
+        }
+        titleElement.textContent = stationTranslatedNames[stationId];
       }
     }
   }, [
@@ -167,6 +208,7 @@ export const StationMap: React.FC<Props> = (props) => {
     stationCodes,
     stationTranslatedNames,
     intl.locale,
+    navigate,
   ]);
 
   return (
