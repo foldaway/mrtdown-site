@@ -120,7 +120,12 @@ export interface Station {
   id: string;
   name: string;
   name_translations: Record<string, string>;
-  componentMembers: Record<string, StationComponentMember>;
+  componentMembers: Record<string, StationComponentMember[]>;
+}
+
+export interface StationManifest {
+  station: Station;
+  issueRefs: IssueRef[];
 }
 
 export interface IssuesHistory {

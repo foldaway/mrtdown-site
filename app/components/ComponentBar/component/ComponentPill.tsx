@@ -1,12 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import type { Component } from '../../../types';
+import { useIntl } from 'react-intl';
 
 interface Props {
   componentId: string;
+  showName?: boolean;
 }
 
 export const ComponentPill: React.FC<Props> = (props) => {
-  const { componentId } = props;
+  const { componentId, showName } = props;
+
+  const intl = useIntl();
 
   const { data } = useQuery<Component>({
     queryKey: ['components', componentId],
@@ -25,11 +29,18 @@ export const ComponentPill: React.FC<Props> = (props) => {
   }
 
   return (
-    <span
-      className="rounded-sm px-2 py-0.5 font-semibold text-white text-xs"
-      style={{ backgroundColor: data.color }}
-    >
-      {data.id}
-    </span>
+    <>
+      <span
+        className="rounded-sm px-2 py-0.5 font-semibold text-white text-xs"
+        style={{ backgroundColor: data.color }}
+      >
+        {data.id}
+      </span>
+      {showName && (
+        <span className="text-sm">
+          {data.title_translations[intl.locale] ?? data.title}
+        </span>
+      )}
+    </>
   );
 };

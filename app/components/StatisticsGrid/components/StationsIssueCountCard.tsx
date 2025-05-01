@@ -3,6 +3,8 @@ import { FormattedMessage, FormattedNumber, useIntl } from 'react-intl';
 import { ComponentBar } from '~/components/ComponentBar';
 import { useHydrated } from '../../../hooks/useHydrated';
 import type { Statistics } from '../../../types';
+import { Link } from 'react-router';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 interface Props {
   statistics: Statistics;
@@ -34,9 +36,17 @@ export const StationsIssueCountCard: React.FC<Props> = (props) => {
                 <ComponentBar
                   componentIds={Object.keys(station.componentMembers)}
                 />
-                <span className="truncate text-sm">
-                  {station.name_translations[intl.locale] ?? station.name}
-                </span>
+                <Link
+                  to={buildLocaleAwareLink(
+                    `/stations/${station.id}`,
+                    intl.locale,
+                  )}
+                  className="hover:underline"
+                >
+                  <span className="truncate text-sm">
+                    {station.name_translations[intl.locale] ?? station.name}
+                  </span>
+                </Link>
               </div>
               <span className="font-bold text-sm">
                 {isHydrated ? <FormattedNumber value={count} /> : count}
