@@ -16,6 +16,8 @@ import {
   FormattedRelativeTime,
   useIntl,
 } from 'react-intl';
+import { Link } from 'react-router';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
   issueTypesDurationMs: {},
@@ -79,10 +81,14 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
         >
           {component.id}
         </span>
-        <span className="ms-1.5 font-bold text-base text-gray-700 dark:text-gray-200">
-          {component.title_translations[intl.locale] ?? component.title}
-        </span>
-
+        <Link
+          className="group"
+          to={buildLocaleAwareLink(`/lines/${component.id}`, intl.locale)}
+        >
+          <span className="ms-1.5 font-bold text-base text-gray-700 group-hover:underline dark:text-gray-200">
+            {component.title_translations[intl.locale] ?? component.title}
+          </span>
+        </Link>
         <div className="ms-auto flex">
           {isComponentInService ? (
             <>

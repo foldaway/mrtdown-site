@@ -25,6 +25,7 @@
   "general.beta": "பீட்டா",
   "general.change_since_last_period": "முந்தைய காலகட்டத்திலிருந்து {change}",
   "general.closed": "மூடிய தேதி",
+  "general.component_description": "{componentName} {startDate} அன்று செயல்பட தொடங்கியது. தற்போது {stationCount, plural, one {# நிலையம் உள்ளது} other {# நிலையங்கள் உள்ளன}}.",
   "general.disruption": "தடை",
   "general.disruption_count": "{count, plural, one { {count} தடை } other { {count} தடைகள் }}",
   "general.disruption_time_average": "சராசரி தடை நேரம்",

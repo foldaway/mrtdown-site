@@ -1,0 +1,222 @@
+import type { ComponentManifest } from '~/types';
+import { assert } from '../util/assert';
+import type { Route } from './+types/($lang).lines.$lineId';
+import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
+import { useHydrated } from '~/hooks/useHydrated';
+import { Fragment, useMemo } from 'react';
+import classNames from 'classnames';
+import { Link } from 'react-router';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { DateTime } from 'luxon';
+
+export async function loader({ params }: Route.LoaderArgs) {
+  const { lineId } = params;
+
+  const res = await fetch(
+    `https://data.mrtdown.foldaway.space/product/component_${lineId}.json`,
+  );
+  assert(res.ok, res.statusText);
+  const componentManifest: ComponentManifest = await res.json();
+  return componentManifest;
+}
+
+export function headers() {
+  return {
+    'Cache-Control': 'max-age=60, s-maxage=60',
+  };
+}
+
+export const meta: Route.MetaFunction = ({ params, data }) => {
+  const { lang = 'en-SG' } = params;
+  const { componentId, componentsById } = data;
+  const component = componentsById[componentId];
+
+  return [
+    {
+      title: `${component.title_translations[lang] ?? component.title} | mrtdown`,
+    },
+  ];
+};
+
+const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
+  const { loaderData } = props;
+  const { componentId, componentsById, stationsByCode } = loaderData;
+
+  const component = componentsById[componentId];
+
+  const intl = useIntl();
+  const isHydrated = useHydrated();
+  const componentName =
+    component.title_translations[intl.locale] ?? component.title;
+
+  const stationCount = useMemo(() => {
+    const idSet = new Set<string>();
+    for (const station of Object.values(stationsByCode)) {
+      const componentMembers = station.componentMembers[componentId];
+      const hasSomeComponentMembersInOperation = componentMembers.some(
+        (member) => {
+          if (member.endedAt != null) {
+            return false;
+          }
+          return DateTime.fromISO(member.startedAt).diffNow().as('days') < 0;
+        },
+      );
+      if (!hasSomeComponentMembersInOperation) {
+        continue;
+      }
+      idSet.add(station.id);
+    }
+    return idSet.size;
+  }, [stationsByCode, componentId]);
+
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-x-2">
+        <span
+          className="rounded-sm px-2 py-0.5 font-semibold text-white text-xs"
+          style={{ backgroundColor: component.color }}
+        >
+          {component.id}
+        </span>
+        <span className="font-bold text-gray-800 text-xl dark:text-gray-100">
+          {componentName}
+        </span>
+      </div>
+
+      {DateTime.fromISO(component.startedAt).diffNow().as('days') < 0 && (
+        <span className="mt-1 text-gray-600 text-sm dark:text-gray-400">
+          <FormattedMessage
+            id="general.component_description"
+            defaultMessage="The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}."
+            values={{
+              stationCount,
+              componentName,
+              startDate: (
+                <FormattedDate
+                  value={component.startedAt}
+                  day="numeric"
+                  month="long"
+                  year="numeric"
+                />
+              ),
+            }}
+          />
+        </span>
+      )}
+
+      <div className="mt-6 flex flex-col gap-y-8">
+        {Object.entries(component.branches).map(
+          ([branchCode, branchStationCodes]) => (
+            <div key={branchCode} className="flex flex-col">
+              <div className="flex flex-wrap gap-y-3 px-12 lg:px-8">
+                {branchStationCodes.map((branchStationCode, index) => (
+                  <div key={branchStationCode} className="flex flex-col">
+                    <div
+                      className={classNames(
+                        'relative flex flex-col items-center justify-end',
+                        {
+                          'h-12 w-24 sm:h-20 lg:w-14':
+                            intl.locale !== 'zh-Hans',
+                          'h-12 w-24 sm:h-10 lg:w-16':
+                            intl.locale === 'zh-Hans',
+                        },
+                      )}
+                    >
+                      <div
+                        className={classNames(
+                          'mb-2 flex transition-transform',
+                          {
+                            'sm:-rotate-45': intl.locale !== 'zh-Hans',
+                          },
+                        )}
+                        style={{
+                          transformOrigin: 'center bottom',
+                        }}
+                      >
+                        <Link
+                          to={buildLocaleAwareLink(
+                            `/stations/${stationsByCode[branchStationCode].id}`,
+                            intl.locale,
+                          )}
+                          className="group flex"
+                        >
+                          <span
+                            className={classNames(
+                              'text-center text-gray-800 text-sm group-hover:underline sm:text-xs dark:text-gray-200',
+                              {
+                                'sm:[writing-mode:vertical-lr]':
+                                  intl.locale !== 'zh-Hans',
+                              },
+                            )}
+                          >
+                            {stationsByCode[branchStationCode]
+                              .name_translations[intl.locale] ??
+                              stationsByCode[branchStationCode].name}
+                          </span>
+                        </Link>
+                      </div>
+                    </div>
+                    <div className="relative row-start-2 row-end-2 flex flex-col items-center gap-y-1">
+                      <div
+                        className={classNames(
+                          'absolute top-0 flex h-4 items-center',
+                          {
+                            'right-0 left-1/2': index === 0,
+                            'right-1/2 left-0':
+                              index === branchStationCodes.length - 1,
+                            'right-0 left-0':
+                              index > 0 &&
+                              index < branchStationCodes.length - 1,
+                          },
+                        )}
+                      >
+                        <div
+                          className="h-1 grow"
+                          style={{
+                            backgroundColor: component.color,
+                          }}
+                        />
+                      </div>
+                      {Object.entries(
+                        stationsByCode[branchStationCode].componentMembers,
+                      )
+                        .sort((a, b) => {
+                          if (a[0] === componentId) {
+                            return -1;
+                          }
+                          if (b[0] === componentId) {
+                            return 1;
+                          }
+                          return 0;
+                        })
+                        .map(([componentId, componentMembers]) => (
+                          <Fragment key={componentId}>
+                            {componentMembers.map((member) => (
+                              <div
+                                key={member.code}
+                                className="z-10 flex h-4 items-center rounded-md px-1.5"
+                                style={{
+                                  backgroundColor:
+                                    componentsById[componentId].color,
+                                }}
+                              >
+                                <span className="font-semibold text-white text-xs">
+                                  {member.code}
+                                </span>
+                              </div>
+                            ))}
+                          </Fragment>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ),
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ComponentPage;

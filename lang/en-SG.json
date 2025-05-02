@@ -25,6 +25,7 @@
   "general.beta": "Beta",
   "general.change_since_last_period": "{change} from {period}",
   "general.closed": "Closed",
+  "general.component_description": "The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}.",
   "general.disruption": "Disruption",
   "general.disruption_count": "{count, plural, one { {count} disruption } other { {count} disruptions }}",
   "general.disruption_time_average": "Disruption time (average)",
