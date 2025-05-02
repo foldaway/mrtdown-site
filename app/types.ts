@@ -63,6 +63,7 @@ export interface Component {
   title_translations: Record<string, string>;
   color: string;
   startedAt: string;
+  branches: Record<string, string[]>;
 }
 
 export type IssueType = 'disruption' | 'maintenance' | 'infra';
@@ -126,6 +127,12 @@ export interface Station {
 export interface StationManifest {
   station: Station;
   issueRefs: IssueRef[];
+}
+
+export interface ComponentManifest {
+  componentId: string;
+  componentsById: Record<string, Component>;
+  stationsByCode: Record<string, Station>;
 }
 
 export interface IssuesHistory {
