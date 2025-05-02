@@ -1,9 +1,9 @@
 import * as Popover from '@radix-ui/react-popover';
-import { DateTime } from 'luxon';
+import type { DateTime } from 'luxon';
 import { useState } from 'react';
 import { useDebounce } from 'use-debounce';
 import { useHydrated } from '../../../hooks/useHydrated';
-import { FormattedMessage } from 'react-intl';
+import { FormattedDate, FormattedMessage } from 'react-intl';
 
 interface Props {
   dateTime: DateTime;
@@ -33,9 +33,16 @@ export const ServiceEndedDateCard: React.FC<Props> = (props) => {
           onMouseLeave={() => setIsOpen(false)}
         >
           <span className="font-bold text-gray-600 text-sm dark:text-gray-300">
-            {isHydrated
-              ? dateTime.toLocaleString(DateTime.DATE_FULL)
-              : dateTime.toISO()}
+            {isHydrated ? (
+              <FormattedDate
+                value={dateTime.toJSDate()}
+                year="numeric"
+                month="short"
+                day="numeric"
+              />
+            ) : (
+              dateTime.toISO()
+            )}
           </span>
 
           <span className="text-gray-500 text-sm dark:text-gray-400">
