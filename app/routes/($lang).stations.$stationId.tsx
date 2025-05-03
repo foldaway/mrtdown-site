@@ -7,6 +7,8 @@ import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/
 import { Fragment, useMemo } from 'react';
 import { DateTime } from 'luxon';
 import { useHydrated } from '~/hooks/useHydrated';
+import { Link } from 'react-router';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 export async function loader({ params }: Route.LoaderArgs) {
   const { stationId } = params;
@@ -120,7 +122,18 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                           className="p-2 align-top"
                           rowSpan={componentMemberEntries.length}
                         >
-                          <ComponentBar componentIds={[componentId]} showName />
+                          <Link
+                            className="flex hover:underline"
+                            to={buildLocaleAwareLink(
+                              `/lines/${componentId}`,
+                              intl.locale,
+                            )}
+                          >
+                            <ComponentBar
+                              componentIds={[componentId]}
+                              showName
+                            />
+                          </Link>
                         </td>
                       )}
 
