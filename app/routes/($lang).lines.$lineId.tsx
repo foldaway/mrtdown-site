@@ -262,7 +262,7 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
                       'relative flex flex-col items-center justify-end',
                       {
                         'h-16 sm:h-32': intl.locale !== 'zh-Hans',
-                        'h-12 sm:h-10': intl.locale === 'zh-Hans',
+                        'h-16 sm:h-12': intl.locale === 'zh-Hans',
                       },
                     )}
                   >
