@@ -65,7 +65,7 @@ export const DateCard: React.FC<Props> = (props) => {
         onMouseLeave={() => setIsOpen(false)}
         className="outline-none"
       >
-        <div className="flex h-7 w-1.5 flex-col-reverse rounded-xs bg-operational-light transition-transform hover:scale-150 dark:bg-operational-dark">
+        <div className="flex h-7 w-1.5 flex-col-reverse overflow-hidden rounded-xs bg-operational-light transition-transform hover:scale-150 dark:bg-operational-dark">
           {Object.entries(percentages).map(
             ([issueType, percentage]) =>
               percentage > 0 && (
