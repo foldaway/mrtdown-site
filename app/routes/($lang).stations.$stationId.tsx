@@ -214,7 +214,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                     >
                       {index === 0 && (
                         <td
-                          className="p-2 align-top"
+                          className="p-2 align-middle"
                           rowSpan={componentMemberEntries.length}
                         >
                           <Link
@@ -242,14 +242,14 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                         </td>
                       )}
 
-                      <td className="p-2">
+                      <td className="p-2 align-middle">
                         <div className="inline-flex items-center rounded-lg border border-gray-300 px-2 py-0.5 dark:border-gray-700">
                           <span className="text-gray-500 text-sm leading-none dark:text-gray-400">
                             {entry.code}
                           </span>
                         </div>
                       </td>
-                      <td className="p-2">
+                      <td className="p-2 align-middle">
                         <span className="text-sm">
                           {isHydrated ? (
                             <>
@@ -278,7 +278,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                           )}
                         </span>
                       </td>
-                      <td className="p-2">
+                      <td className="p-2 align-middle">
                         <span className="text-sm">
                           {entry.endedAt != null ? (
                             <>
