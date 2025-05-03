@@ -118,6 +118,7 @@ export interface Statistics {
     station: Station;
     count: number;
   }[];
+  componentsById: Record<string, Component>;
 }
 
 export interface StationComponentMember {

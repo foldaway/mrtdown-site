@@ -13,6 +13,7 @@ import { DateTime } from 'luxon';
 import { useHydrated } from '~/hooks/useHydrated';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { StationBar } from '~/components/StationBar';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { stationId, lang = 'en-SG' } = params;
@@ -155,25 +156,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-x-1.5">
-        <div className="grid auto-cols-fr grid-flow-col divide-x divide-gray-50 dark:divide-gray-900">
-          {Object.entries(station.componentMembers).map(
-            ([componentId, componentMembers]) => (
-              <Fragment key={componentId}>
-                {componentMembers.map((member) => (
-                  <span
-                    key={member.code}
-                    className="px-1.5 py-1 text-center font-semibold text-white text-xs leading-none first:rounded-tl-md first:rounded-bl-md last:rounded-tr-md last:rounded-br-md"
-                    style={{
-                      backgroundColor: componentsById[componentId].color,
-                    }}
-                  >
-                    {member.code}
-                  </span>
-                ))}
-              </Fragment>
-            ),
-          )}
-        </div>
+        <StationBar station={station} componentsById={componentsById} />
         <span className="font-bold text-gray-800 text-xl dark:text-gray-100">
           {stationName}
         </span>

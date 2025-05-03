@@ -1,10 +1,10 @@
 import type React from 'react';
 import { FormattedMessage, FormattedNumber, useIntl } from 'react-intl';
-import { ComponentBar } from '~/components/ComponentBar';
 import { useHydrated } from '../../../hooks/useHydrated';
 import type { Statistics } from '../../../types';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { StationBar } from '~/components/StationBar';
 
 interface Props {
   statistics: Statistics;
@@ -33,8 +33,9 @@ export const StationsIssueCountCard: React.FC<Props> = (props) => {
               className="flex items-center justify-between px-4 py-1 even:bg-gray-100 dark:even:bg-gray-800"
             >
               <div className="flex items-center gap-x-2">
-                <ComponentBar
-                  componentIds={Object.keys(station.componentMembers)}
+                <StationBar
+                  station={station}
+                  componentsById={statistics.componentsById}
                 />
                 <Link
                   to={buildLocaleAwareLink(
