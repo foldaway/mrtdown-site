@@ -1,8 +1,12 @@
 import type { Route } from './+types/($lang).stations.$stationId';
 import { assert } from '../util/assert';
 import type { StationManifest } from '~/types';
-import { ComponentBar } from '~/components/ComponentBar';
-import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
+import {
+  createIntl,
+  FormattedDate,
+  FormattedMessage,
+  useIntl,
+} from 'react-intl';
 import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
 import { Fragment, useMemo } from 'react';
 import { DateTime } from 'luxon';
@@ -10,15 +14,66 @@ import { useHydrated } from '~/hooks/useHydrated';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
-export async function loader({ params }: Route.LoaderArgs) {
-  const { stationId } = params;
+export async function loader({ params, context }: Route.LoaderArgs) {
+  const { stationId, lang = 'en-SG' } = params;
+
+  const rootUrl = context.cloudflare.env.CF_PAGES_URL;
 
   const res = await fetch(
     `https://data.mrtdown.foldaway.space/product/station_${stationId}.json`,
   );
   assert(res.ok, res.statusText);
   const stationManifest: StationManifest = await res.json();
-  return stationManifest;
+
+  const { default: messages } = await import(`../../lang/${lang}.json`);
+
+  const intl = createIntl({
+    locale: lang,
+    messages,
+  });
+
+  const { station } = stationManifest;
+
+  const stationName = station.name_translations[lang] ?? station.name;
+
+  const title = `${intl.formatMessage(
+    {
+      id: 'general.station_title',
+      defaultMessage: '{stationName} Station',
+    },
+    { stationName },
+  )} | mrtdown`;
+
+  const stationCodes = new Set<string>();
+  for (const members of Object.values(station.componentMembers)) {
+    for (const member of members) {
+      stationCodes.add(member.code);
+    }
+  }
+
+  const description = intl.formatMessage(
+    {
+      id: 'general.station_description',
+      defaultMessage:
+        '{stationName} is served by {lines}, with station codes {stationCodes}.',
+    },
+    {
+      stationName,
+      lines: intl.formatList(
+        Object.keys(stationManifest.station.componentMembers),
+      ),
+      stationCodes: intl.formatList(Array.from(stationCodes)),
+    },
+  );
+
+  return {
+    stationManifest,
+    title,
+    description,
+    stationName,
+    stationCodes: Array.from(stationCodes),
+    rootUrl,
+  };
 }
 
 export function headers() {
@@ -27,19 +82,58 @@ export function headers() {
   };
 }
 
-export const meta: Route.MetaFunction = ({ params, data }) => {
-  const { lang = 'en-SG' } = params;
+export const meta: Route.MetaFunction = ({ data, location }) => {
+  const { title, description, stationName, stationCodes, rootUrl } = data;
+
+  const ogUrl = new URL(location.pathname, rootUrl).toString();
+  const ogImage = new URL('/og_image.png', rootUrl).toString();
 
   return [
     {
-      title: `${data.station.name_translations[lang] ?? data.station.name} | mrtdown`,
+      title,
+    },
+    {
+      property: 'og:title',
+      content: title,
+    },
+    {
+      property: 'og:type',
+      content: 'website',
+    },
+    {
+      property: 'og:description',
+      content: description,
+    },
+    {
+      property: 'og:url',
+      content: ogUrl,
+    },
+    {
+      property: 'og:image',
+      content: ogImage,
+    },
+    {
+      'script:ld+json': {
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        name: title,
+        mainEntity: {
+          '@type': 'TrainStation',
+          name: stationName,
+          alternateName: stationCodes.join(' / '),
+          description,
+        },
+        url: ogUrl,
+        image: ogImage,
+      },
     },
   ];
 };
 
 const StationPage: React.FC<Route.ComponentProps> = (props) => {
   const { loaderData } = props;
-  const { station, componentsById } = loaderData;
+  const { stationManifest } = loaderData;
+  const { station, componentsById } = stationManifest;
 
   const intl = useIntl();
   const isHydrated = useHydrated();
@@ -92,7 +186,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
           values={{
             stationName,
             lines: intl.formatList(
-              Object.keys(loaderData.station.componentMembers),
+              Object.keys(stationManifest.station.componentMembers),
             ),
             stationCodes: intl.formatList(stationCodes),
           }}
@@ -242,12 +336,12 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
           id="general.issues_with_count"
           defaultMessage="Issues ({count})"
           values={{
-            count: loaderData.issueRefs.length,
+            count: stationManifest.issueRefs.length,
           }}
         />
       </h2>
       <div className="mt-1 flex flex-col gap-y-2">
-        {loaderData.issueRefs.map((issueRef) => (
+        {stationManifest.issueRefs.map((issueRef) => (
           <IssueRefViewer key={issueRef.id} issueRef={issueRef} />
         ))}
       </div>

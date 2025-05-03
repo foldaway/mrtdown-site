@@ -51,6 +51,7 @@
   "general.station_description": "{stationName} is served by {lines}, with station codes {stationCodes}.",
   "general.station_details": "Station Details",
   "general.station_issue_counts": "Issue Count by Station",
+  "general.station_title": "{stationName} Station",
   "general.statistics": "Statistics",
   "general.system_map": "System Map",
   "general.there_are_ongoing_issues": "Issues ongoing",
