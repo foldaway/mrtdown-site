@@ -1,23 +1,81 @@
 import type { ComponentManifest } from '~/types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).lines.$lineId';
-import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
-import { useHydrated } from '~/hooks/useHydrated';
+import {
+  createIntl,
+  FormattedDate,
+  FormattedMessage,
+  useIntl,
+} from 'react-intl';
 import { Fragment, useMemo } from 'react';
 import classNames from 'classnames';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { DateTime } from 'luxon';
 
-export async function loader({ params }: Route.LoaderArgs) {
-  const { lineId } = params;
+export async function loader({ params, context }: Route.LoaderArgs) {
+  const { lineId, lang = 'en-SG' } = params;
+
+  const rootUrl = context.cloudflare.env.CF_PAGES_URL;
 
   const res = await fetch(
     `https://data.mrtdown.foldaway.space/product/component_${lineId}.json`,
   );
   assert(res.ok, res.statusText);
+
   const componentManifest: ComponentManifest = await res.json();
-  return componentManifest;
+  const component = componentManifest.componentsById[lineId];
+
+  const stationIds = new Set<string>();
+  for (const station of Object.values(componentManifest.stationsByCode)) {
+    const componentMembers = station.componentMembers[lineId];
+    const hasSomeComponentMembersInOperation = componentMembers.some(
+      (member) => {
+        if (member.endedAt != null) {
+          return false;
+        }
+        return DateTime.fromISO(member.startedAt).diffNow().as('days') < 0;
+      },
+    );
+    if (!hasSomeComponentMembersInOperation) {
+      continue;
+    }
+    stationIds.add(station.id);
+  }
+
+  const { default: messages } = await import(`../../lang/${lang}.json`);
+
+  const intl = createIntl({
+    locale: lang,
+    messages,
+  });
+
+  const componentName = component.title_translations[lang] ?? component.title;
+  const title = `${componentName} | mrtdown`;
+
+  const description = intl.formatMessage(
+    {
+      id: 'general.component_description',
+      defaultMessage:
+        'The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}.',
+    },
+    {
+      stationCount: stationIds.size,
+      componentName,
+      startDate: intl.formatDate(component.startedAt, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+    },
+  );
+
+  return {
+    title,
+    description,
+    componentManifest,
+    rootUrl,
+  };
 }
 
 export function headers() {
@@ -26,26 +84,86 @@ export function headers() {
   };
 }
 
-export const meta: Route.MetaFunction = ({ params, data }) => {
+export const meta: Route.MetaFunction = ({ params, data, location }) => {
   const { lang = 'en-SG' } = params;
-  const { componentId, componentsById } = data;
+  const { title, description, componentManifest, rootUrl } = data;
+  const { componentId, componentsById, stationsByCode } = componentManifest;
   const component = componentsById[componentId];
+  const componentName = component.title_translations[lang] ?? component.title;
+
+  const ogUrl = new URL(location.pathname, rootUrl).toString();
+  const ogImage = new URL('/og_image.png', rootUrl).toString();
+
+  const stations = Object.fromEntries(
+    Object.values(stationsByCode).map((station) => {
+      return [station.id, station];
+    }),
+  );
 
   return [
     {
-      title: `${component.title_translations[lang] ?? component.title} | mrtdown`,
+      title,
+    },
+    {
+      property: 'og:title',
+      content: title,
+    },
+    {
+      property: 'og:type',
+      content: 'website',
+    },
+    {
+      property: 'og:description',
+      content: description,
+    },
+    {
+      property: 'og:url',
+      content: ogUrl,
+    },
+    {
+      property: 'og:image',
+      content: ogImage,
+    },
+    {
+      'script:ld+json': {
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        name: title,
+        mainEntity: {
+          '@type': 'Place',
+          name: componentName,
+          identifier: component.id,
+          containsPlace: Object.values(stations).map((station) => {
+            const stationName = station.name_translations[lang] ?? station.name;
+
+            const stationCodes = new Set<string>();
+            for (const members of Object.values(station.componentMembers)) {
+              for (const member of members) {
+                stationCodes.add(member.code);
+              }
+            }
+
+            return {
+              '@type': 'TrainStation',
+              name: stationName,
+              alternateName: Array.from(stationCodes).join(' / '),
+            };
+          }),
+        },
+        url: ogUrl,
+      },
     },
   ];
 };
 
 const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
   const { loaderData } = props;
-  const { componentId, componentsById, stationsByCode } = loaderData;
+  const { componentManifest } = loaderData;
+  const { componentId, componentsById, stationsByCode } = componentManifest;
 
   const component = componentsById[componentId];
 
   const intl = useIntl();
-  const isHydrated = useHydrated();
   const componentName =
     component.title_translations[intl.locale] ?? component.title;
 
