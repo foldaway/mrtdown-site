@@ -104,22 +104,47 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
         </span>
       )}
 
-      <div className="mt-6 flex flex-col gap-y-8">
+      <div className="mt-6 flex flex-col gap-y-16">
         {Object.entries(component.branches).map(([branchCode, branch]) => (
           <div key={branchCode} className="flex flex-col">
-            <h2 className="font-bold text-gray-800 text-lg dark:text-gray-100">
-              {branch.title_translations[intl.locale] ?? branch.title}
-            </h2>
+            <div className="flex items-center gap-x-2">
+              <h2 className="font-bold text-gray-800 text-lg dark:text-gray-100">
+                {branch.title_translations[intl.locale] ?? branch.title}
+              </h2>
 
-            <div className="flex flex-wrap gap-y-3 px-12 lg:px-8">
+              <div className="rounded bg-gray-300 px-2 py-1 text-gray-500 text-xs dark:bg-gray-700 dark:text-gray-400">
+                {branch.startedAt == null ? (
+                  <FormattedMessage
+                    id="status.not_in_service"
+                    defaultMessage="Not in Service"
+                  />
+                ) : (
+                  <>
+                    {branch.endedAt == null ? (
+                      <FormattedMessage
+                        id="general.opened"
+                        defaultMessage="Opened"
+                      />
+                    ) : (
+                      <FormattedMessage
+                        id="general.closed"
+                        defaultMessage="Closed"
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-y-4 sm:px-12 lg:px-8">
               {branch.stationCodes.map((branchStationCode, index) => (
                 <div key={branchStationCode} className="flex flex-col">
                   <div
                     className={classNames(
                       'relative flex flex-col items-center justify-end',
                       {
-                        'h-12 w-24 sm:h-20 lg:w-14': intl.locale !== 'zh-Hans',
-                        'h-12 w-24 sm:h-10 lg:w-16': intl.locale === 'zh-Hans',
+                        'h-16 w-24 sm:h-32 lg:w-14': intl.locale !== 'zh-Hans',
+                        'h-12 w-24 sm:h-10 lg:w-20': intl.locale === 'zh-Hans',
                       },
                     )}
                   >
