@@ -51,6 +51,7 @@
   "general.station_description": "{stationName} நிலையம் {lines} வழித்தடங்களில் சேவை செய்யப்படுகிறது; நிலைய குறியீடுகள் {stationCodes} ஆகும்.",
   "general.station_details": "நிலைய விவரங்கள்",
   "general.station_issue_counts": "நிலையங்கள் வாரியான பிரச்சனை எண்ணிக்கை",
+  "general.station_title": "{stationName} நிலையம்",
   "general.statistics": "புள்ளிவிவரங்கள்",
   "general.system_map": "முறைகள் வரைபடம்",
   "general.there_are_ongoing_issues": "சிக்கல்கள் தொடர்கின்றன",

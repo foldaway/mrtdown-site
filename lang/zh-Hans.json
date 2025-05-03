@@ -51,6 +51,7 @@
   "general.station_description": "{stationName}由{lines}线服务，地铁站编号为{stationCodes}。",
   "general.station_details": "地铁站详情",
   "general.station_issue_counts": "各地铁站事故数量",
+  "general.station_title": "{stationName}地铁站",
   "general.statistics": "统计数据",
   "general.system_map": "地铁路线图",
   "general.there_are_ongoing_issues": "系统故障中",

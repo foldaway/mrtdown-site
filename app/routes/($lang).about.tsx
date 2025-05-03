@@ -8,29 +8,52 @@ export function headers() {
   };
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, context }: Route.LoaderArgs) {
   const { lang = 'en-SG' } = params;
+  const rootUrl = context.cloudflare.env.CF_PAGES_URL;
   const { default: messages } = await import(`../../lang/${lang}.json`);
-
-  return {
-    messages,
-  };
-}
-
-export const meta: Route.MetaFunction = ({ data, params }) => {
-  const { lang = 'en-SG' } = params;
 
   const intl = createIntl({
     locale: lang,
-    messages: data.messages,
+    messages,
   });
+
+  const title = `${intl.formatMessage({
+    id: 'general.about',
+    defaultMessage: 'About',
+  })} | mrtdown`;
+
+  return {
+    title,
+    rootUrl,
+  };
+}
+
+export const meta: Route.MetaFunction = ({ data, location }) => {
+  const { title, rootUrl } = data;
+
+  const ogUrl = new URL(location.pathname, rootUrl).toString();
+  const ogImage = new URL('/og_image.png', rootUrl).toString();
 
   return [
     {
-      title: `${intl.formatMessage({
-        id: 'general.about',
-        defaultMessage: 'About',
-      })} | mrtdown`,
+      title,
+    },
+    {
+      property: 'og:title',
+      content: title,
+    },
+    {
+      property: 'og:type',
+      content: 'website',
+    },
+    {
+      property: 'og:url',
+      content: ogUrl,
+    },
+    {
+      property: 'og:image',
+      content: ogImage,
     },
   ];
 };

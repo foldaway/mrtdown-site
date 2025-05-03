@@ -1,4 +1,3 @@
-import type { MetaFunction } from 'react-router';
 import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
 import type { IssueStationEntry, Overview } from '../types';
 
@@ -9,7 +8,9 @@ import type { Route } from './+types/($lang).system-map';
 import { StatusBanner } from '~/components/StatusBanner';
 import { createIntl } from 'react-intl';
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, context }: Route.LoaderArgs) {
+  const rootUrl = context.cloudflare.env.CF_PAGES_URL;
+
   const res = await fetch(
     'https://data.mrtdown.foldaway.space/product/overview.json',
   );
@@ -20,7 +21,17 @@ export async function loader({ params }: Route.LoaderArgs) {
   const { lang = 'en-SG' } = params;
   const { default: messages } = await import(`../../lang/${lang}.json`);
 
-  return { overview, messages };
+  const intl = createIntl({
+    locale: lang,
+    messages,
+  });
+
+  const title = `${intl.formatMessage({
+    id: 'general.system_map',
+    defaultMessage: 'System Map',
+  })} | mrtdown`;
+
+  return { overview, title, rootUrl };
 }
 
 export function headers() {
@@ -29,20 +40,31 @@ export function headers() {
   };
 }
 
-export const meta: Route.MetaFunction = ({ data, params }) => {
-  const { lang = 'en-SG' } = params;
+export const meta: Route.MetaFunction = ({ data, location }) => {
+  const { title, rootUrl } = data;
 
-  const intl = createIntl({
-    locale: lang,
-    messages: data.messages,
-  });
+  const ogUrl = new URL(location.pathname, rootUrl).toString();
+  const ogImage = new URL('/og_image.png', rootUrl).toString();
 
   return [
     {
-      title: `${intl.formatMessage({
-        id: 'general.system_map',
-        defaultMessage: 'System Map',
-      })} | mrtdown`,
+      title,
+    },
+    {
+      property: 'og:title',
+      content: title,
+    },
+    {
+      property: 'og:type',
+      content: 'website',
+    },
+    {
+      property: 'og:url',
+      content: ogUrl,
+    },
+    {
+      property: 'og:image',
+      content: ogImage,
     },
   ];
 };

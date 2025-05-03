@@ -51,6 +51,7 @@
   "general.station_description": "{stationName} dilayan oleh laluan {lines}, dengan kod stesen {stationCodes}.",
   "general.station_details": "Butiran Stesen",
   "general.station_issue_counts": "Bilangan Insiden Mengikut Stesen",
+  "general.station_title": "Stesen {stationName}",
   "general.statistics": "Statistik",
   "general.system_map": "Peta Sistem",
   "general.there_are_ongoing_issues": "Gangguan sedang berlaku",

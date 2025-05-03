@@ -1,6 +1,5 @@
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
-import type { MetaFunction } from 'react-router';
 import { ComponentOutlook } from '../components/ComponentOutlook';
 import { computeComponentBreakdown } from '../components/ComponentOutlook/helpers/computeComponentBreakdowns';
 import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
@@ -12,14 +11,19 @@ import type { Route } from './+types/($lang)._index';
 import { StatusBanner } from '~/components/StatusBanner';
 import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
 
-export async function loader() {
+export async function loader({ context }: Route.LoaderArgs) {
+  const rootUrl = context.cloudflare.env.CF_PAGES_URL;
+
   const res = await fetch(
     'https://data.mrtdown.foldaway.space/product/overview.json',
   );
   assert(res.ok, res.statusText);
   const overview: Overview = await res.json();
   patchDatesForOngoingIssues(overview.dates, overview.issuesOngoing);
-  return overview;
+  return {
+    overview,
+    rootUrl,
+  };
 }
 
 export function headers() {
@@ -28,16 +32,38 @@ export function headers() {
   };
 }
 
-export const meta: MetaFunction = () => {
+export const meta: Route.MetaFunction = ({ data, location }) => {
+  const { rootUrl } = data;
+
+  const ogUrl = new URL(location.pathname, rootUrl).toString();
+  const ogImage = new URL('/og_image.png', rootUrl).toString();
+
   return [
     {
       title: 'mrtdown',
+    },
+    {
+      property: 'og:title',
+      content: 'mrtdown',
+    },
+    {
+      property: 'og:type',
+      content: 'website',
+    },
+    {
+      property: 'og:url',
+      content: ogUrl,
+    },
+    {
+      property: 'og:image',
+      content: ogImage,
     },
   ];
 };
 
 const HomePage: React.FC<Route.ComponentProps> = (props) => {
   const { loaderData } = props;
+  const { overview } = loaderData;
 
   const viewport = useViewport();
   const dateCount = useMemo<number>(() => {
@@ -67,16 +93,16 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
   }, [dateCount]);
 
   const componentBreakdowns = useMemo(() => {
-    return computeComponentBreakdown(loaderData);
-  }, [loaderData]);
+    return computeComponentBreakdown(overview);
+  }, [overview]);
 
   return (
     <div className="flex flex-col">
       <div className="mb-3 flex flex-col">
-        <StatusBanner hasOngoingIssues={loaderData.issuesOngoing.length > 0} />
+        <StatusBanner hasOngoingIssues={overview.issuesOngoing.length > 0} />
       </div>
 
-      {loaderData.issuesOngoing.map((issue) => (
+      {overview.issuesOngoing.map((issue) => (
         <IssueRefViewer key={issue.id} issueRef={issue} />
       ))}
 
