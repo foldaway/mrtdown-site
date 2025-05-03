@@ -235,7 +235,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                           rowSpan={componentMemberEntries.length}
                         >
                           <Link
-                            className="group flex items-center gap-x-1"
+                            className="group flex flex-wrap items-center gap-x-1 gap-y-0.5"
                             to={buildLocaleAwareLink(
                               `/lines/${componentId}`,
                               intl.locale,
