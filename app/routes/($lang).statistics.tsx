@@ -6,7 +6,9 @@ import type { Route } from './+types/($lang).statistics';
 import { assert } from '../util/assert';
 import { createIntl } from 'react-intl';
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, context }: Route.LoaderArgs) {
+  const rootUrl = context.cloudflare.env.CF_PAGES_URL;
+
   const res = await fetch(
     'https://data.mrtdown.foldaway.space/product/statistics.json',
   );
@@ -17,9 +19,20 @@ export async function loader({ params }: Route.LoaderArgs) {
   const { lang = 'en-SG' } = params;
   const { default: messages } = await import(`../../lang/${lang}.json`);
 
+  const intl = createIntl({
+    locale: lang,
+    messages,
+  });
+
+  const title = `${intl.formatMessage({
+    id: 'general.statistics',
+    defaultMessage: 'Statistics',
+  })} | mrtdown`;
+
   return {
     statistics,
-    messages,
+    title,
+    rootUrl,
   };
 }
 
@@ -29,20 +42,31 @@ export function headers() {
   };
 }
 
-export const meta: Route.MetaFunction = ({ params, data }) => {
-  const { lang = 'en-SG' } = params;
+export const meta: Route.MetaFunction = ({ data, location }) => {
+  const { title, rootUrl } = data;
 
-  const intl = createIntl({
-    locale: lang,
-    messages: data.messages,
-  });
+  const ogUrl = new URL(location.pathname, rootUrl).toString();
+  const ogImage = new URL('/og_image.png', rootUrl).toString();
 
   return [
     {
-      title: `${intl.formatMessage({
-        id: 'general.statistics',
-        defaultMessage: 'Statistics',
-      })} | mrtdown`,
+      title,
+    },
+    {
+      property: 'og:title',
+      content: title,
+    },
+    {
+      property: 'og:type',
+      content: 'website',
+    },
+    {
+      property: 'og:url',
+      content: ogUrl,
+    },
+    {
+      property: 'og:image',
+      content: ogImage,
     },
   ];
 };
