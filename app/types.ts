@@ -136,6 +136,7 @@ export interface Station {
 export interface StationManifest {
   station: Station;
   issueRefs: IssueRef[];
+  componentsById: Record<string, Component>;
 }
 
 export interface ComponentManifest {

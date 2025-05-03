@@ -4,11 +4,10 @@ import { useIntl } from 'react-intl';
 
 interface Props {
   componentId: string;
-  showName?: boolean;
 }
 
 export const ComponentPill: React.FC<Props> = (props) => {
-  const { componentId, showName } = props;
+  const { componentId } = props;
 
   const intl = useIntl();
 
@@ -36,11 +35,6 @@ export const ComponentPill: React.FC<Props> = (props) => {
       >
         {data.id}
       </span>
-      {showName && (
-        <span className="text-sm">
-          {data.title_translations[intl.locale] ?? data.title}
-        </span>
-      )}
     </>
   );
 };

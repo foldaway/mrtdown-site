@@ -39,7 +39,7 @@ export const meta: Route.MetaFunction = ({ params, data }) => {
 
 const StationPage: React.FC<Route.ComponentProps> = (props) => {
   const { loaderData } = props;
-  const { station } = loaderData;
+  const { station, componentsById } = loaderData;
 
   const intl = useIntl();
   const isHydrated = useHydrated();
@@ -60,8 +60,26 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center gap-x-2">
-        <ComponentBar componentIds={Object.keys(station.componentMembers)} />
+      <div className="flex items-center gap-x-1.5">
+        <div className="grid auto-cols-fr grid-flow-col divide-x divide-gray-50 dark:divide-gray-900">
+          {Object.entries(station.componentMembers).map(
+            ([componentId, componentMembers]) => (
+              <Fragment key={componentId}>
+                {componentMembers.map((member) => (
+                  <span
+                    key={member.code}
+                    className="px-1.5 py-1 text-center font-semibold text-white text-xs leading-none first:rounded-tl-md first:rounded-bl-md last:rounded-tr-md last:rounded-br-md"
+                    style={{
+                      backgroundColor: componentsById[componentId].color,
+                    }}
+                  >
+                    {member.code}
+                  </span>
+                ))}
+              </Fragment>
+            ),
+          )}
+        </div>
         <span className="font-bold text-gray-800 text-xl dark:text-gray-100">
           {stationName}
         </span>
@@ -123,16 +141,26 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                           rowSpan={componentMemberEntries.length}
                         >
                           <Link
-                            className="flex hover:underline"
+                            className="group flex items-center gap-x-1"
                             to={buildLocaleAwareLink(
                               `/lines/${componentId}`,
                               intl.locale,
                             )}
                           >
-                            <ComponentBar
-                              componentIds={[componentId]}
-                              showName
-                            />
+                            <span
+                              className="rounded-md px-2 py-1 font-semibold text-white text-xs leading-none"
+                              style={{
+                                backgroundColor:
+                                  componentsById[componentId].color,
+                              }}
+                            >
+                              {componentId}
+                            </span>
+                            <span className="text-sm group-hover:underline">
+                              {componentsById[componentId].title_translations[
+                                intl.locale
+                              ] ?? componentsById[componentId].title}
+                            </span>
                           </Link>
                         </td>
                       )}
