@@ -1,15 +1,15 @@
 import { DateTime } from 'luxon';
-import type { IssueMaintenanceUpdate } from '../../../../../types';
+import type { IssueMaintenanceUpdate } from '../../../types';
 import { useMemo } from 'react';
 import { ClockIcon } from '@heroicons/react/24/solid';
-import { useHydrated } from '../../../../../hooks/useHydrated';
+import { useHydrated } from '../../../hooks/useHydrated';
 import { FormattedDate, useIntl } from 'react-intl';
 
 interface Props {
   update: IssueMaintenanceUpdate;
 }
 
-export const Update: React.FC<Props> = (props) => {
+export const UpdateMaintenance: React.FC<Props> = (props) => {
   const { update } = props;
 
   const createdAt = useMemo(

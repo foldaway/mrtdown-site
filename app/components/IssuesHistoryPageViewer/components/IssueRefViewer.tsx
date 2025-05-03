@@ -14,6 +14,8 @@ import { useHydrated } from '../../../hooks/useHydrated';
 import { FormattedDateTimeRange, FormattedMessage, useIntl } from 'react-intl';
 import { FormattedDuration } from '~/components/FormattedDuration';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { assert } from '~/util/assert';
+import { IssueSubtypeLabels } from '~/constants';
 
 interface Props {
   issueRef: IssueRef;
@@ -38,8 +40,10 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
     if (endAt == null) {
       return null;
     }
+    const interval = Interval.fromDateTimes(startAt, endAt);
+    assert(interval.isValid);
     return {
-      interval: Interval.fromDateTimes(startAt, endAt),
+      interval,
       durationWithinServiceHours: calculateDurationWithinServiceHours(
         startAt,
         endAt,
@@ -63,13 +67,16 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
   return (
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
       <Link
-        className={classNames('group flex items-center gap-x-2 px-4 py-2', {
-          'bg-disruption-light dark:bg-disruption-dark':
-            issueRef.type === 'disruption',
-          'bg-maintenance-light dark:bg-maintenance-dark':
-            issueRef.type === 'maintenance',
-          'bg-infra-light dark:bg-infra-dark': issueRef.type === 'infra',
-        })}
+        className={classNames(
+          'group flex items-center justify-between gap-x-2 gap-y-0.5 px-4 py-2',
+          {
+            'bg-disruption-light dark:bg-disruption-dark':
+              issueRef.type === 'disruption',
+            'bg-maintenance-light dark:bg-maintenance-dark':
+              issueRef.type === 'maintenance',
+            'bg-infra-light dark:bg-infra-dark': issueRef.type === 'infra',
+          },
+        )}
         to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
       >
         {issueRef.type === 'disruption' && (
@@ -81,20 +88,29 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
         {issueRef.type === 'infra' && (
           <BuildingOfficeIcon className="size-5 shrink-0 text-gray-50 dark:text-gray-200" />
         )}
-        <h2 className="font-bold text-base text-gray-50 group-hover:underline dark:text-gray-200">
-          {issueRef.title}
-        </h2>
+        <div className="flex grow flex-wrap items-center justify-between gap-x-2 overflow-hidden">
+          <h2 className="truncate font-bold text-base text-gray-50 group-hover:underline dark:text-gray-200">
+            {issueRef.title}
+          </h2>
+
+          <div className="inline-flex items-center gap-x-1">
+            {issueRef.subtypes.map((subtype) => (
+              <div
+                key={subtype}
+                className="flex rounded-md bg-gray-300 px-2 py-1 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+              >
+                <span className="font-bold text-xs leading-none">
+                  <FormattedMessage {...IssueSubtypeLabels[subtype]} />
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </Link>
-      <div className="flex flex-col justify-between gap-1.5 bg-gray-200 px-4 py-2 sm:flex-row sm:items-center dark:bg-gray-700">
-        <div className="inline-flex items-center">
-          <span className="me-1 text-gray-500 text-xs dark:text-gray-400">
-            <FormattedMessage
-              id="general.affected_components_stations"
-              defaultMessage="Affected:"
-            />
-          </span>
+      <div className="flex justify-between gap-1.5 bg-gray-200 px-4 py-2 sm:items-center dark:bg-gray-800">
+        <div className="inline-flex flex-wrap items-center gap-x-1.5">
           <ComponentBar componentIds={issueRef.componentIdsAffected} />
-          <span className="ms-1 text-gray-500 text-xs dark:text-gray-400">
+          <span className="text-gray-500 text-xs dark:text-gray-400">
             <FormattedMessage
               id="general.station_count"
               defaultMessage="{count, plural, one { {count} stations } other { {count} stations }}"
@@ -102,31 +118,36 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
             />
           </span>
         </div>
-        <span className="text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
-          {dateTimeInfo == null ? (
-            <FormattedMessage
-              id="general.ongoing_timestamp"
-              defaultMessage="{start, date, medium} {start, time, short} to present"
-              values={{
-                start: startAt.toJSDate(),
-              }}
-            />
-          ) : (
-            <>
-              {isHydrated ? (
-                <FormattedDateTimeRange
-                  from={startAt.toJSDate()}
-                  to={endAt!.toJSDate()}
-                  month="short"
-                  day="numeric"
-                  year="numeric"
-                  hour="numeric"
-                  minute="numeric"
-                />
-              ) : (
-                dateTimeInfo.interval.toISO()
-              )}{' '}
-              [
+        <div className="flex flex-col text-end">
+          <span className="truncate font-bold text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
+            {dateTimeInfo == null ? (
+              <FormattedMessage
+                id="general.ongoing_timestamp"
+                defaultMessage="{start, date, medium} {start, time, short} to present"
+                values={{
+                  start: startAt.toJSDate(),
+                }}
+              />
+            ) : (
+              <>
+                {isHydrated ? (
+                  <FormattedDateTimeRange
+                    from={startAt.toJSDate()}
+                    to={endAt!.toJSDate()}
+                    month="short"
+                    day="numeric"
+                    year="numeric"
+                    hour="numeric"
+                    minute="numeric"
+                  />
+                ) : (
+                  dateTimeInfo.interval.toISO()
+                )}
+              </>
+            )}
+          </span>
+          {dateTimeInfo != null && (
+            <span className="text-gray-400 text-xs dark:border-gray-300 dark:text-gray-500">
               {isHydrated ? (
                 <FormattedMessage
                   id="general.uptime_duration_display"
@@ -145,10 +166,9 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
               ) : (
                 dateTimeInfo.durationWithinServiceHours.toISO()
               )}
-              ]
-            </>
+            </span>
           )}
-        </span>
+        </div>
       </div>
     </div>
   );
