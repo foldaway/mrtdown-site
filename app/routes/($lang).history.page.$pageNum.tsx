@@ -13,7 +13,9 @@ import type { Route } from './+types/($lang).history.page.$pageNum';
 import { createIntl, FormattedDateTimeRange } from 'react-intl';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, context }: Route.LoaderArgs) {
+  const rootUrl = context.cloudflare.env.CF_PAGES_URL;
+
   const { pageNum } = params;
 
   const pageNumber = Number.parseInt(pageNum, 10);
@@ -30,7 +32,22 @@ export async function loader({ params }: Route.LoaderArgs) {
   const { lang = 'en-SG' } = params;
   const { default: messages } = await import(`../../lang/${lang}.json`);
 
-  return { history, page, messages };
+  const intl = createIntl({
+    locale: lang,
+    messages,
+  });
+
+  const title = `${intl.formatMessage(
+    {
+      id: 'site.title_history',
+      defaultMessage: 'Incident History - Page {num}',
+    },
+    {
+      num: params.pageNum,
+    },
+  )} | mrtdown`;
+
+  return { history, page, title, rootUrl };
 }
 
 export function headers() {
@@ -39,25 +56,31 @@ export function headers() {
   };
 }
 
-export const meta: Route.MetaFunction = ({ data, params }) => {
-  const { lang = 'en-SG' } = params;
+export const meta: Route.MetaFunction = ({ data, location }) => {
+  const { title, rootUrl } = data;
 
-  const intl = createIntl({
-    locale: lang,
-    messages: data.messages,
-  });
+  const ogUrl = new URL(location.pathname, rootUrl).toString();
+  const ogImage = new URL('/og_image.png', rootUrl).toString();
 
   return [
     {
-      title: `${intl.formatMessage(
-        {
-          id: 'site.title_history',
-          defaultMessage: 'Incident History - Page {num}',
-        },
-        {
-          num: params.pageNum,
-        },
-      )} | mrtdown`,
+      title,
+    },
+    {
+      property: 'og:title',
+      content: title,
+    },
+    {
+      property: 'og:type',
+      content: 'website',
+    },
+    {
+      property: 'og:url',
+      content: ogUrl,
+    },
+    {
+      property: 'og:image',
+      content: ogImage,
     },
   ];
 };
