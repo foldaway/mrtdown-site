@@ -57,13 +57,22 @@ export interface IssueInfra extends IssueBase {
 
 export type Issue = IssueDisruption | IssueMaintenance | IssueInfra;
 
+export interface ComponentBranch {
+  id: string;
+  title: string;
+  title_translations: Record<string, string>;
+  startedAt: string | null;
+  endedAt: string | null;
+  stationCodes: string[];
+}
+
 export interface Component {
   id: string;
   title: string;
   title_translations: Record<string, string>;
   color: string;
   startedAt: string;
-  branches: Record<string, string[]>;
+  branches: Record<string, ComponentBranch>;
 }
 
 export type IssueType = 'disruption' | 'maintenance' | 'infra';
