@@ -254,15 +254,15 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-y-4 sm:px-12 lg:px-8">
+            <div className="grid grid-cols-3 justify-between gap-y-4 sm:px-12 md:grid-cols-6 lg:grid-cols-12 lg:px-8">
               {branch.stationCodes.map((branchStationCode, index) => (
                 <div key={branchStationCode} className="flex flex-col">
                   <div
                     className={classNames(
                       'relative flex flex-col items-center justify-end',
                       {
-                        'h-16 w-24 sm:h-32 lg:w-14': intl.locale !== 'zh-Hans',
-                        'h-12 w-24 sm:h-10 lg:w-20': intl.locale === 'zh-Hans',
+                        'h-16 sm:h-32': intl.locale !== 'zh-Hans',
+                        'h-16 sm:h-12': intl.locale === 'zh-Hans',
                       },
                     )}
                   >

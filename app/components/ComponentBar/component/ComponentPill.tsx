@@ -30,7 +30,7 @@ export const ComponentPill: React.FC<Props> = (props) => {
   return (
     <>
       <span
-        className="rounded-sm px-2 py-0.5 font-semibold text-white text-xs"
+        className="rounded-sm px-2 py-1 font-semibold text-white text-xs leading-none"
         style={{ backgroundColor: data.color }}
       >
         {data.id}

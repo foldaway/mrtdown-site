@@ -175,7 +175,7 @@ export default function App(props: Route.ComponentProps) {
             <FormattedDate value={DateTime.now().toJSDate()} year="numeric" />{' '}
             mrtdown
           </span>
-          <span className="text-gray-500 text-sm italic">
+          <span className="text-center text-gray-500 text-sm italic">
             <FormattedMessage
               id="footer.disclaimer"
               defaultMessage="This is an independent platform not affiliated with any public transport operator."

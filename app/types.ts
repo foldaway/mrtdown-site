@@ -26,9 +26,21 @@ export interface IssueDisruptionUpdate {
   text: string;
 }
 
+export type IssueDisruptionSubtype =
+  | 'signal.fault'
+  | 'track.fault'
+  | 'train.fault'
+  | 'power.fault'
+  | 'security'
+  | 'weather'
+  | 'passenger.incident'
+  | 'platform_door.fault'
+  | 'delay';
+
 export interface IssueDisruption extends IssueBase {
   type: 'disruption';
   updates: IssueDisruptionUpdate[];
+  subtypes: IssueDisruptionSubtype[];
 }
 
 export interface IssueMaintenanceUpdate {
@@ -38,10 +50,16 @@ export interface IssueMaintenanceUpdate {
   text: string;
 }
 
+export type IssueMaintenanceSubtype =
+  | 'track.work'
+  | 'station.renovation'
+  | 'system.upgrade';
+
 export interface IssueMaintenance extends IssueBase {
   type: 'maintenance';
   cancelledAt: string | null;
   updates: IssueMaintenanceUpdate[];
+  subtypes: IssueMaintenanceSubtype[];
 }
 export interface IssueInfraUpdate {
   type: 'operator.update';
@@ -50,9 +68,15 @@ export interface IssueInfraUpdate {
   text: string;
 }
 
+export type IssueInfraSubtype =
+  | 'elevator.outage'
+  | 'escalator.outage'
+  | 'air_conditioning.issue';
+
 export interface IssueInfra extends IssueBase {
   type: 'infra';
   updates: IssueInfraUpdate[];
+  subtypes: IssueInfraSubtype[];
 }
 
 export type Issue = IssueDisruption | IssueMaintenance | IssueInfra;
@@ -85,6 +109,11 @@ export interface IssueRef {
   stationIdsAffected: IssueStationEntry[];
   startAt: string;
   endAt: string | null;
+  subtypes: (
+    | IssueDisruptionSubtype
+    | IssueMaintenanceSubtype
+    | IssueInfraSubtype
+  )[];
 }
 
 export interface DateSummary {
@@ -118,6 +147,7 @@ export interface Statistics {
     station: Station;
     count: number;
   }[];
+  componentsById: Record<string, Component>;
 }
 
 export interface StationComponentMember {

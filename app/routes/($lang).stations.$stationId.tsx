@@ -13,6 +13,7 @@ import { DateTime } from 'luxon';
 import { useHydrated } from '~/hooks/useHydrated';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { StationBar } from '~/components/StationBar';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { stationId, lang = 'en-SG' } = params;
@@ -155,25 +156,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-x-1.5">
-        <div className="grid auto-cols-fr grid-flow-col divide-x divide-gray-50 dark:divide-gray-900">
-          {Object.entries(station.componentMembers).map(
-            ([componentId, componentMembers]) => (
-              <Fragment key={componentId}>
-                {componentMembers.map((member) => (
-                  <span
-                    key={member.code}
-                    className="px-1.5 py-1 text-center font-semibold text-white text-xs leading-none first:rounded-tl-md first:rounded-bl-md last:rounded-tr-md last:rounded-br-md"
-                    style={{
-                      backgroundColor: componentsById[componentId].color,
-                    }}
-                  >
-                    {member.code}
-                  </span>
-                ))}
-              </Fragment>
-            ),
-          )}
-        </div>
+        <StationBar station={station} componentsById={componentsById} />
         <span className="font-bold text-gray-800 text-xl dark:text-gray-100">
           {stationName}
         </span>
@@ -231,11 +214,11 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                     >
                       {index === 0 && (
                         <td
-                          className="p-2 align-top"
+                          className="p-2 align-middle"
                           rowSpan={componentMemberEntries.length}
                         >
                           <Link
-                            className="group flex items-center gap-x-1"
+                            className="group flex flex-wrap items-center gap-x-1 gap-y-0.5"
                             to={buildLocaleAwareLink(
                               `/lines/${componentId}`,
                               intl.locale,
@@ -259,14 +242,14 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                         </td>
                       )}
 
-                      <td className="p-2">
+                      <td className="p-2 align-middle">
                         <div className="inline-flex items-center rounded-lg border border-gray-300 px-2 py-0.5 dark:border-gray-700">
                           <span className="text-gray-500 text-sm leading-none dark:text-gray-400">
                             {entry.code}
                           </span>
                         </div>
                       </td>
-                      <td className="p-2">
+                      <td className="p-2 align-middle">
                         <span className="text-sm">
                           {isHydrated ? (
                             <>
@@ -295,7 +278,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                           )}
                         </span>
                       </td>
-                      <td className="p-2">
+                      <td className="p-2 align-middle">
                         <span className="text-sm">
                           {entry.endedAt != null ? (
                             <>
