@@ -1,15 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FormattedMessage, useIntl } from 'react-intl';
-import type {
-  IssueStationEntry,
-  StationIndex,
-  StationTranslatedNames,
-} from '~/types';
+import { FormattedList, FormattedMessage, useIntl } from 'react-intl';
+import type { IssueStationEntry, StationTranslatedNames } from '~/types';
 import { segmentText } from './helpers/segmentText';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useNavigate } from 'react-router';
+import { Link } from 'react-router';
 
 interface Props {
   stationIdsAffected: IssueStationEntry[];
@@ -17,18 +14,10 @@ interface Props {
 }
 
 export const StationMap: React.FC<Props> = (props) => {
-  const { stationIdsAffected, componentIdsAffected } = props;
+  const { stationIdsAffected } = props;
 
   const intl = useIntl();
   const navigate = useNavigate();
-
-  const stationIndexQuery = useQuery<StationIndex>({
-    queryKey: ['station-index'],
-    queryFn: () =>
-      fetch(
-        'https://data.mrtdown.foldaway.space/product/station_index.json',
-      ).then((r) => r.json()),
-  });
 
   const stationTranslatedNamesQuery = useQuery<StationTranslatedNames>({
     queryKey: ['station-translated-names', intl.locale],
@@ -38,24 +27,20 @@ export const StationMap: React.FC<Props> = (props) => {
       ).then((r) => r.json()),
   });
 
-  const stationCodes = useMemo(() => {
-    return stationIndexQuery.data ?? {};
-  }, [stationIndexQuery.data]);
-
   const stationTranslatedNames = useMemo(() => {
     return stationTranslatedNamesQuery.data ?? {};
   }, [stationTranslatedNamesQuery.data]);
 
   const [ref, setRef] = useState<SVGElement | null>(null);
 
-  const stationCount = useMemo(() => {
+  const stationIds = useMemo(() => {
     const result = new Set<string>();
     for (const entry of stationIdsAffected) {
       for (const stationId of entry.stationIds) {
         result.add(stationId);
       }
     }
-    return result.size;
+    return result;
   }, [stationIdsAffected]);
 
   useEffect(() => {
@@ -63,16 +48,29 @@ export const StationMap: React.FC<Props> = (props) => {
       return;
     }
 
+    const linesByStationId: Record<string, Set<string>> = {};
+    const linesPatchedByStationId: Record<string, Set<string>> = {};
+    const componentByLineId: Record<string, string> = {};
+
     for (const entry of stationIdsAffected) {
       for (const stationId of entry.stationIds) {
-        let patchedLineCount = 0;
-
-        const stationCodeCount = stationCodes[stationId]?.length ?? 0;
-
+        // Retrieve all lines connected to this station
         const lineElements = [
           ...ref.querySelectorAll(`[id^='line_${stationId.toLowerCase()}:']`),
           ...ref.querySelectorAll(`[id$=':${stationId.toLowerCase()}']`),
         ] as SVGGElement[];
+
+        for (const lineElement of lineElements) {
+          const linesStation = linesByStationId[stationId] ?? new Set();
+          linesStation.add(lineElement.id);
+          linesByStationId[stationId] = linesStation;
+
+          const parentElement = lineElement.parentElement;
+          if (parentElement != null) {
+            const lineComponentId = parentElement.id.replace(/^line_/, '');
+            componentByLineId[lineElement.id] = lineComponentId;
+          }
+        }
 
         for (const otherStationId of entry.stationIds) {
           if (stationId === otherStationId) {
@@ -84,51 +82,74 @@ export const StationMap: React.FC<Props> = (props) => {
               case `line_${stationId.toLowerCase()}:${otherStationId.toLowerCase()}`:
               case `line_${otherStationId.toLowerCase()}:${stationId.toLowerCase()}`: {
                 lineElement.style.opacity = '0.3';
-                patchedLineCount++;
+
+                const linesPatchedStation =
+                  linesPatchedByStationId[stationId] ?? new Set();
+                linesPatchedStation.add(lineElement.id);
+                linesPatchedByStationId[stationId] = linesPatchedStation;
+                const linePatchedOtherStation =
+                  linesPatchedByStationId[otherStationId] ?? new Set();
+                linePatchedOtherStation.add(lineElement.id);
+                linesPatchedByStationId[otherStationId] =
+                  linePatchedOtherStation;
+
                 break;
               }
             }
           }
         }
+      }
+    }
+
+    for (const entry of stationIdsAffected) {
+      for (const stationId of entry.stationIds) {
+        const lines = linesByStationId[stationId] ?? new Set();
+        const patchedLines = linesPatchedByStationId[stationId] ?? new Set();
 
         const nodeElement: SVGGElement | null = ref.querySelector(
           `#node_${stationId.toLowerCase()}`,
         );
 
-        const unpatchedLineCount = lineElements.length - patchedLineCount;
-        if (unpatchedLineCount === 1 && stationCodeCount === 1) {
-          // There is only one unpatched line left, it should be greyed out as the current station is an orphan node
-          for (const lineElement of lineElements) {
-            lineElement.style.opacity = '0.3';
+        const lineCountForComponent = Array.from(lines).filter((lineId) => {
+          const lineComponentId = componentByLineId[lineId];
+          return (
+            lineComponentId.toLowerCase() === entry.componentId.toLowerCase()
+          );
+        }).length;
+
+        const patchedLineCountForComponent = Array.from(patchedLines).filter(
+          (lineId) => {
+            const lineComponentId = componentByLineId[lineId];
+            return (
+              lineComponentId.toLowerCase() === entry.componentId.toLowerCase()
+            );
+          },
+        ).length;
+
+        if (
+          nodeElement != null &&
+          patchedLineCountForComponent === lineCountForComponent
+        ) {
+          // All SVG lines connected to this station for the entry's component have been patched out
+          const componentElement: SVGGElement | null =
+            nodeElement.querySelector(
+              `[id^='${entry.componentId.toLowerCase()}']`,
+            );
+          if (componentElement != null) {
+            // Patch out the section of the station node for the entry's component
+            componentElement.style.opacity = '0.3';
           }
-          patchedLineCount++;
         }
 
-        if (patchedLineCount < lineElements.length) {
-          // Patch out component parts
-
-          if (nodeElement != null) {
-            for (const componentId of componentIdsAffected) {
-              const componentElement: SVGGElement | null =
-                nodeElement.querySelector(
-                  `[id^='${componentId.toLowerCase()}']`,
-                );
-              if (componentElement != null) {
-                componentElement.style.opacity = '0.3';
-              }
-            }
+        if (patchedLines.size === lines.size) {
+          // All SVG lines connected to this station have been patched out
+          const labelElement: SVGGElement | null = ref.querySelector(
+            `#label_${stationId.toLowerCase()}`,
+          );
+          if (labelElement != null) {
+            // Patch out the station label
+            labelElement.style.opacity = '0.3';
           }
-          continue;
-        }
-
-        if (nodeElement != null) {
-          nodeElement.style.opacity = '0.3';
-        }
-        const labelElement: SVGGElement | null = ref.querySelector(
-          `#label_${stationId.toLowerCase()}`,
-        );
-        if (labelElement != null) {
-          labelElement.style.opacity = '0.3';
         }
       }
     }
@@ -201,15 +222,7 @@ export const StationMap: React.FC<Props> = (props) => {
         titleElement.textContent = stationTranslatedNames[stationId];
       }
     }
-  }, [
-    ref,
-    stationIdsAffected,
-    componentIdsAffected,
-    stationCodes,
-    stationTranslatedNames,
-    intl.locale,
-    navigate,
-  ]);
+  }, [ref, stationIdsAffected, stationTranslatedNames, intl.locale, navigate]);
 
   return (
     <div className="flex flex-col fill-gray-800 dark:fill-gray-50">
@@ -221,8 +234,54 @@ export const StationMap: React.FC<Props> = (props) => {
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <title>MRT/LRT System Map</title>
-        <g id="Frame 3">
+        <title>
+          {intl.formatMessage({
+            id: 'general.system_map',
+            defaultMessage: 'System Map',
+          })}
+        </title>
+        <g id="System Map">
+          <g id="u/c">
+            <line
+              id="Line 10"
+              x1="2601"
+              y1="1416.5"
+              x2="2913"
+              y2="1416.5"
+              stroke="#969696"
+            />
+            <line
+              id="Line 11"
+              x1="2784"
+              y1="1200.5"
+              x2="2913"
+              y2="1200.5"
+              stroke="#969696"
+            />
+            <path id="Line 12" d="M2913.5 1200V1417" stroke="#969696" />
+            <g id="Frame 2">
+              <rect
+                x="2892"
+                y="1296"
+                width="43"
+                height="25"
+                rx="4"
+                fill="#969696"
+              />
+              <text
+                id="U/C"
+                fill="white"
+                font-family="Radio Canada Big"
+                font-size="16"
+                font-weight="500"
+                letter-spacing="0em"
+              >
+                <tspan x="2900" y="1314.02">
+                  U/C
+                </tspan>
+              </text>
+            </g>
+          </g>
           <g id="line_ccl">
             <path
               id="line_cdt:btn"
@@ -232,7 +291,7 @@ export const StationMap: React.FC<Props> = (props) => {
             />
             <path
               id="line_frr:hlv"
-              d="M924.871 1233.87C924.871 1233.87 916.5 1256 911 1271.5C905.5 1287 900.871 1312.87 900.871 1312.87"
+              d="M924.871 1233.87C924.871 1233.87 916.5 1256 911 1271.5C905.5 1287 901 1310 901 1310"
               stroke="#FF9E18"
               stroke-width="6"
             />
@@ -244,7 +303,7 @@ export const StationMap: React.FC<Props> = (props) => {
             />
             <path
               id="line_bnv:onh"
-              d="M878.5 1482C878.5 1482 878.5 1494.5 879.994 1513.5C881.488 1532.5 882.5 1542.5 882.5 1542.5"
+              d="M878.5 1482C878.5 1482 878.5 1494.5 879.994 1513.5C881.488 1532.5 882 1539.5 882 1539.5"
               stroke="#FF9E18"
               stroke-width="6"
             />
@@ -256,13 +315,13 @@ export const StationMap: React.FC<Props> = (props) => {
             />
             <path
               id="line_krg:hpv"
-              d="M908.818 1666.97C908.818 1666.97 917 1693 919.5 1699.5C922 1706 931.818 1729.97 931.818 1729.97"
+              d="M910 1669.5C910 1669.5 917 1693 919.5 1699.5C922 1706 931.818 1729.97 931.818 1729.97"
               stroke="#FF9E18"
               stroke-width="6"
             />
             <path
               id="line_hpv:ppj"
-              d="M946.806 1759.36C946.806 1759.36 953.5 1776.5 959 1784.5C964.5 1792.5 972.657 1808.61 972.657 1808.61"
+              d="M946.806 1759.36C946.806 1759.36 953.5 1776.5 959 1784.5C964.5 1792.5 971 1805 971 1805"
               stroke="#FF9E18"
               stroke-width="6"
             />
@@ -305,25 +364,25 @@ export const StationMap: React.FC<Props> = (props) => {
             />
             <path
               id="line_pmn:nch"
-              d="M2052.41 1829.49C2052.41 1829.49 2068.5 1806 2074.5 1795C2080.5 1784 2090.41 1764.49 2090.41 1764.49"
+              d="M2052.41 1829.49C2052.41 1829.49 2068.5 1806 2074.5 1795C2080.5 1784 2092 1760 2092 1760"
               stroke="#FF9E18"
               stroke-width="6"
             />
             <path
               id="line_nch:sdm"
-              d="M2106 1732C2106 1732 2115 1713 2119.5 1699C2124 1685 2129.62 1665.06 2129.62 1665.06"
+              d="M2107.5 1728C2107.5 1728 2115 1713 2119.5 1699C2124 1685 2129.62 1665.06 2129.62 1665.06"
               stroke="#FF9E18"
               stroke-width="6"
             />
             <path
               id="line_sdm:mbt"
-              d="M2139.05 1636.48C2139.05 1636.48 2144.5 1612.5 2146.5 1600C2148.5 1587.5 2151.8 1564.35 2151.8 1564.35"
+              d="M2139.05 1636.48C2139.05 1636.48 2144.5 1612.5 2146.5 1600C2148.5 1587.5 2151.5 1566.5 2151.5 1566.5"
               stroke="#FF9E18"
               stroke-width="6"
             />
             <path
               id="line_mbt:dkt"
-              d="M2155 1536C2155 1536 2158.43 1518 2158.43 1502.5C2158.43 1487 2158.43 1466.81 2158.43 1466.81"
+              d="M2155.5 1537C2155.5 1537 2158.43 1515 2158.43 1499.5C2158.43 1484 2158.43 1466.81 2158.43 1466.81"
               stroke="#FF9E18"
               stroke-width="6"
             />
@@ -347,19 +406,19 @@ export const StationMap: React.FC<Props> = (props) => {
             />
             <path
               id="line_tsg:bly"
-              d="M2019.45 1067.46C2019.45 1067.46 1996.5 1040 1991 1034C1985.5 1028 1961.8 1005.04 1961.8 1005.04"
+              d="M2015 1061C2015 1061 1996.5 1040 1991 1034C1985.5 1028 1961.8 1005.03 1961.8 1005.03"
               stroke="#FF9E18"
               stroke-width="6"
             />
             <path
-              id="line_bly:srg"
+              id="line_bly:ser"
               d="M1929.77 976.358C1929.77 976.358 1893.5 949 1889 945.5C1884.5 942 1847.28 918.455 1847.28 918.455"
               stroke="#FF9E18"
               stroke-width="6"
             />
             <path
               id="line_srg:lrc"
-              d="M1773 880.83C1773 880.83 1735 866.5 1728 863.5C1721 860.5 1682 848.83 1682 848.83"
+              d="M1773 880.83C1773 880.83 1735 866.5 1728 863.5C1721 860.5 1696.5 851 1696.5 851"
               stroke="#FF9E18"
               stroke-width="6"
             />
@@ -371,13 +430,13 @@ export const StationMap: React.FC<Props> = (props) => {
             />
             <path
               id="line_bsh:mrm"
-              d="M1413.61 836.938C1413.61 836.938 1382 843 1374 845C1366 847 1333.5 856 1333.5 856"
+              d="M1413.61 836.938C1413.61 836.938 1382 843 1374 845C1366 847 1336.5 855.5 1336.5 855.5"
               stroke="#FF9E18"
               stroke-width="6"
             />
             <path
               id="line_mrm:cdt"
-              d="M1290 870.5C1290 870.5 1264.5 881 1255 884.5C1245.5 888 1227 898 1227 898"
+              d="M1279 871C1279 871 1264 876.5 1250.5 884C1237 891.5 1227 898 1227 898"
               stroke="#FF9E18"
               stroke-width="6"
             />
@@ -764,7 +823,7 @@ export const StationMap: React.FC<Props> = (props) => {
             />
             <path
               id="line_hvl:otp"
-              d="M1196.59 1531.48C1196.59 1531.48 1196.59 1605.5 1196.59 1616.5C1196.59 1627.5 1201 1632.5 1206.5 1640.5C1212 1648.5 1222.5 1659 1222.5 1659L1340.59 1776.48"
+              d="M1196.59 1534C1196.59 1534 1196.59 1605.5 1196.59 1616.5C1196.59 1627.5 1201 1632.5 1206.5 1640.5C1212 1648.5 1222.5 1659 1222.5 1659L1340.59 1776.48"
               stroke="#9D5918"
               stroke-width="6"
             />
@@ -1037,54 +1096,39 @@ export const StationMap: React.FC<Props> = (props) => {
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_hvw:hme"
-                x1="743"
-                y1="830"
-                x2="743"
-                y2="853"
+                d="M743 830V851"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_hme:btw"
-                x1="743"
-                y1="880"
-                x2="743"
-                y2="903"
+                d="M743 880V903"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_btw:kap"
-                x1="743"
-                y1="930"
-                x2="743"
-                y2="953"
+                d="M743 930V954.5"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_kap:sav"
-                x1="743"
-                y1="981"
-                x2="743"
-                y2="1004"
+                d="M743 982.5V1004"
                 stroke="#0055B8"
                 stroke-width="6"
               />
               <path
                 id="line_sav:tkk"
-                d="M741.888 1028.67C741.888 1028.67 744.5 1050.5 755.5 1066C766.5 1081.5 777.5 1085.33 787 1089C796.5 1092.67 820.888 1092.67 820.888 1092.67"
+                d="M742.5 1032C742.5 1032 744.5 1050.5 755.5 1066C766.5 1081.5 772.5 1082.33 782 1086C791.5 1089.67 813 1091 813 1091"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_tkk:btn"
-                x1="866"
-                y1="1091"
-                x2="944"
-                y2="1091"
+                d="M872 1091L944 1091"
                 stroke="#0055B8"
                 stroke-width="6"
               />
@@ -1144,13 +1188,13 @@ export const StationMap: React.FC<Props> = (props) => {
               />
               <path
                 id="line_bft:dtn"
-                d="M1848 1990C1848 1990 1831.5 1997 1822.5 1999.5C1813.5 2002 1793.61 2002.94 1793.61 2002.94"
+                d="M1848 1990C1848 1990 1838.9 1997 1829.9 1999.5C1820.9 2002 1801 2002.94 1801 2002.94"
                 stroke="#0055B8"
                 stroke-width="6"
               />
               <path
                 id="line_dtn:tla"
-                d="M1746.5 2003C1746.5 2003 1719 2003.82 1710 2001C1701 1998.18 1687 1991.5 1682 1987.5C1677 1983.5 1601.38 1910.52 1601.38 1910.52"
+                d="M1742.5 2003.5C1742.5 2003.5 1719 2003.82 1710 2001C1701 1998.18 1687 1991.5 1682 1987.5C1677 1983.5 1601.38 1910.52 1601.38 1910.52"
                 stroke="#0055B8"
                 stroke-width="6"
               />
@@ -1171,61 +1215,46 @@ export const StationMap: React.FC<Props> = (props) => {
               />
               <path
                 id="line_fcn:bcl"
-                d="M1706.15 1594C1706.15 1594 1694 1600 1682 1605.5C1670 1611 1624.5 1609 1624.5 1609L1407.5 1607.5"
+                d="M1706.15 1594C1706.15 1594 1694 1600 1682 1605.5C1670 1611 1624.5 1609 1624.5 1609L1415 1607.5"
                 stroke="#0055B8"
                 stroke-width="6"
               />
               <line
                 id="line_bcl:jlb"
                 x1="1784.12"
-                y1="1514.8"
+                y1="1514.79"
                 x2="1734.12"
-                y2="1564.8"
+                y2="1564.79"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_jlb:bdm"
-                x1="1884.13"
-                y1="1415.11"
-                x2="1810.13"
-                y2="1489.73"
+                d="M1884.13 1415.11L1815.24 1484"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_bdm:glb"
-                x1="1953.81"
-                y1="1346.12"
-                x2="1912.81"
-                y2="1387.12"
+                d="M1953.81 1346.12L1917.5 1382.43"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_glb:mtr"
-                x1="2024.73"
-                y1="1274.92"
-                x2="1981.73"
-                y2="1317.92"
+                d="M2024.73 1274.92L1985.15 1314.5"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_mtr:mps"
-                x1="2090.96"
-                y1="1209.01"
-                x2="2052.96"
-                y2="1247.01"
+                d="M2090.96 1209.01L2055.46 1244.5"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_mps:ubi"
-                x1="2172.18"
-                y1="1128.1"
-                x2="2129.18"
-                y2="1171.1"
+                d="M2166 1134.28L2129.18 1171.1"
                 stroke="#0055B8"
                 stroke-width="6"
               />
@@ -1249,25 +1278,19 @@ export const StationMap: React.FC<Props> = (props) => {
               />
               <path
                 id="line_bdn:bdr"
-                d="M2435.48 941.961C2435.48 941.961 2388.5 941.961 2385 941.961C2381.5 941.961 2370 944.5 2366 946C2362 947.5 2349.48 955.961 2349.48 955.961"
+                d="M2427 941.961C2427 941.961 2388.5 941.961 2385 941.961C2381.5 941.961 2370 944.5 2366 946C2362 947.5 2353 952.5 2353 952.5"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_bdr:tpw"
-                x1="2564"
-                y1="942"
-                x2="2483"
-                y2="942"
+                d="M2554.5 942H2484.5"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_tpw:tam"
-                x1="2729"
-                y1="942"
-                x2="2610"
-                y2="942"
+                d="M2729 942L2613 942"
                 stroke="#0055B8"
                 stroke-width="6"
               />
@@ -1277,21 +1300,15 @@ export const StationMap: React.FC<Props> = (props) => {
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_tpe:upc"
-                x1="2843"
-                y1="1057"
-                x2="2843"
-                y2="1016"
+                d="M2843 1058.5L2843 1016"
                 stroke="#0055B8"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_upc:xpo"
-                x1="2843"
-                y1="1153"
-                x2="2843"
-                y2="1084"
+                d="M2843 1153L2843 1088"
                 stroke="#0055B8"
                 stroke-width="6"
               />
@@ -1314,13 +1331,13 @@ export const StationMap: React.FC<Props> = (props) => {
             <g id="line_bplrt">
               <path
                 id="line_jlp:snj"
-                d="M702.055 580.467C702.055 580.467 699 573.5 698 570C697 566.5 696.055 555.467 696.055 555.467"
+                d="M702.055 580.467C702.055 580.467 699 573.5 698 570C697 566.5 696.5 559 696.5 559"
                 stroke="#718472"
                 stroke-width="4"
               />
               <path
                 id="line_snj:bkp"
-                d="M743.227 646.925C743.227 646.925 740.5 633.5 739.5 630C738.5 626.5 735.5 619.5 733 616C730.5 612.5 719.227 600.925 719.227 600.925"
+                d="M743.227 646.925C743.227 646.925 740.5 633.5 739.5 630C738.5 626.5 735.5 619.5 733 616C730.5 612.5 721 603.5 721 603.5"
                 stroke="#718472"
                 stroke-width="4"
               />
@@ -1348,12 +1365,9 @@ export const StationMap: React.FC<Props> = (props) => {
                 stroke="#718472"
                 stroke-width="4"
               />
-              <line
+              <path
                 id="line_pnx:bkp"
-                x1="713"
-                y1="668"
-                x2="661"
-                y2="668"
+                d="M713 668L659.5 668"
                 stroke="#718472"
                 stroke-width="4"
               />
@@ -1365,16 +1379,13 @@ export const StationMap: React.FC<Props> = (props) => {
               />
               <path
                 id="line_ptr:pnd"
-                d="M787 555.5C787 555.5 787 562.5 786 568.5C785 574.5 782.92 580.56 782.92 580.56"
+                d="M787.5 557.5C787.5 557.5 787 562.5 786 568.5C785 574.5 782.92 580.56 782.92 580.56"
                 stroke="#718472"
                 stroke-width="4"
               />
-              <line
+              <path
                 id="line_pnd:bkt"
-                x1="787"
-                y1="509"
-                x2="787"
-                y2="534"
+                d="M787 511L787 534"
                 stroke="#718472"
                 stroke-width="4"
               />
@@ -1390,32 +1401,23 @@ export const StationMap: React.FC<Props> = (props) => {
                 stroke="#718472"
                 stroke-width="4"
               />
-              <line
+              <path
                 id="line_sgr:jlp"
-                x1="697"
-                y1="534"
-                x2="697"
-                y2="509"
+                d="M697 535.5L697 510.5"
                 stroke="#718472"
                 stroke-width="4"
               />
-              <line
+              <path
                 id="line_cck:shv"
-                x1="568"
-                y1="894"
-                x2="568"
-                y2="937"
+                d="M568 895.5L568 937"
                 stroke="#718472"
                 stroke-width="4"
               />
             </g>
             <g id="line_nsl">
-              <line
+              <path
                 id="line_jur:bbt"
-                x1="520"
-                y1="1283"
-                x2="520"
-                y2="1449"
+                d="M520 1285.5L520 1449"
                 stroke="#E1251B"
                 stroke-width="6"
               />
@@ -1431,7 +1433,7 @@ export const StationMap: React.FC<Props> = (props) => {
               <line
                 id="line_bgb:cck"
                 x1="520"
-                y1="971.001"
+                y1="971"
                 x2="520"
                 y2="1109"
                 stroke="#E1251B"
@@ -1446,87 +1448,69 @@ export const StationMap: React.FC<Props> = (props) => {
                 stroke="#E1251B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_ywt:krj"
-                x1="520"
-                y1="624"
-                x2="520"
-                y2="764"
+                d="M520 624L520 762.5"
                 stroke="#E1251B"
                 stroke-width="6"
               />
               <path
                 id="line_krj:msl"
-                d="M595.725 434.255C595.725 434.255 564.5 465 555.5 479C546.5 493 534 520 528 536.5C522 553 520 597.5 520 597.5"
+                d="M593.5 435C593.5 435 564.5 465 555.5 479C546.5 493 532 525.501 528 536.5C524 547.5 520 595 520 595"
                 stroke="#E1251B"
                 stroke-width="6"
               />
               <path
                 id="line_msl:wdl"
-                d="M781.614 379.936C781.614 379.936 741 379.936 731.5 379.936C722 379.936 686 386 673.5 390C661 394 629 410.5 629 410.5"
+                d="M781.614 379.936C781.614 379.936 741 379.936 731.5 379.936C722 379.936 686 386 673.5 390C661 394 634.5 406.5 634.5 406.5"
                 stroke="#E1251B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_wdl:adm"
-                x1="893"
-                y1="381"
-                x2="958"
-                y2="381"
+                d="M893 381L953.5 381"
                 stroke="#E1251B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_adm:sbw"
-                x1="1003"
-                y1="381"
-                x2="1091"
-                y2="381"
+                d="M1010.5 381L1084.5 381"
                 stroke="#E1251B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_sbw:cbr"
-                x1="1136"
-                y1="381"
-                x2="1224"
-                y2="381"
+                d="M1142.5 381L1219.5 380"
                 stroke="#E1251B"
                 stroke-width="6"
               />
               <path
                 id="line_cbr:yis"
-                d="M1270.86 381.125C1270.86 381.125 1307.5 386.5 1319.5 390.5C1331.5 394.5 1365 411.5 1365 411.5"
+                d="M1276 381.5C1276 381.5 1307.5 386.5 1319.5 390.5C1331.5 394.5 1360.5 410 1360.5 410"
                 stroke="#E1251B"
                 stroke-width="6"
               />
               <path
                 id="line_yis:ktb"
-                d="M1401 437C1401 437 1419.5 457 1426.5 464.5C1433.5 472 1447 496 1447 496"
+                d="M1403.5 438.5C1403.5 438.5 1419.5 457 1426.5 464.5C1433.5 472 1447 496 1447 496"
                 stroke="#E1251B"
                 stroke-width="6"
               />
               <path
                 id="line_ktb:yck"
-                d="M1458.95 522.442C1458.95 522.442 1468 552.5 1469.5 559.5C1471 566.5 1472.95 596.442 1472.95 596.442"
+                d="M1460.5 526.5C1460.5 526.5 1468 552.5 1469.5 559.5C1471 566.5 1473 599 1473 599"
                 stroke="#E1251B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_yck:amk"
-                x1="1473"
-                y1="624"
-                x2="1473"
-                y2="699"
+                d="M1473 626.5L1473 699"
                 stroke="#E1251B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_amk:bsh"
-                x1="1473"
-                y1="725"
-                x2="1473"
-                y2="811"
+                d="M1473 727L1473 811"
                 stroke="#E1251B"
                 stroke-width="6"
               />
@@ -1539,27 +1523,21 @@ export const StationMap: React.FC<Props> = (props) => {
                 stroke="#E1251B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_bdl:tap"
-                x1="1473"
-                y1="910"
-                x2="1473"
-                y2="981"
+                d="M1473 912.5L1473 978"
                 stroke="#E1251B"
                 stroke-width="6"
               />
               <path
                 id="line_tap:nov"
-                d="M1472.68 1008.34C1472.68 1008.34 1472.68 1034 1470 1044C1467.32 1054 1461.5 1059.5 1454.5 1067C1447.5 1074.5 1429.68 1094.34 1429.68 1094.34"
+                d="M1472.5 1006.5C1472.5 1006.5 1472.68 1034 1470 1044C1467.32 1054 1461.5 1059.5 1454.5 1067C1447.5 1074.5 1429.68 1094.34 1429.68 1094.34"
                 stroke="#E1251B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_nov:new"
-                x1="1402.18"
-                y1="1121.06"
-                x2="1354.18"
-                y2="1172.06"
+                d="M1397.5 1124.5L1354.19 1172.05"
                 stroke="#E1251B"
                 stroke-width="6"
               />
@@ -1575,12 +1553,9 @@ export const StationMap: React.FC<Props> = (props) => {
                 stroke="#E1251B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_som:dbg"
-                x1="1334.09"
-                y1="1455.84"
-                x2="1428.09"
-                y2="1546.84"
+                d="M1340.24 1459L1428.09 1546.84"
                 stroke="#E1251B"
                 stroke-width="6"
               />
@@ -1610,7 +1585,7 @@ export const StationMap: React.FC<Props> = (props) => {
               />
               <path
                 id="line_mrb:msp"
-                d="M1666.71 2056.54C1666.71 2056.54 1669 2090.5 1682 2103.5C1695 2116.5 1707.5 2125.58 1726.5 2127.54C1745.5 2129.5 1768.71 2127.54 1768.71 2127.54"
+                d="M1666.71 2056.54C1666.71 2056.54 1669 2090.5 1682 2103.5C1695 2116.5 1707.5 2125.58 1726.5 2127.54C1745.5 2129.5 1766 2128.5 1766 2128.5"
                 stroke="#E1251B"
                 stroke-width="6"
               />
@@ -1672,52 +1647,37 @@ export const StationMap: React.FC<Props> = (props) => {
               />
               <path
                 id="line_lks:bnl"
-                d="M185 1372C185 1372 184.5 1404 187.5 1417.5C190.5 1431 202.5 1447 217.5 1457.5C232.5 1468 265 1466 265 1466"
+                d="M185 1372C185 1372 184.5 1404 187.5 1417.5C190.5 1431 202.5 1447 217.5 1457.5C232.5 1468 257.5 1466.5 257.5 1466.5"
                 stroke="#00953B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_cng:lks"
-                x1="376"
-                y1="1466"
-                x2="311"
-                y2="1466"
+                d="M372 1466H314"
                 stroke="#00953B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_jur:cng"
-                x1="464"
-                y1="1466"
-                x2="422"
-                y2="1466"
+                d="M464 1466H427.5"
                 stroke="#00953B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_cle:jur"
-                x1="645"
-                y1="1466"
-                x2="575"
-                y2="1466"
+                d="M639.5 1466H575"
                 stroke="#00953B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_dvr:cle"
-                x1="746"
-                y1="1466"
-                x2="690"
-                y2="1466"
+                d="M739 1466H695.5"
                 stroke="#00953B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_bnv:dvr"
-                x1="823"
-                y1="1466"
-                x2="791"
-                y2="1466"
+                d="M823 1466H796"
                 stroke="#00953B"
                 stroke-width="6"
               />
@@ -1730,39 +1690,27 @@ export const StationMap: React.FC<Props> = (props) => {
                 stroke="#00953B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_que:com"
-                x1="1015.92"
-                y1="1572.16"
-                x2="986.916"
-                y2="1544.16"
+                d="M1015.92 1572.16L988.5 1546"
                 stroke="#00953B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_rdh:que"
-                x1="1086.9"
-                y1="1642.15"
-                x2="1044.9"
-                y2="1601.15"
+                d="M1085.26 1640.5L1048 1603.24"
                 stroke="#00953B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_tib:rdh"
-                x1="1158.93"
-                y1="1711.17"
-                x2="1117.19"
-                y2="1671.34"
+                d="M1158.93 1711.17L1119.5 1673.5"
                 stroke="#00953B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_otp:tib"
-                x1="1225.9"
-                y1="1777.14"
-                x2="1189.3"
-                y2="1741.16"
+                d="M1225.9 1777.14L1191.5 1742.74"
                 stroke="#00953B"
                 stroke-width="6"
               />
@@ -1817,12 +1765,9 @@ export const StationMap: React.FC<Props> = (props) => {
                 stroke="#00953B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_alj:kal"
-                x1="2044.12"
-                y1="1432.12"
-                x2="2007.12"
-                y2="1469.12"
+                d="M2042.5 1433.74L2007.12 1469.12"
                 stroke="#00953B"
                 stroke-width="6"
               />
@@ -1855,16 +1800,13 @@ export const StationMap: React.FC<Props> = (props) => {
               />
               <path
                 id="line_bdk:kem"
-                d="M2462.53 1059.58C2462.53 1059.58 2441 1059.58 2436 1059.58C2431 1059.58 2419 1063 2411.5 1067C2404 1071 2394.5 1080.5 2394.5 1080.5L2348.55 1127.38"
+                d="M2457.5 1059.58C2457.5 1059.58 2441 1059.58 2436 1059.58C2431 1059.58 2419 1063 2411.5 1067C2404 1071 2394.5 1080.5 2394.5 1080.5L2348.55 1127.38"
                 stroke="#00953B"
                 stroke-width="6"
               />
-              <line
+              <path
                 id="line_tnm:bdk"
-                x1="2634"
-                y1="1059"
-                x2="2507"
-                y2="1059"
+                d="M2634 1059L2515.5 1059"
                 stroke="#00953B"
                 stroke-width="6"
               />
@@ -1876,7 +1818,7 @@ export const StationMap: React.FC<Props> = (props) => {
               />
               <path
                 id="line_xpo:cga"
-                d="M2930 1171L2898 1170"
+                d="M2926 1170H2898"
                 stroke="#00953B"
                 stroke-width="6"
               />
@@ -1942,7 +1884,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="544" y="1277.9">
+              <tspan x="552" y="1277.9">
                 Bukit Batok
               </tspan>
             </text>
@@ -1954,7 +1896,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="544" y="1128.9">
+              <tspan x="552" y="1128.9">
                 Bukit Gombak
               </tspan>
             </text>
@@ -2050,7 +1992,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="607" y="550.02">
+              <tspan x="607" y="551.02">
                 Jelapang
               </tspan>
             </text>
@@ -2062,7 +2004,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="632" y="503.02">
+              <tspan x="632" y="504.02">
                 Segar
               </tspan>
             </text>
@@ -2122,7 +2064,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1995.38" y="456.02">
+              <tspan x="1995.38" y="454.02">
                 Kupang
               </tspan>
             </text>
@@ -2134,7 +2076,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1826.48" y="448.02">
+              <tspan x="1825.48" y="446.02">
                 Thanggam
               </tspan>
             </text>
@@ -2278,7 +2220,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1974.2" y="300.02">
+              <tspan x="1974.2" y="298.02">
                 Samudera
               </tspan>
             </text>
@@ -2662,7 +2604,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1223.29" y="1182.9">
+              <tspan x="1229.29" y="1182.9">
                 Napier
               </tspan>
             </text>
@@ -3067,7 +3009,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1860" y="1803.9">
+              <tspan x="1863" y="1806.9">
                 Esplanade
               </tspan>
             </text>
@@ -3079,10 +3021,10 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1626" y="1665.9">
+              <tspan x="1614" y="1664.9">
                 Bras&#10;
               </tspan>
-              <tspan x="1626" y="1691.9">
+              <tspan x="1614" y="1690.9">
                 Basah
               </tspan>
             </text>
@@ -3130,7 +3072,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="2730" y="832.9">
+              <tspan x="2734" y="832.9">
                 Pasir Ris
               </tspan>
             </text>
@@ -3142,7 +3084,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="2314" y="431.9">
+              <tspan x="2319" y="431.9">
                 Punggol Coast
               </tspan>
             </text>
@@ -3214,7 +3156,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1751.07" y="1001.9">
+              <tspan x="1751.07" y="999.9">
                 Woodleigh
               </tspan>
             </text>
@@ -3226,7 +3168,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1666.23" y="1089.9">
+              <tspan x="1666.23" y="1087.9">
                 Potong Pasir
               </tspan>
             </text>
@@ -3394,7 +3336,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1053.22" y="1432.9">
+              <tspan x="1050.22" y="1432.9">
                 Great World
               </tspan>
             </text>
@@ -3703,7 +3645,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="763.355" y="1561.9">
+              <tspan x="758.355" y="1561.9">
                 one-north
               </tspan>
             </text>
@@ -3859,7 +3801,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="794.031" y="1228.9">
+              <tspan x="794.031" y="1225.9">
                 Farrer Road
               </tspan>
             </text>
@@ -4021,10 +3963,10 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1512.35" y="1901.9">
+              <tspan x="1507.35" y="1901.9">
                 Telok&#10;
               </tspan>
-              <tspan x="1515.89" y="1927.9">
+              <tspan x="1510.89" y="1927.9">
                 Ayer
               </tspan>
             </text>
@@ -4084,7 +4026,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1057.44" y="1594.9">
+              <tspan x="1060.44" y="1594.9">
                 Queenstown
               </tspan>
             </text>
@@ -4096,7 +4038,7 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1000.24" y="1536.9">
+              <tspan x="1002.24" y="1536.9">
                 Commonwealth
               </tspan>
             </text>
@@ -4147,10 +4089,10 @@ export const StationMap: React.FC<Props> = (props) => {
               font-weight="600"
               letter-spacing="0em"
             >
-              <tspan x="1464" y="1663.9">
+              <tspan x="1471" y="1663.9">
                 Clarke&#10;
               </tspan>
-              <tspan x="1464" y="1689.9">
+              <tspan x="1471" y="1689.9">
                 Quay
               </tspan>
             </text>
@@ -4686,7 +4628,7 @@ export const StationMap: React.FC<Props> = (props) => {
             </g>
             <g id="node_hbf">
               <g clip-path="url(#clip12_13_2)">
-                <g id="ccl">
+                <g id="ccl_7">
                   <rect
                     width="53.5"
                     height="30"
@@ -4706,7 +4648,7 @@ export const StationMap: React.FC<Props> = (props) => {
                     </tspan>
                   </text>
                 </g>
-                <g id="nel">
+                <g id="nel_4">
                   <rect
                     width="53.5"
                     height="30"
@@ -4750,7 +4692,7 @@ export const StationMap: React.FC<Props> = (props) => {
                     </tspan>
                   </text>
                 </g>
-                <g id="nel_4">
+                <g id="nel_5">
                   <rect
                     width="54"
                     height="30"
@@ -4770,7 +4712,7 @@ export const StationMap: React.FC<Props> = (props) => {
                     </tspan>
                   </text>
                 </g>
-                <g id="ccl_7">
+                <g id="ccl_8">
                   <rect
                     width="54"
                     height="30"
@@ -4814,7 +4756,7 @@ export const StationMap: React.FC<Props> = (props) => {
                     </tspan>
                   </text>
                 </g>
-                <g id="nel_5">
+                <g id="nel_6">
                   <rect
                     width="54"
                     height="30"
@@ -4898,7 +4840,7 @@ export const StationMap: React.FC<Props> = (props) => {
                     </tspan>
                   </text>
                 </g>
-                <g id="ccl_8">
+                <g id="ccl_9">
                   <rect
                     width="54"
                     height="30"
@@ -5030,7 +4972,7 @@ export const StationMap: React.FC<Props> = (props) => {
             </g>
             <g id="node_bnv">
               <g clip-path="url(#clip18_13_2)">
-                <g id="ccl_9">
+                <g id="ccl_10">
                   <rect
                     width="53.5"
                     height="30"
@@ -5074,7 +5016,7 @@ export const StationMap: React.FC<Props> = (props) => {
             </g>
             <g id="node_btn">
               <g clip-path="url(#clip19_13_2)">
-                <g id="ccl_10">
+                <g id="ccl_11">
                   <rect
                     width="53.5"
                     height="30"
@@ -5118,7 +5060,7 @@ export const StationMap: React.FC<Props> = (props) => {
             </g>
             <g id="node_lti">
               <g clip-path="url(#clip20_13_2)">
-                <g id="nel_6">
+                <g id="nel_7">
                   <rect
                     width="53.5"
                     height="30"
@@ -5294,7 +5236,7 @@ export const StationMap: React.FC<Props> = (props) => {
             </g>
             <g id="node_ctn">
               <g clip-path="url(#clip24_13_2)">
-                <g id="nel_7">
+                <g id="nel_8">
                   <rect
                     width="53.5"
                     height="30"
@@ -5382,7 +5324,7 @@ export const StationMap: React.FC<Props> = (props) => {
             </g>
             <g id="node_cdt">
               <g clip-path="url(#clip26_13_2)">
-                <g id="ccl_11">
+                <g id="ccl_12">
                   <rect
                     width="53.5"
                     height="30"
@@ -5423,1612 +5365,6 @@ export const StationMap: React.FC<Props> = (props) => {
                   </text>
                 </g>
               </g>
-            </g>
-            <g id="node_bbt">
-              <rect
-                x="497"
-                y="1258"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 2"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="503.296" y="1274.83">
-                  NS 2
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bgb">
-              <rect
-                x="498"
-                y="1111"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 3"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="504.289" y="1127.83">
-                  NS 3
-                </tspan>
-              </text>
-            </g>
-            <g id="node_ywt">
-              <rect
-                x="501"
-                y="765"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 5"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="507.214" y="781.83">
-                  NS 5
-                </tspan>
-              </text>
-            </g>
-            <g id="node_csw">
-              <rect
-                x="721"
-                y="755"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 2"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="727.768" y="771.83">
-                  DT 2
-                </tspan>
-              </text>
-            </g>
-            <g id="node_hvw">
-              <rect
-                x="721"
-                y="804"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 3"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="727.761" y="820.83">
-                  DT 3
-                </tspan>
-              </text>
-            </g>
-            <g id="node_hme">
-              <rect
-                x="721"
-                y="855"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 4"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="727.85" y="871.83">
-                  DT 4
-                </tspan>
-              </text>
-            </g>
-            <g id="node_btw">
-              <rect
-                x="721"
-                y="905"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 5"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="727.686" y="921.83">
-                  DT 5
-                </tspan>
-              </text>
-            </g>
-            <g id="node_kap">
-              <rect
-                x="721"
-                y="955"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 6"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="727.631" y="971.83">
-                  DT 6
-                </tspan>
-              </text>
-            </g>
-            <g id="node_sav">
-              <rect
-                x="721"
-                y="1006"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 7"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="728.055" y="1022.83">
-                  DT 7
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tkk">
-              <rect
-                x="822"
-                y="1082"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 8"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="828.747" y="1098.83">
-                  DT 8
-                </tspan>
-              </text>
-            </g>
-            <g id="node_rcr">
-              <rect
-                x="1650"
-                y="1445"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 13"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1654.18" y="1461.83">
-                  DT 13
-                </tspan>
-              </text>
-            </g>
-            <g id="node_dtn">
-              <rect
-                x="1748"
-                y="1990"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 17"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1752.48" y="2006.83">
-                  DT 17
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tla">
-              <rect
-                x="1566"
-                y="1885"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 18"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1570.17" y="1901.83">
-                  DT 18
-                </tspan>
-              </text>
-            </g>
-            <g id="node_fcn">
-              <rect
-                x="1363"
-                y="1596"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 20"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1365.42" y="1612.83">
-                  DT 20
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bcl">
-              <rect
-                x="1701"
-                y="1566"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 21"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1705.19" y="1582.83">
-                  DT 21
-                </tspan>
-              </text>
-            </g>
-            <g id="node_jlb">
-              <rect
-                x="1777"
-                y="1489"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 22"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1779.71" y="1505.83">
-                  DT 22
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bdm">
-              <rect
-                x="1877"
-                y="1389"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 23"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1879.71" y="1405.83">
-                  DT 23
-                </tspan>
-              </text>
-            </g>
-            <g id="node_glb">
-              <rect
-                x="1941"
-                y="1319"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 24"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1943.93" y="1335.83">
-                  DT 24
-                </tspan>
-              </text>
-            </g>
-            <g id="node_mtr">
-              <rect
-                x="2013"
-                y="1248"
-                width="43"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 25"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2016.13" y="1264.83">
-                  DT 25
-                </tspan>
-              </text>
-            </g>
-            <g id="node_ubi">
-              <rect
-                x="2162"
-                y="1101"
-                width="43"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 27"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2165.57" y="1117.83">
-                  DT 27
-                </tspan>
-              </text>
-            </g>
-            <g id="node_kkb">
-              <rect
-                x="2237"
-                y="1024"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 28"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2240.69" y="1040.83">
-                  DT 28
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bdn">
-              <rect
-                x="2309"
-                y="954"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 29"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2312.58" y="970.83">
-                  DT 29
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bgk">
-              <rect
-                x="1997"
-                y="682"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#9E28B5"
-              />
-              <text
-                id="NE 15"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2001.6" y="698.83">
-                  NE 15
-                </tspan>
-              </text>
-            </g>
-            <g id="node_hgn">
-              <rect
-                x="1935"
-                y="746"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#9E28B5"
-              />
-              <text
-                id="NE 14"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1939.77" y="762.83">
-                  NE 14
-                </tspan>
-              </text>
-            </g>
-            <g id="node_kvn">
-              <rect
-                x="1869"
-                y="811"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#9E28B5"
-              />
-              <text
-                id="NE 13"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1873.68" y="827.83">
-                  NE 13
-                </tspan>
-              </text>
-            </g>
-            <g id="node_wlh">
-              <rect
-                x="1695"
-                y="980"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#9E28B5"
-              />
-              <text
-                id="NE 11"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1701.16" y="996.83">
-                  NE 11
-                </tspan>
-              </text>
-            </g>
-            <g id="node_ptp">
-              <rect
-                x="1610"
-                y="1070"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#9E28B5"
-              />
-              <text
-                id="NE 10"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1614.39" y="1086.83">
-                  NE 10
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bnk">
-              <rect
-                x="1553"
-                y="1165"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#9E28B5"
-              />
-              <text
-                id="NE 9"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1560.12" y="1181.83">
-                  NE 9
-                </tspan>
-              </text>
-            </g>
-            <g id="node_frp">
-              <rect
-                x="1553"
-                y="1257"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#9E28B5"
-              />
-              <text
-                id="NE 8"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1560.24" y="1273.83">
-                  NE 8
-                </tspan>
-              </text>
-            </g>
-            <g id="node_crq">
-              <rect
-                x="1416"
-                y="1645"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#9E28B5"
-              />
-              <text
-                id="NE 5"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1423.18" y="1661.83">
-                  NE 5
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bdr">
-              <rect
-                x="2437"
-                y="930"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 30"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2440.41" y="946.83">
-                  DT 30
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tpw">
-              <rect
-                x="2565"
-                y="930"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 31"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2570.18" y="946.83">
-                  DT 31
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tpe">
-              <rect
-                x="2822"
-                y="991"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 33"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2825.7" y="1007.83">
-                  DT 33
-                </tspan>
-              </text>
-            </g>
-            <g id="node_upc">
-              <rect
-                x="2821"
-                y="1059"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 34"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2824.79" y="1075.83">
-                  DT 34
-                </tspan>
-              </text>
-            </g>
-            <g id="node_xln">
-              <rect
-                x="2805"
-                y="1248"
-                width="44"
-                height="24"
-                rx="10"
-                fill="#0055B8"
-              />
-              <text
-                id="DT 36"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2808.57" y="1264.83">
-                  DT 36
-                </tspan>
-              </text>
-            </g>
-            <g id="node_shv">
-              <rect
-                x="552"
-                y="873"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="BP 2"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="556.801" y="887.14">
-                  BP 2
-                </tspan>
-              </text>
-            </g>
-            <g id="node_kth">
-              <rect
-                x="552"
-                y="801"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="BP 3"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="556.795" y="815.14">
-                  BP 3
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tkw">
-              <rect
-                x="551"
-                y="732"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="BP 4"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="555.871" y="746.14">
-                  BP 4
-                </tspan>
-              </text>
-            </g>
-            <g id="node_pnx">
-              <rect
-                x="625"
-                y="657"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="BP 5"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="629.73" y="671.14">
-                  BP 5
-                </tspan>
-              </text>
-            </g>
-            <g id="node_snj">
-              <rect
-                x="688"
-                y="582"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="BP 13"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="690.586" y="596.14">
-                  BP 13
-                </tspan>
-              </text>
-            </g>
-            <g id="node_sgr">
-              <rect
-                x="680"
-                y="488"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="BP 11"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="683.857" y="502.14">
-                  BP 11
-                </tspan>
-              </text>
-            </g>
-            <g id="node_fjr">
-              <rect
-                x="725"
-                y="443"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="BP 10"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="727.34" y="457.14">
-                  BP 10
-                </tspan>
-              </text>
-            </g>
-            <g id="node_stk">
-              <rect
-                x="2117"
-                y="403"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PW 7"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2120.12" y="417.14">
-                  PW 7
-                </tspan>
-              </text>
-            </g>
-            <g id="node_cgl">
-              <rect
-                x="2023"
-                y="509"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SW 1"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2027.17" y="523.14">
-                  SW 1
-                </tspan>
-              </text>
-            </g>
-            <g id="node_fmw">
-              <rect
-                x="1992"
-                y="473"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SW 2"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1994.9" y="487.14">
-                  SW 2
-                </tspan>
-              </text>
-            </g>
-            <g id="node_kpg">
-              <rect
-                x="1957"
-                y="440"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SW 3"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1959.9" y="454.14">
-                  SW 3
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tng">
-              <rect
-                x="1909"
-                y="432"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SW 4"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1911.97" y="446.14">
-                  SW 4
-                </tspan>
-              </text>
-            </g>
-            <g id="node_fnv">
-              <rect
-                x="1877"
-                y="462"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SW 5"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1879.83" y="476.14">
-                  SW 5
-                </tspan>
-              </text>
-            </g>
-            <g id="node_lyr">
-              <rect
-                x="1893"
-                y="503"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SW 6"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1895.79" y="517.14">
-                  SW 6
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tkg">
-              <rect
-                x="1929"
-                y="537"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SW 7"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1932.15" y="551.14">
-                  SW 7
-                </tspan>
-              </text>
-            </g>
-            <g id="node_rnj">
-              <rect
-                x="1961"
-                y="569"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SW 8"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1963.88" y="583.14">
-                  SW 8
-                </tspan>
-              </text>
-            </g>
-            <g id="node_rng">
-              <rect
-                x="2133"
-                y="742"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SE 5"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2137.92" y="756.14">
-                  SE 5
-                </tspan>
-              </text>
-            </g>
-            <g id="node_rmb">
-              <rect
-                x="2243"
-                y="726"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SE 2"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2247.99" y="740.14">
-                  SE 2
-                </tspan>
-              </text>
-            </g>
-            <g id="node_cpv">
-              <rect
-                x="2204"
-                y="688"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SE 1"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2210.25" y="702.14">
-                  SE 1
-                </tspan>
-              </text>
-            </g>
-            <g id="node_kgk">
-              <rect
-                x="2177"
-                y="784"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SE 4"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2182.06" y="798.14">
-                  SE 4
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bak">
-              <rect
-                x="2245"
-                y="794"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="SE 3"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2249.98" y="808.14">
-                  SE 3
-                </tspan>
-              </text>
-            </g>
-            <g id="node_smg">
-              <rect
-                x="2079"
-                y="372"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PW 6"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2081.76" y="386.14">
-                  PW 6
-                </tspan>
-              </text>
-            </g>
-            <g id="node_nbg">
-              <rect
-                x="2048"
-                y="341"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PW 5"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2050.8" y="355.14">
-                  PW 5
-                </tspan>
-              </text>
-            </g>
-            <g id="node_smd">
-              <rect
-                x="2052"
-                y="284"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PW 4"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2054.94" y="298.14">
-                  PW 4
-                </tspan>
-              </text>
-            </g>
-            <g id="node_pgp">
-              <rect
-                x="2114"
-                y="279"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PW 3"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2116.87" y="293.14">
-                  PW 3
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tkl">
-              <rect
-                x="2148"
-                y="314"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PW 2"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2150.87" y="328.14">
-                  PW 2
-                </tspan>
-              </text>
-            </g>
-            <g id="node_smk">
-              <rect
-                x="2184"
-                y="350"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PW 1"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2188.14" y="364.14">
-                  PW 1
-                </tspan>
-              </text>
-            </g>
-            <g id="node_dam">
-              <rect
-                x="2337"
-                y="506"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PE 7"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2342.15" y="520.14">
-                  PE 7
-                </tspan>
-              </text>
-            </g>
-            <g id="node_oas">
-              <rect
-                x="2378"
-                y="541"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PE 6"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2382.78" y="555.14">
-                  PE 6
-                </tspan>
-              </text>
-            </g>
-            <g id="node_kdl">
-              <rect
-                x="2414"
-                y="577"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PE 5"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2418.83" y="591.14">
-                  PE 5
-                </tspan>
-              </text>
-            </g>
-            <g id="node_riv">
-              <rect
-                x="2405"
-                y="635"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PE 4"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2409.97" y="649.14">
-                  PE 4
-                </tspan>
-              </text>
-            </g>
-            <g id="node_cre">
-              <rect
-                x="2342"
-                y="633"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PE 3"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2346.89" y="647.14">
-                  PE 3
-                </tspan>
-              </text>
-            </g>
-            <g id="node_mrd">
-              <rect
-                x="2309"
-                y="600"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PE 2"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2313.9" y="614.14">
-                  PE 2
-                </tspan>
-              </text>
-            </g>
-            <g id="node_cov">
-              <rect
-                x="2274"
-                y="552"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="PE 1"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2280.17" y="566.14">
-                  PE 1
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bkt">
-              <rect
-                x="769"
-                y="488"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="BP 9"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="773.684" y="502.14">
-                  BP 9
-                </tspan>
-              </text>
-            </g>
-            <g id="node_pnd">
-              <rect
-                x="770"
-                y="535"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="BP 8"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="774.783" y="549.14">
-                  BP 8
-                </tspan>
-              </text>
-            </g>
-            <g id="node_ptr">
-              <rect
-                x="759"
-                y="582"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="BP 7"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="764.047" y="596.14">
-                  BP 7
-                </tspan>
-              </text>
-            </g>
-            <g id="node_jlp">
-              <rect
-                x="681"
-                y="535"
-                width="34"
-                height="20"
-                rx="6"
-                fill="#718472"
-              />
-              <text
-                id="BP 12"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="12"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="683.592" y="549.14">
-                  BP 12
-                </tspan>
-              </text>
             </g>
             <g id="node_cck">
               <g clip-path="url(#clip27_13_2)">
@@ -7248,1765 +5584,3701 @@ export const StationMap: React.FC<Props> = (props) => {
                 </g>
               </g>
             </g>
-            <g id="node_krj">
-              <rect
-                x="501"
-                y="599"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 7"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="507.583" y="615.83">
-                  NS 7
-                </tspan>
-              </text>
-            </g>
-            <g id="node_msl">
-              <rect
-                x="589"
-                y="409"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 8"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="595.275" y="425.83">
-                  NS 8
-                </tspan>
-              </text>
-            </g>
-            <g id="node_wdn">
-              <rect
-                x="723"
-                y="269"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 1"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="731.613" y="285.83">
-                  TE 1
-                </tspan>
-              </text>
-            </g>
-            <g id="node_wds">
-              <rect
-                x="877"
-                y="433"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 3"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="884.13" y="449.83">
-                  TE 3
-                </tspan>
-              </text>
-            </g>
-            <g id="node_spl">
-              <rect
-                x="938"
-                y="496"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 4"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="945.219" y="512.83">
-                  TE 4
-                </tspan>
-              </text>
-            </g>
-            <g id="node_ltr">
-              <rect
-                x="998"
-                y="560"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 5"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1005.05" y="576.83">
-                  TE 5
-                </tspan>
-              </text>
-            </g>
-            <g id="node_mfl">
-              <rect
-                x="1059"
-                y="623"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 6"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1066" y="639.83">
-                  TE 6
-                </tspan>
-              </text>
-            </g>
-            <g id="node_brh">
-              <rect
-                x="1120"
-                y="687"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 7"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1127.42" y="703.83">
-                  TE 7
-                </tspan>
-              </text>
-            </g>
-            <g id="node_uts">
-              <rect
-                x="1176"
-                y="801"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 8"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1183.12" y="817.83">
-                  TE 8
-                </tspan>
-              </text>
-            </g>
-            <g id="node_npr">
-              <rect
-                x="1175"
-                y="1164"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 12"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1179.56" y="1180.83">
-                  TE 12
-                </tspan>
-              </text>
-            </g>
-            <g id="node_obv">
-              <rect
-                x="1175"
-                y="1242"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 13"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1179.55" y="1258.83">
-                  TE 13
-                </tspan>
-              </text>
-            </g>
-            <g id="node_grw">
-              <rect
-                x="1175"
-                y="1414"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 15"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1179.48" y="1430.83">
-                  TE 15
-                </tspan>
-              </text>
-            </g>
-            <g id="node_hvl">
-              <rect
-                x="1177"
-                y="1507"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 16"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1181.42" y="1523.83">
-                  TE 16
-                </tspan>
-              </text>
-            </g>
-            <g id="node_max">
-              <rect
-                x="1392"
-                y="1838"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 18"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1396.54" y="1854.83">
-                  TE 18
-                </tspan>
-              </text>
-            </g>
-            <g id="node_shw">
-              <rect
-                x="1544"
-                y="1987"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 19"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1548.42" y="2003.83">
-                  TE 19
-                </tspan>
-              </text>
-            </g>
-            <g id="node_grb">
-              <rect
-                x="2102"
-                y="1949"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 22"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2105.08" y="1965.83">
-                  TE 22
-                </tspan>
-              </text>
-            </g>
-            <g id="node_trh">
-              <rect
-                x="2258"
-                y="1796"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 23"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2261.08" y="1812.83">
-                  TE 23
-                </tspan>
-              </text>
-            </g>
-            <g id="node_ktp">
-              <rect
-                x="2319"
-                y="1735"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 24"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2322.3" y="1751.83">
-                  TE 24
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tkt">
-              <rect
-                x="2380"
-                y="1674"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 25"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2383" y="1690.83">
-                  TE 25
-                </tspan>
-              </text>
-            </g>
-            <g id="node_mpr">
-              <rect
-                x="2441"
-                y="1613"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 26"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2443.95" y="1629.83">
-                  TE 26
-                </tspan>
-              </text>
-            </g>
-            <g id="node_mtc">
-              <rect
-                x="2502"
-                y="1552"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 27"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2505.44" y="1568.83">
-                  TE 27
-                </tspan>
-              </text>
-            </g>
-            <g id="node_sgl">
-              <rect
-                x="2563"
-                y="1491"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 28"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2566.06" y="1507.83">
-                  TE 28
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bsr">
-              <rect
-                x="2617"
-                y="1437"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 29"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2619.95" y="1453.83">
-                  TE 29
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bds">
-              <rect
-                x="2674"
-                y="1380"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9D5918"
-              />
-              <text
-                id="TE 30"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2676.78" y="1396.83">
-                  TE 30
-                </tspan>
-              </text>
-            </g>
-            <g id="node_adm">
-              <rect
-                x="959"
-                y="369"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 10"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="962.425" y="385.83">
-                  NS 10
-                </tspan>
-              </text>
-            </g>
-            <g id="node_sbw">
-              <rect
-                x="1092"
-                y="369"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 11"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1097.2" y="385.83">
-                  NS 11
-                </tspan>
-              </text>
-            </g>
-            <g id="node_cbr">
-              <rect
-                x="1227"
-                y="369"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 12"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1230.72" y="385.83">
-                  NS 12
-                </tspan>
-              </text>
-            </g>
-            <g id="node_yis">
-              <rect
-                x="1362"
-                y="412"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 13"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1365.71" y="428.83">
-                  NS 13
-                </tspan>
-              </text>
-            </g>
-            <g id="node_ktb">
-              <rect
-                x="1433"
-                y="498"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 14"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1436.8" y="514.83">
-                  NS 14
-                </tspan>
-              </text>
-            </g>
-            <g id="node_pgc">
-              <rect
-                x="2260"
-                y="413"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#9E28B5"
-              />
-              <text
-                id="NE 18"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2263.66" y="429.83">
-                  NE 18
-                </tspan>
-              </text>
-            </g>
-            <g id="node_yck">
-              <rect
-                x="1449"
-                y="599"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 15"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1452.64" y="615.83">
-                  NS 15
-                </tspan>
-              </text>
-            </g>
-            <g id="node_amk">
-              <rect
-                x="1452"
-                y="700"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 16"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1455.58" y="716.83">
-                  NS 16
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bdl">
-              <rect
-                x="1451"
-                y="885"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 18"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1454.7" y="901.83">
-                  NS 18
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tap">
-              <rect
-                x="1451"
-                y="982"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 19"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1454.58" y="998.83">
-                  NS 19
-                </tspan>
-              </text>
-            </g>
-            <g id="node_nov">
-              <rect
-                x="1393"
-                y="1095"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 20"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1394.95" y="1111.83">
-                  NS 20
-                </tspan>
-              </text>
-            </g>
-            <g id="node_som">
-              <rect
-                x="1302"
-                y="1430"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 23"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1304.24" y="1446.83">
-                  NS 23
-                </tspan>
-              </text>
-            </g>
-            <g id="node_msp">
-              <rect
-                x="1771"
-                y="2115"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#E1251B"
-              />
-              <text
-                id="NS 28"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1773.22" y="2131.83">
-                  NS 28
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tlb">
-              <rect
-                x="1104"
-                y="1962"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 28"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1105.99" y="1978.83">
-                  CC 28
-                </tspan>
-              </text>
-            </g>
-            <g id="node_lbd">
-              <rect
-                x="1022"
-                y="1889"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 27"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1024.37" y="1905.83">
-                  CC 27
-                </tspan>
-              </text>
-            </g>
-            <g id="node_ppj">
-              <rect
-                x="962"
-                y="1811"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 26"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="963.873" y="1827.83">
-                  CC 26
-                </tspan>
-              </text>
-            </g>
-            <g id="node_hpv">
-              <rect
-                x="916"
-                y="1732"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 25"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="917.928" y="1748.83">
-                  CC 25
-                </tspan>
-              </text>
-            </g>
-            <g id="node_krg">
-              <rect
-                x="886"
-                y="1642"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 24"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="888.229" y="1658.83">
-                  CC 24
-                </tspan>
-              </text>
-            </g>
-            <g id="node_onh">
-              <rect
-                x="865"
-                y="1543"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 23"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="867.003" y="1559.83">
-                  CC 23
-                </tspan>
-              </text>
-            </g>
-            <g id="node_hlv">
-              <rect
-                x="872"
-                y="1314"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 21"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="875.486" y="1330.83">
-                  CC 21
-                </tspan>
-              </text>
-            </g>
-            <g id="node_frr">
-              <rect
-                x="909"
-                y="1208"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 20"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="910.716" y="1224.83">
-                  CC 20
-                </tspan>
-              </text>
-            </g>
-            <g id="node_mrm">
-              <rect
-                x="1289"
-                y="849"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 16"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1292.35" y="865.83">
-                  CC 16
-                </tspan>
-              </text>
-            </g>
-            <g id="node_lrc">
-              <rect
-                x="1641"
-                y="830"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 14"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1644.57" y="846.83">
-                  CC 14
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bly">
-              <rect
-                x="1925"
-                y="977"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 12"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1928.49" y="993.83">
-                  CC 12
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tsg">
-              <rect
-                x="2012"
-                y="1066"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 11"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2016.96" y="1082.83">
-                  CC 11
-                </tspan>
-              </text>
-            </g>
-            <g id="node_dkt">
-              <rect
-                x="2140"
-                y="1441"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 8"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2146.04" y="1457.83">
-                  CC 8
-                </tspan>
-              </text>
-            </g>
-            <g id="node_mbt">
-              <rect
-                x="2136"
-                y="1538"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 7"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2142.35" y="1554.83">
-                  CC 7
-                </tspan>
-              </text>
-            </g>
-            <g id="node_sdm">
-              <rect
-                x="2113"
-                y="1640"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 6"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2118.93" y="1656.83">
-                  CC 6
-                </tspan>
-              </text>
-            </g>
-            <g id="node_nch">
-              <rect
-                x="2078"
-                y="1734"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 5"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2083.98" y="1750.83">
-                  CC 5
-                </tspan>
-              </text>
-            </g>
-            <g id="node_epn">
-              <rect
-                x="1814"
-                y="1786"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 3"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1820.06" y="1802.83">
-                  CC 3
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bbs">
-              <rect
-                x="1675"
-                y="1645"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#FF9E18"
-              />
-              <text
-                id="CC 2"
-                fill="#383A37"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1681.06" y="1661.83">
-                  CC 2
-                </tspan>
-              </text>
-            </g>
-            <g id="node_psr">
-              <rect
-                x="2678"
-                y="814"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 1"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2684" y="830.83">
-                  EW 1
-                </tspan>
-              </text>
-            </g>
-            <g id="node_sim">
-              <rect
-                x="2678"
-                y="991"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 3"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2682.51" y="1007.83">
-                  EW 3
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bdk">
-              <rect
-                x="2464"
-                y="1048"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 5"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2468.44" y="1064.83">
-                  EW 5
-                </tspan>
-              </text>
-            </g>
-            <g id="node_kem">
-              <rect
-                x="2313"
-                y="1129"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 6"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2317.38" y="1145.83">
-                  EW 6
-                </tspan>
-              </text>
-            </g>
-            <g id="node_eun">
-              <rect
-                x="2220"
-                y="1221"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 7"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2224.81" y="1237.83">
-                  EW 7
-                </tspan>
-              </text>
-            </g>
-            <g id="node_alj">
-              <rect
-                x="2037"
-                y="1405"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 9"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2041.38" y="1421.83">
-                  EW 9
-                </tspan>
-              </text>
-            </g>
-            <g id="node_kal">
-              <rect
-                x="1971"
-                y="1472"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 10"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1972.65" y="1488.83">
-                  EW 10
-                </tspan>
-              </text>
-            </g>
-            <g id="node_lvr">
-              <rect
-                x="1901"
-                y="1543"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 11"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1904.42" y="1559.83">
-                  EW 11
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tpg">
-              <rect
-                x="1375"
-                y="1927"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 15"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1376.86" y="1943.83">
-                  EW 15
-                </tspan>
-              </text>
-            </g>
-            <g id="node_tib">
-              <rect
-                x="1153"
-                y="1714"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 17"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1155.23" y="1730.83">
-                  EW 17
-                </tspan>
-              </text>
-            </g>
-            <g id="node_rdh">
-              <rect
-                x="1084"
-                y="1644"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 18"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1085.92" y="1660.83">
-                  EW 18
-                </tspan>
-              </text>
-            </g>
-            <g id="node_que">
-              <rect
-                x="1009"
-                y="1575"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 19"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="1010.8" y="1591.83">
-                  EW 19
-                </tspan>
-              </text>
-            </g>
-            <g id="node_com">
-              <rect
-                x="950"
-                y="1518"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 20"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="950.171" y="1534.83">
-                  EW 20
-                </tspan>
-              </text>
-            </g>
-            <g id="node_dvr">
-              <rect
-                x="747"
-                y="1454"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 22"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="747.465" y="1470.83">
-                  EW 22
-                </tspan>
-              </text>
-            </g>
-            <g id="node_cle">
-              <rect
-                x="647"
-                y="1454"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 23"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="647.458" y="1470.83">
-                  EW 23
-                </tspan>
-              </text>
-            </g>
-            <g id="node_cng">
-              <rect
-                x="377"
-                y="1454"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 25"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="377.383" y="1470.83">
-                  EW 25
-                </tspan>
-              </text>
-            </g>
-            <g id="node_lks">
-              <rect
-                x="267"
-                y="1454"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 26"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="267.328" y="1470.83">
-                  EW 26
-                </tspan>
-              </text>
-            </g>
-            <g id="node_bnl">
-              <rect
-                x="164"
-                y="1346"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 27"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="164.82" y="1362.83">
-                  EW 27
-                </tspan>
-              </text>
-            </g>
-            <g id="node_pnr">
-              <rect
-                x="164"
-                y="1258"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 28"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="164.444" y="1274.83">
-                  EW 28
-                </tspan>
-              </text>
-            </g>
-            <g id="node_jkn">
-              <rect
-                x="164"
-                y="1170"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 29"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="164.328" y="1186.83">
-                  EW 29
-                </tspan>
-              </text>
-            </g>
-            <g id="node_gcl">
-              <rect
-                x="164"
-                y="1082"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 30"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="164.164" y="1098.83">
-                  EW 30
-                </tspan>
-              </text>
+            <g id="node_twr">
+              <g clip-path="url(#clip30_13_2)">
+                <g id="ewl_12">
+                  <rect
+                    width="53.5"
+                    height="24"
+                    transform="translate(158 907)"
+                    fill="#00953B"
+                  />
+                  <text
+                    id="EW 32"
+                    fill="white"
+                    font-family="Radio Canada Big"
+                    font-size="14"
+                    font-weight="600"
+                    letter-spacing="0em"
+                  >
+                    <tspan x="164.208" y="923.83">
+                      EW 32
+                    </tspan>
+                  </text>
+                </g>
+              </g>
             </g>
             <g id="node_tcr">
-              <rect
-                x="164"
-                y="995"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 31"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="165.935" y="1011.83">
-                  EW 31
-                </tspan>
-              </text>
+              <g clip-path="url(#clip31_13_2)">
+                <g id="ewl_13">
+                  <rect
+                    width="53.5"
+                    height="24"
+                    transform="translate(158 995)"
+                    fill="#00953B"
+                  />
+                  <text
+                    id="EW 31"
+                    fill="white"
+                    font-family="Radio Canada Big"
+                    font-size="14"
+                    font-weight="600"
+                    letter-spacing="0em"
+                  >
+                    <tspan x="165.685" y="1011.83">
+                      EW 31
+                    </tspan>
+                  </text>
+                </g>
+              </g>
             </g>
-            <g id="node_twr">
-              <rect
-                x="164"
-                y="907"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 32"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="164.458" y="923.83">
-                  EW 32
-                </tspan>
-              </text>
+            <g id="node_gcl">
+              <g clip-path="url(#clip32_13_2)">
+                <g id="ewl_14">
+                  <rect
+                    width="53.5"
+                    height="24"
+                    transform="translate(158 1082)"
+                    fill="#00953B"
+                  />
+                  <text
+                    id="EW 30"
+                    fill="white"
+                    font-family="Radio Canada Big"
+                    font-size="14"
+                    font-weight="600"
+                    letter-spacing="0em"
+                  >
+                    <tspan x="163.914" y="1098.83">
+                      EW 30
+                    </tspan>
+                  </text>
+                </g>
+              </g>
+            </g>
+            <g id="node_jkn">
+              <g clip-path="url(#clip33_13_2)">
+                <g id="ewl_15">
+                  <rect
+                    width="53.5"
+                    height="24"
+                    transform="translate(158 1170)"
+                    fill="#00953B"
+                  />
+                  <text
+                    id="EW 29"
+                    fill="white"
+                    font-family="Radio Canada Big"
+                    font-size="14"
+                    font-weight="600"
+                    letter-spacing="0em"
+                  >
+                    <tspan x="164.078" y="1186.83">
+                      EW 29
+                    </tspan>
+                  </text>
+                </g>
+              </g>
+            </g>
+            <g id="node_pnr">
+              <g clip-path="url(#clip34_13_2)">
+                <g id="ewl_16">
+                  <rect
+                    width="53.5"
+                    height="24"
+                    transform="translate(158 1258)"
+                    fill="#00953B"
+                  />
+                  <text
+                    id="EW 28"
+                    fill="white"
+                    font-family="Radio Canada Big"
+                    font-size="14"
+                    font-weight="600"
+                    letter-spacing="0em"
+                  >
+                    <tspan x="164.194" y="1274.83">
+                      EW 28
+                    </tspan>
+                  </text>
+                </g>
+              </g>
+            </g>
+            <g id="node_bnl">
+              <g clip-path="url(#clip35_13_2)">
+                <g id="ewl_17">
+                  <rect
+                    width="53.5"
+                    height="24"
+                    transform="translate(158 1346)"
+                    fill="#00953B"
+                  />
+                  <text
+                    id="EW 27"
+                    fill="white"
+                    font-family="Radio Canada Big"
+                    font-size="14"
+                    font-weight="600"
+                    letter-spacing="0em"
+                  >
+                    <tspan x="164.57" y="1362.83">
+                      EW 27
+                    </tspan>
+                  </text>
+                </g>
+              </g>
             </g>
             <g id="node_tlk">
-              <rect
-                x="164"
-                y="819"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="EW 33"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="164.451" y="835.83">
-                  EW 33
-                </tspan>
-              </text>
+              <g clip-path="url(#clip36_13_2)">
+                <g id="ewl_18">
+                  <rect
+                    width="53.5"
+                    height="24"
+                    transform="translate(158 819)"
+                    fill="#00953B"
+                  />
+                  <text
+                    id="EW 33"
+                    fill="white"
+                    font-family="Radio Canada Big"
+                    font-size="14"
+                    font-weight="600"
+                    letter-spacing="0em"
+                  >
+                    <tspan x="164.201" y="835.83">
+                      EW 33
+                    </tspan>
+                  </text>
+                </g>
+              </g>
             </g>
-            <g id="node_cga">
-              <rect
-                x="2932"
-                y="1159"
-                width="42"
-                height="24"
-                rx="10"
-                fill="#00953B"
-              />
-              <text
-                id="CG 2"
-                fill="white"
-                font-family="Radio Canada Big"
-                font-size="14"
-                font-weight="600"
-                letter-spacing="0em"
-              >
-                <tspan x="2937.81" y="1175.83">
-                  CG 2
-                </tspan>
-              </text>
+          </g>
+          <g id="node_lks">
+            <g clip-path="url(#clip37_13_2)">
+              <g id="ewl_19">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(259 1454)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 26"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="265.078" y="1470.83">
+                    EW 26
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_cng">
+            <g clip-path="url(#clip38_13_2)">
+              <g id="ewl_20">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(373 1454)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 25"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="379.133" y="1470.83">
+                    EW 25
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_cle">
+            <g clip-path="url(#clip39_13_2)">
+              <g id="ewl_21">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(641 1454)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 23"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="647.208" y="1470.83">
+                    EW 23
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bbt">
+            <g clip-path="url(#clip40_13_2)">
+              <g id="nsl_11">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(493 1259)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 2"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="505.046" y="1275.83">
+                    NS 2
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bgb">
+            <g clip-path="url(#clip41_13_2)">
+              <g id="nsl_12">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(493 1110)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 3"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="505.039" y="1126.83">
+                    NS 3
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_ywt">
+            <g clip-path="url(#clip42_13_2)">
+              <g id="nsl_13">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(493 764)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 5"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="504.964" y="780.83">
+                    NS 5
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_shv">
+            <g clip-path="url(#clip43_13_2)">
+              <g id="bplrt_3">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(552 874)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 2"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="555.801" y="888.14">
+                    BP 2
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_kth">
+            <g clip-path="url(#clip44_13_2)">
+              <g id="bplrt_4">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(552 801)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 3"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="555.795" y="815.14">
+                    BP 3
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_kth_2">
+            <g clip-path="url(#clip45_13_2)">
+              <g id="bplrt_5">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(552 801)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 3_2"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="555.795" y="815.14">
+                    BP 3
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tkw">
+            <g clip-path="url(#clip46_13_2)">
+              <g id="bplrt_6">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(552 733)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 4"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="555.871" y="747.14">
+                    BP 4
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_pnx">
+            <g clip-path="url(#clip47_13_2)">
+              <g id="bplrt_7">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(625 657)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 5"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="628.73" y="671.14">
+                    BP 5
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_ptr">
+            <g clip-path="url(#clip48_13_2)">
+              <g id="bplrt_8">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(763 582)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 7"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="767.047" y="596.14">
+                    BP 7
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_pnd">
+            <g clip-path="url(#clip49_13_2)">
+              <g id="bplrt_9">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(771 536)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 8"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="774.783" y="550.14">
+                    BP 8
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bkt">
+            <g clip-path="url(#clip50_13_2)">
+              <g id="bplrt_10">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(771 489)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 9"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="774.684" y="503.14">
+                    BP 9
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_fjr">
+            <g clip-path="url(#clip51_13_2)">
+              <g id="bplrt_11">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(727 442)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 10"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="728.34" y="456.14">
+                    BP 10
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_sgr">
+            <g clip-path="url(#clip52_13_2)">
+              <g id="bplrt_12">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(682 489)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 11"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="684.857" y="503.14">
+                    BP 11
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_jlp">
+            <g clip-path="url(#clip53_13_2)">
+              <g id="bplrt_13">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(680 536)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 12"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="681.592" y="550.14">
+                    BP 12
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_snj">
+            <g clip-path="url(#clip54_13_2)">
+              <g id="bplrt_14">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(691 582)"
+                  fill="#718472"
+                />
+                <text
+                  id="BP 13"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="692.586" y="596.14">
+                    BP 13
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_smd">
+            <g clip-path="url(#clip55_13_2)">
+              <g id="pglrt_2">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2053 283)"
+                  fill="#718472"
+                />
+                <text
+                  id="PW 4"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2054.94" y="297.14">
+                    PW 4
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_pgp">
+            <g clip-path="url(#clip56_13_2)">
+              <g id="pglrt_3">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2111 279)"
+                  fill="#718472"
+                />
+                <text
+                  id="PW 3"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2112.87" y="293.14">
+                    PW 3
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tkl">
+            <g clip-path="url(#clip57_13_2)">
+              <g id="pglrt_4">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2150 315)"
+                  fill="#718472"
+                />
+                <text
+                  id="PW 2"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2151.87" y="329.14">
+                    PW 2
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_smk">
+            <g clip-path="url(#clip58_13_2)">
+              <g id="pglrt_5">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2183 350)"
+                  fill="#718472"
+                />
+                <text
+                  id="PW 1"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2186.14" y="364.14">
+                    PW 1
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_dam">
+            <g clip-path="url(#clip59_13_2)">
+              <g id="pglrt_6">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2340 507)"
+                  fill="#718472"
+                />
+                <text
+                  id="PE 7"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2344.15" y="521.14">
+                    PE 7
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_oas">
+            <g clip-path="url(#clip60_13_2)">
+              <g id="pglrt_7">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2376 541)"
+                  fill="#718472"
+                />
+                <text
+                  id="PE 6"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2379.78" y="555.14">
+                    PE 6
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_kdl">
+            <g clip-path="url(#clip61_13_2)">
+              <g id="pglrt_8">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2412 577)"
+                  fill="#718472"
+                />
+                <text
+                  id="PE 5"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2415.83" y="591.14">
+                    PE 5
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_riv">
+            <g clip-path="url(#clip62_13_2)">
+              <g id="pglrt_9">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2411 635)"
+                  fill="#718472"
+                />
+                <text
+                  id="PE 4"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2414.97" y="649.14">
+                    PE 4
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_cre">
+            <g clip-path="url(#clip63_13_2)">
+              <g id="pglrt_10">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2344 634)"
+                  fill="#718472"
+                />
+                <text
+                  id="PE 3"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2347.89" y="648.14">
+                    PE 3
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_mrd">
+            <g clip-path="url(#clip64_13_2)">
+              <g id="pglrt_11">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2310 599)"
+                  fill="#718472"
+                />
+                <text
+                  id="PE 2"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2313.9" y="613.14">
+                    PE 2
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_cov">
+            <g clip-path="url(#clip65_13_2)">
+              <g id="pglrt_12">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2278 553)"
+                  fill="#718472"
+                />
+                <text
+                  id="PE 1"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2283.17" y="567.14">
+                    PE 1
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_cgl">
+            <g clip-path="url(#clip66_13_2)">
+              <g id="sklrt_2">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2024 510)"
+                  fill="#718472"
+                />
+                <text
+                  id="SW 1"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2027.17" y="524.14">
+                    SW 1
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_fmw">
+            <g clip-path="url(#clip67_13_2)">
+              <g id="sklrt_3">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(1991 475)"
+                  fill="#718472"
+                />
+                <text
+                  id="SW 2"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1992.9" y="489.14">
+                    SW 2
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_kpg">
+            <g clip-path="url(#clip68_13_2)">
+              <g id="sklrt_4">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(1958 439)"
+                  fill="#718472"
+                />
+                <text
+                  id="SW 3"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1959.9" y="453.14">
+                    SW 3
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tng">
+            <g clip-path="url(#clip69_13_2)">
+              <g id="sklrt_5">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(1909 431)"
+                  fill="#718472"
+                />
+                <text
+                  id="SW 4"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1910.97" y="445.14">
+                    SW 4
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_fnv">
+            <g clip-path="url(#clip70_13_2)">
+              <g id="sklrt_6">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(1878 463)"
+                  fill="#718472"
+                />
+                <text
+                  id="SW 5"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1879.83" y="477.14">
+                    SW 5
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_lyr">
+            <g clip-path="url(#clip71_13_2)">
+              <g id="sklrt_7">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(1897 504)"
+                  fill="#718472"
+                />
+                <text
+                  id="SW 6"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1898.79" y="518.14">
+                    SW 6
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tkg">
+            <g clip-path="url(#clip72_13_2)">
+              <g id="sklrt_8">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(1929 538)"
+                  fill="#718472"
+                />
+                <text
+                  id="SW 7"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1931.15" y="552.14">
+                    SW 7
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_rnj">
+            <g clip-path="url(#clip73_13_2)">
+              <g id="sklrt_9">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(1961 570)"
+                  fill="#718472"
+                />
+                <text
+                  id="SW 8"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1962.88" y="584.14">
+                    SW 8
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_cpv">
+            <g clip-path="url(#clip74_13_2)">
+              <g id="sklrt_10">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2206 689)"
+                  fill="#718472"
+                />
+                <text
+                  id="SE 1"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2211.25" y="703.14">
+                    SE 1
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_rmb">
+            <g clip-path="url(#clip75_13_2)">
+              <g id="sklrt_11">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2245 728)"
+                  fill="#718472"
+                />
+                <text
+                  id="SE 2"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2248.99" y="742.14">
+                    SE 2
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bak">
+            <g clip-path="url(#clip76_13_2)">
+              <g id="sklrt_12">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2246 794)"
+                  fill="#718472"
+                />
+                <text
+                  id="SE 3"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2249.98" y="808.14">
+                    SE 3
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_kgk">
+            <g clip-path="url(#clip77_13_2)">
+              <g id="sklrt_13">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2177 785)"
+                  fill="#718472"
+                />
+                <text
+                  id="SE 4"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2181.06" y="799.14">
+                    SE 4
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_rng">
+            <g clip-path="url(#clip78_13_2)">
+              <g id="sklrt_14">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2134 743)"
+                  fill="#718472"
+                />
+                <text
+                  id="SE 5"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2137.92" y="757.14">
+                    SE 5
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_nbg">
+            <g clip-path="url(#clip79_13_2)">
+              <g id="pglrt_13">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2048 342)"
+                  fill="#718472"
+                />
+                <text
+                  id="PW 5"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2049.8" y="356.14">
+                    PW 5
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_smg">
+            <g clip-path="url(#clip80_13_2)">
+              <g id="pglrt_14">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2082 373)"
+                  fill="#718472"
+                />
+                <text
+                  id="PW 6"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2083.76" y="387.14">
+                    PW 6
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_stk">
+            <g clip-path="url(#clip81_13_2)">
+              <g id="pglrt_15">
+                <rect
+                  width="32"
+                  height="20"
+                  transform="translate(2119 404)"
+                  fill="#718472"
+                />
+                <text
+                  id="PW 7"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="12"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2121.12" y="418.14">
+                    PW 7{' '}
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_krj">
+            <g clip-path="url(#clip82_13_2)">
+              <g id="nsl_14">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(493 598)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 7"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="505.333" y="614.83">
+                    NS 7
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_msl">
+            <g clip-path="url(#clip83_13_2)">
+              <g id="nsl_15">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(585 408)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 8"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="597.025" y="424.83">
+                    NS 8
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_wdn">
+            <g clip-path="url(#clip84_13_2)">
+              <g id="tel_8">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(714 268)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 1"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="728.363" y="284.83">
+                    TE 1
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_wds">
+            <g clip-path="url(#clip85_13_2)">
+              <g id="tel_9">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(867 433)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 3"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="879.88" y="449.83">
+                    TE 3
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_spl">
+            <g clip-path="url(#clip86_13_2)">
+              <g id="tel_10">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(927 497)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 4"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="939.969" y="513.83">
+                    TE 4
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_ltr">
+            <g clip-path="url(#clip87_13_2)">
+              <g id="tel_11">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(989 559)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 5"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1001.8" y="575.83">
+                    TE 5
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_mfl">
+            <g clip-path="url(#clip88_13_2)">
+              <g id="tel_12">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1050 622)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 6"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1062.75" y="638.83">
+                    TE 6
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_brh">
+            <g clip-path="url(#clip89_13_2)">
+              <g id="tel_13">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1113 687)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 7"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1126.17" y="703.83">
+                    TE 7
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_uts">
+            <g clip-path="url(#clip90_13_2)">
+              <g id="tel_14">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1170 800)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 8"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1182.87" y="816.83">
+                    TE 8
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_npr">
+            <g clip-path="url(#clip91_13_2)">
+              <g id="tel_15">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1170 1164)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 12"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1180.31" y="1180.83">
+                    TE 12
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_obv">
+            <g clip-path="url(#clip92_13_2)">
+              <g id="tel_16">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1170 1242)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 13"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1180.3" y="1258.83">
+                    TE 13
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_grw">
+            <g clip-path="url(#clip93_13_2)">
+              <g id="tel_17">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1170 1414)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 15"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1180.23" y="1430.83">
+                    TE 15
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_hvl">
+            <g clip-path="url(#clip94_13_2)">
+              <g id="tel_18">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1170 1508)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 16"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1180.17" y="1524.83">
+                    TE 16
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_max">
+            <g clip-path="url(#clip95_13_2)">
+              <g id="tel_19">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1383 1837)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 18"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1393.29" y="1853.83">
+                    TE 18
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_crq">
+            <g clip-path="url(#clip96_13_2)">
+              <g id="nel_9">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1414 1645)"
+                  fill="#9E28B5"
+                />
+                <text
+                  id="NE 5"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1425.93" y="1661.83">
+                    NE 5
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_frp">
+            <g clip-path="url(#clip97_13_2)">
+              <g id="nel_10">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1548 1257)"
+                  fill="#9E28B5"
+                />
+                <text
+                  id="NE 8"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1559.99" y="1273.83">
+                    NE 8
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bnk">
+            <g clip-path="url(#clip98_13_2)">
+              <g id="nel_11">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1548 1166)"
+                  fill="#9E28B5"
+                />
+                <text
+                  id="NE 9"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1559.88" y="1182.83">
+                    NE 9
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_ptp">
+            <g clip-path="url(#clip99_13_2)">
+              <g id="nel_12">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1605 1070)"
+                  fill="#9E28B5"
+                />
+                <text
+                  id="NE 10"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1614.14" y="1086.83">
+                    NE 10
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_wlh">
+            <g clip-path="url(#clip100_13_2)">
+              <g id="nel_13">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1691 981)"
+                  fill="#9E28B5"
+                />
+                <text
+                  id="NE 11"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1701.91" y="997.83">
+                    NE 11
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_kvn">
+            <g clip-path="url(#clip101_13_2)">
+              <g id="nel_14">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1867 810)"
+                  fill="#9E28B5"
+                />
+                <text
+                  id="NE 13"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1876.43" y="826.83">
+                    NE 13
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_hgn">
+            <g clip-path="url(#clip102_13_2)">
+              <g id="nel_15">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1932 744)"
+                  fill="#9E28B5"
+                />
+                <text
+                  id="NE 14"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1941.52" y="760.83">
+                    NE 14
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bgk">
+            <g clip-path="url(#clip103_13_2)">
+              <g id="nel_16">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1996 681)"
+                  fill="#9E28B5"
+                />
+                <text
+                  id="NE 15"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2005.35" y="697.83">
+                    NE 15
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_pgc">
+            <g clip-path="url(#clip104_13_2)">
+              <g id="nel_17">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2260 413)"
+                  fill="#9E28B5"
+                />
+                <text
+                  id="NE 18"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2269.41" y="429.83">
+                    NE 18
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_shw">
+            <g clip-path="url(#clip105_13_2)">
+              <g id="tel_20">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1540 1988)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 19"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1550.17" y="2004.83">
+                    TE 19
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_grb">
+            <g clip-path="url(#clip106_13_2)">
+              <g id="tel_21">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2097 1950)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 22"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2105.83" y="1966.83">
+                    TE 22
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_trh">
+            <g clip-path="url(#clip107_13_2)">
+              <g id="tel_22">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2254 1797)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 23"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2262.83" y="1813.83">
+                    TE 23
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_ktp">
+            <g clip-path="url(#clip108_13_2)">
+              <g id="tel_23">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2309 1735)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 24"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2318.05" y="1751.83">
+                    TE 24
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tkt">
+            <g clip-path="url(#clip109_13_2)">
+              <g id="tel_24">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2370 1674)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 25"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2378.75" y="1690.83">
+                    TE 25
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_mpr">
+            <g clip-path="url(#clip110_13_2)">
+              <g id="tel_25">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2429 1614)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 26"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2437.7" y="1630.83">
+                    TE 26
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_mtc">
+            <g clip-path="url(#clip111_13_2)">
+              <g id="tel_26">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2496 1552)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 27"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2505.19" y="1568.83">
+                    TE 27
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_sgl">
+            <g clip-path="url(#clip112_13_2)">
+              <g id="tel_27">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2558 1491)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 28"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2566.81" y="1507.83">
+                    TE 28
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bsr">
+            <g clip-path="url(#clip113_13_2)">
+              <g id="tel_28">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2609 1436)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 29"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2617.7" y="1452.83">
+                    TE 29
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bds">
+            <g clip-path="url(#clip114_13_2)">
+              <g id="tel_29">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2667 1380)"
+                  fill="#9D5918"
+                />
+                <text
+                  id="TE 30"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2675.53" y="1396.83">
+                    TE 30
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_adm">
+            <g clip-path="url(#clip115_13_2)">
+              <g id="nsl_16">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(955 368)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 10"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="964.175" y="384.83">
+                    NS 10
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_sbw">
+            <g clip-path="url(#clip116_13_2)">
+              <g id="nsl_17">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1087 368)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 11"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1097.95" y="384.83">
+                    NS 11
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_cbr">
+            <g clip-path="url(#clip117_13_2)">
+              <g id="nsl_18">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1221 368)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 12"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1230.47" y="384.83">
+                    NS 12
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_yis">
+            <g clip-path="url(#clip118_13_2)">
+              <g id="nsl_19">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1355 413)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 13"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1364.46" y="429.83">
+                    NS 13
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_ktb">
+            <g clip-path="url(#clip119_13_2)">
+              <g id="nsl_20">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1424 499)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 14"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1433.55" y="515.83">
+                    NS 14
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_yck">
+            <g clip-path="url(#clip120_13_2)">
+              <g id="nsl_21">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1446 601)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 15"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1455.39" y="617.83">
+                    NS 15
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_amk">
+            <g clip-path="url(#clip121_13_2)">
+              <g id="nsl_22">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1446 701)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 16"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1455.33" y="717.83">
+                    NS 16
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bdl">
+            <g clip-path="url(#clip122_13_2)">
+              <g id="nsl_23">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1446 886)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 18"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1455.45" y="902.83">
+                    NS 18
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tap">
+            <g clip-path="url(#clip123_13_2)">
+              <g id="nsl_24">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1446 980)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 19"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1455.33" y="996.83">
+                    NS 19
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_nov">
+            <g clip-path="url(#clip124_13_2)">
+              <g id="nsl_25">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1387 1097)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 20"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1394.7" y="1113.83">
+                    NS 20
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_som">
+            <g clip-path="url(#clip125_13_2)">
+              <g id="nsl_26">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1293 1431)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 23"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1300.99" y="1447.83">
+                    NS 23
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_msp">
+            <g clip-path="url(#clip126_13_2)">
+              <g id="nsl_27">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1769 2116)"
+                  fill="#E1251B"
+                />
+                <text
+                  id="NS 28"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1776.97" y="2132.83">
+                    NS 28
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_csw">
+            <g clip-path="url(#clip127_13_2)">
+              <g id="dtl_14">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(716 755)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 2"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="728.518" y="771.83">
+                    DT 2
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_hvw">
+            <g clip-path="url(#clip128_13_2)">
+              <g id="dtl_15">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(716 804)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 3"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="728.511" y="820.83">
+                    DT 3
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_hme">
+            <g clip-path="url(#clip129_13_2)">
+              <g id="dtl_16">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(716 853)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 4"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="728.6" y="869.83">
+                    DT 4
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_btw">
+            <g clip-path="url(#clip130_13_2)">
+              <g id="dtl_17">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(716 904)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 5"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="728.436" y="920.83">
+                    DT 5
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_kap">
+            <g clip-path="url(#clip131_13_2)">
+              <g id="dtl_18">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(716 956)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 6"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="728.381" y="972.83">
+                    DT 6
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_sav">
+            <g clip-path="url(#clip132_13_2)">
+              <g id="dtl_19">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(716 1006)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 7"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="728.805" y="1022.83">
+                    DT 7
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tkk">
+            <g clip-path="url(#clip133_13_2)">
+              <g id="dtl_20">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(816 1080)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 8"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="828.497" y="1096.83">
+                    DT 8
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_rcr">
+            <g clip-path="url(#clip134_13_2)">
+              <g id="dtl_21">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1639 1446)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 13"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1648.93" y="1462.83">
+                    DT 13
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_dtn">
+            <g clip-path="url(#clip135_13_2)">
+              <g id="dtl_22">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1745 1992)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 17"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1755.23" y="2008.83">
+                    DT 17
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tla">
+            <g clip-path="url(#clip136_13_2)">
+              <g id="dtl_23">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1563 1884)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 18"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1572.92" y="1900.83">
+                    DT 18
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_fcn">
+            <g clip-path="url(#clip137_13_2)">
+              <g id="dtl_24">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1359 1595)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 20"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1367.17" y="1611.83">
+                    DT 20
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bcl">
+            <g clip-path="url(#clip138_13_2)">
+              <g id="dtl_25">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1696 1568)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 21"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1705.94" y="1584.83">
+                    DT 21
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_jlb">
+            <g clip-path="url(#clip139_13_2)">
+              <g id="dtl_26">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1769 1488)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 22"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1777.46" y="1504.83">
+                    DT 22
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bdm">
+            <g clip-path="url(#clip140_13_2)">
+              <g id="dtl_27">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1876 1386)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 23"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1884.46" y="1402.83">
+                    DT 23
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_glb">
+            <g clip-path="url(#clip141_13_2)">
+              <g id="dtl_28">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1940 1318)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 24"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1948.68" y="1334.83">
+                    DT 24
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_mtr">
+            <g clip-path="url(#clip142_13_2)">
+              <g id="dtl_29">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2014 1248)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 25"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2022.38" y="1264.83">
+                    DT 25
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_ubi">
+            <g clip-path="url(#clip143_13_2)">
+              <g id="dtl_30">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2153 1106)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 27"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2161.82" y="1122.83">
+                    DT 27
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_kkb">
+            <g clip-path="url(#clip144_13_2)">
+              <g id="dtl_31">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2230 1025)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 28"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2238.44" y="1041.83">
+                    DT 28
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bdn">
+            <g clip-path="url(#clip145_13_2)">
+              <g id="dtl_32">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2306 955)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 29"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2314.33" y="971.83">
+                    DT 29
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bdr">
+            <g clip-path="url(#clip146_13_2)">
+              <g id="dtl_33">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2429 931)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 30"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2437.16" y="947.83">
+                    DT 30
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tpw">
+            <g clip-path="url(#clip147_13_2)">
+              <g id="dtl_34">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2557 931)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 31"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2566.93" y="947.83">
+                    DT 31
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tpe">
+            <g clip-path="url(#clip148_13_2)">
+              <g id="dtl_35">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2816 991)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 33"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2824.45" y="1007.83">
+                    DT 33
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_upc">
+            <g clip-path="url(#clip149_13_2)">
+              <g id="dtl_36">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2816 1061)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 34"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2824.54" y="1077.83">
+                    DT 34
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_xln">
+            <g clip-path="url(#clip150_13_2)">
+              <g id="dtl_37">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2799 1248)"
+                  fill="#0055B8"
+                />
+                <text
+                  id="DT 34_2"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2807.54" y="1264.83">
+                    DT 34
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_dvr">
+            <g clip-path="url(#clip151_13_2)">
+              <g id="ewl_22">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(741 1454)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 22"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="747.215" y="1470.83">
+                    EW 22
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_com">
+            <g clip-path="url(#clip152_13_2)">
+              <g id="ewl_23">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(944 1519)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 20"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="949.921" y="1535.83">
+                    EW 20
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_que">
+            <g clip-path="url(#clip153_13_2)">
+              <g id="ewl_24">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1002 1576)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 19"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1009.55" y="1592.83">
+                    EW 19
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_rdh">
+            <g clip-path="url(#clip154_13_2)">
+              <g id="ewl_25">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1077 1645)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 18"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1084.67" y="1661.83">
+                    EW 18
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tib">
+            <g clip-path="url(#clip155_13_2)">
+              <g id="ewl_26">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1148 1715)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 17"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1155.98" y="1731.83">
+                    EW 17
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tlb">
+            <g clip-path="url(#clip156_13_2)">
+              <g id="ccl_13">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1097 1963)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 28"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1104.74" y="1979.83">
+                    CC 28
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_lbd">
+            <g clip-path="url(#clip157_13_2)">
+              <g id="ccl_14">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1021 1889)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 27"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1029.12" y="1905.83">
+                    CC 27
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_ppj">
+            <g clip-path="url(#clip158_13_2)">
+              <g id="ccl_15">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(955 1808)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 26"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="962.623" y="1824.83">
+                    CC 26
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_hpv">
+            <g clip-path="url(#clip159_13_2)">
+              <g id="ccl_16">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(911 1732)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 25"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="918.678" y="1748.83">
+                    CC 25
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_krg">
+            <g clip-path="url(#clip160_13_2)">
+              <g id="ccl_17">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(878 1643)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 24"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="885.979" y="1659.83">
+                    CC 24
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_onh">
+            <g clip-path="url(#clip161_13_2)">
+              <g id="ccl_18">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(857 1543)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 23"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="864.753" y="1559.83">
+                    CC 23
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_hlv">
+            <g clip-path="url(#clip162_13_2)">
+              <g id="ccl_19">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(872 1313)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 21"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="881.236" y="1329.83">
+                    CC 21
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_frr">
+            <g clip-path="url(#clip163_13_2)">
+              <g id="ccl_20">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(907 1207)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 20"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="914.466" y="1223.83">
+                    CC 20
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_mrm">
+            <g clip-path="url(#clip164_13_2)">
+              <g id="ccl_21">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1282 851)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 16"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1291.1" y="867.83">
+                    CC 16
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_lrc">
+            <g clip-path="url(#clip165_13_2)">
+              <g id="ccl_22">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1642 830)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 14"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1651.32" y="846.83">
+                    CC 14
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bly">
+            <g clip-path="url(#clip166_13_2)">
+              <g id="ccl_23">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1918 980)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 12"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1927.24" y="996.83">
+                    CC 12
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tsg">
+            <g clip-path="url(#clip167_13_2)">
+              <g id="ccl_24">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2001 1065)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 11"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2011.71" y="1081.83">
+                    CC 11
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_dkt">
+            <g clip-path="url(#clip168_13_2)">
+              <g id="ccl_25">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2132 1442)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 8"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2143.79" y="1458.83">
+                    CC 8
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_mbt">
+            <g clip-path="url(#clip169_13_2)">
+              <g id="ccl_26">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2127 1540)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 7"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2139.1" y="1556.83">
+                    CC 7
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_sdm">
+            <g clip-path="url(#clip170_13_2)">
+              <g id="ccl_27">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2105 1640)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 6"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2116.68" y="1656.83">
+                    CC 6
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_nch">
+            <g clip-path="url(#clip171_13_2)">
+              <g id="ccl_28">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2067 1732)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 5"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2078.73" y="1748.83">
+                    CC 5
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_epn">
+            <g clip-path="url(#clip172_13_2)">
+              <g id="ccl_29">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1806 1787)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 3"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1817.81" y="1803.83">
+                    CC 3
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bbs">
+            <g clip-path="url(#clip173_13_2)">
+              <g id="ccl_30">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1671 1645)"
+                  fill="#FF9E18"
+                />
+                <text
+                  id="CC 2"
+                  fill="#383A37"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1682.81" y="1661.83">
+                    CC 2
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_tpg">
+            <g clip-path="url(#clip174_13_2)">
+              <g id="ewl_27">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1370 1929)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 15"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1377.61" y="1945.83">
+                    EW 15
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_lvr">
+            <g clip-path="url(#clip175_13_2)">
+              <g id="ewl_28">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1894 1543)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 11"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1903.17" y="1559.83">
+                    EW 11
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_kal">
+            <g clip-path="url(#clip176_13_2)">
+              <g id="ewl_29">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(1965 1472)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 10"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="1972.4" y="1488.83">
+                    EW 10
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_alj">
+            <g clip-path="url(#clip177_13_2)">
+              <g id="ewl_30">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2035 1407)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 9"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2045.13" y="1423.83">
+                    EW 9
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_eun">
+            <g clip-path="url(#clip178_13_2)">
+              <g id="ewl_31">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2214 1222)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 7"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2224.56" y="1238.83">
+                    EW 7
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_kem">
+            <g clip-path="url(#clip179_13_2)">
+              <g id="ewl_32">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2308 1129)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 6"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2318.13" y="1145.83">
+                    EW 6
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_bdk">
+            <g clip-path="url(#clip180_13_2)">
+              <g id="ewl_33">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2460 1048)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 5"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2470.19" y="1064.83">
+                    EW 5
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_sim">
+            <g clip-path="url(#clip181_13_2)">
+              <g id="ewl_34">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2675 990)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 3"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2685.26" y="1006.83">
+                    EW 3
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_psr">
+            <g clip-path="url(#clip182_13_2)">
+              <g id="ewl_35">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2675 814)"
+                  fill="#00953B"
+                />
+                <text
+                  id="EW 1"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2686.75" y="830.83">
+                    EW 1
+                  </tspan>
+                </text>
+              </g>
+            </g>
+          </g>
+          <g id="node_cga">
+            <g clip-path="url(#clip183_13_2)">
+              <g id="ewl_36">
+                <rect
+                  width="53.5"
+                  height="24"
+                  transform="translate(2928 1158)"
+                  fill="#00953B"
+                />
+                <text
+                  id="CG 2"
+                  fill="white"
+                  font-family="Radio Canada Big"
+                  font-size="14"
+                  font-weight="600"
+                  letter-spacing="0em"
+                >
+                  <tspan x="2939.56" y="1174.83">
+                    CG 2
+                  </tspan>
+                </text>
+              </g>
             </g>
           </g>
         </g>
@@ -9304,17 +9576,1306 @@ export const StationMap: React.FC<Props> = (props) => {
               fill="white"
             />
           </clipPath>
+          <clipPath id="clip30_13_2">
+            <rect
+              x="158"
+              y="907"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip31_13_2">
+            <rect
+              x="158"
+              y="995"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip32_13_2">
+            <rect
+              x="158"
+              y="1082"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip33_13_2">
+            <rect
+              x="158"
+              y="1170"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip34_13_2">
+            <rect
+              x="158"
+              y="1258"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip35_13_2">
+            <rect
+              x="158"
+              y="1346"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip36_13_2">
+            <rect
+              x="158"
+              y="819"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip37_13_2">
+            <rect
+              x="259"
+              y="1454"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip38_13_2">
+            <rect
+              x="373"
+              y="1454"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip39_13_2">
+            <rect
+              x="641"
+              y="1454"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip40_13_2">
+            <rect
+              x="493"
+              y="1259"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip41_13_2">
+            <rect
+              x="493"
+              y="1110"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip42_13_2">
+            <rect
+              x="493"
+              y="764"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip43_13_2">
+            <rect x="552" y="874" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip44_13_2">
+            <rect x="552" y="801" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip45_13_2">
+            <rect x="552" y="801" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip46_13_2">
+            <rect x="552" y="733" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip47_13_2">
+            <rect x="625" y="657" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip48_13_2">
+            <rect x="763" y="582" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip49_13_2">
+            <rect x="771" y="536" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip50_13_2">
+            <rect x="771" y="489" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip51_13_2">
+            <rect x="727" y="442" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip52_13_2">
+            <rect x="682" y="489" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip53_13_2">
+            <rect x="680" y="536" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip54_13_2">
+            <rect x="691" y="582" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip55_13_2">
+            <rect x="2053" y="283" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip56_13_2">
+            <rect x="2111" y="279" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip57_13_2">
+            <rect x="2150" y="315" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip58_13_2">
+            <rect x="2183" y="350" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip59_13_2">
+            <rect x="2340" y="507" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip60_13_2">
+            <rect x="2376" y="541" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip61_13_2">
+            <rect x="2412" y="577" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip62_13_2">
+            <rect x="2411" y="635" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip63_13_2">
+            <rect x="2344" y="634" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip64_13_2">
+            <rect x="2310" y="599" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip65_13_2">
+            <rect x="2278" y="553" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip66_13_2">
+            <rect x="2024" y="510" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip67_13_2">
+            <rect x="1991" y="475" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip68_13_2">
+            <rect x="1958" y="439" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip69_13_2">
+            <rect x="1909" y="431" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip70_13_2">
+            <rect x="1878" y="463" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip71_13_2">
+            <rect x="1897" y="504" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip72_13_2">
+            <rect x="1929" y="538" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip73_13_2">
+            <rect x="1961" y="570" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip74_13_2">
+            <rect x="2206" y="689" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip75_13_2">
+            <rect x="2245" y="728" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip76_13_2">
+            <rect x="2246" y="794" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip77_13_2">
+            <rect x="2177" y="785" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip78_13_2">
+            <rect x="2134" y="743" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip79_13_2">
+            <rect x="2048" y="342" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip80_13_2">
+            <rect x="2082" y="373" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip81_13_2">
+            <rect x="2119" y="404" width="32" height="20" rx="6" fill="white" />
+          </clipPath>
+          <clipPath id="clip82_13_2">
+            <rect
+              x="493"
+              y="598"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip83_13_2">
+            <rect
+              x="585"
+              y="408"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip84_13_2">
+            <rect
+              x="714"
+              y="268"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip85_13_2">
+            <rect
+              x="867"
+              y="433"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip86_13_2">
+            <rect
+              x="927"
+              y="497"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip87_13_2">
+            <rect
+              x="989"
+              y="559"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip88_13_2">
+            <rect
+              x="1050"
+              y="622"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip89_13_2">
+            <rect
+              x="1113"
+              y="687"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip90_13_2">
+            <rect
+              x="1170"
+              y="800"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip91_13_2">
+            <rect
+              x="1170"
+              y="1164"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip92_13_2">
+            <rect
+              x="1170"
+              y="1242"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip93_13_2">
+            <rect
+              x="1170"
+              y="1414"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip94_13_2">
+            <rect
+              x="1170"
+              y="1508"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip95_13_2">
+            <rect
+              x="1383"
+              y="1837"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip96_13_2">
+            <rect
+              x="1414"
+              y="1645"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip97_13_2">
+            <rect
+              x="1548"
+              y="1257"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip98_13_2">
+            <rect
+              x="1548"
+              y="1166"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip99_13_2">
+            <rect
+              x="1605"
+              y="1070"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip100_13_2">
+            <rect
+              x="1691"
+              y="981"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip101_13_2">
+            <rect
+              x="1867"
+              y="810"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip102_13_2">
+            <rect
+              x="1932"
+              y="744"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip103_13_2">
+            <rect
+              x="1996"
+              y="681"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip104_13_2">
+            <rect
+              x="2260"
+              y="413"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip105_13_2">
+            <rect
+              x="1540"
+              y="1988"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip106_13_2">
+            <rect
+              x="2097"
+              y="1950"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip107_13_2">
+            <rect
+              x="2254"
+              y="1797"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip108_13_2">
+            <rect
+              x="2309"
+              y="1735"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip109_13_2">
+            <rect
+              x="2370"
+              y="1674"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip110_13_2">
+            <rect
+              x="2429"
+              y="1614"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip111_13_2">
+            <rect
+              x="2496"
+              y="1552"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip112_13_2">
+            <rect
+              x="2558"
+              y="1491"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip113_13_2">
+            <rect
+              x="2609"
+              y="1436"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip114_13_2">
+            <rect
+              x="2667"
+              y="1380"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip115_13_2">
+            <rect
+              x="955"
+              y="368"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip116_13_2">
+            <rect
+              x="1087"
+              y="368"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip117_13_2">
+            <rect
+              x="1221"
+              y="368"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip118_13_2">
+            <rect
+              x="1355"
+              y="413"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip119_13_2">
+            <rect
+              x="1424"
+              y="499"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip120_13_2">
+            <rect
+              x="1446"
+              y="601"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip121_13_2">
+            <rect
+              x="1446"
+              y="701"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip122_13_2">
+            <rect
+              x="1446"
+              y="886"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip123_13_2">
+            <rect
+              x="1446"
+              y="980"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip124_13_2">
+            <rect
+              x="1387"
+              y="1097"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip125_13_2">
+            <rect
+              x="1293"
+              y="1431"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip126_13_2">
+            <rect
+              x="1769"
+              y="2116"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip127_13_2">
+            <rect
+              x="716"
+              y="755"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip128_13_2">
+            <rect
+              x="716"
+              y="804"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip129_13_2">
+            <rect
+              x="716"
+              y="853"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip130_13_2">
+            <rect
+              x="716"
+              y="904"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip131_13_2">
+            <rect
+              x="716"
+              y="956"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip132_13_2">
+            <rect
+              x="716"
+              y="1006"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip133_13_2">
+            <rect
+              x="816"
+              y="1080"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip134_13_2">
+            <rect
+              x="1639"
+              y="1446"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip135_13_2">
+            <rect
+              x="1745"
+              y="1992"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip136_13_2">
+            <rect
+              x="1563"
+              y="1884"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip137_13_2">
+            <rect
+              x="1359"
+              y="1595"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip138_13_2">
+            <rect
+              x="1696"
+              y="1568"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip139_13_2">
+            <rect
+              x="1769"
+              y="1488"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip140_13_2">
+            <rect
+              x="1876"
+              y="1386"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip141_13_2">
+            <rect
+              x="1940"
+              y="1318"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip142_13_2">
+            <rect
+              x="2014"
+              y="1248"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip143_13_2">
+            <rect
+              x="2153"
+              y="1106"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip144_13_2">
+            <rect
+              x="2230"
+              y="1025"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip145_13_2">
+            <rect
+              x="2306"
+              y="955"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip146_13_2">
+            <rect
+              x="2429"
+              y="931"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip147_13_2">
+            <rect
+              x="2557"
+              y="931"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip148_13_2">
+            <rect
+              x="2816"
+              y="991"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip149_13_2">
+            <rect
+              x="2816"
+              y="1061"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip150_13_2">
+            <rect
+              x="2799"
+              y="1248"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip151_13_2">
+            <rect
+              x="741"
+              y="1454"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip152_13_2">
+            <rect
+              x="944"
+              y="1519"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip153_13_2">
+            <rect
+              x="1002"
+              y="1576"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip154_13_2">
+            <rect
+              x="1077"
+              y="1645"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip155_13_2">
+            <rect
+              x="1148"
+              y="1715"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip156_13_2">
+            <rect
+              x="1097"
+              y="1963"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip157_13_2">
+            <rect
+              x="1021"
+              y="1889"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip158_13_2">
+            <rect
+              x="955"
+              y="1808"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip159_13_2">
+            <rect
+              x="911"
+              y="1732"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip160_13_2">
+            <rect
+              x="878"
+              y="1643"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip161_13_2">
+            <rect
+              x="857"
+              y="1543"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip162_13_2">
+            <rect
+              x="872"
+              y="1313"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip163_13_2">
+            <rect
+              x="907"
+              y="1207"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip164_13_2">
+            <rect
+              x="1282"
+              y="851"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip165_13_2">
+            <rect
+              x="1642"
+              y="830"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip166_13_2">
+            <rect
+              x="1918"
+              y="980"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip167_13_2">
+            <rect
+              x="2001"
+              y="1065"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip168_13_2">
+            <rect
+              x="2132"
+              y="1442"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip169_13_2">
+            <rect
+              x="2127"
+              y="1540"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip170_13_2">
+            <rect
+              x="2105"
+              y="1640"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip171_13_2">
+            <rect
+              x="2067"
+              y="1732"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip172_13_2">
+            <rect
+              x="1806"
+              y="1787"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip173_13_2">
+            <rect
+              x="1671"
+              y="1645"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip174_13_2">
+            <rect
+              x="1370"
+              y="1929"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip175_13_2">
+            <rect
+              x="1894"
+              y="1543"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip176_13_2">
+            <rect
+              x="1965"
+              y="1472"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip177_13_2">
+            <rect
+              x="2035"
+              y="1407"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip178_13_2">
+            <rect
+              x="2214"
+              y="1222"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip179_13_2">
+            <rect
+              x="2308"
+              y="1129"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip180_13_2">
+            <rect
+              x="2460"
+              y="1048"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip181_13_2">
+            <rect
+              x="2675"
+              y="990"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip182_13_2">
+            <rect
+              x="2675"
+              y="814"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
+          <clipPath id="clip183_13_2">
+            <rect
+              x="2928"
+              y="1158"
+              width="53.5"
+              height="24"
+              rx="10"
+              fill="white"
+            />
+          </clipPath>
         </defs>
       </svg>
-      <span className="text-gray-400 text-sm italic dark:text-gray-500">
-        <FormattedMessage
-          id="general.station_count"
-          defaultMessage="{count, plural, one { {count} stations } other { {count} stations }}"
-          values={{
-            count: stationCount,
-          }}
-        />
-      </span>
+      {stationIds.size > 0 && (
+        <>
+          <span className="font-bold text-gray-500 text-sm dark:text-gray-400">
+            <FormattedMessage
+              id="general.station_count"
+              defaultMessage="{count, plural, one { {count} stations } other { {count} stations }}"
+              values={{
+                count: stationIds.size,
+              }}
+            />
+          </span>
+          <span className="text-gray-500 text-sm dark:text-gray-400">
+            <FormattedList
+              value={Array.from(stationIds).map((stationId) => {
+                return (
+                  <Link
+                    className="hover:underline"
+                    key={stationId}
+                    to={buildLocaleAwareLink(
+                      `/stations/${stationId}`,
+                      intl.locale,
+                    )}
+                  >
+                    {stationTranslatedNames[stationId] ?? stationId}
+                  </Link>
+                );
+              })}
+            />
+          </span>
+        </>
+      )}
     </div>
   );
 };
