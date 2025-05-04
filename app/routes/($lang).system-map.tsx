@@ -6,7 +6,9 @@ import { StationMap } from '~/components/StationMap';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).system-map';
 import { StatusBanner } from '~/components/StatusBanner';
-import { createIntl } from 'react-intl';
+import { createIntl, useIntl } from 'react-intl';
+import { Link } from 'react-router';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.CF_PAGES_URL;
@@ -72,6 +74,8 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
 const SystemMapPage: React.FC<Route.ComponentProps> = (props) => {
   const { loaderData } = props;
 
+  const intl = useIntl();
+
   const { stationIdsAffected, componentIdsAffected } = useMemo(() => {
     const _stationIdsAffected: IssueStationEntry[] = [];
     const _componentIdsAffected = new Set<string>();
@@ -102,6 +106,47 @@ const SystemMapPage: React.FC<Route.ComponentProps> = (props) => {
           stationIdsAffected={stationIdsAffected}
           componentIdsAffected={componentIdsAffected}
         />
+
+        <div className="flex bg-gray-50 px-4 py-2.5 dark:bg-gray-900">
+          <div className="grid grow grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {loaderData.overview.components
+              .sort((a, b) => {
+                if (a.id.endsWith('LRT')) {
+                  return 1;
+                }
+                if (b.id.endsWith('LRT')) {
+                  return -1;
+                }
+                return 0;
+              })
+              .map((component) => (
+                <Link
+                  key={component.id}
+                  to={buildLocaleAwareLink(
+                    `/lines/${component.id}`,
+                    intl.locale,
+                  )}
+                  className="group flex items-center gap-x-2 overflow-hidden"
+                >
+                  <div
+                    className="flex h-4 w-12 items-center justify-center rounded-md"
+                    style={{
+                      backgroundColor: component.color,
+                    }}
+                  >
+                    <span className="font-semibold text-white text-xs">
+                      {component.id}
+                    </span>
+                  </div>
+
+                  <span className="text-gray-800 text-sm group-hover:underline dark:text-gray-200">
+                    {component.title_translations[intl.locale] ??
+                      component.title}
+                  </span>
+                </Link>
+              ))}
+          </div>
+        </div>
       </div>
     </div>
   );
