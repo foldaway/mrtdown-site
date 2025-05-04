@@ -50,6 +50,8 @@ export const UpdateMaintenance: React.FC<Props> = (props) => {
                 day="numeric"
                 month="long"
                 year="numeric"
+                hour="numeric"
+                minute="numeric"
               />{' '}
               ({createdAt.reconfigure({ locale: intl.locale }).toRelative()})
             </>
