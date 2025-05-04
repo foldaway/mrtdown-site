@@ -81,6 +81,14 @@ export const StationMap: React.FC<Props> = (props) => {
             switch (lineElement.id) {
               case `line_${stationId.toLowerCase()}:${otherStationId.toLowerCase()}`:
               case `line_${otherStationId.toLowerCase()}:${stationId.toLowerCase()}`: {
+                const componentId = componentByLineId[lineElement.id];
+                if (
+                  componentId != null &&
+                  componentId.toLowerCase() !== entry.componentId.toLowerCase()
+                ) {
+                  continue;
+                }
+
                 lineElement.style.opacity = '0.3';
 
                 const linesPatchedStation =
@@ -1730,7 +1738,7 @@ export const StationMap: React.FC<Props> = (props) => {
                 stroke-width="6"
               />
               <line
-                id="line_cth:rfp_2"
+                id="line_rfp:cth"
                 x1="1689"
                 y1="1814"
                 x2="1689"
