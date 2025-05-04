@@ -5953,30 +5953,6 @@ export const StationMap: React.FC<Props> = (props) => {
               </g>
             </g>
           </g>
-          <g id="node_kth_2">
-            <g clip-path="url(#clip45_13_2)">
-              <g id="bplrt_5">
-                <rect
-                  width="32"
-                  height="20"
-                  transform="translate(552 801)"
-                  fill="#718472"
-                />
-                <text
-                  id="BP 3_2"
-                  fill="white"
-                  font-family="Radio Canada Big"
-                  font-size="12"
-                  font-weight="600"
-                  letter-spacing="0em"
-                >
-                  <tspan x="555.795" y="815.14">
-                    BP 3
-                  </tspan>
-                </text>
-              </g>
-            </g>
-          </g>
           <g id="node_tkw">
             <g clip-path="url(#clip46_13_2)">
               <g id="bplrt_6">
