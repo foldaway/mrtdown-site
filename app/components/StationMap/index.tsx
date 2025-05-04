@@ -417,7 +417,7 @@ export const StationMap: React.FC<Props> = (props) => {
               stroke-width="6"
             />
             <path
-              id="line_srg:lrc"
+              id="line_ser:lrc"
               d="M1773 880.83C1773 880.83 1735 866.5 1728 863.5C1721 860.5 1696.5 851 1696.5 851"
               stroke="#FF9E18"
               stroke-width="6"
