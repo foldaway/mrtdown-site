@@ -53,22 +53,25 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const componentName = component.title_translations[lang] ?? component.title;
   const title = `${componentName} | mrtdown`;
 
-  const description = intl.formatMessage(
-    {
-      id: 'general.component_description',
-      defaultMessage:
-        'The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}.',
-    },
-    {
-      stationCount: stationIds.size,
-      componentName,
-      startDate: intl.formatDate(component.startedAt, {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }),
-    },
-  );
+  const description =
+    DateTime.fromISO(component.startedAt).diffNow().as('days') < 0
+      ? intl.formatMessage(
+          {
+            id: 'general.component_description',
+            defaultMessage:
+              'The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}.',
+          },
+          {
+            stationCount: stationIds.size,
+            componentName,
+            startDate: intl.formatDate(component.startedAt, {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            }),
+          },
+        )
+      : '';
 
   return {
     title,
