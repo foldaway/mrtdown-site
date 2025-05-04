@@ -1,15 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FormattedMessage, useIntl } from 'react-intl';
-import type {
-  IssueStationEntry,
-  StationIndex,
-  StationTranslatedNames,
-} from '~/types';
+import { FormattedList, FormattedMessage, useIntl } from 'react-intl';
+import type { IssueStationEntry, StationTranslatedNames } from '~/types';
 import { segmentText } from './helpers/segmentText';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useNavigate } from 'react-router';
+import { Link } from 'react-router';
 
 interface Props {
   stationIdsAffected: IssueStationEntry[];
@@ -36,14 +33,14 @@ export const StationMap: React.FC<Props> = (props) => {
 
   const [ref, setRef] = useState<SVGElement | null>(null);
 
-  const stationCount = useMemo(() => {
+  const stationIds = useMemo(() => {
     const result = new Set<string>();
     for (const entry of stationIdsAffected) {
       for (const stationId of entry.stationIds) {
         result.add(stationId);
       }
     }
-    return result.size;
+    return result;
   }, [stationIdsAffected]);
 
   useEffect(() => {
@@ -10848,15 +10845,37 @@ export const StationMap: React.FC<Props> = (props) => {
           </clipPath>
         </defs>
       </svg>
-      <span className="text-gray-400 text-sm italic dark:text-gray-500">
-        <FormattedMessage
-          id="general.station_count"
-          defaultMessage="{count, plural, one { {count} stations } other { {count} stations }}"
-          values={{
-            count: stationCount,
-          }}
-        />
-      </span>
+      {stationIds.size > 0 && (
+        <>
+          <span className="font-bold text-gray-500 text-sm dark:text-gray-400">
+            <FormattedMessage
+              id="general.station_count"
+              defaultMessage="{count, plural, one { {count} stations } other { {count} stations }}"
+              values={{
+                count: stationIds.size,
+              }}
+            />
+          </span>
+          <span className="text-gray-500 text-sm dark:text-gray-400">
+            <FormattedList
+              value={Array.from(stationIds).map((stationId) => {
+                return (
+                  <Link
+                    className="hover:underline"
+                    key={stationId}
+                    to={buildLocaleAwareLink(
+                      `/stations/${stationId}`,
+                      intl.locale,
+                    )}
+                  >
+                    {stationTranslatedNames[stationId] ?? stationId}
+                  </Link>
+                );
+              })}
+            />
+          </span>
+        </>
+      )}
     </div>
   );
 };
