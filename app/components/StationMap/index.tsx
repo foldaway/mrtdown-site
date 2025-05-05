@@ -52,6 +52,10 @@ export const StationMap: React.FC<Props> = (props) => {
     const linesPatchedByStationId: Record<string, Set<string>> = {};
     const componentByLineId: Record<string, string> = {};
 
+    const isSingleStationCase =
+      stationIdsAffected.length === 1 &&
+      stationIdsAffected[0].stationIds.length === 1;
+
     for (const entry of stationIdsAffected) {
       for (const stationId of entry.stationIds) {
         // Retrieve all lines connected to this station
@@ -72,38 +76,58 @@ export const StationMap: React.FC<Props> = (props) => {
           }
         }
 
-        for (const otherStationId of entry.stationIds) {
-          if (stationId === otherStationId) {
-            continue;
-          }
+        if (!isSingleStationCase) {
+          for (const otherStationId of entry.stationIds) {
+            if (stationId === otherStationId) {
+              continue;
+            }
 
-          for (const lineElement of lineElements) {
-            switch (lineElement.id) {
-              case `line_${stationId.toLowerCase()}:${otherStationId.toLowerCase()}`:
-              case `line_${otherStationId.toLowerCase()}:${stationId.toLowerCase()}`: {
-                const componentId = componentByLineId[lineElement.id];
-                if (
-                  componentId != null &&
-                  componentId.toLowerCase() !== entry.componentId.toLowerCase()
-                ) {
-                  continue;
+            for (const lineElement of lineElements) {
+              switch (lineElement.id) {
+                case `line_${stationId.toLowerCase()}:${otherStationId.toLowerCase()}`:
+                case `line_${otherStationId.toLowerCase()}:${stationId.toLowerCase()}`: {
+                  const componentId = componentByLineId[lineElement.id];
+                  if (
+                    componentId != null &&
+                    componentId.toLowerCase() !==
+                      entry.componentId.toLowerCase()
+                  ) {
+                    continue;
+                  }
+
+                  lineElement.style.opacity = '0.3';
+
+                  const linesPatchedStation =
+                    linesPatchedByStationId[stationId] ?? new Set();
+                  linesPatchedStation.add(lineElement.id);
+                  linesPatchedByStationId[stationId] = linesPatchedStation;
+                  const linePatchedOtherStation =
+                    linesPatchedByStationId[otherStationId] ?? new Set();
+                  linePatchedOtherStation.add(lineElement.id);
+                  linesPatchedByStationId[otherStationId] =
+                    linePatchedOtherStation;
+
+                  break;
                 }
-
-                lineElement.style.opacity = '0.3';
-
-                const linesPatchedStation =
-                  linesPatchedByStationId[stationId] ?? new Set();
-                linesPatchedStation.add(lineElement.id);
-                linesPatchedByStationId[stationId] = linesPatchedStation;
-                const linePatchedOtherStation =
-                  linesPatchedByStationId[otherStationId] ?? new Set();
-                linePatchedOtherStation.add(lineElement.id);
-                linesPatchedByStationId[otherStationId] =
-                  linePatchedOtherStation;
-
-                break;
               }
             }
+          }
+        } else {
+          for (const lineElement of lineElements) {
+            const componentId = componentByLineId[lineElement.id];
+            if (
+              componentId != null &&
+              componentId.toLowerCase() !== entry.componentId.toLowerCase()
+            ) {
+              continue;
+            }
+
+            lineElement.style.opacity = '0.3';
+
+            const linesPatchedStation =
+              linesPatchedByStationId[stationId] ?? new Set();
+            linesPatchedStation.add(lineElement.id);
+            linesPatchedByStationId[stationId] = linesPatchedStation;
           }
         }
       }
