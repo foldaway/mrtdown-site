@@ -1,3 +1,4 @@
+import { decode } from 'html-entities';
 import { DateTime } from 'luxon';
 import type { IssueInfraUpdate } from '../../../types';
 import { useMemo } from 'react';
@@ -58,7 +59,7 @@ export const UpdateInfra: React.FC<Props> = (props) => {
         </time>
 
         <span className="text-gray-900 text-sm dark:text-gray-300">
-          {update.text}
+          {decode(update.text)}
         </span>
       </div>
     </div>

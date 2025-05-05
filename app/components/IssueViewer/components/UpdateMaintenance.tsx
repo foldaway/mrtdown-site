@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon';
+import { decode } from 'html-entities';
 import type { IssueMaintenanceUpdate } from '../../../types';
 import { useMemo } from 'react';
 import { ClockIcon, InformationCircleIcon } from '@heroicons/react/24/solid';
@@ -60,7 +61,7 @@ export const UpdateMaintenance: React.FC<Props> = (props) => {
           )}
         </time>
         <span className="text-gray-900 text-sm dark:text-gray-300">
-          {update.text}
+          {decode(update.text)}
         </span>
       </div>
     </div>

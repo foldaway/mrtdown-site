@@ -1,3 +1,4 @@
+import { decode } from 'html-entities';
 import {
   CheckCircleIcon,
   EyeIcon,
@@ -79,7 +80,7 @@ export const UpdateDisruption: React.FC<Props> = (props) => {
         </time>
 
         <span className="text-gray-900 text-sm dark:text-gray-300">
-          {update.text}
+          {decode(update.text)}
         </span>
       </div>
     </div>
