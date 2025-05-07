@@ -68,7 +68,7 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
       <Link
         className={classNames(
-          'group flex items-center justify-between gap-x-2 gap-y-0.5 px-4 py-2',
+          'group grid grid-cols-[auto_1fr] grid-rows-[1fr_auto] items-center justify-between gap-x-2 gap-y-0.5 px-4 py-2 md:grid-cols-[auto_1fr_1fr] md:grid-rows-1',
           {
             'bg-disruption-light dark:bg-disruption-dark':
               issueRef.type === 'disruption',
@@ -88,27 +88,26 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
         {issueRef.type === 'infra' && (
           <BuildingOfficeIcon className="size-5 shrink-0 text-gray-50 dark:text-gray-200" />
         )}
-        <div className="flex grow flex-wrap items-center justify-between gap-x-2 overflow-hidden">
-          <h2 className="truncate font-bold text-base text-gray-50 group-hover:underline dark:text-gray-200">
-            {issueRef.title}
-          </h2>
 
-          <div className="inline-flex items-center gap-x-1">
-            {issueRef.subtypes.map((subtype) => (
-              <div
-                key={subtype}
-                className="flex rounded-md bg-gray-300 px-2 py-1 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-              >
-                <span className="font-bold text-xs leading-none">
-                  <FormattedMessage {...IssueSubtypeLabels[subtype]} />
-                </span>
-              </div>
-            ))}
-          </div>
+        <h2 className="truncate font-bold text-base text-gray-50 group-hover:underline dark:text-gray-200">
+          {issueRef.title}
+        </h2>
+
+        <div className="col-start-2 col-end-2 flex items-center gap-x-1 md:col-start-3 md:col-end-3 md:justify-end">
+          {issueRef.subtypes.map((subtype) => (
+            <div
+              key={subtype}
+              className="flex rounded-md bg-gray-300 px-2 py-1 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+            >
+              <span className="font-bold text-xs leading-none">
+                <FormattedMessage {...IssueSubtypeLabels[subtype]} />
+              </span>
+            </div>
+          ))}
         </div>
       </Link>
-      <div className="flex justify-between gap-1.5 bg-gray-200 px-4 py-2 sm:items-center dark:bg-gray-800">
-        <div className="inline-flex flex-wrap items-center gap-x-1.5">
+      <div className="flex justify-between gap-1.5 overflow-hidden bg-gray-200 px-4 py-2 sm:items-center dark:bg-gray-800">
+        <div className="inline-flex flex-col gap-x-1.5 md:flex-row md:items-center">
           <ComponentBar componentIds={issueRef.componentIdsAffected} />
           <span className="text-gray-500 text-xs dark:text-gray-400">
             <FormattedMessage
@@ -118,7 +117,7 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
             />
           </span>
         </div>
-        <div className="flex flex-col text-end">
+        <div className="flex shrink-0 flex-col text-end">
           <span className="truncate font-bold text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
             {dateTimeInfo == null ? (
               <FormattedMessage
