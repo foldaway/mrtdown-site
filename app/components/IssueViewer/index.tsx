@@ -104,7 +104,7 @@ export const IssueViewer: React.FC<Props> = (props) => {
           </div>
         </div>
       </Link>
-      <div className="flex justify-between gap-1.5 bg-gray-200 px-4 py-2 sm:flex-row sm:items-center dark:bg-gray-700">
+      <div className="flex justify-between gap-1.5 bg-gray-100 px-4 py-2 sm:flex-row sm:items-center dark:bg-gray-800">
         <div className="inline-flex flex-wrap items-center gap-x-1.5">
           <ComponentBar componentIds={issue.componentIdsAffected} />
           <span className="text-gray-500 text-xs dark:text-gray-400">
@@ -167,7 +167,7 @@ export const IssueViewer: React.FC<Props> = (props) => {
           )}
         </div>
       </div>
-      <div className="flex flex-col gap-y-4 p-4">
+      <div className="flex flex-col gap-y-4 bg-gray-50 p-4 dark:bg-gray-900">
         {issue.type === 'disruption' &&
           issue.updates.map((update) => (
             <UpdateDisruption key={update.sourceUrl} update={update} />
@@ -182,7 +182,7 @@ export const IssueViewer: React.FC<Props> = (props) => {
           ))}
       </div>
 
-      <div className="flex flex-col gap-y-4 bg-gray-200 p-4 dark:bg-gray-700">
+      <div className="flex flex-col gap-y-4 bg-gray-100 p-4 dark:bg-gray-800">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-gray-500 text-sm group-hover:underline dark:text-gray-400">
             <FormattedMessage
