@@ -101,7 +101,7 @@ const SystemMapPage: React.FC<Route.ComponentProps> = (props) => {
         hasOngoingIssues={loaderData.overview.issuesOngoing.length > 0}
       />
 
-      <div className="flex flex-col bg-gray-200 p-4 dark:bg-gray-700">
+      <div className="flex flex-col bg-gray-100 p-4 dark:bg-gray-800">
         <StationMap
           stationIdsAffected={stationIdsAffected}
           componentIdsAffected={componentIdsAffected}
