@@ -57,6 +57,7 @@
   "general.there_are_ongoing_issues": "Issues ongoing",
   "general.uptime_duration_display": "{duration} within service hours",
   "general.uptime_percent_display": "{percent} uptime",
+  "issue.description": "This issue affected {stationCount, plural, one { {stationCount} {lineNames} station } other { {stationCount} {lineNames} stations }} on {period}.",
   "issue.subtype.air_conditioning_issue": "Air Conditioning Issue",
   "issue.subtype.delay": "Delay",
   "issue.subtype.elevator_outage": "Elevator Outage",

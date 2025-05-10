@@ -19,6 +19,7 @@ import { BetaPill } from './components/BetaPill';
 import { UpdateDisruption } from './components/UpdateDisruption';
 import { UpdateInfra } from './components/UpdateInfra';
 import { UpdateMaintenance } from './components/UpdateMaintenance';
+import { countIssueStations } from '~/helpers/countIssueStations';
 
 interface Props {
   issue: Issue;
@@ -53,14 +54,8 @@ export const IssueViewer: React.FC<Props> = (props) => {
   }, [startAt, endAt]);
 
   const stationCount = useMemo(() => {
-    const result = new Set<string>();
-    for (const entry of issue.stationIdsAffected) {
-      for (const stationId of entry.stationIds) {
-        result.add(stationId);
-      }
-    }
-    return result.size;
-  }, [issue.stationIdsAffected]);
+    return countIssueStations(issue);
+  }, [issue]);
 
   const isHydrated = useHydrated();
 

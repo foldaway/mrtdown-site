@@ -57,6 +57,7 @@
   "general.there_are_ongoing_issues": "Gangguan sedang berlaku",
   "general.uptime_duration_display": "{duration} dalam waktu operasi",
   "general.uptime_percent_display": "{percent} masa operasi",
+  "issue.description": "Isu ini menjejaskan {stationCount} stesen laluan {lineNames} pada {period}.",
   "issue.subtype.air_conditioning_issue": "Masalah Penyaman Udara",
   "issue.subtype.delay": "Kelewatan Tren",
   "issue.subtype.elevator_outage": "Lif Tidak Berfungsi",

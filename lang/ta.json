@@ -57,6 +57,7 @@
   "general.there_are_ongoing_issues": "சிக்கல்கள் தொடர்கின்றன",
   "general.uptime_duration_display": "{duration} சேவை நேரத்துக்குள்",
   "general.uptime_percent_display": "{percent} செயல்பாடு நேரம்",
+  "issue.description": "இந்தப் பிரச்சனை {period} அன்று {lineNames} வழித்தடத்தில் உள்ள {stationCount} நிலையங்களை பாதித்தது.",
   "issue.subtype.air_conditioning_issue": "குளிரூட்டும் அமைப்பில் கோளாறு",
   "issue.subtype.delay": "ரயில்தாமதம்",
   "issue.subtype.elevator_outage": "லிப்ட் வேலை செய்யவில்லை",
