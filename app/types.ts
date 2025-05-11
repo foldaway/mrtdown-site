@@ -193,6 +193,8 @@ export interface IssuesHistoryPageSection {
   issueRefs: IssueRef[];
 }
 
-export type StationIndex = Record<string, string[]>;
+export type StationIndex = string[];
+export type ComponentIndex = string[];
+export type IssueIndex = string[];
 
 export type StationTranslatedNames = Record<string, string>;

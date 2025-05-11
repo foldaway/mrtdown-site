@@ -5,6 +5,8 @@ import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssue
 import type { Route } from './+types/($lang).statistics';
 import { assert } from '../util/assert';
 import { createIntl } from 'react-intl';
+import type { SitemapFunction } from 'remix-sitemap';
+import { LANGUAGES_NON_DEFAULT } from '~/constants';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.CF_PAGES_URL;
@@ -67,6 +69,20 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
     {
       property: 'og:image',
       content: ogImage,
+    },
+  ];
+};
+
+export const sitemap: SitemapFunction = async ({ config }) => {
+  return [
+    {
+      loc: '/statistics',
+      alternateRefs: LANGUAGES_NON_DEFAULT.map((lang) => {
+        return {
+          href: new URL(`/${lang}`, config.siteUrl).toString(),
+          hreflang: lang,
+        };
+      }),
     },
   ];
 };

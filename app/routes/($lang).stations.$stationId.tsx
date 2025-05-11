@@ -1,6 +1,6 @@
 import type { Route } from './+types/($lang).stations.$stationId';
 import { assert } from '../util/assert';
-import type { StationManifest } from '~/types';
+import type { StationIndex, StationManifest } from '~/types';
 import {
   createIntl,
   FormattedDate,
@@ -14,6 +14,8 @@ import { useHydrated } from '~/hooks/useHydrated';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { StationBar } from '~/components/StationBar';
+import type { SitemapFunction } from 'remix-sitemap';
+import { LANGUAGES_NON_DEFAULT } from '~/constants';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { stationId, lang = 'en-SG' } = params;
@@ -129,6 +131,30 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
       },
     },
   ];
+};
+
+export const sitemap: SitemapFunction = async ({ config }) => {
+  const res = await fetch(
+    'https://data.mrtdown.foldaway.space/product/station_index.json',
+  );
+  assert(res.ok, res.statusText);
+  const stationIndex: StationIndex = await res.json();
+
+  const result: ReturnType<SitemapFunction> = [];
+
+  for (const stationId of stationIndex) {
+    result.push({
+      loc: `/stations/${stationId}`,
+      alternateRefs: LANGUAGES_NON_DEFAULT.map((lang) => {
+        return {
+          href: new URL(`/${lang}`, config.siteUrl).toString(),
+          hreflang: lang,
+        };
+      }),
+    });
+  }
+
+  return result;
 };
 
 const StationPage: React.FC<Route.ComponentProps> = (props) => {
