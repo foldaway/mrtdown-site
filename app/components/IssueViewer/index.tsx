@@ -190,6 +190,7 @@ export const IssueViewer: React.FC<Props> = (props) => {
         <StationMap
           componentIdsAffected={issue.componentIdsAffected}
           stationIdsAffected={issue.stationIdsAffected}
+          currentDate={issue.startAt}
         />
       </div>
     </div>
