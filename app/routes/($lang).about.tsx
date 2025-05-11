@@ -1,6 +1,8 @@
 import type React from 'react';
 import { createIntl, FormattedMessage } from 'react-intl';
 import type { Route } from './+types/($lang).about';
+import type { SitemapFunction } from 'remix-sitemap';
+import { LANGUAGES_NON_DEFAULT } from '~/constants';
 
 export function headers() {
   return {
@@ -54,6 +56,20 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
     {
       property: 'og:image',
       content: ogImage,
+    },
+  ];
+};
+
+export const sitemap: SitemapFunction = async ({ config }) => {
+  return [
+    {
+      loc: '/about',
+      alternateRefs: LANGUAGES_NON_DEFAULT.map((lang) => {
+        return {
+          href: new URL(`/${lang}`, config.siteUrl).toString(),
+          hreflang: lang,
+        };
+      }),
     },
   ];
 };

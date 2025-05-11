@@ -5,6 +5,8 @@ import type {
   IssueMaintenanceSubtype,
 } from './types';
 
+export const LANGUAGES_NON_DEFAULT = ['zh-Hans', 'ms', 'ta'];
+
 export const IssueSubtypeLabels: Record<
   IssueDisruptionSubtype | IssueMaintenanceSubtype | IssueInfraSubtype,
   MessageDescriptor

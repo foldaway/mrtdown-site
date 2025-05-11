@@ -10,6 +10,8 @@ import { createIntl, useIntl } from 'react-intl';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { DateTime } from 'luxon';
+import type { SitemapFunction } from 'remix-sitemap';
+import { LANGUAGES_NON_DEFAULT } from '~/constants';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.CF_PAGES_URL;
@@ -68,6 +70,20 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
     {
       property: 'og:image',
       content: ogImage,
+    },
+  ];
+};
+
+export const sitemap: SitemapFunction = async ({ config }) => {
+  return [
+    {
+      loc: '/system-map',
+      alternateRefs: LANGUAGES_NON_DEFAULT.map((lang) => {
+        return {
+          href: new URL(`/${lang}`, config.siteUrl).toString(),
+          hreflang: lang,
+        };
+      }),
     },
   ];
 };

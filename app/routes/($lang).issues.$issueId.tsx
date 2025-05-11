@@ -1,4 +1,4 @@
-import type { Issue } from '../types';
+import type { Issue, IssueIndex } from '../types';
 import { IssueViewer } from '../components/IssueViewer';
 import { IssueSkeleton } from '../components/IssueSkeleton';
 
@@ -6,6 +6,8 @@ import type { Route } from './+types/($lang).issues.$issueId';
 import { assert } from '../util/assert';
 import { createIntl } from 'react-intl';
 import { countIssueStations } from '~/helpers/countIssueStations';
+import type { SitemapFunction } from 'remix-sitemap';
+import { LANGUAGES_NON_DEFAULT } from '~/constants';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.CF_PAGES_URL;
@@ -119,6 +121,30 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
       },
     },
   ];
+};
+
+export const sitemap: SitemapFunction = async ({ config }) => {
+  const res = await fetch(
+    'https://data.mrtdown.foldaway.space/product/issue_index.json',
+  );
+  assert(res.ok, res.statusText);
+  const issueIndex: IssueIndex = await res.json();
+
+  const result: ReturnType<SitemapFunction> = [];
+
+  for (const componentId of issueIndex) {
+    result.push({
+      loc: `/issues/${componentId}`,
+      alternateRefs: LANGUAGES_NON_DEFAULT.map((lang) => {
+        return {
+          href: new URL(`/${lang}`, config.siteUrl).toString(),
+          hreflang: lang,
+        };
+      }),
+    });
+  }
+
+  return result;
 };
 
 // HydrateFallback is rendered while the client loader is running
