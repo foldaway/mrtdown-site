@@ -217,13 +217,26 @@ export const StationMap: React.FC<Props> = (props) => {
         );
         for (let i = 0; i < tspans.length; i++) {
           const tspan = tspans[i];
+
           switch (i) {
             case tspans.length - 1: {
-              tspan.textContent = segments.slice(i).join('');
+              tspan.textContent = segments.join('');
               break;
             }
             default: {
-              tspan.textContent = segments[i];
+              const origTextLength = tspan.getComputedTextLength();
+              tspan.textContent = '';
+              while (segments.length > 0) {
+                const textContentBeforeChange: string = tspan.textContent;
+                const firstSegment = segments.shift();
+                assert(firstSegment != null);
+                tspan.textContent = `${textContentBeforeChange}${firstSegment}`;
+                if (tspan.getComputedTextLength() > origTextLength) {
+                  tspan.textContent = textContentBeforeChange;
+                  segments.unshift(firstSegment);
+                  break;
+                }
+              }
               break;
             }
           }
