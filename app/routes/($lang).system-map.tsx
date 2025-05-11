@@ -9,6 +9,7 @@ import { StatusBanner } from '~/components/StatusBanner';
 import { createIntl, useIntl } from 'react-intl';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { DateTime } from 'luxon';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.CF_PAGES_URL;
@@ -105,6 +106,7 @@ const SystemMapPage: React.FC<Route.ComponentProps> = (props) => {
         <StationMap
           stationIdsAffected={stationIdsAffected}
           componentIdsAffected={componentIdsAffected}
+          currentDate={DateTime.now().toISODate()}
         />
 
         <div className="flex bg-gray-50 px-4 py-2.5 dark:bg-gray-900">
