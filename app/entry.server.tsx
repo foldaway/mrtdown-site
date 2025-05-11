@@ -1,16 +1,29 @@
 import type { AppLoadContext, EntryContext } from 'react-router';
-import React from 'react';
 import { ServerRouter } from 'react-router';
 import { isbot } from 'isbot';
 import { renderToReadableStream } from 'react-dom/server';
+import { createSitemapGenerator } from 'remix-sitemap';
 
 export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   routerContext: EntryContext,
-  _loadContext: AppLoadContext,
+  loadContext: AppLoadContext,
 ) {
+  const { isSitemapUrl, sitemap } = createSitemapGenerator({
+    siteUrl: loadContext.cloudflare.env.CF_PAGES_URL,
+    generateRobotsTxt: true,
+  });
+
+  if (isSitemapUrl(request)) {
+    return await sitemap(
+      request,
+      // @ts-expect-error Library is typed for Remix
+      routerContext,
+    );
+  }
+
   let shellRendered = false;
   const userAgent = request.headers.get('user-agent');
 
