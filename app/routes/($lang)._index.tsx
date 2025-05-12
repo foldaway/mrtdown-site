@@ -14,7 +14,7 @@ import type { SitemapFunction } from 'remix-sitemap';
 import { LANGUAGES_NON_DEFAULT } from '~/constants';
 
 export async function loader({ context }: Route.LoaderArgs) {
-  const rootUrl = context.cloudflare.env.CF_PAGES_URL;
+  const rootUrl = context.cloudflare.env.ROOT_URL;
 
   const res = await fetch(
     'https://data.mrtdown.foldaway.space/product/overview.json',
