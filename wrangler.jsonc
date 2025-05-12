@@ -14,5 +14,11 @@
     "logs": {
       "enabled": true
     }
-  }
+  },
+  "routes": [
+    {
+      "pattern": "mrtdown.foldaway.space",
+      "custom_domain": true
+    }
+  ]
 }
