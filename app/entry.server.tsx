@@ -12,7 +12,7 @@ export default async function handleRequest(
   loadContext: AppLoadContext,
 ) {
   const { isSitemapUrl, sitemap } = createSitemapGenerator({
-    siteUrl: loadContext.cloudflare.env.CF_PAGES_URL,
+    siteUrl: loadContext.cloudflare.env.ROOT_URL,
     generateRobotsTxt: true,
   });
 

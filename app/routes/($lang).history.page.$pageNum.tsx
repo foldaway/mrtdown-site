@@ -16,7 +16,7 @@ import type { SitemapFunction } from 'remix-sitemap';
 import { LANGUAGES_NON_DEFAULT } from '~/constants';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
-  const rootUrl = context.cloudflare.env.CF_PAGES_URL;
+  const rootUrl = context.cloudflare.env.ROOT_URL;
 
   const { pageNum } = params;
 

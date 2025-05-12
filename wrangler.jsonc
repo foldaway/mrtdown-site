@@ -1,9 +1,18 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "react-router-app",
+  "name": "mrtdown-site",
   "compatibility_date": "2025-02-24",
   "vars": {
-    "TZ": "Asia/Singapore"
+    "TZ": "Asia/Singapore",
+    "ROOT_URL": "https://mrtdown.foldaway.space"
   },
-  "pages_build_output_dir": "./build/client"
+  "main": "./workers/app.ts",
+  "assets": {
+    "directory": "./build/client"
+  },
+  "observability": {
+    "logs": {
+      "enabled": true
+    }
+  }
 }

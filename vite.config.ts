@@ -1,10 +1,9 @@
 import { defineConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import { getLoadContext } from './server/load-context';
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
-import { cloudflareDevProxy } from '@react-router/dev/vite/cloudflare';
 import { execSync } from 'node:child_process';
+import { cloudflare } from '@cloudflare/vite-plugin';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -12,9 +11,7 @@ export default defineConfig({
     port: 3000,
   },
   plugins: [
-    cloudflareDevProxy({
-      getLoadContext,
-    }),
+    cloudflare({ viteEnvironment: { name: 'ssr' } }),
     reactRouter(),
     tailwindcss(),
     tsconfigPaths(),
