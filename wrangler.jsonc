@@ -5,5 +5,8 @@
   "vars": {
     "TZ": "Asia/Singapore"
   },
-  "pages_build_output_dir": "./build/client"
+  "main": "./workers/app.ts",
+  "assets": {
+    "directory": "./build/client"
+  }
 }
