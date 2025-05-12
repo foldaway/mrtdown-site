@@ -23,6 +23,10 @@ export const IssueSubtypeLabels: Record<
     id: 'issue.subtype.train_fault',
     defaultMessage: 'Train Fault',
   }),
+  'station.fault': defineMessage({
+    id: 'issue.subtype.station_fault',
+    defaultMessage: 'Station Fault',
+  }),
   'power.fault': defineMessage({
     id: 'issue.subtype.power_fault',
     defaultMessage: 'Power Fault',

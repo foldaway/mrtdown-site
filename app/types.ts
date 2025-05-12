@@ -35,6 +35,7 @@ export type IssueDisruptionSubtype =
   | 'weather'
   | 'passenger.incident'
   | 'platform_door.fault'
+  | 'station.fault'
   | 'delay';
 
 export interface IssueDisruption extends IssueBase {
