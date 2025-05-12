@@ -36,7 +36,7 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@formatjs/cli": "^6.6.3",
-    "@react-router/dev": "^7.5.0",
+    "@react-router/dev": "^7.5.2",
     "@react-router/fs-routes": "^7.5.0",
     "@tailwindcss/vite": "^4.0.9",
     "@types/luxon": "^3.4.2",
