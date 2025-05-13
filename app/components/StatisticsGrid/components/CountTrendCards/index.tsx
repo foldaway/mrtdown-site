@@ -140,7 +140,11 @@ export const CountTrendCards: React.FC<Props> = (props) => {
           bucketLabel: bucketDateTime
             .reconfigure({ locale: intl.locale })
             .toFormat(format),
-          issueIdsByIssueType: {},
+          issueIdsByIssueType: {
+            disruption: new Set(),
+            maintenance: new Set(),
+            infra: new Set(),
+          },
         };
         bucketData.issueIdsByIssueType[issue.type].add(issue.id);
         dataByBucket[bucketIso] = bucketData;
