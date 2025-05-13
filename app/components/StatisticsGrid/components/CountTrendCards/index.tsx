@@ -126,11 +126,11 @@ export const CountTrendCards: React.FC<Props> = (props) => {
     for (const [dateIso, dateSummary] of Object.entries(statistics.dates)) {
       const dateTime = DateTime.fromISO(dateIso);
       assert(dateTime.isValid);
-      if (
-        currentBucketDateTime
-          .diff(dateTime.startOf(bucket.data.unit))
-          .as(bucket.data.unit) >= bucket.data.count
-      ) {
+
+      const diff = currentBucketDateTime
+        .diff(dateTime.startOf(bucket.data.unit))
+        .as(bucket.data.unit);
+      if (diff < 0 || diff >= bucket.data.count) {
         continue;
       }
       const bucketDateTime = dateTime.startOf(bucket.data.unit);
