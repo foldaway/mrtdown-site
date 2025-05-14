@@ -68,7 +68,7 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
       <Link
         className={classNames(
-          'group grid grid-cols-[auto_1fr] grid-rows-[1fr_auto] items-center justify-between gap-x-2 gap-y-0.5 px-4 py-2 md:grid-cols-[auto_1fr_1fr] md:grid-rows-1',
+          'group grid grid-cols-[auto_1fr] grid-rows-[1fr_auto] justify-between gap-x-2 gap-y-1 px-4 py-2 md:grid-cols-[auto_2fr_1fr] md:grid-rows-1 md:items-center',
           {
             'bg-disruption-light dark:bg-disruption-dark':
               issueRef.type === 'disruption',
@@ -80,16 +80,16 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
         to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
       >
         {issueRef.type === 'disruption' && (
-          <ExclamationTriangleIcon className="size-5 shrink-0 text-gray-50 dark:text-gray-200" />
+          <ExclamationTriangleIcon className="mt-[1px] size-5 shrink-0 text-gray-50 md:mt-0 dark:text-gray-200" />
         )}
         {issueRef.type === 'maintenance' && (
-          <CogIcon className="size-5 shrink-0 text-gray-50 dark:text-gray-200" />
+          <CogIcon className="mt-[1px] size-5 shrink-0 text-gray-50 md:mt-0 dark:text-gray-200" />
         )}
         {issueRef.type === 'infra' && (
-          <BuildingOfficeIcon className="size-5 shrink-0 text-gray-50 dark:text-gray-200" />
+          <BuildingOfficeIcon className="mt-[1px] size-5 shrink-0 text-gray-50 md:mt-0 dark:text-gray-200" />
         )}
 
-        <h2 className="truncate font-bold text-base text-gray-50 group-hover:underline dark:text-gray-200">
+        <h2 className="font-bold text-base text-gray-50 leading-tight group-hover:underline dark:text-gray-200">
           {issueRef.title}
         </h2>
 

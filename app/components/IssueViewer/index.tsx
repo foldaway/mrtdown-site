@@ -62,41 +62,42 @@ export const IssueViewer: React.FC<Props> = (props) => {
   return (
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
       <Link
-        className={classNames('group flex items-center gap-x-2 px-4 py-2', {
-          'bg-disruption-light dark:bg-disruption-dark':
-            issue.type === 'disruption',
-          'bg-maintenance-light dark:bg-maintenance-dark':
-            issue.type === 'maintenance',
-          'bg-infra-light dark:bg-infra-dark': issue.type === 'infra',
-        })}
+        className={classNames(
+          'group grid grid-cols-[auto_1fr] grid-rows-[1fr_auto] justify-between gap-x-2 gap-y-1 px-4 py-2 md:grid-cols-[auto_2fr_1fr] md:grid-rows-1 md:items-center',
+          {
+            'bg-disruption-light dark:bg-disruption-dark':
+              issue.type === 'disruption',
+            'bg-maintenance-light dark:bg-maintenance-dark':
+              issue.type === 'maintenance',
+            'bg-infra-light dark:bg-infra-dark': issue.type === 'infra',
+          },
+        )}
         to={`/issues/${issue.id}`}
       >
         {issue.type === 'disruption' && (
-          <ExclamationTriangleIcon className="size-5 text-gray-50 dark:text-gray-200" />
+          <ExclamationTriangleIcon className="mt-[1px] size-5 text-gray-50 md:mt-0 dark:text-gray-200" />
         )}
         {issue.type === 'infra' && (
-          <BuildingOfficeIcon className="size-5 text-gray-50 dark:text-gray-200" />
+          <BuildingOfficeIcon className="mt-[1px] size-5 text-gray-50 md:mt-0 dark:text-gray-200" />
         )}
         {issue.type === 'maintenance' && (
-          <CogIcon className="size-5 text-gray-50 dark:text-gray-200" />
+          <CogIcon className="mt-[1px] size-5 text-gray-50 md:mt-0 dark:text-gray-200" />
         )}
-        <div className="flex grow flex-wrap items-center justify-between gap-x-2 overflow-hidden">
-          <h2 className="truncate font-bold text-base text-gray-50 group-hover:underline dark:text-gray-200">
-            {issue.title}
-          </h2>
+        <h2 className="font-bold text-base text-gray-50 group-hover:underline dark:text-gray-200">
+          {issue.title}
+        </h2>
 
-          <div className="inline-flex items-center gap-x-1">
-            {issue.subtypes.map((subtype) => (
-              <div
-                key={subtype}
-                className="flex rounded-md bg-gray-300 px-2 py-1 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-              >
-                <span className="font-bold text-xs leading-none">
-                  <FormattedMessage {...IssueSubtypeLabels[subtype]} />
-                </span>
-              </div>
-            ))}
-          </div>
+        <div className="col-start-2 col-end-2 flex items-center gap-x-1 md:col-start-3 md:col-end-3 md:justify-end">
+          {issue.subtypes.map((subtype) => (
+            <div
+              key={subtype}
+              className="flex rounded-md bg-gray-300 px-2 py-1 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+            >
+              <span className="font-bold text-xs leading-none">
+                <FormattedMessage {...IssueSubtypeLabels[subtype]} />
+              </span>
+            </div>
+          ))}
         </div>
       </Link>
       <div className="flex justify-between gap-1.5 bg-gray-100 px-4 py-2 sm:flex-row sm:items-center dark:bg-gray-800">
