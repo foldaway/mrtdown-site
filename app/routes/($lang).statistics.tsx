@@ -1,6 +1,5 @@
 import type { Statistics } from '../types';
 import { StatisticsGrid } from '../components/StatisticsGrid';
-import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
 
 import type { Route } from './+types/($lang).statistics';
 import { assert } from '../util/assert';
@@ -16,7 +15,6 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   );
   assert(res.ok, res.statusText);
   const statistics: Statistics = await res.json();
-  patchDatesForOngoingIssues(statistics.dates, statistics.issuesOngoing);
 
   const { lang = 'en-SG' } = params;
   const { default: messages } = await import(`../../lang/${lang}.json`);

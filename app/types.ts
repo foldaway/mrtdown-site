@@ -139,7 +139,6 @@ export interface Overview {
 
 export interface Statistics {
   dates: Record<string, DateSummary>;
-  issuesOngoing: Issue[];
   issuesDisruptionHistoricalCount: number;
   issuesDisruptionDurationTotalDays: number;
   issuesDisruptionLongest: IssueRef[];
