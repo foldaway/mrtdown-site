@@ -21,7 +21,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   );
   assert(res.ok, res.statusText);
   const overview: Overview = await res.json();
-  patchDatesForOngoingIssues(overview.dates, overview.issuesOngoing);
+  patchDatesForOngoingIssues(overview.dates, overview.issuesOngoingSnapshot);
 
   const { lang = 'en-SG' } = params;
   const { default: messages } = await import(`../../lang/${lang}.json`);
@@ -97,7 +97,7 @@ const SystemMapPage: React.FC<Route.ComponentProps> = (props) => {
     const _stationIdsAffected: IssueStationEntry[] = [];
     const _componentIdsAffected = new Set<string>();
 
-    for (const issue of loaderData.overview.issuesOngoing) {
+    for (const issue of loaderData.overview.issuesOngoingSnapshot) {
       for (const componentId of issue.componentIdsAffected) {
         _componentIdsAffected.add(componentId);
       }
@@ -110,13 +110,11 @@ const SystemMapPage: React.FC<Route.ComponentProps> = (props) => {
       stationIdsAffected: _stationIdsAffected,
       componentIdsAffected: Array.from(_componentIdsAffected),
     };
-  }, [loaderData.overview.issuesOngoing]);
+  }, [loaderData.overview.issuesOngoingSnapshot]);
 
   return (
     <div className="flex flex-col gap-y-2">
-      <StatusBanner
-        hasOngoingIssues={loaderData.overview.issuesOngoing.length > 0}
-      />
+      <StatusBanner issues={loaderData.overview.issuesOngoingSnapshot} />
 
       <div className="flex flex-col bg-gray-100 p-4 dark:bg-gray-800">
         <StationMap

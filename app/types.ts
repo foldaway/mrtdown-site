@@ -134,7 +134,7 @@ export interface DateSummary {
 export interface Overview {
   components: Component[];
   dates: Record<string, DateSummary>;
-  issuesOngoing: Issue[];
+  issuesOngoingSnapshot: Issue[];
 }
 
 export interface Statistics {

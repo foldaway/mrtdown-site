@@ -1,19 +1,57 @@
 import type React from 'react';
+import { useMemo } from 'react';
 import { FormattedMessage } from 'react-intl';
+import type { IssueRef, IssueType } from '~/types';
 
 interface Props {
-  hasOngoingIssues: boolean;
+  issues: IssueRef[];
 }
 
 export const StatusBanner: React.FC<Props> = (props) => {
-  const { hasOngoingIssues } = props;
+  const { issues } = props;
 
-  if (hasOngoingIssues) {
+  const countByIssueType = useMemo(() => {
+    const result: Record<IssueType, number> = {
+      disruption: 0,
+      maintenance: 0,
+      infra: 0,
+    };
+
+    for (const issue of issues) {
+      result[issue.type]++;
+    }
+
+    return result;
+  }, [issues]);
+
+  if (countByIssueType.disruption > 0) {
     return (
       <h2 className="rounded bg-disruption-light px-4 py-2 font-bold text-gray-50 text-lg dark:bg-disruption-dark dark:text-gray-100">
         <FormattedMessage
-          id="general.there_are_ongoing_issues"
-          defaultMessage="Issues ongoing"
+          id="status.banner.ongoing_disruption"
+          defaultMessage="Ongoing Disruption"
+        />
+      </h2>
+    );
+  }
+
+  if (countByIssueType.maintenance > 0) {
+    return (
+      <h2 className="rounded bg-maintenance-light px-4 py-2 font-bold text-gray-50 text-lg dark:bg-maintenance-dark dark:text-gray-100">
+        <FormattedMessage
+          id="status.banner.ongoing_maintenance"
+          defaultMessage="Ongoing Maintenance"
+        />
+      </h2>
+    );
+  }
+
+  if (countByIssueType.infra > 0) {
+    return (
+      <h2 className="rounded bg-disruption-light px-4 py-2 font-bold text-gray-50 text-lg dark:bg-disruption-dark dark:text-gray-100">
+        <FormattedMessage
+          id="status.banner.ongoing_infra"
+          defaultMessage="Ongoing Infrastructure Issues"
         />
       </h2>
     );

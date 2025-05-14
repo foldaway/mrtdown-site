@@ -5,11 +5,25 @@ import { splitIntervalByServiceHours } from './splitIntervalByServiceHours';
 
 export function patchDatesForOngoingIssues(
   dates: Record<string, DateSummary>,
-  issuesOngoing: Issue[],
+  issuesOngoingSnapshot: Issue[],
 ) {
-  for (const issue of issuesOngoing) {
+  for (let i = issuesOngoingSnapshot.length - 1; i > 0; i--) {
+    const issue = issuesOngoingSnapshot[i];
+    if (issue.endAt == null) {
+      continue;
+    }
+
+    const endAt = DateTime.fromISO(issue.startAt);
+    assert(endAt.isValid);
+    if (endAt.diffNow().as('seconds') < 0) {
+      issuesOngoingSnapshot.splice(i, 1);
+    }
+  }
+
+  for (const issue of issuesOngoingSnapshot) {
     const startAt = DateTime.fromISO(issue.startAt);
     assert(startAt.isValid);
+
     const interval = Interval.fromDateTimes(startAt, DateTime.now());
     for (const segment of splitIntervalByServiceHours(interval)) {
       assert(segment.start != null);

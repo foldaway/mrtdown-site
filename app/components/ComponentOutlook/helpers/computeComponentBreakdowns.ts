@@ -41,7 +41,7 @@ export function computeComponentBreakdown(
   }
 
   const issuesOngoingCountByComponentId: Record<string, number> = {};
-  for (const issue of overview.issuesOngoing) {
+  for (const issue of overview.issuesOngoingSnapshot) {
     for (const componentId of issue.componentIdsAffected) {
       let count = issuesOngoingCountByComponentId[componentId] ?? 0;
       count++;

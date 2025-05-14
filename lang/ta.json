@@ -54,7 +54,6 @@
   "general.station_title": "{stationName} நிலையம்",
   "general.statistics": "புள்ளிவிவரங்கள்",
   "general.system_map": "முறைகள் வரைபடம்",
-  "general.there_are_ongoing_issues": "சிக்கல்கள் தொடர்கின்றன",
   "general.uptime_duration_display": "{duration} சேவை நேரத்துக்குள்",
   "general.uptime_percent_display": "{percent} செயல்பாடு நேரம்",
   "issue.description": "இந்தப் பிரச்சனை {period} அன்று {lineNames} வழித்தடத்தில் உள்ள {stationCount} நிலையங்களை பாதித்தது.",
@@ -76,6 +75,9 @@
   "issue.subtype.weather": "வானிலை பாதிப்பு",
   "site.tagline": "சமூகம் இயக்கும் போக்குவரத்து கண்காணிப்பு",
   "site.title_history": "நிகழ்வுப் பதிவுகள் - பக்கம் {num}",
+  "status.banner.ongoing_disruption": "சேவை தடையுடன் நடப்பில் உள்ளது",
+  "status.banner.ongoing_maintenance": "பணிகள் பராமரிப்பு நடக்கிறது",
+  "status.banner.ongoing_infra": "மூலமைப்புச் சிக்கல்கள் நடப்பில் உள்ளன",
   "status.not_in_service": "சேவையில் இல்லை",
   "status.operational": "இயங்குகிறது",
   "status.service_ended": "சேவை முடிந்தது"

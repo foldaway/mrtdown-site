@@ -21,7 +21,7 @@ export async function loader({ context }: Route.LoaderArgs) {
   );
   assert(res.ok, res.statusText);
   const overview: Overview = await res.json();
-  patchDatesForOngoingIssues(overview.dates, overview.issuesOngoing);
+  patchDatesForOngoingIssues(overview.dates, overview.issuesOngoingSnapshot);
   return {
     overview,
     rootUrl,
@@ -115,10 +115,10 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
   return (
     <div className="flex flex-col">
       <div className="mb-3 flex flex-col">
-        <StatusBanner hasOngoingIssues={overview.issuesOngoing.length > 0} />
+        <StatusBanner issues={overview.issuesOngoingSnapshot} />
       </div>
 
-      {overview.issuesOngoing.map((issue) => (
+      {overview.issuesOngoingSnapshot.map((issue) => (
         <IssueRefViewer key={issue.id} issueRef={issue} />
       ))}
 

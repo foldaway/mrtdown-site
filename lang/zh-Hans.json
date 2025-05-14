@@ -54,7 +54,6 @@
   "general.station_title": "{stationName}地铁站",
   "general.statistics": "统计数据",
   "general.system_map": "地铁路线图",
-  "general.there_are_ongoing_issues": "系统故障中",
   "general.uptime_duration_display": "营运时间内累计中断时间：{duration}",
   "general.uptime_percent_display": "系统可用率高达 {percent}",
   "issue.description": "此问题影响了{stationCount}个{lineNames}线的地铁站，时间为{period}。",
@@ -76,6 +75,9 @@
   "issue.subtype.weather": "天气影响",
   "site.tagline": "「由社群驱动的地铁监察」",
   "site.title_history": "事故记录 - 第{num}页",
+  "status.banner.ongoing_disruption": "列车服务中断中",
+  "status.banner.ongoing_maintenance": "维护工作进行中",
+  "status.banner.ongoing_infra": "基础设施问题处理中",
   "status.not_in_service": "尚未通车",
   "status.operational": "正常运营",
   "status.service_ended": "运营已结束"

@@ -54,7 +54,6 @@
   "general.station_title": "Stesen {stationName}",
   "general.statistics": "Statistik",
   "general.system_map": "Peta Sistem",
-  "general.there_are_ongoing_issues": "Gangguan sedang berlaku",
   "general.uptime_duration_display": "{duration} dalam waktu operasi",
   "general.uptime_percent_display": "{percent} masa operasi",
   "issue.description": "Isu ini menjejaskan {stationCount} stesen laluan {lineNames} pada {period}.",
@@ -76,6 +75,9 @@
   "issue.subtype.weather": "Cuaca Buruk",
   "site.tagline": "pemantauan transit oleh komuniti",
   "site.title_history": "Sejarah Insiden - Halaman {num}",
+  "status.banner.ongoing_disruption": "Gangguan Perkhidmatan Sedang Berlaku",
+  "status.banner.ongoing_maintenance": "Penyelenggaraan Sedang Dijalankan",
+  "status.banner.ongoing_infra": "Isu Infrastruktur Sedang Berlaku",
   "status.not_in_service": "Tidak beroperasi",
   "status.operational": "Beroperasi",
   "status.service_ended": "Perkhidmatan tamat"

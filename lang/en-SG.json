@@ -54,7 +54,6 @@
   "general.station_title": "{stationName} Station",
   "general.statistics": "Statistics",
   "general.system_map": "System Map",
-  "general.there_are_ongoing_issues": "Issues ongoing",
   "general.uptime_duration_display": "{duration} within service hours",
   "general.uptime_percent_display": "{percent} uptime",
   "issue.description": "This issue affected {stationCount, plural, one { {stationCount} {lineNames} station } other { {stationCount} {lineNames} stations }} on {period}.",
@@ -76,6 +75,9 @@
   "issue.subtype.weather": "Weather",
   "site.tagline": "community-run transit monitoring",
   "site.title_history": "Incident History - Page {num}",
+  "status.banner.ongoing_disruption": "Ongoing Disruption",
+  "status.banner.ongoing_maintenance": "Ongoing Maintenance",
+  "status.banner.ongoing_infra": "Ongoing Infrastructure Issues",
   "status.not_in_service": "Not in Service",
   "status.operational": "Operational",
   "status.service_ended": "Service Ended"
