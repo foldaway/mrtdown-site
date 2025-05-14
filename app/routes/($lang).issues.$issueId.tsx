@@ -115,6 +115,7 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
           eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
           startDate: issue.startAt,
           endDate: issue.endAt,
+          location: 'Singapore Public Transport',
         },
         url: ogUrl,
         image: ogImage,
