@@ -85,19 +85,6 @@ export const DateCard: React.FC<Props> = (props) => {
               ),
           )}
         </div>
-        {/* <div
-          className={classNames(
-            'h-7 w-1.5 rounded-xs transition-transform hover:scale-150',
-            {
-              'bg-disruption-light dark:bg-disruption-dark':
-                status === 'disruption',
-              'bg-maintenance-light dark:bg-maintenance-dark':
-                status === 'maintenance',
-              'bg-infra-light dark:bg-infra-dark': status === 'infra',
-              'bg-operational-light dark:bg-operational-dark': status == null,
-            },
-          )}
-        /> */}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
@@ -112,6 +99,7 @@ export const DateCard: React.FC<Props> = (props) => {
                 day="numeric"
                 month="long"
                 year="numeric"
+                weekday="long"
               />
             ) : (
               dateTime.toISO()

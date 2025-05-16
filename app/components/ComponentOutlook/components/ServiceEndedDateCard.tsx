@@ -39,6 +39,7 @@ export const ServiceEndedDateCard: React.FC<Props> = (props) => {
                 year="numeric"
                 month="short"
                 day="numeric"
+                weekday="long"
               />
             ) : (
               dateTime.toISO()
