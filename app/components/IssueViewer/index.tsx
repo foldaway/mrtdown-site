@@ -1,12 +1,19 @@
+import * as Popover from '@radix-ui/react-popover';
 import {
+  ArrowPathIcon,
   BuildingOfficeIcon,
   CogIcon,
   ExclamationTriangleIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/solid';
 import classNames from 'classnames';
 import { DateTime, Interval } from 'luxon';
 import { useMemo } from 'react';
-import { FormattedDateTimeRange, FormattedMessage } from 'react-intl';
+import {
+  FormattedDateTimeRange,
+  FormattedMessage,
+  FormattedNumber,
+} from 'react-intl';
 import { Link } from 'react-router';
 import { IssueSubtypeLabels } from '~/constants';
 import { calculateDurationWithinServiceHours } from '~/helpers/calculateDurationWithinServiceHours';
@@ -20,6 +27,8 @@ import { UpdateDisruption } from './components/UpdateDisruption';
 import { UpdateInfra } from './components/UpdateInfra';
 import { UpdateMaintenance } from './components/UpdateMaintenance';
 import { countIssueStations } from '~/helpers/countIssueStations';
+import { rrulestr } from 'rrule';
+import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
 
 interface Props {
   issue: Issue;
@@ -58,6 +67,8 @@ export const IssueViewer: React.FC<Props> = (props) => {
   }, [issue]);
 
   const isHydrated = useHydrated();
+
+  const intervals = useMemo(() => computeIssueIntervals(issue), [issue]);
 
   return (
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
@@ -138,7 +149,49 @@ export const IssueViewer: React.FC<Props> = (props) => {
                 )}
               </>
             )}
+
+            {intervals.length > 1 && (
+              <Popover.Root>
+                <Popover.Trigger className="ms-1 rounded-lg bg-gray-300 px-1.5 py-0.5 hover:cursor-pointer hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600">
+                  <FormattedNumber
+                    value={intervals.length - 1}
+                    signDisplay="always"
+                    unit="day"
+                    style="unit"
+                  />
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Content className="flex max-h-96 flex-col overflow-y-scroll rounded border border-gray-300 bg-gray-100 py-2 outline-none dark:border-gray-600 dark:bg-gray-800">
+                    <Popover.Arrow className="fill-gray-300 dark:fill-gray-800" />
+
+                    {intervals.slice(1).map((interval) => (
+                      <div
+                        key={interval.toISO()}
+                        className="px-4 py-1.5 text-gray-600 text-xs even:bg-gray-200 dark:text-gray-300 dark:even:bg-gray-700"
+                      >
+                        {isHydrated ? (
+                          <span className="truncate font-bold text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
+                            <FormattedDateTimeRange
+                              from={interval.start.toJSDate()}
+                              to={interval.end.toJSDate()}
+                              month="short"
+                              day="numeric"
+                              year="numeric"
+                              hour="numeric"
+                              minute="numeric"
+                            />
+                          </span>
+                        ) : (
+                          interval.toISO()
+                        )}
+                      </div>
+                    ))}
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover.Root>
+            )}
           </span>
+
           {dateTimeInfo != null && (
             <span className="text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
               {isHydrated ? (
