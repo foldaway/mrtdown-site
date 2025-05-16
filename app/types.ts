@@ -59,6 +59,7 @@ export type IssueMaintenanceSubtype =
 export interface IssueMaintenance extends IssueBase {
   type: 'maintenance';
   cancelledAt: string | null;
+  rrule?: string;
   updates: IssueMaintenanceUpdate[];
   subtypes: IssueMaintenanceSubtype[];
 }
@@ -110,6 +111,7 @@ export interface IssueRef {
   stationIdsAffected: IssueStationEntry[];
   startAt: string;
   endAt: string | null;
+  rrule?: string;
   subtypes: (
     | IssueDisruptionSubtype
     | IssueMaintenanceSubtype

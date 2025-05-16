@@ -11,11 +11,17 @@ import {
 } from '@heroicons/react/20/solid';
 import { calculateDurationWithinServiceHours } from '../../../helpers/calculateDurationWithinServiceHours';
 import { useHydrated } from '../../../hooks/useHydrated';
-import { FormattedDateTimeRange, FormattedMessage, useIntl } from 'react-intl';
+import {
+  FormattedDateTimeRange,
+  FormattedMessage,
+  FormattedNumber,
+  useIntl,
+} from 'react-intl';
 import { FormattedDuration } from '~/components/FormattedDuration';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { assert } from '~/util/assert';
 import { IssueSubtypeLabels } from '~/constants';
+import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
 
 interface Props {
   issueRef: IssueRef;
@@ -63,6 +69,8 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
     }
     return result.size;
   }, [issueRef.stationIdsAffected]);
+
+  const intervals = useMemo(() => computeIssueIntervals(issueRef), [issueRef]);
 
   return (
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
@@ -143,6 +151,17 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
                   dateTimeInfo.interval.toISO()
                 )}
               </>
+            )}
+
+            {intervals.length > 1 && (
+              <div className="ms-1 inline-block rounded-lg bg-gray-300 px-1.5 py-0.5 dark:bg-gray-700">
+                <FormattedNumber
+                  value={intervals.length - 1}
+                  signDisplay="always"
+                  unit="day"
+                  style="unit"
+                />
+              </div>
             )}
           </span>
           {dateTimeInfo != null && (
