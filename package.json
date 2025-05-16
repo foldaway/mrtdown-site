@@ -30,6 +30,7 @@
     "react-router": "^7.5.2",
     "recharts": "^2.15.1",
     "remix-sitemap": "^3.2.0",
+    "rrule": "^2.8.1",
     "tailwindcss": "^4.0.9",
     "use-debounce": "^10.0.4"
   },
