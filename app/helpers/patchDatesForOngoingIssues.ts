@@ -7,15 +7,18 @@ export function patchDatesForOngoingIssues(
   dates: Record<string, DateSummary>,
   issuesOngoingSnapshot: Issue[],
 ) {
-  for (let i = issuesOngoingSnapshot.length - 1; i > 0; i--) {
+  for (let i = issuesOngoingSnapshot.length - 1; i >= 0; i--) {
     const issue = issuesOngoingSnapshot[i];
     if (issue.endAt == null) {
       continue;
     }
 
-    const endAt = DateTime.fromISO(issue.startAt);
+    const startAt = DateTime.fromISO(issue.startAt);
+    assert(startAt.isValid);
+    const endAt = DateTime.fromISO(issue.endAt);
     assert(endAt.isValid);
-    if (endAt.diffNow().as('seconds') < 0) {
+    const interval = Interval.fromDateTimes(startAt, endAt);
+    if (!interval.contains(DateTime.now())) {
       issuesOngoingSnapshot.splice(i, 1);
     }
   }
@@ -25,6 +28,9 @@ export function patchDatesForOngoingIssues(
     assert(startAt.isValid);
 
     const interval = Interval.fromDateTimes(startAt, DateTime.now());
+    if (!interval.isValid) {
+      continue;
+    }
     for (const segment of splitIntervalByServiceHours(interval)) {
       assert(segment.start != null);
       assert(segment.end != null);
