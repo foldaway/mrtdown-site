@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import type { Component } from '../../../types';
 import { useIntl } from 'react-intl';
+import { Link } from 'react-router';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 interface Props {
   componentId: string;
@@ -28,13 +30,16 @@ export const ComponentPill: React.FC<Props> = (props) => {
   }
 
   return (
-    <>
+    <Link
+      className="inline-flex items-center transition-transform duration-75 hover:scale-105"
+      to={buildLocaleAwareLink(`/lines/${componentId}`, intl.locale)}
+    >
       <span
         className="rounded-sm px-2 py-1 font-semibold text-white text-xs leading-none"
         style={{ backgroundColor: data.color }}
       >
         {data.id}
       </span>
-    </>
+    </Link>
   );
 };

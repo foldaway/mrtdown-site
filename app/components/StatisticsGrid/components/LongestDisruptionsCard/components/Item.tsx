@@ -6,8 +6,9 @@ import { ComponentBar } from '../../../../ComponentBar';
 import { Link } from 'react-router';
 import { calculateDurationWithinServiceHours } from '../../../../../helpers/calculateDurationWithinServiceHours';
 import { useHydrated } from '../../../../../hooks/useHydrated';
-import { FormattedDateTimeRange, FormattedMessage } from 'react-intl';
+import { FormattedDateTimeRange, FormattedMessage, useIntl } from 'react-intl';
 import { FormattedDuration } from '~/components/FormattedDuration';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 interface Props {
   issueRef: IssueRef;
@@ -15,6 +16,8 @@ interface Props {
 
 export const Item: React.FC<Props> = (props) => {
   const { issueRef } = props;
+
+  const intl = useIntl();
 
   const startAt = useMemo(() => {
     const dateTime = DateTime.fromISO(issueRef.startAt);
@@ -40,7 +43,10 @@ export const Item: React.FC<Props> = (props) => {
   }, [startAt, endAt]);
 
   return (
-    <Link className="flex flex-col py-1" to={`/issues/${issueRef.id}`}>
+    <Link
+      className="flex flex-col py-1"
+      to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
+    >
       <span className="line-clamp-1 text-gray-700 text-sm dark:text-gray-200">
         {issueRef.title}
       </span>
