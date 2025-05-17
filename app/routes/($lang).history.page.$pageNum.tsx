@@ -7,13 +7,11 @@ import { IssuesHistoryPageViewer } from '../components/IssuesHistoryPageViewer';
 import { useViewport } from '../hooks/useViewport';
 import type { IssuesHistory, IssuesHistoryPage } from '../types';
 
+import { createIntl, FormattedDateTimeRange } from 'react-intl';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '../hooks/useHydrated';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).history.page.$pageNum';
-import { createIntl, FormattedDateTimeRange } from 'react-intl';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
-import type { SitemapFunction } from 'remix-sitemap';
-import { LANGUAGES_NON_DEFAULT } from '~/constants';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.ROOT_URL;
@@ -85,30 +83,6 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
       content: ogImage,
     },
   ];
-};
-
-export const sitemap: SitemapFunction = async ({ config }) => {
-  const res = await fetch(
-    'https://data.mrtdown.foldaway.space/product/issues_history.json',
-  );
-  assert(res.ok, res.statusText);
-  const history: IssuesHistory = await res.json();
-
-  const result: ReturnType<SitemapFunction> = [];
-
-  for (let i = 0; i < history.pageCount; i++) {
-    result.push({
-      loc: `/history/page/${i + 1}`,
-      alternateRefs: LANGUAGES_NON_DEFAULT.map((lang) => {
-        return {
-          href: new URL(`/${lang}`, config.siteUrl).toString(),
-          hreflang: lang,
-        };
-      }),
-    });
-  }
-
-  return result;
 };
 
 const HistoryPage: React.FC<Route.ComponentProps> = (props) => {

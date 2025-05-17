@@ -1,4 +1,4 @@
-import type { ComponentIndex, ComponentManifest } from '~/types';
+import type { ComponentManifest } from '~/types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).lines.$lineId';
 import {
@@ -12,8 +12,6 @@ import classNames from 'classnames';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { DateTime } from 'luxon';
-import type { SitemapFunction } from 'remix-sitemap';
-import { LANGUAGES_NON_DEFAULT } from '~/constants';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { lineId, lang = 'en-SG' } = params;
@@ -159,30 +157,6 @@ export const meta: Route.MetaFunction = ({ params, data, location }) => {
       },
     },
   ];
-};
-
-export const sitemap: SitemapFunction = async ({ config }) => {
-  const res = await fetch(
-    'https://data.mrtdown.foldaway.space/product/component_index.json',
-  );
-  assert(res.ok, res.statusText);
-  const componentIndex: ComponentIndex = await res.json();
-
-  const result: ReturnType<SitemapFunction> = [];
-
-  for (const componentId of componentIndex) {
-    result.push({
-      loc: `/lines/${componentId}`,
-      alternateRefs: LANGUAGES_NON_DEFAULT.map((lang) => {
-        return {
-          href: new URL(`/${lang}`, config.siteUrl).toString(),
-          hreflang: lang,
-        };
-      }),
-    });
-  }
-
-  return result;
 };
 
 const ComponentPage: React.FC<Route.ComponentProps> = (props) => {

@@ -1,11 +1,9 @@
-import type { Statistics } from '../types';
 import { StatisticsGrid } from '../components/StatisticsGrid';
+import type { Statistics } from '../types';
 
-import type { Route } from './+types/($lang).statistics';
-import { assert } from '../util/assert';
 import { createIntl } from 'react-intl';
-import type { SitemapFunction } from 'remix-sitemap';
-import { LANGUAGES_NON_DEFAULT } from '~/constants';
+import { assert } from '../util/assert';
+import type { Route } from './+types/($lang).statistics';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.ROOT_URL;
@@ -67,20 +65,6 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
     {
       property: 'og:image',
       content: ogImage,
-    },
-  ];
-};
-
-export const sitemap: SitemapFunction = async ({ config }) => {
-  return [
-    {
-      loc: '/statistics',
-      alternateRefs: LANGUAGES_NON_DEFAULT.map((lang) => {
-        return {
-          href: new URL(`/${lang}`, config.siteUrl).toString(),
-          hreflang: lang,
-        };
-      }),
     },
   ];
 };

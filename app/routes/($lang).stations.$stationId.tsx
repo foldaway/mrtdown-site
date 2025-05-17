@@ -1,21 +1,19 @@
-import type { Route } from './+types/($lang).stations.$stationId';
-import { assert } from '../util/assert';
-import type { StationIndex, StationManifest } from '~/types';
+import { DateTime } from 'luxon';
+import { Fragment, useMemo } from 'react';
 import {
   createIntl,
   FormattedDate,
   FormattedMessage,
   useIntl,
 } from 'react-intl';
-import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
-import { Fragment, useMemo } from 'react';
-import { DateTime } from 'luxon';
-import { useHydrated } from '~/hooks/useHydrated';
 import { Link } from 'react-router';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
 import { StationBar } from '~/components/StationBar';
-import type { SitemapFunction } from 'remix-sitemap';
-import { LANGUAGES_NON_DEFAULT } from '~/constants';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { useHydrated } from '~/hooks/useHydrated';
+import type { StationManifest } from '~/types';
+import { assert } from '../util/assert';
+import type { Route } from './+types/($lang).stations.$stationId';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { stationId, lang = 'en-SG' } = params;
@@ -131,30 +129,6 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
       },
     },
   ];
-};
-
-export const sitemap: SitemapFunction = async ({ config }) => {
-  const res = await fetch(
-    'https://data.mrtdown.foldaway.space/product/station_index.json',
-  );
-  assert(res.ok, res.statusText);
-  const stationIndex: StationIndex = await res.json();
-
-  const result: ReturnType<SitemapFunction> = [];
-
-  for (const stationId of stationIndex) {
-    result.push({
-      loc: `/stations/${stationId}`,
-      alternateRefs: LANGUAGES_NON_DEFAULT.map((lang) => {
-        return {
-          href: new URL(`/${lang}`, config.siteUrl).toString(),
-          hreflang: lang,
-        };
-      }),
-    });
-  }
-
-  return result;
 };
 
 const StationPage: React.FC<Route.ComponentProps> = (props) => {

@@ -1,17 +1,15 @@
 import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
 import type { IssueStationEntry, Overview } from '../types';
 
+import { DateTime } from 'luxon';
 import { useMemo } from 'react';
-import { StationMap } from '~/components/StationMap';
-import { assert } from '../util/assert';
-import type { Route } from './+types/($lang).system-map';
-import { StatusBanner } from '~/components/StatusBanner';
 import { createIntl, useIntl } from 'react-intl';
 import { Link } from 'react-router';
+import { StationMap } from '~/components/StationMap';
+import { StatusBanner } from '~/components/StatusBanner';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
-import { DateTime } from 'luxon';
-import type { SitemapFunction } from 'remix-sitemap';
-import { LANGUAGES_NON_DEFAULT } from '~/constants';
+import { assert } from '../util/assert';
+import type { Route } from './+types/($lang).system-map';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.ROOT_URL;
@@ -70,20 +68,6 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
     {
       property: 'og:image',
       content: ogImage,
-    },
-  ];
-};
-
-export const sitemap: SitemapFunction = async ({ config }) => {
-  return [
-    {
-      loc: '/system-map',
-      alternateRefs: LANGUAGES_NON_DEFAULT.map((lang) => {
-        return {
-          href: new URL(`/${lang}`, config.siteUrl).toString(),
-          hreflang: lang,
-        };
-      }),
     },
   ];
 };

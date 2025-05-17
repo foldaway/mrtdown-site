@@ -6,12 +6,10 @@ import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssue
 import { useViewport } from '../hooks/useViewport';
 import type { Overview } from '../types';
 
+import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
+import { StatusBanner } from '~/components/StatusBanner';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang)._index';
-import { StatusBanner } from '~/components/StatusBanner';
-import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
-import type { SitemapFunction } from 'remix-sitemap';
-import { LANGUAGES_NON_DEFAULT } from '~/constants';
 
 export async function loader({ context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.ROOT_URL;
@@ -59,20 +57,6 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
     {
       property: 'og:image',
       content: ogImage,
-    },
-  ];
-};
-
-export const sitemap: SitemapFunction = async ({ config }) => {
-  return [
-    {
-      loc: '/',
-      alternateRefs: LANGUAGES_NON_DEFAULT.map((lang) => {
-        return {
-          href: new URL(`/${lang}`, config.siteUrl).toString(),
-          hreflang: lang,
-        };
-      }),
     },
   ];
 };
