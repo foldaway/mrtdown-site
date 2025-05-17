@@ -1,16 +1,15 @@
 import * as Popover from '@radix-ui/react-popover';
-import type { DateSummary, Issue, IssueType } from '../../../types';
+import classNames from 'classnames';
 import { type DateTime, Duration, Interval } from 'luxon';
 import { useMemo, useState } from 'react';
-import { computeStatus } from '../helpers/computeStatus';
-import { Link } from 'react-router';
-import classNames from 'classnames';
-import { useDebounce } from 'use-debounce';
-import { useHydrated } from '../../../hooks/useHydrated';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { Link } from 'react-router';
+import { useDebounce } from 'use-debounce';
 import { FormattedDuration } from '~/components/FormattedDuration';
-import { sumIntervalDuration } from '~/helpers/sumIntervalDuration';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { useHydrated } from '../../../hooks/useHydrated';
+import type { DateSummary, Issue } from '../../../types';
+import { computeStatus } from '../helpers/computeStatus';
 
 interface Props {
   dateTime: DateTime;
@@ -19,44 +18,34 @@ interface Props {
 
 export const DateCard: React.FC<Props> = (props) => {
   const { dateTime, dateOverview } = props;
-  const { issues, issueTypesDurationMs, issueTypesIntervalsNoOverlapMs } =
-    dateOverview;
+  const { issues, issueTypesDurationMs } = dateOverview;
 
   const [isOpen, setIsOpen] = useState(false);
   const [isOpenDebounced] = useDebounce(isOpen, 100);
 
-  const status = useMemo(() => {
-    return computeStatus(issueTypesDurationMs);
-  }, [issueTypesDurationMs]);
-
   const isHydrated = useHydrated();
   const intl = useIntl();
 
-  const percentages = useMemo<Record<IssueType, number>>(() => {
+  const status = useMemo(
+    () => computeStatus(issueTypesDurationMs),
+    [issueTypesDurationMs],
+  );
+
+  const percentages = useMemo(() => {
     const serviceHours = Interval.fromDateTimes(
       dateTime.startOf('day').set({ hour: 5, minute: 30 }),
       dateTime.startOf('day').plus({ days: 1 }),
     );
 
-    const result: Record<IssueType, number> = {
-      disruption: 0,
-      maintenance: 0,
-      infra: 0,
-    };
-
-    for (const [issueType, intervalIsos] of Object.entries(
-      issueTypesIntervalsNoOverlapMs,
-    )) {
-      const _issueType = issueType as IssueType;
-      const intervals = intervalIsos.map((iso) => Interval.fromISO(iso));
-      result[_issueType] =
-        (sumIntervalDuration(Interval.merge(intervals)).as('milliseconds') /
-          serviceHours.toDuration().toMillis()) *
-        100;
-    }
-
-    return result;
-  }, [issueTypesIntervalsNoOverlapMs, dateTime]);
+    return Object.fromEntries(
+      Object.entries(issueTypesDurationMs).map(([issueType, durationMs]) => {
+        return [
+          issueType,
+          (durationMs / serviceHours.toDuration().toMillis()) * 100,
+        ];
+      }),
+    );
+  }, [issueTypesDurationMs, dateTime]);
 
   return (
     <Popover.Root open={isOpenDebounced} onOpenChange={setIsOpen}>

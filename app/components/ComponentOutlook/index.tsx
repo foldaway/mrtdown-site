@@ -18,6 +18,7 @@ import {
 } from 'react-intl';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { computeDayIssueTypeDuration } from './helpers/computeDayIssueTypeDuration';
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
   issueTypesDurationMs: {},
@@ -64,10 +65,12 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
       return 'operational';
     }
 
-    return (
-      computeStatus(dates[nowIsoDate]?.issueTypesDurationMs ?? {}) ??
-      'operational'
+    const issueTypesDurationMs = computeDayIssueTypeDuration(
+      now,
+      dates[nowIsoDate]?.issueTypesIntervalsNoOverlapMs ?? {},
     );
+
+    return computeStatus(issueTypesDurationMs) ?? 'operational';
   }, [dates, now, serviceStartToday, breakdown.issuesOngoingCount]);
 
   const isHydrated = useHydrated();

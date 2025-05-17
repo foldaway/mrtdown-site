@@ -6,7 +6,11 @@ export function computeStatus(
   issueTypesDurationMs: Partial<Record<IssueType, number>>,
 ) {
   for (const issueType of ISSUE_TYPE_PRIORITY) {
-    if (issueType in issueTypesDurationMs) {
+    if (
+      issueType in issueTypesDurationMs &&
+      issueTypesDurationMs[issueType] != null &&
+      issueTypesDurationMs[issueType] > 0
+    ) {
       return issueType;
     }
   }
