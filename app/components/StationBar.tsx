@@ -11,20 +11,22 @@ export const StationBar: React.FC<Props> = (props) => {
   const { station, componentsById } = props;
 
   return (
-    <div className="grid auto-cols-fr grid-flow-col divide-x divide-gray-50 dark:divide-gray-900">
+    <div className="flex overflow-hidden rounded-md">
       {Object.entries(station.componentMembers).map(
         ([componentId, componentMembers]) => (
           <Fragment key={componentId}>
             {componentMembers.map((member) => (
-              <span
+              <div
                 key={member.code}
-                className="px-1.5 py-1 text-center font-semibold text-white text-xs leading-none first:rounded-tl-md first:rounded-bl-md last:rounded-tr-md last:rounded-br-md"
+                className="z-10 flex h-4 w-10 items-center justify-center px-1.5"
                 style={{
                   backgroundColor: componentsById[componentId].color,
                 }}
               >
-                {member.code}
-              </span>
+                <span className="font-semibold text-white text-xs leading-none">
+                  {member.code}
+                </span>
+              </div>
             ))}
           </Fragment>
         ),
