@@ -26,6 +26,19 @@
           "level": "error",
           "options": {},
           "fix": "safe"
+        },
+        "useComponentExportOnlyModules": {
+          "level": "error",
+          "options": {
+            "allowExportNames": [
+              "json",
+              "loader",
+              "headers",
+              "meta",
+              "links",
+              "scripts"
+            ]
+          }
         }
       }
     }
