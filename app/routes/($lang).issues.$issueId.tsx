@@ -8,6 +8,7 @@ import { createIntl } from 'react-intl';
 import { countIssueStations } from '~/helpers/countIssueStations';
 import type { SitemapFunction } from 'remix-sitemap';
 import { LANGUAGES_NON_DEFAULT } from '~/constants';
+import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.ROOT_URL;
@@ -80,6 +81,8 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
   const ogUrl = new URL(location.pathname, rootUrl).toString();
   const ogImage = new URL('/og_image.png', rootUrl).toString();
 
+  const intervals = computeIssueIntervals(issue);
+
   return [
     {
       title,
@@ -109,14 +112,17 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
         '@context': 'https://schema.org',
         '@type': 'WebPage',
         name: title,
-        mainEntity: {
-          '@type': 'Event',
-          name: issue.title,
-          eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-          startDate: issue.startAt,
-          endDate: issue.endAt,
-          location: 'Singapore Public Transport',
-        },
+        mainEntity: intervals.map((interval) => {
+          return {
+            '@type': 'Event',
+            name: issue.title,
+            eventAttendanceMode:
+              'https://schema.org/OfflineEventAttendanceMode',
+            startDate: interval.start!.toISO(),
+            endDate: interval.end!.toISO(),
+            location: 'Singapore Public Transport',
+          };
+        }),
         url: ogUrl,
         image: ogImage,
       },
