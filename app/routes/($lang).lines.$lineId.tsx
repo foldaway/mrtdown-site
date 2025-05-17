@@ -252,11 +252,11 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
         </span>
       )}
 
-      <div className="mt-6 flex flex-col gap-y-16">
+      <div className="mt-6 grid grid-cols-1 gap-x-24 gap-y-16 sm:grid-cols-2 md:grid-cols-3">
         {Object.entries(component.branches).map(([branchCode, branch]) => (
           <div key={branchCode} className="flex flex-col">
             <div className="flex items-center gap-x-2">
-              <h2 className="font-bold text-gray-800 text-lg dark:text-gray-100">
+              <h2 className="font-bold text-gray-800 text-lg leading-tight dark:text-gray-100">
                 {branch.title_translations[intl.locale] ?? branch.title}
               </h2>
 
@@ -284,26 +284,70 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 justify-between gap-y-4 sm:px-12 md:grid-cols-6 lg:grid-cols-12 lg:px-8">
+            <div className="mt-1.5 grid grid-flow-row grid-cols-[auto_1fr] gap-x-2">
               {branch.stationCodes.map((branchStationCode, index) => (
-                <div key={branchStationCode} className="flex flex-col">
-                  <div
-                    className={classNames(
-                      'relative flex flex-col items-center justify-end',
-                      {
-                        'h-16 sm:h-32': intl.locale !== 'zh-Hans',
-                        'h-16 sm:h-12': intl.locale === 'zh-Hans',
-                      },
-                    )}
-                  >
+                <Fragment key={branchStationCode}>
+                  <div className="relative flex h-8 items-center gap-y-1">
                     <div
-                      className={classNames('mb-2 flex transition-transform', {
-                        'sm:-rotate-45': intl.locale !== 'zh-Hans',
-                      })}
+                      className="z-20 size-4 rounded-full border-4 bg-white"
                       style={{
-                        transformOrigin: 'center bottom',
+                        borderColor: component.color,
                       }}
+                    />
+                    <div
+                      className={classNames(
+                        '-translate-x-1/2 absolute left-1/2 z-10 flex',
+                        {
+                          'top-1/2 bottom-0': index === 0,
+                          'top-0 bottom-1/2':
+                            index === branch.stationCodes.length - 1,
+                          'top-0 bottom-0':
+                            index > 0 && index < branch.stationCodes.length - 1,
+                        },
+                      )}
                     >
+                      <div
+                        className="w-1 grow"
+                        style={{
+                          backgroundColor: component.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="relative flex items-center gap-x-1.5">
+                    <div className="flex items-center overflow-hidden rounded-md">
+                      {Object.entries(
+                        stationsByCode[branchStationCode].componentMembers,
+                      )
+                        .sort((a, b) => {
+                          if (a[0] === componentId) {
+                            return -1;
+                          }
+                          if (b[0] === componentId) {
+                            return 1;
+                          }
+                          return 0;
+                        })
+                        .map(([componentId, componentMembers]) => (
+                          <Fragment key={componentId}>
+                            {componentMembers.map((member) => (
+                              <div
+                                key={member.code}
+                                className="z-10 flex h-4 w-10 items-center justify-center px-1.5"
+                                style={{
+                                  backgroundColor:
+                                    componentsById[componentId].color,
+                                }}
+                              >
+                                <span className="font-semibold text-white text-xs leading-none">
+                                  {member.code}
+                                </span>
+                              </div>
+                            ))}
+                          </Fragment>
+                        ))}
+                    </div>
+                    <div className="flex">
                       <Link
                         to={buildLocaleAwareLink(
                           `/stations/${stationsByCode[branchStationCode].id}`,
@@ -311,15 +355,7 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
                         )}
                         className="group flex"
                       >
-                        <span
-                          className={classNames(
-                            'text-center text-gray-800 text-sm group-hover:underline sm:text-xs dark:text-gray-200',
-                            {
-                              'sm:[writing-mode:vertical-lr]':
-                                intl.locale !== 'zh-Hans',
-                            },
-                          )}
-                        >
+                        <span className="text-gray-800 text-sm group-hover:underline dark:text-gray-200">
                           {stationsByCode[branchStationCode].name_translations[
                             intl.locale
                           ] ?? stationsByCode[branchStationCode].name}
@@ -327,58 +363,7 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
                       </Link>
                     </div>
                   </div>
-                  <div className="relative row-start-2 row-end-2 flex flex-col items-center gap-y-1">
-                    <div
-                      className={classNames(
-                        'absolute top-0 flex h-4 items-center',
-                        {
-                          'right-0 left-1/2': index === 0,
-                          'right-1/2 left-0':
-                            index === branch.stationCodes.length - 1,
-                          'right-0 left-0':
-                            index > 0 && index < branch.stationCodes.length - 1,
-                        },
-                      )}
-                    >
-                      <div
-                        className="h-1 grow"
-                        style={{
-                          backgroundColor: component.color,
-                        }}
-                      />
-                    </div>
-                    {Object.entries(
-                      stationsByCode[branchStationCode].componentMembers,
-                    )
-                      .sort((a, b) => {
-                        if (a[0] === componentId) {
-                          return -1;
-                        }
-                        if (b[0] === componentId) {
-                          return 1;
-                        }
-                        return 0;
-                      })
-                      .map(([componentId, componentMembers]) => (
-                        <Fragment key={componentId}>
-                          {componentMembers.map((member) => (
-                            <div
-                              key={member.code}
-                              className="z-10 flex h-4 items-center rounded-md px-1.5"
-                              style={{
-                                backgroundColor:
-                                  componentsById[componentId].color,
-                              }}
-                            >
-                              <span className="font-semibold text-white text-xs">
-                                {member.code}
-                              </span>
-                            </div>
-                          ))}
-                        </Fragment>
-                      ))}
-                  </div>
-                </div>
+                </Fragment>
               ))}
             </div>
           </div>
