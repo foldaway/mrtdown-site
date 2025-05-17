@@ -227,6 +227,7 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
         </span>
         <span className="font-bold text-gray-800 text-xl dark:text-gray-100">
           {componentName}
+          {component.title !== componentName && ` ${component.title}`}
         </span>
       </div>
 

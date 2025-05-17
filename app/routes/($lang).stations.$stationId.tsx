@@ -185,6 +185,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
         <StationBar station={station} componentsById={componentsById} />
         <span className="font-bold text-gray-800 text-xl dark:text-gray-100">
           {stationName}
+          {station.name !== stationName && ` ${station.name}`}
         </span>
       </div>
 
