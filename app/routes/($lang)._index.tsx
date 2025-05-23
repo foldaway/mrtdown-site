@@ -102,9 +102,11 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
         <StatusBanner issues={overview.issuesOngoingSnapshot} />
       </div>
 
-      {overview.issuesOngoingSnapshot.map((issue) => (
-        <IssueRefViewer key={issue.id} issueRef={issue} />
-      ))}
+      <div className="flex flex-col gap-y-2">
+        {overview.issuesOngoingSnapshot.map((issue) => (
+          <IssueRefViewer key={issue.id} issueRef={issue} />
+        ))}
+      </div>
 
       <div className="mt-5 flex flex-col gap-y-6">
         {componentBreakdowns.map((componentBreakdown) => (

@@ -111,8 +111,8 @@ export const IssueViewer: React.FC<Props> = (props) => {
           ))}
         </div>
       </Link>
-      <div className="flex justify-between gap-1.5 bg-gray-100 px-4 py-2 sm:flex-row sm:items-center dark:bg-gray-800">
-        <div className="inline-flex flex-wrap items-center gap-x-1.5">
+      <div className="flex flex-col justify-between gap-1.5 bg-gray-100 px-4 py-2.5 sm:flex-row sm:items-center sm:py-2 dark:bg-gray-800">
+        <div className="inline-flex items-center gap-x-1.5">
           <ComponentBar componentIds={issue.componentIdsAffected} />
           <span className="text-gray-500 text-xs dark:text-gray-400">
             <FormattedMessage
@@ -122,7 +122,7 @@ export const IssueViewer: React.FC<Props> = (props) => {
             />
           </span>
         </div>
-        <div className="flex flex-col text-end">
+        <div className="flex flex-col sm:text-end">
           <span className="truncate font-bold text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
             {dateTimeInfo == null ? (
               <FormattedMessage
@@ -193,7 +193,7 @@ export const IssueViewer: React.FC<Props> = (props) => {
           </span>
 
           {dateTimeInfo != null && (
-            <span className="text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
+            <span className="text-gray-500 text-xs leading-none dark:border-gray-300 dark:text-gray-400">
               {isHydrated ? (
                 <FormattedMessage
                   id="general.uptime_duration_display"
