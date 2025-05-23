@@ -1,4 +1,4 @@
-import { DateTime } from 'luxon';
+import { DateTime, Interval } from 'luxon';
 import type { DateSummary, Issue } from '../types';
 import { assert } from '../util/assert';
 import { splitIntervalByServiceHours } from './splitIntervalByServiceHours';
@@ -8,6 +8,12 @@ export function patchDatesForOngoingIssues(
   dates: Record<string, DateSummary>,
   issuesOngoingSnapshot: Issue[],
 ) {
+  const now = DateTime.now();
+  const intervalToday = Interval.fromDateTimes(
+    now.startOf('day'),
+    now.startOf('day').plus({ days: 1 }),
+  );
+
   for (let i = issuesOngoingSnapshot.length - 1; i >= 0; i--) {
     const issue = issuesOngoingSnapshot[i];
     if (issue.endAt == null) {
@@ -23,7 +29,7 @@ export function patchDatesForOngoingIssues(
 
     if (
       !intervals.some((i) => {
-        return !i.contains(DateTime.now());
+        return i.overlaps(intervalToday);
       })
     ) {
       issuesOngoingSnapshot.splice(i, 1);
