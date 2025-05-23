@@ -158,8 +158,6 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
                 <FormattedNumber
                   value={intervals.length - 1}
                   signDisplay="always"
-                  unit="day"
-                  style="unit"
                 />
               </div>
             )}

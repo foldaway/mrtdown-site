@@ -156,8 +156,6 @@ export const IssueViewer: React.FC<Props> = (props) => {
                   <FormattedNumber
                     value={intervals.length - 1}
                     signDisplay="always"
-                    unit="day"
-                    style="unit"
                   />
                 </Popover.Trigger>
                 <Popover.Portal>
