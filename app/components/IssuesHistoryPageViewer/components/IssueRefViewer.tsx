@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import type { IssueRef } from '../../../types';
 import { useMemo } from 'react';
-import { DateTime, Interval } from 'luxon';
+import { DateTime, Duration, Interval } from 'luxon';
 import { ComponentBar } from '../../ComponentBar';
 import classNames from 'classnames';
 import {
@@ -42,20 +42,39 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
     return DateTime.fromISO(issueRef.endAt);
   }, [issueRef.endAt]);
 
+  const intervals = useMemo(() => computeIssueIntervals(issueRef), [issueRef]);
+
   const dateTimeInfo = useMemo(() => {
-    if (endAt == null) {
+    if (intervals.length === 0) {
       return null;
     }
-    const interval = Interval.fromDateTimes(startAt, endAt);
-    assert(interval.isValid);
+
+    const intervalFirst = intervals[0];
+    const intervalLast = intervals[intervals.length - 1];
+
+    assert(intervalFirst.start != null);
+    assert(intervalLast.end != null);
+
+    const intervalOverall = Interval.fromDateTimes(
+      intervalFirst.start,
+      intervalLast.end,
+    );
+    assert(intervalOverall.isValid);
+
+    let durationWithinServiceHours = Duration.fromMillis(0);
+    for (const interval of intervals) {
+      assert(interval.isValid);
+      assert(interval.start != null && interval.end != null);
+      durationWithinServiceHours = durationWithinServiceHours.plus(
+        calculateDurationWithinServiceHours(interval.start, interval.end),
+      );
+    }
+
     return {
-      interval,
-      durationWithinServiceHours: calculateDurationWithinServiceHours(
-        startAt,
-        endAt,
-      ),
+      intervalOverall,
+      durationWithinServiceHours,
     };
-  }, [startAt, endAt]);
+  }, [intervals]);
 
   const isHydrated = useHydrated();
   const intl = useIntl();
@@ -69,8 +88,6 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
     }
     return result.size;
   }, [issueRef.stationIdsAffected]);
-
-  const intervals = useMemo(() => computeIssueIntervals(issueRef), [issueRef]);
 
   return (
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
@@ -139,8 +156,8 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
               <>
                 {isHydrated ? (
                   <FormattedDateTimeRange
-                    from={startAt.toJSDate()}
-                    to={endAt!.toJSDate()}
+                    from={dateTimeInfo.intervalOverall.start.toJSDate()}
+                    to={dateTimeInfo.intervalOverall.end.toJSDate()}
                     month="short"
                     day="numeric"
                     year="numeric"
@@ -148,17 +165,14 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
                     minute="numeric"
                   />
                 ) : (
-                  dateTimeInfo.interval.toISO()
+                  dateTimeInfo.intervalOverall.toISO()
                 )}
               </>
             )}
 
             {intervals.length > 1 && (
               <div className="ms-1 inline-block rounded-lg bg-gray-300 px-1.5 py-0.5 dark:bg-gray-700">
-                <FormattedNumber
-                  value={intervals.length - 1}
-                  signDisplay="always"
-                />
+                <FormattedNumber value={intervals.length} />x
               </div>
             )}
           </span>

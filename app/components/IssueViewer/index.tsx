@@ -7,7 +7,7 @@ import {
   InformationCircleIcon,
 } from '@heroicons/react/24/solid';
 import classNames from 'classnames';
-import { DateTime, Interval } from 'luxon';
+import { DateTime, Duration, Interval } from 'luxon';
 import { useMemo } from 'react';
 import {
   FormattedDateTimeRange,
@@ -29,6 +29,8 @@ import { UpdateMaintenance } from './components/UpdateMaintenance';
 import { countIssueStations } from '~/helpers/countIssueStations';
 import { rrulestr } from 'rrule';
 import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
+import { RecurringIntervalsPill } from './components/RecurringIntervalsPill';
+import { assert } from '~/util/assert';
 
 interface Props {
   issue: Issue;
@@ -49,26 +51,45 @@ export const IssueViewer: React.FC<Props> = (props) => {
     return DateTime.fromISO(issue.endAt);
   }, [issue.endAt]);
 
+  const intervals = useMemo(() => computeIssueIntervals(issue), [issue]);
+
   const dateTimeInfo = useMemo(() => {
-    if (endAt == null) {
+    if (intervals.length === 0) {
       return null;
     }
+
+    const intervalFirst = intervals[0];
+    const intervalLast = intervals[intervals.length - 1];
+
+    assert(intervalFirst.start != null);
+    assert(intervalLast.end != null);
+
+    const intervalOverall = Interval.fromDateTimes(
+      intervalFirst.start,
+      intervalLast.end,
+    );
+    assert(intervalOverall.isValid);
+
+    let durationWithinServiceHours = Duration.fromMillis(0);
+    for (const interval of intervals) {
+      assert(interval.isValid);
+      assert(interval.start != null && interval.end != null);
+      durationWithinServiceHours = durationWithinServiceHours.plus(
+        calculateDurationWithinServiceHours(interval.start, interval.end),
+      );
+    }
+
     return {
-      interval: Interval.fromDateTimes(startAt, endAt),
-      durationWithinServiceHours: calculateDurationWithinServiceHours(
-        startAt,
-        endAt,
-      ),
+      intervalOverall,
+      durationWithinServiceHours,
     };
-  }, [startAt, endAt]);
+  }, [intervals]);
 
   const stationCount = useMemo(() => {
     return countIssueStations(issue);
   }, [issue]);
 
   const isHydrated = useHydrated();
-
-  const intervals = useMemo(() => computeIssueIntervals(issue), [issue]);
 
   return (
     <div className="flex flex-col bg-gray-100 dark:bg-gray-800">
@@ -136,8 +157,8 @@ export const IssueViewer: React.FC<Props> = (props) => {
               <>
                 {isHydrated ? (
                   <FormattedDateTimeRange
-                    from={startAt.toJSDate()}
-                    to={endAt!.toJSDate()}
+                    from={dateTimeInfo.intervalOverall.start.toJSDate()}
+                    to={dateTimeInfo.intervalOverall.end.toJSDate()}
                     month="short"
                     day="numeric"
                     year="numeric"
@@ -145,48 +166,13 @@ export const IssueViewer: React.FC<Props> = (props) => {
                     minute="numeric"
                   />
                 ) : (
-                  dateTimeInfo.interval.toISO()
+                  dateTimeInfo.intervalOverall.toISO()
                 )}
               </>
             )}
 
             {intervals.length > 1 && (
-              <Popover.Root>
-                <Popover.Trigger className="ms-1 rounded-lg bg-gray-300 px-1.5 py-0.5 hover:cursor-pointer hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600">
-                  <FormattedNumber
-                    value={intervals.length - 1}
-                    signDisplay="always"
-                  />
-                </Popover.Trigger>
-                <Popover.Portal>
-                  <Popover.Content className="flex max-h-96 flex-col overflow-y-scroll rounded border border-gray-300 bg-gray-100 py-2 outline-none dark:border-gray-600 dark:bg-gray-800">
-                    <Popover.Arrow className="fill-gray-300 dark:fill-gray-800" />
-
-                    {intervals.slice(1).map((interval) => (
-                      <div
-                        key={interval.toISO()}
-                        className="px-4 py-1.5 text-gray-600 text-xs even:bg-gray-200 dark:text-gray-300 dark:even:bg-gray-700"
-                      >
-                        {isHydrated ? (
-                          <span className="truncate font-bold text-gray-500 text-xs dark:border-gray-300 dark:text-gray-400">
-                            <FormattedDateTimeRange
-                              from={interval.start.toJSDate()}
-                              to={interval.end.toJSDate()}
-                              month="short"
-                              day="numeric"
-                              year="numeric"
-                              hour="numeric"
-                              minute="numeric"
-                            />
-                          </span>
-                        ) : (
-                          interval.toISO()
-                        )}
-                      </div>
-                    ))}
-                  </Popover.Content>
-                </Popover.Portal>
-              </Popover.Root>
+              <RecurringIntervalsPill intervals={intervals} />
             )}
           </span>
 
