@@ -24,6 +24,7 @@ import { MapDec2030 } from './components/MapDec2030';
 import { MapDec2029 } from './components/MapDec2029';
 import { MapDec2019 } from './components/MapDec2019';
 import { MapNov2024 } from './components/MapNov2024';
+import { MapDec2032 } from './components/MapDec2032';
 
 interface Props {
   stationIdsAffected: IssueStationEntry[];
@@ -293,6 +294,9 @@ export const StationMap: React.FC<Props> = (props) => {
     }
     const dateTime = DateTime.fromISO(currentDate);
     assert(dateTime.isValid);
+    if (dateTime >= DateTime.fromObject({ year: 2032, month: 12 })) {
+      return '2032-12';
+    }
     if (dateTime >= DateTime.fromObject({ year: 2030, month: 12 })) {
       return '2030-12';
     }
@@ -325,12 +329,19 @@ export const StationMap: React.FC<Props> = (props) => {
       <Tabs.Root defaultValue={defaultTab}>
         <Tabs.List className="flex items-center overflow-x-scroll border-gray-400 border-b [scrollbar-width:thin]">
           <Tabs.Trigger
+            value="2032-12"
+            className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
+          >
+            <FormattedDate value="2032-12" year="numeric" month="short" />
+            <ClockIcon className="size-4 shrink-0" />
+          </Tabs.Trigger>
+          <Tabs.Trigger
             value="2030-12"
             className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
           >
             <FormattedDate value="2030-12" year="numeric" month="short" />
             <ClockIcon className="size-4 shrink-0" />
-          </Tabs.Trigger>{' '}
+          </Tabs.Trigger>
           <Tabs.Trigger
             value="2029-12"
             className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
@@ -377,6 +388,9 @@ export const StationMap: React.FC<Props> = (props) => {
             <FormattedDate value="2012-01" year="numeric" month="short" />
           </Tabs.Trigger>
         </Tabs.List>
+        <Tabs.Content value="2032-12">
+          <MapDec2032 ref={setRef} />
+        </Tabs.Content>
         <Tabs.Content value="2030-12">
           <MapDec2030 ref={setRef} />
         </Tabs.Content>
