@@ -24,27 +24,15 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
       <g id="System Map (Dec 2030)">
         <g id="lines">
           <g id="line_crl">
-            <line
-              id="line_psr:prl"
-              x1="2793.12"
-              y1="741.879"
-              x2="2856.12"
-              y2="804.879"
-              stroke="#97C616"
-              stroke-width="6"
-            />
-            <line
+            <path
               id="line_psr:tpn"
-              x1="2731"
-              y1="827"
-              x2="2832"
-              y2="827"
+              d="M2735.5 827L2886.5 827"
               stroke="#97C616"
               stroke-width="6"
             />
             <path
               id="line_pre:psr"
-              d="M3008.5 827L3131 827"
+              d="M3004.5 827L3131 827"
               stroke="#97C616"
               stroke-width="6"
             />
@@ -102,24 +90,6 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             <path
               id="line_tge:brh"
               d="M1541 702L1468 702"
-              stroke="#97C616"
-              stroke-width="6"
-            />
-            <line
-              id="line_prl:riv"
-              x1="2708.12"
-              y1="658.879"
-              x2="2755.12"
-              y2="705.879"
-              stroke="#97C616"
-              stroke-width="6"
-            />
-            <line
-              id="line_riv:pgl"
-              x1="2534.12"
-              y1="486.879"
-              x2="2667.12"
-              y2="619.879"
               stroke="#97C616"
               stroke-width="6"
             />
@@ -1381,7 +1351,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             />
             <path
               id="line_cre:riv"
-              d="M2731.5 657.5C2731.5 657.5 2701 688.5 2696 691.5C2691 694.5 2682 694.5 2677 691.5C2672 688.5 2638.5 655 2638.5 655"
+              d="M2742 647C2742 647 2701 688.5 2696 691.5C2691 694.5 2682 694.5 2677 691.5C2672 688.5 2638.5 655 2638.5 655"
               stroke="#718472"
               stroke-width="4"
             />
@@ -2658,11 +2628,11 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             id="label_riv"
             fill="#2D2A26"
             font-family="Radio Canada Big"
-            font-size="20"
+            font-size="16"
             font-weight="600"
             letter-spacing="0em"
           >
-            <tspan x="2788.15" y="646.9">
+            <tspan x="2760.42" y="640.02">
               Riviera
             </tspan>
           </text>
@@ -3442,7 +3412,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             font-weight="600"
             letter-spacing="0em"
           >
-            <tspan x="2872" y="799.9">
+            <tspan x="2905" y="799.9">
               Pasir Ris
             </tspan>
           </text>
@@ -3537,18 +3507,6 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           >
             <tspan x="1856.41" y="739.9">
               Tavistock
-            </tspan>
-          </text>
-          <text
-            id="label_prl"
-            fill="#2D2A26"
-            font-family="Radio Canada Big"
-            font-size="20"
-            font-weight="600"
-            letter-spacing="0em"
-          >
-            <tspan x="2815" y="732.9">
-              Elias
             </tspan>
           </text>
           <text
@@ -4719,26 +4677,6 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 >
                   <tspan x="2490.79" y="474.52">
                     NE 17
-                  </tspan>
-                </text>
-              </g>
-              <g id="crl">
-                <rect
-                  width="53.5"
-                  height="30"
-                  transform="translate(2536 454)"
-                  fill="#97C616"
-                />
-                <text
-                  id="CP 4"
-                  fill="white"
-                  font-family="Radio Canada Big"
-                  font-size="16"
-                  font-weight="600"
-                  letter-spacing="0em"
-                >
-                  <tspan x="2546.2" y="474.52">
-                    CP 4
                   </tspan>
                 </text>
               </g>
@@ -7592,7 +7530,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                   </tspan>
                 </text>
               </g>
-              <g id="crl_2">
+              <g id="crl">
                 <rect
                   width="53.5"
                   height="30"
@@ -7924,7 +7862,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                   </tspan>
                 </text>
               </g>
-              <g id="crl_3">
+              <g id="crl_2">
                 <rect
                   width="53.5"
                   height="30"
@@ -8424,7 +8362,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                   </tspan>
                 </text>
               </g>
-              <g id="crl_4">
+              <g id="crl_3">
                 <rect
                   width="53.5"
                   height="30"
@@ -9888,31 +9826,11 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           </g>
           <g id="node_psr">
             <g clip-path="url(#clip181_36_20020)">
-              <g id="crl_5">
+              <g id="crl_4">
                 <rect
                   width="53.5"
                   height="30"
-                  transform="translate(2840 813)"
-                  fill="#97C616"
-                />
-                <text
-                  id="CP 1"
-                  fill="white"
-                  font-family="Radio Canada Big"
-                  font-size="16"
-                  font-weight="600"
-                  letter-spacing="0em"
-                >
-                  <tspan x="2851.8" y="833.52">
-                    CP 1
-                  </tspan>
-                </text>
-              </g>
-              <g id="crl_6">
-                <rect
-                  width="53.5"
-                  height="30"
-                  transform="translate(2894.5 813)"
+                  transform="translate(2890 813)"
                   fill="#97C616"
                 />
                 <text
@@ -9923,7 +9841,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                   font-weight="600"
                   letter-spacing="0em"
                 >
-                  <tspan x="2904.45" y="833.52">
+                  <tspan x="2899.95" y="833.52">
                     CR 5
                   </tspan>
                 </text>
@@ -9932,7 +9850,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <rect
                   width="53.5"
                   height="30"
-                  transform="translate(2949 813)"
+                  transform="translate(2944.5 813)"
                   fill="#00953B"
                 />
                 <text
@@ -9943,7 +9861,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                   font-weight="600"
                   letter-spacing="0em"
                 >
-                  <tspan x="2958.6" y="833.52">
+                  <tspan x="2954.1" y="833.52">
                     EW 1
                   </tspan>
                 </text>
@@ -10478,33 +10396,9 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
               </g>
             </g>
           </g>
-          <g id="node_prl">
-            <g clip-path="url(#clip204_36_20020)">
-              <g id="crl_7">
-                <rect
-                  width="53.5"
-                  height="24"
-                  transform="translate(2747 715)"
-                  fill="#97C616"
-                />
-                <text
-                  id="CP 2"
-                  fill="white"
-                  font-family="Radio Canada Big"
-                  font-size="14"
-                  font-weight="600"
-                  letter-spacing="0em"
-                >
-                  <tspan x="2759.19" y="731.83">
-                    CP 2
-                  </tspan>
-                </text>
-              </g>
-            </g>
-          </g>
           <g id="node_tpn">
-            <g clip-path="url(#clip205_36_20020)">
-              <g id="crl_8">
+            <g clip-path="url(#clip204_36_20020)">
+              <g id="crl_5">
                 <rect
                   width="53.5"
                   height="24"
@@ -10527,8 +10421,8 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_pre">
-            <g clip-path="url(#clip206_36_20020)">
-              <g id="crl_9">
+            <g clip-path="url(#clip205_36_20020)">
+              <g id="crl_6">
                 <rect
                   width="53.5"
                   height="24"
@@ -10551,8 +10445,8 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_lyg">
-            <g clip-path="url(#clip207_36_20020)">
-              <g id="crl_10">
+            <g clip-path="url(#clip206_36_20020)">
+              <g id="crl_7">
                 <rect
                   width="53.5"
                   height="24"
@@ -10575,8 +10469,8 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_avp">
-            <g clip-path="url(#clip208_36_20020)">
-              <g id="crl_11">
+            <g clip-path="url(#clip207_36_20020)">
+              <g id="crl_8">
                 <rect
                   width="53.5"
                   height="24"
@@ -10599,8 +10493,8 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_dfu">
-            <g clip-path="url(#clip209_36_20020)">
-              <g id="crl_12">
+            <g clip-path="url(#clip208_36_20020)">
+              <g id="crl_9">
                 <rect
                   width="53.5"
                   height="24"
@@ -10623,8 +10517,8 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_srn">
-            <g clip-path="url(#clip210_36_20020)">
-              <g id="crl_13">
+            <g clip-path="url(#clip209_36_20020)">
+              <g id="crl_10">
                 <rect
                   width="53.5"
                   height="24"
@@ -10647,8 +10541,8 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_tvk">
-            <g clip-path="url(#clip211_36_20020)">
-              <g id="crl_14">
+            <g clip-path="url(#clip210_36_20020)">
+              <g id="crl_11">
                 <rect
                   width="53.5"
                   height="24"
@@ -10671,8 +10565,8 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_tge">
-            <g clip-path="url(#clip212_36_20020)">
-              <g id="crl_15">
+            <g clip-path="url(#clip211_36_20020)">
+              <g id="crl_12">
                 <rect
                   width="53.5"
                   height="24"
@@ -10695,63 +10589,23 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_riv">
-            <g clip-path="url(#clip213_36_20020)">
-              <g id="crl_16">
+            <g clip-path="url(#clip212_36_20020)">
+              <g id="pglrt_15">
                 <rect
-                  x="2660"
-                  y="624"
-                  width="51.5"
-                  height="30"
-                  rx="10"
-                  fill="#97C616"
-                />
-                <text
-                  id="CP 3"
-                  fill="white"
-                  font-family="Radio Canada Big"
-                  font-size="16"
-                  font-weight="600"
-                  letter-spacing="0em"
-                >
-                  <tspan x="2669.1" y="644.52">
-                    CP 3
-                  </tspan>
-                </text>
-              </g>
-              <rect
-                id="Rectangle 1_2"
-                x="2710.5"
-                y="636"
-                width="6"
-                height="6"
-                fill="#97C616"
-              />
-              <rect
-                id="Rectangle 2_2"
-                x="2715.5"
-                y="636"
-                width="6"
-                height="6"
-                fill="#718472"
-              />
-              <g id="dtl_38">
-                <rect
-                  x="2720.5"
-                  y="624"
-                  width="51.5"
-                  height="30"
-                  rx="10"
+                  width="32"
+                  height="20"
+                  transform="translate(2721 625)"
                   fill="#718472"
                 />
                 <text
                   id="PE 4"
                   fill="white"
                   font-family="Radio Canada Big"
-                  font-size="16"
+                  font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
                 >
-                  <tspan x="2730.21" y="644.52">
+                  <tspan x="2724.97" y="639.14">
                     PE 4
                   </tspan>
                 </text>
@@ -10759,7 +10613,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_kpl">
-            <g clip-path="url(#clip214_36_20020)">
+            <g clip-path="url(#clip213_36_20020)">
               <g id="ccl_31">
                 <rect
                   width="53.5"
@@ -10783,7 +10637,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_ctm">
-            <g clip-path="url(#clip215_36_20020)">
+            <g clip-path="url(#clip214_36_20020)">
               <g id="ccl_32">
                 <rect
                   width="53.5"
@@ -10807,7 +10661,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_per">
-            <g clip-path="url(#clip216_36_20020)">
+            <g clip-path="url(#clip215_36_20020)">
               <g id="ccl_33">
                 <rect
                   width="53.5"
@@ -10837,14 +10691,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <rect x="1689" y="813" width="106" height="30" rx="10" fill="white" />
         </clipPath>
         <clipPath id="clip1_36_20020">
-          <rect
-            x="2431"
-            y="454"
-            width="158.5"
-            height="30"
-            rx="10"
-            fill="white"
-          />
+          <rect x="2431" y="454" width="106" height="30" rx="10" fill="white" />
         </clipPath>
         <clipPath id="clip2_36_20020">
           <rect x="2303" y="614" width="106" height="30" rx="10" fill="white" />
@@ -12245,14 +12092,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           />
         </clipPath>
         <clipPath id="clip181_36_20020">
-          <rect
-            x="2840"
-            y="813"
-            width="162.5"
-            height="30"
-            rx="10"
-            fill="white"
-          />
+          <rect x="2890" y="813" width="108" height="30" rx="10" fill="white" />
         </clipPath>
         <clipPath id="clip182_36_20020">
           <rect
@@ -12476,16 +12316,6 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
         </clipPath>
         <clipPath id="clip204_36_20020">
           <rect
-            x="2747"
-            y="715"
-            width="53.5"
-            height="24"
-            rx="10"
-            fill="white"
-          />
-        </clipPath>
-        <clipPath id="clip205_36_20020">
-          <rect
             x="2671"
             y="816"
             width="53.5"
@@ -12494,7 +12324,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip206_36_20020">
+        <clipPath id="clip205_36_20020">
           <rect
             x="3138"
             y="816"
@@ -12504,7 +12334,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip207_36_20020">
+        <clipPath id="clip206_36_20020">
           <rect
             x="3300"
             y="917"
@@ -12514,7 +12344,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip208_36_20020">
+        <clipPath id="clip207_36_20020">
           <rect
             x="3300"
             y="1061"
@@ -12524,7 +12354,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip209_36_20020">
+        <clipPath id="clip208_36_20020">
           <rect
             x="2328"
             y="816"
@@ -12534,7 +12364,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip210_36_20020">
+        <clipPath id="clip209_36_20020">
           <rect
             x="2003"
             y="690"
@@ -12544,7 +12374,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip211_36_20020">
+        <clipPath id="clip210_36_20020">
           <rect
             x="1873"
             y="690"
@@ -12554,7 +12384,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip212_36_20020">
+        <clipPath id="clip211_36_20020">
           <rect
             x="1545"
             y="690"
@@ -12564,10 +12394,10 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip213_36_20020">
-          <rect x="2660" y="624" width="112" height="30" rx="10" fill="white" />
+        <clipPath id="clip212_36_20020">
+          <rect x="2721" y="625" width="32" height="20" rx="6" fill="white" />
         </clipPath>
-        <clipPath id="clip214_36_20020">
+        <clipPath id="clip213_36_20020">
           <rect
             x="1621"
             y="2103"
@@ -12577,7 +12407,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip215_36_20020">
+        <clipPath id="clip214_36_20020">
           <rect
             x="1749"
             y="2119"
@@ -12587,7 +12417,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip216_36_20020">
+        <clipPath id="clip215_36_20020">
           <rect
             x="1878"
             y="2103"
