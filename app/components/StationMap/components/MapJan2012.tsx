@@ -275,12 +275,6 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
               stroke="#E1251B"
               stroke-width="6"
             />
-            <path
-              id="line_mrb:msp"
-              d="M1739 2062C1739 2062 1739 2088.5 1739 2109C1739 2129.5 1751.5 2128.5 1751.5 2128.5L1764.5 2128.5"
-              stroke="#E1251B"
-              stroke-width="6"
-            />
           </g>
           <g id="line_ewl">
             <line
@@ -2105,18 +2099,6 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
           >
             <tspan x="1602.22" y="2047.9">
               Marina Bay
-            </tspan>
-          </text>
-          <text
-            id="label_msp"
-            fill="#2D2A26"
-            font-family="Radio Canada Big"
-            font-size="20"
-            font-weight="600"
-            letter-spacing="0em"
-          >
-            <tspan x="1828.12" y="2134.9">
-              Marina South Pier
             </tspan>
           </text>
           <text
@@ -4960,32 +4942,8 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
               </g>
             </g>
           </g>
-          <g id="node_msp">
-            <g clip-path="url(#clip88_39_22161)">
-              <g id="nsl_26">
-                <rect
-                  width="53.5"
-                  height="24"
-                  transform="translate(1769 2116)"
-                  fill="#E1251B"
-                />
-                <text
-                  id="NS 28"
-                  fill="white"
-                  font-family="Radio Canada Big"
-                  font-size="14"
-                  font-weight="600"
-                  letter-spacing="0em"
-                >
-                  <tspan x="1776.97" y="2132.83">
-                    NS 28
-                  </tspan>
-                </text>
-              </g>
-            </g>
-          </g>
           <g id="node_dvr">
-            <g clip-path="url(#clip89_39_22161)">
+            <g clip-path="url(#clip88_39_22161)">
               <g id="ewl_18">
                 <rect
                   width="53.5"
@@ -5009,7 +4967,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_com">
-            <g clip-path="url(#clip90_39_22161)">
+            <g clip-path="url(#clip89_39_22161)">
               <g id="ewl_19">
                 <rect
                   width="53.5"
@@ -5033,7 +4991,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_que">
-            <g clip-path="url(#clip91_39_22161)">
+            <g clip-path="url(#clip90_39_22161)">
               <g id="ewl_20">
                 <rect
                   width="53.5"
@@ -5057,7 +5015,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_rdh">
-            <g clip-path="url(#clip92_39_22161)">
+            <g clip-path="url(#clip91_39_22161)">
               <g id="ewl_21">
                 <rect
                   width="53.5"
@@ -5081,7 +5039,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_tib">
-            <g clip-path="url(#clip93_39_22161)">
+            <g clip-path="url(#clip92_39_22161)">
               <g id="ewl_22">
                 <rect
                   width="53.5"
@@ -5105,7 +5063,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_tlb">
-            <g clip-path="url(#clip94_39_22161)">
+            <g clip-path="url(#clip93_39_22161)">
               <g id="ccl_12">
                 <rect
                   width="53.5"
@@ -5129,7 +5087,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_lbd">
-            <g clip-path="url(#clip95_39_22161)">
+            <g clip-path="url(#clip94_39_22161)">
               <g id="ccl_13">
                 <rect
                   width="53.5"
@@ -5153,7 +5111,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_ppj">
-            <g clip-path="url(#clip96_39_22161)">
+            <g clip-path="url(#clip95_39_22161)">
               <g id="ccl_14">
                 <rect
                   width="53.5"
@@ -5177,7 +5135,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_hpv">
-            <g clip-path="url(#clip97_39_22161)">
+            <g clip-path="url(#clip96_39_22161)">
               <g id="ccl_15">
                 <rect
                   width="53.5"
@@ -5201,7 +5159,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_krg">
-            <g clip-path="url(#clip98_39_22161)">
+            <g clip-path="url(#clip97_39_22161)">
               <g id="ccl_16">
                 <rect
                   width="53.5"
@@ -5225,7 +5183,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_onh">
-            <g clip-path="url(#clip99_39_22161)">
+            <g clip-path="url(#clip98_39_22161)">
               <g id="ccl_17">
                 <rect
                   width="53.5"
@@ -5249,7 +5207,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_hlv">
-            <g clip-path="url(#clip100_39_22161)">
+            <g clip-path="url(#clip99_39_22161)">
               <g id="ccl_18">
                 <rect
                   width="53.5"
@@ -5273,7 +5231,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_frr">
-            <g clip-path="url(#clip101_39_22161)">
+            <g clip-path="url(#clip100_39_22161)">
               <g id="ccl_19">
                 <rect
                   width="53.5"
@@ -5297,7 +5255,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_mrm">
-            <g clip-path="url(#clip102_39_22161)">
+            <g clip-path="url(#clip101_39_22161)">
               <g id="ccl_20">
                 <rect
                   width="53.5"
@@ -5321,7 +5279,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_cdt">
-            <g clip-path="url(#clip103_39_22161)">
+            <g clip-path="url(#clip102_39_22161)">
               <g id="ccl_21">
                 <rect
                   width="53.5"
@@ -5345,7 +5303,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_lrc">
-            <g clip-path="url(#clip104_39_22161)">
+            <g clip-path="url(#clip103_39_22161)">
               <g id="ccl_22">
                 <rect
                   width="53.5"
@@ -5369,7 +5327,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_bly">
-            <g clip-path="url(#clip105_39_22161)">
+            <g clip-path="url(#clip104_39_22161)">
               <g id="ccl_23">
                 <rect
                   width="53.5"
@@ -5393,7 +5351,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_tsg">
-            <g clip-path="url(#clip106_39_22161)">
+            <g clip-path="url(#clip105_39_22161)">
               <g id="ccl_24">
                 <rect
                   width="53.5"
@@ -5417,7 +5375,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_dkt">
-            <g clip-path="url(#clip107_39_22161)">
+            <g clip-path="url(#clip106_39_22161)">
               <g id="ccl_25">
                 <rect
                   width="53.5"
@@ -5441,7 +5399,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_mbt">
-            <g clip-path="url(#clip108_39_22161)">
+            <g clip-path="url(#clip107_39_22161)">
               <g id="ccl_26">
                 <rect
                   width="53.5"
@@ -5465,7 +5423,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_sdm">
-            <g clip-path="url(#clip109_39_22161)">
+            <g clip-path="url(#clip108_39_22161)">
               <g id="ccl_27">
                 <rect
                   width="53.5"
@@ -5489,7 +5447,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_nch">
-            <g clip-path="url(#clip110_39_22161)">
+            <g clip-path="url(#clip109_39_22161)">
               <g id="ccl_28">
                 <rect
                   width="53.5"
@@ -5513,7 +5471,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_epn">
-            <g clip-path="url(#clip111_39_22161)">
+            <g clip-path="url(#clip110_39_22161)">
               <g id="ccl_29">
                 <rect
                   width="53.5"
@@ -5537,7 +5495,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_bbs">
-            <g clip-path="url(#clip112_39_22161)">
+            <g clip-path="url(#clip111_39_22161)">
               <g id="ccl_30">
                 <rect
                   width="53.5"
@@ -5561,7 +5519,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_tpg">
-            <g clip-path="url(#clip113_39_22161)">
+            <g clip-path="url(#clip112_39_22161)">
               <g id="ewl_23">
                 <rect
                   width="53.5"
@@ -5585,7 +5543,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_lvr">
-            <g clip-path="url(#clip114_39_22161)">
+            <g clip-path="url(#clip113_39_22161)">
               <g id="ewl_24">
                 <rect
                   width="53.5"
@@ -5609,7 +5567,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_kal">
-            <g clip-path="url(#clip115_39_22161)">
+            <g clip-path="url(#clip114_39_22161)">
               <g id="ewl_25">
                 <rect
                   width="53.5"
@@ -5633,7 +5591,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_alj">
-            <g clip-path="url(#clip116_39_22161)">
+            <g clip-path="url(#clip115_39_22161)">
               <g id="ewl_26">
                 <rect
                   width="53.5"
@@ -5657,7 +5615,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_eun">
-            <g clip-path="url(#clip117_39_22161)">
+            <g clip-path="url(#clip116_39_22161)">
               <g id="ewl_27">
                 <rect
                   width="53.5"
@@ -5681,7 +5639,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_kem">
-            <g clip-path="url(#clip118_39_22161)">
+            <g clip-path="url(#clip117_39_22161)">
               <g id="ewl_28">
                 <rect
                   width="53.5"
@@ -5705,7 +5663,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_bdk">
-            <g clip-path="url(#clip119_39_22161)">
+            <g clip-path="url(#clip118_39_22161)">
               <g id="ewl_29">
                 <rect
                   width="53.5"
@@ -5729,7 +5687,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_sim">
-            <g clip-path="url(#clip120_39_22161)">
+            <g clip-path="url(#clip119_39_22161)">
               <g id="ewl_30">
                 <rect
                   width="53.5"
@@ -5753,7 +5711,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_psr">
-            <g clip-path="url(#clip121_39_22161)">
+            <g clip-path="url(#clip120_39_22161)">
               <g id="ewl_31">
                 <rect
                   width="53.5"
@@ -5777,7 +5735,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             </g>
           </g>
           <g id="node_cga">
-            <g clip-path="url(#clip122_39_22161)">
+            <g clip-path="url(#clip121_39_22161)">
               <g id="ewl_32">
                 <rect
                   width="53.5"
@@ -6370,16 +6328,6 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
         </clipPath>
         <clipPath id="clip88_39_22161">
           <rect
-            x="1769"
-            y="2116"
-            width="53.5"
-            height="24"
-            rx="10"
-            fill="white"
-          />
-        </clipPath>
-        <clipPath id="clip89_39_22161">
-          <rect
             x="741"
             y="1454"
             width="53.5"
@@ -6388,7 +6336,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip90_39_22161">
+        <clipPath id="clip89_39_22161">
           <rect
             x="944"
             y="1519"
@@ -6398,7 +6346,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip91_39_22161">
+        <clipPath id="clip90_39_22161">
           <rect
             x="1002"
             y="1576"
@@ -6408,7 +6356,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip92_39_22161">
+        <clipPath id="clip91_39_22161">
           <rect
             x="1077"
             y="1645"
@@ -6418,7 +6366,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip93_39_22161">
+        <clipPath id="clip92_39_22161">
           <rect
             x="1148"
             y="1715"
@@ -6428,7 +6376,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip94_39_22161">
+        <clipPath id="clip93_39_22161">
           <rect
             x="1097"
             y="1963"
@@ -6438,7 +6386,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip95_39_22161">
+        <clipPath id="clip94_39_22161">
           <rect
             x="1021"
             y="1889"
@@ -6448,7 +6396,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip96_39_22161">
+        <clipPath id="clip95_39_22161">
           <rect
             x="955"
             y="1808"
@@ -6458,7 +6406,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip97_39_22161">
+        <clipPath id="clip96_39_22161">
           <rect
             x="911"
             y="1732"
@@ -6468,7 +6416,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip98_39_22161">
+        <clipPath id="clip97_39_22161">
           <rect
             x="878"
             y="1643"
@@ -6478,7 +6426,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip99_39_22161">
+        <clipPath id="clip98_39_22161">
           <rect
             x="857"
             y="1543"
@@ -6488,7 +6436,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip100_39_22161">
+        <clipPath id="clip99_39_22161">
           <rect
             x="872"
             y="1313"
@@ -6498,7 +6446,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip101_39_22161">
+        <clipPath id="clip100_39_22161">
           <rect
             x="907"
             y="1207"
@@ -6508,7 +6456,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip102_39_22161">
+        <clipPath id="clip101_39_22161">
           <rect
             x="1282"
             y="851"
@@ -6518,7 +6466,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip103_39_22161">
+        <clipPath id="clip102_39_22161">
           <rect
             x="1166"
             y="902"
@@ -6528,7 +6476,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip104_39_22161">
+        <clipPath id="clip103_39_22161">
           <rect
             x="1642"
             y="830"
@@ -6538,7 +6486,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip105_39_22161">
+        <clipPath id="clip104_39_22161">
           <rect
             x="1918"
             y="980"
@@ -6548,7 +6496,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip106_39_22161">
+        <clipPath id="clip105_39_22161">
           <rect
             x="2001"
             y="1065"
@@ -6558,7 +6506,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip107_39_22161">
+        <clipPath id="clip106_39_22161">
           <rect
             x="2132"
             y="1442"
@@ -6568,7 +6516,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip108_39_22161">
+        <clipPath id="clip107_39_22161">
           <rect
             x="2127"
             y="1540"
@@ -6578,7 +6526,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip109_39_22161">
+        <clipPath id="clip108_39_22161">
           <rect
             x="2105"
             y="1640"
@@ -6588,7 +6536,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip110_39_22161">
+        <clipPath id="clip109_39_22161">
           <rect
             x="2067"
             y="1732"
@@ -6598,7 +6546,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip111_39_22161">
+        <clipPath id="clip110_39_22161">
           <rect
             x="1806"
             y="1787"
@@ -6608,7 +6556,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip112_39_22161">
+        <clipPath id="clip111_39_22161">
           <rect
             x="1671"
             y="1645"
@@ -6618,7 +6566,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip113_39_22161">
+        <clipPath id="clip112_39_22161">
           <rect
             x="1370"
             y="1929"
@@ -6628,7 +6576,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip114_39_22161">
+        <clipPath id="clip113_39_22161">
           <rect
             x="1894"
             y="1543"
@@ -6638,7 +6586,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip115_39_22161">
+        <clipPath id="clip114_39_22161">
           <rect
             x="1965"
             y="1472"
@@ -6648,7 +6596,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip116_39_22161">
+        <clipPath id="clip115_39_22161">
           <rect
             x="2035"
             y="1407"
@@ -6658,7 +6606,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip117_39_22161">
+        <clipPath id="clip116_39_22161">
           <rect
             x="2214"
             y="1222"
@@ -6668,7 +6616,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip118_39_22161">
+        <clipPath id="clip117_39_22161">
           <rect
             x="2308"
             y="1129"
@@ -6678,7 +6626,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip119_39_22161">
+        <clipPath id="clip118_39_22161">
           <rect
             x="2460"
             y="1048"
@@ -6688,7 +6636,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip120_39_22161">
+        <clipPath id="clip119_39_22161">
           <rect
             x="2675"
             y="990"
@@ -6698,7 +6646,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip121_39_22161">
+        <clipPath id="clip120_39_22161">
           <rect
             x="2675"
             y="814"
@@ -6708,7 +6656,7 @@ const _MapJan2012: React.ForwardRefRenderFunction<SVGSVGElement> = (
             fill="white"
           />
         </clipPath>
-        <clipPath id="clip122_39_22161">
+        <clipPath id="clip121_39_22161">
           <rect
             x="2928"
             y="1158"
