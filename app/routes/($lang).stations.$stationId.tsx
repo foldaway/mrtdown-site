@@ -11,7 +11,7 @@ import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/
 import { StationBar } from '~/components/StationBar';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
-import type { StationManifest } from '~/types';
+import type { IssueType, StationManifest } from '~/types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).stations.$stationId';
 
@@ -152,6 +152,64 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
     }
     return Array.from(codes);
   }, [station.componentMembers]);
+
+  const issueTypeCountString = useMemo(() => {
+    const issueCountByType: Record<IssueType, number> = {
+      disruption: 0,
+      maintenance: 0,
+      infra: 0,
+    };
+    for (const issueRef of stationManifest.issueRefs) {
+      let count = issueCountByType[issueRef.type] ?? 0;
+      count++;
+      issueCountByType[issueRef.type] = count;
+    }
+
+    const result: string[] = [];
+    if (issueCountByType.disruption > 0) {
+      result.push(
+        intl.formatMessage(
+          {
+            id: 'general.disruption_count',
+            defaultMessage:
+              '{count, plural, one { {count} disruption } other { {count} disruptions }}',
+          },
+          {
+            count: issueCountByType.disruption,
+          },
+        ),
+      );
+    }
+    if (issueCountByType.maintenance > 0) {
+      result.push(
+        intl.formatMessage(
+          {
+            id: 'general.maintenance_count',
+            defaultMessage:
+              '{count, plural, one { {count} maintenance operation } other { {count} maintenance operations }}',
+          },
+          {
+            count: issueCountByType.maintenance,
+          },
+        ),
+      );
+    }
+    if (issueCountByType.infra > 0) {
+      result.push(
+        intl.formatMessage(
+          {
+            id: 'general.infra_count',
+            defaultMessage:
+              '{count, plural, one { {count} infrastructure issue } other { {count} infrastructure issues }}',
+          },
+          {
+            count: issueCountByType.infra,
+          },
+        ),
+      );
+    }
+    return intl.formatList(result);
+  }, [stationManifest.issueRefs, intl]);
 
   return (
     <div className="flex flex-col">
@@ -324,7 +382,19 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
           }}
         />
       </h2>
-      <div className="mt-1 flex flex-col gap-y-2">
+      {stationManifest.issueRefs.length > 0 && (
+        <span className="text-gray-600 text-sm dark:text-gray-400">
+          <FormattedMessage
+            id="general.station_issues_description"
+            defaultMessage="{stationName} station has been impacted by {issueTypeCountString} thus far."
+            values={{
+              stationName,
+              issueTypeCountString,
+            }}
+          />
+        </span>
+      )}
+      <div className="mt-3 flex flex-col gap-y-2">
         {stationManifest.issueRefs.map((issueRef) => (
           <IssueRefViewer key={issueRef.id} issueRef={issueRef} />
         ))}
