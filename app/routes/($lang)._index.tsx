@@ -10,6 +10,7 @@ import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/
 import { StatusBanner } from '~/components/StatusBanner';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang)._index';
+import { FormattedMessage } from 'react-intl';
 
 export async function loader({ context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.ROOT_URL;
@@ -116,6 +117,59 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
             dateTimes={dateTimes}
           />
         ))}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-x-5 gap-y-1 rounded-lg px-4 py-2 md:grid-cols-4 md:flex-row md:items-center">
+        <div className="inline-flex items-center gap-x-1.5">
+          <div className="size-4 rounded-sm bg-operational-light dark:bg-operational-dark" />
+          <span className="text-gray-400 text-sm capitalize">
+            <FormattedMessage
+              id="status.operational"
+              defaultMessage="Operational"
+            />
+          </span>
+        </div>
+        <div className="inline-flex items-center gap-x-1.5">
+          <div className="size-4 rounded-sm bg-disruption-light dark:bg-disruption-dark" />
+          <span className="text-gray-400 text-sm capitalize">
+            <FormattedMessage
+              id="general.disruption"
+              defaultMessage="Disruption"
+            />
+          </span>
+        </div>
+        <div className="inline-flex items-center gap-x-1.5">
+          <div className="size-4 rounded-sm bg-maintenance-light dark:bg-maintenance-dark" />
+          <span className="text-gray-400 text-sm capitalize">
+            <FormattedMessage
+              id="general.maintenance"
+              defaultMessage="Maintenance"
+            />
+          </span>
+        </div>
+        <div className="inline-flex items-center gap-x-1.5">
+          <div className="size-4 rounded-sm bg-infra-light dark:bg-infra-dark" />
+          <span className="text-gray-400 text-sm capitalize">
+            <FormattedMessage
+              id="general.infrastructure"
+              defaultMessage="Infrastructure"
+            />
+          </span>
+        </div>
+        <div className="inline-flex items-center gap-x-1.5">
+          <div className="size-4 shrink-0 rounded-sm bg-gray-400 dark:bg-gray-600" />
+          <span className="text-gray-400 text-sm capitalize">
+            <FormattedMessage
+              id="status.service_ended"
+              defaultMessage="Service Ended"
+            />
+            /
+            <FormattedMessage
+              id="status.not_in_service"
+              defaultMessage="Not in Service"
+            />
+          </span>
+        </div>
       </div>
     </div>
   );
