@@ -40,7 +40,14 @@ export function patchDatesForOngoingIssues(
     const startAt = DateTime.fromISO(issue.startAt);
     assert(startAt.isValid);
 
-    const intervals = computeIssueIntervals(issue);
+    let intervals: Interval[] = [];
+
+    if (issue.endAt == null) {
+      intervals = [Interval.fromDateTimes(startAt, now)];
+    } else {
+      intervals = computeIssueIntervals(issue);
+    }
+
     for (const interval of intervals) {
       if (!interval.isValid) {
         continue;
