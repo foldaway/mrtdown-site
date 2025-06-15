@@ -12,7 +12,13 @@ import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/
 import { StationBar } from '~/components/StationBar';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
-import type { Component, IssueType, Station, StationManifest } from '~/types';
+import type {
+  Component,
+  IssueRef,
+  IssueType,
+  Station,
+  StationManifest,
+} from '~/types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).stations.$stationId';
 import { ComponentTypeLabels, StationStructureTypeLabels } from '~/constants';
@@ -269,6 +275,31 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
     return intl.formatList(result);
   }, [stationManifest.issueRefs, intl]);
 
+  const issuesGrouped = useMemo(() => {
+    const groups: Record<string, IssueRef[]> = {};
+
+    for (const issueRef of stationManifest.issueRefs) {
+      const startedAt = DateTime.fromISO(issueRef.startAt).setZone(
+        'Asia/Singapore',
+      );
+      assert(startedAt.isValid);
+      const key = startedAt.startOf('year').toISO();
+      const temp = groups[key] ?? [];
+      temp.push(issueRef);
+      groups[key] = temp;
+    }
+
+    const keys = Object.keys(groups);
+    keys.sort().reverse();
+
+    return keys.map((key) => {
+      return {
+        key,
+        issueRefs: groups[key],
+      };
+    });
+  }, [stationManifest.issueRefs]);
+
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-x-1.5">
@@ -479,6 +510,19 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
         </span>
       )}
       <div className="mt-3 flex flex-col gap-y-2">
+        {issuesGrouped.map((group) => (
+          <div key={group.key} className="flex flex-col gap-y-2">
+            <span className="font-bold text-base text-gray-700 dark:text-gray-50">
+              <FormattedDate
+                value={DateTime.fromISO(group.key).toJSDate()}
+                year="numeric"
+              />
+            </span>
+            {group.issueRefs.map((issueRef) => (
+              <IssueRefViewer key={issueRef.id} issueRef={issueRef} />
+            ))}
+          </div>
+        ))}
         {stationManifest.issueRefs.map((issueRef) => (
           <IssueRefViewer key={issueRef.id} issueRef={issueRef} />
         ))}
