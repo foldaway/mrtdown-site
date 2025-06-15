@@ -4,6 +4,7 @@ import {
   createIntl,
   FormattedDate,
   FormattedMessage,
+  type IntlShape,
   useIntl,
 } from 'react-intl';
 import { Link } from 'react-router';
@@ -11,9 +12,50 @@ import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/
 import { StationBar } from '~/components/StationBar';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
-import type { IssueType, StationManifest } from '~/types';
+import type { Component, IssueType, Station, StationManifest } from '~/types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).stations.$stationId';
+import { ComponentTypeLabels, StationStructureTypeLabels } from '~/constants';
+
+function computeStationStrings(
+  intl: IntlShape,
+  station: Station,
+  componentsById: Record<string, Component>,
+) {
+  const town = station.town_translations[intl.locale] ?? station.town;
+  const landmarks =
+    station.landmarks_translations[intl.locale] ?? station.landmarks;
+
+  let memberCount = 0;
+  const _componentTypeStrings = new Set<string>();
+  const _stationStructureTypes = new Set<string>();
+  const stationCodes = new Set<string>();
+
+  for (const [componentId, members] of Object.entries(
+    station.componentMembers,
+  )) {
+    const component = componentsById[componentId];
+    _componentTypeStrings.add(
+      intl.formatMessage(ComponentTypeLabels[component.type]),
+    );
+
+    for (const member of members) {
+      _stationStructureTypes.add(
+        intl.formatMessage(StationStructureTypeLabels[member.structureType]),
+      );
+      stationCodes.add(member.code);
+      memberCount++;
+    }
+  }
+  return {
+    town,
+    landmarks,
+    stationCodes,
+    componentTypeStrings: Array.from(_componentTypeStrings),
+    stationStructureTypes: Array.from(_stationStructureTypes),
+    isInterchange: memberCount > 1,
+  };
+}
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { stationId, lang = 'en-SG' } = params;
@@ -33,7 +75,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     messages,
   });
 
-  const { station } = stationManifest;
+  const { station, componentsById } = stationManifest;
 
   const stationName = station.name_translations[lang] ?? station.name;
 
@@ -45,27 +87,43 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     { stationName },
   )} | mrtdown`;
 
-  const stationCodes = new Set<string>();
-  for (const members of Object.values(station.componentMembers)) {
-    for (const member of members) {
-      stationCodes.add(member.code);
-    }
-  }
+  const {
+    town,
+    landmarks,
+    stationCodes,
+    componentTypeStrings,
+    stationStructureTypes,
+    isInterchange,
+  } = computeStationStrings(intl, station, componentsById);
 
-  const description = intl.formatMessage(
-    {
-      id: 'general.station_description',
-      defaultMessage:
-        '{stationName} is served by {lines}, with station codes {stationCodes}.',
-    },
-    {
-      stationName,
-      lines: intl.formatList(
-        Object.keys(stationManifest.station.componentMembers),
-      ),
-      stationCodes: intl.formatList(Array.from(stationCodes)),
-    },
-  );
+  const description = isInterchange
+    ? intl.formatMessage(
+        {
+          id: 'station.description.interchange',
+          defaultMessage:
+            '{stationName} station is a {componentTypes} interchange station. It is located in {area}, near {landmarks}.',
+        },
+        {
+          stationName,
+          componentTypes: intl.formatList(componentTypeStrings),
+          area: town,
+          landmarks: intl.formatList(landmarks),
+        },
+      )
+    : intl.formatMessage(
+        {
+          id: 'station.description.non_interchange',
+          defaultMessage:
+            '{stationName} station is an {structureTypes} {componentTypes} station. It is located in {area}, near {landmarks}.',
+        },
+        {
+          stationName,
+          area: town,
+          landmarks: intl.formatList(landmarks),
+          structureTypes: intl.formatList(stationStructureTypes),
+          componentTypes: intl.formatList(componentTypeStrings),
+        },
+      );
 
   return {
     stationManifest,
@@ -143,15 +201,15 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
     return station.name_translations[intl.locale] ?? station.name;
   }, [station, intl.locale]);
 
-  const stationCodes = useMemo(() => {
-    const codes = new Set<string>();
-    for (const members of Object.values(station.componentMembers)) {
-      for (const member of members) {
-        codes.add(member.code);
-      }
-    }
-    return Array.from(codes);
-  }, [station.componentMembers]);
+  const {
+    town,
+    landmarks,
+    componentTypeStrings,
+    stationStructureTypes,
+    isInterchange,
+  } = useMemo(() => {
+    return computeStationStrings(intl, station, componentsById);
+  }, [station, intl, componentsById]);
 
   const issueTypeCountString = useMemo(() => {
     const issueCountByType: Record<IssueType, number> = {
@@ -222,17 +280,30 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
       </div>
 
       <span className="mt-1 text-gray-600 text-sm dark:text-gray-400">
-        <FormattedMessage
-          id="general.station_description"
-          defaultMessage="{stationName} is served by {lines}, with station codes {stationCodes}."
-          values={{
-            stationName,
-            lines: intl.formatList(
-              Object.keys(stationManifest.station.componentMembers),
-            ),
-            stationCodes: intl.formatList(stationCodes),
-          }}
-        />
+        {isInterchange ? (
+          <FormattedMessage
+            id="station.description.interchange"
+            defaultMessage="{stationName} station is a {componentTypes} interchange station. It is located in {area}, near {landmarks}."
+            values={{
+              stationName,
+              componentTypes: intl.formatList(componentTypeStrings),
+              area: town,
+              landmarks: intl.formatList(landmarks),
+            }}
+          />
+        ) : (
+          <FormattedMessage
+            id="station.description.non_interchange"
+            defaultMessage="{stationName} station is an {structureTypes} {componentTypes} station. It is located in {area}, near {landmarks}."
+            values={{
+              stationName,
+              area: town,
+              landmarks: intl.formatList(landmarks),
+              structureTypes: intl.formatList(stationStructureTypes),
+              componentTypes: intl.formatList(componentTypeStrings),
+            }}
+          />
+        )}
       </span>
 
       <h2 className="mt-4 font-bold text-gray-800 text-lg dark:text-gray-100">
@@ -252,6 +323,12 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                 <FormattedMessage
                   id="general.station_code"
                   defaultMessage="Station Code"
+                />
+              </th>
+              <th className="sm:!table-cell hidden p-2 text-start">
+                <FormattedMessage
+                  id="general.structure"
+                  defaultMessage="Structure"
                 />
               </th>
               <th className="p-2 text-start">
@@ -307,6 +384,13 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                             {entry.code}
                           </span>
                         </div>
+                      </td>
+                      <td className="sm:!table-cell hidden p-2 align-middle">
+                        <span className="text-gray-500 text-sm leading-none dark:text-gray-400">
+                          <FormattedMessage
+                            {...StationStructureTypeLabels[entry.structureType]}
+                          />
+                        </span>
                       </td>
                       <td className="p-2 align-middle">
                         <span className="text-sm">

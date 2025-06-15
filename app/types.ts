@@ -92,10 +92,13 @@ export interface ComponentBranch {
   stationCodes: string[];
 }
 
+export type ComponentType = 'mrt.high' | 'mrt.medium' | 'lrt';
+
 export interface Component {
   id: string;
   title: string;
   title_translations: Record<string, string>;
+  type: ComponentType;
   color: string;
   startedAt: string;
   branches: Record<string, ComponentBranch>;
@@ -152,16 +155,33 @@ export interface Statistics {
   componentsById: Record<string, Component>;
 }
 
+export type StationComponentMemberStructureType =
+  | 'elevated'
+  | 'underground'
+  | 'at_grade'
+  | 'in_building';
+
 export interface StationComponentMember {
   code: string;
   startedAt: string;
   endedAt?: string;
+  structureType: StationComponentMemberStructureType;
+}
+
+export interface StationGeo {
+  latitude: number;
+  longitude: number;
 }
 
 export interface Station {
   id: string;
   name: string;
   name_translations: Record<string, string>;
+  town: string;
+  town_translations: Record<string, string>;
+  landmarks: string[];
+  landmarks_translations: Record<string, string[]>;
+  geo: StationGeo;
   componentMembers: Record<string, StationComponentMember[]>;
 }
 

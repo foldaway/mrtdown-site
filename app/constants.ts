@@ -1,8 +1,10 @@
 import { defineMessage, type MessageDescriptor } from 'react-intl';
 import type {
+  ComponentType,
   IssueDisruptionSubtype,
   IssueInfraSubtype,
   IssueMaintenanceSubtype,
+  StationComponentMemberStructureType,
 } from './types';
 
 export const LANGUAGES_NON_DEFAULT = ['zh-Hans', 'ms', 'ta'];
@@ -71,5 +73,42 @@ export const IssueSubtypeLabels: Record<
   'air_conditioning.issue': defineMessage({
     id: 'issue.subtype.air_conditioning_issue',
     defaultMessage: 'Air Conditioning Issue',
+  }),
+};
+
+export const ComponentTypeLabels: Record<ComponentType, MessageDescriptor> = {
+  'mrt.high': defineMessage({
+    id: 'general.mrt',
+    defaultMessage: 'Mass Rapid Transit (MRT)',
+  }),
+  'mrt.medium': defineMessage({
+    id: 'general.mrt',
+    defaultMessage: 'Mass Rapid Transit (MRT)',
+  }),
+  lrt: defineMessage({
+    id: 'general.lrt',
+    defaultMessage: 'Light Rail Transit (LRT)',
+  }),
+};
+
+export const StationStructureTypeLabels: Record<
+  StationComponentMemberStructureType,
+  MessageDescriptor
+> = {
+  elevated: defineMessage({
+    id: 'station.structure_type.elevated',
+    defaultMessage: 'elevated',
+  }),
+  underground: defineMessage({
+    id: 'station.structure_type.underground',
+    defaultMessage: 'underground',
+  }),
+  at_grade: defineMessage({
+    id: 'station.structure_type.at_grade',
+    defaultMessage: 'at-grade',
+  }),
+  in_building: defineMessage({
+    id: 'station.structure_type.in_building',
+    defaultMessage: 'enclosed',
   }),
 };
