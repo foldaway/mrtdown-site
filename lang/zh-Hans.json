@@ -25,7 +25,7 @@
   "general.beta": "测试版",
   "general.change_since_last_period": "相较{period}：{change} 起",
   "general.closed": "停用日期",
-  "general.component_description": "{componentName}于{startDate}开始运营。目前共有{stationCount}个站。",
+  "general.component_description": "{componentName}于{startDate}开始运营。目前共有{stationCount}个站，累计报告了{issueTypeCountString}。",
   "general.disruption": "服务中断",
   "general.disruption_count": "{count}次中断",
   "general.disruption_time_average": "平均中断时间",

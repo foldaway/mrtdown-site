@@ -195,6 +195,7 @@ export interface ComponentManifest {
   componentId: string;
   componentsById: Record<string, Component>;
   stationsByCode: Record<string, Station>;
+  issueRefs: IssueRef[];
 }
 
 export interface IssuesHistory {

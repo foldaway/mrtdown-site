@@ -1,4 +1,4 @@
-import type { ComponentManifest } from '~/types';
+import type { ComponentManifest, IssueRef } from '~/types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).lines.$lineId';
 import {
@@ -12,6 +12,8 @@ import classNames from 'classnames';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { DateTime } from 'luxon';
+import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
+import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { lineId, lang = 'en-SG' } = params;
@@ -53,13 +55,18 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const componentName = component.title_translations[lang] ?? component.title;
   const title = `${componentName} | mrtdown`;
 
+  const issueTypeCountString = buildIssueTypeCountString(
+    componentManifest.issueRefs,
+    intl,
+  );
+
   const description =
     DateTime.fromISO(component.startedAt).diffNow().as('days') < 0
       ? intl.formatMessage(
           {
             id: 'general.component_description',
             defaultMessage:
-              'The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}.',
+              'The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}, with {issueTypeCountString} reported to date.',
           },
           {
             stationCount: stationIds.size,
@@ -69,6 +76,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
               month: 'long',
               year: 'numeric',
             }),
+            issueTypeCountString,
           },
         )
       : '';
@@ -162,7 +170,8 @@ export const meta: Route.MetaFunction = ({ params, data, location }) => {
 const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
   const { loaderData } = props;
   const { componentManifest } = loaderData;
-  const { componentId, componentsById, stationsByCode } = componentManifest;
+  const { componentId, componentsById, stationsByCode, issueRefs } =
+    componentManifest;
 
   const component = componentsById[componentId];
 
@@ -190,6 +199,35 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
     return idSet.size;
   }, [stationsByCode, componentId]);
 
+  const issueTypeCountString = useMemo(() => {
+    return buildIssueTypeCountString(issueRefs, intl);
+  }, [issueRefs, intl]);
+
+  const issuesGrouped = useMemo(() => {
+    const groups: Record<string, IssueRef[]> = {};
+
+    for (const issueRef of issueRefs) {
+      const startedAt = DateTime.fromISO(issueRef.startAt).setZone(
+        'Asia/Singapore',
+      );
+      assert(startedAt.isValid);
+      const key = startedAt.startOf('year').toISO();
+      const temp = groups[key] ?? [];
+      temp.push(issueRef);
+      groups[key] = temp;
+    }
+
+    const keys = Object.keys(groups);
+    keys.sort().reverse();
+
+    return keys.map((key) => {
+      return {
+        key,
+        issueRefs: groups[key],
+      };
+    });
+  }, [issueRefs]);
+
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-x-2">
@@ -209,7 +247,7 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
         <span className="mt-1 text-gray-600 text-sm dark:text-gray-400">
           <FormattedMessage
             id="general.component_description"
-            defaultMessage="The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}."
+            defaultMessage="The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}, with {issueTypeCountString} reported to date."
             values={{
               stationCount,
               componentName,
@@ -221,6 +259,7 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
                   year="numeric"
                 />
               ),
+              issueTypeCountString,
             }}
           />
         </span>
@@ -340,6 +379,32 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
                 </Fragment>
               ))}
             </div>
+          </div>
+        ))}
+      </div>
+
+      <h2 className="mt-4 font-bold text-gray-800 text-lg dark:text-gray-100">
+        <FormattedMessage
+          id="general.issues_with_count"
+          defaultMessage="Issues ({count})"
+          values={{
+            count: issueRefs.length,
+          }}
+        />
+      </h2>
+
+      <div className="mt-2 flex flex-col gap-y-2">
+        {issuesGrouped.map((group) => (
+          <div key={group.key} className="flex flex-col gap-y-2">
+            <span className="font-bold text-base text-gray-700 dark:text-gray-50">
+              <FormattedDate
+                value={DateTime.fromISO(group.key).toJSDate()}
+                year="numeric"
+              />
+            </span>
+            {group.issueRefs.map((issueRef) => (
+              <IssueRefViewer key={issueRef.id} issueRef={issueRef} />
+            ))}
           </div>
         ))}
       </div>

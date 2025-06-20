@@ -25,7 +25,7 @@
   "general.beta": "Beta",
   "general.change_since_last_period": "{change} daripada {period}",
   "general.closed": "Tarikh Ditutup",
-  "general.component_description": "{componentName} mula beroperasi pada {startDate}. Kini ia mempunyai {stationCount} stesen.",
+  "general.component_description": "{componentName} mula beroperasi pada {startDate}. Ia kini mempunyai {stationCount} stesen, dengan {issueTypeCountString} yang telah dilaporkan setakat ini.",
   "general.disruption": "Gangguan",
   "general.disruption_count": "{count} gangguan",
   "general.disruption_time_average": "Purata masa gangguan",
