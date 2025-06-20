@@ -1,16 +1,17 @@
-import { DateTime } from 'luxon';
-import { useMemo } from 'react';
+import { DateTime, Interval } from 'luxon';
+import { useCallback, useMemo } from 'react';
 import { ComponentOutlook } from '../components/ComponentOutlook';
 import { computeComponentBreakdown } from '../components/ComponentOutlook/helpers/computeComponentBreakdowns';
 import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
 import { useViewport } from '../hooks/useViewport';
-import type { Overview } from '../types';
+import type { IssueRef, Overview } from '../types';
 
 import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
 import { StatusBanner } from '~/components/StatusBanner';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang)._index';
 import { FormattedMessage } from 'react-intl';
+import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
 
 export async function loader({ context }: Route.LoaderArgs) {
   const rootUrl = context.cloudflare.env.ROOT_URL;
@@ -97,6 +98,18 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
     return computeComponentBreakdown(overview);
   }, [overview]);
 
+  const isTodayIssue = useCallback((issueRef: IssueRef) => {
+    const now = DateTime.now();
+
+    const intervalToday = Interval.fromDateTimes(
+      now.startOf('day'),
+      now.startOf('day').plus({ days: 1 }),
+    );
+
+    const intervals = computeIssueIntervals(issueRef);
+    return intervals.some((interval) => interval.overlaps(intervalToday));
+  }, []);
+
   return (
     <div className="flex flex-col">
       <div className="mb-3 flex flex-col">
@@ -104,9 +117,11 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
       </div>
 
       <div className="flex flex-col gap-y-2">
-        {overview.issuesOngoingSnapshot.map((issue) => (
-          <IssueRefViewer key={issue.id} issueRef={issue} />
-        ))}
+        {overview.issuesOngoingSnapshot
+          .filter((issueRef) => isTodayIssue(issueRef))
+          .map((issue) => (
+            <IssueRefViewer key={issue.id} issueRef={issue} />
+          ))}
       </div>
 
       <div className="mt-5 flex flex-col gap-y-6">

@@ -15,7 +15,6 @@ import {
 
 import classNames from 'classnames';
 import { DateTime, Settings } from 'luxon';
-import { useLocation } from 'react-router';
 import type { Route } from './+types/root';
 import { LocaleSwitcher } from './components/LocaleSwitcher';
 import Spinner from './components/Spinner';
@@ -84,6 +83,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   Settings.defaultZone = 'Asia/Singapore';
 
   const { lang = 'en-SG' } = params;
+
   const { default: messages } = await import(`../lang/${lang}.json`);
 
   return {
@@ -97,7 +97,6 @@ export default function App(props: Route.ComponentProps) {
   const { messages } = loaderData;
 
   const navigation = useNavigation();
-  const location = useLocation();
   const isNavigating = Boolean(navigation.location);
 
   return (

@@ -9,10 +9,6 @@ export function patchDatesForOngoingIssues(
   issuesOngoingSnapshot: Issue[],
 ) {
   const now = DateTime.now();
-  const intervalToday = Interval.fromDateTimes(
-    now.startOf('day'),
-    now.startOf('day').plus({ days: 1 }),
-  );
 
   for (let i = issuesOngoingSnapshot.length - 1; i >= 0; i--) {
     const issue = issuesOngoingSnapshot[i];
@@ -28,8 +24,8 @@ export function patchDatesForOngoingIssues(
     const intervals = computeIssueIntervals(issue);
 
     if (
-      !intervals.some((i) => {
-        return i.overlaps(intervalToday);
+      intervals.every((i) => {
+        return i.isBefore(now.startOf('day'));
       })
     ) {
       issuesOngoingSnapshot.splice(i, 1);
