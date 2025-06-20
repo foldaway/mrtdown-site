@@ -17,7 +17,7 @@ export function buildIssueTypeCountString(
   }
 
   const result: string[] = [];
-  if (issueCountByType.disruption > 0) {
+  if (issueRefs.length === 0 || issueCountByType.disruption > 0) {
     result.push(
       intl.formatMessage(
         {
@@ -31,7 +31,7 @@ export function buildIssueTypeCountString(
       ),
     );
   }
-  if (issueCountByType.maintenance > 0) {
+  if (issueRefs.length === 0 || issueCountByType.maintenance > 0) {
     result.push(
       intl.formatMessage(
         {
@@ -45,7 +45,7 @@ export function buildIssueTypeCountString(
       ),
     );
   }
-  if (issueCountByType.infra > 0) {
+  if (issueRefs.length === 0 || issueCountByType.infra > 0) {
     result.push(
       intl.formatMessage(
         {
