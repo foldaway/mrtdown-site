@@ -523,9 +523,6 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
             ))}
           </div>
         ))}
-        {stationManifest.issueRefs.map((issueRef) => (
-          <IssueRefViewer key={issueRef.id} issueRef={issueRef} />
-        ))}
       </div>
     </div>
   );
