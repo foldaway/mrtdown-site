@@ -12,13 +12,7 @@ import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/
 import { StationBar } from '~/components/StationBar';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
-import type {
-  Component,
-  IssueRef,
-  IssueType,
-  Station,
-  StationManifest,
-} from '~/types';
+import type { Component, IssueRef, Station, StationManifest } from '~/types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).stations.$stationId';
 import { ComponentTypeLabels, StationStructureTypeLabels } from '~/constants';
@@ -82,7 +76,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     messages,
   });
 
-  const { station, componentsById } = stationManifest;
+  const { station, componentsById, issueRefs } = stationManifest;
 
   const stationName = station.name_translations[lang] ?? station.name;
 
@@ -103,25 +97,28 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     isInterchange,
   } = computeStationStrings(intl, station, componentsById);
 
+  const issueTypeCountString = buildIssueTypeCountString(issueRefs, intl);
+
   const description = isInterchange
     ? intl.formatMessage(
         {
           id: 'station.description.interchange',
           defaultMessage:
-            '{stationName} station is a {componentTypes} interchange station. It is located in {area}, near {landmarks}.',
+            '{stationName} station is a {componentTypes} interchange station, located in {area} near {landmarks}. There have been {issueTypeCountString}.',
         },
         {
           stationName,
           componentTypes: intl.formatList(componentTypeStrings),
           area: town,
           landmarks: intl.formatList(landmarks),
+          issueTypeCountString,
         },
       )
     : intl.formatMessage(
         {
           id: 'station.description.non_interchange',
           defaultMessage:
-            '{stationName} station is an {structureTypes} {componentTypes} station. It is located in {area}, near {landmarks}.',
+            '{stationName} station is an {structureTypes} {componentTypes} station, located in {area} near {landmarks}. There have been {issueTypeCountString}.',
         },
         {
           stationName,
@@ -129,6 +126,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
           landmarks: intl.formatList(landmarks),
           structureTypes: intl.formatList(stationStructureTypes),
           componentTypes: intl.formatList(componentTypeStrings),
+          issueTypeCountString,
         },
       );
 
@@ -261,24 +259,26 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
         {isInterchange ? (
           <FormattedMessage
             id="station.description.interchange"
-            defaultMessage="{stationName} station is a {componentTypes} interchange station. It is located in {area}, near {landmarks}."
+            defaultMessage="{stationName} station is a {componentTypes} interchange station, located in {area} near {landmarks}. There have been {issueTypeCountString}."
             values={{
               stationName,
               componentTypes: intl.formatList(componentTypeStrings),
               area: town,
               landmarks: intl.formatList(landmarks),
+              issueTypeCountString,
             }}
           />
         ) : (
           <FormattedMessage
             id="station.description.non_interchange"
-            defaultMessage="{stationName} station is an {structureTypes} {componentTypes} station. It is located in {area}, near {landmarks}."
+            defaultMessage="{stationName} station is an {structureTypes} {componentTypes} station, located in {area} near {landmarks}. There have been {issueTypeCountString}."
             values={{
               stationName,
               area: town,
               landmarks: intl.formatList(landmarks),
               structureTypes: intl.formatList(stationStructureTypes),
               componentTypes: intl.formatList(componentTypeStrings),
+              issueTypeCountString,
             }}
           />
         )}
@@ -444,19 +444,8 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
           }}
         />
       </h2>
-      {stationManifest.issueRefs.length > 0 && (
-        <span className="text-gray-600 text-sm dark:text-gray-400">
-          <FormattedMessage
-            id="general.station_issues_description"
-            defaultMessage="{stationName} station has been impacted by {issueTypeCountString} thus far."
-            values={{
-              stationName,
-              issueTypeCountString,
-            }}
-          />
-        </span>
-      )}
-      <div className="mt-3 flex flex-col gap-y-2">
+
+      <div className="mt-2 flex flex-col gap-y-2">
         {issuesGrouped.map((group) => (
           <div key={group.key} className="flex flex-col gap-y-2">
             <span className="font-bold text-base text-gray-700 dark:text-gray-50">
