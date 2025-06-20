@@ -57,6 +57,7 @@
   "general.station_issues_description": "{stationName} station has been impacted by {issueTypeCountString} thus far.",
   "general.station_title": "{stationName} Station",
   "general.statistics": "Statistics",
+  "general.structure": "Structure",
   "general.system_map": "System Map",
   "general.uptime_duration_display": "{duration} within service hours",
   "general.uptime_percent_display": "{percent} uptime",
