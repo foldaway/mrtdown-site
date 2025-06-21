@@ -10,10 +10,17 @@ import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/
 import { StatusBanner } from '~/components/StatusBanner';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang)._index';
-import { FormattedMessage } from 'react-intl';
+import { createIntl, FormattedMessage } from 'react-intl';
 import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ context, params }: Route.LoaderArgs) {
+  const { lang = 'en-SG' } = params;
+  const { default: messages } = await import(`../../lang/${lang}.json`);
+  const intl = createIntl({
+    locale: lang,
+    messages,
+  });
+
   const rootUrl = context.cloudflare.env.ROOT_URL;
 
   const res = await fetch(
@@ -22,9 +29,16 @@ export async function loader({ context }: Route.LoaderArgs) {
   assert(res.ok, res.statusText);
   const overview: Overview = await res.json();
   patchDatesForOngoingIssues(overview.dates, overview.issuesOngoingSnapshot);
+
+  const description = intl.formatMessage({
+    id: 'site.tagline',
+    defaultMessage: 'community-run transit monitoring',
+  });
+
   return {
     overview,
     rootUrl,
+    description,
   };
 }
 
@@ -35,7 +49,7 @@ export function headers() {
 }
 
 export const meta: Route.MetaFunction = ({ data, location }) => {
-  const { rootUrl } = data;
+  const { rootUrl, description } = data;
 
   const ogUrl = new URL(location.pathname, rootUrl).toString();
   const ogImage = new URL('/og_image.png', rootUrl).toString();
@@ -43,6 +57,10 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
   return [
     {
       title: 'mrtdown',
+    },
+    {
+      name: 'description',
+      content: description,
     },
     {
       property: 'og:title',

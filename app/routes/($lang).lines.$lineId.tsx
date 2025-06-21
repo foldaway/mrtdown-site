@@ -116,6 +116,10 @@ export const meta: Route.MetaFunction = ({ params, data, location }) => {
       title,
     },
     {
+      name: 'description',
+      content: description,
+    },
+    {
       property: 'og:title',
       content: title,
     },
