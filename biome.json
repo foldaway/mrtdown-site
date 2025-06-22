@@ -24,7 +24,8 @@
           "level": "error",
           "options": {},
           "fix": "safe"
-        }
+        },
+        "useUniqueElementIds": "off"
       },
       "style": {
         "noParameterAssign": "error",
