@@ -20,14 +20,16 @@ export const Item: React.FC<Props> = (props) => {
   const intl = useIntl();
 
   const startAt = useMemo(() => {
-    const dateTime = DateTime.fromISO(issueRef.startAt);
+    const dateTime = DateTime.fromISO(issueRef.startAt).setZone(
+      'Asia/Singapore',
+    );
     assert(dateTime.isValid);
     return dateTime;
   }, [issueRef.startAt]);
 
   const endAt = useMemo(() => {
     assert(issueRef.endAt != null);
-    const dateTime = DateTime.fromISO(issueRef.endAt);
+    const dateTime = DateTime.fromISO(issueRef.endAt).setZone('Asia/Singapore');
     assert(dateTime.isValid);
     return dateTime;
   }, [issueRef.endAt]);
@@ -43,13 +45,15 @@ export const Item: React.FC<Props> = (props) => {
   }, [startAt, endAt]);
 
   return (
-    <Link
-      className="flex flex-col py-1"
-      to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
-    >
-      <span className="line-clamp-1 text-gray-700 text-sm dark:text-gray-200">
-        {issueRef.title}
-      </span>
+    <div className="flex flex-col py-1">
+      <Link
+        className="hover:underline"
+        to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
+      >
+        <span className="line-clamp-1 text-gray-700 text-sm dark:text-gray-200">
+          {issueRef.title}
+        </span>
+      </Link>
       <time className="mt-0.5 mb-1.5 text-gray-400 text-xs dark:text-gray-500">
         {isHydrated ? (
           <FormattedDateTimeRange
@@ -85,6 +89,6 @@ export const Item: React.FC<Props> = (props) => {
         )}
       </time>
       <ComponentBar componentIds={issueRef.componentIdsAffected} />
-    </Link>
+    </div>
   );
 };

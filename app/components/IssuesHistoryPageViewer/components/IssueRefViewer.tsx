@@ -31,7 +31,7 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
   const { issueRef } = props;
 
   const startAt = useMemo(
-    () => DateTime.fromISO(issueRef.startAt),
+    () => DateTime.fromISO(issueRef.startAt).setZone('Asia/Singapore'),
     [issueRef.startAt],
   );
   const endAt = useMemo(() => {

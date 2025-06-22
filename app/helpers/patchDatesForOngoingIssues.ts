@@ -8,7 +8,7 @@ export function patchDatesForOngoingIssues(
   dates: Record<string, DateSummary>,
   issuesOngoingSnapshot: Issue[],
 ) {
-  const now = DateTime.now();
+  const now = DateTime.now().setZone('Asia/Singapore');
 
   for (let i = issuesOngoingSnapshot.length - 1; i >= 0; i--) {
     const issue = issuesOngoingSnapshot[i];
@@ -16,9 +16,9 @@ export function patchDatesForOngoingIssues(
       continue;
     }
 
-    const startAt = DateTime.fromISO(issue.startAt);
+    const startAt = DateTime.fromISO(issue.startAt).setZone('Asia/Singapore');
     assert(startAt.isValid);
-    const endAt = DateTime.fromISO(issue.endAt);
+    const endAt = DateTime.fromISO(issue.endAt).setZone('Asia/Singapore');
     assert(endAt.isValid);
 
     const intervals = computeIssueIntervals(issue);

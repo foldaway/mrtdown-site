@@ -21,7 +21,7 @@ export const UpdateDisruption: React.FC<Props> = (props) => {
   const { update } = props;
 
   const createdAt = useMemo(
-    () => DateTime.fromISO(update.createdAt),
+    () => DateTime.fromISO(update.createdAt).setZone('Asia/Singapore'),
     [update.createdAt],
   );
 
@@ -32,7 +32,7 @@ export const UpdateDisruption: React.FC<Props> = (props) => {
     <div className="flex gap-x-2">
       <div className="inline-flex shrink-0">
         <a
-          className="hover:scale-110 flex transition-transform duration-75"
+          className="flex transition-transform duration-75 hover:scale-110"
           href={update.sourceUrl}
           target="_blank"
           rel="noreferrer"

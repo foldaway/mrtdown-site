@@ -14,6 +14,7 @@ import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { DateTime } from 'luxon';
 import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
+import { useHydrated } from '~/hooks/useHydrated';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { lineId, lang = 'en-SG' } = params;
@@ -179,6 +180,8 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
 
   const component = componentsById[componentId];
 
+  const isHydrated = useHydrated();
+
   const intl = useIntl();
   const componentName =
     component.title_translations[intl.locale] ?? component.title;
@@ -215,7 +218,7 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
         'Asia/Singapore',
       );
       assert(startedAt.isValid);
-      const key = startedAt.startOf('year').toISO();
+      const key = startedAt.startOf('year').toFormat('yyyy');
       const temp = groups[key] ?? [];
       temp.push(issueRef);
       groups[key] = temp;
@@ -401,10 +404,14 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
         {issuesGrouped.map((group) => (
           <div key={group.key} className="flex flex-col gap-y-2">
             <span className="font-bold text-base text-gray-700 dark:text-gray-50">
-              <FormattedDate
-                value={DateTime.fromISO(group.key).toJSDate()}
-                year="numeric"
-              />
+              {isHydrated ? (
+                <FormattedDate
+                  value={DateTime.fromISO(group.key).toJSDate()}
+                  year="numeric"
+                />
+              ) : (
+                group.key
+              )}
             </span>
             {group.issueRefs.map((issueRef) => (
               <IssueRefViewer key={issueRef.id} issueRef={issueRef} />

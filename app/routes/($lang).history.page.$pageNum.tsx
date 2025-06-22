@@ -131,8 +131,12 @@ const HistoryPage: React.FC<Route.ComponentProps> = (props) => {
 
   const interval = useMemo(() => {
     return Interval.fromDateTimes(
-      DateTime.fromISO(page.startAt),
-      DateTime.fromISO(page.endAt),
+      DateTime.fromISO(page.startAt).setZone('Asia/Singapore', {
+        keepLocalTime: true,
+      }),
+      DateTime.fromISO(page.endAt).setZone('Asia/Singapore', {
+        keepLocalTime: true,
+      }),
     );
   }, [page]);
 

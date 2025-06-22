@@ -117,7 +117,7 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
   }, [overview]);
 
   const isTodayIssue = useCallback((issueRef: IssueRef) => {
-    const now = DateTime.now();
+    const now = DateTime.now().setZone('Asia/Singapore');
 
     const intervalToday = Interval.fromDateTimes(
       now.startOf('day'),

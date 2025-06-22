@@ -14,6 +14,7 @@ export function computeIssueIntervals(issue: IssueRef): Interval[] {
   assert(endAt.isValid);
 
   const issueIntervals: Interval[] = [];
+  const tzEnvironment = DateTime.local().zoneName;
 
   if (issue.type === 'maintenance' && issue.rrule != null) {
     const rruleSet = rrulestr(issue.rrule);
@@ -21,7 +22,7 @@ export function computeIssueIntervals(issue: IssueRef): Interval[] {
       const dtStart = DateTime.fromISO(dt.toISOString())
         .toUTC()
         .setZone(rruleSet.options.tzid ?? 'Asia/Singapore', {
-          keepLocalTime: true,
+          keepLocalTime: tzEnvironment !== 'UTC',
         });
       assert(dtStart.isValid);
       const dtEnd = dtStart.plus(endAt.diff(startAt));

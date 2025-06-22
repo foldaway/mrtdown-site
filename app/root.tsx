@@ -80,8 +80,6 @@ const navLinkClassNameFunction: NavLinkProps['className'] = ({ isActive }) => {
 };
 
 export async function loader({ params }: Route.LoaderArgs) {
-  Settings.defaultZone = 'Asia/Singapore';
-
   const { lang = 'en-SG' } = params;
 
   const { default: messages } = await import(`../lang/${lang}.json`);
