@@ -1,6 +1,13 @@
+import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import type React from 'react';
 import { useMemo, useState } from 'react';
+import {
+  FormattedMessage,
+  FormattedNumber,
+  FormattedRelativeTime,
+  useIntl,
+} from 'react-intl';
 import {
   CartesianGrid,
   Line,
@@ -11,15 +18,8 @@ import {
 } from 'recharts';
 import type { IssueType, Statistics } from '../../../../types';
 import { assert } from '../../../../util/assert';
-import classNames from 'classnames';
-import type { Data, DataPartial } from './types';
 import { CustomTooltip } from './components/CustomTooltip';
-import {
-  FormattedMessage,
-  FormattedNumber,
-  FormattedRelativeTime,
-  useIntl,
-} from 'react-intl';
+import type { Data, DataPartial } from './types';
 
 type Bucket = {
   display?: {
@@ -200,7 +200,7 @@ export const CountTrendCards: React.FC<Props> = (props) => {
       <span className="mt-2.5 font-bold text-4xl">
         <FormattedMessage
           id="general.disruption_count"
-          defaultMessage="{count, plural, one { {count} disruption } other { {count} disruptions }}"
+          defaultMessage="{count, plural, one {{count} disruption} other {{count} disruptions}}"
           values={{
             count: chartData[chartData.length - 1].countByIssueType.disruption,
           }}
