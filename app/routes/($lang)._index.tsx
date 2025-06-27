@@ -1,17 +1,16 @@
 import { DateTime, Interval } from 'luxon';
 import { useCallback, useMemo } from 'react';
+import { createIntl, FormattedMessage } from 'react-intl';
+import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
+import { StatusBanner } from '~/components/StatusBanner';
+import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
 import { ComponentOutlook } from '../components/ComponentOutlook';
 import { computeComponentBreakdown } from '../components/ComponentOutlook/helpers/computeComponentBreakdowns';
 import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
 import { useViewport } from '../hooks/useViewport';
 import type { IssueRef, Overview } from '../types';
-
-import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
-import { StatusBanner } from '~/components/StatusBanner';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang)._index';
-import { createIntl, FormattedMessage } from 'react-intl';
-import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
 
 export async function loader({ context, params }: Route.LoaderArgs) {
   const { lang = 'en-SG' } = params;
@@ -77,6 +76,18 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
     {
       property: 'og:image',
       content: ogImage,
+    },
+    {
+      property: 'og:site_name',
+      content: 'mrtdown',
+    },
+    {
+      'script:ld+json': {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'mrtdown',
+        url: rootUrl,
+      },
     },
   ];
 };
