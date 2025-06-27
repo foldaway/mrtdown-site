@@ -1,6 +1,3 @@
-import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
-import type { IssueStationEntry, Overview } from '../types';
-
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
 import { createIntl, useIntl } from 'react-intl';
@@ -8,6 +5,8 @@ import { Link } from 'react-router';
 import { StationMap } from '~/components/StationMap';
 import { StatusBanner } from '~/components/StatusBanner';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
+import type { IssueStationEntry, Overview } from '../types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).system-map';
 
@@ -29,10 +28,10 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     messages,
   });
 
-  const title = `${intl.formatMessage({
+  const title = intl.formatMessage({
     id: 'general.system_map',
     defaultMessage: 'System Map',
-  })} | mrtdown`;
+  });
 
   return { overview, title, rootUrl };
 }

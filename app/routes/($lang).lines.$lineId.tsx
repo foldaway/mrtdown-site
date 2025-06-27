@@ -1,20 +1,20 @@
-import type { ComponentManifest, IssueRef } from '~/types';
-import { assert } from '../util/assert';
-import type { Route } from './+types/($lang).lines.$lineId';
+import classNames from 'classnames';
+import { DateTime } from 'luxon';
+import { Fragment, useMemo } from 'react';
 import {
   createIntl,
   FormattedDate,
   FormattedMessage,
   useIntl,
 } from 'react-intl';
-import { Fragment, useMemo } from 'react';
-import classNames from 'classnames';
 import { Link } from 'react-router';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
-import { DateTime } from 'luxon';
 import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
+import type { ComponentManifest, IssueRef } from '~/types';
+import { assert } from '../util/assert';
+import type { Route } from './+types/($lang).lines.$lineId';
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { lineId, lang = 'en-SG' } = params;
@@ -54,7 +54,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   });
 
   const componentName = component.title_translations[lang] ?? component.title;
-  const title = `${componentName} | mrtdown`;
+  const title = componentName;
 
   const issueTypeCountString = buildIssueTypeCountString(
     componentManifest.issueRefs,

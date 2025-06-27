@@ -1,7 +1,6 @@
+import { createIntl } from 'react-intl';
 import { StatisticsGrid } from '../components/StatisticsGrid';
 import type { Statistics } from '../types';
-
-import { createIntl } from 'react-intl';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).statistics';
 
@@ -22,10 +21,10 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     messages,
   });
 
-  const title = `${intl.formatMessage({
+  const title = intl.formatMessage({
     id: 'general.statistics',
     defaultMessage: 'Statistics',
-  })} | mrtdown`;
+  });
 
   return {
     statistics,

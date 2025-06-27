@@ -2,14 +2,13 @@ import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/16/solid';
 import classNames from 'classnames';
 import { DateTime, Interval } from 'luxon';
 import { useMemo } from 'react';
+import { createIntl, FormattedDateTimeRange } from 'react-intl';
 import { Link } from 'react-router';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { IssuesHistoryPageViewer } from '../components/IssuesHistoryPageViewer';
+import { useHydrated } from '../hooks/useHydrated';
 import { useViewport } from '../hooks/useViewport';
 import type { IssuesHistory, IssuesHistoryPage } from '../types';
-
-import { createIntl, FormattedDateTimeRange } from 'react-intl';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
-import { useHydrated } from '../hooks/useHydrated';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).history.page.$pageNum';
 
@@ -37,7 +36,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     messages,
   });
 
-  const title = `${intl.formatMessage(
+  const title = intl.formatMessage(
     {
       id: 'site.title_history',
       defaultMessage: 'Incident History - Page {num}',
@@ -45,7 +44,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     {
       num: params.pageNum,
     },
-  )} | mrtdown`;
+  );
 
   return { history, page, title, rootUrl };
 }

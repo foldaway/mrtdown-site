@@ -18,10 +18,10 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     messages,
   });
 
-  const title = `${intl.formatMessage({
+  const title = intl.formatMessage({
     id: 'general.about',
     defaultMessage: 'About',
-  })} | mrtdown`;
+  });
 
   return {
     title,

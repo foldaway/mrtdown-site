@@ -10,13 +10,13 @@ import {
 import { Link } from 'react-router';
 import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
 import { StationBar } from '~/components/StationBar';
+import { ComponentTypeLabels, StationStructureTypeLabels } from '~/constants';
+import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
 import type { Component, IssueRef, Station, StationManifest } from '~/types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).stations.$stationId';
-import { ComponentTypeLabels, StationStructureTypeLabels } from '~/constants';
-import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 
 function computeStationStrings(
   intl: IntlShape,
@@ -80,13 +80,13 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
   const stationName = station.name_translations[lang] ?? station.name;
 
-  const title = `${intl.formatMessage(
+  const title = intl.formatMessage(
     {
       id: 'general.station_title',
       defaultMessage: '{stationName} Station',
     },
     { stationName },
-  )} | mrtdown`;
+  );
 
   const {
     town,
