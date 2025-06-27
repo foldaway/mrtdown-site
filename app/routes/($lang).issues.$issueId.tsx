@@ -1,10 +1,9 @@
-import { IssueSkeleton } from '../components/IssueSkeleton';
-import { IssueViewer } from '../components/IssueViewer';
-import type { Issue } from '../types';
-
 import { createIntl } from 'react-intl';
 import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
 import { countIssueStations } from '~/helpers/countIssueStations';
+import { IssueSkeleton } from '../components/IssueSkeleton';
+import { IssueViewer } from '../components/IssueViewer';
+import type { Issue } from '../types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).issues.$issueId';
 

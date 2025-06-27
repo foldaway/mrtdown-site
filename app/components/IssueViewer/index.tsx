@@ -1,36 +1,28 @@
-import * as Popover from '@radix-ui/react-popover';
 import {
-  ArrowPathIcon,
   BuildingOfficeIcon,
   CogIcon,
   ExclamationTriangleIcon,
-  InformationCircleIcon,
 } from '@heroicons/react/24/solid';
 import classNames from 'classnames';
 import { DateTime, Duration, Interval } from 'luxon';
 import { useMemo } from 'react';
-import {
-  FormattedDateTimeRange,
-  FormattedMessage,
-  FormattedNumber,
-} from 'react-intl';
+import { FormattedDateTimeRange, FormattedMessage } from 'react-intl';
 import { Link } from 'react-router';
 import { IssueSubtypeLabels } from '~/constants';
 import { calculateDurationWithinServiceHours } from '~/helpers/calculateDurationWithinServiceHours';
+import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
+import { countIssueStations } from '~/helpers/countIssueStations';
 import { useHydrated } from '~/hooks/useHydrated';
+import { assert } from '~/util/assert';
 import type { Issue } from '../../types';
 import { ComponentBar } from '../ComponentBar';
 import { FormattedDuration } from '../FormattedDuration';
 import { StationMap } from '../StationMap';
 import { BetaPill } from './components/BetaPill';
+import { RecurringIntervalsPill } from './components/RecurringIntervalsPill';
 import { UpdateDisruption } from './components/UpdateDisruption';
 import { UpdateInfra } from './components/UpdateInfra';
 import { UpdateMaintenance } from './components/UpdateMaintenance';
-import { countIssueStations } from '~/helpers/countIssueStations';
-import { rrulestr } from 'rrule';
-import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
-import { RecurringIntervalsPill } from './components/RecurringIntervalsPill';
-import { assert } from '~/util/assert';
 
 interface Props {
   issue: Issue;
@@ -43,13 +35,6 @@ export const IssueViewer: React.FC<Props> = (props) => {
     () => DateTime.fromISO(issue.startAt),
     [issue.startAt],
   );
-  const endAt = useMemo(() => {
-    if (issue.endAt == null) {
-      return null;
-    }
-
-    return DateTime.fromISO(issue.endAt);
-  }, [issue.endAt]);
 
   const intervals = useMemo(() => computeIssueIntervals(issue), [issue]);
 
@@ -115,9 +100,9 @@ export const IssueViewer: React.FC<Props> = (props) => {
         {issue.type === 'maintenance' && (
           <CogIcon className="mt-[1px] size-5 text-gray-50 md:mt-0 dark:text-gray-200" />
         )}
-        <h2 className="font-bold text-base text-gray-50 group-hover:underline dark:text-gray-200">
+        <h1 className="font-bold text-base text-gray-50 group-hover:underline dark:text-gray-200">
           {issue.title}
-        </h2>
+        </h1>
 
         <div className="col-start-2 col-end-2 flex items-center gap-x-1 md:col-start-3 md:col-end-3 md:justify-end">
           {issue.subtypes.map((subtype) => (
