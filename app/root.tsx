@@ -1,4 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import classNames from 'classnames';
+import { DateTime } from 'luxon';
 import { FormattedDate, FormattedMessage, IntlProvider } from 'react-intl';
 import {
   isRouteErrorResponse,
@@ -12,10 +14,8 @@ import {
   ScrollRestoration,
   useNavigation,
 } from 'react-router';
-
-import classNames from 'classnames';
-import { DateTime, Settings } from 'luxon';
 import type { Route } from './+types/root';
+import { HrefLangs } from './components/HrefLangs';
 import { LocaleSwitcher } from './components/LocaleSwitcher';
 import Spinner from './components/Spinner';
 import { buildLocaleAwareLink } from './helpers/buildLocaleAwareLink';
@@ -59,6 +59,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        <HrefLangs />
       </head>
       <body>
         {children}
