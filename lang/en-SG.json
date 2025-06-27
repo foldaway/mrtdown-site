@@ -33,6 +33,7 @@
   "general.disruptions_by_line": "Disruptions by line",
   "general.history": "History",
   "general.home": "Home",
+  "general.home_page_title": "mrtdown – community-run transit monitoring",
   "general.infra_count": "{count, plural, one {{count} infrastructure issue} other {{count} infrastructure issues}}",
   "general.infrastructure": "Infrastructure",
   "general.issue_duration_this_period": "Issue duration {period}",

@@ -33,6 +33,7 @@
   "general.disruptions_by_line": "各线路服务中断情况",
   "general.history": "事故记录",
   "general.home": "首页",
+  "general.home_page_title": "mrtdown – 由社群驱动的地铁监察",
   "general.infra_count": "{count}项基础设施问题",
   "general.infrastructure": "基础设施问题",
   "general.issue_duration_this_period": "{period}事件持续时间",

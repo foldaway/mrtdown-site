@@ -33,6 +33,7 @@
   "general.disruptions_by_line": "Gangguan ikut laluan",
   "general.history": "Sejarah",
   "general.home": "Laman Utama",
+  "general.home_page_title": "mrtdown – pemantauan transit yang dikendalikan komuniti",
   "general.infra_count": "{count} isu infrastruktur",
   "general.infrastructure": "Infrastruktur",
   "general.issue_duration_this_period": "Tempoh isu dalam {period}",

@@ -33,6 +33,7 @@
   "general.disruptions_by_line": "வரிசை வாரியான தடைகள்",
   "general.history": "பதிவுகள்",
   "general.home": "முகப்பு",
+  "general.home_page_title": "mrtdown – சமூகத்தால் இயக்கப்படும் போக்குவரத்து கண்காணிப்பு",
   "general.infra_count": "{count} கட்டமைப்பு சிக்கல்",
   "general.infrastructure": "அடித்தளம்",
   "general.issue_duration_this_period": "சிக்கல்களின் காலநிலை ({period})",

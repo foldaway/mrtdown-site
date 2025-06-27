@@ -20,6 +20,11 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     messages,
   });
 
+  const title = intl.formatMessage({
+    id: 'general.home_page_title',
+    defaultMessage: 'mrtdown – community-run transit monitoring',
+  });
+
   const rootUrl = context.cloudflare.env.ROOT_URL;
 
   const res = await fetch(
@@ -37,6 +42,7 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   return {
     overview,
     rootUrl,
+    title,
     description,
   };
 }
@@ -48,14 +54,14 @@ export function headers() {
 }
 
 export const meta: Route.MetaFunction = ({ data, location }) => {
-  const { rootUrl, description } = data;
+  const { rootUrl, title, description } = data;
 
   const ogUrl = new URL(location.pathname, rootUrl).toString();
   const ogImage = new URL('/og_image.png', rootUrl).toString();
 
   return [
     {
-      title: 'mrtdown',
+      title,
     },
     {
       name: 'description',
@@ -63,7 +69,7 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
     },
     {
       property: 'og:title',
-      content: 'mrtdown',
+      content: title,
     },
     {
       property: 'og:type',
