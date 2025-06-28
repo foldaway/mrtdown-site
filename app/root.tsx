@@ -13,6 +13,7 @@ import {
   Scripts,
   ScrollRestoration,
   useNavigation,
+  useParams,
 } from 'react-router';
 import type { Route } from './+types/root';
 import { HrefLangs } from './components/HrefLangs';
@@ -52,8 +53,10 @@ export const links: Route.LinksFunction = () => [
 const queryClient = new QueryClient();
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const { lang = 'en-SG' } = useParams();
+
   return (
-    <html lang="en">
+    <html lang={lang}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
