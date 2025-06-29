@@ -76,6 +76,7 @@ export async function loader({ context }: Route.LoaderArgs) {
     const componentIndex: ComponentIndex = await res.json();
     for (const componentId of componentIndex) {
       paths.push(`/lines/${componentId}`);
+      paths.push(`/status/${componentId}`);
     }
   }
 
