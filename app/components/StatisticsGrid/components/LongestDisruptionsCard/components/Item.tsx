@@ -1,14 +1,14 @@
-import { useMemo } from 'react';
-import type { IssueRef } from '../../../../../types';
 import { DateTime, Interval } from 'luxon';
-import { assert } from '../../../../../util/assert';
-import { ComponentBar } from '../../../../ComponentBar';
-import { Link } from 'react-router';
-import { calculateDurationWithinServiceHours } from '../../../../../helpers/calculateDurationWithinServiceHours';
-import { useHydrated } from '../../../../../hooks/useHydrated';
+import { useMemo } from 'react';
 import { FormattedDateTimeRange, FormattedMessage, useIntl } from 'react-intl';
+import { Link } from 'react-router';
 import { FormattedDuration } from '~/components/FormattedDuration';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { calculateDurationWithinServiceHours } from '../../../../../helpers/calculateDurationWithinServiceHours';
+import { useHydrated } from '../../../../../hooks/useHydrated';
+import type { IssueRef } from '../../../../../types';
+import { assert } from '../../../../../util/assert';
+import { ComponentBar } from '../../../../ComponentBar';
 
 interface Props {
   issueRef: IssueRef;
@@ -51,7 +51,7 @@ export const Item: React.FC<Props> = (props) => {
         to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
       >
         <span className="line-clamp-1 text-gray-700 text-sm dark:text-gray-200">
-          {issueRef.title}
+          {issueRef.title_translations[intl.locale] ?? issueRef.title}
         </span>
       </Link>
       <time className="mt-0.5 mb-1.5 text-gray-400 text-xs dark:text-gray-500">

@@ -18,7 +18,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   assert(res.ok, res.statusText);
   const issue: Issue = await res.json();
 
-  const title = issue.title;
+  const title = issue.title_translations[lang] ?? issue.title;
 
   const { default: messages } = await import(`../../lang/${lang}.json`);
 

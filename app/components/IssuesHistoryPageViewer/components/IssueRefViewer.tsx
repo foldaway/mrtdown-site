@@ -1,27 +1,27 @@
-import { Link } from 'react-router';
-import type { IssueRef } from '../../../types';
-import { useMemo } from 'react';
-import { DateTime, Duration, Interval } from 'luxon';
-import { ComponentBar } from '../../ComponentBar';
-import classNames from 'classnames';
 import {
   BuildingOfficeIcon,
   CogIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/20/solid';
-import { calculateDurationWithinServiceHours } from '../../../helpers/calculateDurationWithinServiceHours';
-import { useHydrated } from '../../../hooks/useHydrated';
+import classNames from 'classnames';
+import { DateTime, Duration, Interval } from 'luxon';
+import { useMemo } from 'react';
 import {
   FormattedDateTimeRange,
   FormattedMessage,
   FormattedNumber,
   useIntl,
 } from 'react-intl';
+import { Link } from 'react-router';
 import { FormattedDuration } from '~/components/FormattedDuration';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
-import { assert } from '~/util/assert';
 import { IssueSubtypeLabels } from '~/constants';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
+import { assert } from '~/util/assert';
+import { calculateDurationWithinServiceHours } from '../../../helpers/calculateDurationWithinServiceHours';
+import { useHydrated } from '../../../hooks/useHydrated';
+import type { IssueRef } from '../../../types';
+import { ComponentBar } from '../../ComponentBar';
 
 interface Props {
   issueRef: IssueRef;
@@ -34,13 +34,6 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
     () => DateTime.fromISO(issueRef.startAt).setZone('Asia/Singapore'),
     [issueRef.startAt],
   );
-  const endAt = useMemo(() => {
-    if (issueRef.endAt == null) {
-      return null;
-    }
-
-    return DateTime.fromISO(issueRef.endAt);
-  }, [issueRef.endAt]);
 
   const intervals = useMemo(() => computeIssueIntervals(issueRef), [issueRef]);
 
@@ -115,7 +108,7 @@ export const IssueRefViewer: React.FC<Props> = (props) => {
         )}
 
         <h2 className="font-bold text-base text-gray-50 leading-tight group-hover:underline dark:text-gray-200">
-          {issueRef.title}
+          {issueRef.title_translations[intl.locale] ?? issueRef.title}
         </h2>
 
         <div className="col-start-2 col-end-2 flex items-center gap-x-1 md:col-start-3 md:col-end-3 md:justify-end">

@@ -6,7 +6,7 @@ import {
 import classNames from 'classnames';
 import { DateTime, Duration, Interval } from 'luxon';
 import { useMemo } from 'react';
-import { FormattedDateTimeRange, FormattedMessage } from 'react-intl';
+import { FormattedDateTimeRange, FormattedMessage, useIntl } from 'react-intl';
 import { Link } from 'react-router';
 import { IssueSubtypeLabels } from '~/constants';
 import { calculateDurationWithinServiceHours } from '~/helpers/calculateDurationWithinServiceHours';
@@ -30,6 +30,8 @@ interface Props {
 
 export const IssueViewer: React.FC<Props> = (props) => {
   const { issue } = props;
+
+  const intl = useIntl();
 
   const startAt = useMemo(
     () => DateTime.fromISO(issue.startAt),
@@ -101,7 +103,7 @@ export const IssueViewer: React.FC<Props> = (props) => {
           <CogIcon className="mt-[1px] size-5 text-gray-50 md:mt-0 dark:text-gray-200" />
         )}
         <h1 className="font-bold text-base text-gray-50 group-hover:underline dark:text-gray-200">
-          {issue.title}
+          {issue.title_translations[intl.locale] ?? issue.title}
         </h1>
 
         <div className="col-start-2 col-end-2 flex items-center gap-x-1 md:col-start-3 md:col-end-3 md:justify-end">

@@ -7,6 +7,7 @@ export interface IssueStationEntry {
 interface IssueBase {
   id: string;
   title: string;
+  title_translations: Record<string, string>;
   startAt: string;
   endAt: string | null;
   componentIdsAffected: string[];
@@ -110,6 +111,7 @@ export interface IssueRef {
   id: string;
   type: IssueType;
   title: string;
+  title_translations: Record<string, string>;
   componentIdsAffected: string[];
   stationIdsAffected: IssueStationEntry[];
   startAt: string;
