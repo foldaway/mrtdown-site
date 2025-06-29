@@ -1,3 +1,5 @@
+import { LinkIcon } from '@heroicons/react/16/solid';
+import { ClockIcon } from '@heroicons/react/24/solid';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
@@ -21,6 +23,8 @@ import { LocaleSwitcher } from './components/LocaleSwitcher';
 import Spinner from './components/Spinner';
 import { buildLocaleAwareLink } from './helpers/buildLocaleAwareLink';
 import stylesheet from './index.css?url';
+import type { FooterManifest } from './types';
+import { assert } from './util/assert';
 
 export const links: Route.LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -88,15 +92,22 @@ export async function loader({ params }: Route.LoaderArgs) {
 
   const { default: messages } = await import(`../lang/${lang}.json`);
 
+  const res = await fetch(
+    'https://data.mrtdown.foldaway.space/product/footer_manifest.json',
+  );
+  assert(res.ok, res.statusText);
+  const footerManifest: FooterManifest = await res.json();
+
   return {
     messages,
+    footerManifest,
   };
 }
 
 export default function App(props: Route.ComponentProps) {
   const { params, loaderData } = props;
   const { lang } = params;
-  const { messages } = loaderData;
+  const { messages, footerManifest } = loaderData;
 
   const navigation = useNavigation();
   const isNavigating = Boolean(navigation.location);
@@ -166,23 +177,187 @@ export default function App(props: Route.ComponentProps) {
             </div>
           )}
         </main>
-        <footer className="flex flex-col items-center p-10">
-          <div className="mb-4 flex">
-            <LocaleSwitcher />
-          </div>
+        <footer className="mt-8 border-gray-800 border-t bg-gray-900 text-gray-300">
+          <div className="mx-auto max-w-7xl px-8 py-12">
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
+              {/* Brand Section */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <img
+                    src="/favicon-32x32.png"
+                    alt="Site favicon"
+                    className="size-8"
+                  />
+                  {/* <Train className="h-8 w-8 text-blue-400" /> */}
+                  <span className="font-bold text-2xl text-white">mrtdown</span>
+                </div>
+                <p className="max-w-xs text-gray-400 text-sm">
+                  <FormattedMessage
+                    id="site.tagline"
+                    defaultMessage="community-run transit monitoring"
+                  />
+                </p>
+                <div className="flex space-x-4">
+                  <a
+                    href="https://github.com/foldaway/mrtdown-site"
+                    className="text-gray-400 transition-colors hover:text-blue-400"
+                  >
+                    <LinkIcon className="h-5 w-5" />
+                    <span className="sr-only">GitHub</span>
+                  </a>
+                </div>
+              </div>
 
-          <span className="text-gray-500 text-sm">
-            &copy;{' '}
-            <FormattedDate value={DateTime.now().toJSDate()} year="numeric" />{' '}
-            mrtdown
-          </span>
-          <span className="text-center text-gray-500 text-sm italic">
-            <FormattedMessage
-              id="footer.disclaimer"
-              defaultMessage="This is an independent platform not affiliated with any public transport operator."
-            />
-          </span>
-        </footer>
+              {/* Line Status Links */}
+              <div>
+                <h3 className="mb-4 font-semibold text-sm text-white uppercase tracking-wider">
+                  <FormattedMessage
+                    id="footer.line_status"
+                    defaultMessage="Line status"
+                  />
+                </h3>
+                <ul className="space-y-3">
+                  {footerManifest.components.map((component) => (
+                    <li key={component.id}>
+                      <Link
+                        to={buildLocaleAwareLink(
+                          `/status/${component.id}`,
+                          lang,
+                        )}
+                        className="flex items-center gap-x-1.5 text-sm transition-colors hover:text-blue-400"
+                      >
+                        <span
+                          className="rounded-sm px-2 py-1 font-semibold text-white text-xs leading-none"
+                          style={{ backgroundColor: component.color }}
+                        >
+                          {component.id}
+                        </span>
+                        {component.title_translations[lang ?? 'en-SG'] ??
+                          component.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Quick Access */}
+              <div>
+                <h3 className="mb-4 font-semibold text-sm text-white uppercase tracking-wider">
+                  <FormattedMessage
+                    id="footer.quick_access"
+                    defaultMessage="Quick Access"
+                  />
+                </h3>
+                <ul className="space-y-3">
+                  {footerManifest.featuredStations.map((station) => (
+                    <li key={station.id}>
+                      <Link
+                        to={buildLocaleAwareLink(
+                          `/stations/${station.id}`,
+                          lang,
+                        )}
+                        className="text-sm transition-colors hover:text-blue-400"
+                      >
+                        {station.name_translations[lang ?? 'en-SG'] ??
+                          station.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Community */}
+              <div>
+                <h3 className="mb-4 font-semibold text-sm text-white uppercase tracking-wider">
+                  <FormattedMessage
+                    id="general.community"
+                    defaultMessage="Community"
+                  />
+                </h3>
+                <ul className="space-y-3">
+                  <li>
+                    <Link
+                      to={buildLocaleAwareLink('/about', lang)}
+                      className="text-sm transition-colors hover:text-blue-400"
+                    >
+                      <FormattedMessage
+                        id="general.about"
+                        defaultMessage="About"
+                      />
+                    </Link>
+                  </li>
+                  <li>
+                    <a
+                      href="https://github.com/foldaway/mrtdown-data"
+                      className="text-sm transition-colors hover:text-blue-400"
+                    >
+                      <FormattedMessage
+                        id="footer.contribute_data"
+                        defaultMessage="Contribute Data"
+                      />
+                    </a>
+                  </li>
+                </ul>
+
+                {/* Language Selector */}
+                <div className="mt-6 border-gray-800 border-t pt-4">
+                  <h4 className="mb-3 font-semibold text-white text-xs uppercase tracking-wider">
+                    <FormattedMessage
+                      id="general.language"
+                      defaultMessage="Language"
+                    />
+                  </h4>
+                  <LocaleSwitcher />
+                </div>
+
+                {/* Quick Stats */}
+                <div className="mt-6 border-gray-800 border-t pt-4">
+                  <div className="flex items-center space-x-2 text-gray-400 text-xs">
+                    <ClockIcon className="h-3 w-3" />
+                    <span>
+                      <FormattedMessage
+                        id="footer.last_updated"
+                        defaultMessage="Last updated {lastUpdatedAt}"
+                        values={{
+                          lastUpdatedAt: (
+                            <FormattedDate
+                              value={footerManifest.lastUpdatedAt}
+                              dateStyle="medium"
+                              timeStyle="short"
+                            />
+                          ),
+                        }}
+                      />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Section */}
+            <div className="mt-12 border-gray-800 border-t pt-8">
+              <div className="flex flex-col items-center justify-between space-y-4 md:flex-row md:space-y-0">
+                <div className="text-gray-400 text-sm">
+                  <FormattedMessage
+                    id="footer.copyright"
+                    defaultMessage="© {now, date, ::yyyy} mrtdown. All rights reserved."
+                    values={{
+                      now: DateTime.now().toMillis(),
+                    }}
+                  />
+                </div>
+                <div className="flex items-center space-x-6 text-gray-400 text-sm">
+                  <span className="text-center text-sm italic">
+                    <FormattedMessage
+                      id="footer.disclaimer"
+                      defaultMessage="This is an independent platform not affiliated with any public transport operator."
+                    />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </footer>{' '}
       </IntlProvider>
     </QueryClientProvider>
   );

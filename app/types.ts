@@ -233,3 +233,9 @@ export type ComponentIndex = string[];
 export type IssueIndex = string[];
 
 export type StationTranslatedNames = Record<string, string>;
+
+export interface FooterManifest {
+  components: Component[];
+  featuredStations: Station[];
+  lastUpdatedAt: string;
+}
