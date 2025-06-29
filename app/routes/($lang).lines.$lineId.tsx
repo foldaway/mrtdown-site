@@ -9,7 +9,7 @@ import {
 } from 'react-intl';
 import { Link } from 'react-router';
 import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
-import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
+import { buildIssueTypeCountStringWithArray } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
 import type { ComponentManifest, IssueRef } from '~/types';
@@ -56,7 +56,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const componentName = component.title_translations[lang] ?? component.title;
   const title = componentName;
 
-  const issueTypeCountString = buildIssueTypeCountString(
+  const issueTypeCountString = buildIssueTypeCountStringWithArray(
     componentManifest.issueRefs,
     intl,
   );
@@ -207,7 +207,7 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
   }, [stationsByCode, componentId]);
 
   const issueTypeCountString = useMemo(() => {
-    return buildIssueTypeCountString(issueRefs, intl);
+    return buildIssueTypeCountStringWithArray(issueRefs, intl);
   }, [issueRefs, intl]);
 
   const issuesGrouped = useMemo(() => {

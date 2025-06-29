@@ -11,7 +11,7 @@ import { Link } from 'react-router';
 import { IssueRefViewer } from '~/components/IssuesHistoryPageViewer/components/IssueRefViewer';
 import { StationBar } from '~/components/StationBar';
 import { ComponentTypeLabels, StationStructureTypeLabels } from '~/constants';
-import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
+import { buildIssueTypeCountStringWithArray } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
 import type { Component, IssueRef, Station, StationManifest } from '~/types';
@@ -97,7 +97,10 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     isInterchange,
   } = computeStationStrings(intl, station, componentsById);
 
-  const issueTypeCountString = buildIssueTypeCountString(issueRefs, intl);
+  const issueTypeCountString = buildIssueTypeCountStringWithArray(
+    issueRefs,
+    intl,
+  );
 
   const description = isInterchange
     ? intl.formatMessage(
@@ -221,7 +224,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
   }, [station, intl, componentsById]);
 
   const issueTypeCountString = useMemo(() => {
-    return buildIssueTypeCountString(stationManifest.issueRefs, intl);
+    return buildIssueTypeCountStringWithArray(stationManifest.issueRefs, intl);
   }, [stationManifest.issueRefs, intl]);
 
   const issuesGrouped = useMemo(() => {

@@ -1,7 +1,7 @@
 import type { IntlShape } from 'react-intl';
 import type { IssueRef, IssueType } from '~/types';
 
-export function buildIssueTypeCountString(
+export function buildIssueTypeCountStringWithArray(
   issueRefs: IssueRef[],
   intl: IntlShape,
 ) {
@@ -16,8 +16,27 @@ export function buildIssueTypeCountString(
     issueCountByType[issueRef.type] = count;
   }
 
+  return buildIssueTypeCountString(issueCountByType, intl);
+}
+
+export function buildIssueTypeCountString(
+  issueCountByType: Record<IssueType, number>,
+  intl: IntlShape,
+) {
+  let totalCount = 0;
+  for (const count of Object.values(issueCountByType)) {
+    totalCount += count;
+  }
+
+  if (totalCount === 0) {
+    return intl.formatMessage({
+      id: 'general.issue_count_empty',
+      defaultMessage: 'no issues',
+    });
+  }
+
   const result: string[] = [];
-  if (issueRefs.length === 0 || issueCountByType.disruption > 0) {
+  if (issueCountByType.disruption > 0) {
     result.push(
       intl.formatMessage(
         {
@@ -31,7 +50,7 @@ export function buildIssueTypeCountString(
       ),
     );
   }
-  if (issueRefs.length === 0 || issueCountByType.maintenance > 0) {
+  if (issueCountByType.maintenance > 0) {
     result.push(
       intl.formatMessage(
         {
@@ -45,7 +64,7 @@ export function buildIssueTypeCountString(
       ),
     );
   }
-  if (issueRefs.length === 0 || issueCountByType.infra > 0) {
+  if (issueCountByType.infra > 0) {
     result.push(
       intl.formatMessage(
         {

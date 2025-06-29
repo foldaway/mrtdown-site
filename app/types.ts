@@ -198,6 +198,18 @@ export interface ComponentManifest {
   issueRefs: IssueRef[];
 }
 
+export interface ComponentStatusManifest {
+  componentId: string;
+  componentsById: Record<string, Component>;
+  stationsByCode: Record<string, Station>;
+  issuesOngoingSnapshot: Issue[];
+  dates: Record<string, DateSummary>;
+  lastUpdatedAt: string;
+  issuesRecent: IssueRef[];
+  issueCountByType: Record<IssueType, number>;
+  lastMajorDisruption: IssueRef | null;
+}
+
 export interface IssuesHistory {
   pageCount: number;
   fileNames: string[];

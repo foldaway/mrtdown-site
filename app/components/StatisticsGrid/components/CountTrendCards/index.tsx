@@ -16,7 +16,7 @@ import {
   Tooltip,
   XAxis,
 } from 'recharts';
-import type { IssueType, Statistics } from '../../../../types';
+import type { DateSummary, IssueType, Statistics } from '../../../../types';
 import { assert } from '../../../../util/assert';
 import { CustomTooltip } from './components/CustomTooltip';
 import type { Data, DataPartial } from './types';
@@ -33,7 +33,7 @@ type Bucket = {
 };
 
 interface Props {
-  statistics: Statistics;
+  dates: Record<string, DateSummary>;
 }
 
 const BUCKETS: Bucket[] = [
@@ -74,7 +74,7 @@ const BUCKETS: Bucket[] = [
 ];
 
 export const CountTrendCards: React.FC<Props> = (props) => {
-  const { statistics } = props;
+  const { dates } = props;
 
   const intl = useIntl();
 
@@ -123,7 +123,7 @@ export const CountTrendCards: React.FC<Props> = (props) => {
       };
     }
 
-    for (const [dateIso, dateSummary] of Object.entries(statistics.dates)) {
+    for (const [dateIso, dateSummary] of Object.entries(dates)) {
       const dateTime = DateTime.fromISO(dateIso);
       assert(dateTime.isValid);
 
@@ -178,7 +178,7 @@ export const CountTrendCards: React.FC<Props> = (props) => {
     }
 
     return data;
-  }, [statistics, bucket, intl.locale]);
+  }, [dates, bucket, intl.locale]);
 
   return (
     <div className="flex flex-col rounded-lg border border-gray-300 p-6 shadow-lg sm:col-span-3 dark:border-gray-700">
