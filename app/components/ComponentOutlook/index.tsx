@@ -1,15 +1,6 @@
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
-import type { DateSummary } from '../../types';
-import { assert } from '../../util/assert';
-import { DateCard } from './components/DateCard';
-import { UptimeCard } from './components/UptimeCard';
-import type { ComponentBreakdown } from './helpers/computeComponentBreakdowns';
-import { computeStatus } from './helpers/computeStatus';
-import { useHydrated } from '../../hooks/useHydrated';
-import { NonOperationalDateCard } from './components/NonOperationalDateCard';
-import { ServiceEndedDateCard } from './components/ServiceEndedDateCard';
 import {
   FormattedDate,
   FormattedMessage,
@@ -18,7 +9,16 @@ import {
 } from 'react-intl';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { useHydrated } from '../../hooks/useHydrated';
+import type { DateSummary } from '../../types';
+import { assert } from '../../util/assert';
+import { DateCard } from './components/DateCard';
+import { NonOperationalDateCard } from './components/NonOperationalDateCard';
+import { ServiceEndedDateCard } from './components/ServiceEndedDateCard';
+import { UptimeCard } from './components/UptimeCard';
+import type { ComponentBreakdown } from './helpers/computeComponentBreakdowns';
 import { computeDayIssueTypeDuration } from './helpers/computeDayIssueTypeDuration';
+import { computeStatus } from './helpers/computeStatus';
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
   issueTypesDurationMs: {},

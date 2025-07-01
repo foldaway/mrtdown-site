@@ -1,8 +1,8 @@
 import { DateTime, Interval } from 'luxon';
 import type { DateSummary, Issue } from '../types';
 import { assert } from '../util/assert';
-import { splitIntervalByServiceHours } from './splitIntervalByServiceHours';
 import { computeIssueIntervals } from './computeIssueIntervals';
+import { splitIntervalByServiceHours } from './splitIntervalByServiceHours';
 
 export function patchDatesForOngoingIssues(
   dates: Record<string, DateSummary>,
@@ -78,6 +78,7 @@ export function patchDatesForOngoingIssues(
           id: issue.id,
           type: issue.type,
           title: issue.title,
+          title_translations: issue.title_translations,
           componentIdsAffected: issue.componentIdsAffected,
           stationIdsAffected: issue.stationIdsAffected,
           startAt: issue.startAt,
