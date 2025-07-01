@@ -172,7 +172,7 @@ export const DateCard: React.FC<Props> = (props) => {
               to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
               className="text-gray-600 text-sm hover:underline dark:text-gray-300"
             >
-              {issueRef.title}
+              {issueRef.title_translations[intl.locale] ?? issueRef.title}
             </Link>
           ))}
           <Popover.Arrow className="fill-gray-300 dark:fill-gray-600" />
