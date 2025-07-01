@@ -23,7 +23,7 @@ export const ReliabilityTrend: React.FC<Props> = (props) => {
     let durationPrevPeriod = Duration.fromObject({ milliseconds: 0 });
     let durationCurrentPeriod = Duration.fromObject({ milliseconds: 0 });
 
-    for (let i = -60; i < 0; i++) {
+    for (let i = -60; i <= 0; i++) {
       const dateTime = now.minus({ days: -i });
       const dateOverview = dates[dateTime.toISODate()] ?? {
         issueTypesDurationMs: 0,
@@ -49,9 +49,9 @@ export const ReliabilityTrend: React.FC<Props> = (props) => {
     }
 
     const _uptimePrevPeriod =
-      durationPrevPeriod.toMillis() / periodServiceHours.toMillis();
+      1 - durationPrevPeriod.toMillis() / periodServiceHours.toMillis();
     const _uptimeCurrentPeriod =
-      durationCurrentPeriod.toMillis() / periodServiceHours.toMillis();
+      1 - durationCurrentPeriod.toMillis() / periodServiceHours.toMillis();
 
     return {
       uptimePrevPeriod: _uptimePrevPeriod,
