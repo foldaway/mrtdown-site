@@ -81,26 +81,60 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     intl,
   );
 
-  const description =
-    DateTime.fromISO(component.startedAt).diffNow().as('days') < 0
-      ? intl.formatMessage(
-          {
-            id: 'general.component_description',
-            defaultMessage:
-              'The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}, with {issueTypeCountString} reported to date.',
-          },
-          {
-            stationCount: stationIds.size,
-            componentName,
-            startDate: intl.formatDate(component.startedAt, {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            }),
-            issueTypeCountString,
-          },
-        )
-      : '';
+  const stationCount = stationIds.size;
+  let interchangeNames: string[] = [];
+  {
+    const result: string[] = [];
+
+    for (const station of Object.values(
+      componentStatusManifest.stationsByCode,
+    )) {
+      let stationCodeCount = 0;
+      for (const members of Object.values(station.componentMembers)) {
+        stationCodeCount += members.length;
+      }
+
+      if (stationCodeCount <= 1) {
+        continue;
+      }
+
+      const stationName =
+        station.name_translations[intl.locale] ?? station.name;
+      result.push(stationName);
+    }
+
+    if (result.length <= 3) {
+      interchangeNames = result;
+    } else {
+      const stepCount = Math.ceil(result.length / 3);
+
+      for (let i = 0; i < result.length; i += stepCount) {
+        interchangeNames.push(result[i]);
+      }
+    }
+  }
+
+  const description = intl.formatMessage(
+    {
+      id: 'general.component_status.description',
+      defaultMessage:
+        'The {componentName} connects key interchanges like {interchangeNames}. Official updates indicate {issueTypeCountString}.',
+    },
+    {
+      stationCount,
+      componentName,
+      startDate: (
+        <FormattedDate
+          value={component.startedAt}
+          day="numeric"
+          month="long"
+          year="numeric"
+        />
+      ),
+      interchangeNames: intl.formatList(interchangeNames),
+      issueTypeCountString,
+    },
+  );
 
   return {
     title,
