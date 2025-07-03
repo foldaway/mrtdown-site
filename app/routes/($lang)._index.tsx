@@ -141,7 +141,16 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
       now.startOf('day').plus({ days: 1 }),
     );
 
-    const intervals = computeIssueIntervals(issueRef);
+    let intervals: Interval[];
+    const startAt = DateTime.fromISO(issueRef.startAt).setZone(
+      'Asia/Singapore',
+    );
+    assert(startAt.isValid);
+    if (issueRef.endAt == null) {
+      intervals = [Interval.fromDateTimes(startAt, now)];
+    } else {
+      intervals = computeIssueIntervals(issueRef);
+    }
     return intervals.some((interval) => interval.overlaps(intervalToday));
   }, []);
 
