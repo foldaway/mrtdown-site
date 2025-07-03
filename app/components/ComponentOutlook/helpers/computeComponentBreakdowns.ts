@@ -1,9 +1,14 @@
-import type { Component, DateSummary, Overview } from '../../../types';
+import type {
+  Component,
+  DateSummary,
+  IssueRef,
+  Overview,
+} from '../../../types';
 
 export interface ComponentBreakdown {
   component: Component;
   dates: Record<string, DateSummary>;
-  issuesOngoingCount: number;
+  issuesOngoing: IssueRef[];
 }
 
 export function computeComponentBreakdown(
@@ -40,12 +45,12 @@ export function computeComponentBreakdown(
     }
   }
 
-  const issuesOngoingCountByComponentId: Record<string, number> = {};
+  const issuesOngoingByComponentId: Record<string, IssueRef[]> = {};
   for (const issue of overview.issuesOngoingSnapshot) {
     for (const componentId of issue.componentIdsAffected) {
-      let count = issuesOngoingCountByComponentId[componentId] ?? 0;
-      count++;
-      issuesOngoingCountByComponentId[componentId] = count;
+      const _issues = issuesOngoingByComponentId[componentId] ?? [];
+      _issues.push(issue);
+      issuesOngoingByComponentId[componentId] = _issues;
     }
   }
 
@@ -53,7 +58,7 @@ export function computeComponentBreakdown(
     return {
       component,
       dates: dateSummariesByComponentId[component.id] ?? {},
-      issuesOngoingCount: issuesOngoingCountByComponentId[component.id] ?? 0,
+      issuesOngoing: issuesOngoingByComponentId[component.id] ?? [],
     };
   });
 }

@@ -17,7 +17,6 @@ import { NonOperationalDateCard } from './components/NonOperationalDateCard';
 import { ServiceEndedDateCard } from './components/ServiceEndedDateCard';
 import { UptimeCard } from './components/UptimeCard';
 import type { ComponentBreakdown } from './helpers/computeComponentBreakdowns';
-import { computeDayIssueTypeDuration } from './helpers/computeDayIssueTypeDuration';
 import { computeStatus } from './helpers/computeStatus';
 
 const DATE_OVERVIEW_DEFAULT: DateSummary = {
@@ -53,7 +52,7 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
     return componentStartedAtDateTime < now;
   }, [now, componentStartedAtDateTime]);
 
-  const statusToday = useMemo(() => {
+  const statusNow = useMemo(() => {
     const nowIsoDate = now.toISODate();
     assert(nowIsoDate != null);
 
@@ -61,17 +60,12 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
       return 'service ended';
     }
 
-    if (breakdown.issuesOngoingCount === 0) {
+    if (breakdown.issuesOngoing.length === 0) {
       return 'operational';
     }
 
-    const issueTypesDurationMs = computeDayIssueTypeDuration(
-      now,
-      dates[nowIsoDate]?.issueTypesIntervalsNoOverlapMs ?? {},
-    );
-
-    return computeStatus(issueTypesDurationMs) ?? 'operational';
-  }, [dates, now, serviceStartToday, breakdown.issuesOngoingCount]);
+    return computeStatus(breakdown.issuesOngoing) ?? 'operational';
+  }, [now, serviceStartToday, breakdown.issuesOngoing]);
 
   const isHydrated = useHydrated();
 
@@ -98,42 +92,42 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
               <span
                 className={classNames('ms-auto text-sm capitalize', {
                   'text-disruption-light dark:text-disruption-dark':
-                    statusToday === 'disruption',
+                    statusNow === 'disruption',
                   'text-maintenance-light dark:text-maintenance-dark':
-                    statusToday === 'maintenance',
+                    statusNow === 'maintenance',
                   'text-infra-light dark:text-infra-dark':
-                    statusToday === 'infra',
+                    statusNow === 'infra',
                   'text-operational-light dark:text-operational-dark':
-                    statusToday === 'operational',
+                    statusNow === 'operational',
                   'text-gray-400 dark:text-gray-500':
-                    statusToday === 'service ended',
+                    statusNow === 'service ended',
                 })}
               >
-                {statusToday === 'disruption' && (
+                {statusNow === 'disruption' && (
                   <FormattedMessage
                     id="general.disruption"
                     defaultMessage="Disruption"
                   />
                 )}{' '}
-                {statusToday === 'maintenance' && (
+                {statusNow === 'maintenance' && (
                   <FormattedMessage
                     id="general.maintenance"
                     defaultMessage="Maintenance"
                   />
                 )}
-                {statusToday === 'infra' && (
+                {statusNow === 'infra' && (
                   <FormattedMessage
                     id="general.infrastructure"
                     defaultMessage="Infrastructure"
                   />
                 )}
-                {statusToday === 'operational' && (
+                {statusNow === 'operational' && (
                   <FormattedMessage
                     id="status.operational"
                     defaultMessage="Operational"
                   />
                 )}
-                {statusToday === 'service ended' && (
+                {statusNow === 'service ended' && (
                   <FormattedMessage
                     id="status.service_ended"
                     defaultMessage="Service Ended"

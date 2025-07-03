@@ -267,7 +267,7 @@ const ComponentStatusPage: React.FC<Route.ComponentProps> = (props) => {
     return {
       component,
       dates,
-      issuesOngoingCount: issuesOngoingSnapshot.length,
+      issuesOngoing: issuesOngoingSnapshot,
     };
   }, [dates, component, issuesOngoingSnapshot]);
 
@@ -340,7 +340,7 @@ const ComponentStatusPage: React.FC<Route.ComponentProps> = (props) => {
         <Summary
           component={component}
           dates={dates}
-          issuesOngoingCount={issuesOngoingSnapshot.length}
+          issuesOngoing={issuesOngoingSnapshot}
         />
         <LastMajorDisruption issueRef={lastMajorDisruption} />
         <ReliabilityTrend dates={dates} />

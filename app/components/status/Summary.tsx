@@ -13,17 +13,16 @@ import { useMemo } from 'react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import type { Component, DateSummary, IssueRef } from '~/types';
 import { assert } from '~/util/assert';
-import { computeDayIssueTypeDuration } from '../ComponentOutlook/helpers/computeDayIssueTypeDuration';
 import { computeStatus } from '../ComponentOutlook/helpers/computeStatus';
 
 interface Props {
   component: Component;
   dates: Record<string, DateSummary>;
-  issuesOngoingCount: number;
+  issuesOngoing: IssueRef[];
 }
 
 export const Summary: React.FC<Props> = (props) => {
-  const { component, dates, issuesOngoingCount } = props;
+  const { component, dates, issuesOngoing } = props;
 
   const now = useMemo(() => DateTime.now(), []);
   const serviceStartToday = useMemo(
@@ -48,17 +47,12 @@ export const Summary: React.FC<Props> = (props) => {
       return 'service ended';
     }
 
-    if (issuesOngoingCount === 0) {
+    if (issuesOngoing.length === 0) {
       return 'operational';
     }
 
-    const issueTypesDurationMs = computeDayIssueTypeDuration(
-      now,
-      dates[nowIsoDate]?.issueTypesIntervalsNoOverlapMs ?? {},
-    );
-
-    return computeStatus(issueTypesDurationMs) ?? 'operational';
-  }, [dates, now, serviceStartToday, issuesOngoingCount, isComponentInService]);
+    return computeStatus(issuesOngoing) ?? 'operational';
+  }, [now, serviceStartToday, issuesOngoing, isComponentInService]);
 
   const uptime = useMemo(() => {
     // Account for service hours, 5:30 AM - 12 midnight

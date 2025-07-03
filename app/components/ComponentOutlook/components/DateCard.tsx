@@ -26,10 +26,7 @@ export const DateCard: React.FC<Props> = (props) => {
   const isHydrated = useHydrated();
   const intl = useIntl();
 
-  const status = useMemo(
-    () => computeStatus(issueTypesDurationMs),
-    [issueTypesDurationMs],
-  );
+  const status = useMemo(() => computeStatus(issues), [issues]);
 
   const percentages = useMemo(() => {
     const serviceHours = Interval.fromDateTimes(
