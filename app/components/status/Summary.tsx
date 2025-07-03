@@ -112,10 +112,10 @@ export const Summary: React.FC<Props> = (props) => {
         <CheckCircleIcon className="size-10 text-operational-light dark:text-operational-dark" />
       )}
       {statusToday === 'service ended' && (
-        <ClockIcon className="size-10 text-gray-400 dark:text-gray-600" />
+        <ClockIcon className="size-10 text-gray-400 dark:text-gray-500" />
       )}
       {statusToday === 'not in service' && (
-        <NoSymbolIcon className="size-10 text-gray-400 dark:text-gray-600" />
+        <NoSymbolIcon className="size-10 text-gray-400 dark:text-gray-500" />
       )}
 
       <span className="font-bold text-gray-700 text-xl dark:text-gray-100">
@@ -159,7 +159,7 @@ export const Summary: React.FC<Props> = (props) => {
 
       <span
         className={classNames(
-          'mt-1 rounded-lg bg-gray-100 px-2 py-0.5 text-xs',
+          'mt-1 rounded-lg px-2 py-0.5 text-gray-900 text-xs dark:text-gray-100',
           {
             'bg-disruption-light/20 dark:bg-disruption-dark/20':
               statusToday === 'disruption',
@@ -168,7 +168,7 @@ export const Summary: React.FC<Props> = (props) => {
             'bg-infra-light/20 dark:bg-infra-dark/20': statusToday === 'infra',
             'bg-operational-light/20 dark:bg-operational-dark/20':
               statusToday === 'operational',
-            ' bg-gray-400 dark:bg-gray-700': statusToday === 'service ended',
+            ' bg-gray-300 dark:bg-gray-600': statusToday === 'service ended',
             hidden: statusToday === 'not in service',
           },
         )}

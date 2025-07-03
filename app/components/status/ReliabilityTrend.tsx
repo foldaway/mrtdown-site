@@ -72,8 +72,8 @@ export const ReliabilityTrend: React.FC<Props> = (props) => {
   }, [uptimePrevPeriod, uptimeCurrentPeriod]);
 
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-gray-300 bg-white py-2 dark:border-gray-700 dark:bg-gray-800">
-      <ArrowTrendingUpIcon className="size-10" />
+    <div className="flex flex-col items-center justify-center rounded-lg border border-gray-300 bg-white py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+      <ArrowTrendingUpIcon className="size-10 text-gray-400 dark:text-gray-500" />
 
       <span className="font-bold text-gray-700 text-xl dark:text-gray-100">
         <FormattedMessage
@@ -92,7 +92,7 @@ export const ReliabilityTrend: React.FC<Props> = (props) => {
         />
       </span>
 
-      <span className="mt-1 rounded-lg bg-gray-200 px-2 py-0.5 text-xs dark:bg-gray-700">
+      <span className="mt-1 rounded-lg bg-gray-300 px-2 py-0.5 text-xs dark:bg-gray-600">
         <FormattedMessage
           id="general.component_status.reliability_trend_uptime_change"
           defaultMessage="{percentChange, number, ::sign-always percent .##} vs previous 30 days"

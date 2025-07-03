@@ -58,7 +58,7 @@ export const LastMajorDisruption: React.FC<Props> = (props) => {
   }, [issueRef]);
 
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-gray-300 bg-white py-2 py-4 dark:border-gray-700 dark:bg-gray-800">
+    <div className="flex flex-col items-center justify-center rounded-lg border border-gray-300 bg-white py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
       <ClockIcon className="size-10 text-disruption-light dark:text-disruption-dark" />
 
       <span className="font-bold text-gray-700 text-xl dark:text-gray-100">
@@ -94,7 +94,7 @@ export const LastMajorDisruption: React.FC<Props> = (props) => {
 
       {issueRef != null && (
         <Link to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}>
-          <span className="rounded-lg bg-gray-200 px-2 py-0.5 text-xs dark:bg-gray-700">
+          <span className="rounded-lg bg-gray-300 px-2 py-0.5 text-xs dark:bg-gray-600">
             <FormattedMessage
               id="general.uptime_duration_display"
               defaultMessage="{duration} within service hours"
