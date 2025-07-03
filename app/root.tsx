@@ -256,7 +256,7 @@ export default function App(props: Route.ComponentProps) {
                           `/stations/${station.id}`,
                           lang,
                         )}
-                        className="text-sm transition-colors hover:text-blue-400"
+                        className="flex text-sm transition-colors hover:text-blue-400"
                       >
                         {station.name_translations[lang ?? 'en-SG'] ??
                           station.name}
@@ -278,7 +278,7 @@ export default function App(props: Route.ComponentProps) {
                   <li>
                     <Link
                       to={buildLocaleAwareLink('/about', lang)}
-                      className="text-sm transition-colors hover:text-blue-400"
+                      className="flex text-sm transition-colors hover:text-blue-400"
                     >
                       <FormattedMessage
                         id="general.about"
