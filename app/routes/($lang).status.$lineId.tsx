@@ -17,9 +17,10 @@ import {
   buildIssueTypeCountString,
   buildIssueTypeCountStringWithArray,
 } from '~/helpers/buildIssueTypeCountString';
+import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
 import { patchDatesForOngoingIssues } from '~/helpers/patchDatesForOngoingIssues';
 import { useViewport } from '~/hooks/useViewport';
-import type { ComponentStatusManifest } from '~/types';
+import type { ComponentStatusManifest, IssueRef } from '~/types';
 import { assert } from '~/util/assert';
 import type { Route } from './+types/($lang).status.$lineId';
 
@@ -297,13 +298,30 @@ const ComponentStatusPage: React.FC<Route.ComponentProps> = (props) => {
     return results;
   }, [dateCount]);
 
+  const issuesOngoingFiltered = useMemo(() => {
+    const now = DateTime.now();
+
+    const result: IssueRef[] = [];
+    for (const issue of issuesOngoingSnapshot) {
+      const intervals = computeIssueIntervals(issue);
+
+      if (!intervals.some((interval) => interval.contains(now))) {
+        continue;
+      }
+
+      result.push(issue);
+    }
+
+    return result;
+  }, [issuesOngoingSnapshot]);
+
   const componentBreakdown = useMemo<ComponentBreakdown>(() => {
     return {
       component,
       dates,
-      issuesOngoing: issuesOngoingSnapshot,
+      issuesOngoing: issuesOngoingFiltered,
     };
-  }, [dates, component, issuesOngoingSnapshot]);
+  }, [dates, component, issuesOngoingFiltered]);
 
   const interchangeNames = useMemo(() => {
     const result: string[] = [];
@@ -374,7 +392,7 @@ const ComponentStatusPage: React.FC<Route.ComponentProps> = (props) => {
         <Summary
           component={component}
           dates={dates}
-          issuesOngoing={issuesOngoingSnapshot}
+          issuesOngoing={issuesOngoingFiltered}
         />
         <LastMajorDisruption issueRef={lastMajorDisruption} />
         <ReliabilityTrend dates={dates} />

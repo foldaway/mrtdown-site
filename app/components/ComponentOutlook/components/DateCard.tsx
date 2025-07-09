@@ -163,15 +163,30 @@ export const DateCard: React.FC<Props> = (props) => {
               <FormattedMessage id="general.related" defaultMessage="Related" />
             </span>
           )}
-          {issues.map((issueRef) => (
-            <Link
-              key={issueRef.id}
-              to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
-              className="text-gray-600 text-sm hover:underline dark:text-gray-300"
-            >
-              {issueRef.title_translations[intl.locale] ?? issueRef.title}
-            </Link>
-          ))}
+          <div className="flex flex-col gap-y-1">
+            {issues.map((issueRef) => (
+              <Link
+                key={issueRef.id}
+                to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
+                className="flex items-center text-gray-600 text-sm hover:underline dark:text-gray-300"
+              >
+                <div
+                  className={classNames(
+                    'me-1 size-3 shrink-0 rounded-full hover:opacity-55',
+                    {
+                      'bg-disruption-light dark:bg-disruption-dark':
+                        issueRef.type === 'disruption',
+                      'bg-maintenance-light dark:bg-maintenance-dark':
+                        issueRef.type === 'maintenance',
+                      'bg-infra-light dark:bg-infra-dark':
+                        issueRef.type === 'infra',
+                    },
+                  )}
+                />
+                {issueRef.title_translations[intl.locale] ?? issueRef.title}
+              </Link>
+            ))}
+          </div>
           <Popover.Arrow className="fill-gray-300 dark:fill-gray-600" />
         </Popover.Content>
       </Popover.Portal>

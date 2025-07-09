@@ -1,3 +1,5 @@
+import { DateTime } from 'luxon';
+import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
 import type {
   Component,
   DateSummary,
@@ -13,6 +15,7 @@ export interface ComponentBreakdown {
 
 export function computeComponentBreakdown(
   overview: Overview,
+  now = DateTime.now(),
 ): ComponentBreakdown[] {
   const dateSummariesByComponentId: Record<
     string,
@@ -47,6 +50,12 @@ export function computeComponentBreakdown(
 
   const issuesOngoingByComponentId: Record<string, IssueRef[]> = {};
   for (const issue of overview.issuesOngoingSnapshot) {
+    const intervals = computeIssueIntervals(issue);
+
+    if (!intervals.some((interval) => interval.contains(now))) {
+      continue;
+    }
+
     for (const componentId of issue.componentIdsAffected) {
       const _issues = issuesOngoingByComponentId[componentId] ?? [];
       _issues.push(issue);
