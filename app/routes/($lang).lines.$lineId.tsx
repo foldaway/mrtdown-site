@@ -16,10 +16,10 @@ import type { ComponentManifest, IssueRef } from '~/types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).lines.$lineId';
 
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ params }: Route.LoaderArgs) {
   const { lineId, lang = 'en-SG' } = params;
 
-  const rootUrl = context.cloudflare.env.ROOT_URL;
+  const rootUrl = process.env.ROOT_URL;
 
   const res = await fetch(
     `https://data.mrtdown.foldaway.space/product/component_${lineId}.json`,

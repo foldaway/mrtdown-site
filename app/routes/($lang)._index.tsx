@@ -25,7 +25,7 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     defaultMessage: 'mrtdown – community-run transit monitoring',
   });
 
-  const rootUrl = context.cloudflare.env.ROOT_URL;
+  const rootUrl = process.env.ROOT_URL;
 
   const res = await fetch(
     'https://data.mrtdown.foldaway.space/product/overview.json',

@@ -10,7 +10,7 @@ export function headers() {
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { lang = 'en-SG' } = params;
-  const rootUrl = context.cloudflare.env.ROOT_URL;
+  const rootUrl = process.env.ROOT_URL;
   const { default: messages } = await import(`../../lang/${lang}.json`);
 
   const intl = createIntl({

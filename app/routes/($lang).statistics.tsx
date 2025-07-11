@@ -4,8 +4,8 @@ import type { Statistics } from '../types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).statistics';
 
-export async function loader({ params, context }: Route.LoaderArgs) {
-  const rootUrl = context.cloudflare.env.ROOT_URL;
+export async function loader({ params }: Route.LoaderArgs) {
+  const rootUrl = process.env.ROOT_URL;
 
   const res = await fetch(
     'https://data.mrtdown.foldaway.space/product/statistics.json',
