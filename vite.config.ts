@@ -9,6 +9,9 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  ssr: {
+    noExternal: ['@heroicons/*', '@radix-ui/*', '@floating-ui/*'],
+  },
   plugins: [
     reactRouter(),
     tailwindcss(),
