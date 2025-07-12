@@ -5,8 +5,9 @@ import { Link } from 'react-router';
 import { StationMap } from '~/components/StationMap';
 import { StatusBanner } from '~/components/StatusBanner';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { computeIssueIntervals } from '~/helpers/computeIssueIntervals';
 import { patchDatesForOngoingIssues } from '../helpers/patchDatesForOngoingIssues';
-import type { IssueStationEntry, Overview } from '../types';
+import type { IssueRef, IssueStationEntry, Overview } from '../types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).system-map';
 
@@ -76,11 +77,28 @@ const SystemMapPage: React.FC<Route.ComponentProps> = (props) => {
 
   const intl = useIntl();
 
+  const issuesOngoingFiltered = useMemo(() => {
+    const now = DateTime.now();
+
+    const result: IssueRef[] = [];
+    for (const issue of loaderData.overview.issuesOngoingSnapshot) {
+      const intervals = computeIssueIntervals(issue);
+
+      if (!intervals.some((interval) => interval.contains(now))) {
+        continue;
+      }
+
+      result.push(issue);
+    }
+
+    return result;
+  }, [loaderData.overview.issuesOngoingSnapshot]);
+
   const { stationIdsAffected, componentIdsAffected } = useMemo(() => {
     const _stationIdsAffected: IssueStationEntry[] = [];
     const _componentIdsAffected = new Set<string>();
 
-    for (const issue of loaderData.overview.issuesOngoingSnapshot) {
+    for (const issue of issuesOngoingFiltered) {
       for (const componentId of issue.componentIdsAffected) {
         _componentIdsAffected.add(componentId);
       }
@@ -93,11 +111,11 @@ const SystemMapPage: React.FC<Route.ComponentProps> = (props) => {
       stationIdsAffected: _stationIdsAffected,
       componentIdsAffected: Array.from(_componentIdsAffected),
     };
-  }, [loaderData.overview.issuesOngoingSnapshot]);
+  }, [issuesOngoingFiltered]);
 
   return (
     <div className="flex flex-col gap-y-2">
-      <StatusBanner issues={loaderData.overview.issuesOngoingSnapshot} />
+      <StatusBanner issues={issuesOngoingFiltered} />
 
       <div className="flex flex-col bg-gray-100 p-4 dark:bg-gray-800">
         <StationMap
