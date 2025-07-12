@@ -1,6 +1,7 @@
 import { LinkIcon } from '@heroicons/react/16/solid';
 import { ClockIcon } from '@heroicons/react/24/solid';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Analytics } from '@vercel/analytics/react';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { FormattedDate, FormattedMessage, IntlProvider } from 'react-intl';
@@ -72,6 +73,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <ScrollRestoration />
         <Scripts />
+        <Analytics />
       </body>
     </html>
   );
