@@ -28,7 +28,9 @@ export const Item: React.FC<Props> = (props) => {
   }, [issueRef.startAt]);
 
   const endAt = useMemo(() => {
-    assert(issueRef.endAt != null);
+    if (issueRef.endAt == null) {
+      return DateTime.now().setZone('Asia/Singapore');
+    }
     const dateTime = DateTime.fromISO(issueRef.endAt).setZone('Asia/Singapore');
     assert(dateTime.isValid);
     return dateTime;

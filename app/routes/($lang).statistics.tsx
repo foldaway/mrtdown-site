@@ -1,4 +1,5 @@
 import { createIntl } from 'react-intl';
+import { patchStatisticsForOngoingIssues } from '~/helpers/patchStatisticsForOngoingIssues';
 import { StatisticsGrid } from '../components/StatisticsGrid';
 import type { Statistics } from '../types';
 import { assert } from '../util/assert';
@@ -12,6 +13,8 @@ export async function loader({ params }: Route.LoaderArgs) {
   );
   assert(res.ok, res.statusText);
   const statistics: Statistics = await res.json();
+
+  patchStatisticsForOngoingIssues(statistics);
 
   const { lang = 'en-SG' } = params;
   const { default: messages } = await import(`../../lang/${lang}.json`);

@@ -155,6 +155,7 @@ export interface Statistics {
     count: number;
   }[];
   componentsById: Record<string, Component>;
+  issuesOngoingSnapshot: Issue[];
 }
 
 export type StationComponentMemberStructureType =
