@@ -1,17 +1,18 @@
-import { defineConfig } from 'vite';
-import tsconfigPaths from 'vite-tsconfig-paths';
+import { execSync } from 'node:child_process';
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
-import { execSync } from 'node:child_process';
-import { cloudflare } from '@cloudflare/vite-plugin';
+import { defineConfig } from 'vite';
+import tsconfigPaths from 'vite-tsconfig-paths';
 
 // https://vite.dev/config/
 export default defineConfig({
   server: {
     port: 3000,
   },
+  ssr: {
+    noExternal: ['@heroicons/*', '@radix-ui/*', '@floating-ui/*'],
+  },
   plugins: [
-    cloudflare({ viteEnvironment: { name: 'ssr' } }),
     reactRouter(),
     tailwindcss(),
     tsconfigPaths(),

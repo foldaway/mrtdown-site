@@ -61,7 +61,7 @@ function computeStationStrings(
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { stationId, lang = 'en-SG' } = params;
 
-  const rootUrl = context.cloudflare.env.ROOT_URL;
+  const rootUrl = process.env.ROOT_URL;
 
   const res = await fetch(
     `https://data.mrtdown.foldaway.space/product/station_${stationId}.json`,

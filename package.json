@@ -4,20 +4,20 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build": "react-router build",
     "dev": "react-router dev",
     "preview": "vite preview",
-    "start": "wrangler dev",
     "deploy": "npm run build && wrangler deploy",
-    "typecheck": "wrangler types && react-router typegen && tsc -b",
-    "cf-typegen": "wrangler types",
-    "i18n:extract": "formatjs extract 'app/**/*.{ts,tsx}' --out-file lang/en-SG.json --format simple"
+    "i18n:extract": "formatjs extract 'app/**/*.{ts,tsx}' --out-file lang/en-SG.json --format simple",
+    "build": "react-router build",
+    "test": "vitest",
+    "start": "react-router-serve ./build/server/index.js",
+    "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@radix-ui/react-popover": "^1.1.6",
     "@radix-ui/react-tabs": "^1.1.11",
-    "@react-router/cloudflare": "^7.5.2",
+    "@react-router/node": "^7.5.2",
     "@react-router/serve": "^7.5.2",
     "@tanstack/react-query": "^5.66.11",
     "classnames": "^2.5.1",
@@ -51,7 +51,6 @@
     "typescript": "~5.7.2",
     "vite": "^6.3.5",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.0.9",
-    "wrangler": "^4.7.2"
+    "vitest": "^3.0.9"
   }
 }

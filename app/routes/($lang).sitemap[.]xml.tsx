@@ -1,4 +1,3 @@
-import type { Route } from '.react-router/types/app/routes/+types/($lang).sitemap[.]xml';
 import { DateTime } from 'luxon';
 import type { Root, Element } from 'xast';
 import { toXml } from 'xast-util-to-xml';
@@ -58,7 +57,7 @@ function buildEntries(path: string, rootUrl: string): Element {
   };
 }
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader() {
   const paths: string[] = [
     '/',
     '/history',
@@ -127,7 +126,7 @@ export async function loader({ context }: Route.LoaderArgs) {
       'xmlns:xhtml': 'http://www.w3.org/1999/xhtml',
     },
     children: paths.map((path) => {
-      return buildEntries(path, context.cloudflare.env.ROOT_URL);
+      return buildEntries(path, process.env.ROOT_URL ?? 'http://localhost:3000');
     }),
   };
 

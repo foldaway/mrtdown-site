@@ -27,7 +27,4 @@ dist-ssr
 /.react-router/
 /build/
 
-# Cloudflare
-.mf
-.wrangler
-.dev.vars*
+.env

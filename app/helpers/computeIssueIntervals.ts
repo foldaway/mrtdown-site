@@ -1,7 +1,9 @@
 import { DateTime, Interval } from 'luxon';
-import { assert } from '../util/assert';
+import * as RRule from 'rrule';
 import type { IssueRef } from '~/types';
-import { rrulestr } from 'rrule';
+import { assert } from '../util/assert';
+
+const { rrulestr } = RRule.default ?? RRule;
 
 export function computeIssueIntervals(issue: IssueRef): Interval[] {
   if (issue.endAt == null) {

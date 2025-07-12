@@ -12,8 +12,8 @@ import type { IssuesHistory, IssuesHistoryPage } from '../types';
 import { assert } from '../util/assert';
 import type { Route } from './+types/($lang).history.page.$pageNum';
 
-export async function loader({ params, context }: Route.LoaderArgs) {
-  const rootUrl = context.cloudflare.env.ROOT_URL;
+export async function loader({ params }: Route.LoaderArgs) {
+  const rootUrl = process.env.ROOT_URL;
 
   const { pageNum } = params;
 
