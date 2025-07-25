@@ -118,10 +118,11 @@ export default function App(props: Route.ComponentProps) {
     <QueryClientProvider client={queryClient}>
       <IntlProvider locale={lang ?? 'en-SG'} messages={messages}>
         <header className="flex w-full flex-col items-center p-10">
-          <Link to="/">
-            <h1 className="px-2 font-bold text-gray-900 italic hover:underline dark:text-gray-200">
-              mrtdown
-            </h1>
+          <Link
+            to="/"
+            className="px-2 font-bold text-gray-900 italic hover:underline dark:text-gray-200"
+          >
+            mrtdown
           </Link>
           <p className="max-w-4xl text-center text-gray-500 text-sm dark:text-gray-400">
             <FormattedMessage
