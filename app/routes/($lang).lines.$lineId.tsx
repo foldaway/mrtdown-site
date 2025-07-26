@@ -244,10 +244,10 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
         >
           {component.id}
         </span>
-        <span className="font-bold text-gray-800 text-xl dark:text-gray-100">
+        <h1 className="font-bold text-gray-800 text-xl dark:text-gray-100">
           {componentName}
           {component.title !== componentName && ` ${component.title}`}
-        </span>
+        </h1>
       </div>
 
       {DateTime.fromISO(component.startedAt).diffNow().as('days') < 0 && (

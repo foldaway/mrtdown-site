@@ -156,6 +156,12 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
 
   return (
     <div className="flex flex-col">
+      <h1 className="sr-only">
+        <FormattedMessage
+          id="site.landing.title"
+          defaultMessage="Singapore MRT & LRT Service Status - Live Disruptions and Maintenance"
+        />
+      </h1>
       <div className="mb-3 flex flex-col">
         <StatusBanner issues={overview.issuesOngoingSnapshot} />
       </div>

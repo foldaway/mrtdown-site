@@ -2,7 +2,11 @@ import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/16/solid';
 import classNames from 'classnames';
 import { DateTime, Interval } from 'luxon';
 import { useMemo } from 'react';
-import { createIntl, FormattedDateTimeRange } from 'react-intl';
+import {
+  createIntl,
+  FormattedDateTimeRange,
+  FormattedMessage,
+} from 'react-intl';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { IssuesHistoryPageViewer } from '../components/IssuesHistoryPageViewer';
@@ -143,6 +147,9 @@ const HistoryPage: React.FC<Route.ComponentProps> = (props) => {
 
   return (
     <div className="flex flex-col gap-y-3">
+      <h1 className="sr-only">
+        <FormattedMessage id="general.history" defaultMessage="History" />
+      </h1>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
         <div className="flex grow items-center justify-center gap-x-3">
           <button

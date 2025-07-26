@@ -1,4 +1,4 @@
-import { createIntl } from 'react-intl';
+import { createIntl, FormattedMessage } from 'react-intl';
 import { patchStatisticsForOngoingIssues } from '~/helpers/patchStatisticsForOngoingIssues';
 import { StatisticsGrid } from '../components/StatisticsGrid';
 import type { Statistics } from '../types';
@@ -76,6 +76,9 @@ const StatisticsPage: React.FC<Route.ComponentProps> = (props) => {
 
   return (
     <div className="flex flex-col">
+      <h1 className="sr-only">
+        <FormattedMessage id="general.statistics" defaultMessage="Statistics" />
+      </h1>
       <StatisticsGrid statistics={loaderData.statistics} />
     </div>
   );

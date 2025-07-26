@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
-import { createIntl, useIntl } from 'react-intl';
+import { createIntl, FormattedMessage, useIntl } from 'react-intl';
 import { Link } from 'react-router';
 import { StationMap } from '~/components/StationMap';
 import { StatusBanner } from '~/components/StatusBanner';
@@ -115,6 +115,9 @@ const SystemMapPage: React.FC<Route.ComponentProps> = (props) => {
 
   return (
     <div className="flex flex-col gap-y-2">
+      <h1 className="sr-only">
+        <FormattedMessage id="general.system_map" defaultMessage="System Map" />
+      </h1>
       <StatusBanner issues={issuesOngoingFiltered} />
 
       <div className="flex flex-col bg-gray-100 p-4 dark:bg-gray-800">

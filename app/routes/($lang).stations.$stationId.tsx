@@ -256,10 +256,10 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
     <div className="flex flex-col">
       <div className="flex items-center gap-x-1.5">
         <StationBar station={station} componentsById={componentsById} />
-        <span className="font-bold text-gray-800 text-xl dark:text-gray-100">
+        <h1 className="font-bold text-gray-800 text-xl dark:text-gray-100">
           {stationName}
           {station.name !== stationName && ` ${station.name}`}
-        </span>
+        </h1>
       </div>
 
       <span className="mt-1 text-gray-600 text-sm dark:text-gray-400">
