@@ -95,6 +95,7 @@
   "issue.subtype.track_work": "Kerja Penyelenggaraan Landasan",
   "issue.subtype.train_fault": "Kerosakan Kereta Api",
   "issue.subtype.weather": "Cuaca Buruk",
+  "site.landing.title": "Status Perkhidmatan MRT & LRT Singapura - Gangguan dan Penyelenggaraan Secara Langsung",
   "site.tagline": "pemantauan transit oleh komuniti",
   "site.title_history": "Sejarah Insiden - Halaman {num}",
   "station.description.interchange": "Stesen {stationName} ialah stesen pertukaran {componentTypes} yang terletak di {area}, berhampiran {landmarks}. Setakat ini, sebanyak {issueTypeCountString} telah direkodkan.",

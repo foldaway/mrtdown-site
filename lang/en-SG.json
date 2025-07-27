@@ -95,6 +95,7 @@
   "issue.subtype.track_work": "Track Work",
   "issue.subtype.train_fault": "Train Fault",
   "issue.subtype.weather": "Weather",
+  "site.landing.title": "Singapore MRT & LRT Service Status - Live Disruptions and Maintenance",
   "site.tagline": "community-run transit monitoring",
   "site.title_history": "Incident History - Page {num}",
   "station.description.interchange": "{stationName} station is a {componentTypes} interchange station, located in {area} near {landmarks}. There have been {issueTypeCountString}.",

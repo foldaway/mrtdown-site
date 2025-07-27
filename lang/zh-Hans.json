@@ -95,6 +95,7 @@
   "issue.subtype.track_work": "轨道施工",
   "issue.subtype.train_fault": "列车故障",
   "issue.subtype.weather": "天气影响",
+  "site.landing.title": "新加坡地铁与轻轨服务状态 - 实时中断与维护信息",
   "site.tagline": "「由社群驱动的地铁监察」",
   "site.title_history": "事故记录 - 第{num}页",
   "station.description.interchange": "{stationName}站是一座{componentTypes}转换站，位于{area}，邻近{landmarks}。截至目前，共记录了{issueTypeCountString}。",
