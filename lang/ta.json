@@ -95,6 +95,7 @@
   "issue.subtype.track_work": "தடங்களில் பராமரிப்பு வேலை",
   "issue.subtype.train_fault": "ரயில் கோளாறு",
   "issue.subtype.weather": "வானிலை பாதிப்பு",
+  "line.branch.closed": "{year} ஆம்முடக்கப்பட்டது",
   "site.landing.title": "சிங்கப்பூர் MRT மற்றும் LRT சேவை நிலை - நேரடி குறுக்கீடுகள் மற்றும் பராமரிப்பு",
   "site.tagline": "சமூகம் இயக்கும் போக்குவரத்து கண்காணிப்பு",
   "site.title_history": "நிகழ்வுப் பதிவுகள் - பக்கம் {num}",

@@ -290,13 +290,21 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
                   <>
                     {branch.endedAt == null ? (
                       <FormattedMessage
-                        id="general.opened"
-                        defaultMessage="Opened"
+                        id="status.operational"
+                        defaultMessage="Operational"
                       />
                     ) : (
                       <FormattedMessage
-                        id="general.closed"
-                        defaultMessage="Closed"
+                        id="line.branch.closed"
+                        defaultMessage="Closed in {year}"
+                        values={{
+                          year: (
+                            <FormattedDate
+                              year="numeric"
+                              value={branch.endedAt}
+                            />
+                          ),
+                        }}
                       />
                     )}
                   </>
