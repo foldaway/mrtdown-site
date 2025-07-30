@@ -168,11 +168,11 @@ export const DateCard: React.FC<Props> = (props) => {
               <Link
                 key={issueRef.id}
                 to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
-                className="flex items-center text-gray-600 text-sm hover:underline dark:text-gray-300"
+                className="flex items-center gap-x-2 text-gray-600 text-sm hover:underline dark:text-gray-300"
               >
                 <div
                   className={classNames(
-                    'me-1 size-3 shrink-0 rounded-full hover:opacity-55',
+                    'size-3 shrink-0 rounded-full hover:opacity-55',
                     {
                       'bg-disruption-light dark:bg-disruption-dark':
                         issueRef.type === 'disruption',
@@ -183,7 +183,9 @@ export const DateCard: React.FC<Props> = (props) => {
                     },
                   )}
                 />
-                {issueRef.title_translations[intl.locale] ?? issueRef.title}
+                <span className="leading-tight">
+                  {issueRef.title_translations[intl.locale] ?? issueRef.title}
+                </span>
               </Link>
             ))}
           </div>

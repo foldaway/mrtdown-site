@@ -365,7 +365,7 @@ const ComponentStatusPage: React.FC<Route.ComponentProps> = (props) => {
         />
       </h1>
 
-      <span className="mt-1 mb-2 text-gray-600 text-sm dark:text-gray-400">
+      <span className="mt-1 mb-3 text-gray-600 text-sm dark:text-gray-400">
         <FormattedMessage
           id="general.component_status.description"
           defaultMessage="The {componentName} connects key interchanges like {interchangeNames}. Official updates indicate {issueTypeCountString}."
@@ -388,7 +388,7 @@ const ComponentStatusPage: React.FC<Route.ComponentProps> = (props) => {
 
       <ComponentOutlook breakdown={componentBreakdown} dateTimes={dateTimes} />
 
-      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-3">
         <Summary
           component={component}
           dates={dates}

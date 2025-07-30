@@ -280,7 +280,7 @@ const ComponentPage: React.FC<Route.ComponentProps> = (props) => {
                 {branch.title_translations[intl.locale] ?? branch.title}
               </h2>
 
-              <div className="rounded bg-gray-300 px-2 py-1 text-gray-500 text-xs dark:bg-gray-700 dark:text-gray-400">
+              <div className="rounded bg-gray-300 px-2 py-0.5 text-gray-500 text-xs dark:bg-gray-700 dark:text-gray-400">
                 {branch.startedAt == null ? (
                   <FormattedMessage
                     id="status.not_in_service"
