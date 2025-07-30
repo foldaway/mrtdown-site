@@ -22,12 +22,13 @@ function computeStationStrings(
   intl: IntlShape,
   station: Station,
   componentsById: Record<string, Component>,
+  now = DateTime.now(),
 ) {
   const town = station.town_translations[intl.locale] ?? station.town;
   const landmarks =
     station.landmarks_translations[intl.locale] ?? station.landmarks;
 
-  let memberCount = 0;
+  let operationalMemberCount = 0;
   const _componentTypeStrings = new Set<string>();
   const _stationStructureTypes = new Set<string>();
   const stationCodes = new Set<string>();
@@ -45,7 +46,12 @@ function computeStationStrings(
         intl.formatMessage(StationStructureTypeLabels[member.structureType]),
       );
       stationCodes.add(member.code);
-      memberCount++;
+      const startedAt = DateTime.fromISO(member.startedAt).setZone(
+        'Asia/Singapore',
+      );
+      if (startedAt < now) {
+        operationalMemberCount++;
+      }
     }
   }
   return {
@@ -54,7 +60,7 @@ function computeStationStrings(
     stationCodes,
     componentTypeStrings: Array.from(_componentTypeStrings),
     stationStructureTypes: Array.from(_stationStructureTypes),
-    isInterchange: memberCount > 1,
+    isInterchange: operationalMemberCount > 1,
   };
 }
 
