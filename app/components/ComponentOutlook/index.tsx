@@ -71,7 +71,7 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
 
   return (
     <div className="flex flex-col rounded-lg bg-gray-100 px-4 py-2 dark:bg-gray-800">
-      <div className="mb-1.5 flex items-center">
+      <div className="mb-1.5 flex items-center gap-x-1.5">
         <span
           className="rounded-sm px-2 py-0.5 font-semibold text-white text-xs"
           style={{ backgroundColor: component.color }}
@@ -79,18 +79,16 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
           {component.id}
         </span>
         <Link
-          className="group"
+          className="overflow-hidden truncate font-bold text-base text-gray-700 hover:underline dark:text-gray-200"
           to={buildLocaleAwareLink(`/lines/${component.id}`, intl.locale)}
         >
-          <span className="ms-1.5 font-bold text-base text-gray-700 group-hover:underline dark:text-gray-200">
-            {component.title_translations[intl.locale] ?? component.title}
-          </span>
+          {component.title_translations[intl.locale] ?? component.title}
         </Link>
-        <div className="ms-auto flex">
+        <div className="flex grow justify-end truncate">
           {isComponentInService ? (
             <>
               <span
-                className={classNames('ms-auto text-sm capitalize', {
+                className={classNames('ms-auto truncate text-sm capitalize', {
                   'text-disruption-light dark:text-disruption-dark':
                     statusNow === 'disruption',
                   'text-maintenance-light dark:text-maintenance-dark':

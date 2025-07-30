@@ -384,7 +384,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                         </span>
                       </td>
                       <td className="p-2 align-middle">
-                        <span className="text-sm">
+                        <span className="inline-block text-sm">
                           {isHydrated ? (
                             <>
                               {DateTime.fromISO(entry.startedAt)

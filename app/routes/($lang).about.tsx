@@ -59,7 +59,7 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
 };
 
 const AboutPage: React.FC = () => (
-  <div className="flex w-full flex-col items-center py-8">
+  <div className="flex w-full flex-col items-center py-4 sm:py-8">
     <h1 className="sr-only">
       <FormattedMessage id="general.about" defaultMessage="About" />
     </h1>
