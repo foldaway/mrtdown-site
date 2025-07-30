@@ -69,7 +69,7 @@ export async function loader() {
   // Lines
   {
     const res = await fetch(
-      'https://data.mrtdown.foldaway.space/product/component_index.json',
+      'https://data.mrtdown.org/product/component_index.json',
     );
     assert(res.ok, res.statusText);
     const componentIndex: ComponentIndex = await res.json();
@@ -82,7 +82,7 @@ export async function loader() {
   // Stations
   {
     const res = await fetch(
-      'https://data.mrtdown.foldaway.space/product/station_index.json',
+      'https://data.mrtdown.org/product/station_index.json',
     );
     assert(res.ok, res.statusText);
     const stationIndex: StationIndex = await res.json();
@@ -95,7 +95,7 @@ export async function loader() {
   // History pages
   {
     const res = await fetch(
-      'https://data.mrtdown.foldaway.space/product/issues_history.json',
+      'https://data.mrtdown.org/product/issues_history.json',
     );
     assert(res.ok, res.statusText);
     const history: IssuesHistory = await res.json();
@@ -108,7 +108,7 @@ export async function loader() {
   // Issue pages
   {
     const res = await fetch(
-      'https://data.mrtdown.foldaway.space/product/issue_index.json',
+      'https://data.mrtdown.org/product/issue_index.json',
     );
     assert(res.ok, res.statusText);
     const issueIndex: IssueIndex = await res.json();

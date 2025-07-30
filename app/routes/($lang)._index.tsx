@@ -27,9 +27,7 @@ export async function loader({ context, params }: Route.LoaderArgs) {
 
   const rootUrl = process.env.ROOT_URL;
 
-  const res = await fetch(
-    'https://data.mrtdown.foldaway.space/product/overview.json',
-  );
+  const res = await fetch('https://data.mrtdown.org/product/overview.json');
   assert(res.ok, res.statusText);
   const overview: Overview = await res.json();
   patchDatesForOngoingIssues(overview.dates, overview.issuesOngoingSnapshot);

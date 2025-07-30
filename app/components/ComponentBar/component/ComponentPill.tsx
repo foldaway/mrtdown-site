@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import type { Component } from '../../../types';
 import { useIntl } from 'react-intl';
 import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import type { Component } from '../../../types';
 
 interface Props {
   componentId: string;
@@ -17,7 +17,7 @@ export const ComponentPill: React.FC<Props> = (props) => {
     queryKey: ['components', componentId],
     queryFn: () =>
       fetch(
-        `https://data.mrtdown.foldaway.space/source/component/${componentId}.json`,
+        `https://data.mrtdown.org/source/component/${componentId}.json`,
       ).then((r) => r.json()),
   });
 

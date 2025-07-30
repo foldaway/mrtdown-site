@@ -1,5 +1,7 @@
+import { useQuery } from '@tanstack/react-query';
 import type React from 'react';
-import type { Component, Statistics } from '../../../types';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { FormattedMessage } from 'react-intl';
 import {
   Bar,
   BarChart,
@@ -8,9 +10,7 @@ import {
   ResponsiveContainer,
   XAxis,
 } from 'recharts';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { FormattedMessage } from 'react-intl';
+import type { Component, Statistics } from '../../../types';
 
 interface Data {
   line: string;
@@ -34,7 +34,7 @@ const Tick: React.FC<TickProps> = (props) => {
     queryKey: ['components', componentId],
     queryFn: () =>
       fetch(
-        `https://data.mrtdown.foldaway.space/source/component/${componentId}.json`,
+        `https://data.mrtdown.org/source/component/${componentId}.json`,
       ).then((r) => r.json()),
   });
 

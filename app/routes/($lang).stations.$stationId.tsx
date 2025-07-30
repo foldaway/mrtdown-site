@@ -64,7 +64,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const rootUrl = process.env.ROOT_URL;
 
   const res = await fetch(
-    `https://data.mrtdown.foldaway.space/product/station_${stationId}.json`,
+    `https://data.mrtdown.org/product/station_${stationId}.json`,
   );
   assert(res.ok, res.statusText);
   const stationManifest: StationManifest = await res.json();

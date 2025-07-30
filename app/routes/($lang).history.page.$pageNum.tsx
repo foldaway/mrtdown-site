@@ -25,11 +25,11 @@ export async function loader({ params }: Route.LoaderArgs) {
   assert(!Number.isNaN(pageNumber), 'Invalid page number');
 
   const res = await fetch(
-    'https://data.mrtdown.foldaway.space/product/issues_history.json',
+    'https://data.mrtdown.org/product/issues_history.json',
   );
   const history: IssuesHistory = await res.json();
   const page: IssuesHistoryPage = await fetch(
-    `https://data.mrtdown.foldaway.space/product/issues_history_page_${pageNumber}.json`,
+    `https://data.mrtdown.org/product/issues_history_page_${pageNumber}.json`,
   ).then((r) => r.json());
 
   const { lang = 'en-SG' } = params;

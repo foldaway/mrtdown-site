@@ -95,7 +95,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   const { default: messages } = await import(`../lang/${lang}.json`);
 
   const res = await fetch(
-    'https://data.mrtdown.foldaway.space/product/footer_manifest.json',
+    'https://data.mrtdown.org/product/footer_manifest.json',
   );
   assert(res.ok, res.statusText);
   const footerManifest: FooterManifest = await res.json();

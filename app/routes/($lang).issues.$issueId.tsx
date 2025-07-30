@@ -13,7 +13,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   const { issueId, lang = 'en-SG' } = params;
 
   const res = await fetch(
-    `https://data.mrtdown.foldaway.space/source/issue/${issueId}.json`,
+    `https://data.mrtdown.org/source/issue/${issueId}.json`,
   );
   assert(res.ok, res.statusText);
   const issue: Issue = await res.json();

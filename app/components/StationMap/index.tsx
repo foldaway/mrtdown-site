@@ -1,5 +1,7 @@
+import { ClockIcon, StarIcon } from '@heroicons/react/24/outline';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useQuery } from '@tanstack/react-query';
+import { DateTime } from 'luxon';
 import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -8,23 +10,20 @@ import {
   FormattedMessage,
   useIntl,
 } from 'react-intl';
-import type { IssueStationEntry, StationTranslatedNames } from '~/types';
-import { segmentText } from './helpers/segmentText';
+import { Link, useNavigate } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
-import { useNavigate } from 'react-router';
-import { Link } from 'react-router';
-import { MapApr2025 } from './components/MapApr2025';
-import { DateTime } from 'luxon';
+import type { IssueStationEntry, StationTranslatedNames } from '~/types';
 import { assert } from '~/util/assert';
-import { MapNov2017 } from './components/MapNov2017';
-import { MapDec2027 } from './components/MapDec2027';
-import { ClockIcon, StarIcon } from '@heroicons/react/24/outline';
-import { MapJan2012 } from './components/MapJan2012';
-import { MapDec2030 } from './components/MapDec2030';
-import { MapDec2029 } from './components/MapDec2029';
+import { MapApr2025 } from './components/MapApr2025';
 import { MapDec2019 } from './components/MapDec2019';
-import { MapNov2024 } from './components/MapNov2024';
+import { MapDec2027 } from './components/MapDec2027';
+import { MapDec2029 } from './components/MapDec2029';
+import { MapDec2030 } from './components/MapDec2030';
 import { MapDec2032 } from './components/MapDec2032';
+import { MapJan2012 } from './components/MapJan2012';
+import { MapNov2017 } from './components/MapNov2017';
+import { MapNov2024 } from './components/MapNov2024';
+import { segmentText } from './helpers/segmentText';
 
 interface Props {
   stationIdsAffected: IssueStationEntry[];
@@ -42,7 +41,7 @@ export const StationMap: React.FC<Props> = (props) => {
     queryKey: ['station-translated-names', intl.locale],
     queryFn: () =>
       fetch(
-        `https://data.mrtdown.foldaway.space/product/station_names_${intl.locale}.json`,
+        `https://data.mrtdown.org/product/station_names_${intl.locale}.json`,
       ).then((r) => r.json()),
   });
 

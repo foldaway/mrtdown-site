@@ -30,7 +30,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const rootUrl = process.env.ROOT_URL;
 
   const res = await fetch(
-    `https://data.mrtdown.foldaway.space/product/component_status_${lineId}.json`,
+    `https://data.mrtdown.org/product/component_status_${lineId}.json`,
   );
   assert(res.ok, res.statusText);
 

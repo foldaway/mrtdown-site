@@ -8,9 +8,7 @@ import type { Route } from './+types/($lang).statistics';
 export async function loader({ params }: Route.LoaderArgs) {
   const rootUrl = process.env.ROOT_URL;
 
-  const res = await fetch(
-    'https://data.mrtdown.foldaway.space/product/statistics.json',
-  );
+  const res = await fetch('https://data.mrtdown.org/product/statistics.json');
   assert(res.ok, res.statusText);
   const statistics: Statistics = await res.json();
 

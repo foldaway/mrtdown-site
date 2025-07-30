@@ -22,7 +22,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   const rootUrl = process.env.ROOT_URL;
 
   const res = await fetch(
-    `https://data.mrtdown.foldaway.space/product/component_${lineId}.json`,
+    `https://data.mrtdown.org/product/component_${lineId}.json`,
   );
   assert(res.ok, res.statusText);
 

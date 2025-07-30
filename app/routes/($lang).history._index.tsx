@@ -10,7 +10,7 @@ export function headers() {
 
 export async function loader({ params }: Route.LoaderArgs) {
   const res = await fetch(
-    'https://data.mrtdown.foldaway.space/product/issues_history.json',
+    'https://data.mrtdown.org/product/issues_history.json',
   );
   const history: IssuesHistory = await res.json();
   if (params.lang != null) {
