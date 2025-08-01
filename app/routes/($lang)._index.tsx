@@ -22,7 +22,7 @@ export async function loader({ context, params }: Route.LoaderArgs) {
 
   const title = intl.formatMessage({
     id: 'general.home_page_title',
-    defaultMessage: 'mrtdown – community-run transit monitoring',
+    defaultMessage: 'Is the MRT Down? Train Disruption Status in Singapore',
   });
 
   const rootUrl = process.env.ROOT_URL;
@@ -33,8 +33,9 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   patchDatesForOngoingIssues(overview.dates, overview.issuesOngoingSnapshot);
 
   const description = intl.formatMessage({
-    id: 'site.tagline',
-    defaultMessage: 'community-run transit monitoring',
+    id: 'general.home_page_description',
+    defaultMessage:
+      'See if the MRT is down right now. Get live updates, maintenance alerts, and crowd-sourced reports from fellow commuters on mrtdown.',
   });
 
   return {
