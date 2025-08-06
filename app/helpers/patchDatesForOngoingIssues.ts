@@ -48,7 +48,20 @@ export function patchDatesForOngoingIssues(
       if (!interval.isValid) {
         continue;
       }
-      for (const segment of splitIntervalByServiceHours(interval)) {
+      for (const _segment of splitIntervalByServiceHours(interval)) {
+        let segment = _segment;
+
+        // Workaround: treat station renovation as a 1-minute issue, assume that there is no line downtime
+        if (
+          issue.type === 'maintenance' &&
+          issue.subtypes.includes('station.renovation')
+        ) {
+          segment = Interval.fromDateTimes(
+            _segment.start!,
+            _segment.start!.plus({ minutes: 1 }),
+          );
+        }
+
         assert(segment.start != null);
         assert(segment.end != null);
 
