@@ -33,7 +33,7 @@ export function patchDatesForOngoingIssues(
   }
 
   for (const issue of issuesOngoingSnapshot) {
-    const startAt = DateTime.fromISO(issue.startAt);
+    const startAt = DateTime.fromISO(issue.startAt).setZone('Asia/Singapore');
     assert(startAt.isValid);
 
     let intervals: Interval[] = [];
