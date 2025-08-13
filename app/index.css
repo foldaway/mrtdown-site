@@ -11,8 +11,8 @@ html {
     --color-maintenance-light: var(--color-cyan-600);
     --color-maintenance-dark: var(--color-cyan-700);
 
-    --color-infra-light: var(--color-indigo-600);
-    --color-infra-dark: var(--color-indigo-700);
+    --color-infra-light: var(--color-indigo-500);
+    --color-infra-dark: var(--color-indigo-600);
 
     --color-operational-light: var(--color-green-500);
     --color-operational-dark: var(--color-green-600);
