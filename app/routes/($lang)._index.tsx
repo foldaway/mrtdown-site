@@ -132,26 +132,22 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
     return computeComponentBreakdown(overview);
   }, [overview]);
 
-  const isTodayIssue = useCallback((issueRef: IssueRef) => {
-    const now = DateTime.now().setZone('Asia/Singapore');
+  const issuesOngoingFiltered = useMemo(() => {
+    const now = DateTime.now();
 
-    const intervalToday = Interval.fromDateTimes(
-      now.startOf('day'),
-      now.startOf('day').plus({ days: 1 }),
-    );
+    const result: IssueRef[] = [];
+    for (const issue of loaderData.overview.issuesOngoingSnapshot) {
+      const intervals = computeIssueIntervals(issue);
 
-    let intervals: Interval[];
-    const startAt = DateTime.fromISO(issueRef.startAt).setZone(
-      'Asia/Singapore',
-    );
-    assert(startAt.isValid);
-    if (issueRef.endAt == null) {
-      intervals = [Interval.fromDateTimes(startAt, now)];
-    } else {
-      intervals = computeIssueIntervals(issueRef);
+      if (!intervals.some((interval) => interval.contains(now))) {
+        continue;
+      }
+
+      result.push(issue);
     }
-    return intervals.some((interval) => interval.overlaps(intervalToday));
-  }, []);
+
+    return result;
+  }, [loaderData.overview.issuesOngoingSnapshot]);
 
   return (
     <div className="flex flex-col">
@@ -162,15 +158,13 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
         />
       </h1>
       <div className="mb-3 flex flex-col">
-        <StatusBanner issues={overview.issuesOngoingSnapshot} />
+        <StatusBanner issues={issuesOngoingFiltered} />
       </div>
 
       <div className="flex flex-col gap-y-2">
-        {overview.issuesOngoingSnapshot
-          .filter((issueRef) => isTodayIssue(issueRef))
-          .map((issue) => (
-            <IssueRefViewer key={issue.id} issueRef={issue} />
-          ))}
+        {issuesOngoingFiltered.map((issue) => (
+          <IssueRefViewer key={issue.id} issueRef={issue} />
+        ))}
       </div>
 
       <div className="mt-5 flex flex-col gap-y-6">
