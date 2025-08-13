@@ -1,10 +1,10 @@
+import { InformationCircleIcon } from '@heroicons/react/16/solid';
 import { decode } from 'html-entities';
 import { DateTime } from 'luxon';
-import type { IssueInfraUpdate } from '../../../types';
 import { useMemo } from 'react';
-import { InformationCircleIcon } from '@heroicons/react/16/solid';
-import { useHydrated } from '../../../hooks/useHydrated';
 import { FormattedDate, useIntl } from 'react-intl';
+import { useHydrated } from '../../../hooks/useHydrated';
+import type { IssueInfraUpdate } from '../../../types';
 
 interface Props {
   update: IssueInfraUpdate;
@@ -31,6 +31,9 @@ export const UpdateInfra: React.FC<Props> = (props) => {
           rel="noreferrer"
         >
           {update.type === 'operator.update' && (
+            <InformationCircleIcon className="size-4 text-gray-500 dark:text-gray-400" />
+          )}
+          {update.type === 'planned' && (
             <InformationCircleIcon className="size-4 text-gray-500 dark:text-gray-400" />
           )}
         </a>

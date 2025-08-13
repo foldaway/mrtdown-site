@@ -52,10 +52,7 @@ export interface IssueMaintenanceUpdate {
   text: string;
 }
 
-export type IssueMaintenanceSubtype =
-  | 'track.work'
-  | 'station.renovation'
-  | 'system.upgrade';
+export type IssueMaintenanceSubtype = 'track.work' | 'system.upgrade';
 
 export interface IssueMaintenance extends IssueBase {
   type: 'maintenance';
@@ -65,7 +62,7 @@ export interface IssueMaintenance extends IssueBase {
   subtypes: IssueMaintenanceSubtype[];
 }
 export interface IssueInfraUpdate {
-  type: 'operator.update';
+  type: 'operator.update' | 'planned';
   createdAt: string;
   sourceUrl: string;
   text: string;
@@ -74,10 +71,12 @@ export interface IssueInfraUpdate {
 export type IssueInfraSubtype =
   | 'elevator.outage'
   | 'escalator.outage'
+  | 'station.renovation'
   | 'air_conditioning.issue';
 
 export interface IssueInfra extends IssueBase {
   type: 'infra';
+  rrule?: string;
   updates: IssueInfraUpdate[];
   subtypes: IssueInfraSubtype[];
 }

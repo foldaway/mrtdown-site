@@ -18,7 +18,7 @@ export function computeIssueIntervals(issue: IssueRef): Interval[] {
   const issueIntervals: Interval[] = [];
   const tzEnvironment = DateTime.local().zoneName;
 
-  if (issue.type === 'maintenance' && issue.rrule != null) {
+  if ('rrule' in issue && issue.rrule != null) {
     const rruleSet = rrulestr(issue.rrule);
     for (const dt of rruleSet.all()) {
       const dtStart = DateTime.fromISO(dt.toISOString())
