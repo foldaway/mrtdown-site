@@ -62,7 +62,7 @@ export const DateCard: React.FC<Props> = (props) => {
                       issueType === 'disruption',
                     'bg-maintenance-light dark:bg-maintenance-dark':
                       issueType === 'maintenance',
-                    'bg-infra-light dark:bg-infra-dark': status === 'infra',
+                    'bg-infra-light dark:bg-infra-dark': issueType === 'infra',
                   })}
                   style={{
                     flexBasis: `${Math.max(25, percentage).toFixed(1)}%`,
