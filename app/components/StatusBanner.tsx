@@ -48,7 +48,7 @@ export const StatusBanner: React.FC<Props> = (props) => {
 
   if (countByIssueType.infra > 0) {
     return (
-      <h2 className="rounded bg-disruption-light px-4 py-2 font-bold text-gray-50 text-lg dark:bg-disruption-dark dark:text-gray-100">
+      <h2 className="rounded bg-infra-light px-4 py-2 font-bold text-gray-50 text-lg dark:bg-infra-dark dark:text-gray-100">
         <FormattedMessage
           id="status.banner.ongoing_infra"
           defaultMessage="Ongoing Infrastructure Issues"
