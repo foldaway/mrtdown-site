@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
+import { DateTime } from 'luxon';
 import { defineConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
@@ -11,6 +12,11 @@ export default defineConfig({
   },
   ssr: {
     noExternal: ['@heroicons/*', '@radix-ui/*', '@floating-ui/*'],
+  },
+  define: {
+    __APP_BUILD_TIMESTAMP__: JSON.stringify(
+      DateTime.now().setZone('Asia/Singapore').toISO(),
+    ),
   },
   plugins: [
     reactRouter(),

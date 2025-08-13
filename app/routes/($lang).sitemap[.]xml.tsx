@@ -27,13 +27,13 @@ function buildEntries(path: string, rootUrl: string): Element {
         type: 'element',
         name: 'lastmod',
         attributes: {},
-        children: [{ type: 'text', value: DateTime.now().toISO() }],
+        children: [{ type: 'text', value: __APP_BUILD_TIMESTAMP__ }],
       },
       {
         type: 'element',
         name: 'changefreq',
         attributes: {},
-        children: [{ type: 'text', value: 'daily' }],
+        children: [{ type: 'text', value: 'hourly' }],
       },
       {
         type: 'element',
