@@ -14,9 +14,7 @@ import type { Route } from './+types/($lang).system-map';
 export async function loader({ params }: Route.LoaderArgs) {
   const rootUrl = process.env.ROOT_URL;
 
-  const res = await fetch(
-    'https://data.mrtdown.org/product/overview.json',
-  );
+  const res = await fetch('https://data.mrtdown.org/product/overview.json');
   assert(res.ok, res.statusText);
   const overview: Overview = await res.json();
   patchDatesForOngoingIssues(overview.dates, overview.issuesOngoingSnapshot);
@@ -84,7 +82,10 @@ const SystemMapPage: React.FC<Route.ComponentProps> = (props) => {
     for (const issue of loaderData.overview.issuesOngoingSnapshot) {
       const intervals = computeIssueIntervals(issue);
 
-      if (!intervals.some((interval) => interval.contains(now))) {
+      if (
+        issue.endAt != null &&
+        !intervals.some((interval) => interval.contains(now))
+      ) {
         continue;
       }
 

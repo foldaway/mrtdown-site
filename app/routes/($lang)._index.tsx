@@ -139,7 +139,10 @@ const HomePage: React.FC<Route.ComponentProps> = (props) => {
     for (const issue of loaderData.overview.issuesOngoingSnapshot) {
       const intervals = computeIssueIntervals(issue);
 
-      if (!intervals.some((interval) => interval.contains(now))) {
+      if (
+        issue.endAt != null &&
+        !intervals.some((interval) => interval.contains(now))
+      ) {
         continue;
       }
 
