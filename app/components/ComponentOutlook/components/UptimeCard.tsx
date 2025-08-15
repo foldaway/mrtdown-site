@@ -174,7 +174,7 @@ export const UptimeCard: React.FC<Props> = (props) => {
                         <div className="me-1 size-3 rounded-full bg-infra-light hover:opacity-55 dark:bg-infra-dark" />
                         <span className="text-xs">
                           <FormattedMessage
-                            id="general.infra"
+                            id="general.infrastructure"
                             defaultMessage="Infrastructure"
                           />
                         </span>
