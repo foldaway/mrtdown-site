@@ -11,7 +11,8 @@
     "build": "react-router build",
     "test": "vitest",
     "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "api:client:generate": "node app/scripts/generateApiClient.js"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -48,6 +49,7 @@
     "@types/xast": "^2.0.4",
     "@vitejs/plugin-react-swc": "^3.8.0",
     "globals": "^15.15.0",
+    "tsx": "^4.20.4",
     "typescript": "~5.7.2",
     "vite": "^6.3.5",
     "vite-tsconfig-paths": "^5.1.4",
