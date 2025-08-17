@@ -37,6 +37,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.0.0",
     "@formatjs/cli": "^6.6.3",
+    "@hey-api/openapi-ts": "^0.80.11",
     "@react-router/dev": "^7.5.2",
     "@react-router/fs-routes": "^7.5.2",
     "@tailwindcss/vite": "^4.0.9",
