@@ -1,36 +1,31 @@
 import type React from 'react';
-import { Fragment } from 'react';
-import type { Component, Station } from '~/types';
+import type { StationLineMembership } from '~/client';
+import { useIncludedEntities } from '~/contexts/IncludedEntities';
 
 interface Props {
-  station: Station;
-  componentsById: Record<string, Component>;
+  memberships: StationLineMembership[];
 }
 
 export const StationBar: React.FC<Props> = (props) => {
-  const { station, componentsById } = props;
+  const { memberships } = props;
+
+  const { lines } = useIncludedEntities();
 
   return (
     <div className="flex overflow-hidden rounded-md">
-      {Object.entries(station.componentMembers).map(
-        ([componentId, componentMembers]) => (
-          <Fragment key={componentId}>
-            {componentMembers.map((member) => (
-              <div
-                key={member.code}
-                className="z-10 flex h-4 w-10 items-center justify-center px-1.5"
-                style={{
-                  backgroundColor: componentsById[componentId].color,
-                }}
-              >
-                <span className="font-semibold text-white text-xs leading-none">
-                  {member.code}
-                </span>
-              </div>
-            ))}
-          </Fragment>
-        ),
-      )}
+      {memberships.map((membership) => (
+        <div
+          key={membership.code}
+          className="z-10 flex h-4 w-10 items-center justify-center px-1.5"
+          style={{
+            backgroundColor: lines[membership.lineId].color,
+          }}
+        >
+          <span className="font-semibold text-white text-xs leading-none">
+            {membership.code}
+          </span>
+        </div>
+      ))}
     </div>
   );
 };

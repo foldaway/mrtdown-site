@@ -1,14 +1,9 @@
-import { DateTime } from 'luxon';
+import { DateTime, Interval } from 'luxon';
 import type { Root, Element } from 'xast';
 import { toXml } from 'xast-util-to-xml';
+import { getIssues, getLines, getStations } from '~/client';
 import { LANGUAGES_NON_DEFAULT } from '~/constants';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
-import type {
-  ComponentIndex,
-  IssueIndex,
-  IssuesHistory,
-  StationIndex,
-} from '~/types';
 import { assert } from '~/util/assert';
 
 function buildEntries(path: string, rootUrl: string): Element {
@@ -68,53 +63,73 @@ export async function loader() {
 
   // Lines
   {
-    const res = await fetch(
-      'https://data.mrtdown.org/product/component_index.json',
-    );
-    assert(res.ok, res.statusText);
-    const componentIndex: ComponentIndex = await res.json();
-    for (const componentId of componentIndex) {
-      paths.push(`/lines/${componentId}`);
-      paths.push(`/status/${componentId}`);
+    const { data, error, response } = await getLines({
+      auth: () => process.env.API_TOKEN,
+      baseUrl: process.env.API_ENDPOINT,
+    });
+    if (error != null) {
+      console.error('Error fetching lines:', error);
+      throw new Response('Failed to fetch lines', {
+        status: response.status,
+        statusText: response.statusText,
+      });
+    }
+    assert(data != null);
+    for (const lineId of data.data.lineIds) {
+      paths.push(`/lines/${lineId}`);
     }
   }
 
   // Stations
   {
-    const res = await fetch(
-      'https://data.mrtdown.org/product/station_index.json',
-    );
-    assert(res.ok, res.statusText);
-    const stationIndex: StationIndex = await res.json();
-
-    for (const stationId of stationIndex) {
-      paths.push(`/stations/${stationId}`);
+    const { data, error ,response } = await getStations({
+      auth: () => process.env.API_TOKEN,
+      baseUrl: process.env.API_ENDPOINT,
+    });
+    if (error != null) {
+      console.error('Error fetching stations:', error);
+      throw new Response('Failed to fetch stations', {
+        status: response.status,
+        statusText: response.statusText,
+      });
     }
-  }
-
-  // History pages
-  {
-    const res = await fetch(
-      'https://data.mrtdown.org/product/issues_history.json',
-    );
-    assert(res.ok, res.statusText);
-    const history: IssuesHistory = await res.json();
-
-    for (let i = 0; i < history.pageCount; i++) {
-      paths.push(`/history/page/${i + 1}`);
+    assert(data != null);
+    for (const stationId of data.data.stationIds) {
+      paths.push(`/stations/${stationId}`);
     }
   }
 
   // Issue pages
   {
-    const res = await fetch(
-      'https://data.mrtdown.org/product/issue_index.json',
-    );
-    assert(res.ok, res.statusText);
-    const issueIndex: IssueIndex = await res.json();
-
-    for (const issueId of issueIndex) {
+    const { data, error, response } = await getIssues({
+      auth: () => process.env.API_TOKEN,
+      baseUrl: process.env.API_ENDPOINT,
+    });
+    if (error != null) {
+      console.error('Error fetching issues:', error);
+      throw new Response('Failed to fetch issues', {
+        status: response.status,
+        statusText: response.statusText,
+      });
+    }
+    assert(data != null);
+    for (const issueId of data.data.issueIds) {
       paths.push(`/issues/${issueId}`);
+    }
+
+    const monthEarliestDateTime = DateTime.fromISO(data.data.monthEarliest)
+    const monthLatestDateTime = DateTime.fromISO(data.data.monthLatest)
+
+    const interval = Interval.fromDateTimes(monthEarliestDateTime, monthLatestDateTime)
+    for (const monthInterval of interval.splitBy({ month: 1})) {
+      const monthDateTime = monthInterval.start;
+      assert(monthDateTime != null);
+
+      if (!paths.includes(`/history/${monthDateTime.toFormat('yyyy')}`)) {
+        paths.push(`/history/${monthDateTime.toFormat('yyyy')}`);
+      }
+
+      paths.push(`/history/${monthDateTime.toFormat('yyyy')}/${monthDateTime.toFormat('MM')}`);
     }
   }
 

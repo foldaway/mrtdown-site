@@ -7,12 +7,12 @@
     "dev": "react-router dev",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",
-    "i18n:extract": "formatjs extract 'app/**/*.{ts,tsx}' --out-file lang/en-SG.json --format simple",
+    "i18n:extract": "formatjs extract 'app/**/*.{ts,tsx}' --ignore '**/*.d.ts' --out-file lang/en-SG.json --format simple",
     "build": "react-router build",
     "test": "vitest",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
-    "api:client:generate": "node app/scripts/generateApiClient.js"
+    "api:client:generate": "tsx app/scripts/generateApiClient.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

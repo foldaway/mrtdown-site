@@ -1,9 +1,8 @@
 import { ClockIcon, StarIcon } from '@heroicons/react/24/outline';
-import { useQuery } from '@tanstack/react-query';
 import { DateTime } from 'luxon';
 import { Tabs } from 'radix-ui';
 import type React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FormattedDate,
   FormattedList,
@@ -11,8 +10,9 @@ import {
   useIntl,
 } from 'react-intl';
 import { Link, useNavigate } from 'react-router';
+import type { IssueAffectedBranch } from '~/client';
+import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
-import type { IssueStationEntry, StationTranslatedNames } from '~/types';
 import { assert } from '~/util/assert';
 import { MapApr2025 } from './components/MapApr2025';
 import { MapDec2019 } from './components/MapDec2019';
@@ -26,40 +26,29 @@ import { MapNov2024 } from './components/MapNov2024';
 import { segmentText } from './helpers/segmentText';
 
 interface Props {
-  stationIdsAffected: IssueStationEntry[];
-  componentIdsAffected: string[];
+  branchesAffected: IssueAffectedBranch[];
   currentDate?: string;
 }
 
 export const StationMap: React.FC<Props> = (props) => {
-  const { stationIdsAffected, currentDate } = props;
+  const { branchesAffected, currentDate } = props;
 
   const intl = useIntl();
   const navigate = useNavigate();
 
-  const stationTranslatedNamesQuery = useQuery<StationTranslatedNames>({
-    queryKey: ['station-translated-names', intl.locale],
-    queryFn: () =>
-      fetch(
-        `https://data.mrtdown.org/product/station_names_${intl.locale}.json`,
-      ).then((r) => r.json()),
-  });
-
-  const stationTranslatedNames = useMemo(() => {
-    return stationTranslatedNamesQuery.data ?? {};
-  }, [stationTranslatedNamesQuery.data]);
+  const included = useIncludedEntities();
 
   const [ref, setRef] = useState<SVGElement | null>(null);
 
   const stationIds = useMemo(() => {
     const result = new Set<string>();
-    for (const entry of stationIdsAffected) {
+    for (const entry of branchesAffected) {
       for (const stationId of entry.stationIds) {
         result.add(stationId);
       }
     }
     return result;
-  }, [stationIdsAffected]);
+  }, [branchesAffected]);
 
   useEffect(() => {
     if (ref == null) {
@@ -71,10 +60,10 @@ export const StationMap: React.FC<Props> = (props) => {
     const componentByLineId: Record<string, string> = {};
 
     const isSingleStationCase =
-      stationIdsAffected.length === 1 &&
-      stationIdsAffected[0].stationIds.length === 1;
+      branchesAffected.length === 1 &&
+      branchesAffected[0].stationIds.length === 1;
 
-    for (const entry of stationIdsAffected) {
+    for (const entry of branchesAffected) {
       for (const stationId of entry.stationIds) {
         // Retrieve all lines connected to this station
         const lineElements = [
@@ -107,8 +96,7 @@ export const StationMap: React.FC<Props> = (props) => {
                   const componentId = componentByLineId[lineElement.id];
                   if (
                     componentId != null &&
-                    componentId.toLowerCase() !==
-                      entry.componentId.toLowerCase()
+                    componentId.toLowerCase() !== entry.lineId.toLowerCase()
                   ) {
                     continue;
                   }
@@ -135,7 +123,7 @@ export const StationMap: React.FC<Props> = (props) => {
             const componentId = componentByLineId[lineElement.id];
             if (
               componentId != null &&
-              componentId.toLowerCase() !== entry.componentId.toLowerCase()
+              componentId.toLowerCase() !== entry.lineId.toLowerCase()
             ) {
               continue;
             }
@@ -151,7 +139,7 @@ export const StationMap: React.FC<Props> = (props) => {
       }
     }
 
-    for (const entry of stationIdsAffected) {
+    for (const entry of branchesAffected) {
       for (const stationId of entry.stationIds) {
         const lines = linesByStationId[stationId] ?? new Set();
         const patchedLines = linesPatchedByStationId[stationId] ?? new Set();
@@ -162,17 +150,13 @@ export const StationMap: React.FC<Props> = (props) => {
 
         const lineCountForComponent = Array.from(lines).filter((lineId) => {
           const lineComponentId = componentByLineId[lineId];
-          return (
-            lineComponentId.toLowerCase() === entry.componentId.toLowerCase()
-          );
+          return lineComponentId.toLowerCase() === entry.lineId.toLowerCase();
         }).length;
 
         const patchedLineCountForComponent = Array.from(patchedLines).filter(
           (lineId) => {
             const lineComponentId = componentByLineId[lineId];
-            return (
-              lineComponentId.toLowerCase() === entry.componentId.toLowerCase()
-            );
+            return lineComponentId.toLowerCase() === entry.lineId.toLowerCase();
           },
         ).length;
 
@@ -182,9 +166,7 @@ export const StationMap: React.FC<Props> = (props) => {
         ) {
           // All SVG lines connected to this station for the entry's component have been patched out
           const componentElement: SVGGElement | null =
-            nodeElement.querySelector(
-              `[id^='${entry.componentId.toLowerCase()}']`,
-            );
+            nodeElement.querySelector(`[id^='${entry.lineId.toLowerCase()}']`);
           if (componentElement != null) {
             // Patch out the section of the station node for the entry's component
             componentElement.style.opacity = '0.3';
@@ -210,13 +192,13 @@ export const StationMap: React.FC<Props> = (props) => {
       for (const labelElement of labelElements) {
         const stationId = labelElement.id.replace(/^label_/, '').toUpperCase();
         const tspans = [...labelElement.querySelectorAll('tspan')];
-        if (!(stationId in stationTranslatedNames)) {
+        if (!(stationId in included.stations)) {
           continue;
         }
-        const segments = segmentText(
-          stationTranslatedNames[stationId],
-          intl.locale,
-        );
+        const station = included.stations[stationId];
+        const stationName =
+          station.nameTranslations[intl.locale] ?? station.name;
+        const segments = segmentText(stationName, intl.locale);
         for (let i = 0; i < tspans.length; i++) {
           const tspan = tspans[i];
 
@@ -282,10 +264,10 @@ export const StationMap: React.FC<Props> = (props) => {
           );
           labelElement.appendChild(titleElement);
         }
-        titleElement.textContent = stationTranslatedNames[stationId];
+        titleElement.textContent = stationName;
       }
     }
-  }, [ref, stationIdsAffected, stationTranslatedNames, intl.locale, navigate]);
+  }, [ref, branchesAffected, included.stations, intl.locale, navigate]);
 
   const defaultTab = useMemo(() => {
     if (currentDate == null) {
@@ -430,6 +412,8 @@ export const StationMap: React.FC<Props> = (props) => {
           <span className="text-gray-500 text-sm dark:text-gray-400">
             <FormattedList
               value={Array.from(stationIds).map((stationId) => {
+                const station = included.stations[stationId];
+
                 return (
                   <Link
                     className="hover:underline"
@@ -439,7 +423,9 @@ export const StationMap: React.FC<Props> = (props) => {
                       intl.locale,
                     )}
                   >
-                    {stationTranslatedNames[stationId] ?? stationId}
+                    {station.nameTranslations[intl.locale] ??
+                      station.name ??
+                      stationId}
                   </Link>
                 );
               })}

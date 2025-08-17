@@ -1,6 +1,8 @@
 import { useLayoutEffect, useState } from 'react';
+import z from 'zod';
 
-type Viewport = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+export const ViewportSchema = z.enum(['xs', 'sm', 'md', 'lg', 'xl', '2xl']);
+export type Viewport = z.infer<typeof ViewportSchema>;
 
 function computeViewport(width: number): Viewport {
   if (width >= 1536) {

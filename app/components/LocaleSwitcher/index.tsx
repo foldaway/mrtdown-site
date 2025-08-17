@@ -6,7 +6,7 @@ import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { LOCALES } from './constants';
 
 const navLinkClassNameFunction: NavLinkProps['className'] = ({ isActive }) => {
-  return classNames('text-xs hover:text-blue-400', {
+  return classNames('text-xs transition-colors hover:text-blue-400', {
     'text-blue-400 font-medium': isActive,
     'text-gray-300': !isActive,
   });

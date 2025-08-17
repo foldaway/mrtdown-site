@@ -1,0 +1,181 @@
+import classNames from 'classnames';
+import { Duration } from 'luxon';
+import type React from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { FormattedMessage, FormattedNumber, useIntl } from 'react-intl';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+} from 'recharts';
+import type { TimeScaleChart } from '~/client';
+import { FormattedDuration } from '~/components/FormattedDuration';
+import { getDateFormatOptions } from '../../../../../../helpers/getDateFormatOptions';
+import { CustomTooltip } from './components/CustomTooltip';
+import { displayMsFormatter } from './helpers/formatters';
+
+interface Props {
+  graphs: TimeScaleChart[];
+}
+
+export const DurationTrendCards: React.FC<Props> = (props) => {
+  const { graphs } = props;
+
+  const intl = useIntl();
+
+  const [graphIndex, setGraphIndex] = useState(0);
+  const graph = useMemo(() => graphs[graphIndex], [graphs, graphIndex]);
+
+  const tickFormatter = useCallback(
+    (date: string) => {
+      return intl.formatDate(
+        date,
+        getDateFormatOptions(graph.dataTimeScale.granularity),
+      );
+    },
+    [intl, graph],
+  );
+
+  return (
+    <div className="col-span-6 flex flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
+      <h3 className="mb-1 font-semibold text-base text-gray-900 dark:text-white">
+        <FormattedMessage
+          id="general.issue_duration_past_period"
+          defaultMessage="Issue duration (past {period})"
+          values={{
+            period: (
+              <FormattedNumber
+                value={
+                  graph.displayTimeScale?.count ?? graph.dataTimeScale.count
+                }
+                unit={
+                  graph.displayTimeScale?.granularity ??
+                  graph.dataTimeScale.granularity
+                }
+                unitDisplay="long"
+                style="unit"
+              />
+            ),
+          }}
+        />
+      </h3>
+      <div className="mb-1 font-bold text-3xl text-gray-900 dark:text-white">
+        <FormattedMessage
+          id="general.disruption_time_count"
+          defaultMessage="{duration} of disruption"
+          values={{
+            duration: (
+              <FormattedDuration
+                duration={Duration.fromObject({
+                  seconds: graph.dataCumulative[0].payload.disruption as number,
+                })}
+              />
+            ),
+          }}
+        />
+      </div>
+      <p className="mb-4 text-gray-500 text-sm dark:text-gray-400">
+        <FormattedMessage
+          id="general.change_since_previous"
+          defaultMessage="{change} vs previous"
+          values={{
+            change: (
+              <FormattedDuration
+                signDisplay="always"
+                duration={Duration.fromObject({
+                  seconds:
+                    (graph.dataCumulative[0].payload.disruption as number) -
+                    (graph.dataCumulative[1].payload.disruption as number),
+                })}
+              />
+            ),
+          }}
+        />
+      </p>
+      <div className="mb-4 h-48">
+        <ResponsiveContainer>
+          <LineChart
+            accessibilityLayer
+            data={graph.data}
+            layout="horizontal"
+            margin={{ top: 30, left: 5, right: 5, bottom: 5 }}
+          >
+            <CartesianGrid
+              vertical={false}
+              className="stroke-gray-300 dark:stroke-gray-600"
+            />
+            <XAxis
+              type="category"
+              dataKey="name"
+              className="text-gray-600 text-sm dark:text-gray-300"
+              tickFormatter={tickFormatter}
+            />
+            <Tooltip
+              formatter={displayMsFormatter}
+              content={(tooltipProps) => (
+                <CustomTooltip
+                  {...tooltipProps}
+                  granularity={graph.dataTimeScale.granularity}
+                />
+              )}
+            />
+            <Line
+              dataKey="payload.disruption"
+              className="stroke-disruption-light dark:stroke-disruption-dark"
+              stroke=""
+              radius={5}
+              type="monotone"
+              strokeWidth={2}
+            />
+
+            <Line
+              dataKey="payload.maintenance"
+              className="stroke-maintenance-light dark:stroke-maintenance-dark"
+              stroke=""
+              radius={5}
+              type="monotone"
+              strokeWidth={2}
+            />
+
+            <Line
+              dataKey="payload.infra"
+              className="stroke-infra-light dark:stroke-infra-dark"
+              stroke=""
+              radius={5}
+              type="monotone"
+              strokeWidth={2}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex items-center divide-x divide-gray-200 self-start rounded-lg border border-gray-200 bg-gray-50 shadow-sm dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
+        {graphs.map((graph, index) => (
+          <button
+            key={graph.title}
+            className={classNames(
+              'px-3 py-2 font-medium text-sm transition-colors first:rounded-l-lg last:rounded-r-lg hover:bg-gray-100 dark:hover:bg-gray-700',
+              graphIndex === index
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                : 'text-gray-600 dark:text-gray-400',
+            )}
+            type="button"
+            onClick={() => setGraphIndex(index)}
+          >
+            <FormattedNumber
+              value={graph.displayTimeScale?.count ?? graph.dataTimeScale.count}
+              style="unit"
+              unitDisplay="long"
+              unit={
+                graph.displayTimeScale?.granularity ??
+                graph.dataTimeScale.granularity
+              }
+            />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};

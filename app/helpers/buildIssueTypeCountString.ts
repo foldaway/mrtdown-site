@@ -1,23 +1,5 @@
 import type { IntlShape } from 'react-intl';
-import type { IssueRef, IssueType } from '~/types';
-
-export function buildIssueTypeCountStringWithArray(
-  issueRefs: IssueRef[],
-  intl: IntlShape,
-) {
-  const issueCountByType: Record<IssueType, number> = {
-    disruption: 0,
-    maintenance: 0,
-    infra: 0,
-  };
-  for (const issueRef of issueRefs) {
-    let count = issueCountByType[issueRef.type] ?? 0;
-    count++;
-    issueCountByType[issueRef.type] = count;
-  }
-
-  return buildIssueTypeCountString(issueCountByType, intl);
-}
+import type { IssueType } from '~/client';
 
 export function buildIssueTypeCountString(
   issueCountByType: Record<IssueType, number>,
