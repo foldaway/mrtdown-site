@@ -1,24 +1,40 @@
+import { ClockIcon } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
-import { type DateTime, Duration, Interval } from 'luxon';
+import { type DateTime, Duration } from 'luxon';
 import { Popover } from 'radix-ui';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import { Link } from 'react-router';
 import { useDebounce } from 'use-debounce';
+import type {
+  Issue,
+  Line,
+  LineSummaryDateRecord,
+  LineSummaryStatus,
+} from '~/client';
 import { FormattedDuration } from '~/components/FormattedDuration';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '../../../hooks/useHydrated';
-import type { DateSummary, Issue } from '../../../types';
-import { computeStatus } from '../helpers/computeStatus';
+import { DAY_TYPE_MESSAGE_DESCRIPTORS } from '../constants';
+import { useOperatingHours } from '../hooks/useOperatingHours';
+
+const DAY_IN_SECONDS = 24 * 60 * 60;
+
+interface Segment {
+  percentage: number;
+  type: LineSummaryStatus;
+}
 
 interface Props {
+  line: Line;
+  issues: Record<string, Issue>;
   dateTime: DateTime;
-  dateOverview: DateSummary;
+  data: LineSummaryDateRecord;
 }
 
 export const DateCard: React.FC<Props> = (props) => {
-  const { dateTime, dateOverview } = props;
-  const { issues, issueTypesDurationMs } = dateOverview;
+  const { line, dateTime, data, issues } = props;
+  const { breakdownByIssueTypes, dayType } = data;
 
   const [isOpen, setIsOpen] = useState(false);
   const [isOpenDebounced] = useDebounce(isOpen, 100);
@@ -26,23 +42,53 @@ export const DateCard: React.FC<Props> = (props) => {
   const isHydrated = useHydrated();
   const intl = useIntl();
 
-  const status = useMemo(() => computeStatus(issues), [issues]);
+  const operatingHours = useOperatingHours(line, dateTime, dayType);
 
-  const percentages = useMemo(() => {
-    const serviceHours = Interval.fromDateTimes(
-      dateTime.startOf('day').set({ hour: 5, minute: 30 }),
-      dateTime.startOf('day').plus({ days: 1 }),
-    );
+  const notInServiceDuration = useMemo(() => {
+    const startOfDay = dateTime.startOf('day');
+    const endOfDay = startOfDay.plus({ days: 1 });
 
-    return Object.fromEntries(
-      Object.entries(issueTypesDurationMs).map(([issueType, durationMs]) => {
-        return [
-          issueType,
-          (durationMs / serviceHours.toDuration().toMillis()) * 100,
-        ];
-      }),
-    );
-  }, [issueTypesDurationMs, dateTime]);
+    let duration = Duration.fromMillis(0);
+
+    if (operatingHours.start > startOfDay) {
+      duration = duration.plus(operatingHours.start.diff(startOfDay));
+    }
+
+    if (operatingHours.end < endOfDay) {
+      duration = duration.plus(endOfDay.diff(operatingHours.end));
+    }
+
+    return duration;
+  }, [dateTime, operatingHours]);
+
+  const segments = useMemo<Segment[]>(() => {
+    const results: Segment[] = [];
+
+    if (notInServiceDuration.as('seconds') > 0) {
+      const notInServiceSegment: Segment = {
+        percentage: notInServiceDuration.as('seconds') / DAY_IN_SECONDS,
+        type: 'closed_for_day',
+      };
+      results.push(notInServiceSegment);
+    }
+
+    for (const [issueType, entry] of Object.entries(breakdownByIssueTypes).sort(
+      (a, b) => a[1].totalDurationSeconds - b[1].totalDurationSeconds,
+    )) {
+      const percentage = Math.max(
+        entry.totalDurationSeconds / DAY_IN_SECONDS,
+        0.15,
+      );
+      if (percentage > 0) {
+        results.push({
+          percentage,
+          type: `ongoing_${issueType}` as LineSummaryStatus,
+        });
+      }
+    }
+
+    return results;
+  }, [breakdownByIssueTypes, notInServiceDuration]);
 
   return (
     <Popover.Root open={isOpenDebounced} onOpenChange={setIsOpen}>
@@ -52,24 +98,24 @@ export const DateCard: React.FC<Props> = (props) => {
         className="outline-none"
       >
         <div className="flex h-7 w-1.5 flex-col-reverse overflow-hidden rounded-xs bg-operational-light transition-transform hover:scale-150 dark:bg-operational-dark">
-          {Object.entries(percentages).map(
-            ([issueType, percentage]) =>
-              percentage > 0 && (
-                <div
-                  key={issueType}
-                  className={classNames('flex w-1.5 bg-blue-400', {
-                    'bg-disruption-light dark:bg-disruption-dark':
-                      issueType === 'disruption',
-                    'bg-maintenance-light dark:bg-maintenance-dark':
-                      issueType === 'maintenance',
-                    'bg-infra-light dark:bg-infra-dark': issueType === 'infra',
-                  })}
-                  style={{
-                    flexBasis: `${Math.max(25, percentage).toFixed(1)}%`,
-                  }}
-                />
-              ),
-          )}
+          {segments.map((segment) => (
+            <div
+              key={segment.type}
+              className={classNames('flex w-1.5', {
+                'bg-disruption-light dark:bg-disruption-dark':
+                  segment.type === 'ongoing_disruption',
+                'bg-maintenance-light dark:bg-maintenance-dark':
+                  segment.type === 'ongoing_maintenance',
+                'bg-infra-light dark:bg-infra-dark':
+                  segment.type === 'ongoing_infra',
+                'bg-gray-400 dark:bg-gray-600':
+                  segment.type === 'closed_for_day',
+              })}
+              style={{
+                height: `${(segment.percentage * 100).toFixed(1)}%`,
+              }}
+            />
+          ))}
         </div>
       </Popover.Trigger>
       <Popover.Portal>
@@ -78,7 +124,7 @@ export const DateCard: React.FC<Props> = (props) => {
           onMouseEnter={() => setIsOpen(true)}
           onMouseLeave={() => setIsOpen(false)}
         >
-          <span className="font-bold text-gray-600 text-sm dark:text-gray-300">
+          <span className="mb-1 font-bold text-gray-600 text-sm dark:text-gray-300">
             {isHydrated ? (
               <FormattedDate
                 value={dateTime.toJSDate()}
@@ -92,7 +138,116 @@ export const DateCard: React.FC<Props> = (props) => {
             )}
           </span>
 
-          {status == null && (
+          <div className="mb-1 grid grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-1">
+            <ClockIcon className="size-4 shrink-0 text-gray-500 dark:text-gray-400" />
+            <span className="font-bold text-gray-500 text-sm dark:text-gray-400">
+              <FormattedMessage
+                id="component.service_hours_title"
+                defaultMessage="Service hours ({type})"
+                values={{
+                  type: (
+                    <FormattedMessage
+                      {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]}
+                    />
+                  ),
+                }}
+              />
+            </span>
+            <div />
+            <span className="text-gray-500 text-sm dark:text-gray-400">
+              <FormattedMessage
+                id="component.service_hours_description"
+                defaultMessage="{start, time, short} to {end, time, short}"
+                values={{
+                  start: operatingHours.start.toMillis(),
+                  end: operatingHours.end.toMillis(),
+                }}
+              />
+            </span>
+          </div>
+
+          {notInServiceDuration.as('seconds') > 0 && (
+            <div className="flex items-center">
+              <div className="me-1 size-3 rounded-full bg-gray-400 hover:opacity-55 dark:bg-gray-600" />
+              <span className="text-gray-400 text-sm capitalize">
+                <FormattedMessage
+                  id="status.service_ended"
+                  defaultMessage="Service Ended"
+                />
+              </span>
+              <span className="ms-auto text-gray-400 text-sm">
+                {isHydrated ? (
+                  <FormattedDuration
+                    duration={notInServiceDuration.rescale()}
+                  />
+                ) : (
+                  notInServiceDuration.toISO()
+                )}
+              </span>
+            </div>
+          )}
+
+          {Object.entries(breakdownByIssueTypes).map(([key, entry]) => {
+            const issueType = key as Issue['type'];
+            return (
+              <div key={issueType} className="flex items-center">
+                <div
+                  className={classNames(
+                    'me-1 size-3 rounded-full hover:opacity-55',
+                    {
+                      'bg-disruption-light dark:bg-disruption-dark':
+                        issueType === 'disruption',
+                      'bg-maintenance-light dark:bg-maintenance-dark':
+                        issueType === 'maintenance',
+                      'bg-infra-light dark:bg-infra-dark':
+                        issueType === 'infra',
+                    },
+                  )}
+                />
+                <span className="text-gray-400 text-sm capitalize">
+                  {issueType === 'disruption' && (
+                    <FormattedMessage
+                      id="general.disruption"
+                      defaultMessage="Disruption"
+                    />
+                  )}
+                  {issueType === 'maintenance' && (
+                    <FormattedMessage
+                      id="general.maintenance"
+                      defaultMessage="Maintenance"
+                    />
+                  )}
+                  {issueType === 'infra' && (
+                    <FormattedMessage
+                      id="general.infrastructure"
+                      defaultMessage="Infrastructure"
+                    />
+                  )}
+                </span>
+                <span className="ms-auto text-gray-400 text-sm">
+                  {isHydrated ? (
+                    <FormattedDuration
+                      duration={Duration.fromObject({
+                        seconds: entry.totalDurationSeconds,
+                      })
+                        .rescale()
+                        .set({ seconds: 0 })
+                        .rescale()}
+                    />
+                  ) : (
+                    Duration.fromObject({
+                      seconds: entry.totalDurationSeconds,
+                    }).toISO()
+                  )}
+                </span>
+              </div>
+            );
+          })}
+
+          <span className="mt-4 mb-1 text-gray-400 text-xs uppercase dark:text-gray-400">
+            <FormattedMessage id="general.related" defaultMessage="Related" />
+          </span>
+          {Object.keys(breakdownByIssueTypes).length === 0 && (
             <span className="text-gray-500 text-sm dark:text-gray-400">
               <FormattedMessage
                 id="general.no_downtime_on_this_day"
@@ -100,93 +255,41 @@ export const DateCard: React.FC<Props> = (props) => {
               />
             </span>
           )}
-          {Object.entries(issueTypesDurationMs)
-            .filter(([, durationMs]) => durationMs > 0)
-            .map(([key, durationMs]) => {
-              const issueType = key as Issue['type'];
-              return (
-                <div key={issueType} className="flex items-center">
-                  <div
-                    className={classNames(
-                      'me-1 size-3 rounded-full hover:opacity-55',
-                      {
-                        'bg-disruption-light dark:bg-disruption-dark':
-                          issueType === 'disruption',
-                        'bg-maintenance-light dark:bg-maintenance-dark':
-                          issueType === 'maintenance',
-                        'bg-infra-light dark:bg-infra-dark':
-                          issueType === 'infra',
-                      },
-                    )}
-                  />
-                  <span className="text-gray-400 text-sm capitalize">
-                    {issueType === 'disruption' && (
-                      <FormattedMessage
-                        id="general.disruption"
-                        defaultMessage="Disruption"
-                      />
-                    )}
-                    {issueType === 'maintenance' && (
-                      <FormattedMessage
-                        id="general.maintenance"
-                        defaultMessage="Maintenance"
-                      />
-                    )}
-                    {issueType === 'infra' && (
-                      <FormattedMessage
-                        id="general.infrastructure"
-                        defaultMessage="Infrastructure"
-                      />
-                    )}
-                  </span>
-                  <span className="ms-auto text-gray-400 text-sm">
-                    {isHydrated ? (
-                      <FormattedDuration
-                        duration={Duration.fromObject({
-                          milliseconds: durationMs,
-                        })
-                          .rescale()
-                          .set({ seconds: 0 })
-                          .rescale()}
-                      />
-                    ) : (
-                      Duration.fromObject({
-                        milliseconds: durationMs,
-                      }).toISO()
-                    )}
-                  </span>
-                </div>
-              );
-            })}
-          {issues.length > 0 && (
-            <span className="mt-4 mb-1 text-gray-400 text-xs uppercase dark:text-gray-400">
-              <FormattedMessage id="general.related" defaultMessage="Related" />
-            </span>
-          )}
           <div className="flex flex-col gap-y-1">
-            {issues.map((issueRef) => (
-              <Link
-                key={issueRef.id}
-                to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
-                className="flex items-center gap-x-2 text-gray-600 text-sm hover:underline dark:text-gray-300"
-              >
-                <div
-                  className={classNames(
-                    'size-3 shrink-0 rounded-full hover:opacity-55',
-                    {
-                      'bg-disruption-light dark:bg-disruption-dark':
-                        issueRef.type === 'disruption',
-                      'bg-maintenance-light dark:bg-maintenance-dark':
-                        issueRef.type === 'maintenance',
-                      'bg-infra-light dark:bg-infra-dark':
-                        issueRef.type === 'infra',
-                    },
-                  )}
-                />
-                <span className="leading-tight">
-                  {issueRef.title_translations[intl.locale] ?? issueRef.title}
-                </span>
-              </Link>
+            {Object.entries(breakdownByIssueTypes).map(([issueType, entry]) => (
+              <Fragment key={issueType}>
+                {entry.issueIds.map((issueId) => {
+                  const issueRef = issues[issueId];
+                  return (
+                    <Link
+                      key={issueRef.id}
+                      to={buildLocaleAwareLink(
+                        `/issues/${issueRef.id}`,
+                        intl.locale,
+                      )}
+                      className="flex items-center gap-x-2 text-gray-600 text-sm hover:underline dark:text-gray-300"
+                    >
+                      <div
+                        className={classNames(
+                          'size-3 shrink-0 rounded-full hover:opacity-55',
+                          {
+                            'bg-disruption-light dark:bg-disruption-dark':
+                              issueType === 'disruption',
+                            'bg-maintenance-light dark:bg-maintenance-dark':
+                              issueType === 'maintenance',
+                            'bg-infra-light dark:bg-infra-dark':
+                              issueType === 'infra',
+                          },
+                        )}
+                      />
+                      <span className="leading-tight">
+                        {issueRef.titleTranslations[intl.locale] ??
+                          issueRef.title}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </Fragment>
             ))}
           </div>
           <Popover.Arrow className="fill-gray-300 dark:fill-gray-600" />

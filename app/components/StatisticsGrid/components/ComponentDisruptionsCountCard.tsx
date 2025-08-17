@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import type React from 'react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { FormattedMessage } from 'react-intl';
@@ -10,12 +9,8 @@ import {
   ResponsiveContainer,
   XAxis,
 } from 'recharts';
-import type { Component, Statistics } from '../../../types';
-
-interface Data {
-  line: string;
-  count: number;
-}
+import type { Chart } from '~/client';
+import { useIncludedEntities } from '~/contexts/IncludedEntities';
 
 interface TickProps extends React.SVGProps<SVGElement> {
   x: number;
@@ -29,14 +24,8 @@ const Tick: React.FC<TickProps> = (props) => {
   const { x, y, payload } = props;
 
   const componentId = payload.value;
-
-  const { data } = useQuery<Component>({
-    queryKey: ['components', componentId],
-    queryFn: () =>
-      fetch(
-        `https://data.mrtdown.org/source/component/${componentId}.json`,
-      ).then((r) => r.json()),
-  });
+  const { lines } = useIncludedEntities();
+  const line = useMemo(() => lines[componentId], [lines, componentId]);
 
   const [textRef, setTextRef] = useState<SVGTextElement | null>(null);
   const rectRef = useRef<SVGRectElement>(null);
@@ -55,7 +44,7 @@ const Tick: React.FC<TickProps> = (props) => {
     <g transform={`translate(${x},${y})`}>
       <rect
         ref={rectRef}
-        fill={data?.color}
+        fill={line.color}
         x={-21}
         y={1}
         width={42}
@@ -78,22 +67,11 @@ const Tick: React.FC<TickProps> = (props) => {
 };
 
 interface Props {
-  statistics: Statistics;
+  chart: Chart;
 }
 
 export const ComponentDisruptionsCountCard: React.FC<Props> = (props) => {
-  const { statistics } = props;
-
-  const chartData = useMemo<Data[]>(() => {
-    return Object.entries(statistics.componentsIssuesDisruptionCount).map(
-      ([componentId, count]) => {
-        return {
-          line: componentId,
-          count,
-        };
-      },
-    );
-  }, [statistics.componentsIssuesDisruptionCount]);
+  const { chart: graph } = props;
 
   return (
     <div className="flex flex-col justify-between rounded-lg border border-gray-300 p-6 shadow-lg sm:col-span-2 dark:border-gray-700">
@@ -107,7 +85,7 @@ export const ComponentDisruptionsCountCard: React.FC<Props> = (props) => {
         <ResponsiveContainer>
           <BarChart
             accessibilityLayer
-            data={chartData}
+            data={graph.data}
             layout="horizontal"
             margin={{ top: 30, left: 5, right: 5, bottom: 5 }}
           >
@@ -117,21 +95,49 @@ export const ComponentDisruptionsCountCard: React.FC<Props> = (props) => {
             />
             <XAxis
               type="category"
-              dataKey="line"
+              dataKey="name"
               className="text-gray-600 text-sm dark:text-gray-300"
               // @ts-ignore
               tick={<Tick />}
             />
             <Bar
-              dataKey="count"
-              className="fill-gray-700 dark:fill-gray-200"
+              dataKey="payload.disruption"
+              className="fill-disruption-light dark:fill-disruption-dark"
               stroke=""
-              radius={5}
               type="monotone"
               strokeWidth={2}
+              stackId="issueType"
             >
               <LabelList
-                position="top"
+                position="inside"
+                offset={12}
+                className="fill-foreground stroke-gray-400 text-sm dark:stroke-gray-500"
+              />
+            </Bar>
+            <Bar
+              dataKey="payload.maintenance"
+              className="fill-maintenance-light dark:fill-maintenance-dark"
+              stroke=""
+              type="monotone"
+              strokeWidth={2}
+              stackId="issueType"
+            >
+              <LabelList
+                position="inside"
+                offset={12}
+                className="fill-foreground stroke-gray-400 text-sm dark:stroke-gray-500"
+              />
+            </Bar>
+            <Bar
+              dataKey="payload.infra"
+              className="fill-infra-light dark:fill-infra-dark"
+              stroke=""
+              type="monotone"
+              strokeWidth={2}
+              stackId="issueType"
+            >
+              <LabelList
+                position="inside"
                 offset={12}
                 className="fill-foreground stroke-gray-400 text-sm dark:stroke-gray-500"
               />

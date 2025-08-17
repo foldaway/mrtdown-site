@@ -12,7 +12,7 @@
     "test": "vitest",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
-    "api:client:generate": "node app/scripts/generateApiClient.js"
+    "api:client:generate": "tsx app/scripts/generateApiClient.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

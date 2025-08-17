@@ -472,7 +472,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
               )}
             </span>
             {group.issueRefs.map((issueRef) => (
-              <IssueRefViewer key={issueRef.id} issueRef={issueRef} />
+              <IssueRefViewer key={issueRef.id} issue={issueRef} />
             ))}
           </div>
         ))}

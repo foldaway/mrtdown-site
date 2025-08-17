@@ -140,6 +140,15 @@ export default function App(props: Route.ComponentProps) {
               <FormattedMessage id="general.home" defaultMessage="Home" />
             </NavLink>
             <NavLink
+              to={buildLocaleAwareLink('/status', lang)}
+              className={navLinkClassNameFunction}
+            >
+              <FormattedMessage
+                id="general.system_status"
+                defaultMessage="System Status"
+              />
+            </NavLink>
+            <NavLink
               to={buildLocaleAwareLink('/history', lang)}
               className={navLinkClassNameFunction}
             >
@@ -224,7 +233,7 @@ export default function App(props: Route.ComponentProps) {
                     <li key={component.id}>
                       <Link
                         to={buildLocaleAwareLink(
-                          `/status/${component.id}`,
+                          `/lines/${component.id}`,
                           lang,
                         )}
                         className="flex items-center gap-x-1.5 text-sm transition-colors hover:text-blue-400"

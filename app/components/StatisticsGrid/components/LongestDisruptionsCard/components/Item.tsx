@@ -1,66 +1,47 @@
-import { DateTime, Interval } from 'luxon';
+import { Duration } from 'luxon';
 import { useMemo } from 'react';
-import { FormattedDateTimeRange, FormattedMessage, useIntl } from 'react-intl';
+import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import { Link } from 'react-router';
+import type { Issue } from '~/client';
+import { ComponentBar } from '~/components/ComponentBar';
 import { FormattedDuration } from '~/components/FormattedDuration';
+import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
-import { calculateDurationWithinServiceHours } from '../../../../../helpers/calculateDurationWithinServiceHours';
 import { useHydrated } from '../../../../../hooks/useHydrated';
-import type { IssueRef } from '../../../../../types';
-import { assert } from '../../../../../util/assert';
-import { ComponentBar } from '../../../../ComponentBar';
 
 interface Props {
-  issueRef: IssueRef;
+  issue: Issue;
 }
 
 export const Item: React.FC<Props> = (props) => {
-  const { issueRef } = props;
+  const { issue } = props;
 
   const intl = useIntl();
-
-  const startAt = useMemo(() => {
-    const dateTime = DateTime.fromISO(issueRef.startAt).setZone(
-      'Asia/Singapore',
-    );
-    assert(dateTime.isValid);
-    return dateTime;
-  }, [issueRef.startAt]);
-
-  const endAt = useMemo(() => {
-    if (issueRef.endAt == null) {
-      return DateTime.now().setZone('Asia/Singapore');
-    }
-    const dateTime = DateTime.fromISO(issueRef.endAt).setZone('Asia/Singapore');
-    assert(dateTime.isValid);
-    return dateTime;
-  }, [issueRef.endAt]);
-
-  const interval = useMemo(
-    () => Interval.fromDateTimes(startAt, endAt),
-    [startAt, endAt],
-  );
   const isHydrated = useHydrated();
+  const includedEntities = useIncludedEntities();
 
-  const durationWithinServiceHours = useMemo(() => {
-    return calculateDurationWithinServiceHours(startAt, endAt);
-  }, [startAt, endAt]);
+  const duration = useMemo(() => {
+    return Duration.fromMillis(issue.durationSeconds * 1000);
+  }, [issue.durationSeconds]);
+
+  const lines = useMemo(() => {
+    return issue.lineIds.map((lineId) => includedEntities.lines[lineId]);
+  }, [issue.lineIds, includedEntities.lines]);
 
   return (
     <div className="flex flex-col py-1">
       <Link
         className="hover:underline"
-        to={buildLocaleAwareLink(`/issues/${issueRef.id}`, intl.locale)}
+        to={buildLocaleAwareLink(`/issues/${issue.id}`, intl.locale)}
       >
         <span className="line-clamp-1 text-gray-700 text-sm dark:text-gray-200">
-          {issueRef.title_translations[intl.locale] ?? issueRef.title}
+          {issue.titleTranslations[intl.locale] ?? issue.title}
         </span>
       </Link>
       <time className="mt-0.5 mb-1.5 text-gray-400 text-xs dark:text-gray-500">
         {isHydrated ? (
-          <FormattedDateTimeRange
-            from={startAt.toJSDate()}
-            to={endAt.toJSDate()}
+          <FormattedDate
+            value={issue.intervals[0].startAt}
             month="short"
             day="numeric"
             year="numeric"
@@ -68,7 +49,7 @@ export const Item: React.FC<Props> = (props) => {
             minute="numeric"
           />
         ) : (
-          interval.toISO()
+          issue.intervals[0].startAt
         )}
         <br />
         {isHydrated ? (
@@ -78,7 +59,7 @@ export const Item: React.FC<Props> = (props) => {
             values={{
               duration: (
                 <FormattedDuration
-                  duration={durationWithinServiceHours
+                  duration={duration
                     .rescale()
                     .set({ seconds: 0, milliseconds: 0 })
                     .rescale()}
@@ -87,10 +68,12 @@ export const Item: React.FC<Props> = (props) => {
             }}
           />
         ) : (
-          durationWithinServiceHours.toISO()
+          duration.toISO()
         )}
       </time>
-      <ComponentBar componentIds={issueRef.componentIdsAffected} />
+      <div className="flex items-center">
+        <ComponentBar components={lines} />
+      </div>
     </div>
   );
 };

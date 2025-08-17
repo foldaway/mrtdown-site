@@ -1,7 +1,13 @@
 import classNames from 'classnames';
 import { DateTime, Duration } from 'luxon';
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  FormattedMessage,
+  FormattedNumber,
+  FormattedRelativeTime,
+  useIntl,
+} from 'react-intl';
 import {
   CartesianGrid,
   Line,
@@ -10,18 +16,14 @@ import {
   Tooltip,
   XAxis,
 } from 'recharts';
+import type { TimeScaleChart } from '~/client';
+import { FormattedDuration } from '~/components/FormattedDuration';
+import { getDateFormatOptions } from '../../../../helpers/getDateFormatOptions';
 import type { IssueType, Statistics } from '../../../../types';
 import { assert } from '../../../../util/assert';
 import { CustomTooltip } from './components/CustomTooltip';
 import { changeMsFormatter, displayMsFormatter } from './helpers/formatters';
 import type { Data } from './types';
-import {
-  FormattedMessage,
-  FormattedNumber,
-  FormattedRelativeTime,
-  useIntl,
-} from 'react-intl';
-import { FormattedDuration } from '~/components/FormattedDuration';
 
 type Bucket = {
   display?: {
@@ -35,160 +37,45 @@ type Bucket = {
 };
 
 interface Props {
-  statistics: Statistics;
+  graphs: TimeScaleChart[];
 }
 
-const BUCKETS: Bucket[] = [
-  {
-    data: {
-      unit: 'day',
-      count: 7,
-    },
-  },
-  {
-    display: {
-      unit: 'month',
-      count: 1,
-    },
-    data: {
-      unit: 'day',
-      count: 28,
-    },
-  },
-  {
-    data: {
-      unit: 'month',
-      count: 6,
-    },
-  },
-  {
-    data: {
-      unit: 'month',
-      count: 12,
-    },
-  },
-  {
-    data: {
-      unit: 'year',
-      count: 10,
-    },
-  },
-  {
-    data: {
-      unit: 'year',
-      count: 20,
-    },
-  },
-];
-
 export const DurationTrendCards: React.FC<Props> = (props) => {
-  const { statistics } = props;
+  const { graphs } = props;
 
   const intl = useIntl();
 
-  const [bucket, setBucket] = useState<Bucket>({
-    data: {
-      unit: 'month',
-      count: 6,
+  const [graphIndex, setGraphIndex] = useState(0);
+  const graph = useMemo(() => graphs[graphIndex], [graphs, graphIndex]);
+
+  const tickFormatter = useCallback(
+    (date: string) => {
+      return intl.formatDate(
+        date,
+        getDateFormatOptions(graph.dataTimeScale.granularity),
+      );
     },
-  });
-
-  const chartData = useMemo<Data[]>(() => {
-    const dataByBucket: Record<string, Data> = {};
-
-    const currentBucketDateTime = DateTime.now().startOf(bucket.data.unit);
-
-    let format: string;
-    switch (bucket.data.unit) {
-      case 'day': {
-        format = 'd/M';
-        break;
-      }
-      case 'month': {
-        format = 'LLLL';
-        break;
-      }
-      case 'year': {
-        format = 'yyyy';
-        break;
-      }
-    }
-
-    for (let i = 0; i < bucket.data.count; i++) {
-      const bucketDateTime = currentBucketDateTime.minus({
-        [bucket.data.unit]: i,
-      });
-      const bucketIso = bucketDateTime.toISODate();
-      dataByBucket[bucketIso] = {
-        bucketLabel: bucketDateTime
-          .reconfigure({ locale: intl.locale })
-          .toFormat(format),
-        durationMsByIssueType: {
-          disruption: 0,
-          maintenance: 0,
-          infra: 0,
-        },
-      };
-    }
-
-    for (const [dateIso, dateSummary] of Object.entries(statistics.dates)) {
-      const dateTime = DateTime.fromISO(dateIso);
-      assert(dateTime.isValid);
-      const diff = currentBucketDateTime
-        .diff(dateTime.startOf(bucket.data.unit))
-        .as(bucket.data.unit);
-      if (diff < 0 || diff >= bucket.data.count) {
-        continue;
-      }
-      const bucketDateTime = dateTime.startOf(bucket.data.unit);
-      const bucketIso = bucketDateTime.toISODate();
-      for (const issueType of [
-        'disruption',
-        'maintenance',
-        'infra',
-      ] satisfies IssueType[]) {
-        const bucketData = dataByBucket[bucketIso] ?? {
-          bucketLabel: bucketDateTime
-            .reconfigure({ locale: intl.locale })
-            .toFormat(format),
-          durationMsByIssueType: {
-            disruption: 0,
-            maintenance: 0,
-            infra: 0,
-          },
-        };
-        bucketData.durationMsByIssueType[issueType] +=
-          dateSummary.issueTypesDurationMs[issueType] ?? 0;
-        dataByBucket[bucketIso] = bucketData;
-      }
-    }
-
-    const data: Data[] = [];
-
-    const bucketKeys = Object.keys(dataByBucket);
-    bucketKeys.sort();
-
-    for (const bucketKey of bucketKeys) {
-      const bucketData = dataByBucket[bucketKey];
-
-      data.push(bucketData);
-    }
-
-    return data;
-  }, [statistics, bucket, intl.locale]);
+    [intl, graph],
+  );
 
   return (
     <div className="flex flex-col rounded-lg border border-gray-300 p-6 shadow-lg sm:col-span-3 dark:border-gray-700">
       <span className="text-base">
         <FormattedMessage
-          id="general.issue_duration_this_period"
-          defaultMessage="Issue duration {period}"
+          id="general.issue_duration_past_period"
+          defaultMessage="Issue duration (past {period})"
           values={{
             period: (
-              <FormattedRelativeTime
-                value={0}
-                unit={bucket.data.unit}
-                numeric="auto"
+              <FormattedNumber
+                value={
+                  graph.displayTimeScale?.count ?? graph.dataTimeScale.count
+                }
+                unit={
+                  graph.displayTimeScale?.granularity ??
+                  graph.dataTimeScale.granularity
+                }
+                unitDisplay="long"
+                style="unit"
               />
             ),
           }}
@@ -201,10 +88,9 @@ export const DurationTrendCards: React.FC<Props> = (props) => {
           values={{
             duration: (
               <FormattedDuration
-                duration={Duration.fromMillis(
-                  chartData[chartData.length - 1].durationMsByIssueType
-                    .disruption,
-                )}
+                duration={Duration.fromObject({
+                  seconds: graph.dataCumulative[0].payload.disruption as number,
+                })}
               />
             ),
           }}
@@ -212,28 +98,17 @@ export const DurationTrendCards: React.FC<Props> = (props) => {
       </span>
       <span className="text-gray-400 text-sm dark:text-gray-500">
         <FormattedMessage
-          id="general.change_since_last_period"
-          defaultMessage="{change} from {period}"
+          id="general.change_since_previous"
+          defaultMessage="{change} vs previous"
           values={{
             change: (
               <FormattedDuration
                 signDisplay="always"
-                duration={Duration.fromMillis(
-                  chartData[chartData.length - 1].durationMsByIssueType
-                    .disruption -
-                    chartData[chartData.length - 2].durationMsByIssueType
-                      .disruption,
-                )
-                  .rescale()
-                  .set({ seconds: 0 })
-                  .rescale()}
-              />
-            ),
-            period: (
-              <FormattedRelativeTime
-                value={-1}
-                unit={bucket.data.unit}
-                numeric="auto"
+                duration={Duration.fromObject({
+                  seconds:
+                    (graph.dataCumulative[0].payload.disruption as number) -
+                    (graph.dataCumulative[1].payload.disruption as number),
+                })}
               />
             ),
           }}
@@ -243,7 +118,7 @@ export const DurationTrendCards: React.FC<Props> = (props) => {
         <ResponsiveContainer>
           <LineChart
             accessibilityLayer
-            data={chartData}
+            data={graph.data}
             layout="horizontal"
             margin={{ top: 30, left: 5, right: 5, bottom: 5 }}
           >
@@ -253,16 +128,21 @@ export const DurationTrendCards: React.FC<Props> = (props) => {
             />
             <XAxis
               type="category"
-              dataKey="bucketLabel"
+              dataKey="name"
               className="text-gray-600 text-sm dark:text-gray-300"
+              tickFormatter={tickFormatter}
             />
             <Tooltip
               formatter={displayMsFormatter}
-              // @ts-expect-error typing issue
-              content={CustomTooltip}
+              content={(tooltipProps) => (
+                <CustomTooltip
+                  {...tooltipProps}
+                  granularity={graph.dataTimeScale.granularity}
+                />
+              )}
             />
             <Line
-              dataKey="durationMsByIssueType.disruption"
+              dataKey="payload.disruption"
               className="stroke-disruption-light dark:stroke-disruption-dark"
               stroke=""
               radius={5}
@@ -271,7 +151,7 @@ export const DurationTrendCards: React.FC<Props> = (props) => {
             />
 
             <Line
-              dataKey="durationMsByIssueType.maintenance"
+              dataKey="payload.maintenance"
               className="stroke-maintenance-light dark:stroke-maintenance-dark"
               stroke=""
               radius={5}
@@ -280,7 +160,7 @@ export const DurationTrendCards: React.FC<Props> = (props) => {
             />
 
             <Line
-              dataKey="durationMsByIssueType.infra"
+              dataKey="payload.infra"
               className="stroke-infra-light dark:stroke-infra-dark"
               stroke=""
               radius={5}
@@ -291,23 +171,26 @@ export const DurationTrendCards: React.FC<Props> = (props) => {
         </ResponsiveContainer>
       </div>
       <div className="flex items-center divide-x divide-gray-300 self-start rounded-md border border-gray-300 dark:divide-gray-600 dark:border-gray-600">
-        {BUCKETS.map((optionBucket) => (
+        {graphs.map((graph, index) => (
           <button
-            key={`${optionBucket.data.unit}:${optionBucket.data.count}`}
+            key={graph.title}
             className={classNames(
               'px-2 py-0.5 text-xs',
-              optionBucket.data.unit === bucket.data.unit &&
-                optionBucket.data.count === bucket.data.count
+              graphIndex === index
                 ? 'bg-gray-400 text-gray-50 dark:bg-gray-500 dark:text-gray-200'
                 : 'text-gray-400 dark:text-gray-500',
             )}
             type="button"
-            onClick={() => setBucket(optionBucket)}
+            onClick={() => setGraphIndex(index)}
           >
             <FormattedNumber
-              value={optionBucket.display?.count ?? optionBucket.data.count}
+              value={graph.displayTimeScale?.count ?? graph.dataTimeScale.count}
               style="unit"
-              unit={optionBucket.display?.unit ?? optionBucket.data.unit}
+              unitDisplay="long"
+              unit={
+                graph.displayTimeScale?.granularity ??
+                graph.dataTimeScale.granularity
+              }
             />
           </button>
         ))}

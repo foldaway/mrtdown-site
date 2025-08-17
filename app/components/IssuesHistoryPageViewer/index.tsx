@@ -31,7 +31,7 @@ export const IssuesHistoryPageViewer: React.FC<Props> = (props) => {
             )}
           </span>
           {section.issueRefs.map((issueRef) => (
-            <IssueRefViewer key={issueRef.id} issueRef={issueRef} />
+            <IssueRefViewer key={issueRef.id} issue={issueRef} />
           ))}
         </div>
       ))}

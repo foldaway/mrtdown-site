@@ -1,20 +1,21 @@
-import type React from 'react';
-import type { Data } from '../types';
-import { FormattedDuration } from '~/components/FormattedDuration';
 import { Duration } from 'luxon';
-import { FormattedMessage } from 'react-intl';
+import type React from 'react';
+import { FormattedDate, FormattedMessage } from 'react-intl';
+import type { ChartEntry, Granularity } from '~/client';
+import { FormattedDuration } from '~/components/FormattedDuration';
+import { getDateFormatOptions } from '~/helpers/getDateFormatOptions';
 
 interface Props {
   active?: boolean;
   payload?: {
-    payload?: Data;
-    value?: number;
+    payload?: ChartEntry;
   }[];
   label?: string;
+  granularity: Granularity;
 }
 
 export const CustomTooltip: React.FC<Props> = (props) => {
-  const { active, payload, label } = props;
+  const { active, payload, label, granularity } = props;
 
   if (!active) {
     return null;
@@ -25,7 +26,7 @@ export const CustomTooltip: React.FC<Props> = (props) => {
   return (
     <div className="flex flex-col rounded border border-gray-300 bg-gray-50 px-4 py-1 dark:border-gray-700 dark:bg-gray-800">
       <span className="mb-1 text-gray-900 text-xs dark:text-gray-50">
-        {label}
+        <FormattedDate value={label} {...getDateFormatOptions(granularity)} />
       </span>
       <div className="flex items-center justify-between gap-x-2">
         <div className="flex items-center">
@@ -40,7 +41,7 @@ export const CustomTooltip: React.FC<Props> = (props) => {
         <span className="ms-auto text-xs">
           <FormattedDuration
             duration={Duration.fromMillis(
-              data?.durationMsByIssueType?.disruption ?? 0,
+              ((data?.payload?.disruption ?? 0) as number) * 1000,
             )}
           />
         </span>
@@ -58,7 +59,7 @@ export const CustomTooltip: React.FC<Props> = (props) => {
         <span className="ms-auto text-xs">
           <FormattedDuration
             duration={Duration.fromMillis(
-              data?.durationMsByIssueType?.maintenance ?? 0,
+              ((data?.payload?.maintenance ?? 0) as number) * 1000,
             )}
           />
         </span>
@@ -76,7 +77,7 @@ export const CustomTooltip: React.FC<Props> = (props) => {
         <span className="ms-auto text-xs">
           <FormattedDuration
             duration={Duration.fromMillis(
-              data?.durationMsByIssueType?.infra ?? 0,
+              ((data?.payload?.infra ?? 0) as number) * 1000,
             )}
           />
         </span>
