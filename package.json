@@ -23,6 +23,7 @@
     "html-entities": "^2.6.0",
     "isbot": "^5",
     "luxon": "^3.5.0",
+    "radix-ui": "^1.4.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-intl": "^7.1.10",
