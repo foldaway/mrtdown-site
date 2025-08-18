@@ -1,6 +1,6 @@
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
-import * as Popover from '@radix-ui/react-popover';
 import { type DateTime, Duration } from 'luxon';
+import { Popover } from 'radix-ui';
 import { useMemo, useState } from 'react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import { useDebounce } from 'use-debounce';

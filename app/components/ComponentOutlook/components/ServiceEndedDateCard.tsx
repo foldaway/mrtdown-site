@@ -1,9 +1,9 @@
-import * as Popover from '@radix-ui/react-popover';
 import type { DateTime } from 'luxon';
+import { Popover } from 'radix-ui';
 import { useState } from 'react';
+import { FormattedDate, FormattedMessage } from 'react-intl';
 import { useDebounce } from 'use-debounce';
 import { useHydrated } from '../../../hooks/useHydrated';
-import { FormattedDate, FormattedMessage } from 'react-intl';
 
 interface Props {
   dateTime: DateTime;
