@@ -1,6 +1,6 @@
-import * as Popover from '@radix-ui/react-popover';
 import classNames from 'classnames';
 import { type DateTime, Duration, Interval } from 'luxon';
+import { Popover } from 'radix-ui';
 import { useMemo, useState } from 'react';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import { Link } from 'react-router';
