@@ -8,6 +8,9 @@ import {
   useIntl,
 } from 'react-intl';
 import { Link } from 'react-router';
+import type { Issue, Line, LineSummary } from '~/client';
+import { LineSummaryStatusLabels } from '~/constants';
+import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '../../hooks/useHydrated';
 import type { DateSummary } from '../../types';
@@ -16,56 +19,34 @@ import { DateCard } from './components/DateCard';
 import { NonOperationalDateCard } from './components/NonOperationalDateCard';
 import { ServiceEndedDateCard } from './components/ServiceEndedDateCard';
 import { UptimeCard } from './components/UptimeCard';
-import type { ComponentBreakdown } from './helpers/computeComponentBreakdowns';
 import { computeStatus } from './helpers/computeStatus';
 
-const DATE_OVERVIEW_DEFAULT: DateSummary = {
-  issueTypesDurationMs: {},
-  issueTypesIntervalsNoOverlapMs: {},
-  issues: [],
-  componentIdsIssueTypesDurationMs: {},
-  componentIdsIssueTypesIntervalsNoOverlapMs: {},
-};
-
 interface Props {
-  breakdown: ComponentBreakdown;
+  data: LineSummary;
   dateTimes: DateTime<true>[];
 }
 
 export const ComponentOutlook: React.FC<Props> = (props) => {
-  const { breakdown, dateTimes } = props;
-  const { component, dates } = breakdown;
+  const { data, dateTimes } = props;
+  const { lineId, status, breakdownByDates } = data;
 
   const intl = useIntl();
 
+  const { lines, issues } = useIncludedEntities();
+  const line = lines[lineId];
+
   const componentStartedAtDateTime = useMemo(() => {
-    return DateTime.fromISO(component.startedAt);
-  }, [component.startedAt]);
+    if (line.startedAt == null) {
+      return null;
+    }
+    return DateTime.fromISO(line.startedAt);
+  }, [line.startedAt]);
 
   const now = dateTimes[dateTimes.length - 1];
   const serviceStartToday = useMemo(
     () => now.set({ hour: 5, minute: 30 }),
     [now],
   );
-
-  const isComponentInService = useMemo(() => {
-    return componentStartedAtDateTime < now;
-  }, [now, componentStartedAtDateTime]);
-
-  const statusNow = useMemo(() => {
-    const nowIsoDate = now.toISODate();
-    assert(nowIsoDate != null);
-
-    if (now < serviceStartToday) {
-      return 'service ended';
-    }
-
-    if (breakdown.issuesOngoing.length === 0) {
-      return 'operational';
-    }
-
-    return computeStatus(breakdown.issuesOngoing) ?? 'operational';
-  }, [now, serviceStartToday, breakdown.issuesOngoing]);
 
   const isHydrated = useHydrated();
 
@@ -74,80 +55,43 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
       <div className="mb-1.5 flex items-center gap-x-1.5">
         <span
           className="rounded-sm px-2 py-0.5 font-semibold text-white text-xs"
-          style={{ backgroundColor: component.color }}
+          style={{ backgroundColor: line.color }}
         >
-          {component.id}
+          {line.id}
         </span>
         <Link
           className="overflow-hidden truncate font-bold text-base text-gray-700 hover:underline dark:text-gray-200"
-          to={buildLocaleAwareLink(`/lines/${component.id}`, intl.locale)}
+          to={buildLocaleAwareLink(`/lines/${line.id}`, intl.locale)}
         >
-          {component.title_translations[intl.locale] ?? component.title}
+          {line.titleTranslations[intl.locale] ?? line.title}
         </Link>
         <div className="flex grow justify-end truncate">
-          {isComponentInService ? (
-            <>
-              <span
-                className={classNames('ms-auto truncate text-sm capitalize', {
-                  'text-disruption-light dark:text-disruption-dark':
-                    statusNow === 'disruption',
-                  'text-maintenance-light dark:text-maintenance-dark':
-                    statusNow === 'maintenance',
-                  'text-infra-light dark:text-infra-dark':
-                    statusNow === 'infra',
-                  'text-operational-light dark:text-operational-dark':
-                    statusNow === 'operational',
-                  'text-gray-400 dark:text-gray-500':
-                    statusNow === 'service ended',
-                })}
-              >
-                {statusNow === 'disruption' && (
-                  <FormattedMessage
-                    id="general.disruption"
-                    defaultMessage="Disruption"
-                  />
-                )}{' '}
-                {statusNow === 'maintenance' && (
-                  <FormattedMessage
-                    id="general.maintenance"
-                    defaultMessage="Maintenance"
-                  />
-                )}
-                {statusNow === 'infra' && (
-                  <FormattedMessage
-                    id="general.infrastructure"
-                    defaultMessage="Infrastructure"
-                  />
-                )}
-                {statusNow === 'operational' && (
-                  <FormattedMessage
-                    id="status.operational"
-                    defaultMessage="Operational"
-                  />
-                )}
-                {statusNow === 'service ended' && (
-                  <FormattedMessage
-                    id="status.service_ended"
-                    defaultMessage="Service Ended"
-                  />
-                )}
-              </span>
-            </>
-          ) : (
-            <span className="text-gray-400 text-sm dark:text-gray-500">
-              <FormattedMessage
-                id="status.not_in_service"
-                defaultMessage="Not in Service"
-              />
-            </span>
-          )}
+          <span
+            className={classNames('ms-auto truncate text-sm capitalize', {
+              'text-disruption-light dark:text-disruption-dark':
+                status === 'ongoing_disruption',
+              'text-maintenance-light dark:text-maintenance-dark':
+                status === 'ongoing_maintenance',
+              'text-infra-light dark:text-infra-dark':
+                status === 'ongoing_infra',
+              'text-operational-light dark:text-operational-dark':
+                status === 'normal',
+              'text-gray-400 dark:text-gray-500':
+                status === 'closed_for_day' || status === 'future_service',
+            })}
+          >
+            <FormattedMessage {...LineSummaryStatusLabels[status]} />
+          </span>
         </div>
       </div>
 
       <div className="flex items-center justify-between gap-x-1">
         {dateTimes.map((dateTime) => {
           const dateTimeIsoDate = dateTime.toISODate();
-          if (dateTime < componentStartedAtDateTime) {
+          if (
+            componentStartedAtDateTime == null ||
+            dateTime < componentStartedAtDateTime
+          ) {
             return <NonOperationalDateCard key={dateTime.valueOf()} />;
           }
           if (dateTime.hasSame(now, 'day') && now < serviceStartToday) {
@@ -155,14 +99,23 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
               <ServiceEndedDateCard
                 key={dateTime.valueOf()}
                 dateTime={dateTime}
+                dayType={breakdownByDates[dateTimeIsoDate].dayType}
+                componentRef={line}
               />
             );
           }
+
+          if (!(dateTimeIsoDate in breakdownByDates)) {
+            return null;
+          }
+
           return (
             <DateCard
               key={dateTime.valueOf()}
               dateTime={dateTime}
-              dateOverview={dates[dateTimeIsoDate] ?? DATE_OVERVIEW_DEFAULT}
+              data={breakdownByDates[dateTimeIsoDate]}
+              line={line}
+              issues={issues}
             />
           );
         })}
@@ -181,9 +134,9 @@ export const ComponentOutlook: React.FC<Props> = (props) => {
             dateTimes[0].toISO()
           )}
         </span>
-        {isComponentInService && (
+        {data.status !== 'future_service' && (
           <div className="flex items-center">
-            <UptimeCard dates={dates} dateTimes={dateTimes} />
+            <UptimeCard data={data} dateTimes={dateTimes} />
           </div>
         )}
         <span className="text-gray-500 text-xs capitalize dark:text-gray-400">

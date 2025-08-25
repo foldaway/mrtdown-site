@@ -1,7 +1,7 @@
 import { ClockIcon, StarIcon } from '@heroicons/react/24/outline';
-import * as Tabs from '@radix-ui/react-tabs';
 import { useQuery } from '@tanstack/react-query';
 import { DateTime } from 'luxon';
+import { Tabs } from 'radix-ui';
 import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {

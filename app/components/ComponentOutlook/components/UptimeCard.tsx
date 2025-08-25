@@ -1,86 +1,54 @@
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
-import * as Popover from '@radix-ui/react-popover';
+import classNames from 'classnames';
 import { type DateTime, Duration } from 'luxon';
-import { useMemo, useState } from 'react';
-import { FormattedMessage, FormattedNumber } from 'react-intl';
+import { Popover } from 'radix-ui';
+import { useState } from 'react';
+import {
+  defineMessage,
+  FormattedMessage,
+  FormattedNumber,
+  type MessageDescriptor,
+} from 'react-intl';
 import { useDebounce } from 'use-debounce';
+import type { ComponentStatusSummary } from '~/client';
 import { FormattedDuration } from '~/components/FormattedDuration';
-import type { DateSummary, IssueType } from '../../../types';
+import type { IssueType } from '~/types';
+import { assert } from '~/util/assert';
 
-const DATE_OVERVIEW_DEFAULT: DateSummary = {
-  issueTypesDurationMs: {},
-  issues: [],
-  componentIdsIssueTypesDurationMs: {},
+const ISSUE_TYPE_MESSAGE_DESCRIPTORS: Record<IssueType, MessageDescriptor> = {
+  disruption: defineMessage({
+    id: 'general.disruption',
+    defaultMessage: 'Disruption',
+  }),
+  maintenance: defineMessage({
+    id: 'general.maintenance',
+    defaultMessage: 'Maintenance',
+  }),
+  infra: defineMessage({
+    id: 'general.infrastructure',
+    defaultMessage: 'Infrastructure',
+  }),
 };
 
 interface Props {
+  data: Pick<
+    ComponentStatusSummary,
+    | 'durationSecondsByIssueType'
+    | 'durationSecondsTotalForIssues'
+    | 'uptimeRatio'
+    | 'totalDowntimeSeconds'
+    | 'totalServiceSeconds'
+    | 'downtimeBreakdown'
+  >;
   dateTimes: DateTime<true>[];
-  dates: Record<string, DateSummary>;
 }
 
 export const UptimeCard: React.FC<Props> = (props) => {
-  const { dateTimes, dates } = props;
+  const { data } = props;
+  assert(data.uptimeRatio != null);
 
   const [isOpen, setIsOpen] = useState(false);
   const [isOpenDebounced] = useDebounce(isOpen, 100);
-
-  const totalDuration = useMemo(() => {
-    // Account for service hours, 5:30 AM - 12 midnight
-    return Duration.fromObject({
-      hours: 18.5 * dateTimes.length,
-    }).rescale();
-  }, [dateTimes.length]);
-
-  const {
-    total: downtimeDuration,
-    disruption: downtimeDurationDisruption,
-    maintenance: downtimeDurationMaintenance,
-  } = useMemo(() => {
-    let durationTotal = Duration.fromObject({ milliseconds: 0 });
-    let durationDisruption = Duration.fromObject({ milliseconds: 0 });
-    let durationMaintenance = Duration.fromObject({ milliseconds: 0 });
-
-    for (const dateTime of dateTimes) {
-      const dateOverview = dates[dateTime.toISODate()] ?? DATE_OVERVIEW_DEFAULT;
-
-      for (const [issueType, durationMs] of Object.entries(
-        dateOverview.issueTypesDurationMs,
-      )) {
-        switch (issueType as IssueType) {
-          case 'disruption': {
-            durationTotal = durationTotal.plus({
-              milliseconds: durationMs,
-            });
-            durationDisruption = durationDisruption.plus({
-              milliseconds: durationMs,
-            });
-            break;
-          }
-          case 'maintenance': {
-            durationTotal = durationTotal.plus({
-              milliseconds: durationMs,
-            });
-            durationMaintenance = durationMaintenance.plus({
-              milliseconds: durationMs,
-            });
-            break;
-          }
-          case 'infra': {
-            // Don't include infra issues in downtime calculation
-            break;
-          }
-        }
-      }
-    }
-
-    return {
-      total: durationTotal.rescale(),
-      disruption: durationDisruption.rescale(),
-      maintenance: durationMaintenance.rescale(),
-    };
-  }, [dateTimes, dates]);
-
-  const percentage = downtimeDuration.toMillis() / totalDuration.toMillis();
 
   return (
     <>
@@ -91,7 +59,7 @@ export const UptimeCard: React.FC<Props> = (props) => {
           values={{
             percent: (
               <FormattedNumber
-                value={1 - percentage}
+                value={data.uptimeRatio}
                 style="percent"
                 maximumFractionDigits={2}
               />
@@ -99,7 +67,7 @@ export const UptimeCard: React.FC<Props> = (props) => {
           }}
         />
       </span>
-      {downtimeDuration.toMillis() > 0 && (
+      {data.totalDowntimeSeconds != null && (
         <Popover.Root open={isOpenDebounced} onOpenChange={setIsOpen}>
           <Popover.Trigger
             onMouseEnter={() => setIsOpen(true)}
@@ -121,69 +89,74 @@ export const UptimeCard: React.FC<Props> = (props) => {
                   id="general.uptime_duration_display"
                   defaultMessage="{duration} within service hours"
                   values={{
-                    duration: <FormattedDuration duration={downtimeDuration} />,
+                    duration: (
+                      <FormattedDuration
+                        duration={Duration.fromObject({
+                          seconds: data.totalDowntimeSeconds,
+                        })}
+                      />
+                    ),
                   }}
                 />
               </span>
 
               <table className="mt-1 table-auto text-gray-500 text-xs dark:text-gray-400">
                 <tbody>
-                  <tr>
-                    <td>
-                      <div className="flex items-center py-0.5 pe-1">
-                        <div className="me-1 size-3 rounded-full bg-disruption-light hover:opacity-55 dark:bg-disruption-dark" />
+                  {data.downtimeBreakdown?.map((breakdown) => (
+                    <tr key={breakdown.type}>
+                      <td>
+                        <div className="flex items-center py-0.5 pe-1">
+                          <div
+                            className={classNames(
+                              'me-1 size-3 rounded-full hover:opacity-55',
+                              {
+                                'bg-disruption-light dark:bg-disruption-dark':
+                                  breakdown.type === 'disruption',
+                                'bg-maintenance-light dark:bg-maintenance-dark':
+                                  breakdown.type === 'maintenance',
+                                'bg-infra-light dark:bg-infra-dark':
+                                  breakdown.type === 'infra',
+                              },
+                            )}
+                          />
+                          <span className="text-xs">
+                            <FormattedMessage
+                              {...ISSUE_TYPE_MESSAGE_DESCRIPTORS[
+                                breakdown.type
+                              ]}
+                            />
+                          </span>
+                        </div>
+                      </td>
+                      <td>
                         <span className="text-xs">
-                          <FormattedMessage
-                            id="general.disruption"
-                            defaultMessage="Disruption"
+                          <FormattedDuration
+                            duration={Duration.fromObject({
+                              seconds: breakdown.downtimeSeconds,
+                            })}
                           />
                         </span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="text-xs">
-                        <FormattedDuration
-                          duration={downtimeDurationDisruption}
-                        />
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <div className="flex items-center py-0.5 pe-1">
-                        <div className="me-1 size-3 rounded-full bg-maintenance-light hover:opacity-55 dark:bg-maintenance-dark" />
-                        <span className="text-xs">
-                          <FormattedMessage
-                            id="general.maintenance"
-                            defaultMessage="Maintenance"
-                          />
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="text-xs">
-                        <FormattedDuration
-                          duration={downtimeDurationMaintenance}
-                        />
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <div className="flex items-center py-0.5 pe-1">
-                        <div className="me-1 size-3 rounded-full bg-infra-light hover:opacity-55 dark:bg-infra-dark" />
-                        <span className="text-xs">
-                          <FormattedMessage
-                            id="general.infrastructure"
-                            defaultMessage="Infrastructure"
-                          />
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="text-xs">-</span>
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+                  ))}
+                  {'infra' in data.durationSecondsByIssueType && (
+                    <tr>
+                      <td>
+                        <div className="flex items-center py-0.5 pe-1">
+                          <div className="me-1 size-3 rounded-full bg-infra-light hover:opacity-55 dark:bg-infra-dark" />
+                          <span className="text-xs">
+                            <FormattedMessage
+                              id="general.infrastructure"
+                              defaultMessage="Infrastructure"
+                            />
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="text-xs">-</span>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </Popover.Content>

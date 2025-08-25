@@ -1,5 +1,5 @@
-import * as Popover from '@radix-ui/react-popover';
 import type { Interval } from 'luxon';
+import { Popover } from 'radix-ui';
 import type React from 'react';
 import { FormattedDateTimeRange, FormattedNumber } from 'react-intl';
 import { useHydrated } from '~/hooks/useHydrated';
