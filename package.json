@@ -48,7 +48,7 @@
     "@vitejs/plugin-react-swc": "^3.8.0",
     "globals": "^15.15.0",
     "typescript": "~5.7.2",
-    "vite": "^6.3.5",
+    "vite": "^6.3.6",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.0.9"
   }
