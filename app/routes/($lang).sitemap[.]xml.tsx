@@ -82,7 +82,7 @@ export async function loader() {
 
   // Stations
   {
-    const { data, error ,response } = await getStations({
+    const { data, error, response } = await getStations({
       auth: () => process.env.API_TOKEN,
       baseUrl: process.env.API_ENDPOINT,
     });
