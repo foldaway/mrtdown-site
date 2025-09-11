@@ -1,15 +1,11 @@
 import { defineMessage, type MessageDescriptor } from 'react-intl';
 import type {
+  IssueSubtype,
   IssueType,
   LineSummaryStatus,
   LineType,
   StationComponentMemberStructureType,
 } from './client';
-import type {
-  IssueDisruptionSubtype,
-  IssueInfraSubtype,
-  IssueMaintenanceSubtype,
-} from './types';
 
 export const LANGUAGES_NON_DEFAULT = ['zh-Hans', 'ms', 'ta'];
 
@@ -58,10 +54,7 @@ export const IssueTypeLabels: Record<IssueType, MessageDescriptor> = {
   }),
 };
 
-export const IssueSubtypeLabels: Record<
-  IssueDisruptionSubtype | IssueMaintenanceSubtype | IssueInfraSubtype,
-  MessageDescriptor
-> = {
+export const IssueSubtypeLabels: Record<IssueSubtype, MessageDescriptor> = {
   'signal.fault': defineMessage({
     id: 'issue.subtype.signal_fault',
     defaultMessage: 'Signal Fault',
