@@ -59,10 +59,18 @@ export const meta: Route.MetaFunction = ({ data, location }) => {
 };
 
 const AboutPage: React.FC = () => (
-  <div className="flex w-full flex-col items-center py-4 sm:py-8">
-    <h1 className="sr-only">
-      <FormattedMessage id="general.about" defaultMessage="About" />
-    </h1>
+  <div className="flex flex-col space-y-8">
+    <header className="space-y-2 text-center">
+      <h1 className="font-bold text-2xl text-gray-900 leading-tight sm:text-3xl dark:text-gray-100">
+        <FormattedMessage id="general.about" defaultMessage="About" />
+      </h1>
+      <p className="mx-auto max-w-2xl text-gray-600 text-base leading-normal dark:text-gray-400">
+        <FormattedMessage
+          id="site.about.subtitle"
+          defaultMessage="Learn more about our mission, data collection methods, and frequently asked questions"
+        />
+      </p>
+    </header>
     <div className="flex w-full flex-col">
       <h2 className="mb-2 font-bold text-gray-800 text-xl dark:text-gray-200">
         <FormattedMessage id="about.our_mission" defaultMessage="Our Mission" />

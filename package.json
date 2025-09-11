@@ -7,11 +7,12 @@
     "dev": "react-router dev",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",
-    "i18n:extract": "formatjs extract 'app/**/*.{ts,tsx}' --out-file lang/en-SG.json --format simple",
+    "i18n:extract": "formatjs extract 'app/**/*.{ts,tsx}' --ignore '**/*.d.ts' --out-file lang/en-SG.json --format simple",
     "build": "react-router build",
     "test": "vitest",
     "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "api:client:generate": "tsx app/scripts/generateApiClient.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -37,6 +38,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.0.0",
     "@formatjs/cli": "^6.6.3",
+    "@hey-api/openapi-ts": "^0.80.11",
     "@react-router/dev": "^7.5.2",
     "@react-router/fs-routes": "^7.5.2",
     "@tailwindcss/vite": "^4.0.9",
@@ -47,6 +49,7 @@
     "@types/xast": "^2.0.4",
     "@vitejs/plugin-react-swc": "^3.8.0",
     "globals": "^15.15.0",
+    "tsx": "^4.20.4",
     "typescript": "~5.7.2",
     "vite": "^6.3.6",
     "vite-tsconfig-paths": "^5.1.4",

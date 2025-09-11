@@ -1,18 +1,60 @@
 import { defineMessage, type MessageDescriptor } from 'react-intl';
 import type {
-  ComponentType,
-  IssueDisruptionSubtype,
-  IssueInfraSubtype,
-  IssueMaintenanceSubtype,
+  IssueSubtype,
+  IssueType,
+  LineSummaryStatus,
+  LineType,
   StationComponentMemberStructureType,
-} from './types';
+} from './client';
 
 export const LANGUAGES_NON_DEFAULT = ['zh-Hans', 'ms', 'ta'];
 
-export const IssueSubtypeLabels: Record<
-  IssueDisruptionSubtype | IssueMaintenanceSubtype | IssueInfraSubtype,
+export const LineSummaryStatusLabels: Record<
+  LineSummaryStatus,
   MessageDescriptor
 > = {
+  ongoing_disruption: defineMessage({
+    id: 'status.ongoing_disruption',
+    defaultMessage: 'Disruption',
+  }),
+  ongoing_maintenance: defineMessage({
+    id: 'status.ongoing_maintenance',
+    defaultMessage: 'Maintenance',
+  }),
+  ongoing_infra: defineMessage({
+    id: 'status.ongoing_infra',
+    defaultMessage: 'Infrastructure',
+  }),
+  normal: defineMessage({
+    id: 'status.operational',
+    defaultMessage: 'Operational',
+  }),
+  closed_for_day: defineMessage({
+    id: 'status.service_ended',
+    defaultMessage: 'Service Ended',
+  }),
+  future_service: defineMessage({
+    id: 'status.future_service',
+    defaultMessage: 'Under Development',
+  }),
+};
+
+export const IssueTypeLabels: Record<IssueType, MessageDescriptor> = {
+  disruption: defineMessage({
+    id: 'general.disruption',
+    defaultMessage: 'Disruption',
+  }),
+  maintenance: defineMessage({
+    id: 'general.maintenance',
+    defaultMessage: 'Maintenance',
+  }),
+  infra: defineMessage({
+    id: 'general.infrastructure',
+    defaultMessage: 'Infrastructure',
+  }),
+};
+
+export const IssueSubtypeLabels: Record<IssueSubtype, MessageDescriptor> = {
   'signal.fault': defineMessage({
     id: 'issue.subtype.signal_fault',
     defaultMessage: 'Signal Fault',
@@ -76,7 +118,7 @@ export const IssueSubtypeLabels: Record<
   }),
 };
 
-export const ComponentTypeLabels: Record<ComponentType, MessageDescriptor> = {
+export const LineTypeLabels: Record<LineType, MessageDescriptor> = {
   'mrt.high': defineMessage({
     id: 'general.mrt',
     defaultMessage: 'Mass Rapid Transit (MRT)',

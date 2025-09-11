@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**"]
+    "includes": ["**", "!app/src/client/"]
   },
   "formatter": {
     "enabled": true,
