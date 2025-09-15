@@ -98,7 +98,9 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
               <ServiceEndedDateCard
                 key={dateTime.valueOf()}
                 dateTime={dateTime}
-                dayType={breakdownByDates[dateTimeIsoDate].dayType}
+                dayType={
+                  breakdownByDates[dateTimeIsoDate]?.dayType ?? 'weekday'
+                }
                 componentRef={line}
               />
             );
