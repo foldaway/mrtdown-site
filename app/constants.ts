@@ -8,6 +8,7 @@ import type {
 } from './client';
 
 export const LANGUAGES_NON_DEFAULT = ['zh-Hans', 'ms', 'ta'];
+export const LANGUAGES = ['en-SG', ...LANGUAGES_NON_DEFAULT];
 
 export const LineSummaryStatusLabels: Record<
   LineSummaryStatus,

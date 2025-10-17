@@ -17,6 +17,7 @@ import {
   NavLink,
   type NavLinkProps,
   Outlet,
+  redirect,
   Scripts,
   ScrollRestoration,
   useNavigation,
@@ -26,7 +27,9 @@ import type { Route } from './+types/root';
 import { getLines, getMetadata } from './client';
 import { HrefLangs } from './components/HrefLangs';
 import { LocaleSwitcher } from './components/LocaleSwitcher';
+import NotFound from './components/NotFound';
 import Spinner from './components/Spinner';
+import { LANGUAGES } from './constants';
 import { buildLocaleAwareLink } from './helpers/buildLocaleAwareLink';
 import stylesheet from './index.css?url';
 import { assert } from './util/assert';
@@ -111,6 +114,9 @@ const navLinkClassNameFunctionMobile: NavLinkProps['className'] = ({
 
 export async function loader({ params }: Route.LoaderArgs) {
   const { lang = 'en-SG' } = params;
+  if (!LANGUAGES.includes(lang)) {
+    throw redirect('/404', 404);
+  }
 
   const { default: messages } = await import(`../lang/${lang}.json`);
 
@@ -555,11 +561,15 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let details = 'An unexpected error occurred.';
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? '404' : 'Error';
-    details =
-      error.status === 404
-        ? 'The requested page could not be found.'
-        : error.statusText || details;
+    if (error.status === 404) {
+      return (
+        <main className="mx-4 my-12 flex justify-center lg:mx-auto">
+          <NotFound />
+        </main>
+      );
+    }
+    message = error.status.toString();
+    details = error.statusText || details;
   } else if (error && error instanceof Error) {
     // you only want to capture non 404-errors that reach the boundary
     Sentry.captureException(error);
@@ -569,9 +579,9 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="container mx-auto p-4 pt-16 text-gray-900 dark:text-gray-50">
-      <h1 className="font-bold">{message}</h1>
-      <p>{details}</p>
+    <main className="container mx-auto px-4 py-16 text-gray-900 dark:text-gray-50">
+      <h1 className="font-bold text-2xl">{message}</h1>
+      <p className="mt-2 text-base">{details}</p>
     </main>
   );
 }

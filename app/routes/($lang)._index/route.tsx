@@ -1,10 +1,11 @@
 import { DateTime } from 'luxon';
 import { useEffect, useMemo } from 'react';
 import { createIntl, FormattedMessage } from 'react-intl';
-import { useSearchParams } from 'react-router';
+import { redirect, useSearchParams } from 'react-router';
 import { z } from 'zod';
 import { getOverview } from '~/client';
 import { LineSummaryBlock } from '~/components/LineSummaryBlock';
+import { LANGUAGES } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { useViewport, ViewportSchema } from '~/hooks/useViewport';
@@ -76,6 +77,16 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     description,
     dateCount,
   };
+}
+
+/**
+ * Empty handler to handle HTTP POST/PUT/DELETE
+ */
+export async function action({ params }: Route.ActionArgs) {
+  const { lang = 'en-SG' } = params;
+  if (!LANGUAGES.includes(lang)) {
+    throw redirect('/404', 404);
+  }
 }
 
 export function headers() {
