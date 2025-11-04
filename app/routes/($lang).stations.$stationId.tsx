@@ -16,6 +16,7 @@ import {
   type Station,
 } from '~/client';
 import { IssueCard } from '~/components/IssueCard';
+import type { IssueCardContext } from '~/components/IssueCard/types';
 import { StationBar } from '~/components/StationBar';
 import { LineTypeLabels, StationStructureTypeLabels } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
@@ -256,6 +257,14 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
       return true;
     });
   }, [station.memberships]);
+
+  const issueCardContext = useMemo<IssueCardContext>(() => {
+    return {
+      type: 'history.days',
+      date: DateTime.now().startOf('day').minus({ days: 30 }).toISODate(),
+      days: 30,
+    };
+  }, []);
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
@@ -509,6 +518,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
                       key={issue.id}
                       issue={issue}
                       className="!w-auto"
+                      context={issueCardContext}
                     />
                   );
                 })
