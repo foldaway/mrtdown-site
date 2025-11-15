@@ -270,15 +270,14 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
     <IncludedEntitiesContext.Provider value={included}>
       <div className="flex flex-col gap-6">
         {/* Station Header Section */}
-        <div className="overflow-hidden rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 shadow-2xl dark:border-gray-600/60 dark:from-gray-800 dark:to-gray-900">
-          <div className="relative p-4 sm:p-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/5 to-transparent dark:via-white/5" />
-            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-lg dark:border-gray-600/60 dark:bg-gray-800">
+          <div className="p-4 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex-1">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <StationBar memberships={membershipsUnique} />
                   {isInterchange && (
-                    <span className="rounded-full bg-amber-500/20 px-3 py-0.5 font-medium text-amber-300 text-xs">
+                    <span className="rounded-full bg-amber-500/10 px-3 py-0.5 font-medium text-amber-500 text-xs dark:text-amber-300">
                       <FormattedMessage
                         id="station.interchange_badge"
                         defaultMessage="Interchange"
