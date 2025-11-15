@@ -2,7 +2,12 @@ import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { DateTime } from 'luxon';
 import { Collapsible } from 'radix-ui';
 import { useMemo } from 'react';
-import { FormattedMessage, FormattedNumber, useIntl } from 'react-intl';
+import {
+  defineMessage,
+  FormattedMessage,
+  FormattedNumber,
+  useIntl,
+} from 'react-intl';
 import type { Issue, IssueType } from '~/client';
 import { IssueCard } from '~/components/IssueCard';
 import { LineBar } from '~/components/LineBar';
@@ -15,22 +20,29 @@ const ISSUE_CARD_CONTEXT_NOW: IssueCardContext = {
 const ISSUE_TYPES = [
   {
     type: 'disruption',
-    messageId: 'general.active_disruptions',
-    defaultMessage:
-      'Active {count, plural, one {Disruption} other {Disruptions}}',
+    message: defineMessage({
+      id: 'general.active_disruptions',
+      defaultMessage:
+        'Active {count, plural, one {Disruption} other {Disruptions}}',
+    }),
     bgClass: 'bg-disruption-light dark:bg-disruption-dark',
   },
   {
     type: 'maintenance',
-    messageId: 'general.planned_maintenance',
-    defaultMessage:
-      'Planned Maintenance {count, plural, one {} other {Activities}}',
+    message: defineMessage({
+      id: 'general.planned_maintenance',
+      defaultMessage:
+        'Planned Maintenance {count, plural, one {} other {Activities}}',
+    }),
     bgClass: 'bg-maintenance-light dark:bg-maintenance-dark',
   },
   {
     type: 'infra',
-    messageId: 'general.infrastructure_works',
-    defaultMessage: 'Infrastructure {count, plural, one {Work} other {Works}}',
+    message: defineMessage({
+      id: 'general.infrastructure_works',
+      defaultMessage:
+        'Infrastructure {count, plural, one {Work} other {Works}}',
+    }),
     bgClass: 'bg-infra-light dark:bg-infra-dark',
   },
 ] as const;
@@ -88,32 +100,26 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
               />
             </h2>
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-3 text-gray-800 dark:text-gray-200">
-              {ISSUE_TYPES.map(
-                ({ type, messageId, defaultMessage, bgClass }) => {
-                  const count = issueCountsByType[type] ?? 0;
-                  const lineIds = issueLineIdsByType[type] ?? new Set();
-                  return count > 0 ? (
+              {ISSUE_TYPES.map(({ type, message, bgClass }) => {
+                const count = issueCountsByType[type] ?? 0;
+                const lineIds = issueLineIdsByType[type] ?? new Set();
+                return count > 0 ? (
+                  <div
+                    key={type}
+                    className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 rounded-lg bg-gray-50 p-2.5 text-sm sm:p-3 dark:bg-gray-700/50"
+                  >
                     <div
-                      key={type}
-                      className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 rounded-lg bg-gray-50 p-2.5 text-sm sm:p-3 dark:bg-gray-700/50"
+                      className={`row-span-2 inline-flex size-6 shrink-0 items-center justify-center rounded-full shadow-sm sm:size-7 ${bgClass}`}
                     >
-                      <div
-                        className={`row-span-2 inline-flex size-6 shrink-0 items-center justify-center rounded-full shadow-sm sm:size-7 ${bgClass}`}
-                      >
-                        <span className="font-bold text-sm text-white">
-                          <FormattedNumber value={count} />
-                        </span>
-                      </div>
-                      <FormattedMessage
-                        id={messageId}
-                        defaultMessage={defaultMessage}
-                        values={{ count }}
-                      />
-                      <LineBar lineIds={Array.from(lineIds).sort()} />
+                      <span className="font-bold text-sm text-white">
+                        <FormattedNumber value={count} />
+                      </span>
                     </div>
-                  ) : null;
-                },
-              )}
+                    <FormattedMessage {...message} values={{ count }} />
+                    <LineBar lineIds={Array.from(lineIds).sort()} />
+                  </div>
+                ) : null;
+              })}
               {lineOperationalCount > 0 && (
                 <div className="flex items-center gap-x-2 rounded-lg bg-gray-50 p-2.5 text-sm sm:p-3 dark:bg-gray-700/50">
                   <FormattedMessage
