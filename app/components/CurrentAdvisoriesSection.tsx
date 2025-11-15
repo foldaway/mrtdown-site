@@ -1,10 +1,16 @@
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import { DateTime } from 'luxon';
 import { Collapsible } from 'radix-ui';
 import { useMemo } from 'react';
 import { FormattedMessage, FormattedNumber, useIntl } from 'react-intl';
 import type { Issue, IssueType } from '~/client';
 import { IssueCard } from '~/components/IssueCard';
 import { LineBar } from '~/components/LineBar';
+import type { IssueCardContext } from './IssueCard/types';
+
+const ISSUE_CARD_CONTEXT_NOW: IssueCardContext = {
+  type: 'now',
+};
 
 const ISSUE_TYPES = [
   {
@@ -61,6 +67,14 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
       issueLineIdsByType: lineIdsByType,
     };
   }, [issuesActiveNow, issuesActiveToday]);
+
+  const issueCardContextToday = useMemo<IssueCardContext>(() => {
+    return {
+      type: 'history.days',
+      date: DateTime.now().toISO(),
+      days: 1,
+    };
+  }, []);
 
   return (
     <Collapsible.Root>
@@ -143,8 +157,21 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
       </div>
       <Collapsible.Content asChild>
         <div className="mt-4 flex flex-col space-y-3">
-          {[...issuesActiveNow, ...issuesActiveToday].map((issue) => (
-            <IssueCard key={issue.id} issue={issue} className="!w-auto" />
+          {issuesActiveNow.map((issue) => (
+            <IssueCard
+              key={issue.id}
+              issue={issue}
+              className="!w-auto"
+              context={ISSUE_CARD_CONTEXT_NOW}
+            />
+          ))}
+          {issuesActiveToday.map((issue) => (
+            <IssueCard
+              key={issue.id}
+              issue={issue}
+              className="!w-auto"
+              context={issueCardContextToday}
+            />
           ))}
           <Collapsible.Trigger asChild>
             <button
