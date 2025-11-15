@@ -168,7 +168,7 @@
   "station.interchange_badge": "Pertukaran",
   "station.line_types_station": "stesen {lineTypes}",
   "station.no_recent_issues": "Tiada isu terkini dilaporkan untuk stesen ini",
-  "station.recent_issues": "Isu Terkini (30 hari lepas)",
+  "station.recent_issues": "Isu Terkini",
   "station.structure_type.at_grade": "aras tanah",
   "station.structure_type.elevated": "bertingkat",
   "station.structure_type.in_building": "tertutup",

@@ -168,7 +168,7 @@
   "station.interchange_badge": "Interchange",
   "station.line_types_station": "{lineTypes} station",
   "station.no_recent_issues": "No recent issues reported for this station",
-  "station.recent_issues": "Recent Issues (last 30 days)",
+  "station.recent_issues": "Recent Issues",
   "station.structure_type.at_grade": "at-grade",
   "station.structure_type.elevated": "elevated",
   "station.structure_type.in_building": "enclosed",

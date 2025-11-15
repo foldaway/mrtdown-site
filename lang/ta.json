@@ -168,7 +168,7 @@
   "station.interchange_badge": "மாற்று",
   "station.line_types_station": "{lineTypes} நிலையம்",
   "station.no_recent_issues": "இந்த நிலையத்திற்கு சமீபத்திய சிக்கல்கள் இல்லை",
-  "station.recent_issues": "சமீபத்திய சிக்கல்கள் (கடந்த 30 நாட்கள்)",
+  "station.recent_issues": "சமீபத்திய சிக்கல்கள்",
   "station.structure_type.at_grade": "தரையில் அமைந்த",
   "station.structure_type.elevated": "உயர்த்திய",
   "station.structure_type.in_building": "மூடப்பட்ட",

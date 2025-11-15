@@ -504,7 +504,7 @@ const StationPage: React.FC<Route.ComponentProps> = (props) => {
             <h2 className="font-semibold text-base text-gray-900 dark:text-gray-100">
               <FormattedMessage
                 id="station.recent_issues"
-                defaultMessage="Recent Issues (last 30 days)"
+                defaultMessage="Recent Issues"
               />
             </h2>
 

@@ -168,7 +168,7 @@
   "station.interchange_badge": "换乘站",
   "station.line_types_station": "{lineTypes}站",
   "station.no_recent_issues": "该站无近期问题报告",
-  "station.recent_issues": "近期问题（最近30天）",
+  "station.recent_issues": "近期问题",
   "station.structure_type.at_grade": "地面",
   "station.structure_type.elevated": "高架",
   "station.structure_type.in_building": "室内",
