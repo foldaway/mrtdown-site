@@ -83,7 +83,7 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
   const issueCardContextToday = useMemo<IssueCardContext>(() => {
     return {
       type: 'history.days',
-      date: DateTime.now().toISO(),
+      date: DateTime.now().toISODate(),
       days: 1,
     };
   }, []);
