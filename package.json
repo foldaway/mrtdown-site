@@ -18,7 +18,7 @@
     "@heroicons/react": "^2.2.0",
     "@react-router/node": "^7.5.2",
     "@react-router/serve": "^7.5.2",
-    "@sentry/react-router": "^10.20.0",
+    "@sentry/react-router": "^10.27.0",
     "@tanstack/react-query": "^5.66.11",
     "@vercel/analytics": "^1.5.0",
     "classnames": "^2.5.1",
