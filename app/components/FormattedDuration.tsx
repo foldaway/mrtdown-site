@@ -20,9 +20,13 @@ export const FormattedDuration: React.FC<Props> = (props) => {
   }
 
   if (isHydrated && 'DurationFormat' in Intl) {
+    const durationObj = duration.shiftToAll().toObject();
+    for (const [key, value] of Object.entries(durationObj)) {
+      durationObj[key] = Math.round(value);
+    }
     // @ts-expect-error missing types https://github.com/microsoft/TypeScript/issues/60608
     const nativeString = new Intl.DurationFormat(intl.locale).format(
-      duration.shiftToAll().toObject(),
+      durationObj,
       otherProps,
     );
     const { signDisplay } = otherProps;
