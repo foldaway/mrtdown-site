@@ -51,7 +51,7 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
     return (
       <div
         className={classNames(
-          'flex items-center gap-x-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs transition-all duration-200 hover:border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-650',
+          'flex items-center gap-x-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs transition-all duration-200 hover:border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600',
           className,
         )}
         role="img"
@@ -68,7 +68,7 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
           {source && (
             <Link
               to={buildLocaleAwareLink(`/stations/${source.id}`, intl.locale)}
-              className="font-medium text-gray-700 text-xs transition-colors hover:text-accent-light dark:text-gray-200 dark:hover:text-accent-dark"
+              className="font-medium text-gray-700 text-xs transition-colors hover:underline dark:text-gray-200"
             >
               {source.nameTranslations[intl.locale] ?? source.name ?? 'N/A'}
             </Link>
@@ -81,7 +81,7 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
                   `/stations/${destination.id}`,
                   intl.locale,
                 )}
-                className="font-medium text-gray-700 text-xs transition-colors hover:text-accent-light dark:text-gray-200 dark:hover:text-accent-dark"
+                className="font-medium text-gray-700 text-xs transition-colors hover:underline dark:text-gray-200"
               >
                 {destination.nameTranslations[intl.locale] ?? destination.name}
               </Link>
