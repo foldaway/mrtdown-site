@@ -14,6 +14,7 @@ import type { IssueAffectedBranch } from '~/client';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { assert } from '~/util/assert';
+import { ZoomControls } from '~/components/ZoomControls';
 import { MapApr2025 } from './components/MapApr2025';
 import { MapDec2019 } from './components/MapDec2019';
 import { MapDec2027 } from './components/MapDec2027';
@@ -369,33 +370,38 @@ export const StationMap: React.FC<Props> = (props) => {
             <FormattedDate value="2012-01" year="numeric" month="short" />
           </Tabs.Trigger>
         </Tabs.List>
-        <Tabs.Content value="2032-12">
-          <MapDec2032 ref={setRef} />
-        </Tabs.Content>
-        <Tabs.Content value="2030-12">
-          <MapDec2030 ref={setRef} />
-        </Tabs.Content>
-        <Tabs.Content value="2029-12">
-          <MapDec2029 ref={setRef} />
-        </Tabs.Content>
-        <Tabs.Content value="2027-12">
-          <MapDec2027 ref={setRef} />
-        </Tabs.Content>
-        <Tabs.Content value="2025-04">
-          <MapApr2025 ref={setRef} />
-        </Tabs.Content>
-        <Tabs.Content value="2024-11">
-          <MapNov2024 ref={setRef} />
-        </Tabs.Content>
-        <Tabs.Content value="2019-12">
-          <MapDec2019 ref={setRef} />
-        </Tabs.Content>
-        <Tabs.Content value="2017-11">
-          <MapNov2017 ref={setRef} />
-        </Tabs.Content>
-        <Tabs.Content value="2012-01">
-          <MapJan2012 ref={setRef} />
-        </Tabs.Content>
+        <div className="relative overflow-hidden">
+          <div className="overflow-auto">
+          <Tabs.Content value="2032-12">
+            <MapDec2032 ref={setRef} />
+          </Tabs.Content>
+          <Tabs.Content value="2030-12">
+            <MapDec2030 ref={setRef} />
+          </Tabs.Content>
+          <Tabs.Content value="2029-12">
+            <MapDec2029 ref={setRef} />
+          </Tabs.Content>
+          <Tabs.Content value="2027-12">
+            <MapDec2027 ref={setRef} />
+          </Tabs.Content>
+          <Tabs.Content value="2025-04">
+            <MapApr2025 ref={setRef} />
+          </Tabs.Content>
+          <Tabs.Content value="2024-11">
+            <MapNov2024 ref={setRef} />
+          </Tabs.Content>
+          <Tabs.Content value="2019-12">
+            <MapDec2019 ref={setRef} />
+          </Tabs.Content>
+          <Tabs.Content value="2017-11">
+            <MapNov2017 ref={setRef} />
+          </Tabs.Content>
+          <Tabs.Content value="2012-01">
+            <MapJan2012 ref={setRef} />
+          </Tabs.Content>
+          </div>
+          <ZoomControls svgRef={ref} initialZoom={1} />
+        </div>
       </Tabs.Root>
 
       {stationIds.size > 0 && (
