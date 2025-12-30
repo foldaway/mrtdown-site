@@ -1,20 +1,14 @@
-import { ClockIcon, StarIcon } from '@heroicons/react/24/outline';
 import { DateTime } from 'luxon';
 import { Tabs } from 'radix-ui';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  FormattedDate,
-  FormattedList,
-  FormattedMessage,
-  useIntl,
-} from 'react-intl';
+import { FormattedList, FormattedMessage, useIntl } from 'react-intl';
 import { Link, useNavigate } from 'react-router';
 import type { IssueAffectedBranch } from '~/client';
+import { ZoomControls } from '~/components/ZoomControls';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { assert } from '~/util/assert';
-import { ZoomControls } from '~/components/ZoomControls';
 import { MapApr2025 } from './components/MapApr2025';
 import { MapDec2019 } from './components/MapDec2019';
 import { MapDec2027 } from './components/MapDec2027';
@@ -24,6 +18,7 @@ import { MapDec2032 } from './components/MapDec2032';
 import { MapJan2012 } from './components/MapJan2012';
 import { MapNov2017 } from './components/MapNov2017';
 import { MapNov2024 } from './components/MapNov2024';
+import { Timeline } from './components/Timeline';
 import { segmentText } from './helpers/segmentText';
 
 interface Props {
@@ -309,96 +304,36 @@ export const StationMap: React.FC<Props> = (props) => {
       <div className="hidden fill-gray-800 stroke-gray-800 dark:fill-gray-300 dark:stroke-gray-300" />
 
       <Tabs.Root defaultValue={defaultTab}>
-        <Tabs.List className="flex items-center overflow-x-scroll border-gray-400 border-b [scrollbar-width:thin]">
-          <Tabs.Trigger
-            value="2032-12"
-            className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
-          >
-            <FormattedDate value="2032-12" year="numeric" month="short" />
-            <ClockIcon className="size-4 shrink-0" />
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            value="2030-12"
-            className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
-          >
-            <FormattedDate value="2030-12" year="numeric" month="short" />
-            <ClockIcon className="size-4 shrink-0" />
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            value="2029-12"
-            className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
-          >
-            <FormattedDate value="2029-12" year="numeric" month="short" />
-            <ClockIcon className="size-4 shrink-0" />
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            value="2027-12"
-            className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
-          >
-            <FormattedDate value="2027-12" year="numeric" month="short" />
-            <ClockIcon className="size-4 shrink-0" />
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            value="2025-04"
-            className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
-          >
-            <FormattedDate value="2025-04" year="numeric" month="short" />
-            <StarIcon className="size-4 shrink-0" />
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            value="2024-11"
-            className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
-          >
-            <FormattedDate value="2024-11" year="numeric" month="short" />
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            value="2019-12"
-            className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
-          >
-            <FormattedDate value="2019-12" year="numeric" month="short" />
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            value="2017-11"
-            className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
-          >
-            <FormattedDate value="2017-11" year="numeric" month="short" />
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            value="2012-01"
-            className="flex shrink-0 cursor-pointer items-center gap-x-1.5 border-gray-300 border-b px-4 py-2 text-gray-700 text-sm data-[state=active]:text-gray-800 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current dark:text-gray-500 dark:data-[state=active]:text-gray-200"
-          >
-            <FormattedDate value="2012-01" year="numeric" month="short" />
-          </Tabs.Trigger>
-        </Tabs.List>
+        <Timeline currentDate={currentDate} />
         <div className="relative overflow-hidden">
           <div className="overflow-auto">
-          <Tabs.Content value="2032-12">
-            <MapDec2032 ref={setRef} />
-          </Tabs.Content>
-          <Tabs.Content value="2030-12">
-            <MapDec2030 ref={setRef} />
-          </Tabs.Content>
-          <Tabs.Content value="2029-12">
-            <MapDec2029 ref={setRef} />
-          </Tabs.Content>
-          <Tabs.Content value="2027-12">
-            <MapDec2027 ref={setRef} />
-          </Tabs.Content>
-          <Tabs.Content value="2025-04">
-            <MapApr2025 ref={setRef} />
-          </Tabs.Content>
-          <Tabs.Content value="2024-11">
-            <MapNov2024 ref={setRef} />
-          </Tabs.Content>
-          <Tabs.Content value="2019-12">
-            <MapDec2019 ref={setRef} />
-          </Tabs.Content>
-          <Tabs.Content value="2017-11">
-            <MapNov2017 ref={setRef} />
-          </Tabs.Content>
-          <Tabs.Content value="2012-01">
-            <MapJan2012 ref={setRef} />
-          </Tabs.Content>
+            <Tabs.Content value="2032-12">
+              <MapDec2032 ref={setRef} />
+            </Tabs.Content>
+            <Tabs.Content value="2030-12">
+              <MapDec2030 ref={setRef} />
+            </Tabs.Content>
+            <Tabs.Content value="2029-12">
+              <MapDec2029 ref={setRef} />
+            </Tabs.Content>
+            <Tabs.Content value="2027-12">
+              <MapDec2027 ref={setRef} />
+            </Tabs.Content>
+            <Tabs.Content value="2025-04">
+              <MapApr2025 ref={setRef} />
+            </Tabs.Content>
+            <Tabs.Content value="2024-11">
+              <MapNov2024 ref={setRef} />
+            </Tabs.Content>
+            <Tabs.Content value="2019-12">
+              <MapDec2019 ref={setRef} />
+            </Tabs.Content>
+            <Tabs.Content value="2017-11">
+              <MapNov2017 ref={setRef} />
+            </Tabs.Content>
+            <Tabs.Content value="2012-01">
+              <MapJan2012 ref={setRef} />
+            </Tabs.Content>
           </div>
           <ZoomControls svgRef={ref} initialZoom={1} />
         </div>
