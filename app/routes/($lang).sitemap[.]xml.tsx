@@ -1,7 +1,7 @@
 import { DateTime, Interval } from 'luxon';
 import type { Root, Element } from 'xast';
 import { toXml } from 'xast-util-to-xml';
-import { getIssues, getLines, getStations } from '~/client';
+import { getIssues, getLines, getOperators, getStations } from '~/client';
 import { LANGUAGES_NON_DEFAULT } from '~/constants';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { assert } from '~/util/assert';
@@ -96,6 +96,31 @@ export async function loader() {
     assert(data != null);
     for (const stationId of data.data.stationIds) {
       paths.push(`/stations/${stationId}`);
+    }
+  }
+
+  // Operators
+  {
+    const { data, error, response } = await getOperators({
+      auth: () => process.env.API_TOKEN,
+      baseUrl: process.env.API_ENDPOINT,
+    });
+    if (error != null) {
+      console.error('Error fetching operators:', error);
+      throw new Response('Failed to fetch operators', {
+        status: response.status,
+        statusText: response.statusText,
+      });
+    }
+    assert(data != null);
+    // Type assertion needed since GetOperatorsResponses[200] is unknown
+    const operatorsResponse = data as {
+      success: true;
+      included: unknown;
+      data: { operatorIds: Array<string> };
+    };
+    for (const operatorId of operatorsResponse.data.operatorIds) {
+      paths.push(`/operators/${operatorId}`);
     }
   }
 
