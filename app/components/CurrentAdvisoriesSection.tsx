@@ -1,18 +1,16 @@
+import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import {
   BuildingOfficeIcon,
-  CheckCircleIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   CogIcon,
   ExclamationTriangleIcon,
-} from '@heroicons/react/24/solid';
-import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+} from '@heroicons/react/24/outline';
+import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { Collapsible } from 'radix-ui';
 import { useMemo } from 'react';
-import {
-  defineMessage,
-  FormattedMessage,
-  useIntl,
-} from 'react-intl';
+import { defineMessage, FormattedMessage, useIntl } from 'react-intl';
 import type { Issue, IssueType } from '~/client';
 import { IssueCard } from '~/components/IssueCard';
 import { LineBar } from '~/components/LineBar';
@@ -30,7 +28,6 @@ const ISSUE_TYPES = [
       defaultMessage:
         '<bold>{count}</bold> Active {count, plural, one {Disruption} other {Disruptions}}',
     }),
-    bgClass: 'bg-disruption-light dark:bg-disruption-dark',
     Icon: ExclamationTriangleIcon,
   },
   {
@@ -40,7 +37,6 @@ const ISSUE_TYPES = [
       defaultMessage:
         '<bold>{count}</bold> Planned Maintenance {count, plural, one {} other {Activities}}',
     }),
-    bgClass: 'bg-maintenance-light dark:bg-maintenance-dark',
     Icon: CogIcon,
   },
   {
@@ -50,7 +46,6 @@ const ISSUE_TYPES = [
       defaultMessage:
         '<bold>{count}</bold> Infrastructure {count, plural, one {Work} other {Works}}',
     }),
-    bgClass: 'bg-infra-light dark:bg-infra-dark',
     Icon: BuildingOfficeIcon,
   },
 ] as const;
@@ -108,7 +103,7 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
               />
             </h2>
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-3 text-gray-800 dark:text-gray-200">
-              {ISSUE_TYPES.map(({ type, message, bgClass, Icon }) => {
+              {ISSUE_TYPES.map(({ type, message, Icon }) => {
                 const count = issueCountsByType[type] ?? 0;
                 const lineIds = issueLineIdsByType[type] ?? new Set();
                 return count > 0 ? (
@@ -117,9 +112,28 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
                     className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 rounded-lg bg-gray-50 p-2.5 text-sm sm:p-3 dark:bg-gray-700/50"
                   >
                     <div
-                      className={`row-span-2 inline-flex size-6 shrink-0 items-center justify-center rounded-full shadow-sm sm:size-7 ${bgClass}`}
+                      className={classNames(
+                        'row-span-2 inline-flex size-6 shrink-0 items-center justify-center rounded-full shadow-sm sm:size-7',
+                        {
+                          'bg-disruption-light/20 ring-1 ring-disruption-light/40 dark:bg-disruption-dark/30 dark:ring-disruption-dark/60':
+                            type === 'disruption',
+                          'bg-maintenance-light/20 ring-1 ring-maintenance-light/40 dark:bg-maintenance-dark/30 dark:ring-maintenance-dark/60':
+                            type === 'maintenance',
+                          'bg-infra-light/20 ring-1 ring-infra-light/40 dark:bg-infra-dark/30 dark:ring-infra-dark/60':
+                            type === 'infra',
+                        },
+                      )}
                     >
-                      <Icon className="size-4 text-white sm:size-5" />
+                      <Icon
+                        className={classNames('size-4 sm:size-5', {
+                          'text-disruption-light dark:text-disruption-dark':
+                            type === 'disruption',
+                          'text-maintenance-light dark:text-maintenance-dark':
+                            type === 'maintenance',
+                          'text-infra-light dark:text-infra-dark':
+                            type === 'infra',
+                        })}
+                      />
                     </div>
                     <div className="flex items-center whitespace-pre-wrap">
                       <FormattedMessage
@@ -140,8 +154,13 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
               })}
               {lineOperationalCount > 0 && (
                 <div className="flex items-center gap-x-2 rounded-lg bg-gray-50 p-2.5 text-sm sm:p-3 dark:bg-gray-700/50">
-                  <div className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-operational-light shadow-sm sm:size-7 dark:bg-operational-dark">
-                    <CheckCircleIcon className="size-4 text-white sm:size-5" />
+                  <div
+                    className={classNames(
+                      'inline-flex size-6 shrink-0 items-center justify-center rounded-full shadow-sm sm:size-7',
+                      'bg-operational-light/20 ring-1 ring-operational-light/40 dark:bg-operational-dark/30 dark:ring-operational-dark/60',
+                    )}
+                  >
+                    <CheckCircleIcon className="size-4 text-operational-light sm:size-5 dark:text-operational-dark" />
                   </div>
                   <div className="flex items-center whitespace-pre-wrap">
                     <FormattedMessage
