@@ -1,0 +1,14 @@
+{
+  "[typescript]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescriptreact]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "biome.require_config_file": true,
+  "editor.codeActionsOnSave": {
+    "quickfix.biome": "explicit"
+  }
+}
