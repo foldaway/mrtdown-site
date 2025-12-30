@@ -23,6 +23,7 @@
   "footer.disclaimer": "这是一个独立平台，与任何公共交通营运商或政府机构无关。",
   "footer.last_updated": "最后更新于 {lastUpdatedAt}",
   "footer.line_status": "线路状态",
+  "footer.operators": "运营商",
   "footer.quick_access": "快速访问",
   "general.about": "关于",
   "general.active_disruptions": "{count, plural, one {进行中的服务中断} other {进行中的服务中断}}",

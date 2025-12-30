@@ -23,6 +23,7 @@
   "footer.disclaimer": "This is an independent platform not affiliated with any public transport operator.",
   "footer.last_updated": "Last updated {lastUpdatedAt}",
   "footer.line_status": "Line status",
+  "footer.operators": "Operators",
   "footer.quick_access": "Quick Access",
   "general.about": "About",
   "general.active_disruptions": "Active {count, plural, one {Disruption} other {Disruptions}}",

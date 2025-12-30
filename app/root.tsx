@@ -24,7 +24,7 @@ import {
   useParams,
 } from 'react-router';
 import type { Route } from './+types/root';
-import { getLines, getMetadata } from './client';
+import { getLines, getMetadata, getOperators, type IncludedEntities } from './client';
 import { HrefLangs } from './components/HrefLangs';
 import { LocaleSwitcher } from './components/LocaleSwitcher';
 import NotFound from './components/NotFound';
@@ -151,18 +151,39 @@ export async function loader({ params }: Route.LoaderArgs) {
   const { lineIds } = data.data;
   const { included } = data;
 
+  const operatorsResponse = await getOperators({
+    auth: () => process.env.API_TOKEN,
+    baseUrl: process.env.API_ENDPOINT,
+  });
+  if (operatorsResponse.error != null) {
+    console.error('Error fetching operators:', operatorsResponse.error);
+    throw new Response('Failed to fetch operators', {
+      status: operatorsResponse.response.status,
+      statusText: operatorsResponse.response.statusText,
+    });
+  }
+  assert(operatorsResponse.data != null);
+  // Type assertion needed since GetOperatorsResponses[200] is unknown
+  const operatorsData = operatorsResponse.data as {
+    success: true;
+    included: IncludedEntities;
+    data: { operatorIds: Array<string> };
+  };
+
   return {
     messages,
     lineIds,
     included,
     metadata,
+    operatorIds: operatorsData.data.operatorIds,
+    operatorsIncluded: operatorsData.included.operators,
   };
 }
 
 export default function App(props: Route.ComponentProps) {
   const { params, loaderData } = props;
   const { lang } = params;
-  const { messages, lineIds, included, metadata } = loaderData;
+  const { messages, lineIds, included, metadata, operatorIds, operatorsIncluded } = loaderData;
 
   const navigation = useNavigation();
   const isNavigating = Boolean(navigation.location);
@@ -409,52 +430,83 @@ export default function App(props: Route.ComponentProps) {
                 </ul>
               </div>
 
-              {/* Quick Access */}
-              <div>
-                <h3 className="mb-4 font-semibold text-sm text-white uppercase tracking-wider">
-                  <FormattedMessage
-                    id="footer.quick_access"
-                    defaultMessage="Quick Access"
-                  />
-                </h3>
-                <ul className="space-y-3">
-                  <li>
-                    <Link
-                      to={buildLocaleAwareLink('/history', lang)}
-                      className="flex text-sm transition-colors hover:text-accent-light"
-                    >
-                      <FormattedMessage
-                        id="general.history"
-                        defaultMessage="History"
-                      />
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to={buildLocaleAwareLink('/system-map', lang)}
-                      className="flex text-sm transition-colors hover:text-accent-light"
-                    >
-                      <FormattedMessage
-                        id="general.system_map"
-                        defaultMessage="System Map"
-                      />
-                    </Link>
-                  </li>
-                  {/*{footerManifest.featuredStations.map((station) => (
-                    <li key={station.id}>
+              {/* Quick Access & Operators */}
+              <div className="flex flex-col gap-8">
+                {/* Quick Access */}
+                <div>
+                  <h3 className="mb-4 font-semibold text-sm text-white uppercase tracking-wider">
+                    <FormattedMessage
+                      id="footer.quick_access"
+                      defaultMessage="Quick Access"
+                    />
+                  </h3>
+                  <ul className="space-y-3">
+                    <li>
                       <Link
-                        to={buildLocaleAwareLink(
-                          `/stations/${station.id}`,
-                          lang,
-                        )}
-                        className="flex text-sm transition-colors hover:text-blue-400"
+                        to={buildLocaleAwareLink('/history', lang)}
+                        className="flex text-sm transition-colors hover:text-accent-light"
                       >
-                        {station.name_translations[lang ?? 'en-SG'] ??
-                          station.name}
+                        <FormattedMessage
+                          id="general.history"
+                          defaultMessage="History"
+                        />
                       </Link>
                     </li>
-                  ))}*/}
-                </ul>
+                    <li>
+                      <Link
+                        to={buildLocaleAwareLink('/system-map', lang)}
+                        className="flex text-sm transition-colors hover:text-accent-light"
+                      >
+                        <FormattedMessage
+                          id="general.system_map"
+                          defaultMessage="System Map"
+                        />
+                      </Link>
+                    </li>
+                    {/*{footerManifest.featuredStations.map((station) => (
+                      <li key={station.id}>
+                        <Link
+                          to={buildLocaleAwareLink(
+                            `/stations/${station.id}`,
+                            lang,
+                          )}
+                          className="flex text-sm transition-colors hover:text-blue-400"
+                        >
+                          {station.name_translations[lang ?? 'en-SG'] ??
+                            station.name}
+                        </Link>
+                      </li>
+                    ))}*/}
+                  </ul>
+                </div>
+
+                {/* Operators */}
+                <div>
+                  <h3 className="mb-4 font-semibold text-sm text-white uppercase tracking-wider">
+                    <FormattedMessage
+                      id="footer.operators"
+                      defaultMessage="Operators"
+                    />
+                  </h3>
+                  <ul className="space-y-3">
+                    {operatorIds.map((operatorId) => {
+                      const operator = operatorsIncluded[operatorId];
+
+                      return (
+                        <li key={operatorId}>
+                          <Link
+                            to={buildLocaleAwareLink(`/operators/${operatorId}`, lang)}
+                            className="flex text-sm transition-colors hover:text-accent-light"
+                          >
+                            {operator?.nameTranslations[lang ?? 'en-SG'] ??
+                              operator?.name ??
+                              operatorId}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               </div>
 
               {/* Community */}

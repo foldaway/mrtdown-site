@@ -23,6 +23,7 @@
   "footer.disclaimer": "Ini ialah platform bebas dan tidak bersekutu dengan mana-mana pengendali pengangkutan awam.",
   "footer.last_updated": "Terakhir dikemas kini {lastUpdatedAt}",
   "footer.line_status": "Status laluan",
+  "footer.operators": "Pengendali",
   "footer.quick_access": "Akses Pantas",
   "general.about": "Tentang",
   "general.active_disruptions": "{count, plural, one {Gangguan Aktif} other {Gangguan Aktif}}",

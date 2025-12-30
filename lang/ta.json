@@ -23,6 +23,7 @@
   "footer.disclaimer": "இந்த தளம் எந்தப் பொதுப் போக்குவரத்து நிறுவனத்துடனும் தொடர்பற்ற, சுயாதீனமானது.",
   "footer.last_updated": "கடைசியாக புதுப்பிக்கப்பட்டது {lastUpdatedAt}",
   "footer.line_status": "லையின் நிலை",
+  "footer.operators": "இயக்குபவர்கள்",
   "footer.quick_access": "விரைவு அணுகல்",
   "general.about": "எங்களைப் பற்றி",
   "general.active_disruptions": "{count, plural, one {நடைபெற்று வரும் தடை} other {நடைபெற்று வரும் தடைகள்}}",
