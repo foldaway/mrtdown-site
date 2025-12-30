@@ -1,3 +1,9 @@
+import {
+  BuildingOfficeIcon,
+  CheckCircleIcon,
+  CogIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/solid';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { DateTime } from 'luxon';
 import { Collapsible } from 'radix-ui';
@@ -5,7 +11,6 @@ import { useMemo } from 'react';
 import {
   defineMessage,
   FormattedMessage,
-  FormattedNumber,
   useIntl,
 } from 'react-intl';
 import type { Issue, IssueType } from '~/client';
@@ -23,27 +28,30 @@ const ISSUE_TYPES = [
     message: defineMessage({
       id: 'general.active_disruptions',
       defaultMessage:
-        'Active {count, plural, one {Disruption} other {Disruptions}}',
+        '<bold>{count}</bold> Active {count, plural, one {Disruption} other {Disruptions}}',
     }),
     bgClass: 'bg-disruption-light dark:bg-disruption-dark',
+    Icon: ExclamationTriangleIcon,
   },
   {
     type: 'maintenance',
     message: defineMessage({
       id: 'general.planned_maintenance',
       defaultMessage:
-        'Planned Maintenance {count, plural, one {} other {Activities}}',
+        '<bold>{count}</bold> Planned Maintenance {count, plural, one {} other {Activities}}',
     }),
     bgClass: 'bg-maintenance-light dark:bg-maintenance-dark',
+    Icon: CogIcon,
   },
   {
     type: 'infra',
     message: defineMessage({
       id: 'general.infrastructure_works',
       defaultMessage:
-        'Infrastructure {count, plural, one {Work} other {Works}}',
+        '<bold>{count}</bold> Infrastructure {count, plural, one {Work} other {Works}}',
     }),
     bgClass: 'bg-infra-light dark:bg-infra-dark',
+    Icon: BuildingOfficeIcon,
   },
 ] as const;
 
@@ -100,7 +108,7 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
               />
             </h2>
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-3 text-gray-800 dark:text-gray-200">
-              {ISSUE_TYPES.map(({ type, message, bgClass }) => {
+              {ISSUE_TYPES.map(({ type, message, bgClass, Icon }) => {
                 const count = issueCountsByType[type] ?? 0;
                 const lineIds = issueLineIdsByType[type] ?? new Set();
                 return count > 0 ? (
@@ -111,31 +119,44 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
                     <div
                       className={`row-span-2 inline-flex size-6 shrink-0 items-center justify-center rounded-full shadow-sm sm:size-7 ${bgClass}`}
                     >
-                      <span className="font-bold text-sm text-white">
-                        <FormattedNumber value={count} />
-                      </span>
+                      <Icon className="size-4 text-white sm:size-5" />
                     </div>
-                    <FormattedMessage {...message} values={{ count }} />
+                    <div className="flex items-center whitespace-pre-wrap">
+                      <FormattedMessage
+                        {...message}
+                        values={{
+                          count,
+                          bold: (chunks) => (
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">
+                              {chunks}
+                            </span>
+                          ),
+                        }}
+                      />
+                    </div>
                     <LineBar lineIds={Array.from(lineIds).sort()} />
                   </div>
                 ) : null;
               })}
               {lineOperationalCount > 0 && (
                 <div className="flex items-center gap-x-2 rounded-lg bg-gray-50 p-2.5 text-sm sm:p-3 dark:bg-gray-700/50">
-                  <FormattedMessage
-                    id="general.count_line_operational"
-                    defaultMessage="<badge>{count}</badge> {count, plural, one {Line} other {Lines}} Operational"
-                    values={{
-                      count: lineOperationalCount,
-                      badge: (chunks) => (
-                        <div className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-operational-light shadow-sm sm:size-7 dark:bg-operational-dark">
-                          <span className="font-bold text-white text-xs">
+                  <div className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-operational-light shadow-sm sm:size-7 dark:bg-operational-dark">
+                    <CheckCircleIcon className="size-4 text-white sm:size-5" />
+                  </div>
+                  <div className="flex items-center whitespace-pre-wrap">
+                    <FormattedMessage
+                      id="general.count_line_operational"
+                      defaultMessage="<bold>{count}</bold> {count, plural, one {Line} other {Lines}} Operational"
+                      values={{
+                        count: lineOperationalCount,
+                        bold: (chunks) => (
+                          <span className="font-semibold text-gray-900 dark:text-gray-100">
                             {chunks}
                           </span>
-                        </div>
-                      ),
-                    }}
-                  />
+                        ),
+                      }}
+                    />
+                  </div>
                 </div>
               )}
             </div>
