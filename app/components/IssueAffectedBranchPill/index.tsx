@@ -47,6 +47,8 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
     return sourceName;
   };
 
+  console.log({allStations})
+
   if (!hasMultipleStations) {
     return (
       <div

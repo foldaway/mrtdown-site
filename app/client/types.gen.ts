@@ -355,6 +355,7 @@ export type SystemAnalytics = {
     timeScaleChartsIssueDuration: Array<TimeScaleChart>;
     chartTotalIssueCountByLine: Chart;
     chartTotalIssueCountByStation: Chart;
+    chartRollingYearHeatmap: Chart;
     issueIdsDisruptionLongest: Array<string>;
 };
 
@@ -713,6 +714,34 @@ export type GetIssuesHistoryYearMonthResponses = {
 };
 
 export type GetIssuesHistoryYearMonthResponse = GetIssuesHistoryYearMonthResponses[keyof GetIssuesHistoryYearMonthResponses];
+
+export type GetIssuesHistoryYearMonthDayData = {
+    body?: never;
+    path: {
+        year: string;
+        month: string;
+        day: string;
+    };
+    query?: never;
+    url: '/issues/history/{year}/{month}/{day}';
+};
+
+export type GetIssuesHistoryYearMonthDayResponses = {
+    /**
+     * Issues for the specified day
+     */
+    200: {
+        success: true;
+        included: IncludedEntities;
+        data: {
+            startAt: string;
+            endAt: string;
+            issueIds: Array<string>;
+        };
+    };
+};
+
+export type GetIssuesHistoryYearMonthDayResponse = GetIssuesHistoryYearMonthDayResponses[keyof GetIssuesHistoryYearMonthDayResponses];
 
 export type GetIssuesIssueIdData = {
     body?: never;
