@@ -118,6 +118,7 @@
   "general.uptime_percent_display": "系统可用率高达 {percent}",
   "general.uptime_this_period": "运行时间（{period}）",
   "general.uptime_trend_past_period": "运行时间趋势（过去{period}）",
+  "general.uptime_rank": "共 {total} 条线路中排名第 {rank}",
   "general.view_details": "查看详情",
   "general.weekday": "工作日",
   "general.weekdays": "工作日",

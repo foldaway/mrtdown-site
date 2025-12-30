@@ -280,6 +280,14 @@ export type LineSummary = {
         type: IssueType;
         downtimeSeconds: number;
     }> | null;
+    /**
+     * Rank of this line's uptime ratio among all lines (1 = best).
+     */
+    uptimeRank: number | null;
+    /**
+     * Total number of lines used for ranking.
+     */
+    totalLines: number | null;
 };
 
 /**

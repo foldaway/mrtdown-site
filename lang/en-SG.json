@@ -118,6 +118,7 @@
   "general.uptime_percent_display": "{percent} uptime",
   "general.uptime_this_period": "Uptime ({period})",
   "general.uptime_trend_past_period": "Uptime trend (past {period})",
+  "general.uptime_rank": "Ranked #{rank} out of {total} {total, plural, one {line} other {lines}}",
   "general.view_details": "View Details",
   "general.weekday": "Weekday",
   "general.weekdays": "Weekdays",

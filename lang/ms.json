@@ -118,6 +118,7 @@
   "general.uptime_percent_display": "{percent} masa operasi",
   "general.uptime_this_period": "Masa Operasi ({period})",
   "general.uptime_trend_past_period": "Trend masa operasi (lepas {period})",
+  "general.uptime_rank": "Kedudukan #{rank} daripada {total} {total, plural, one {laluan} other {laluan}}",
   "general.view_details": "Lihat Butiran",
   "general.weekday": "Hari Bekerja",
   "general.weekdays": "Hari-hari Bekerja",

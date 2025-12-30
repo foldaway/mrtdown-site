@@ -118,6 +118,7 @@
   "general.uptime_percent_display": "{percent} செயல்பாடு நேரம்",
   "general.uptime_this_period": "செயல்பாட்டு நேரம் ({period})",
   "general.uptime_trend_past_period": "செயல்பாட்டு நேரம் போக்கு (கடந்த {period})",
+  "general.uptime_rank": "{total} {total, plural, one {வழித்தடத்தில்} other {வழித்தடங்களில்}} #{rank} வது இடம்",
   "general.view_details": "விவரங்களைப் பார்க்கவும்",
   "general.weekday": "வார நாள்",
   "general.weekdays": "வார நாட்கள்",
