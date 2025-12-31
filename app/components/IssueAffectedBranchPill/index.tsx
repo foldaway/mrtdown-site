@@ -1,7 +1,6 @@
 import {
   ArrowsRightLeftIcon,
   ChevronDownIcon,
-  MapPinIcon,
 } from '@heroicons/react/20/solid';
 import classNames from 'classnames';
 import { DropdownMenu } from 'radix-ui';
@@ -46,8 +45,6 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
 
     return sourceName;
   };
-
-  console.log({allStations})
 
   if (!hasMultipleStations) {
     return (
