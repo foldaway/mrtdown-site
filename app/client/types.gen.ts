@@ -453,7 +453,7 @@ export type OperatorProfile = {
     /**
      * Current operational status across all lines.
      */
-    currentOperationalStatus: 'all_operational' | 'some_lines_disrupted' | 'some_lines_under_maintenance';
+    currentOperationalStatus: 'all_operational' | 'some_lines_disrupted' | 'some_lines_under_maintenance' | 'all_lines_closed_for_day';
     /**
      * List of line IDs currently affected by issues.
      */

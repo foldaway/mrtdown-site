@@ -15,6 +15,10 @@ const StatusLabels: Record<
     id: 'operator.status.all_operational',
     defaultMessage: 'All Lines Operational',
   },
+  all_lines_closed_for_day: {
+    id: 'status.service_ended',
+    defaultMessage: 'Service Ended',
+  },
   some_lines_disrupted: {
     id: 'operator.status.some_lines_disrupted',
     defaultMessage: 'Some Lines Disrupted',
@@ -45,6 +49,8 @@ export const OperatorCurrentStatusCard: React.FC<Props> = (props) => {
               currentOperationalStatus === 'some_lines_disrupted',
             'bg-maintenance-light dark:bg-maintenance-dark':
               currentOperationalStatus === 'some_lines_under_maintenance',
+            'bg-gray-400 dark:bg-gray-500':
+              currentOperationalStatus === 'all_lines_closed_for_day',
           })}
         />
         <span className="text-sm">
@@ -72,4 +78,3 @@ export const OperatorCurrentStatusCard: React.FC<Props> = (props) => {
     </div>
   );
 };
-
