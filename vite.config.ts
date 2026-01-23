@@ -27,7 +27,13 @@ export default defineConfig((config) => {
       port: 3000,
     },
     ssr: {
-      noExternal: ['@heroicons/*', '@radix-ui/*', '@floating-ui/*'],
+      noExternal: [
+        '@heroicons/*',
+        '@radix-ui/*',
+        '@floating-ui/*',
+        'posthog-js',
+        '@posthog/react',
+      ],
     },
     define: {
       __APP_BUILD_TIMESTAMP__: JSON.stringify(

@@ -7,7 +7,7 @@ import { Analytics } from '@vercel/analytics/react';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { DropdownMenu } from 'radix-ui';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { FormattedDate, FormattedMessage, IntlProvider } from 'react-intl';
 import {
   isRouteErrorResponse,
@@ -24,7 +24,12 @@ import {
   useParams,
 } from 'react-router';
 import type { Route } from './+types/root';
-import { getLines, getMetadata, getOperators, type IncludedEntities } from './client';
+import {
+  getLines,
+  getMetadata,
+  getOperators,
+  type IncludedEntities,
+} from './client';
 import { HrefLangs } from './components/HrefLangs';
 import { LocaleSwitcher } from './components/LocaleSwitcher';
 import NotFound from './components/NotFound';
@@ -33,6 +38,7 @@ import { LANGUAGES } from './constants';
 import { buildLocaleAwareLink } from './helpers/buildLocaleAwareLink';
 import stylesheet from './index.css?url';
 import { assert } from './util/assert';
+import { usePostHog } from '@posthog/react';
 
 export const links: Route.LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -183,7 +189,14 @@ export async function loader({ params }: Route.LoaderArgs) {
 export default function App(props: Route.ComponentProps) {
   const { params, loaderData } = props;
   const { lang } = params;
-  const { messages, lineIds, included, metadata, operatorIds, operatorsIncluded } = loaderData;
+  const {
+    messages,
+    lineIds,
+    included,
+    metadata,
+    operatorIds,
+    operatorsIncluded,
+  } = loaderData;
 
   const navigation = useNavigation();
   const isNavigating = Boolean(navigation.location);
@@ -495,7 +508,10 @@ export default function App(props: Route.ComponentProps) {
                       return (
                         <li key={operatorId}>
                           <Link
-                            to={buildLocaleAwareLink(`/operators/${operatorId}`, lang)}
+                            to={buildLocaleAwareLink(
+                              `/operators/${operatorId}`,
+                              lang,
+                            )}
                             className="flex text-sm transition-colors hover:text-accent-light"
                           >
                             {operator?.nameTranslations[lang ?? 'en-SG'] ??
@@ -611,6 +627,12 @@ export default function App(props: Route.ComponentProps) {
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let message = 'Oops!';
   let details = 'An unexpected error occurred.';
+
+  const posthog = usePostHog();
+
+  useEffect(() => {
+    posthog.captureException(error);
+  }, [posthog, error]);
 
   if (isRouteErrorResponse(error)) {
     if (error.status === 404) {
