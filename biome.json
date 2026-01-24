@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!app/src/client/"]
+    "includes": ["**", "!app/src/client/", "vercel.json"]
   },
   "formatter": {
     "enabled": true,
