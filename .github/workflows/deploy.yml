@@ -26,6 +26,7 @@ jobs:
             --build-arg SENTRY_ORG=${{ secrets.SENTRY_ORG }} \
             --build-arg SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }} \
             --build-arg SENTRY_RELEASE=${{ github.sha }} \
+            --build-arg SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
             --build-secret SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }} \
             --build-arg VITE_PUBLIC_POSTHOG_KEY=${{ secrets.VITE_PUBLIC_POSTHOG_KEY }} \
             --build-arg VITE_PUBLIC_POSTHOG_HOST=${{ secrets.VITE_PUBLIC_POSTHOG_HOST }} \
