@@ -14,7 +14,7 @@ const sentryConfig: SentryReactRouterBuildOptions = {
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
   release: {
-    name: process.env.VERCEL_GIT_COMMIT_SHA ?? 'development',
+    name: process.env.GIT_SHA ?? 'development',
   },
   telemetry: false,
   debug: true,
