@@ -9,10 +9,19 @@ WORKDIR /app
 RUN npm ci --omit=dev
 
 FROM node:24-bookworm-slim AS build-env
+ARG SENTRY_ORG
+ARG SENTRY_PROJECT
+ARG SENTRY_RELEASE
+ENV SENTRY_ORG=$SENTRY_ORG \
+    SENTRY_PROJECT=$SENTRY_PROJECT \
+    GIT_SHA=$SENTRY_RELEASE
+
 COPY . /app/
 COPY --from=development-dependencies-env /app/node_modules /app/node_modules
 WORKDIR /app
-RUN npm run build
+# Build application
+RUN --mount=type=secret,id=SENTRY_AUTH_TOKEN \
+    SENTRY_AUTH_TOKEN=$(cat /run/secrets/SENTRY_AUTH_TOKEN) npm run build
 
 FROM node:24-bookworm-slim
 

@@ -22,10 +22,12 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy to production
         run: |-
-          flyctl deploy --local-only -a mrtdown-site --env "TIER=production"
+          flyctl deploy --local-only -a mrtdown-site --env "TIER=production" \
+            --build-arg SENTRY_ORG=${{ secrets.SENTRY_ORG }} \
+            --build-arg SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }} \
+            --build-arg SENTRY_RELEASE=${{ github.sha }} \
+            --build-secret SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }} \
+            --image-label=${{ github.sha }}
         env:
           GIT_SHA: ${{ github.sha }}
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
