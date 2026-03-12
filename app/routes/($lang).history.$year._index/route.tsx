@@ -27,9 +27,17 @@ export async function loader({ params }: Route.LoaderArgs) {
 
   const { year } = params;
   const yearNum = Number.parseInt(year, 10);
+
+  /**
+   * Valid year range: 1980 to current year + 10.
+   * Rejects dates outside this range with 404.
+   * Reduces crawler traffic (AI and non-AI) that probes random date combos
+   * which would otherwise generate full pages and waste resources.
+   */
+  const minYear = 1980;
   const maxYear = DateTime.now().year + 10;
-  if (yearNum > maxYear) {
-    throw new Response('Year is too far in the future', {
+  if (yearNum < minYear || yearNum > maxYear) {
+    throw new Response('Year is outside the valid range', {
       status: 404,
       statusText: 'Not Found',
     });
