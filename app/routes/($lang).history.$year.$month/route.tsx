@@ -26,6 +26,14 @@ export async function loader({ params }: Route.LoaderArgs) {
   const rootUrl = process.env.ROOT_URL;
 
   const { year, month } = params;
+  const yearNum = Number.parseInt(year, 10);
+  const maxYear = DateTime.now().year + 10;
+  if (yearNum > maxYear) {
+    throw new Response('Year is too far in the future', {
+      status: 404,
+      statusText: 'Not Found',
+    });
+  }
 
   const { data, error } = await getIssuesHistoryYearMonth({
     auth: () => process.env.API_TOKEN,
