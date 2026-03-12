@@ -40,12 +40,8 @@ export default defineConfig((config) => {
         DateTime.now().setZone('Asia/Singapore').toISO(),
       ),
       __SENTRY_DSN__: JSON.stringify(process.env.SENTRY_DSN ?? ''),
-      __SENTRY_ENVIRONMENT__: JSON.stringify(
-        process.env.VERCEL_ENV ?? 'development',
-      ),
-      __SENTRY_RELEASE__: JSON.stringify(
-        process.env.VERCEL_GIT_COMMIT_SHA ?? 'development',
-      ),
+      __SENTRY_ENVIRONMENT__: JSON.stringify(process.env.TIER ?? 'development'),
+      __SENTRY_RELEASE__: JSON.stringify(process.env.GIT_SHA ?? 'development'),
     },
     plugins: [
       reactRouter(),
