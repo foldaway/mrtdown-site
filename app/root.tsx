@@ -3,7 +3,6 @@ import { Bars3Icon } from '@heroicons/react/24/outline';
 import { ClockIcon } from '@heroicons/react/24/solid';
 import * as Sentry from '@sentry/react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Analytics } from '@vercel/analytics/react';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { DropdownMenu } from 'radix-ui';
@@ -86,7 +85,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <ScrollRestoration />
         <Scripts />
-        <Analytics />
       </body>
     </html>
   );
