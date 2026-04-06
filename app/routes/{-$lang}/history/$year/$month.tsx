@@ -117,21 +117,22 @@ function HistoryMonthPage() {
       <div className="flex flex-col space-y-8">
         <nav className="flex items-center space-x-1 text-gray-500 text-sm dark:text-gray-400">
           <Link
-            to={buildLocaleAwareLink('/', lang)}
+            to="/{-$lang}"
             className="hover:text-gray-700 dark:hover:text-gray-200"
           >
             <FormattedMessage id="general.home" defaultMessage="Home" />
           </Link>
           <ChevronRightIcon className="size-4" />
           <Link
-            to={buildLocaleAwareLink('/history', lang)}
+            to="/{-$lang}/history"
             className="hover:text-gray-700 dark:hover:text-gray-200"
           >
             <FormattedMessage id="general.history" defaultMessage="History" />
           </Link>
           <ChevronRightIcon className="size-4" />
           <Link
-            to={buildLocaleAwareLink(`/history/${dateTimeStartAt.year}`, lang)}
+            to="/{-$lang}/history/$year"
+            params={{ year: dateTimeStartAt.year.toString() }}
             className="hover:text-gray-700 dark:hover:text-gray-200"
           >
             {isHydrated ? (
@@ -171,12 +172,11 @@ function HistoryMonthPage() {
                 className="rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-800"
               >
                 <Link
-                  to={buildLocaleAwareLink(
-                    `/history/${dateTimeStartAt.minus({ month: 1 }).year}/${dateTimeStartAt
-                      .minus({ month: 1 })
-                      .toFormat('MM')}`,
-                    lang,
-                  )}
+                  to="/{-$lang}/history/$year/$month"
+                  params={{
+                    year: dateTimeStartAt.minus({ month: 1 }).year.toString(),
+                    month: dateTimeStartAt.minus({ month: 1 }).toFormat('MM'),
+                  }}
                 >
                   <ArrowLeftIcon className="size-4" />
                 </Link>
@@ -205,16 +205,25 @@ function HistoryMonthPage() {
                           key={monthOption}
                           className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
                           onSelect={() => {
-                            navigate(
-                              buildLocaleAwareLink(
-                                `/history/${dateTimeStartAt.year}/${monthOption.toString().padStart(2, '0')}`,
-                                lang,
-                              ),
-                            );
+                            navigate({
+                              to: '/{-$lang}/history/$year/$month',
+                              params: {
+                                year: dateTimeStartAt.year.toString(),
+                                month: monthOption.toString().padStart(2, '0'),
+                              },
+                            });
                           }}
                         >
-                          {DateTime.fromObject({ month: monthOption }).toFormat(
-                            'MMMM',
+                          {isHydrated ? (
+                            <FormattedDate
+                              value={DateTime.fromObject({
+                                year: dateTimeStartAt.year,
+                                month: monthOption,
+                              }).toMillis()}
+                              month="long"
+                            />
+                          ) : (
+                            monthOption.toString().padStart(2, '0')
                           )}
                           {monthOption === dateTimeStartAt.month && (
                             <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
@@ -247,15 +256,23 @@ function HistoryMonthPage() {
                           key={yearOption}
                           className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
                           onSelect={() => {
-                            navigate(
-                              buildLocaleAwareLink(
-                                `/history/${yearOption}/${dateTimeStartAt.toFormat('MM')}`,
-                                lang,
-                              ),
-                            );
+                            navigate({
+                              to: '/{-$lang}/history/$year/$month',
+                              params: {
+                                year: yearOption.toString(),
+                                month: dateTimeStartAt.toFormat('MM'),
+                              },
+                            });
                           }}
                         >
-                          {yearOption}
+                          {isHydrated ? (
+                            <FormattedDate
+                              value={yearOption.toString()}
+                              year="numeric"
+                            />
+                          ) : (
+                            yearOption.toString()
+                          )}
                           {yearOption === dateTimeStartAt.year && (
                             <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
                           )}
@@ -271,12 +288,11 @@ function HistoryMonthPage() {
                 className="rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-800"
               >
                 <Link
-                  to={buildLocaleAwareLink(
-                    `/history/${dateTimeStartAt.plus({ month: 1 }).year}/${dateTimeStartAt
-                      .plus({ month: 1 })
-                      .toFormat('MM')}`,
-                    lang,
-                  )}
+                  to="/{-$lang}/history/$year/$month"
+                  params={{
+                    year: dateTimeStartAt.plus({ month: 1 }).year.toString(),
+                    month: dateTimeStartAt.plus({ month: 1 }).toFormat('MM'),
+                  }}
                 >
                   <ArrowRightIcon className="size-4" />
                 </Link>
@@ -338,12 +354,11 @@ function HistoryMonthPage() {
             className="rounded p-1.5 text-gray-600 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
           >
             <Link
-              to={buildLocaleAwareLink(
-                `/history/${dateTimeStartAt.minus({ month: 1 }).year}/${dateTimeStartAt
-                  .minus({ month: 1 })
-                  .toFormat('MM')}`,
-                lang,
-              )}
+              to="/{-$lang}/history/$year/$month"
+              params={{
+                year: dateTimeStartAt.minus({ month: 1 }).year.toString(),
+                month: dateTimeStartAt.minus({ month: 1 }).toFormat('MM'),
+              }}
             >
               <ArrowLeftIcon className="size-4" />
             </Link>
@@ -372,16 +387,25 @@ function HistoryMonthPage() {
                       key={monthOption}
                       className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
                       onSelect={() => {
-                        navigate(
-                          buildLocaleAwareLink(
-                            `/history/${dateTimeStartAt.year}/${monthOption.toString().padStart(2, '0')}`,
-                            lang,
-                          ),
-                        );
+                        navigate({
+                          to: '/{-$lang}/history/$year/$month',
+                          params: {
+                            year: dateTimeStartAt.year.toString(),
+                            month: monthOption.toString().padStart(2, '0'),
+                          },
+                        });
                       }}
                     >
-                      {DateTime.fromObject({ month: monthOption }).toFormat(
-                        'MMMM',
+                      {isHydrated ? (
+                        <FormattedDate
+                          value={DateTime.fromObject({
+                            year: dateTimeStartAt.year,
+                            month: monthOption,
+                          }).toMillis()}
+                          month="long"
+                        />
+                      ) : (
+                        monthOption.toString().padStart(2, '0')
                       )}
                       {monthOption === dateTimeStartAt.month && (
                         <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
@@ -414,15 +438,23 @@ function HistoryMonthPage() {
                       key={yearOption}
                       className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
                       onSelect={() => {
-                        navigate(
-                          buildLocaleAwareLink(
-                            `/history/${yearOption}/${dateTimeStartAt.toFormat('MM')}`,
-                            lang,
-                          ),
-                        );
+                        navigate({
+                          to: '/{-$lang}/history/$year/$month',
+                          params: {
+                            year: yearOption.toString(),
+                            month: dateTimeStartAt.toFormat('MM'),
+                          },
+                        });
                       }}
                     >
-                      {yearOption}
+                      {isHydrated ? (
+                        <FormattedDate
+                          value={yearOption.toString()}
+                          year="numeric"
+                        />
+                      ) : (
+                        yearOption.toString()
+                      )}
                       {yearOption === dateTimeStartAt.year && (
                         <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
                       )}
@@ -438,12 +470,11 @@ function HistoryMonthPage() {
             className="rounded p-1.5 text-gray-600 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
           >
             <Link
-              to={buildLocaleAwareLink(
-                `/history/${dateTimeStartAt.plus({ month: 1 }).year}/${dateTimeStartAt
-                  .plus({ month: 1 })
-                  .toFormat('MM')}`,
-                lang,
-              )}
+              to="/{-$lang}/history/$year/$month"
+              params={{
+                year: dateTimeStartAt.plus({ month: 1 }).year.toString(),
+                month: dateTimeStartAt.plus({ month: 1 }).toFormat('MM'),
+              }}
             >
               <ArrowRightIcon className="size-4" />
             </Link>

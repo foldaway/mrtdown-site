@@ -4,7 +4,6 @@ import { FormattedMessage, FormattedNumber, useIntl } from 'react-intl';
 import type { OperatorLinePerformance } from '~/client';
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 interface Props {
   linePerformanceComparison: OperatorLinePerformance[];
@@ -40,10 +39,8 @@ export const OperatorLinePerformanceCard: React.FC<Props> = (props) => {
             <Link
               key={performance.lineId}
               className="group flex items-center gap-4 rounded-lg border border-gray-300 p-4 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50"
-              to={buildLocaleAwareLink(
-                `/lines/${performance.lineId}`,
-                intl.locale,
-              )}
+              to="/{-$lang}/lines/$lineId"
+              params={{ lineId: performance.lineId }}
             >
               <span
                 className="rounded-md px-2 py-1 font-semibold text-white text-xs leading-none"

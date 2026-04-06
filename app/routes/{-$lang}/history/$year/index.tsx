@@ -108,14 +108,14 @@ function HistoryYearPage() {
       <div className="flex flex-col space-y-8">
         <nav className="flex items-center space-x-1 text-gray-500 text-sm dark:text-gray-400">
           <Link
-            to={buildLocaleAwareLink('/', lang)}
+            to="/{-$lang}"
             className="hover:text-gray-700 dark:hover:text-gray-200"
           >
             <FormattedMessage id="general.home" defaultMessage="Home" />
           </Link>
           <ChevronRightIcon className="size-4" />
           <Link
-            to={buildLocaleAwareLink('/history', lang)}
+            to="/{-$lang}/history"
             className="hover:text-gray-700 dark:hover:text-gray-200"
           >
             <FormattedMessage id="general.history" defaultMessage="History" />
@@ -153,10 +153,10 @@ function HistoryYearPage() {
                 aria-label="Previous year"
               >
                 <Link
-                  to={buildLocaleAwareLink(
-                    `/history/${dateTimeStartAt.minus({ year: 1 }).year}`,
-                    lang,
-                  )}
+                  to="/{-$lang}/history/$year"
+                  params={{
+                    year: dateTimeStartAt.minus({ year: 1 }).year.toString(),
+                  }}
                 >
                   <ArrowLeftIcon className="size-5" />
                 </Link>
@@ -185,15 +185,22 @@ function HistoryYearPage() {
                           key={yearOption}
                           className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
                           onSelect={() => {
-                            navigate(
-                              buildLocaleAwareLink(
-                                `/history/${yearOption}`,
-                                lang,
-                              ),
-                            );
+                            navigate({
+                              to: '/{-$lang}/history/$year',
+                              params: {
+                                year: yearOption.toString(),
+                              },
+                            });
                           }}
                         >
-                          {yearOption}
+                          {isHydrated ? (
+                            <FormattedDate
+                              value={yearOption.toString()}
+                              year="numeric"
+                            />
+                          ) : (
+                            yearOption.toString()
+                          )}
                           {yearOption === dateTimeStartAt.year && (
                             <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
                           )}
@@ -210,10 +217,10 @@ function HistoryYearPage() {
                 aria-label="Next year"
               >
                 <Link
-                  to={buildLocaleAwareLink(
-                    `/history/${dateTimeStartAt.plus({ year: 1 }).year}`,
-                    lang,
-                  )}
+                  to="/{-$lang}/history/$year"
+                  params={{
+                    year: dateTimeStartAt.plus({ year: 1 }).year.toString(),
+                  }}
                 >
                   <ArrowRightIcon className="size-5" />
                 </Link>
@@ -313,10 +320,11 @@ function HistoryYearPage() {
                 </div>
 
                 <Link
-                  to={buildLocaleAwareLink(
-                    `/history/${year}/${DateTime.fromISO(monthSummary.month).toFormat('MM')}`,
-                    lang,
-                  )}
+                  to="/{-$lang}/history/$year/$month"
+                  params={{
+                    year: year.toString(),
+                    month: DateTime.fromISO(monthSummary.month).toFormat('MM'),
+                  }}
                   className="group hover:-translate-y-0.5 inline-flex w-full items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 font-medium text-sm text-white shadow-lg transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:from-blue-500 dark:to-blue-600 dark:focus:ring-offset-gray-800 dark:hover:from-blue-600 dark:hover:to-blue-700"
                 >
                   <FormattedMessage
@@ -337,10 +345,10 @@ function HistoryYearPage() {
             aria-label="Previous year"
           >
             <Link
-              to={buildLocaleAwareLink(
-                `/history/${dateTimeStartAt.minus({ year: 1 }).year}`,
-                lang,
-              )}
+              to="/{-$lang}/history/$year"
+              params={{
+                year: dateTimeStartAt.minus({ year: 1 }).year.toString(),
+              }}
             >
               <ArrowLeftIcon className="size-5" />
             </Link>
@@ -369,12 +377,22 @@ function HistoryYearPage() {
                       key={yearOption}
                       className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
                       onSelect={() => {
-                        navigate(
-                          buildLocaleAwareLink(`/history/${yearOption}`, lang),
-                        );
+                        navigate({
+                          to: '/{-$lang}/history/$year',
+                          params: {
+                            year: yearOption.toString(),
+                          },
+                        });
                       }}
                     >
-                      {yearOption}
+                      {isHydrated ? (
+                        <FormattedDate
+                          value={yearOption.toString()}
+                          year="numeric"
+                        />
+                      ) : (
+                        yearOption.toString()
+                      )}
                       {yearOption === dateTimeStartAt.year && (
                         <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
                       )}
@@ -391,10 +409,10 @@ function HistoryYearPage() {
             aria-label="Next year"
           >
             <Link
-              to={buildLocaleAwareLink(
-                `/history/${dateTimeStartAt.plus({ year: 1 }).year}`,
-                lang,
-              )}
+              to="/{-$lang}/history/$year"
+              params={{
+                year: dateTimeStartAt.plus({ year: 1 }).year.toString(),
+              }}
             >
               <ArrowRightIcon className="size-5" />
             </Link>

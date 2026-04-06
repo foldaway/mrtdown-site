@@ -1,9 +1,10 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, notFound } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useEffect, useMemo } from 'react';
 import { createIntl, FormattedMessage } from 'react-intl';
 import { z } from 'zod';
 import { LineSummaryBlock } from '~/components/LineSummaryBlock';
+import { LANGUAGES } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { useViewport, ViewportSchema } from '~/hooks/useViewport';
@@ -22,7 +23,12 @@ export const Route = createFileRoute('/{-$lang}/')({
   loaderDeps({ search }) {
     return { viewport: search.viewport ?? 'xs' };
   },
-  async loader({ deps }) {
+  async loader({ deps, params }) {
+    const lang = params.lang ?? 'en-SG';
+    if (!LANGUAGES.includes(lang)) {
+      throw notFound();
+    }
+
     const viewport = deps.viewport ?? 'xs';
     const dateCount = getDateCountForViewport(viewport);
     const { data, included } = await getOverviewFn({
@@ -34,6 +40,9 @@ export const Route = createFileRoute('/{-$lang}/')({
   },
   async head(ctx) {
     const lang = ctx.params.lang ?? 'en-SG';
+    if (!LANGUAGES.includes(lang)) {
+      throw notFound();
+    }
 
     const { default: messages } = await import(`../../../lang/${lang}.json`);
     const intl = createIntl({

@@ -34,7 +34,8 @@ export const LineItem: React.FC<Props> = (props) => {
         </span>
 
         <Link
-          to={buildLocaleAwareLink(`/lines/${line.id}`, intl.locale)}
+          to="/{-$lang}/lines/$lineId"
+          params={{ lineId: line.id }}
           className="group flex-1"
         >
           <h2 className="font-semibold text-gray-800 transition-colors group-hover:text-blue-600 dark:text-gray-200 dark:group-hover:text-blue-400">

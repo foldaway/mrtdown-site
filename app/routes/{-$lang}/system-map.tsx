@@ -137,8 +137,9 @@ function SystemMapPage() {
               {lines.map((line) => (
                 <Link
                   key={line.id}
-                  to={buildLocaleAwareLink(`/lines/${line.id}`, intl.locale)}
                   className="group flex items-center gap-x-2 overflow-hidden"
+                  to="/{-$lang}/lines/$lineId"
+                  params={{ lineId: line.id }}
                 >
                   <div
                     className="flex h-4 w-12 items-center justify-center rounded-md"

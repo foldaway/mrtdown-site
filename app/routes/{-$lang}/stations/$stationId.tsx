@@ -16,7 +16,6 @@ import { StationBar } from '~/components/StationBar';
 import { LineTypeLabels, StationStructureTypeLabels } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
 import { getStationProfileFn } from '~/util/station.functions';
 import { assert } from '../../../util/assert';
@@ -364,10 +363,8 @@ function StationPage() {
                       <td className="p-2 align-middle">
                         <Link
                           className="group flex flex-wrap items-center gap-x-1 gap-y-0.5"
-                          to={buildLocaleAwareLink(
-                            `/lines/${membership.lineId}`,
-                            intl.locale,
-                          )}
+                          to="/{-$lang}/lines/$lineId"
+                          params={{ lineId: membership.lineId }}
                         >
                           <span
                             className="rounded-md px-2 py-1 font-semibold text-white text-xs leading-none"

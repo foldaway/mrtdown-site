@@ -11,7 +11,6 @@ import {
 } from 'react-intl';
 import type { Line, LineBranch } from '~/client';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 interface Props {
   line: Line;
@@ -79,10 +78,8 @@ export const QuickFactsCard: React.FC<Props> = (props) => {
                     <span className="text-gray-500 dark:text-gray-400">, </span>
                   )}
                   <Link
-                    to={buildLocaleAwareLink(
-                      `/operators/${operator.id}`,
-                      intl.locale,
-                    )}
+                    to="/{-$lang}/operators/$operatorId"
+                    params={{ operatorId: operator.id }}
                     className="text-blue-600 hover:underline dark:text-blue-400"
                   >
                     {operator.name}

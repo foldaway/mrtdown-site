@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createFileRoute,
   Link,
+  notFound,
   Outlet,
   useHydrated,
   useRouterState,
@@ -16,12 +17,18 @@ import { useMemo } from 'react';
 import { FormattedDate, FormattedMessage, IntlProvider } from 'react-intl';
 import { LocaleSwitcher } from '~/components/LocaleSwitcher';
 import Spinner from '~/components/Spinner';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { LANGUAGES } from '~/constants';
 import { getRootFn } from '~/util/root.functions';
 
 export const Route = createFileRoute('/{-$lang}')({
   component: RouteComponent,
-  loader: ({ params }) => getRootFn({ data: { lang: params.lang } }),
+  loader: ({ params }) => {
+    const lang = params.lang ?? 'en-SG';
+    if (!LANGUAGES.includes(lang)) {
+      throw notFound();
+    }
+    return getRootFn({ data: { lang: params.lang } });
+  },
 });
 
 const queryClient = new QueryClient();
@@ -72,7 +79,7 @@ function RouteComponent() {
             <div className="flex h-18 items-center justify-between">
               <div className="flex items-center space-x-6">
                 <Link
-                  to={buildLocaleAwareLink('/', lang)}
+                  to="/{-$lang}"
                   className="group flex items-center space-x-3 transition-transform duration-200 hover:scale-105"
                 >
                   <div className="relative">
@@ -100,37 +107,25 @@ function RouteComponent() {
                   >
                     <FormattedMessage id="general.home" defaultMessage="Home" />
                   </Link>
-                  <Link
-                    to={buildLocaleAwareLink('/history', lang)}
-                    className={linkClassName}
-                  >
+                  <Link to="/{-$lang}/history" className={linkClassName}>
                     <FormattedMessage
                       id="general.history"
                       defaultMessage="History"
                     />
                   </Link>
-                  <Link
-                    to={buildLocaleAwareLink('/statistics', lang)}
-                    className={linkClassName}
-                  >
+                  <Link to="/{-$lang}/statistics" className={linkClassName}>
                     <FormattedMessage
                       id="general.statistics"
                       defaultMessage="Statistics"
                     />
                   </Link>
-                  <Link
-                    to={buildLocaleAwareLink('/system-map', lang)}
-                    className={linkClassName}
-                  >
+                  <Link to="/{-$lang}/system-map" className={linkClassName}>
                     <FormattedMessage
                       id="general.system_map"
                       defaultMessage="System Map"
                     />
                   </Link>
-                  <Link
-                    to={buildLocaleAwareLink('/about', lang)}
-                    className={linkClassName}
-                  >
+                  <Link to="/{-$lang}/about" className={linkClassName}>
                     <FormattedMessage
                       id="general.about"
                       defaultMessage="About"
@@ -160,7 +155,7 @@ function RouteComponent() {
                       >
                         <DropdownMenu.Item>
                           <Link
-                            to={buildLocaleAwareLink('/', lang)}
+                            to="/{-$lang}"
                             className={linkClassNameMobile}
                             // end
                           >
@@ -173,7 +168,7 @@ function RouteComponent() {
 
                         <DropdownMenu.Item>
                           <Link
-                            to={buildLocaleAwareLink('/history', lang)}
+                            to="/{-$lang}/history"
                             className={linkClassNameMobile}
                           >
                             <FormattedMessage
@@ -185,7 +180,7 @@ function RouteComponent() {
 
                         <DropdownMenu.Item>
                           <Link
-                            to={buildLocaleAwareLink('/statistics', lang)}
+                            to="/{-$lang}/statistics"
                             className={linkClassNameMobile}
                           >
                             <FormattedMessage
@@ -197,7 +192,7 @@ function RouteComponent() {
 
                         <DropdownMenu.Item>
                           <Link
-                            to={buildLocaleAwareLink('/system-map', lang)}
+                            to="/{-$lang}/system-map"
                             className={linkClassNameMobile}
                           >
                             <FormattedMessage
@@ -209,7 +204,7 @@ function RouteComponent() {
 
                         <DropdownMenu.Item>
                           <Link
-                            to={buildLocaleAwareLink('/about', lang)}
+                            to="/{-$lang}/about"
                             className={linkClassNameMobile}
                           >
                             <FormattedMessage
@@ -281,7 +276,8 @@ function RouteComponent() {
                     return (
                       <li key={lineId}>
                         <Link
-                          to={buildLocaleAwareLink(`/lines/${lineId}`, lang)}
+                          to="/{-$lang}/lines/$lineId"
+                          params={{ lineId }}
                           className="flex items-center gap-x-1.5 text-sm transition-colors hover:text-accent-light"
                         >
                           <span
@@ -312,7 +308,7 @@ function RouteComponent() {
                   <ul className="space-y-3">
                     <li>
                       <Link
-                        to={buildLocaleAwareLink('/history', lang)}
+                        to="/{-$lang}/history"
                         className="flex text-sm transition-colors hover:text-accent-light"
                       >
                         <FormattedMessage
@@ -323,7 +319,7 @@ function RouteComponent() {
                     </li>
                     <li>
                       <Link
-                        to={buildLocaleAwareLink('/system-map', lang)}
+                        to="/{-$lang}/system-map"
                         className="flex text-sm transition-colors hover:text-accent-light"
                       >
                         <FormattedMessage
@@ -335,10 +331,8 @@ function RouteComponent() {
                     {/*{footerManifest.featuredStations.map((station) => (
                       <li key={station.id}>
                         <Link
-                          to={buildLocaleAwareLink(
-                            `/stations/${station.id}`,
-                            lang,
-                          )}
+                          to="/{-$lang}/stations/$stationId"
+                          params={{ stationId: station.id }}
                           className="flex text-sm transition-colors hover:text-blue-400"
                         >
                           {station.name_translations[lang ?? 'en-SG'] ??
@@ -364,10 +358,8 @@ function RouteComponent() {
                       return (
                         <li key={operatorId}>
                           <Link
-                            to={buildLocaleAwareLink(
-                              `/operators/${operatorId}`,
-                              lang,
-                            )}
+                            to="/{-$lang}/operators/$operatorId"
+                            params={{ operatorId }}
                             className="flex text-sm transition-colors hover:text-accent-light"
                           >
                             {operator?.nameTranslations[lang ?? 'en-SG'] ??
@@ -392,7 +384,7 @@ function RouteComponent() {
                 <ul className="space-y-3">
                   <li>
                     <Link
-                      to={buildLocaleAwareLink('/about', lang)}
+                      to="/{-$lang}/about"
                       className="flex text-sm transition-colors hover:text-accent-light"
                     >
                       <FormattedMessage

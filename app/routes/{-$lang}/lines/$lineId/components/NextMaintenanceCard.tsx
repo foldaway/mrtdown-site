@@ -5,7 +5,6 @@ import { FormattedDateTimeRange, FormattedMessage, useIntl } from 'react-intl';
 import type { Issue } from '~/client';
 import { IssueAffectedBranchPill } from '~/components/IssueAffectedBranchPill';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 interface InternalContentProps {
   lineId: string;
@@ -42,7 +41,8 @@ const InternalContent: React.FC<InternalContentProps> = (props) => {
     <>
       <Link
         className="hover:underline"
-        to={buildLocaleAwareLink(`/issues/${issue.id}`, intl.locale)}
+        to="/{-$lang}/issues/$issueId"
+        params={{ issueId: issue.id }}
       >
         <span className="font-semibold text-base text-gray-800 leading-tight dark:text-gray-200">
           {issue.titleTranslations[intl.locale] ?? issue.title}

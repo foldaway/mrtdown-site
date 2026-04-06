@@ -2,7 +2,6 @@ import { Link } from '@tanstack/react-router';
 import { Fragment } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 interface Props {
   lineId: string;
@@ -73,10 +72,8 @@ export const StationInterchangesCard: React.FC<Props> = (props) => {
                   </div>
                   <div className="flex">
                     <Link
-                      to={buildLocaleAwareLink(
-                        `/stations/${stationId}`,
-                        intl.locale,
-                      )}
+                      to="/{-$lang}/stations/$stationId"
+                      params={{ stationId }}
                       className="group flex"
                     >
                       <span className="text-gray-800 text-sm group-hover:underline dark:text-gray-200">

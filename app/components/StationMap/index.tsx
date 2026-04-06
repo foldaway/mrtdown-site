@@ -242,7 +242,10 @@ export const StationMap: React.FC<Props> = (props) => {
           newParentElement.setAttributeNS(null, 'href', href);
           newParentElement.onclick = (e) => {
             e.preventDefault();
-            navigate(href);
+            navigate({
+              to: '/{-$lang}/stations/$stationId',
+              params: { stationId },
+            });
           };
           parentElement.removeChild(labelElement);
           newParentElement.appendChild(labelElement);
@@ -359,10 +362,8 @@ export const StationMap: React.FC<Props> = (props) => {
                   <Link
                     className="hover:underline"
                     key={stationId}
-                    to={buildLocaleAwareLink(
-                      `/stations/${stationId}`,
-                      intl.locale,
-                    )}
+                    to="/{-$lang}/stations/$stationId"
+                    params={{ stationId }}
                   >
                     {station.nameTranslations[intl.locale] ??
                       station.name ??
