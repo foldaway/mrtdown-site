@@ -48,6 +48,10 @@ export default defineConfig((config) => {
     plugins: [
       tanstackStart({
         srcDirectory: 'app',
+        router: {
+          // Ignores files/folders containing 'components', 'hooks', or ending in '.test.tsx'
+          routeFileIgnorePattern: '((components|hooks)|.test.tsx)',
+        },
       }),
       tailwindcss(),
       viteReact(),
