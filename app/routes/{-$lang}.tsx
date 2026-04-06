@@ -6,6 +6,7 @@ import {
   createFileRoute,
   Link,
   Outlet,
+  useHydrated,
   useRouterState,
 } from '@tanstack/react-router';
 import classNames from 'classnames';
@@ -49,6 +50,8 @@ function RouteComponent() {
     operatorIds,
     operatorsIncluded,
   } = loaderData;
+
+  const isHydrated = useHydrated();
 
   const isNavigating = useRouterState({
     select: (state) => state.status === 'pending',
@@ -226,7 +229,7 @@ function RouteComponent() {
         <main className="mx-4 mt-6 flex max-w-5xl flex-col bg-gray-50 sm:mt-8 lg:mx-auto dark:bg-gray-900">
           <Outlet />
 
-          {isNavigating && (
+          {isNavigating && isHydrated && (
             <div className="fixed right-4 bottom-4">
               <Spinner size="medium" />
             </div>
