@@ -10,7 +10,7 @@
     "i18n:extract": "formatjs extract 'app/**/*.{ts,tsx}' --ignore '**/*.d.ts' --out-file lang/en-SG.json --format simple",
     "build": "vite build && cp instrument.server.mjs .output/server",
     "test": "vitest",
-    "start": "NODE_OPTIONS='--import ./instrument.server.mjs' node .output/server/index.mjs",
+    "start": "NODE_OPTIONS='--import ./.output/server/instrument.server.mjs' node .output/server/index.mjs",
     "api:client:generate": "tsx app/scripts/generateApiClient.ts"
   },
   "dependencies": {
