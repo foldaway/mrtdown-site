@@ -190,15 +190,19 @@ function OperatorPage() {
 
   const isHydrated = useHydrated();
   const navigate = Route.useNavigate();
-  const viewport = useViewport();
+  const { viewport } = Route.useSearch();
+  const measuredViewport = useViewport();
 
   useEffect(() => {
+    if (viewport === measuredViewport) {
+      return;
+    }
     navigate({
       search: {
-        viewport,
+        viewport: measuredViewport,
       },
     });
-  }, [viewport, navigate]);
+  }, [viewport, measuredViewport, navigate]);
 
   return (
     <IncludedEntitiesContext.Provider value={included}>

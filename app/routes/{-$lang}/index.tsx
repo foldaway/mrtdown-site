@@ -106,20 +106,24 @@ export const Route = createFileRoute('/{-$lang}/')({
 
 function HomePage() {
   const loaderData = Route.useLoaderData();
+  const { viewport } = Route.useSearch();
   const { overview, included, dateCount } = loaderData;
   const { issues } = included;
 
   const navigate = Route.useNavigate();
 
-  const viewport = useViewport();
+  const measuredViewport = useViewport();
 
   useEffect(() => {
+    if (viewport === measuredViewport) {
+      return;
+    }
     navigate({
       search: {
-        viewport,
+        viewport: measuredViewport,
       },
     });
-  }, [viewport, navigate]);
+  }, [viewport, measuredViewport, navigate]);
 
   const dateTimes = useMemo(() => {
     const dateRangeEnd = DateTime.now()
