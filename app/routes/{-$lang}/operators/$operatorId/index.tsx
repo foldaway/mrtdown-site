@@ -201,6 +201,7 @@ function OperatorPage() {
       search: {
         viewport: measuredViewport,
       },
+      replace: true,
     });
   }, [viewport, measuredViewport, navigate]);
 
