@@ -1,9 +1,9 @@
+import { Link, useNavigate } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { Tabs } from 'radix-ui';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { FormattedList, FormattedMessage, useIntl } from 'react-intl';
-import { Link, useNavigate } from 'react-router';
 import type { IssueAffectedBranch } from '~/client';
 import { ZoomControls } from '~/components/ZoomControls';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';

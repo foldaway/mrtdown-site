@@ -1,5 +1,5 @@
+import { Link } from '@tanstack/react-router';
 import { useIntl } from 'react-intl';
-import { Link } from 'react-router';
 import type { Line } from '~/client';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 

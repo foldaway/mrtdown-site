@@ -37,20 +37,7 @@
         "noUnusedTemplateLiteral": "error",
         "useNumberNamespace": "error",
         "noInferrableTypes": "error",
-        "noUselessElse": "error",
-        "useComponentExportOnlyModules": {
-          "level": "error",
-          "options": {
-            "allowExportNames": [
-              "json",
-              "loader",
-              "headers",
-              "meta",
-              "links",
-              "scripts"
-            ]
-          }
-        }
+        "noUselessElse": "error"
       }
     }
   },

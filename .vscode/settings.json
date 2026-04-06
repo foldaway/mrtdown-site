@@ -9,6 +9,7 @@
   },
   "biome.require_config_file": true,
   "editor.codeActionsOnSave": {
-    "quickfix.biome": "explicit"
+    "quickfix.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
   }
 }

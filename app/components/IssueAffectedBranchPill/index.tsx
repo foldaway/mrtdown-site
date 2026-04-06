@@ -2,11 +2,11 @@ import {
   ArrowsRightLeftIcon,
   ChevronDownIcon,
 } from '@heroicons/react/20/solid';
+import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DropdownMenu } from 'radix-ui';
 import { Fragment } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { Link } from 'react-router';
 import type { IssueAffectedBranch } from '~/client';
 import { useAffectedStations } from '~/components/IssueAffectedBranchPill/hooks/useAffectedStations';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';

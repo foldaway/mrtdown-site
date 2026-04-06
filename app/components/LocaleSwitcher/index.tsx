@@ -1,16 +1,16 @@
+import { Link, useLocation } from '@tanstack/react-router';
 import classNames from 'classnames';
 import type React from 'react';
 import { useIntl } from 'react-intl';
-import { NavLink, type NavLinkProps, useLocation } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { LOCALES } from './constants';
 
-const navLinkClassNameFunction: NavLinkProps['className'] = ({ isActive }) => {
-  return classNames('text-xs transition-colors hover:text-blue-400', {
-    'text-blue-400 font-medium': isActive,
-    'text-gray-300': !isActive,
-  });
-};
+const activeClassName = classNames(
+  'text-xs transition-colors hover:text-blue-400 text-blue-400 font-medium',
+);
+const inactiveClassName = classNames(
+  'text-xs transition-colors hover:text-blue-400 text-gray-300',
+);
 
 export const LocaleSwitcher: React.FC = () => {
   const location = useLocation();
@@ -19,18 +19,19 @@ export const LocaleSwitcher: React.FC = () => {
   return (
     <div className="flex flex-col items-start justify-center gap-y-2">
       {LOCALES.map((locale) => (
-        <NavLink
+        <Link
           key={locale}
           to={buildLocaleAwareLink(
             location.pathname.replace(`/${intl.locale}`, ''),
             locale,
           )}
-          className={navLinkClassNameFunction}
+          activeProps={{ className: activeClassName }}
+          inactiveProps={{ className: inactiveClassName }}
         >
           {new Intl.DisplayNames(locale, {
             type: 'language',
           }).of(locale)}
-        </NavLink>
+        </Link>
       ))}
     </div>
   );

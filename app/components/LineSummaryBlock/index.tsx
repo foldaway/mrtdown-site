@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
@@ -7,7 +8,6 @@ import {
   FormattedRelativeTime,
   useIntl,
 } from 'react-intl';
-import { Link } from 'react-router';
 import type { LineSummary } from '~/client';
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';

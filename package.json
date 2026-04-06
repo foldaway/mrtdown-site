@@ -4,14 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "react-router dev",
+    "dev": "NODE_OPTIONS='--import ./instrument.server.mjs' vite dev",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",
     "i18n:extract": "formatjs extract 'app/**/*.{ts,tsx}' --ignore '**/*.d.ts' --out-file lang/en-SG.json --format simple",
-    "build": "react-router build",
+    "build": "vite build && cp instrument.server.mjs .output/server",
     "test": "vitest",
-    "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc",
+    "start": "NODE_OPTIONS='--import ./instrument.server.mjs' node .output/server/index.mjs",
     "api:client:generate": "tsx app/scripts/generateApiClient.ts"
   },
   "dependencies": {

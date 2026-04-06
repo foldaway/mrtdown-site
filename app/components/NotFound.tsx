@@ -4,8 +4,8 @@ import {
   HomeIcon,
   MapIcon,
 } from '@heroicons/react/24/outline';
+import { Link } from '@tanstack/react-router';
 import type React from 'react';
-import { Link } from 'react-router';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 type NotFoundProps = {
