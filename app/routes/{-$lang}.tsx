@@ -427,12 +427,14 @@ function RouteComponent() {
                           id="footer.last_updated"
                           defaultMessage="Last updated {lastUpdatedAt}"
                           values={{
-                            lastUpdatedAt: (
+                            lastUpdatedAt: isHydrated ? (
                               <FormattedDate
                                 value={lastUpdatedAt}
                                 dateStyle="medium"
                                 timeStyle="short"
                               />
+                            ) : (
+                              lastUpdatedAt
                             ),
                           }}
                         />
