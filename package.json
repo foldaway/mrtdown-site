@@ -25,6 +25,7 @@
     "drizzle-orm": "^0.45.2",
     "html-entities": "^2.6.0",
     "isbot": "^5",
+    "json-nd": "^1.0.0",
     "luxon": "^3.5.0",
     "pg": "^8.20.0",
     "posthog-js": "^1.335.0",
