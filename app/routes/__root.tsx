@@ -55,7 +55,7 @@ export const Route = createRootRoute({
     };
   },
   component: RootComponent,
-  errorComponent: ErrorBoundary,
+  // errorComponent: ErrorBoundary,
 });
 
 const posthogOptions = getPosthogOptions();
@@ -86,31 +86,5 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <Scripts />
       </body>
     </html>
-  );
-}
-
-function ErrorBoundary({ error }: ErrorComponentProps) {
-  const message = 'Oops!';
-  let details = 'An unexpected error occurred.';
-
-  const posthog = usePostHog();
-
-  useEffect(() => {
-    posthog.captureException(error);
-  }, [posthog, error]);
-
-  if (error && error instanceof Error) {
-    // you only want to capture non 404-errors that reach the boundary
-    Sentry.captureException(error);
-    if (import.meta.env.DEV) {
-      details = error.message;
-    }
-  }
-
-  return (
-    <main className="container mx-auto px-4 py-16 text-gray-900 dark:text-gray-50">
-      <h1 className="font-bold text-2xl">{message}</h1>
-      <p className="mt-2 text-base">{details}</p>
-    </main>
   );
 }

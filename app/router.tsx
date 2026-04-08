@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/tanstackstart-react';
 import { createRouter } from '@tanstack/react-router';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import NotFound from './components/NotFound';
 import { routeTree } from './routeTree.gen';
 
@@ -14,6 +15,7 @@ export function getRouter() {
         </div>
       );
     },
+    defaultErrorComponent: ErrorBoundary,
   });
 
   if (!router.isServer) {
