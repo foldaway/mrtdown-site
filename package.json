@@ -26,6 +26,7 @@
     "html-entities": "^2.6.0",
     "isbot": "^5",
     "luxon": "^3.5.0",
+    "pg": "^8.20.0",
     "posthog-js": "^1.335.0",
     "radix-ui": "^1.4.3",
     "react": "^19.0.0",
