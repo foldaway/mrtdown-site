@@ -16,6 +16,7 @@ import { StationBar } from '~/components/StationBar';
 import { LineTypeLabels, StationStructureTypeLabels } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
 import { getStationProfileFn } from '~/util/station.functions';
 import { assert } from '../../../util/assert';
