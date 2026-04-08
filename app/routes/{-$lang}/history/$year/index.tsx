@@ -25,6 +25,12 @@ export const Route = createFileRoute('/{-$lang}/history/$year/')({
   loader: ({ params }) =>
     getIssuesHistoryYearFn({ data: { year: params.year } }),
   async head(ctx) {
+    if (ctx.loaderData == null) {
+      return {
+        meta: [],
+      };
+    }
+
     const { lang = 'en-SG' } = ctx.params;
     const { default: messages } = await import(
       `../../../../../lang/${lang}.json`
@@ -32,7 +38,10 @@ export const Route = createFileRoute('/{-$lang}/history/$year/')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
-    const ogUrl = new URL(location.pathname, rootUrl).toString();
+    const ogUrl = new URL(
+      buildLocaleAwareLink('/history/$year', lang),
+      rootUrl,
+    ).toString();
     const ogImage = new URL('/og_image.png', rootUrl).toString();
 
     const intl = createIntl({
