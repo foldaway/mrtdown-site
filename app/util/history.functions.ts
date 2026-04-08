@@ -7,12 +7,19 @@ import {
 } from '~/client';
 import { assert } from './assert';
 
-const minYear = 1980;
-const maxYear = DateTime.now().year + 10;
-const yearError = `Year must be between ${minYear} and ${maxYear}`;
+const YearSchema = z.coerce.number().refine(
+  (year) => {
+    const minYear = 1980;
+    const maxYear = DateTime.now().year + 10;
+    return year >= minYear && year <= maxYear;
+  },
+  {
+    message: 'Year is out of range',
+  },
+);
 
 const YearInputSchema = z.object({
-  year: z.coerce.number().min(minYear, yearError).max(maxYear, yearError),
+  year: YearSchema,
 });
 
 export const getIssuesHistoryYearFn = createServerFn({ method: 'GET' })
@@ -37,7 +44,7 @@ export const getIssuesHistoryYearFn = createServerFn({ method: 'GET' })
   });
 
 const YearMonthInputSchema = z.object({
-  year: z.coerce.number().min(minYear, yearError).max(maxYear, yearError),
+  year: YearSchema,
   month: z.coerce.number().min(1).max(12),
 });
 
