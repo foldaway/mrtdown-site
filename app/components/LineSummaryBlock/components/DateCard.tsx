@@ -1,10 +1,10 @@
 import { ClockIcon } from '@heroicons/react/24/outline';
+import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { type DateTime, Duration } from 'luxon';
 import { Popover } from 'radix-ui';
 import { Fragment, useMemo, useState } from 'react';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
-import { Link } from 'react-router';
 import { useDebounce } from 'use-debounce';
 import type {
   Issue,

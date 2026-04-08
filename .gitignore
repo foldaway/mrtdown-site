@@ -21,8 +21,4 @@ dist-ssr
 *.sln
 *.sw?
 
-# React Router
-/.react-router/
-/build/
-
 .env

@@ -15,19 +15,25 @@ ARG SENTRY_RELEASE
 ARG SENTRY_DSN
 ARG VITE_PUBLIC_POSTHOG_KEY
 ARG VITE_PUBLIC_POSTHOG_HOST
+ARG VITE_ROOT_URL
 ENV SENTRY_ORG=$SENTRY_ORG \
     SENTRY_PROJECT=$SENTRY_PROJECT \
     GIT_SHA=$SENTRY_RELEASE \
     SENTRY_DSN=$SENTRY_DSN \
     VITE_PUBLIC_POSTHOG_KEY=$VITE_PUBLIC_POSTHOG_KEY \
-    VITE_PUBLIC_POSTHOG_HOST=$VITE_PUBLIC_POSTHOG_HOST
+    VITE_PUBLIC_POSTHOG_HOST=$VITE_PUBLIC_POSTHOG_HOST \
+    VITE_ROOT_URL=$VITE_ROOT_URL
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY . /app/
 COPY --from=development-dependencies-env /app/node_modules /app/node_modules
 WORKDIR /app
 # Build application
 RUN --mount=type=secret,id=SENTRY_AUTH_TOKEN \
-    SENTRY_AUTH_TOKEN=$(cat /run/secrets/SENTRY_AUTH_TOKEN) npm run build
+    SENTRY_AUTH_TOKEN=$(cat /run/secrets/SENTRY_AUTH_TOKEN) NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 FROM node:24-bookworm-slim
 
@@ -39,7 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY ./package.json package-lock.json /app/
 COPY --from=production-dependencies-env /app/node_modules /app/node_modules
-COPY --from=build-env /app/build /app/build
+COPY --from=build-env /app/.output /app/.output
 WORKDIR /app
 
 CMD ["npm", "run", "start"]

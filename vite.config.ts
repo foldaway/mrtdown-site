@@ -1,15 +1,17 @@
 import { execSync } from 'node:child_process';
-import { reactRouter } from '@react-router/dev/vite';
 import {
-  type SentryReactRouterBuildOptions,
-  sentryReactRouter,
-} from '@sentry/react-router';
+  type SentryTanstackStartOptions,
+  sentryTanstackStart,
+} from '@sentry/tanstackstart-react/vite';
 import tailwindcss from '@tailwindcss/vite';
+import { tanstackStart } from '@tanstack/react-start/plugin/vite';
+import viteReact from '@vitejs/plugin-react-swc';
 import { DateTime } from 'luxon';
+import { nitro } from 'nitro/vite';
 import { defineConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
-const sentryConfig: SentryReactRouterBuildOptions = {
+const sentryConfig: SentryTanstackStartOptions = {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
@@ -44,9 +46,17 @@ export default defineConfig((config) => {
       __SENTRY_RELEASE__: JSON.stringify(process.env.GIT_SHA ?? 'development'),
     },
     plugins: [
-      reactRouter(),
+      tanstackStart({
+        srcDirectory: 'app',
+        router: {
+          // Ignores files/folders containing 'components', 'hooks', or ending in '.test.tsx'
+          routeFileIgnorePattern: '((components|hooks)|.test.tsx)',
+        },
+      }),
       tailwindcss(),
+      viteReact(),
       tsconfigPaths(),
+      nitro(),
       {
         name: 'react-intl',
         enforce: 'post',
@@ -56,7 +66,7 @@ export default defineConfig((config) => {
           console.log(out);
         },
       },
-      sentryReactRouter(sentryConfig, config),
+      sentryTanstackStart(sentryConfig),
     ],
   };
 });

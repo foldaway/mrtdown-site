@@ -2,15 +2,14 @@ import {
   ArrowsRightLeftIcon,
   ChevronDownIcon,
 } from '@heroicons/react/20/solid';
+import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DropdownMenu } from 'radix-ui';
 import { Fragment } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { Link } from 'react-router';
 import type { IssueAffectedBranch } from '~/client';
 import { useAffectedStations } from '~/components/IssueAffectedBranchPill/hooks/useAffectedStations';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 
 interface Props {
   branch: IssueAffectedBranch;
@@ -66,7 +65,8 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
         <div className="flex items-center gap-x-1">
           {source && (
             <Link
-              to={buildLocaleAwareLink(`/stations/${source.id}`, intl.locale)}
+              to="/{-$lang}/stations/$stationId"
+              params={{ stationId: source.id }}
               className="font-medium text-gray-700 text-xs transition-colors hover:underline dark:text-gray-200"
             >
               {source.nameTranslations[intl.locale] ?? source.name ?? 'N/A'}
@@ -76,10 +76,8 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
             <>
               <ArrowsRightLeftIcon className="size-3 text-gray-400" />
               <Link
-                to={buildLocaleAwareLink(
-                  `/stations/${destination.id}`,
-                  intl.locale,
-                )}
+                to="/{-$lang}/stations/$stationId"
+                params={{ stationId: destination.id }}
                 className="font-medium text-gray-700 text-xs transition-colors hover:underline dark:text-gray-200"
               >
                 {destination.nameTranslations[intl.locale] ?? destination.name}
@@ -203,10 +201,8 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
                           ))}
                       </div>
                       <Link
-                        to={buildLocaleAwareLink(
-                          `/stations/${station.id}`,
-                          intl.locale,
-                        )}
+                        to="/{-$lang}/stations/$stationId"
+                        params={{ stationId: station.id }}
                         className="group flex items-center gap-1"
                       >
                         <span className="text-gray-700 text-xs group-hover:underline dark:text-gray-300">

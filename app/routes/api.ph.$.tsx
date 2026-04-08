@@ -1,4 +1,4 @@
-import type { Route } from './+types/api.ph.$';
+import { createFileRoute } from '@tanstack/react-router';
 
 const API_HOST = 'us.i.posthog.com';
 const ASSET_HOST = 'us-assets.i.posthog.com';
@@ -38,10 +38,15 @@ const posthogProxy = async (request: Request) => {
   });
 };
 
-export async function loader({ request }: Route.LoaderArgs) {
-  return posthogProxy(request);
-}
-
-export async function action({ request }: Route.ActionArgs) {
-  return posthogProxy(request);
-}
+export const Route = createFileRoute('/api/ph/$')({
+  server: {
+    handlers: {
+      async GET(ctx) {
+        return posthogProxy(ctx.request);
+      },
+      async POST(ctx) {
+        return posthogProxy(ctx.request);
+      },
+    },
+  },
+});

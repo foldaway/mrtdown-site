@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - duncanleo/tanstack-start
 
 jobs:
   deploy:
@@ -30,6 +31,7 @@ jobs:
             --build-secret SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }} \
             --build-arg VITE_PUBLIC_POSTHOG_KEY=${{ secrets.VITE_PUBLIC_POSTHOG_KEY }} \
             --build-arg VITE_PUBLIC_POSTHOG_HOST=${{ secrets.VITE_PUBLIC_POSTHOG_HOST }} \
+            --build-arg VITE_ROOT_URL="https://www.mrtdown.org" \
             --image-label=${{ github.sha }}
         env:
           GIT_SHA: ${{ github.sha }}

@@ -1,8 +1,7 @@
+import { Link } from '@tanstack/react-router';
 import { useIntl } from 'react-intl';
-import { Link } from 'react-router';
 import type { Issue, IssueInterval } from '~/client';
 import { IssueSubtypeBadge } from '~/components/IssueSubtypeBadge';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { IssueAffectedBranchPill } from '../../IssueAffectedBranchPill';
 import { IssueTimestamp } from './IssueTimestamp';
 
@@ -19,7 +18,8 @@ export const IssueContent: React.FC<Props> = (props) => {
     <div className="mt-2 flex flex-col sm:mt-2">
       <Link
         className="mt-1.5 block hover:underline"
-        to={buildLocaleAwareLink(`/issues/${issue.id}`, intl.locale)}
+        to="/{-$lang}/issues/$issueId"
+        params={{ issueId: issue.id }}
       >
         <h3 className="font-semibold text-gray-900 text-sm leading-tight dark:text-gray-100">
           {issue.titleTranslations[intl.locale] ?? issue.title}

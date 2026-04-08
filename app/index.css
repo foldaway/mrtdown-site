@@ -1,4 +1,5 @@
-@import "tailwindcss";
+/* Workaround for https://github.com/TanStack/router/issues/5812, which causes flash of unstyled content before hydration */
+@import "tailwindcss" source("./");
 
 html {
     font-family: "Radio Canada Big", sans-serif;

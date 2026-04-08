@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
@@ -7,11 +8,9 @@ import {
   FormattedRelativeTime,
   useIntl,
 } from 'react-intl';
-import { Link } from 'react-router';
 import type { LineSummary } from '~/client';
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '../../hooks/useHydrated';
 import { DateCard } from './components/DateCard';
 import { NonOperationalDateCard } from './components/NonOperationalDateCard';
@@ -52,7 +51,8 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
       <div className="mb-1.5 flex items-center">
         <Link
           className="group flex items-center gap-x-1.5 overflow-hidden truncate font-bold text-base text-gray-700 dark:text-gray-200"
-          to={buildLocaleAwareLink(`/lines/${line.id}`, intl.locale)}
+          to="/{-$lang}/lines/$lineId"
+          params={{ lineId: line.id }}
         >
           <span
             className="rounded-sm px-2 py-0.5 font-semibold text-white text-xs"
