@@ -5,5 +5,19 @@
     "compatibility_date": "2026-04-08",
     "compatibility_flags": [
         "nodejs_compat"
-    ]
+    ],
+    "observability": {
+        "logs": {
+            "enabled": true
+        }
+    },
+    "env": {
+        "production": {
+            "observability": {
+                "logs": {
+                    "head_sampling_rate": 0.1
+                }
+            }
+        }
+    }
 }
