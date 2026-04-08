@@ -4,14 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "NODE_OPTIONS='--import ./instrument.server.mjs' vite dev",
+    "dev": "vite dev",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",
     "i18n:extract": "formatjs extract 'app/**/*.{ts,tsx}' --ignore '**/*.d.ts' --out-file lang/en-SG.json --format simple",
-    "build": "vite build && cp instrument.server.mjs .output/server",
+    "build": "vite build",
     "test": "vitest",
-    "start": "NODE_OPTIONS='--import ./.output/server/instrument.server.mjs' node .output/server/index.mjs",
-    "api:client:generate": "tsx app/scripts/generateApiClient.ts"
+    "api:client:generate": "tsx app/scripts/generateApiClient.ts",
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

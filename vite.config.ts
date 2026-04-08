@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { cloudflare } from '@cloudflare/vite-plugin';
 import {
   type SentryTanstackStartOptions,
   sentryTanstackStart,
@@ -7,7 +8,6 @@ import tailwindcss from '@tailwindcss/vite';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import viteReact from '@vitejs/plugin-react-swc';
 import { DateTime } from 'luxon';
-import { nitro } from 'nitro/vite';
 import { defineConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
@@ -56,7 +56,7 @@ export default defineConfig((config) => {
       tailwindcss(),
       viteReact(),
       tsconfigPaths(),
-      nitro(),
+      cloudflare({ viteEnvironment: { name: 'ssr' } }),
       {
         name: 'react-intl',
         enforce: 'post',
