@@ -1,13 +1,10 @@
-import { PostHogProvider, usePostHog } from '@posthog/react';
-import * as Sentry from '@sentry/tanstackstart-react';
+import { PostHogProvider } from '@posthog/react';
 import {
   createRootRoute,
-  type ErrorComponentProps,
   HeadContent,
   Outlet,
   Scripts,
 } from '@tanstack/react-router';
-import { useEffect } from 'react';
 import { getPosthogOptions } from '~/helpers/getPosthogOptions';
 import stylesheet from '../index.css?url';
 

@@ -1,4 +1,4 @@
-import '../instrument.server.mjs';
+import * as Sentry from '@sentry/cloudflare';
 import { wrapFetchWithSentry } from '@sentry/tanstackstart-react';
 import handler from '@tanstack/react-start/server-entry';
 
@@ -8,6 +8,15 @@ const wrappedFetch = wrapFetchWithSentry({
   },
 });
 
-export default {
-  fetch: wrappedFetch.fetch,
-} satisfies ExportedHandler<Env>;
+export default Sentry.withSentry(
+  (env) => {
+    return {
+      dsn: env.SENTRY_DSN,
+      environment: env.TIER,
+      release: env.GIT_SHA,
+    };
+  },
+  {
+    fetch: wrappedFetch.fetch,
+  } satisfies ExportedHandler<Env>,
+);

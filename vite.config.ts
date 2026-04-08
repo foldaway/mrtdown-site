@@ -46,6 +46,7 @@ export default defineConfig((config) => {
       __SENTRY_RELEASE__: JSON.stringify(process.env.GIT_SHA ?? 'development'),
     },
     plugins: [
+      cloudflare({ viteEnvironment: { name: 'ssr' } }),
       tanstackStart({
         srcDirectory: 'app',
         router: {
@@ -56,7 +57,6 @@ export default defineConfig((config) => {
       tailwindcss(),
       viteReact(),
       tsconfigPaths(),
-      cloudflare({ viteEnvironment: { name: 'ssr' } }),
       {
         name: 'react-intl',
         enforce: 'post',
