@@ -1,19 +1,22 @@
-name: Cloudflare Deploy
+name: Deploy
 
 on:
   push:
     branches:
-      - "**"
+      - main
+      - production
   workflow_dispatch:
 
 jobs:
-  deploy-preview:
-    if: github.ref != 'refs/heads/production'
-    name: Deploy preview
+  deploy-staging:
+    if: github.ref == 'refs/heads/main'
+    name: Deploy staging
     runs-on: ubuntu-latest
-    environment: preview
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.deployment-url }}
     concurrency:
-      group: cloudflare-deploy-preview-${{ github.ref }}
+      group: deploy-staging-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - name: Checkout
@@ -40,39 +43,13 @@ jobs:
           VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }} \
           VITE_ROOT_URL: "https://www.mrtdown.org"
 
-      - name: Compute preview alias
-        id: cf_alias
-        uses: actions/github-script@v7
-        env:
-          REF_NAME: ${{ github.ref_name }}
-          RUN_ID: ${{ github.run_id }}
-        with:
-          script: |
-            const workerName = "mrtdown-site";
-            const maxLen = 63 - 1 - workerName.length;
-            const ref = process.env.REF_NAME;
-            let alias;
-            let s = ref
-              .toLowerCase()
-              .replace(/\//g, "-")
-              .replace(/[^a-z0-9-]+/g, "-")
-              .replace(/-+/g, "-")
-              .replace(/^-+|-+$/g, "");
-            if (!s) s = "r" + process.env.RUN_ID;
-            else if (!/^[a-z]/.test(s)) s = "b-" + s;
-            alias = s.slice(0, maxLen).replace(/-+$/, "");
-            core.setOutput("preview_alias", alias);
-
       - name: Deploy to Cloudflare Workers
-        run: |-
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            npx --offline wrangler deploy
-          else
-            npx --offline wrangler versions upload --preview-alias "${{ steps.cf_alias.outputs.preview_alias }}"
-          fi
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          command: deploy --env staging
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Print deployment URL
         env:
@@ -84,9 +61,11 @@ jobs:
     name: Deploy production
     runs-on: ubuntu-latest
     concurrency:
-      group: cloudflare-deploy-production
+      group: deploy-production
       cancel-in-progress: true
-    environment: production
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.deployment-url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -105,8 +84,8 @@ jobs:
         env:
           # Used by the Cloudflare Vite plugin for wrangler env key https://developers.cloudflare.com/workers/vite-plugin/reference/cloudflare-environments/
           CLOUDFLARE_ENV: production
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }} \
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }} \
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }} \
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }} \
           SENTRY_RELEASE: ${{ github.sha }} \
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }} \
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }} \
@@ -115,7 +94,9 @@ jobs:
           VITE_ROOT_URL: "https://www.mrtdown.org"
 
       - name: Deploy to Cloudflare Workers
-        run: npx --offline wrangler deploy --env production
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        uses: cloudflare/wrangler-action@v3
+        id: deploy
+        with:
+          command: deploy --env production
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
