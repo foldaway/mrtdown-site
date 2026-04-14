@@ -34,6 +34,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
+          CLOUDFLARE_ENV: staging
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           SENTRY_RELEASE: ${{ github.sha }}
