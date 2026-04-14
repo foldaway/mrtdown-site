@@ -35,11 +35,13 @@ jobs:
         run: npm run build
         env:
           CLOUDFLARE_ENV: staging
+          GIT_SHA: ${{ github.sha }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           SENTRY_RELEASE: ${{ github.sha }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          TIER: staging
           VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY }}
           VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
           VITE_ROOT_URL: "https://www.mrtdown.org"
@@ -85,11 +87,13 @@ jobs:
         env:
           # Used by the Cloudflare Vite plugin for wrangler env key https://developers.cloudflare.com/workers/vite-plugin/reference/cloudflare-environments/
           CLOUDFLARE_ENV: production
+          GIT_SHA: ${{ github.sha }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           SENTRY_RELEASE: ${{ github.sha }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          TIER: production
           VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY }}
           VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
           VITE_ROOT_URL: "https://www.mrtdown.org"
