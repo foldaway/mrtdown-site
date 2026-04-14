@@ -7,21 +7,26 @@
         "nodejs_compat"
     ],
     "observability": {
-        "logs": {
-            "enabled": true
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "traces": {
+            "enabled": true,
+            "head_sampling_rate": 1
         }
     },
     "env": {
         "staging": {
             "observability": {
-                "logs": {
-                    "head_sampling_rate": 0.1
+                "head_sampling_rate": 1,
+                "traces": {
+                    "head_sampling_rate": 1
                 }
             }
         },
         "production": {
             "observability": {
-                "logs": {
+                "head_sampling_rate": 0.1,
+                "traces": {
                     "head_sampling_rate": 0.1
                 }
             }
