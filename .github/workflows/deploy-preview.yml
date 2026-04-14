@@ -41,6 +41,8 @@ jobs:
       - name: Get branch name
         id: branch_name
         uses: tj-actions/branch-names@v8
+        with:
+          replace_slashes_with_hyphens: 'true'
 
       - name: Build
         run: npm run build
