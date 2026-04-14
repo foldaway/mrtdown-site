@@ -12,6 +12,13 @@
         }
     },
     "env": {
+        "staging": {
+            "observability": {
+                "logs": {
+                    "head_sampling_rate": 0.1
+                }
+            }
+        },
         "production": {
             "observability": {
                 "logs": {
