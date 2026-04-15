@@ -38,11 +38,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Get branch name
+      - name: Generate preview alias
         id: branch_name
-        uses: tj-actions/branch-names@v8
-        with:
-          replace_slashes_with_hyphens: 'true'
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          sanitized_branch=$(
+            printf '%s' "$BRANCH_NAME" \
+              | tr '[:upper:]' '[:lower:]' \
+              | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
+          )
+
+          if [ -z "$sanitized_branch" ]; then
+            sanitized_branch="pr-$PR_NUMBER"
+          elif ! printf '%s' "$sanitized_branch" | grep -Eq '^[a-z]'; then
+            sanitized_branch="pr-$sanitized_branch"
+          fi
+
+          echo "current_branch=$sanitized_branch" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: npm run build
