@@ -4,35 +4,104 @@ on:
   push:
     branches:
       - main
-      - duncanleo/tanstack-start
+      - production
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Deploy
+  deploy-staging:
+    if: github.ref == 'refs/heads/main'
+    name: Deploy staging
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.deployment-url }}
+    concurrency:
+      group: deploy-staging-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          CLOUDFLARE_ENV: staging
+          GIT_SHA: ${{ github.sha }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_RELEASE: ${{ github.sha }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          TIER: staging
+          VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY }}
+          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
+          VITE_ROOT_URL: "https://www.mrtdown.org"
+
+      - name: Deploy to Cloudflare Workers
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          command: deploy --env staging
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Print deployment URL
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: echo $DEPLOYMENT_URL
+
+  deploy-production:
+    if: github.ref == 'refs/heads/production'
+    name: Deploy production
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-production
+      cancel-in-progress: true
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.deployment-url }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
-          node-version: 24
-          cache: "npm"
-      - run: |-
-          npm ci
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      - name: Deploy to production
-        run: |-
-          flyctl deploy --local-only -a mrtdown-site --env "TIER=production" \
-            --build-arg SENTRY_ORG=${{ secrets.SENTRY_ORG }} \
-            --build-arg SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }} \
-            --build-arg SENTRY_RELEASE=${{ github.sha }} \
-            --build-arg SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
-            --build-secret SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }} \
-            --build-arg VITE_PUBLIC_POSTHOG_KEY=${{ secrets.VITE_PUBLIC_POSTHOG_KEY }} \
-            --build-arg VITE_PUBLIC_POSTHOG_HOST=${{ secrets.VITE_PUBLIC_POSTHOG_HOST }} \
-            --build-arg VITE_ROOT_URL="https://www.mrtdown.org" \
-            --image-label=${{ github.sha }}
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
         env:
+          # Used by the Cloudflare Vite plugin for wrangler env key https://developers.cloudflare.com/workers/vite-plugin/reference/cloudflare-environments/
+          CLOUDFLARE_ENV: production
           GIT_SHA: ${{ github.sha }}
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_RELEASE: ${{ github.sha }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          TIER: production
+          VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY }}
+          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
+          VITE_ROOT_URL: "https://www.mrtdown.org"
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        id: deploy
+        with:
+          command: deploy --env production
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
