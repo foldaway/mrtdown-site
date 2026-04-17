@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { createIntl, FormattedMessage } from 'react-intl';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { getStatisticsFn } from '~/util/statistics.functions';
 import { StatisticsGrid } from './components/StatisticsGrid';
@@ -13,7 +14,10 @@ export const Route = createFileRoute('/{-$lang}/statistics/')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
-    const ogUrl = new URL(location.pathname, rootUrl).toString();
+    const ogUrl = new URL(
+      buildLocaleAwareLink('/statistics', lang),
+      rootUrl,
+    ).toString();
     const ogImage = new URL('/og_image.png', rootUrl).toString();
 
     const intl = createIntl({
