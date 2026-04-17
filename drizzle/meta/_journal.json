@@ -22,6 +22,13 @@
       "when": 1778985209341,
       "tag": "0002_fair_marvel_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776355200000,
+      "tag": "0003_canonical_issue_periods",
+      "breakpoints": true
     }
   ]
 }
