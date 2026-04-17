@@ -2547,6 +2547,7 @@ export async function getIssueData(issueId: string) {
         (evidence): IssueUpdate => ({
           type: evidence.type,
           text: evidence.text,
+          textTranslations: evidence.render?.text ?? null,
           sourceUrl: evidence.source_url,
           createdAt: evidence.ts,
         }),

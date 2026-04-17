@@ -408,6 +408,7 @@ export type LineProfile = {
 export type IssueUpdate = {
     type: string;
     text: string;
+    textTranslations: Record<string, string | null> | null;
     sourceUrl: string | null;
     createdAt: string;
 };

@@ -1,5 +1,5 @@
 import { LinkIcon } from '@heroicons/react/16/solid';
-import { FormattedDate, FormattedMessage } from 'react-intl';
+import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import type { IssueUpdate } from '~/client';
 import { Source } from './Source';
 
@@ -9,6 +9,8 @@ interface Props {
 
 export const TimelineItem: React.FC<Props> = (props) => {
   const { update } = props;
+  const intl = useIntl();
+  const localizedText = update.textTranslations?.[intl.locale] ?? update.text;
 
   return (
     <div className="relative flex items-start space-x-4 pb-8 last:pb-0">
@@ -39,9 +41,9 @@ export const TimelineItem: React.FC<Props> = (props) => {
           )}
         </div>
         <div className="mt-2">
-          {update.text.trim().length > 0 ? (
+          {localizedText.trim().length > 0 ? (
             <p className="text-gray-800 text-sm dark:text-gray-200">
-              {update.text}
+              {localizedText}
             </p>
           ) : (
             <p className="text-gray-500 text-sm italic dark:text-gray-400">
