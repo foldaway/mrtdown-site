@@ -1589,6 +1589,31 @@ async function getLineDayFactsInRange(start: DateTime, end: DateTime) {
     );
 }
 
+function hasLineFactsCoverage(
+  rows: Array<{ date: string; line_id: string }>,
+  start: DateTime,
+  end: DateTime,
+  lineIds: string[],
+) {
+  if (lineIds.length === 0) {
+    return false;
+  }
+
+  const expectedDates: string[] = [];
+  for (
+    let date = start.startOf('day');
+    date <= end.startOf('day');
+    date = date.plus({ days: 1 })
+  ) {
+    expectedDates.push(date.toISODate()!);
+  }
+
+  const rowKeys = new Set(rows.map((row) => `${row.date}::${row.line_id}`));
+  return expectedDates.every((date) =>
+    lineIds.every((lineId) => rowKeys.has(`${date}::${lineId}`)),
+  );
+}
+
 export async function rebuildOperationalFactsForDate(date: DateTime) {
   const normalizedDate = date.setZone(SG_TIMEZONE).startOf('day');
   const asOf = normalizedDate.endOf('day');
@@ -2086,14 +2111,24 @@ export async function getSystemMapData() {
 }
 
 export async function getHistoryYearSummaryData(year: number) {
+  const dataset = await buildBaseDataset();
   const yearStart = DateTime.fromObject(
     { year, month: 1, day: 1 },
     { zone: SG_TIMEZONE },
   ).startOf('day');
   const yearEnd = yearStart.plus({ years: 1 });
-  const factRows = await getIssueDayFactsInRange(yearStart, yearEnd.minus({ days: 1 }));
-  if (factRows.length > 0) {
-    const dataset = await buildBaseDataset();
+  const rangeEnd = yearEnd.minus({ days: 1 });
+  const factRows = await getIssueDayFactsInRange(yearStart, rangeEnd);
+  const lineFactRows = await getLineDayFactsInRange(yearStart, rangeEnd);
+  if (
+    factRows.length > 0 &&
+    hasLineFactsCoverage(
+      lineFactRows,
+      yearStart,
+      rangeEnd,
+      Object.keys(dataset.included.lines),
+    )
+  ) {
     const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
     const summaryByMonth = Array.from({ length: 12 }, (_, index) => {
       const monthStart = DateTime.fromObject(
@@ -2132,7 +2167,6 @@ export async function getHistoryYearSummaryData(year: number) {
     };
   }
 
-  const dataset = await buildBaseDataset();
   const issues = Object.values(dataset.allIssues).filter((issue) =>
     issueOverlapsRange(issue, yearStart, yearEnd),
   );
@@ -2168,17 +2202,24 @@ export async function getHistoryYearSummaryData(year: number) {
 }
 
 export async function getHistoryYearMonthData(year: number, month: number) {
+  const dataset = await buildBaseDataset();
   const monthStart = DateTime.fromObject(
     { year, month, day: 1 },
     { zone: SG_TIMEZONE },
   ).startOf('day');
   const monthEnd = monthStart.plus({ months: 1 });
-  const factRows = await getIssueDayFactsInRange(
-    monthStart,
-    monthEnd.minus({ days: 1 }),
-  );
-  if (factRows.length > 0) {
-    const dataset = await buildBaseDataset();
+  const rangeEnd = monthEnd.minus({ days: 1 });
+  const factRows = await getIssueDayFactsInRange(monthStart, rangeEnd);
+  const lineFactRows = await getLineDayFactsInRange(monthStart, rangeEnd);
+  if (
+    factRows.length > 0 &&
+    hasLineFactsCoverage(
+      lineFactRows,
+      monthStart,
+      rangeEnd,
+      Object.keys(dataset.included.lines),
+    )
+  ) {
     const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
     const weeks = new Map<string, string[]>();
     for (
@@ -2218,8 +2259,6 @@ export async function getHistoryYearMonthData(year: number, month: number) {
       included: withIssues(dataset.included, dataset.allIssues, issueIds),
     };
   }
-
-  const dataset = await buildBaseDataset();
 
   const issues = Object.values(dataset.allIssues).filter((issue) =>
     issueOverlapsRange(issue, monthStart, monthEnd),
@@ -2268,9 +2307,18 @@ export async function getHistoryDayData(
   day: number,
 ) {
   const date = DateTime.fromObject({ year, month, day }, { zone: SG_TIMEZONE });
+  const dataset = await buildBaseDataset();
   const factRows = await getIssueDayFactsInRange(date, date);
-  if (factRows.length > 0) {
-    const dataset = await buildBaseDataset();
+  const lineFactRows = await getLineDayFactsInRange(date, date);
+  if (
+    factRows.length > 0 &&
+    hasLineFactsCoverage(
+      lineFactRows,
+      date,
+      date,
+      Object.keys(dataset.included.lines),
+    )
+  ) {
     const issueIds = [...new Set(factRows.map((row) => row.issue_id))].sort((a, b) =>
       b.localeCompare(a),
     );
@@ -2284,7 +2332,6 @@ export async function getHistoryDayData(
     };
   }
 
-  const dataset = await buildBaseDataset();
   const issues = Object.values(dataset.allIssues).filter((issue) =>
     issueTouchesDate(issue, date),
   );
@@ -2307,6 +2354,12 @@ export async function getStatisticsData() {
   const rollingYearStart = rollingYearEnd.minus({ days: 364 });
   const issueFactRows = await getIssueDayFactsInRange(rollingYearStart, rollingYearEnd);
   const lineFactRows = await getLineDayFactsInRange(rollingYearStart, rollingYearEnd);
+  const hasRollingYearCoverage = hasLineFactsCoverage(
+    lineFactRows,
+    rollingYearStart,
+    rollingYearEnd,
+    Object.keys(dataset.included.lines),
+  );
   const longestDisruptions = [...issues]
     .filter((issue) => issue.type === 'disruption')
     .sort((a, b) => b.durationSeconds - a.durationSeconds)
@@ -2315,48 +2368,19 @@ export async function getStatisticsData() {
 
   const chartTotalIssueCountByLine: Chart = {
     title: 'Issue Count by Line',
-    data:
-      lineFactRows.length > 0
-        ? Object.values(dataset.included.lines).map((line) => {
-            const rows = lineFactRows.filter((row) => row.line_id === line.id);
-            return {
-              name: line.id,
-              payload: {
-                disruption: rows.reduce(
-                  (sum, row) => sum + row.issue_count_disruption,
-                  0,
-                ),
-                maintenance: rows.reduce(
-                  (sum, row) => sum + row.issue_count_maintenance,
-                  0,
-                ),
-                infra: rows.reduce((sum, row) => sum + row.issue_count_infra, 0),
-                totalIssues: rows.reduce(
-                  (sum, row) =>
-                    sum +
-                    row.issue_count_disruption +
-                    row.issue_count_maintenance +
-                    row.issue_count_infra,
-                  0,
-                ),
-              },
-            };
-          })
-        : Object.values(dataset.included.lines).map((line) => {
-            const lineIssues = issues.filter((issue) =>
-              issue.lineIds.includes(line.id),
-            );
-            const counts = pickIssueTypes(lineIssues);
-            return {
-              name: line.id,
-              payload: {
-                disruption: counts.disruption ?? 0,
-                maintenance: counts.maintenance ?? 0,
-                infra: counts.infra ?? 0,
-                totalIssues: lineIssues.length,
-              },
-            };
-          }),
+    data: Object.values(dataset.included.lines).map((line) => {
+      const lineIssues = issues.filter((issue) => issue.lineIds.includes(line.id));
+      const counts = pickIssueTypes(lineIssues);
+      return {
+        name: line.id,
+        payload: {
+          disruption: counts.disruption ?? 0,
+          maintenance: counts.maintenance ?? 0,
+          infra: counts.infra ?? 0,
+          totalIssues: lineIssues.length,
+        },
+      };
+    }),
   };
 
   const stationIssueCounts = Object.values(dataset.included.stations).map(
@@ -2368,7 +2392,7 @@ export async function getStatisticsData() {
       );
       const counts = pickIssueTypes(stationIssues);
       return {
-        name: station.memberships[0]?.code ?? station.name,
+        name: station.id,
         payload: {
           disruption: counts.disruption ?? 0,
           maintenance: counts.maintenance ?? 0,
@@ -2394,10 +2418,10 @@ export async function getStatisticsData() {
     data: Array.from({ length: 365 }, (_, index) => {
       const date = rollingYearStart.plus({ days: index }).toISODate()!;
       const dayRows =
-        issueFactRows.length > 0
+        hasRollingYearCoverage
           ? issueFactRows.filter((row) => row.date === date && row.active_anytime)
           : [];
-      if (issueFactRows.length > 0) {
+      if (hasRollingYearCoverage) {
         return {
           name: date,
           payload: dayRows.reduce<Record<string, number>>(
@@ -2424,12 +2448,9 @@ export async function getStatisticsData() {
   };
 
   const statistics: SystemAnalytics = {
-    timeScaleChartsIssueCount:
-      issueFactRows.length > 0
-        ? buildCountChartsFromIssueFacts(issueFactRows, false)
-        : buildIssueCountGraphs(issues),
+    timeScaleChartsIssueCount: buildIssueCountGraphs(issues),
     timeScaleChartsIssueDuration:
-      issueFactRows.length > 0
+      hasRollingYearCoverage
         ? buildCountChartsFromIssueFacts(issueFactRows, true)
         : buildIssueDurationGraphs(issues),
     chartTotalIssueCountByLine,
