@@ -972,6 +972,7 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
       .map((evidence) => ({
         type: evidence.type,
         text: evidence.text,
+        textTranslations: evidence.render?.text ?? null,
         sourceUrl: evidence.source_url,
         createdAt: evidence.ts,
       }));
