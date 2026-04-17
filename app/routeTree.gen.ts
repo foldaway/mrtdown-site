@@ -27,6 +27,7 @@ import { Route as Char123LangChar125HistoryYearIndexRouteImport } from './routes
 import { Route as Char123LangChar125HistoryPagePageNumRouteImport } from './routes/{-$lang}/history/page.$pageNum'
 import { Route as Char123LangChar125HistoryYearMonthRouteImport } from './routes/{-$lang}/history/$year/$month'
 import { Route as InternalApiTasksPullRouteImport } from './routes/internal.api.tasks.pull'
+import { Route as InternalApiTasksFactsRouteImport } from './routes/internal.api.tasks.facts'
 
 const Char123LangChar125Route = Char123LangChar125RouteImport.update({
   id: '/{-$lang}',
@@ -130,6 +131,11 @@ const InternalApiTasksPullRoute = InternalApiTasksPullRouteImport.update({
   path: '/internal/api/tasks/pull',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InternalApiTasksFactsRoute = InternalApiTasksFactsRouteImport.update({
+  id: '/internal/api/tasks/facts',
+  path: '/internal/api/tasks/facts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
+  '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdRoute
   '/{-$lang}/history': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/statistics': typeof Char123LangChar125StatisticsIndexRoute
+  '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
@@ -183,6 +191,7 @@ export interface FileRoutesById {
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
+  '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
@@ -205,6 +214,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/status/$lineId'
     | '/{-$lang}/history/'
     | '/{-$lang}/statistics/'
+    | '/internal/api/tasks/facts'
     | '/internal/api/tasks/pull'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/status/$lineId'
     | '/{-$lang}/history'
     | '/{-$lang}/statistics'
+    | '/internal/api/tasks/facts'
     | '/internal/api/tasks/pull'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
@@ -244,6 +255,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/status/$lineId'
     | '/{-$lang}/history/'
     | '/{-$lang}/statistics/'
+    | '/internal/api/tasks/facts'
     | '/internal/api/tasks/pull'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
@@ -257,6 +269,7 @@ export interface RootRouteChildren {
   Char123LangChar125Route: typeof Char123LangChar125RouteWithChildren
   ApiIssuesDayRoute: typeof ApiIssuesDayRoute
   ApiPhSplatRoute: typeof ApiPhSplatRoute
+  InternalApiTasksFactsRoute: typeof InternalApiTasksFactsRoute
   InternalApiTasksPullRoute: typeof InternalApiTasksPullRoute
 }
 
@@ -388,6 +401,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InternalApiTasksPullRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/internal/api/tasks/facts': {
+      id: '/internal/api/tasks/facts'
+      path: '/internal/api/tasks/facts'
+      fullPath: '/internal/api/tasks/facts'
+      preLoaderRoute: typeof InternalApiTasksFactsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -440,6 +460,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char123LangChar125Route: Char123LangChar125RouteWithChildren,
   ApiIssuesDayRoute: ApiIssuesDayRoute,
   ApiPhSplatRoute: ApiPhSplatRoute,
+  InternalApiTasksFactsRoute: InternalApiTasksFactsRoute,
   InternalApiTasksPullRoute: InternalApiTasksPullRoute,
 }
 export const routeTree = rootRouteImport
