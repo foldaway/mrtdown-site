@@ -5,6 +5,7 @@ import {
 } from 'cloudflare:workers';
 import { MRTDownRepository } from '@mrtdown/fs';
 import { ZipStore } from '~/helpers/ZipStore.js';
+import { rebuildOperationalFactsRange } from '~/util/db.queries.js';
 import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
@@ -209,6 +210,11 @@ export class PullWorkflow extends WorkflowEntrypoint<Env, Params> {
       const db = getDb();
       console.log('Finalizing pull...');
       await finalizePull(db);
+    });
+
+    await step.do('refresh-operational-facts', syncStepConfig, async () => {
+      console.log('Refreshing recent operational facts...');
+      await rebuildOperationalFactsRange(3);
     });
 
     console.log('[PULL] Pull complete', counts);
