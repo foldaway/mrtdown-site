@@ -5,7 +5,6 @@
  * against `*_next` so we avoid huge `IN (...)` parameter lists.
  */
 import {
-  type Evidence,
   type ImpactEvent,
   type Issue,
   type Landmark,
@@ -23,7 +22,6 @@ import {
   notExists,
   sql,
 } from 'drizzle-orm';
-import { DateTime } from 'luxon';
 import type { getDb } from '../../../db/index.js';
 import {
   evidencesTable,
@@ -816,20 +814,6 @@ export async function syncServices(db: Db): Promise<void> {
   });
 }
 
-/** Latest evidence timestamp; used for operational period resolution (`resolvePeriods`). */
-function lastEvidenceAtFromList(evidences: Evidence[]): DateTime | null {
-  return evidences.reduce(
-    (max, evidence) => {
-      const evidenceAt = DateTime.fromISO(evidence.ts);
-      if (max == null || evidenceAt > max) {
-        return evidenceAt;
-      }
-      return max;
-    },
-    null as DateTime | null,
-  );
-}
-
 /**
  * Issues, evidences, impact events and all impact child tables. For changed issues:
  * remove impact subtree + evidences, reinsert from staging. Then remove issues
@@ -907,8 +891,6 @@ export async function syncIssues(db: Db): Promise<void> {
 
         const impactEvents = row.impact_events;
         if (impactEvents.length > 0) {
-          const lastEvidenceAt = lastEvidenceAtFromList(row.evidences);
-
           await tx
             .insert(impactEventsTable)
             .values(
@@ -975,33 +957,6 @@ export async function syncIssues(db: Db): Promise<void> {
 
             switch (impactEvent.type) {
               case 'periods.set': {
-                const resolvedPeriodsOperational = resolvePeriods({
-                  mode: {
-                    kind: 'operational',
-                    lastEvidenceAt: lastEvidenceAt?.toISO() ?? null,
-                  },
-                  periods: impactEvent.periods,
-                  asOf: impactEvent.ts,
-                });
-                if (resolvedPeriodsOperational.length > 0) {
-                  await tx.insert(impactEventPeriodsTable).values(
-                    resolvedPeriodsOperational.map((period, index) => {
-                      return {
-                        impact_event_id: impactEvent.id,
-                        mode: 'operational',
-                        index,
-                        start_at: period.startAt,
-                        end_at: period.endAt,
-                        end_at_resolved: period.endAtResolved,
-                        end_at_source: period.endAtSource,
-                        end_at_reason: period.endAtReason,
-                      } satisfies InferInsertModel<
-                        typeof impactEventPeriodsTable
-                      >;
-                    }),
-                  );
-                }
-
                 const resolvedPeriodsCanonical = resolvePeriods({
                   mode: {
                     kind: 'canonical',
@@ -1014,13 +969,9 @@ export async function syncIssues(db: Db): Promise<void> {
                     resolvedPeriodsCanonical.map((period, index) => {
                       return {
                         impact_event_id: impactEvent.id,
-                        mode: 'canonical',
                         index,
                         start_at: period.startAt,
                         end_at: period.endAt,
-                        end_at_resolved: period.endAtResolved,
-                        end_at_source: period.endAtSource,
-                        end_at_reason: period.endAtReason,
                       } satisfies InferInsertModel<
                         typeof impactEventPeriodsTable
                       >;
@@ -1044,10 +995,39 @@ export async function syncIssues(db: Db): Promise<void> {
                 if (impactEvent.serviceScopes.length > 0) {
                   await tx.insert(impactEventServiceScopesTable).values(
                     impactEvent.serviceScopes.map((serviceScope, index) => {
-                      return {
+                      const scopeBase = {
                         impact_event_id: impactEvent.id,
                         type: serviceScope.type,
                         index,
+                      };
+
+                      switch (serviceScope.type) {
+                        case 'service.point': {
+                          return {
+                            ...scopeBase,
+                            station_id: serviceScope.stationId,
+                          } satisfies InferInsertModel<
+                            typeof impactEventServiceScopesTable
+                          >;
+                        }
+                        case 'service.segment': {
+                          return {
+                            ...scopeBase,
+                            from_station_id: serviceScope.fromStationId,
+                            to_station_id: serviceScope.toStationId,
+                          } satisfies InferInsertModel<
+                            typeof impactEventServiceScopesTable
+                          >;
+                        }
+                        case 'service.whole': {
+                          return scopeBase satisfies InferInsertModel<
+                            typeof impactEventServiceScopesTable
+                          >;
+                        }
+                      }
+
+                      return {
+                        ...scopeBase,
                       } satisfies InferInsertModel<
                         typeof impactEventServiceScopesTable
                       >;
