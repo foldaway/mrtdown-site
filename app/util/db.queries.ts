@@ -33,9 +33,11 @@ import {
   impactEventCausesTable,
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
+  impactEventFacilityEffectsTable,
+  issueDayFactsTable,
   impactEventPeriodsTable,
   impactEventsTable,
-  issueDayFactsTable,
+  impactEventServiceEffectsTable,
   issuesTable,
   landmarksTable,
   lineDayFactsTable,
@@ -57,6 +59,11 @@ const SG_TIMEZONE = 'Asia/Singapore';
 
 type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
 
+type IssueWithOperationalEffects = Issue & {
+  serviceEffectKinds: string[];
+  facilityEffectKinds: string[];
+};
+
 type BranchWithEntries = LineBranch & {
   entries: Array<{
     stationId: string;
@@ -71,7 +78,7 @@ type BaseDataset = {
   branchByServiceId: Record<string, BranchWithEntries>;
   metadata: Record<string, string>;
   publicHolidaySet: Set<string>;
-  allIssues: Record<string, Issue>;
+  allIssues: Record<string, IssueWithOperationalEffects>;
   issueUpdatesById: Record<string, IssueUpdate[]>;
 };
 
@@ -403,6 +410,18 @@ function sortIssuesByLatestActivity(
   });
 }
 
+function issueContributesToLineDowntime(issue: IssueWithOperationalEffects) {
+  if (issue.type === 'disruption') {
+    return true;
+  }
+
+  return issue.serviceEffectKinds.includes('no-service');
+}
+
+function issueContributesToLineStatus(issue: IssueWithOperationalEffects) {
+  return issueContributesToLineDowntime(issue);
+}
+
 function makeTimeScale(granularity: Granularity, count: number): TimeScale {
   return { granularity, count };
 }
@@ -447,6 +466,8 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     impactEventServiceRows,
     impactEventFacilityRows,
     impactEventCauseRows,
+    impactEventServiceEffectRows,
+    impactEventFacilityEffectRows,
   ] = await Promise.all([
     db.select().from(metadataTable),
     db.select().from(linesTable),
@@ -476,6 +497,8 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     db.select().from(impactEventEntityServicesTable),
     db.select().from(impactEventEntityFacilitiesTable),
     db.select().from(impactEventCausesTable),
+    db.select().from(impactEventServiceEffectsTable),
+    db.select().from(impactEventFacilityEffectsTable),
   ]);
 
   const metadata = Object.fromEntries(
@@ -819,6 +842,26 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     return acc;
   }, {});
 
+  const serviceEffectsByImpactEventId = impactEventServiceEffectRows.reduce<
+    Record<string, typeof impactEventServiceEffectRows>
+  >((acc, row) => {
+    if (acc[row.impact_event_id] == null) {
+      acc[row.impact_event_id] = [];
+    }
+    acc[row.impact_event_id].push(row);
+    return acc;
+  }, {});
+
+  const facilityEffectsByImpactEventId = impactEventFacilityEffectRows.reduce<
+    Record<string, typeof impactEventFacilityEffectRows>
+  >((acc, row) => {
+    if (acc[row.impact_event_id] == null) {
+      acc[row.impact_event_id] = [];
+    }
+    acc[row.impact_event_id].push(row);
+    return acc;
+  }, {});
+
   const evidenceByIssueId = evidenceRows.reduce<
     Record<string, typeof evidenceRows>
   >((acc, row) => {
@@ -837,7 +880,7 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     ]),
   ) as Record<string, DateTime | null>;
 
-  const allIssues: Record<string, Issue> = {};
+  const allIssues: Record<string, IssueWithOperationalEffects> = {};
   const issueUpdatesById: Record<string, IssueUpdate[]> = {};
   for (const row of issueRows) {
     const { fallback, translations } = parseTranslations(row.title);
@@ -955,6 +998,21 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
       referenceNow,
     );
 
+    const serviceEffectKinds =
+      latestEventByType['service_effects.set'] != null
+        ? (serviceEffectsByImpactEventId[latestEventByType['service_effects.set'].id] ??
+            []
+          ).map((row) => row.kind)
+        : [];
+
+    const facilityEffectKinds =
+      latestEventByType['facility_effects.set'] != null
+        ? (facilityEffectsByImpactEventId[
+            latestEventByType['facility_effects.set'].id
+          ] ?? []
+          ).map((row) => row.kind)
+        : [];
+
     allIssues[row.id] = {
       id: row.id,
       title: fallback,
@@ -965,6 +1023,8 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
       lineIds,
       branchesAffected,
       intervals,
+      serviceEffectKinds,
+      facilityEffectKinds,
     };
 
     issueUpdatesById[row.id] = [...(evidenceByIssueId[row.id] ?? [])]
@@ -997,10 +1057,10 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
 
 function withIssues(
   baseIncluded: BaseIncludedEntities,
-  allIssues: Record<string, Issue>,
+  allIssues: Record<string, IssueWithOperationalEffects>,
   issueIds?: string[],
 ): IncludedEntities {
-  const selectedIssues =
+  const selectedIssuesWithEffects =
     issueIds == null
       ? allIssues
       : Object.fromEntries(
@@ -1008,6 +1068,13 @@ function withIssues(
             .filter((issueId) => allIssues[issueId] != null)
             .map((issueId) => [issueId, allIssues[issueId]]),
         );
+
+  const selectedIssues = Object.fromEntries(
+    Object.entries(selectedIssuesWithEffects).map(([issueId, issue]) => {
+      const { serviceEffectKinds, facilityEffectKinds, ...publicIssue } = issue;
+      return [issueId, publicIssue];
+    }),
+  ) as Record<string, Issue>;
 
   return {
     ...baseIncluded,
@@ -1017,7 +1084,7 @@ function withIssues(
 
 function buildLineSummary(
   line: Line,
-  issues: Issue[],
+  issues: IssueWithOperationalEffects[],
   days: number,
   publicHolidaySet: Set<string>,
   referenceNow = nowSg(),
@@ -1074,22 +1141,29 @@ function buildLineSummary(
         continue;
       }
 
-      durationSecondsByIssueType[issue.type] =
-        (durationSecondsByIssueType[issue.type] ?? 0) + dayOverlap;
+      if (issueContributesToLineDowntime(issue)) {
+        durationSecondsByIssueType[issue.type] =
+          (durationSecondsByIssueType[issue.type] ?? 0) + dayOverlap;
+      }
 
-      if (issue.type === 'disruption' || issue.type === 'maintenance') {
+      if (
+        issueContributesToLineDowntime(issue) &&
+        (issue.type === 'disruption' || issue.type === 'maintenance')
+      ) {
         dailyDowntimeIntervals.push(...contributingBounds);
       }
 
-      const current = dayBreakdown.breakdownByIssueTypes[issue.type] ?? {
-        totalDurationSeconds: 0,
-        issueIds: [],
-      };
-      current.totalDurationSeconds += dayOverlap;
-      if (!current.issueIds.includes(issue.id)) {
-        current.issueIds.push(issue.id);
+      if (issueContributesToLineDowntime(issue)) {
+        const current = dayBreakdown.breakdownByIssueTypes[issue.type] ?? {
+          totalDurationSeconds: 0,
+          issueIds: [],
+        };
+        current.totalDurationSeconds += dayOverlap;
+        if (!current.issueIds.includes(issue.id)) {
+          current.issueIds.push(issue.id);
+        }
+        dayBreakdown.breakdownByIssueTypes[issue.type] = current;
       }
-      dayBreakdown.breakdownByIssueTypes[issue.type] = current;
     }
 
     totalDowntimeSeconds += sumIntervalSeconds(
@@ -1108,11 +1182,26 @@ function buildLineSummary(
     status = 'future_service';
   } else if (!isLineOperatingNow(line, publicHolidaySet, referenceNow)) {
     status = 'closed_for_day';
-  } else if (activeNow.some((issue) => issue.type === 'disruption')) {
+  } else if (
+    activeNow.some(
+      (issue) =>
+        issue.type === 'disruption' && issueContributesToLineStatus(issue),
+    )
+  ) {
     status = 'ongoing_disruption';
-  } else if (activeNow.some((issue) => issue.type === 'maintenance')) {
+  } else if (
+    activeNow.some(
+      (issue) =>
+        issue.type === 'maintenance' && issueContributesToLineStatus(issue),
+    )
+  ) {
     status = 'ongoing_maintenance';
-  } else if (activeNow.some((issue) => issue.type === 'infra')) {
+  } else if (
+    activeNow.some(
+      (issue) =>
+        issue.type === 'infra' && issueContributesToLineStatus(issue),
+    )
+  ) {
     status = 'ongoing_infra';
   }
 
@@ -1270,7 +1359,7 @@ function buildPreviousWindowSummary(
 
 function buildUptimeGraph(
   line: Line,
-  issues: Issue[],
+  issues: IssueWithOperationalEffects[],
   publicHolidaySet: Set<string>,
   count: number,
 ): TimeScaleChart {
@@ -1298,6 +1387,10 @@ function buildUptimeGraph(
         );
       }, 0);
       if (overlap <= 0) {
+        continue;
+      }
+
+      if (!issueContributesToLineDowntime(issue)) {
         continue;
       }
 
@@ -1329,7 +1422,7 @@ function buildUptimeGraph(
       const serviceWindow = serviceWindowForDate(line, date, publicHolidaySet);
       serviceSeconds += serviceWindow.seconds;
       for (const issue of issues) {
-        if (issue.type === 'infra') {
+        if (!issueContributesToLineDowntime(issue)) {
           continue;
         }
         downtime += getIssueBounds(issue).reduce((total, interval) => {
@@ -1369,7 +1462,7 @@ function buildUptimeGraph(
 
 function buildOperatorUptimeGraph(
   lines: Line[],
-  issuesByLineId: Record<string, Issue[]>,
+  issuesByLineId: Record<string, IssueWithOperationalEffects[]>,
   publicHolidaySet: Set<string>,
   count: number,
 ): TimeScaleChart {
@@ -1393,7 +1486,7 @@ function buildOperatorUptimeGraph(
         serviceSeconds += serviceWindow.seconds;
 
         for (const issue of issuesByLineId[line.id] ?? []) {
-          if (issue.type === 'infra') {
+          if (!issueContributesToLineDowntime(issue)) {
             continue;
           }
 
@@ -2014,7 +2107,7 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
         issue.lineIds.includes(lineId),
       ),
     ]),
-  ) as Record<string, Issue[]>;
+  ) as Record<string, IssueWithOperationalEffects[]>;
 
   const operatorIssues = Object.values(dataset.allIssues).filter((issue) =>
     issue.lineIds.some((lineId) => lineIds.includes(lineId)),
