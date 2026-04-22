@@ -33,6 +33,11 @@
     ],
     "env": {
         "staging": {
+            "triggers": {
+                "crons": [
+                    "0 * * * *"
+                ]
+            },
             "observability": {
                 "enabled": true,
                 "head_sampling_rate": 1,
@@ -43,6 +48,11 @@
             }
         },
         "production": {
+            "triggers": {
+                "crons": [
+                    "*/30 * * * *"
+                ]
+            },
             "observability": {
                 "enabled": true,
                 "head_sampling_rate": 0.1,
