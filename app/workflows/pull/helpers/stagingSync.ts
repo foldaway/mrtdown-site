@@ -5,6 +5,7 @@
  * against `*_next` so we avoid huge `IN (...)` parameter lists.
  */
 import {
+  type Evidence,
   type ImpactEvent,
   type Issue,
   type Landmark,
@@ -281,6 +282,28 @@ async function deleteImpactEventChildren(
     .where(
       inArray(impactEventEntityFacilitiesTable.impact_event_id, impactEventIds),
     );
+}
+
+async function deleteIssuesSubtree(
+  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
+  issueIds: string[],
+): Promise<void> {
+  if (issueIds.length === 0) return;
+
+  const impactRows = await tx
+    .select({ id: impactEventsTable.id })
+    .from(impactEventsTable)
+    .where(inArray(impactEventsTable.issue_id, issueIds));
+  const impactEventIds = impactRows.map((r) => r.id);
+
+  await deleteImpactEventChildren(tx, impactEventIds);
+  await tx
+    .delete(impactEventsTable)
+    .where(inArray(impactEventsTable.issue_id, issueIds));
+  await tx
+    .delete(evidencesTable)
+    .where(inArray(evidencesTable.issue_id, issueIds));
+  await tx.delete(issuesTable).where(inArray(issuesTable.id, issueIds));
 }
 
 /** Hash diff staging vs live; upsert changed rows; delete live rows absent from staging. */
@@ -834,6 +857,21 @@ export async function syncIssues(db: Db): Promise<void> {
       .filter((r) => r.liveHash == null || r.liveHash !== r.nextHash)
       .map((r) => r.id);
 
+    const orphanIssueRows = await tx
+      .select({ id: issuesTable.id })
+      .from(issuesTable)
+      .where(
+        notExists(
+          tx
+            .select()
+            .from(issuesNextTable)
+            .where(eq(issuesNextTable.id, issuesTable.id)),
+        ),
+      );
+    const orphanIds = orphanIssueRows.map((r) => r.id);
+
+    await deleteIssuesSubtree(tx, orphanIds);
+
     for (const ch of chunk(changedIds, BATCH)) {
       if (ch.length === 0) continue;
       const impactRows = await tx
@@ -1065,34 +1103,6 @@ export async function syncIssues(db: Db): Promise<void> {
           }
         }
       }
-    }
-
-    const orphanIssueRows = await tx
-      .select({ id: issuesTable.id })
-      .from(issuesTable)
-      .where(
-        notExists(
-          tx
-            .select()
-            .from(issuesNextTable)
-            .where(eq(issuesNextTable.id, issuesTable.id)),
-        ),
-      );
-    const orphanIds = orphanIssueRows.map((r) => r.id);
-    if (orphanIds.length > 0) {
-      const impRows = await tx
-        .select({ id: impactEventsTable.id })
-        .from(impactEventsTable)
-        .where(inArray(impactEventsTable.issue_id, orphanIds));
-      const orphanImpactIds = impRows.map((r) => r.id);
-      await deleteImpactEventChildren(tx, orphanImpactIds);
-      await tx
-        .delete(impactEventsTable)
-        .where(inArray(impactEventsTable.issue_id, orphanIds));
-      await tx
-        .delete(evidencesTable)
-        .where(inArray(evidencesTable.issue_id, orphanIds));
-      await tx.delete(issuesTable).where(inArray(issuesTable.id, orphanIds));
     }
   });
 }
