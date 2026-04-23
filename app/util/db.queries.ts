@@ -54,6 +54,10 @@ import {
   stationsTable,
   townsTable,
 } from '~/db/schema';
+import {
+  issueContributesToLineDowntime,
+  issueContributesToLineStatus,
+} from '~/util/issueOperationalEffects';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 
@@ -85,6 +89,25 @@ type BaseDataset = {
 type IssueIntervalBounds = {
   start: DateTime;
   end: DateTime | null;
+};
+
+type IssueTypeCounts = Record<IssueType, number>;
+
+type IssueTypeBreakdown = IssueTypeCounts & {
+  totalIssues: number;
+};
+
+type IssueDayFactRow = {
+  date: string;
+  issue_id: string;
+  issue_type: IssueType;
+  active_anytime: boolean;
+  duration_seconds: number;
+};
+
+type LineDayCoverageRow = {
+  date: string;
+  line_id: string;
 };
 
 function nowSg() {
@@ -352,6 +375,57 @@ function pickIssueDurationByType<
   return counts;
 }
 
+function createIssueTypeCounts(): IssueTypeCounts {
+  return {
+    disruption: 0,
+    maintenance: 0,
+    infra: 0,
+  };
+}
+
+function createIssueTypeBreakdown(): IssueTypeBreakdown {
+  return {
+    ...createIssueTypeCounts(),
+    totalIssues: 0,
+  };
+}
+
+function addIssueTypeCount(
+  counts: IssueTypeCounts,
+  issueType: IssueType,
+  amount: number,
+) {
+  counts[issueType] += amount;
+}
+
+function groupIssueFactCountsByDate(
+  rows: IssueDayFactRow[],
+  durationMode = false,
+) {
+  const countsByDate = new Map<string, IssueTypeCounts>();
+
+  for (const row of rows) {
+    const amount = durationMode
+      ? row.duration_seconds
+      : row.active_anytime
+        ? 1
+        : 0;
+    if (amount === 0) {
+      continue;
+    }
+
+    let counts = countsByDate.get(row.date);
+    if (counts == null) {
+      counts = createIssueTypeCounts();
+      countsByDate.set(row.date, counts);
+    }
+
+    addIssueTypeCount(counts, row.issue_type, amount);
+  }
+
+  return countsByDate;
+}
+
 function getIssueBounds(issue: Issue): IssueIntervalBounds[] {
   return issue.intervals.map((interval) => ({
     start: parseDateTime(interval.startAt),
@@ -408,18 +482,6 @@ function sortIssuesByLatestActivity(
     );
     return latestB - latestA;
   });
-}
-
-function issueContributesToLineDowntime(issue: IssueWithOperationalEffects) {
-  if (issue.type === 'disruption') {
-    return true;
-  }
-
-  return issue.serviceEffectKinds.includes('no-service');
-}
-
-function issueContributesToLineStatus(issue: IssueWithOperationalEffects) {
-  return issueContributesToLineDowntime(issue);
 }
 
 function makeTimeScale(granularity: Granularity, count: number): TimeScale {
@@ -1587,40 +1649,34 @@ function chunk<T>(items: T[], size: number) {
 }
 
 function buildCountChartsFromIssueFacts(
-  rows: Array<{
-    date: string;
-    issue_type: IssueType;
-    duration_seconds: number;
-    active_anytime: boolean;
-  }>,
+  rows: IssueDayFactRow[],
   durationMode = false,
 ) {
   const end = nowSg().startOf('day');
+  const countsByDate = groupIssueFactCountsByDate(rows, durationMode);
   const aggregateForRange = (
     start: DateTime,
     count: number,
     previous = false,
-  ): Record<string, number> => {
+  ): IssueTypeCounts => {
     const rangeStart = previous
       ? start.minus({ days: count })
       : start;
-    const rangeEnd = rangeStart.plus({ days: count });
-    return rows.reduce<Record<string, number>>(
-      (acc, row) => {
-        const date = DateTime.fromISO(row.date, { zone: SG_TIMEZONE });
-        if (date < rangeStart || date >= rangeEnd) {
-          return acc;
-        }
+    const aggregate = createIssueTypeCounts();
 
-        if (durationMode) {
-          acc[row.issue_type] += row.duration_seconds;
-        } else if (row.active_anytime) {
-          acc[row.issue_type] += 1;
-        }
-        return acc;
-      },
-      { disruption: 0, maintenance: 0, infra: 0 },
-    );
+    for (let offset = 0; offset < count; offset++) {
+      const date = rangeStart.plus({ days: offset }).toISODate()!;
+      const dayCounts = countsByDate.get(date);
+      if (dayCounts == null) {
+        continue;
+      }
+
+      aggregate.disruption += dayCounts.disruption;
+      aggregate.maintenance += dayCounts.maintenance;
+      aggregate.infra += dayCounts.infra;
+    }
+
+    return aggregate;
   };
 
   return [7, 30, 90].map((count) => {
@@ -1628,20 +1684,11 @@ function buildCountChartsFromIssueFacts(
     const data: ChartEntry[] = [];
     for (let offset = 0; offset < count; offset++) {
       const date = start.plus({ days: offset }).toISODate()!;
-      const dayRows = rows.filter((row) => row.date === date);
       data.push({
         name: date,
-        payload: dayRows.reduce<Record<string, number>>(
-          (acc, row) => {
-            acc[row.issue_type] += durationMode
-              ? row.duration_seconds
-              : row.active_anytime
-                ? 1
-                : 0;
-            return acc;
-          },
-          { disruption: 0, maintenance: 0, infra: 0 },
-        ),
+        payload: {
+          ...(countsByDate.get(date) ?? createIssueTypeCounts()),
+        },
       });
     }
 
@@ -1660,7 +1707,13 @@ function buildCountChartsFromIssueFacts(
 async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
   const db = getDb();
   return db
-    .select()
+    .select({
+      date: issueDayFactsTable.date,
+      issue_id: issueDayFactsTable.issue_id,
+      issue_type: issueDayFactsTable.issue_type,
+      active_anytime: issueDayFactsTable.active_anytime,
+      duration_seconds: issueDayFactsTable.duration_seconds,
+    })
     .from(issueDayFactsTable)
     .where(
       and(
@@ -1673,7 +1726,10 @@ async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
 async function getLineDayFactsInRange(start: DateTime, end: DateTime) {
   const db = getDb();
   return db
-    .select()
+    .select({
+      date: lineDayFactsTable.date,
+      line_id: lineDayFactsTable.line_id,
+    })
     .from(lineDayFactsTable)
     .where(
       and(
@@ -1684,7 +1740,7 @@ async function getLineDayFactsInRange(start: DateTime, end: DateTime) {
 }
 
 function hasLineFactsCoverage(
-  rows: Array<{ date: string; line_id: string }>,
+  rows: LineDayCoverageRow[],
   start: DateTime,
   end: DateTime,
   lineIds: string[],
@@ -1706,6 +1762,50 @@ function hasLineFactsCoverage(
   return expectedDates.every((date) =>
     lineIds.every((lineId) => rowKeys.has(`${date}::${lineId}`)),
   );
+}
+
+function buildDailyIssueTypeCountsFromIssues(
+  issues: Issue[],
+  start: DateTime,
+  end: DateTime,
+) {
+  const countsByDate = new Map<string, IssueTypeCounts>();
+  const rangeStart = start.startOf('day');
+  const rangeEndExclusive = end.startOf('day').plus({ days: 1 });
+
+  for (const issue of issues) {
+    const touchedDates = new Set<string>();
+
+    for (const interval of getIssueBounds(issue)) {
+      const boundedStart = interval.start > rangeStart ? interval.start : rangeStart;
+      const rawEnd = interval.end ?? nowSg();
+      const boundedEnd = rawEnd < rangeEndExclusive ? rawEnd : rangeEndExclusive;
+
+      if (boundedStart >= boundedEnd) {
+        continue;
+      }
+
+      for (
+        let cursor = boundedStart.startOf('day');
+        cursor < boundedEnd;
+        cursor = cursor.plus({ days: 1 })
+      ) {
+        touchedDates.add(cursor.toISODate()!);
+      }
+    }
+
+    for (const date of touchedDates) {
+      let counts = countsByDate.get(date);
+      if (counts == null) {
+        counts = createIssueTypeCounts();
+        countsByDate.set(date, counts);
+      }
+
+      addIssueTypeCount(counts, issue.type, 1);
+    }
+  }
+
+  return countsByDate;
 }
 
 export async function rebuildOperationalFactsForDate(date: DateTime) {
@@ -2454,6 +2554,29 @@ export async function getStatisticsData() {
     rollingYearEnd,
     Object.keys(dataset.included.lines),
   );
+  const lineCountsById: Record<string, IssueTypeBreakdown> = {};
+  const stationCountsById: Record<string, IssueTypeBreakdown> = {};
+
+  for (const issue of issues) {
+    for (const lineId of new Set(issue.lineIds)) {
+      const counts =
+        lineCountsById[lineId] ?? (lineCountsById[lineId] = createIssueTypeBreakdown());
+      addIssueTypeCount(counts, issue.type, 1);
+      counts.totalIssues += 1;
+    }
+
+    const stationIds = new Set(
+      issue.branchesAffected.flatMap((branch) => branch.stationIds),
+    );
+    for (const stationId of stationIds) {
+      const counts =
+        stationCountsById[stationId] ??
+        (stationCountsById[stationId] = createIssueTypeBreakdown());
+      addIssueTypeCount(counts, issue.type, 1);
+      counts.totalIssues += 1;
+    }
+  }
+
   const longestDisruptions = [...issues]
     .filter((issue) => issue.type === 'disruption')
     .sort((a, b) => b.durationSeconds - a.durationSeconds)
@@ -2463,15 +2586,14 @@ export async function getStatisticsData() {
   const chartTotalIssueCountByLine: Chart = {
     title: 'Issue Count by Line',
     data: Object.values(dataset.included.lines).map((line) => {
-      const lineIssues = issues.filter((issue) => issue.lineIds.includes(line.id));
-      const counts = pickIssueTypes(lineIssues);
+      const counts = lineCountsById[line.id] ?? createIssueTypeBreakdown();
       return {
         name: line.id,
         payload: {
-          disruption: counts.disruption ?? 0,
-          maintenance: counts.maintenance ?? 0,
-          infra: counts.infra ?? 0,
-          totalIssues: lineIssues.length,
+          disruption: counts.disruption,
+          maintenance: counts.maintenance,
+          infra: counts.infra,
+          totalIssues: counts.totalIssues,
         },
       };
     }),
@@ -2479,23 +2601,26 @@ export async function getStatisticsData() {
 
   const stationIssueCounts = Object.values(dataset.included.stations).map(
     (station) => {
-      const stationIssues = issues.filter((issue) =>
-        issue.branchesAffected.some((branch) =>
-          branch.stationIds.includes(station.id),
-        ),
-      );
-      const counts = pickIssueTypes(stationIssues);
+      const counts = stationCountsById[station.id] ?? createIssueTypeBreakdown();
       return {
         name: station.id,
         payload: {
-          disruption: counts.disruption ?? 0,
-          maintenance: counts.maintenance ?? 0,
-          infra: counts.infra ?? 0,
-          totalIssues: stationIssues.length,
+          disruption: counts.disruption,
+          maintenance: counts.maintenance,
+          infra: counts.infra,
+          totalIssues: counts.totalIssues,
         },
       };
     },
   );
+
+  const heatmapCountsByDate = hasRollingYearCoverage
+    ? groupIssueFactCountsByDate(issueFactRows)
+    : buildDailyIssueTypeCountsFromIssues(
+        issues,
+        rollingYearStart,
+        rollingYearEnd,
+      );
 
   const chartTotalIssueCountByStation: Chart = {
     title: 'Issue Count by Station',
@@ -2511,31 +2636,10 @@ export async function getStatisticsData() {
     title: 'Rolling Year Heatmap',
     data: Array.from({ length: 365 }, (_, index) => {
       const date = rollingYearStart.plus({ days: index }).toISODate()!;
-      const dayRows =
-        hasRollingYearCoverage
-          ? issueFactRows.filter((row) => row.date === date && row.active_anytime)
-          : [];
-      if (hasRollingYearCoverage) {
-        return {
-          name: date,
-          payload: dayRows.reduce<Record<string, number>>(
-            (acc, row) => {
-              acc[row.issue_type] += 1;
-              return acc;
-            },
-            { disruption: 0, maintenance: 0, infra: 0 },
-          ),
-        };
-      }
-      const dayDate = DateTime.fromISO(date, { zone: SG_TIMEZONE });
-      const dayIssues = issues.filter((issue) => issueTouchesDate(issue, dayDate));
-      const counts = pickIssueTypes(dayIssues);
       return {
         name: date,
         payload: {
-          disruption: counts.disruption ?? 0,
-          maintenance: counts.maintenance ?? 0,
-          infra: counts.infra ?? 0,
+          ...(heatmapCountsByDate.get(date) ?? createIssueTypeCounts()),
         },
       };
     }),
