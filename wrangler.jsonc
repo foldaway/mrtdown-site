@@ -38,6 +38,13 @@
                     "0 * * * *"
                 ]
             },
+            "workflows": [
+                {
+                    "binding": "PULL_WORKFLOW",
+                    "name": "mrtdown-pull",
+                    "class_name": "PullWorkflow"
+                }
+            ],
             "observability": {
                 "enabled": true,
                 "head_sampling_rate": 1,
