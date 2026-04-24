@@ -88,6 +88,9 @@ jobs:
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
+          # Preview deployments intentionally share the top-level PULL_WORKFLOW
+          # binding. If PR-level workflow isolation becomes necessary, generate
+          # a temporary Wrangler config for this upload.
           command: versions upload --env preview --preview-alias "${{ steps.branch_name.outputs.current_branch }}" --secrets-file preview.env
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
