@@ -443,15 +443,21 @@ export const evidencesTable = pgTable(
 );
 
 // Entity Type: ImpactEvent
-export const impactEventsTable = pgTable('impact_events', {
-  id: text('id').primaryKey(),
-  ts: timestamp('ts', { withTimezone: true, mode: 'string' }).notNull(),
-  issue_id: text('issue_id')
-    .references(() => issuesTable.id)
-    .notNull(),
-  type: text('type').$type<ImpactEvent['type']>().notNull(),
-  ...timestampColumns,
-});
+export const impactEventsTable = pgTable(
+  'impact_events',
+  {
+    id: text('id').primaryKey(),
+    ts: timestamp('ts', { withTimezone: true, mode: 'string' }).notNull(),
+    issue_id: text('issue_id')
+      .references(() => issuesTable.id)
+      .notNull(),
+    type: text('type').$type<ImpactEvent['type']>().notNull(),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [index('impact_events_issue_id_idx').on(table.issue_id)];
+  },
+);
 
 // Normalized Entity Field: ImpactEvent.basis.evidenceId
 export const impactEventBasisEvidencesTable = pgTable(
@@ -571,8 +577,12 @@ export const lineDayFactsTable = pgTable(
       mode: 'string',
     }).notNull(),
     service_seconds: integer('service_seconds').notNull(),
-    downtime_disruption_seconds: integer('downtime_disruption_seconds').notNull(),
-    downtime_maintenance_seconds: integer('downtime_maintenance_seconds').notNull(),
+    downtime_disruption_seconds: integer(
+      'downtime_disruption_seconds',
+    ).notNull(),
+    downtime_maintenance_seconds: integer(
+      'downtime_maintenance_seconds',
+    ).notNull(),
     downtime_infra_seconds: integer('downtime_infra_seconds').notNull(),
     issue_count_disruption: integer('issue_count_disruption').notNull(),
     issue_count_maintenance: integer('issue_count_maintenance').notNull(),

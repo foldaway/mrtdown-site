@@ -817,258 +817,284 @@ export async function syncServices(db: Db): Promise<void> {
  * remove impact subtree + evidences, reinsert from staging. Then remove issues
  * missing from `issues_next` (with full subtree cleanup).
  */
-export async function syncIssues(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
-    const rows = await tx
-      .select({
-        id: issuesNextTable.id,
-        nextHash: issuesNextTable.hash,
-        liveHash: issuesTable.hash,
-      })
-      .from(issuesNextTable)
-      .leftJoin(issuesTable, eq(issuesNextTable.id, issuesTable.id));
+export type IssueSyncPlan = {
+  changedIds: string[];
+  orphanIds: string[];
+};
 
-    const changedIds = rows
+export async function getIssueSyncPlan(db: Db): Promise<IssueSyncPlan> {
+  const rows = await db
+    .select({
+      id: issuesNextTable.id,
+      nextHash: issuesNextTable.hash,
+      liveHash: issuesTable.hash,
+    })
+    .from(issuesNextTable)
+    .leftJoin(issuesTable, eq(issuesNextTable.id, issuesTable.id));
+
+  const orphanIssueRows = await db
+    .select({ id: issuesTable.id })
+    .from(issuesTable)
+    .where(
+      notExists(
+        db
+          .select()
+          .from(issuesNextTable)
+          .where(eq(issuesNextTable.id, issuesTable.id)),
+      ),
+    );
+
+  return {
+    changedIds: rows
       .filter((r) => r.liveHash == null || r.liveHash !== r.nextHash)
-      .map((r) => r.id);
+      .map((r) => r.id),
+    orphanIds: orphanIssueRows.map((r) => r.id),
+  };
+}
 
-    const orphanIssueRows = await tx
-      .select({ id: issuesTable.id })
-      .from(issuesTable)
-      .where(
-        notExists(
-          tx
-            .select()
-            .from(issuesNextTable)
-            .where(eq(issuesNextTable.id, issuesTable.id)),
-        ),
-      );
-    const orphanIds = orphanIssueRows.map((r) => r.id);
+export async function deleteIssueOrphans(
+  db: Db,
+  issueIds: string[],
+): Promise<void> {
+  for (const ch of chunk(issueIds, BATCH)) {
+    await db.transaction(async (tx) => {
+      await deleteIssuesSubtree(tx, ch);
+    });
+  }
+}
 
-    await deleteIssuesSubtree(tx, orphanIds);
+export async function syncIssueBatch(
+  db: Db,
+  issueIds: string[],
+): Promise<void> {
+  if (issueIds.length === 0) return;
 
-    for (const ch of chunk(changedIds, BATCH)) {
-      if (ch.length === 0) continue;
-      const impactRows = await tx
-        .select({ id: impactEventsTable.id })
-        .from(impactEventsTable)
-        .where(inArray(impactEventsTable.issue_id, ch));
-      const impactEventIds = impactRows.map((r) => r.id);
-      await deleteImpactEventChildren(tx, impactEventIds);
+  await db.transaction(async (tx) => {
+    const impactRows = await tx
+      .select({ id: impactEventsTable.id })
+      .from(impactEventsTable)
+      .where(inArray(impactEventsTable.issue_id, issueIds));
+    const impactEventIds = impactRows.map((r) => r.id);
+    await deleteImpactEventChildren(tx, impactEventIds);
+    await tx
+      .delete(impactEventsTable)
+      .where(inArray(impactEventsTable.issue_id, issueIds));
+    await tx
+      .delete(evidencesTable)
+      .where(inArray(evidencesTable.issue_id, issueIds));
+
+    const full = await tx
+      .select()
+      .from(issuesNextTable)
+      .where(inArray(issuesNextTable.id, issueIds));
+    for (const row of full) {
       await tx
-        .delete(impactEventsTable)
-        .where(inArray(impactEventsTable.issue_id, ch));
-      await tx
-        .delete(evidencesTable)
-        .where(inArray(evidencesTable.issue_id, ch));
-
-      const full = await tx
-        .select()
-        .from(issuesNextTable)
-        .where(inArray(issuesNextTable.id, ch));
-      for (const row of full) {
-        await tx
-          .insert(issuesTable)
-          .values({
-            id: row.id,
+        .insert(issuesTable)
+        .values({
+          id: row.id,
+          hash: row.hash,
+          type: row.type,
+          title: row.title,
+          title_meta: row.title_meta,
+        })
+        .onConflictDoUpdate({
+          target: [issuesTable.id],
+          set: {
             hash: row.hash,
             type: row.type,
             title: row.title,
             title_meta: row.title_meta,
-          })
+          },
+        });
+
+      if (row.evidences.length > 0) {
+        await tx.insert(evidencesTable).values(
+          row.evidences.map((evidence) => {
+            return {
+              id: evidence.id,
+              ts: evidence.ts,
+              text: evidence.text,
+              type: evidence.type,
+              render: evidence.render,
+              source_url: evidence.sourceUrl,
+              issue_id: row.id,
+            } satisfies InferInsertModel<typeof evidencesTable>;
+          }),
+        );
+      }
+
+      const impactEvents = row.impact_events;
+      if (impactEvents.length > 0) {
+        await tx
+          .insert(impactEventsTable)
+          .values(
+            impactEvents.map((impactEvent) => {
+              return {
+                id: impactEvent.id,
+                ts: impactEvent.ts,
+                type: impactEvent.type,
+                issue_id: row.id,
+              } satisfies InferInsertModel<typeof impactEventsTable>;
+            }),
+          )
           .onConflictDoUpdate({
-            target: [issuesTable.id],
+            target: [impactEventsTable.id],
             set: {
-              hash: row.hash,
-              type: row.type,
-              title: row.title,
-              title_meta: row.title_meta,
+              ts: sql.raw(`excluded.${impactEventsTable.ts.name}`),
+              type: sql.raw(`excluded.${impactEventsTable.type.name}`),
+              issue_id: sql.raw(`excluded.${impactEventsTable.issue_id.name}`),
             },
           });
 
-        if (row.evidences.length > 0) {
-          await tx.insert(evidencesTable).values(
-            row.evidences.map((evidence) => {
-              return {
-                id: evidence.id,
-                ts: evidence.ts,
-                text: evidence.text,
-                type: evidence.type,
-                render: evidence.render,
-                source_url: evidence.sourceUrl,
-                issue_id: row.id,
-              } satisfies InferInsertModel<typeof evidencesTable>;
-            }),
-          );
+        // One row per impact event — `basis.evidenceId` is a single id in core schema
+        const basisEvidence = impactEvents.map((impactEvent) => ({
+          impact_event_id: impactEvent.id,
+          evidence_id: impactEvent.basis.evidenceId,
+        }));
+
+        if (basisEvidence.length > 0) {
+          await tx.insert(impactEventBasisEvidencesTable).values(basisEvidence);
         }
 
-        const impactEvents = row.impact_events;
-        if (impactEvents.length > 0) {
-          await tx
-            .insert(impactEventsTable)
-            .values(
-              impactEvents.map((impactEvent) => {
-                return {
-                  id: impactEvent.id,
-                  ts: impactEvent.ts,
-                  type: impactEvent.type,
-                  issue_id: row.id,
-                } satisfies InferInsertModel<typeof impactEventsTable>;
-              }),
-            )
-            .onConflictDoUpdate({
-              target: [impactEventsTable.id],
-              set: {
-                ts: sql.raw(`excluded.${impactEventsTable.ts.name}`),
-                type: sql.raw(`excluded.${impactEventsTable.type.name}`),
-                issue_id: sql.raw(`excluded.${issuesTable.id.name}`),
-              },
-            });
-
-          // One row per impact event — `basis.evidenceId` is a single id in core schema
-          const basisEvidence = impactEvents.map((impactEvent) => ({
-            impact_event_id: impactEvent.id,
-            evidence_id: impactEvent.basis.evidenceId,
-          }));
-
-          if (basisEvidence.length > 0) {
-            await tx
-              .insert(impactEventBasisEvidencesTable)
-              .values(basisEvidence);
+        for (const impactEvent of impactEvents) {
+          switch (impactEvent.entity.type) {
+            case 'service': {
+              await tx.insert(impactEventEntityServicesTable).values({
+                impact_event_id: impactEvent.id,
+                service_id: impactEvent.entity.serviceId,
+              } satisfies InferInsertModel<
+                typeof impactEventEntityServicesTable
+              >);
+              break;
+            }
+            case 'facility': {
+              await tx.insert(impactEventEntityFacilitiesTable).values({
+                impact_event_id: impactEvent.id,
+                station_id: impactEvent.entity.stationId,
+                kind: impactEvent.entity.kind,
+              } satisfies InferInsertModel<
+                typeof impactEventEntityFacilitiesTable
+              >);
+              break;
+            }
           }
 
-          for (const impactEvent of impactEvents) {
-            switch (impactEvent.entity.type) {
-              case 'service': {
-                await tx.insert(impactEventEntityServicesTable).values({
-                  impact_event_id: impactEvent.id,
-                  service_id: impactEvent.entity.serviceId,
-                } satisfies InferInsertModel<
-                  typeof impactEventEntityServicesTable
-                >);
-                break;
-              }
-              case 'facility': {
-                await tx.insert(impactEventEntityFacilitiesTable).values({
-                  impact_event_id: impactEvent.id,
-                  station_id: impactEvent.entity.stationId,
-                  kind: impactEvent.entity.kind,
-                } satisfies InferInsertModel<
-                  typeof impactEventEntityFacilitiesTable
-                >);
-                break;
-              }
-            }
-
-            switch (impactEvent.type) {
-              case 'periods.set': {
-                const resolvedPeriodsCanonical = resolvePeriods({
-                  mode: {
-                    kind: 'canonical',
-                  },
-                  periods: impactEvent.periods,
-                  asOf: impactEvent.ts,
-                });
-                if (resolvedPeriodsCanonical.length > 0) {
-                  await tx.insert(impactEventPeriodsTable).values(
-                    resolvedPeriodsCanonical.map((period, index) => {
-                      return {
-                        impact_event_id: impactEvent.id,
-                        index,
-                        start_at: period.startAt,
-                        end_at: period.endAt,
-                      } satisfies InferInsertModel<
-                        typeof impactEventPeriodsTable
-                      >;
-                    }),
-                  );
-                }
-                break;
-              }
-              case 'causes.set': {
-                await tx.insert(impactEventCausesTable).values(
-                  impactEvent.causes.map((cause) => {
+          switch (impactEvent.type) {
+            case 'periods.set': {
+              const resolvedPeriodsCanonical = resolvePeriods({
+                mode: {
+                  kind: 'canonical',
+                },
+                periods: impactEvent.periods,
+                asOf: impactEvent.ts,
+              });
+              if (resolvedPeriodsCanonical.length > 0) {
+                await tx.insert(impactEventPeriodsTable).values(
+                  resolvedPeriodsCanonical.map((period, index) => {
                     return {
                       impact_event_id: impactEvent.id,
-                      type: cause,
-                    } satisfies InferInsertModel<typeof impactEventCausesTable>;
+                      index,
+                      start_at: period.startAt,
+                      end_at: period.endAt,
+                    } satisfies InferInsertModel<
+                      typeof impactEventPeriodsTable
+                    >;
                   }),
                 );
-                break;
               }
-              case 'service_scopes.set': {
-                if (impactEvent.serviceScopes.length > 0) {
-                  await tx.insert(impactEventServiceScopesTable).values(
-                    impactEvent.serviceScopes.map((serviceScope, index) => {
-                      const scopeBase = {
-                        impact_event_id: impactEvent.id,
-                        type: serviceScope.type,
-                        index,
-                      };
+              break;
+            }
+            case 'causes.set': {
+              await tx.insert(impactEventCausesTable).values(
+                impactEvent.causes.map((cause) => {
+                  return {
+                    impact_event_id: impactEvent.id,
+                    type: cause,
+                  } satisfies InferInsertModel<typeof impactEventCausesTable>;
+                }),
+              );
+              break;
+            }
+            case 'service_scopes.set': {
+              if (impactEvent.serviceScopes.length > 0) {
+                await tx.insert(impactEventServiceScopesTable).values(
+                  impactEvent.serviceScopes.map((serviceScope, index) => {
+                    const scopeBase = {
+                      impact_event_id: impactEvent.id,
+                      type: serviceScope.type,
+                      index,
+                    };
 
-                      switch (serviceScope.type) {
-                        case 'service.point': {
-                          return {
-                            ...scopeBase,
-                            station_id: serviceScope.stationId,
-                          } satisfies InferInsertModel<
-                            typeof impactEventServiceScopesTable
-                          >;
-                        }
-                        case 'service.segment': {
-                          return {
-                            ...scopeBase,
-                            from_station_id: serviceScope.fromStationId,
-                            to_station_id: serviceScope.toStationId,
-                          } satisfies InferInsertModel<
-                            typeof impactEventServiceScopesTable
-                          >;
-                        }
-                        case 'service.whole': {
-                          return scopeBase satisfies InferInsertModel<
-                            typeof impactEventServiceScopesTable
-                          >;
-                        }
+                    switch (serviceScope.type) {
+                      case 'service.point': {
+                        return {
+                          ...scopeBase,
+                          station_id: serviceScope.stationId,
+                        } satisfies InferInsertModel<
+                          typeof impactEventServiceScopesTable
+                        >;
                       }
+                      case 'service.segment': {
+                        return {
+                          ...scopeBase,
+                          from_station_id: serviceScope.fromStationId,
+                          to_station_id: serviceScope.toStationId,
+                        } satisfies InferInsertModel<
+                          typeof impactEventServiceScopesTable
+                        >;
+                      }
+                      case 'service.whole': {
+                        return scopeBase satisfies InferInsertModel<
+                          typeof impactEventServiceScopesTable
+                        >;
+                      }
+                    }
 
-                      return {
-                        ...scopeBase,
-                      } satisfies InferInsertModel<
-                        typeof impactEventServiceScopesTable
-                      >;
-                    }),
-                  );
-                }
-                break;
+                    return {
+                      ...scopeBase,
+                    } satisfies InferInsertModel<
+                      typeof impactEventServiceScopesTable
+                    >;
+                  }),
+                );
               }
-              case 'service_effects.set': {
-                await tx.insert(impactEventServiceEffectsTable).values({
-                  impact_event_id: impactEvent.id,
-                  kind: impactEvent.effect.kind,
-                  duration:
-                    impactEvent.effect.kind === 'delay'
-                      ? impactEvent.effect.duration
-                      : null,
-                } satisfies InferInsertModel<
-                  typeof impactEventServiceEffectsTable
-                >);
-                break;
-              }
-              case 'facility_effects.set': {
-                await tx.insert(impactEventFacilityEffectsTable).values({
-                  impact_event_id: impactEvent.id,
-                  kind: impactEvent.effect.kind,
-                } satisfies InferInsertModel<
-                  typeof impactEventFacilityEffectsTable
-                >);
-                break;
-              }
+              break;
+            }
+            case 'service_effects.set': {
+              await tx.insert(impactEventServiceEffectsTable).values({
+                impact_event_id: impactEvent.id,
+                kind: impactEvent.effect.kind,
+                duration:
+                  impactEvent.effect.kind === 'delay'
+                    ? impactEvent.effect.duration
+                    : null,
+              } satisfies InferInsertModel<
+                typeof impactEventServiceEffectsTable
+              >);
+              break;
+            }
+            case 'facility_effects.set': {
+              await tx.insert(impactEventFacilityEffectsTable).values({
+                impact_event_id: impactEvent.id,
+                kind: impactEvent.effect.kind,
+              } satisfies InferInsertModel<
+                typeof impactEventFacilityEffectsTable
+              >);
+              break;
             }
           }
         }
       }
     }
   });
+}
+
+export async function syncIssues(db: Db): Promise<void> {
+  const plan = await getIssueSyncPlan(db);
+  await deleteIssueOrphans(db, plan.orphanIds);
+  for (const issueIds of chunk(plan.changedIds, BATCH)) {
+    await syncIssueBatch(db, issueIds);
+  }
 }
 
 /** Truncates staging tables and records `manifest_last_pulled_at` in one transaction. */
