@@ -37,26 +37,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate preview alias
-        id: branch_name
-        env:
-          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          sanitized_branch=$(
-            printf '%s' "$BRANCH_NAME" \
-              | tr '[:upper:]' '[:lower:]' \
-              | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
-          )
-
-          if [ -z "$sanitized_branch" ]; then
-            sanitized_branch="pr-$PR_NUMBER"
-          elif ! printf '%s' "$sanitized_branch" | grep -Eq '^[a-z]'; then
-            sanitized_branch="pr-$sanitized_branch"
-          fi
-
-          echo "current_branch=$sanitized_branch" >> "$GITHUB_OUTPUT"
-
       - name: Build
         run: npm run build
         env:
@@ -75,10 +55,17 @@ jobs:
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
-          # Preview deployments intentionally share the top-level HYPERDRIVE
-          # and PULL_WORKFLOW bindings. If PR-level isolation becomes necessary,
-          # generate a temporary Wrangler config for this upload.
-          command: versions upload --env preview --preview-alias "${{ steps.branch_name.outputs.current_branch }}" --secrets-file preview.env
+          # Preview deployments intentionally use the top-level Wrangler config,
+          # not per-PR preview aliases. All open PRs deploy over the same preview
+          # Worker/Workflow resources, so newer preview deploys override older
+          # ones and share the same HYPERDRIVE and PULL_WORKFLOW config.
+          # `versions upload --preview-alias` does not deploy/update Workflows,
+          # so use `deploy` here to keep the Worker and Workflow in sync.
+          # Fully isolated previews would need per-PR Worker, Workflow,
+          # Hyperdrive, and Neon resources plus reliable teardown. That
+          # operational cost is not worth it while preview deploys are mostly
+          # for one active contributor.
+          command: deploy --secrets-file preview.env
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
