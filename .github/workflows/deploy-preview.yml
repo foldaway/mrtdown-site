@@ -57,6 +57,7 @@ jobs:
           fi
 
           echo "current_branch=$sanitized_branch" >> "$GITHUB_OUTPUT"
+          echo "neon_branch=preview/pr-$PR_NUMBER-$sanitized_branch" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: npm run build
@@ -68,9 +69,20 @@ jobs:
           VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
           VITE_ROOT_URL: "https://www.mrtdown.org"
 
+      - name: Create Neon Branch
+        id: create_neon_branch
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ steps.branch_name.outputs.neon_branch }}
+          role: hyperdrive-user
+          database: mrtdown-db
+          api_key: ${{ secrets.NEON_API_KEY }}
+
       - name: Create preview.env
         run: |-
           echo "VITE_ROOT_URL=https://www.mrtdown.org" >> preview.env
+          echo "DATABASE_URL=${{ steps.create_neon_branch.outputs.db_url }}" >> preview.env
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -82,3 +94,39 @@ jobs:
 
       - name: Remove preview.env
         run: rm preview.env
+
+  teardown:
+    name: Teardown
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate preview alias
+        id: branch_name
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          sanitized_branch=$(
+            printf '%s' "$BRANCH_NAME" \
+              | tr '[:upper:]' '[:lower:]' \
+              | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
+          )
+
+          if [ -z "$sanitized_branch" ]; then
+            sanitized_branch="pr-$PR_NUMBER"
+          elif ! printf '%s' "$sanitized_branch" | grep -Eq '^[a-z]'; then
+            sanitized_branch="pr-$sanitized_branch"
+          fi
+
+          echo "current_branch=$sanitized_branch" >> "$GITHUB_OUTPUT"
+          echo "neon_branch=preview/pr-$PR_NUMBER-$sanitized_branch" >> "$GITHUB_OUTPUT"
+
+      - name: Delete Neon Branch
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: ${{ steps.branch_name.outputs.neon_branch }}
+          api_key: ${{ secrets.NEON_API_KEY }}
