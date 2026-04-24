@@ -73,7 +73,7 @@ jobs:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ steps.branch_name.outputs.neon_branch }}
           role: hyperdrive-user
-          database: mrtdown-db
+          database: mrtdown_db
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Create preview.env
