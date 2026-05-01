@@ -14,8 +14,43 @@
             "head_sampling_rate": 1
         }
     },
+    "limits": {
+        "cpu_ms": 300000
+    },
+    "hyperdrive": [
+        {
+            "binding": "HYPERDRIVE",
+            "id": "e9034596011b46179c4c7f65c2ebc773",
+            "localConnectionString": "postgresql://postgres:postgres@localhost:5432/mrtdown-db"
+        }
+    ],
+    "workflows": [
+        {
+            "binding": "PULL_WORKFLOW",
+            "name": "mrtdown-pull",
+            "class_name": "PullWorkflow"
+        }
+    ],
     "env": {
         "staging": {
+            "triggers": {
+                "crons": [
+                    "0 * * * *"
+                ]
+            },
+            "workflows": [
+                {
+                    "binding": "PULL_WORKFLOW",
+                    "name": "mrtdown-pull",
+                    "class_name": "PullWorkflow"
+                }
+            ],
+            "hyperdrive": [
+                {
+                    "binding": "HYPERDRIVE",
+                    "id": "1413ff84b6ef40a19973b1bc8a662736"
+                }
+            ],
             "observability": {
                 "enabled": true,
                 "head_sampling_rate": 1,
@@ -26,6 +61,11 @@
             }
         },
         "production": {
+            "triggers": {
+                "crons": [
+                    "*/30 * * * *"
+                ]
+            },
             "observability": {
                 "enabled": true,
                 "head_sampling_rate": 0.1,
@@ -33,7 +73,23 @@
                     "enabled": true,
                     "head_sampling_rate": 0.1
                 }
-            }
+            },
+            "limits": {
+                "cpu_ms": 300000
+            },
+            "hyperdrive": [
+                {
+                    "binding": "HYPERDRIVE",
+                    "id": "1d9561e9411649a6afe8612881ff926d"
+                }
+            ],
+            "workflows": [
+                {
+                    "binding": "PULL_WORKFLOW",
+                    "name": "mrtdown-pull",
+                    "class_name": "PullWorkflow"
+                }
+            ]
         }
     }
 }

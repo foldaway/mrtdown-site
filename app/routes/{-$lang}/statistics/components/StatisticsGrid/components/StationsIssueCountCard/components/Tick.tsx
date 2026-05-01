@@ -20,6 +20,11 @@ export const Tick: React.FC<TickProps> = (props) => {
     return stations[stationId];
   }, [stations, stationId]);
 
+  const label =
+    station == null
+      ? stationId
+      : (station.nameTranslations[intl.locale] ?? station.name);
+
   return (
     <g transform={`translate(${x},${y})`}>
       <text
@@ -35,7 +40,7 @@ export const Tick: React.FC<TickProps> = (props) => {
           letterSpacing: '0.025em',
         }}
       >
-        {station.nameTranslations[intl.locale] ?? station.name}
+        {label}
       </text>
     </g>
   );
