@@ -495,6 +495,11 @@ export async function syncLines(db: Db): Promise<void> {
             set: {
               hash: row.hash,
               name: row.name,
+              type: row.type,
+              color: row.color,
+              started_at: row.started_at,
+              ended_at: row.ended_at,
+              operating_hours: row.operating_hours,
               updated_at: new Date(),
             },
           });
