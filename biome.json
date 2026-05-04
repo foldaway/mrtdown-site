@@ -7,7 +7,16 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!app/src/client/", "vercel.json"]
+    "includes": [
+      "**",
+      "!app/client/**",
+      "!app/routeTree.gen.ts",
+      "!app/components/StationMap/components/Map*.tsx",
+      "!dist/**",
+      "!node_modules/**",
+      "!.wrangler/**",
+      "vercel.json"
+    ]
   },
   "formatter": {
     "enabled": true,
