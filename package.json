@@ -10,6 +10,7 @@
     "i18n:extract": "formatjs extract 'app/**/*.{ts,tsx}' --ignore '**/*.d.ts' --out-file lang/en-SG.json --format simple",
     "build": "vite build",
     "test": "vitest",
+    "dev:pull": "curl -i -X POST http://localhost:3000/internal/api/tasks/pull",
     "api:client:generate": "tsx app/scripts/generateApiClient.ts",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
