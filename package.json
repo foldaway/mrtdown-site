@@ -11,6 +11,10 @@
     "build": "vite build",
     "test": "vitest",
     "api:client:generate": "tsx app/scripts/generateApiClient.ts",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
