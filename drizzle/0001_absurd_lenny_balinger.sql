@@ -32,9 +32,10 @@ CREATE TABLE "impact_event_basis_evidences" (
 --> statement-breakpoint
 CREATE TABLE "impact_event_causes" (
 	"impact_event_id" text NOT NULL,
-	"type" text NOT NULL,
+	"type" "impact_event_cause_type" NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "impact_event_causes_impact_event_id_type_pk" PRIMARY KEY("impact_event_id","type")
 );
 --> statement-breakpoint
 CREATE TABLE "impact_event_entity_facilities" (
@@ -42,7 +43,8 @@ CREATE TABLE "impact_event_entity_facilities" (
 	"station_id" text NOT NULL,
 	"kind" "affected_entity_facility_kind" NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "impact_event_entity_facilities_impact_event_id_station_id_kind_pk" PRIMARY KEY("impact_event_id","station_id","kind")
 );
 --> statement-breakpoint
 CREATE TABLE "impact_event_entity_services" (
@@ -93,7 +95,27 @@ CREATE TABLE "impact_event_service_scopes" (
 	"to_station_id" text,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "impact_event_service_scopes_impact_event_id_index_pk" PRIMARY KEY("impact_event_id","index")
+	CONSTRAINT "impact_event_service_scopes_impact_event_id_index_pk" PRIMARY KEY("impact_event_id","index"),
+	CONSTRAINT "impact_event_service_scopes_type_station_shape_check" CHECK (
+          (
+            "impact_event_service_scopes"."type" = 'service.whole'
+            and "impact_event_service_scopes"."station_id" is null
+            and "impact_event_service_scopes"."from_station_id" is null
+            and "impact_event_service_scopes"."to_station_id" is null
+          )
+          or (
+            "impact_event_service_scopes"."type" = 'service.point'
+            and "impact_event_service_scopes"."station_id" is not null
+            and "impact_event_service_scopes"."from_station_id" is null
+            and "impact_event_service_scopes"."to_station_id" is null
+          )
+          or (
+            "impact_event_service_scopes"."type" = 'service.segment'
+            and "impact_event_service_scopes"."station_id" is null
+            and "impact_event_service_scopes"."from_station_id" is not null
+            and "impact_event_service_scopes"."to_station_id" is not null
+          )
+        )
 );
 --> statement-breakpoint
 CREATE TABLE "impact_events" (
@@ -221,7 +243,7 @@ CREATE TABLE "service_revision_path_station_entries" (
 	"path_index" integer NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "service_revision_path_station_entries_service_revision_id_station_id_path_index_pk" PRIMARY KEY("service_revision_id","station_id","path_index")
+	CONSTRAINT "service_revision_path_station_entries_service_revision_id_service_id_station_id_path_index_pk" PRIMARY KEY("service_revision_id","service_id","station_id","path_index")
 );
 --> statement-breakpoint
 CREATE TABLE "service_revisions" (
@@ -274,7 +296,7 @@ CREATE TABLE "stations_next" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" jsonb NOT NULL,
 	"hash" text NOT NULL,
-	"geo" geometry(point) NOT NULL,
+	"geo" geometry(point,4326) NOT NULL,
 	"town_id" text NOT NULL,
 	"station_codes" jsonb NOT NULL,
 	"landmark_ids" jsonb NOT NULL
@@ -284,7 +306,7 @@ CREATE TABLE "stations" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" jsonb NOT NULL,
 	"hash" text NOT NULL,
-	"geo" geometry(point) NOT NULL,
+	"geo" geometry(point,4326) NOT NULL,
 	"town_id" text NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -337,6 +359,9 @@ CREATE INDEX "evidences_issue_id_idx" ON "evidences" USING btree ("issue_id");--
 CREATE INDEX "evidences_ts_idx" ON "evidences" USING btree ("ts" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "impact_event_basis_evidences_impact_event_id_idx" ON "impact_event_basis_evidences" USING btree ("impact_event_id");--> statement-breakpoint
 CREATE INDEX "impact_event_basis_evidences_evidence_id_idx" ON "impact_event_basis_evidences" USING btree ("evidence_id");--> statement-breakpoint
+CREATE INDEX "impact_event_causes_impact_event_id_idx" ON "impact_event_causes" USING btree ("impact_event_id");--> statement-breakpoint
+CREATE INDEX "impact_event_entity_facilities_impact_event_id_idx" ON "impact_event_entity_facilities" USING btree ("impact_event_id");--> statement-breakpoint
+CREATE INDEX "impact_event_entity_facilities_station_id_idx" ON "impact_event_entity_facilities" USING btree ("station_id");--> statement-breakpoint
 CREATE INDEX "impact_event_entity_services_impact_event_id_idx" ON "impact_event_entity_services" USING btree ("impact_event_id");--> statement-breakpoint
 CREATE INDEX "impact_event_entity_services_service_id_idx" ON "impact_event_entity_services" USING btree ("service_id");--> statement-breakpoint
 CREATE INDEX "impact_event_facility_effects_impact_event_id_idx" ON "impact_event_facility_effects" USING btree ("impact_event_id");--> statement-breakpoint
@@ -355,6 +380,7 @@ CREATE INDEX "impact_event_service_scopes_type_idx" ON "impact_event_service_sco
 CREATE INDEX "impact_event_service_scopes_station_id_idx" ON "impact_event_service_scopes" USING btree ("station_id");--> statement-breakpoint
 CREATE INDEX "impact_event_service_scopes_from_station_id_idx" ON "impact_event_service_scopes" USING btree ("from_station_id");--> statement-breakpoint
 CREATE INDEX "impact_event_service_scopes_to_station_id_idx" ON "impact_event_service_scopes" USING btree ("to_station_id");--> statement-breakpoint
+CREATE INDEX "impact_events_issue_id_idx" ON "impact_events" USING btree ("issue_id");--> statement-breakpoint
 CREATE INDEX "line_operators_line_id_idx" ON "line_operators" USING btree ("line_id");--> statement-breakpoint
 CREATE INDEX "line_operators_operator_id_idx" ON "line_operators" USING btree ("operator_id");--> statement-breakpoint
 CREATE INDEX "line_services_line_id_idx" ON "line_services" USING btree ("line_id");--> statement-breakpoint

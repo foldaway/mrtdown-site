@@ -236,7 +236,8 @@
         },
         "type": {
           "name": "type",
-          "type": "text",
+          "type": "impact_event_cause_type",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -255,7 +256,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "impact_event_causes_impact_event_id_idx": {
+          "name": "impact_event_causes_impact_event_id_idx",
+          "columns": [
+            {
+              "expression": "impact_event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "impact_event_causes_impact_event_id_impact_events_id_fk": {
           "name": "impact_event_causes_impact_event_id_impact_events_id_fk",
@@ -271,7 +288,15 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "impact_event_causes_impact_event_id_type_pk": {
+          "name": "impact_event_causes_impact_event_id_type_pk",
+          "columns": [
+            "impact_event_id",
+            "type"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -315,7 +340,38 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "impact_event_entity_facilities_impact_event_id_idx": {
+          "name": "impact_event_entity_facilities_impact_event_id_idx",
+          "columns": [
+            {
+              "expression": "impact_event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "impact_event_entity_facilities_station_id_idx": {
+          "name": "impact_event_entity_facilities_station_id_idx",
+          "columns": [
+            {
+              "expression": "station_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "impact_event_entity_facilities_impact_event_id_impact_events_id_fk": {
           "name": "impact_event_entity_facilities_impact_event_id_impact_events_id_fk",
@@ -344,7 +400,16 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "impact_event_entity_facilities_impact_event_id_station_id_kind_pk": {
+          "name": "impact_event_entity_facilities_impact_event_id_station_id_kind_pk",
+          "columns": [
+            "impact_event_id",
+            "station_id",
+            "kind"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -1058,7 +1123,12 @@
       },
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "impact_event_service_scopes_type_station_shape_check": {
+          "name": "impact_event_service_scopes_type_station_shape_check",
+          "value": "\n          (\n            \"impact_event_service_scopes\".\"type\" = 'service.whole'\n            and \"impact_event_service_scopes\".\"station_id\" is null\n            and \"impact_event_service_scopes\".\"from_station_id\" is null\n            and \"impact_event_service_scopes\".\"to_station_id\" is null\n          )\n          or (\n            \"impact_event_service_scopes\".\"type\" = 'service.point'\n            and \"impact_event_service_scopes\".\"station_id\" is not null\n            and \"impact_event_service_scopes\".\"from_station_id\" is null\n            and \"impact_event_service_scopes\".\"to_station_id\" is null\n          )\n          or (\n            \"impact_event_service_scopes\".\"type\" = 'service.segment'\n            and \"impact_event_service_scopes\".\"station_id\" is null\n            and \"impact_event_service_scopes\".\"from_station_id\" is not null\n            and \"impact_event_service_scopes\".\"to_station_id\" is not null\n          )\n        "
+        }
+      },
       "isRLSEnabled": false
     },
     "public.impact_events": {
@@ -1104,7 +1174,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "impact_events_issue_id_idx": {
+          "name": "impact_events_issue_id_idx",
+          "columns": [
+            {
+              "expression": "issue_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "impact_events_issue_id_issues_id_fk": {
           "name": "impact_events_issue_id_issues_id_fk",
@@ -1992,10 +2078,11 @@
         }
       },
       "compositePrimaryKeys": {
-        "service_revision_path_station_entries_service_revision_id_station_id_path_index_pk": {
-          "name": "service_revision_path_station_entries_service_revision_id_station_id_path_index_pk",
+        "service_revision_path_station_entries_service_revision_id_service_id_station_id_path_index_pk": {
+          "name": "service_revision_path_station_entries_service_revision_id_service_id_station_id_path_index_pk",
           "columns": [
             "service_revision_id",
+            "service_id",
             "station_id",
             "path_index"
           ]

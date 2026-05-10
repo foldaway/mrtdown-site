@@ -11,9 +11,9 @@ const wrappedFetch = wrapFetchWithSentry({
 export default Sentry.withSentry(
   (env) => {
     return {
-      dsn: env.SENTRY_DSN,
-      environment: env.TIER,
-      release: env.GIT_SHA,
+      dsn: env.SENTRY_DSN ?? '',
+      environment: env.TIER ?? 'development',
+      release: env.GIT_SHA ?? 'development',
     };
   },
   {

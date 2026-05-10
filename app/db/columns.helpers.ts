@@ -6,8 +6,7 @@ export const timestampColumns = {
     .defaultNow(),
   created_at: timestamp('created_at', { withTimezone: true })
     .notNull()
-    .defaultNow()
-    .notNull(),
+    .defaultNow(),
 };
 
 /**

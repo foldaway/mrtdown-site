@@ -23,7 +23,9 @@ import {
   type Translations,
   type TranslationsMeta,
 } from '@mrtdown/core';
+import { sql } from 'drizzle-orm';
 import {
+  check,
   date,
   foreignKey,
   geometry,
@@ -313,6 +315,7 @@ export const serviceRevisionPathStationEntriesTable = pgTable(
       primaryKey({
         columns: [
           table.service_revision_id,
+          table.service_id,
           table.station_id,
           table.path_index,
         ],
@@ -443,15 +446,21 @@ export const evidencesTable = pgTable(
 );
 
 // Entity Type: ImpactEvent
-export const impactEventsTable = pgTable('impact_events', {
-  id: text('id').primaryKey(),
-  ts: timestamp('ts', { withTimezone: true, mode: 'string' }).notNull(),
-  issue_id: text('issue_id')
-    .references(() => issuesTable.id)
-    .notNull(),
-  type: text('type').$type<ImpactEvent['type']>().notNull(),
-  ...timestampColumns,
-});
+export const impactEventsTable = pgTable(
+  'impact_events',
+  {
+    id: text('id').primaryKey(),
+    ts: timestamp('ts', { withTimezone: true, mode: 'string' }).notNull(),
+    issue_id: text('issue_id')
+      .references(() => issuesTable.id)
+      .notNull(),
+    type: text('type').$type<ImpactEvent['type']>().notNull(),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [index('impact_events_issue_id_idx').on(table.issue_id)];
+  },
+);
 
 // Normalized Entity Field: ImpactEvent.basis.evidenceId
 export const impactEventBasisEvidencesTable = pgTable(
@@ -575,6 +584,29 @@ export const impactEventServiceScopesTable = pgTable(
       index('impact_event_service_scopes_to_station_id_idx').on(
         table.to_station_id,
       ),
+      check(
+        'impact_event_service_scopes_type_station_shape_check',
+        sql`
+          (
+            ${table.type} = 'service.whole'
+            and ${table.station_id} is null
+            and ${table.from_station_id} is null
+            and ${table.to_station_id} is null
+          )
+          or (
+            ${table.type} = 'service.point'
+            and ${table.station_id} is not null
+            and ${table.from_station_id} is null
+            and ${table.to_station_id} is null
+          )
+          or (
+            ${table.type} = 'service.segment'
+            and ${table.station_id} is null
+            and ${table.from_station_id} is not null
+            and ${table.to_station_id} is not null
+          )
+        `,
+      ),
     ];
   },
 );
@@ -674,6 +706,19 @@ export const impactEventEntityFacilitiesTable = pgTable(
     kind: affectedEntityFacilityKindEnum().notNull(),
     ...timestampColumns,
   },
+  (table) => {
+    return [
+      primaryKey({
+        columns: [table.impact_event_id, table.station_id, table.kind],
+      }),
+      index('impact_event_entity_facilities_impact_event_id_idx').on(
+        table.impact_event_id,
+      ),
+      index('impact_event_entity_facilities_station_id_idx').on(
+        table.station_id,
+      ),
+    ];
+  },
 );
 
 export const impactEventCauseTypeEnum = pgEnum(
@@ -685,10 +730,21 @@ export const impactEventCauseTypeEnum = pgEnum(
   }),
 );
 
-export const impactEventCausesTable = pgTable('impact_event_causes', {
-  impact_event_id: text('impact_event_id')
-    .references(() => impactEventsTable.id)
-    .notNull(),
-  type: text('type').notNull(),
-  ...timestampColumns,
-});
+export const impactEventCausesTable = pgTable(
+  'impact_event_causes',
+  {
+    impact_event_id: text('impact_event_id')
+      .references(() => impactEventsTable.id)
+      .notNull(),
+    type: impactEventCauseTypeEnum().notNull(),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      primaryKey({ columns: [table.impact_event_id, table.type] }),
+      index('impact_event_causes_impact_event_id_idx').on(
+        table.impact_event_id,
+      ),
+    ];
+  },
+);
