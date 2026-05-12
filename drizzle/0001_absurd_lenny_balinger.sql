@@ -1,6 +1,6 @@
 CREATE TYPE "public"."affected_entity_facility_kind" AS ENUM('lift', 'escalator', 'screen-door');--> statement-breakpoint
-CREATE TYPE "public"."evidence_type" AS ENUM('official-statement', 'public.report', 'media.report');--> statement-breakpoint
-CREATE TYPE "public"."facility_effect_kind" AS ENUM('facility-out-of-service', 'facility-degraded');--> statement-breakpoint
+CREATE TYPE "public"."evidence_type" AS ENUM('statement.official', 'report.public', 'report.media');--> statement-breakpoint
+CREATE TYPE "public"."facility_effect_kind" AS ENUM('out-of-service', 'degraded');--> statement-breakpoint
 CREATE TYPE "public"."impact_event_cause_type" AS ENUM('signal.fault', 'track.fault', 'train.fault', 'power.fault', 'station.fault', 'security', 'weather', 'passenger.incident', 'platform_door.fault', 'delay', 'track.work', 'system.upgrade', 'elevator.outage', 'escalator.outage', 'air_conditioning.issue', 'station.renovation');--> statement-breakpoint
 CREATE TYPE "public"."impact_event_service_scope_type" AS ENUM('service.whole', 'service.segment', 'service.point');--> statement-breakpoint
 CREATE TYPE "public"."issue_type" AS ENUM('disruption', 'maintenance', 'infra');--> statement-breakpoint
@@ -393,5 +393,7 @@ CREATE INDEX "service_revisions_service_id_idx" ON "service_revisions" USING btr
 CREATE INDEX "services_line_id_idx" ON "services" USING btree ("line_id");--> statement-breakpoint
 CREATE INDEX "station_codes_line_id_idx" ON "station_codes" USING btree ("line_id");--> statement-breakpoint
 CREATE INDEX "station_codes_station_id_idx" ON "station_codes" USING btree ("station_id");--> statement-breakpoint
+CREATE INDEX "stations_next_geo_idx" ON "stations_next" USING gist ("geo");--> statement-breakpoint
+CREATE INDEX "stations_geo_idx" ON "stations" USING gist ("geo");--> statement-breakpoint
 CREATE INDEX "station_landmarks_station_id_idx" ON "station_landmarks" USING btree ("station_id");--> statement-breakpoint
 CREATE INDEX "station_landmarks_landmark_id_idx" ON "station_landmarks" USING btree ("landmark_id");

@@ -126,11 +126,17 @@ export const landmarksNextTable = pgTable('landmarks_next', {
   ...translationsNamedEntitySharedColumns,
 });
 
-export const stationsNextTable = pgTable('stations_next', {
-  id: text('id').primaryKey(),
-  ...stationNameHashSharedColumns,
-  ...stationStagingExtraColumns,
-});
+export const stationsNextTable = pgTable(
+  'stations_next',
+  {
+    id: text('id').primaryKey(),
+    ...stationNameHashSharedColumns,
+    ...stationStagingExtraColumns,
+  },
+  (table) => {
+    return [index('stations_next_geo_idx').using('gist', table.geo)];
+  },
+);
 
 export const servicesNextTable = pgTable('services_next', {
   id: text('id').primaryKey(),
@@ -169,15 +175,21 @@ export const operatorsTable = pgTable('operators', {
 });
 
 // Entity Type: Station
-export const stationsTable = pgTable('stations', {
-  id: text('id').primaryKey(),
-  ...stationNameHashSharedColumns,
-  ...stationGeoColumn,
-  townId: text('town_id')
-    .references(() => townsTable.id)
-    .notNull(),
-  ...timestampColumns,
-});
+export const stationsTable = pgTable(
+  'stations',
+  {
+    id: text('id').primaryKey(),
+    ...stationNameHashSharedColumns,
+    ...stationGeoColumn,
+    townId: text('town_id')
+      .references(() => townsTable.id)
+      .notNull(),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [index('stations_geo_idx').using('gist', table.geo)];
+  },
+);
 
 export const lineTypeEnum = pgEnum(
   'line_type',

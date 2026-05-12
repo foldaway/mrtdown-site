@@ -2583,7 +2583,23 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "stations_next_geo_idx": {
+          "name": "stations_next_geo_idx",
+          "columns": [
+            {
+              "expression": "geo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gist",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -2640,7 +2656,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "stations_geo_idx": {
+          "name": "stations_geo_idx",
+          "columns": [
+            {
+              "expression": "geo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gist",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "stations_town_id_towns_id_fk": {
           "name": "stations_town_id_towns_id_fk",
@@ -2753,17 +2785,17 @@
       "name": "evidence_type",
       "schema": "public",
       "values": [
-        "official-statement",
-        "public.report",
-        "media.report"
+        "statement.official",
+        "report.public",
+        "report.media"
       ]
     },
     "public.facility_effect_kind": {
       "name": "facility_effect_kind",
       "schema": "public",
       "values": [
-        "facility-out-of-service",
-        "facility-degraded"
+        "out-of-service",
+        "degraded"
       ]
     },
     "public.impact_event_cause_type": {
