@@ -14,16 +14,6 @@
             "head_sampling_rate": 1
         }
     },
-    "limits": {
-        "cpu_ms": 300000
-    },
-    "hyperdrive": [
-        {
-            "binding": "HYPERDRIVE",
-            "id": "1413ff84b6ef40a19973b1bc8a662736",
-            "localConnectionString": "postgresql://postgres:postgres@localhost:5432/mrtdown-db"
-        }
-    ],
     "env": {
         "staging": {
             "observability": {
@@ -33,16 +23,7 @@
                     "enabled": true,
                     "head_sampling_rate": 1
                 }
-            },
-            "limits": {
-                "cpu_ms": 300000
-            },
-            "hyperdrive": [
-                {
-                    "binding": "HYPERDRIVE",
-                    "id": "1413ff84b6ef40a19973b1bc8a662736"
-                }
-            ]
+            }
         },
         "production": {
             "observability": {
@@ -52,16 +33,7 @@
                     "enabled": true,
                     "head_sampling_rate": 0.1
                 }
-            },
-            "limits": {
-                "cpu_ms": 300000
-            },
-            "hyperdrive": [
-                {
-                    "binding": "HYPERDRIVE",
-                    "id": "1d9561e9411649a6afe8612881ff926d"
-                }
-            ]
+            }
         }
     }
 }
