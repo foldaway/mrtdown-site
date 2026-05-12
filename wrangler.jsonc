@@ -33,7 +33,16 @@
                     "enabled": true,
                     "head_sampling_rate": 1
                 }
-            }
+            },
+            "limits": {
+                "cpu_ms": 300000
+            },
+            "hyperdrive": [
+                {
+                    "binding": "HYPERDRIVE",
+                    "id": "1413ff84b6ef40a19973b1bc8a662736"
+                }
+            ]
         },
         "production": {
             "observability": {
