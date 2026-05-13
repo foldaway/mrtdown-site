@@ -7,11 +7,25 @@ export const Route = createFileRoute('/internal/api/tasks/pull')({
     middleware: [internalMiddleware],
     handlers: {
       async POST() {
-        const workflow = await env.PULL_WORKFLOW?.create();
+        if (!env.PULL_WORKFLOW) {
+          return Response.json(
+            { success: false, error: 'PULL_WORKFLOW binding is missing' },
+            { status: 503 },
+          );
+        }
+
+        const workflow = await env.PULL_WORKFLOW.create();
+        if (!workflow?.id) {
+          return Response.json(
+            { success: false, error: 'PULL_WORKFLOW creation failed' },
+            { status: 500 },
+          );
+        }
+
         return Response.json(
-          { success: true, workflowId: workflow?.id },
+          { success: true, workflowId: workflow.id },
           {
-            status: 200,
+            status: 202,
           },
         );
       },
