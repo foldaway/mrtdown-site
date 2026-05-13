@@ -14,20 +14,31 @@ export const Route = createFileRoute('/internal/api/tasks/pull')({
           );
         }
 
-        const workflow = await env.PULL_WORKFLOW.create();
-        if (!workflow?.id) {
+        try {
+          const workflow = await env.PULL_WORKFLOW.create();
+          if (!workflow?.id) {
+            return Response.json(
+              { success: false, error: 'PULL_WORKFLOW creation failed' },
+              { status: 500 },
+            );
+          }
+
           return Response.json(
-            { success: false, error: 'PULL_WORKFLOW creation failed' },
+            { success: true, workflowId: workflow.id },
+            {
+              status: 202,
+            },
+          );
+        } catch (error) {
+          return Response.json(
+            {
+              success: false,
+              error: 'PULL_WORKFLOW creation failed',
+              details: error instanceof Error ? error.message : String(error),
+            },
             { status: 500 },
           );
         }
-
-        return Response.json(
-          { success: true, workflowId: workflow.id },
-          {
-            status: 202,
-          },
-        );
       },
     },
   },

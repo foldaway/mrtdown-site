@@ -1,5 +1,6 @@
 /**
- * Fetches the zip archive from mrtdown-data as a single buffer for AdmZip.
+ * Fetches the zip archive from mrtdown-data as a single buffer for ZipStore's
+ * fflate-based archive reader.
  */
 const ARCHIVE_FETCH_TIMEOUT_MS = 30_000;
 const MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
