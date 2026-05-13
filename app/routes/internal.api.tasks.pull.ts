@@ -30,11 +30,11 @@ export const Route = createFileRoute('/internal/api/tasks/pull')({
             },
           );
         } catch (error) {
+          console.error('PULL_WORKFLOW creation failed', { error });
           return Response.json(
             {
               success: false,
               error: 'PULL_WORKFLOW creation failed',
-              details: error instanceof Error ? error.message : String(error),
             },
             { status: 500 },
           );
