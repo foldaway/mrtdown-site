@@ -64,6 +64,10 @@ const BATCH = 500;
 
 type Db = ReturnType<typeof getDb>;
 
+function assertUnreachable(value: never, message: string): never {
+  throw new Error(`${message}: ${String(value)}`);
+}
+
 /** Splits an array into fixed-size chunks for batched inserts. */
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -132,6 +136,22 @@ export async function insertLinesStaging(
   db: Db,
   lines: readonly (Line & { hash: string })[],
 ): Promise<void> {
+  const skippedLines = lines.flatMap((l) => {
+    const missing = [
+      l.startedAt == null ? 'startedAt' : null,
+      l.operatingHours == null ? 'operatingHours' : null,
+    ].filter(Boolean);
+    return missing.length > 0 ? [`${l.id} (${missing.join(', ')})`] : [];
+  });
+  if (skippedLines.length > 0) {
+    const sample = skippedLines.slice(0, 10).join('; ');
+    const suffix =
+      skippedLines.length > 10 ? `; +${skippedLines.length - 10} more` : '';
+    console.warn(
+      `[PULL] Skipping ${skippedLines.length} line(s) missing required fields: ${sample}${suffix}`,
+    );
+  }
+
   const lineRows = lines.flatMap((l) => {
     if (l.startedAt == null || l.operatingHours == null) {
       return [];
@@ -289,27 +309,28 @@ async function upsertChangedOperators(
       .select()
       .from(operatorsNextTable)
       .where(inArray(operatorsNextTable.id, ids));
-    for (const row of full) {
-      await tx
-        .insert(operatorsTable)
-        .values({
+    if (full.length === 0) continue;
+    await tx
+      .insert(operatorsTable)
+      .values(
+        full.map((row) => ({
           id: row.id,
           hash: row.hash,
           name: row.name,
           founded_at: row.founded_at,
           url: row.url,
-        })
-        .onConflictDoUpdate({
-          target: [operatorsTable.id],
-          set: {
-            hash: row.hash,
-            name: row.name,
-            founded_at: row.founded_at,
-            url: row.url,
-            updated_at: new Date(),
-          },
-        });
-    }
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [operatorsTable.id],
+        set: {
+          hash: sql.raw(`excluded.${operatorsTable.hash.name}`),
+          name: sql.raw(`excluded.${operatorsTable.name.name}`),
+          founded_at: sql.raw(`excluded.${operatorsTable.founded_at.name}`),
+          url: sql.raw(`excluded.${operatorsTable.url.name}`),
+          updated_at: new Date(),
+        },
+      });
   }
   await tx
     .delete(operatorsTable)
@@ -573,26 +594,30 @@ export async function syncStations(db: Db): Promise<void> {
         .delete(stationLandmarksTable)
         .where(inArray(stationLandmarksTable.station_id, ch));
       for (const row of full) {
-        await tx.insert(stationCodesTable).values(
-          row.station_codes.map((stationCode) => {
-            return {
-              station_id: row.id,
-              line_id: stationCode.lineId,
-              code: stationCode.code,
-              structure_type: stationCode.structureType,
-              started_at: stationCode.startedAt,
-              ended_at: stationCode.endedAt,
-            } satisfies InferInsertModel<typeof stationCodesTable>;
-          }),
-        );
-        await tx.insert(stationLandmarksTable).values(
-          row.landmark_ids.map((landmarkId) => {
-            return {
-              station_id: row.id,
-              landmark_id: landmarkId,
-            } satisfies InferInsertModel<typeof stationLandmarksTable>;
-          }),
-        );
+        if (row.station_codes.length > 0) {
+          await tx.insert(stationCodesTable).values(
+            row.station_codes.map((stationCode) => {
+              return {
+                station_id: row.id,
+                line_id: stationCode.lineId,
+                code: stationCode.code,
+                structure_type: stationCode.structureType,
+                started_at: stationCode.startedAt,
+                ended_at: stationCode.endedAt,
+              } satisfies InferInsertModel<typeof stationCodesTable>;
+            }),
+          );
+        }
+        if (row.landmark_ids.length > 0) {
+          await tx.insert(stationLandmarksTable).values(
+            row.landmark_ids.map((landmarkId) => {
+              return {
+                station_id: row.id,
+                landmark_id: landmarkId,
+              } satisfies InferInsertModel<typeof stationLandmarksTable>;
+            }),
+          );
+        }
       }
     }
 
@@ -901,7 +926,9 @@ export async function syncIssues(db: Db): Promise<void> {
               set: {
                 ts: sql.raw(`excluded.${impactEventsTable.ts.name}`),
                 type: sql.raw(`excluded.${impactEventsTable.type.name}`),
-                issue_id: sql.raw(`excluded.${issuesTable.id.name}`),
+                issue_id: sql.raw(
+                  `excluded.${impactEventsTable.issue_id.name}`,
+                ),
               },
             });
 
@@ -937,6 +964,12 @@ export async function syncIssues(db: Db): Promise<void> {
                   typeof impactEventEntityFacilitiesTable
                 >);
                 break;
+              }
+              default: {
+                assertUnreachable(
+                  impactEvent.entity,
+                  'Unexpected impact event entity',
+                );
               }
             }
 
@@ -1044,6 +1077,9 @@ export async function syncIssues(db: Db): Promise<void> {
                   typeof impactEventFacilityEffectsTable
                 >);
                 break;
+              }
+              default: {
+                assertUnreachable(impactEvent, 'Unexpected impact event type');
               }
             }
           }
