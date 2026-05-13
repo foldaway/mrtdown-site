@@ -70,72 +70,100 @@ export class PullWorkflow extends WorkflowEntrypoint<Env, Params> {
 
       // Stage one repository domain at a time so the workflow does not retain
       // the full parsed dataset in memory between inserts.
-      const operators = repo.operators.list().map((operator) => ({
-        ...operator,
-        hash: manifest.operators[operator.id] ?? '',
-      }));
-      await insertOperatorsStaging(db, operators);
+      let operatorsCount = 0;
+      {
+        const operators = repo.operators.list().map((operator) => ({
+          ...operator,
+          hash: manifest.operators[operator.id] ?? '',
+        }));
+        await insertOperatorsStaging(db, operators);
+        operatorsCount = operators.length;
+      }
       // The repository caches parsed entities; this drops only inflated ZIP bytes.
       store.clearCache();
 
-      const towns = repo.towns.list().map((town) => ({
-        ...town,
-        hash: manifest.towns[town.id] ?? '',
-      }));
-      await insertTownsStaging(db, towns);
+      let townsCount = 0;
+      {
+        const towns = repo.towns.list().map((town) => ({
+          ...town,
+          hash: manifest.towns[town.id] ?? '',
+        }));
+        await insertTownsStaging(db, towns);
+        townsCount = towns.length;
+      }
       store.clearCache();
 
-      const landmarks = repo.landmarks.list().map((landmark) => ({
-        ...landmark,
-        hash: manifest.landmarks[landmark.id] ?? '',
-      }));
-      await insertLandmarksStaging(db, landmarks);
+      let landmarksCount = 0;
+      {
+        const landmarks = repo.landmarks.list().map((landmark) => ({
+          ...landmark,
+          hash: manifest.landmarks[landmark.id] ?? '',
+        }));
+        await insertLandmarksStaging(db, landmarks);
+        landmarksCount = landmarks.length;
+      }
       store.clearCache();
 
-      const lines = repo.lines.list().map((line) => ({
-        ...line,
-        hash: manifest.lines[line.id] ?? '',
-      }));
-      await insertLinesStaging(db, lines);
+      let linesCount = 0;
+      {
+        const lines = repo.lines.list().map((line) => ({
+          ...line,
+          hash: manifest.lines[line.id] ?? '',
+        }));
+        await insertLinesStaging(db, lines);
+        linesCount = lines.length;
+      }
       store.clearCache();
 
-      const issues = repo.issues.list().map((issue) => ({
-        issue: {
-          ...issue.issue,
-          hash: manifest.issues[issue.issue.id] ?? '',
-        },
-        evidence: issue.evidence,
-        impactEvents: issue.impactEvents,
-      }));
-      await insertIssuesStaging(db, issues);
+      let issuesCount = 0;
+      {
+        const issues = repo.issues.list().map((issue) => ({
+          issue: {
+            ...issue.issue,
+            hash: manifest.issues[issue.issue.id] ?? '',
+          },
+          evidence: issue.evidence,
+          impactEvents: issue.impactEvents,
+        }));
+        await insertIssuesStaging(db, issues);
+        issuesCount = issues.length;
+      }
       store.clearCache();
 
-      const stations = repo.stations.list().map((station) => ({
-        ...station,
-        hash: manifest.stations[station.id] ?? '',
-      }));
-      await insertStationsStaging(db, stations);
+      let stationsCount = 0;
+      {
+        const stations = repo.stations.list().map((station) => ({
+          ...station,
+          hash: manifest.stations[station.id] ?? '',
+        }));
+        await insertStationsStaging(db, stations);
+        stationsCount = stations.length;
+      }
       store.clearCache();
 
-      const services = repo.services.list().map((service) => ({
-        ...service,
-        hash: manifest.services[service.id] ?? '',
-      }));
-      await insertServicesStaging(db, services);
+      let servicesCount = 0;
+      {
+        const services = repo.services.list().map((service) => ({
+          ...service,
+          hash: manifest.services[service.id] ?? '',
+        }));
+        await insertServicesStaging(db, services);
+        servicesCount = services.length;
+      }
       store.clearCache();
 
       console.log(
-        `[PULL] Parsed ${operators.length} operators, ${towns.length} towns, ${landmarks.length} landmarks, ${lines.length} lines, ${stations.length} stations, ${services.length} services, ${issues.length} issues`,
+        `[PULL] Parsed ${operatorsCount} operators, ${townsCount} towns, ${landmarksCount} landmarks, ${linesCount} lines, ${stationsCount} stations, ${servicesCount} services, ${issuesCount} issues`,
       );
 
       return {
-        operators: operators.length,
-        towns: towns.length,
-        landmarks: landmarks.length,
-        lines: lines.length,
-        stations: stations.length,
-        services: services.length,
-        issues: issues.length,
+        operators: operatorsCount,
+        towns: townsCount,
+        landmarks: landmarksCount,
+        lines: linesCount,
+        stations: stationsCount,
+        services: servicesCount,
+        issues: issuesCount,
       };
     });
 
