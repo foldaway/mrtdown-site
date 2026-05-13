@@ -20,6 +20,16 @@ const textDecoder = new TextDecoder();
 const MAX_INFLATED_CACHE_BYTES = 8 * 1024 * 1024;
 
 function toArchivePath(path: string): string {
+  const normalizedInput = normalizeZipPath(path);
+  if (
+    normalizedInput.startsWith('/') ||
+    normalizedInput === '..' ||
+    normalizedInput.startsWith('../') ||
+    normalizedInput.includes('/../')
+  ) {
+    throw new Error(`Invalid archive path outside '${ZIP_DATA_ROOT}': ${path}`);
+  }
+
   const normalized = normalizeArchivePath(path);
   if (normalized === '') {
     return ZIP_DATA_ROOT;
