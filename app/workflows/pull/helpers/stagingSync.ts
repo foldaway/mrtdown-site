@@ -752,6 +752,7 @@ export async function syncServices(db: Db): Promise<void> {
             .onConflictDoUpdate({
               target: [
                 serviceRevisionPathStationEntriesTable.service_revision_id,
+                serviceRevisionPathStationEntriesTable.service_id,
                 serviceRevisionPathStationEntriesTable.station_id,
                 serviceRevisionPathStationEntriesTable.path_index,
               ],
