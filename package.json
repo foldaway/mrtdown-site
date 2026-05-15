@@ -12,9 +12,12 @@
     "test": "vitest",
     "dev:pull": "curl -i -X POST http://localhost:3000/internal/api/tasks/pull",
     "api:client:generate": "tsx app/scripts/generateApiClient.ts",
+    "db:reset": "tsx app/scripts/resetDatabase.ts",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:seed:fixtures": "tsx app/scripts/seedFixtures.ts",
+    "db:preview:prepare": "npm run db:reset && npm run db:migrate && npm run db:seed:fixtures",
     "db:studio": "drizzle-kit studio",
     "cf-typegen": "wrangler types"
   },
