@@ -308,9 +308,7 @@ export const serviceRevisionPathStationEntriesTable = pgTable(
   {
     service_revision_id: text('service_revision_id').notNull(),
     service_id: text('service_id').notNull(),
-    station_id: text('station_id')
-      .references(() => stationsTable.id)
-      .notNull(),
+    station_id: text('station_id').notNull(),
     display_code: text('display_code').notNull(),
     path_index: integer('path_index').notNull(),
     ...timestampColumns,
@@ -318,13 +316,20 @@ export const serviceRevisionPathStationEntriesTable = pgTable(
   (table) => {
     return [
       foreignKey({
+        name: 'sr_path_entries_revision_fk',
         columns: [table.service_revision_id, table.service_id],
         foreignColumns: [
           serviceRevisionsTable.id,
           serviceRevisionsTable.service_id,
         ],
       }),
+      foreignKey({
+        name: 'sr_path_entries_station_fk',
+        columns: [table.station_id],
+        foreignColumns: [stationsTable.id],
+      }),
       primaryKey({
+        name: 'sr_path_entries_pk',
         columns: [
           table.service_revision_id,
           table.service_id,

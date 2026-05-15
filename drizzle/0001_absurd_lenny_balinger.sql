@@ -243,7 +243,7 @@ CREATE TABLE "service_revision_path_station_entries" (
 	"path_index" integer NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "service_revision_path_station_entries_service_revision_id_service_id_station_id_path_index_pk" PRIMARY KEY("service_revision_id","service_id","station_id","path_index")
+	CONSTRAINT "sr_path_entries_pk" PRIMARY KEY("service_revision_id","service_id","station_id","path_index")
 );
 --> statement-breakpoint
 CREATE TABLE "service_revisions" (
@@ -346,8 +346,8 @@ ALTER TABLE "line_operators" ADD CONSTRAINT "line_operators_line_id_lines_id_fk"
 ALTER TABLE "line_operators" ADD CONSTRAINT "line_operators_operator_id_operators_id_fk" FOREIGN KEY ("operator_id") REFERENCES "public"."operators"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "line_services" ADD CONSTRAINT "line_services_line_id_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."lines"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "line_services" ADD CONSTRAINT "line_services_service_id_services_id_fk" FOREIGN KEY ("service_id") REFERENCES "public"."services"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "service_revision_path_station_entries" ADD CONSTRAINT "service_revision_path_station_entries_station_id_stations_id_fk" FOREIGN KEY ("station_id") REFERENCES "public"."stations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "service_revision_path_station_entries" ADD CONSTRAINT "service_revision_path_station_entries_service_revision_id_service_id_service_revisions_id_service_id_fk" FOREIGN KEY ("service_revision_id","service_id") REFERENCES "public"."service_revisions"("id","service_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "service_revision_path_station_entries" ADD CONSTRAINT "sr_path_entries_station_fk" FOREIGN KEY ("station_id") REFERENCES "public"."stations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "service_revision_path_station_entries" ADD CONSTRAINT "sr_path_entries_revision_fk" FOREIGN KEY ("service_revision_id","service_id") REFERENCES "public"."service_revisions"("id","service_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "service_revisions" ADD CONSTRAINT "service_revisions_service_id_services_id_fk" FOREIGN KEY ("service_id") REFERENCES "public"."services"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "services" ADD CONSTRAINT "services_line_id_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."lines"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "station_codes" ADD CONSTRAINT "station_codes_line_id_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."lines"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

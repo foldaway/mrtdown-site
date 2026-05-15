@@ -2048,8 +2048,8 @@
         }
       },
       "foreignKeys": {
-        "service_revision_path_station_entries_station_id_stations_id_fk": {
-          "name": "service_revision_path_station_entries_station_id_stations_id_fk",
+        "sr_path_entries_station_fk": {
+          "name": "sr_path_entries_station_fk",
           "tableFrom": "service_revision_path_station_entries",
           "tableTo": "stations",
           "columnsFrom": [
@@ -2061,8 +2061,8 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "service_revision_path_station_entries_service_revision_id_service_id_service_revisions_id_service_id_fk": {
-          "name": "service_revision_path_station_entries_service_revision_id_service_id_service_revisions_id_service_id_fk",
+        "sr_path_entries_revision_fk": {
+          "name": "sr_path_entries_revision_fk",
           "tableFrom": "service_revision_path_station_entries",
           "tableTo": "service_revisions",
           "columnsFrom": [
@@ -2078,8 +2078,8 @@
         }
       },
       "compositePrimaryKeys": {
-        "service_revision_path_station_entries_service_revision_id_service_id_station_id_path_index_pk": {
-          "name": "service_revision_path_station_entries_service_revision_id_service_id_station_id_path_index_pk",
+        "sr_path_entries_pk": {
+          "name": "sr_path_entries_pk",
           "columns": [
             "service_revision_id",
             "service_id",
