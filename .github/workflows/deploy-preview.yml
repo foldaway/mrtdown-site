@@ -37,6 +37,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Reset, migrate, and seed preview database
+        run: npm run db:preview:prepare
+        env:
+          ALLOW_DATABASE_RESET: "true"
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+          FIXTURES_BASE_URL: https://foldaway.github.io/mrtdown-data/fixtures
+
       - name: Build
         run: npm run build
         env:
