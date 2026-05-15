@@ -41,7 +41,7 @@ jobs:
         run: npm run db:preview:prepare
         env:
           ALLOW_DATABASE_RESET: "true"
-          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           FIXTURES_BASE_URL: https://foldaway.github.io/mrtdown-data/fixtures
 
       - name: Build
