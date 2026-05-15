@@ -48,8 +48,9 @@ const placeholderOperatingHours = {
   weekends: { start: '05:30', end: '00:30' },
 };
 
-function makeEvidenceIdsUnique(issues: IssueFixture[]): IssueFixture[] {
+function makeIssueEntityIdsUnique(issues: IssueFixture[]): IssueFixture[] {
   const seenEvidenceIds = new Set<string>();
+  const seenImpactEventIds = new Set<string>();
 
   return issues.map((issueBundle) => {
     const evidenceIdMap = new Map<string, string>();
@@ -69,14 +70,28 @@ function makeEvidenceIdsUnique(issues: IssueFixture[]): IssueFixture[] {
     });
 
     const impactEvents = issueBundle.impactEvents.map((impactEvent) => {
+      let id = impactEvent.id;
+      if (seenImpactEventIds.has(id)) {
+        const prefix = `${issueBundle.issue.id}:${impactEvent.id}`;
+        id = prefix;
+        for (let suffix = 2; seenImpactEventIds.has(id); suffix += 1) {
+          id = `${prefix}:${suffix}`;
+        }
+      }
+
+      seenImpactEventIds.add(id);
       const evidenceId =
         evidenceIdMap.get(impactEvent.basis.evidenceId) ??
         impactEvent.basis.evidenceId;
-      if (evidenceId === impactEvent.basis.evidenceId) {
+      if (
+        id === impactEvent.id &&
+        evidenceId === impactEvent.basis.evidenceId
+      ) {
         return impactEvent;
       }
       return {
         ...impactEvent,
+        id,
         basis: {
           ...impactEvent.basis,
           evidenceId,
@@ -218,7 +233,7 @@ async function stageFixtures(db: Db, baseUrl: string): Promise<void> {
   await insertLinesStaging(db, lines);
   store.clearCache();
 
-  const issues = makeEvidenceIdsUnique(
+  const issues = makeIssueEntityIdsUnique(
     repo.issues.list().map((issue) => ({
       issue: {
         ...issue.issue,
