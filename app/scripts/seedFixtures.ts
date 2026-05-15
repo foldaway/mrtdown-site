@@ -28,6 +28,7 @@ const DEFAULT_FIXTURES_BASE_URL =
   'https://foldaway.github.io/mrtdown-data/fixtures';
 
 type Db = Parameters<typeof truncateStagingTables>[0];
+type IssueFixture = Parameters<typeof insertIssuesStaging>[1][number];
 
 function placeholderHash(entityName: string, id: string): string {
   return `preview-fixture-placeholder:${entityName}:${id}`;
@@ -46,6 +47,50 @@ const placeholderOperatingHours = {
   weekdays: { start: '05:30', end: '00:30' },
   weekends: { start: '05:30', end: '00:30' },
 };
+
+function makeEvidenceIdsUnique(issues: IssueFixture[]): IssueFixture[] {
+  const seenEvidenceIds = new Set<string>();
+
+  return issues.map((issueBundle) => {
+    const evidenceIdMap = new Map<string, string>();
+    const evidence = issueBundle.evidence.map((evidenceEntry) => {
+      let id = evidenceEntry.id;
+      if (seenEvidenceIds.has(id)) {
+        const prefix = `${issueBundle.issue.id}:${evidenceEntry.id}`;
+        id = prefix;
+        for (let suffix = 2; seenEvidenceIds.has(id); suffix += 1) {
+          id = `${prefix}:${suffix}`;
+        }
+      }
+
+      seenEvidenceIds.add(id);
+      evidenceIdMap.set(evidenceEntry.id, id);
+      return id === evidenceEntry.id ? evidenceEntry : { ...evidenceEntry, id };
+    });
+
+    const impactEvents = issueBundle.impactEvents.map((impactEvent) => {
+      const evidenceId =
+        evidenceIdMap.get(impactEvent.basis.evidenceId) ??
+        impactEvent.basis.evidenceId;
+      if (evidenceId === impactEvent.basis.evidenceId) {
+        return impactEvent;
+      }
+      return {
+        ...impactEvent,
+        basis: {
+          ...impactEvent.basis,
+          evidenceId,
+        },
+      };
+    });
+
+    return {
+      ...issueBundle,
+      evidence,
+      impactEvents,
+    };
+  });
+}
 
 async function stageFixtures(db: Db, baseUrl: string): Promise<void> {
   const manifest = await fetchManifest(baseUrl);
@@ -173,14 +218,16 @@ async function stageFixtures(db: Db, baseUrl: string): Promise<void> {
   await insertLinesStaging(db, lines);
   store.clearCache();
 
-  const issues = repo.issues.list().map((issue) => ({
-    issue: {
-      ...issue.issue,
-      hash: manifest.issues[issue.issue.id] ?? '',
-    },
-    evidence: issue.evidence,
-    impactEvents: issue.impactEvents,
-  }));
+  const issues = makeEvidenceIdsUnique(
+    repo.issues.list().map((issue) => ({
+      issue: {
+        ...issue.issue,
+        hash: manifest.issues[issue.issue.id] ?? '',
+      },
+      evidence: issue.evidence,
+      impactEvents: issue.impactEvents,
+    })),
+  );
   await insertIssuesStaging(db, issues);
   store.clearCache();
 
