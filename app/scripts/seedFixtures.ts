@@ -42,6 +42,11 @@ function placeholderName(id: string) {
   };
 }
 
+const placeholderOperatingHours = {
+  weekdays: { start: '05:30', end: '00:30' },
+  weekends: { start: '05:30', end: '00:30' },
+};
+
 async function stageFixtures(db: Db, baseUrl: string): Promise<void> {
   const manifest = await fetchManifest(baseUrl);
   const archiveBuffer = await fetchArchive(baseUrl);
@@ -50,14 +55,48 @@ async function stageFixtures(db: Db, baseUrl: string): Promise<void> {
 
   await truncateStagingTables(db);
 
-  const lines = repo.lines.list().map((line) => ({
-    ...line,
-    hash: manifest.lines[line.id] ?? '',
-  }));
   const stations = repo.stations.list().map((station) => ({
     ...station,
     hash: manifest.stations[station.id] ?? '',
   }));
+  const services = repo.services.list().map((service) => ({
+    ...service,
+    hash: manifest.services[service.id] ?? '',
+  }));
+  const lineRows = new Map(
+    repo.lines.list().map((line) => [
+      line.id,
+      {
+        ...line,
+        startedAt: line.startedAt ?? '1900-01-01',
+        operatingHours: line.operatingHours ?? placeholderOperatingHours,
+        hash: manifest.lines[line.id] ?? '',
+      },
+    ]),
+  );
+  for (const lineId of new Set([
+    ...stations.flatMap((station) =>
+      station.stationCodes.map((stationCode) => stationCode.lineId),
+    ),
+    ...services.map((service) => service.lineId),
+  ])) {
+    if (!lineRows.has(lineId)) {
+      lineRows.set(lineId, {
+        id: lineId,
+        hash: placeholderHash('line', lineId),
+        name: placeholderName(lineId),
+        type: 'mrt.high',
+        color: '#000000',
+        startedAt: '1900-01-01',
+        serviceIds: services
+          .filter((service) => service.lineId === lineId)
+          .map((service) => service.id),
+        operators: [],
+        operatingHours: placeholderOperatingHours,
+      });
+    }
+  }
+  const lines = Array.from(lineRows.values());
 
   const operatorRows = new Map(
     repo.operators.list().map((operator) => [
@@ -148,10 +187,6 @@ async function stageFixtures(db: Db, baseUrl: string): Promise<void> {
   await insertStationsStaging(db, stations);
   store.clearCache();
 
-  const services = repo.services.list().map((service) => ({
-    ...service,
-    hash: manifest.services[service.id] ?? '',
-  }));
   await insertServicesStaging(db, services);
   store.clearCache();
 
