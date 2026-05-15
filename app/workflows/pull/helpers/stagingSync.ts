@@ -1045,13 +1045,21 @@ export async function syncIssues(db: Db): Promise<void> {
                 if (impactEvent.serviceScopes.length > 0) {
                   await tx.insert(impactEventServiceScopesTable).values(
                     impactEvent.serviceScopes.map((serviceScope, index) => {
-                      return {
+                      const row: InferInsertModel<
+                        typeof impactEventServiceScopesTable
+                      > = {
                         impact_event_id: impactEvent.id,
                         type: serviceScope.type,
                         index,
-                      } satisfies InferInsertModel<
-                        typeof impactEventServiceScopesTable
-                      >;
+                      };
+                      if (serviceScope.type === 'service.point') {
+                        row.station_id = serviceScope.stationId;
+                      }
+                      if (serviceScope.type === 'service.segment') {
+                        row.from_station_id = serviceScope.fromStationId;
+                        row.to_station_id = serviceScope.toStationId;
+                      }
+                      return row;
                     }),
                   );
                 }
