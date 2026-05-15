@@ -5,6 +5,28 @@ declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./app/server");
 	}
+	interface StagingEnv {
+		API_ENDPOINT: string;
+		API_TOKEN: string;
+		SENTRY_DSN: string;
+		TIER: string;
+		GIT_SHA: string;
+		VITE_ROOT_URL: string;
+		MRTDOWN_DATA_URL: string;
+		INTERNAL_API_TOKENS: string;
+	}
+	interface ProductionEnv {
+		HYPERDRIVE: Hyperdrive;
+		API_ENDPOINT: string;
+		API_TOKEN: string;
+		SENTRY_DSN: string;
+		TIER: string;
+		GIT_SHA: string;
+		VITE_ROOT_URL: string;
+		MRTDOWN_DATA_URL: string;
+		INTERNAL_API_TOKENS: string;
+		PULL_WORKFLOW: Workflow<Parameters<import("./app/server").PullWorkflow['run']>[0]['payload']>;
+	}
 	interface Env {
 		API_ENDPOINT: string;
 		API_TOKEN: string;
@@ -12,6 +34,10 @@ declare namespace Cloudflare {
 		TIER: string;
 		GIT_SHA: string;
 		VITE_ROOT_URL: string;
+		MRTDOWN_DATA_URL: string;
+		INTERNAL_API_TOKENS: string;
+		HYPERDRIVE?: Hyperdrive;
+		PULL_WORKFLOW?: Workflow<Parameters<import("./app/server").PullWorkflow['run']>[0]['payload']>;
 	}
 }
 interface Env extends Cloudflare.Env {}
@@ -19,7 +45,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "API_ENDPOINT" | "API_TOKEN" | "SENTRY_DSN" | "TIER" | "GIT_SHA" | "VITE_ROOT_URL">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "API_ENDPOINT" | "API_TOKEN" | "SENTRY_DSN" | "TIER" | "GIT_SHA" | "VITE_ROOT_URL" | "MRTDOWN_DATA_URL" | "INTERNAL_API_TOKENS">> {}
 }
 
 // Begin runtime types

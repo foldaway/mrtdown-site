@@ -8,6 +8,8 @@ const wrappedFetch = wrapFetchWithSentry({
   },
 });
 
+export { PullWorkflow } from './workflows/pull';
+
 export default Sentry.withSentry(
   (env) => {
     return {
