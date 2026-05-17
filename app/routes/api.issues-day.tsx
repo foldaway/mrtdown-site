@@ -1,6 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { getIssuesHistoryYearMonthDay } from '~/client';
-import { assert } from '../util/assert';
+import { DateTime } from 'luxon';
+import { getHistoryDayData } from '../util/db.queries';
+
+function parseDatePart(value: string) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+}
 
 export const Route = createFileRoute('/api/issues-day')({
   server: {
@@ -18,25 +23,33 @@ export const Route = createFileRoute('/api/issues-day')({
           });
         }
 
-        const { data, error, response } = await getIssuesHistoryYearMonthDay({
-          auth: () => process.env.API_TOKEN,
-          baseUrl: process.env.API_ENDPOINT,
-          path: {
-            year,
-            month,
-            day,
-          },
-        });
-
-        if (error != null) {
-          console.error('Error fetching issues for day:', error);
-          return new Response('Failed to fetch issues for day', {
-            status: response?.status ?? 500,
-            statusText: response?.statusText ?? 'Internal Server Error',
+        const yearNumber = parseDatePart(year);
+        const monthNumber = parseDatePart(month);
+        const dayNumber = parseDatePart(day);
+        if (yearNumber == null || monthNumber == null || dayNumber == null) {
+          return new Response('Invalid parameters: year, month, day', {
+            status: 400,
+            statusText: 'Bad Request',
           });
         }
 
-        assert(data != null);
+        const date = DateTime.fromObject({
+          year: yearNumber,
+          month: monthNumber,
+          day: dayNumber,
+        });
+        if (!date.isValid) {
+          return new Response('Invalid date parameters: year, month, day', {
+            status: 400,
+            statusText: 'Bad Request',
+          });
+        }
+
+        const data = await getHistoryDayData(
+          yearNumber,
+          monthNumber,
+          dayNumber,
+        );
 
         return Response.json({
           success: true,
