@@ -7,10 +7,41 @@ on:
       - production
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+  migrate-staging:
+    if: github.ref == 'refs/heads/main'
+    name: Migrate staging database
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    concurrency:
+      group: migrate-staging
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run database migrations
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
   deploy-staging:
     if: github.ref == 'refs/heads/main'
     name: Deploy staging
+    needs: migrate-staging
     runs-on: ubuntu-latest
     environment:
       name: staging
@@ -59,9 +90,37 @@ jobs:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
         run: echo $DEPLOYMENT_URL
 
+  migrate-production:
+    if: github.ref == 'refs/heads/production'
+    name: Migrate production database
+    runs-on: ubuntu-latest
+    concurrency:
+      group: migrate-production
+      cancel-in-progress: false
+    environment:
+      name: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run database migrations
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
   deploy-production:
     if: github.ref == 'refs/heads/production'
     name: Deploy production
+    needs: migrate-production
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-production
