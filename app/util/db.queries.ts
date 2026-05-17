@@ -33,15 +33,15 @@ import {
   impactEventCausesTable,
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
-  issueDayFactsTable,
   impactEventPeriodsTable,
   impactEventsTable,
+  issueDayFactsTable,
   issuesTable,
   landmarksTable,
+  lineDayFactsTable,
   lineOperatorsTable,
   linesTable,
   metadataTable,
-  lineDayFactsTable,
   operatorsTable,
   publicHolidaysTable,
   serviceRevisionPathStationEntriesTable,
@@ -1563,30 +1563,53 @@ function buildCountChartsFromIssueFacts(
   });
 }
 
+function isUndefinedTableError(error: unknown) {
+  return (
+    error != null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === '42P01'
+  );
+}
+
 async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
   const db = getDb();
-  return db
-    .select()
-    .from(issueDayFactsTable)
-    .where(
-      and(
-        gte(issueDayFactsTable.date, start.toISODate()!),
-        lte(issueDayFactsTable.date, end.toISODate()!),
-      ),
-    );
+  try {
+    return await db
+      .select()
+      .from(issueDayFactsTable)
+      .where(
+        and(
+          gte(issueDayFactsTable.date, start.toISODate()!),
+          lte(issueDayFactsTable.date, end.toISODate()!),
+        ),
+      );
+  } catch (error) {
+    if (isUndefinedTableError(error)) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 async function getLineDayFactsInRange(start: DateTime, end: DateTime) {
   const db = getDb();
-  return db
-    .select()
-    .from(lineDayFactsTable)
-    .where(
-      and(
-        gte(lineDayFactsTable.date, start.toISODate()!),
-        lte(lineDayFactsTable.date, end.toISODate()!),
-      ),
-    );
+  try {
+    return await db
+      .select()
+      .from(lineDayFactsTable)
+      .where(
+        and(
+          gte(lineDayFactsTable.date, start.toISODate()!),
+          lte(lineDayFactsTable.date, end.toISODate()!),
+        ),
+      );
+  } catch (error) {
+    if (isUndefinedTableError(error)) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function rebuildOperationalFactsForDate(date: DateTime) {
