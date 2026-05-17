@@ -10,7 +10,13 @@ import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
 import {
+  deleteIssueOrphans,
+  deleteLineOrphans,
+  deleteOperatorsTownsLandmarksOrphans,
+  deleteServiceOrphans,
+  deleteStationOrphans,
   finalizePull,
+  getIssueSyncPlan,
   insertIssuesStaging,
   insertLandmarksStaging,
   insertLinesStaging,
@@ -18,9 +24,9 @@ import {
   insertServicesStaging,
   insertStationsStaging,
   insertTownsStaging,
-  syncIssues,
+  syncIssueBatch,
   syncLines,
-  syncOperatorsTownsLandmarks,
+  syncOperatorsTownsLandmarksUpserts,
   syncServices,
   syncStations,
   truncateStagingTables,
@@ -46,6 +52,16 @@ const syncStepConfig = {
     backoff: 'exponential' as const,
   },
 };
+
+const ISSUE_SYNC_BATCH = 100;
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
 
 /**
  * Durable pull pipeline: manifest → parse into staging → promote by domain →
@@ -169,11 +185,11 @@ export class PullWorkflow extends WorkflowEntrypoint<Env, Params> {
     });
 
     await step.do(
-      'sync-operators-towns-landmarks',
+      'sync-operators-towns-landmarks-upserts',
       syncStepConfig,
       async () => {
         const db = getDb();
-        await syncOperatorsTownsLandmarks(db);
+        await syncOperatorsTownsLandmarksUpserts(db);
       },
     );
 
@@ -195,16 +211,71 @@ export class PullWorkflow extends WorkflowEntrypoint<Env, Params> {
       await syncServices(db);
     });
 
-    await step.do('sync-issues', syncStepConfig, async () => {
+    const issueSyncPlan = await step.do(
+      'sync-issues-plan',
+      syncStepConfig,
+      async () => {
+        const db = getDb();
+        const plan = await getIssueSyncPlan(db);
+        console.log(
+          `[PULL] Issue sync plan: ${plan.changedIds.length} changed, ${plan.orphanIds.length} orphaned`,
+        );
+        return plan;
+      },
+    );
+
+    await step.do('sync-issues-delete-orphans', syncStepConfig, async () => {
       const db = getDb();
-      console.log('Syncing issues...');
-      try {
-        await syncIssues(db);
-      } catch (error) {
-        console.error('Error syncing issues', error);
-        throw error;
-      }
+      console.log(
+        `Deleting ${issueSyncPlan.orphanIds.length} orphan issues...`,
+      );
+      await deleteIssueOrphans(db, issueSyncPlan.orphanIds);
     });
+
+    for (const [index, issueIds] of chunk(
+      issueSyncPlan.changedIds,
+      ISSUE_SYNC_BATCH,
+    ).entries()) {
+      await step.do(
+        `sync-issues-batch-${index + 1}`,
+        syncStepConfig,
+        async () => {
+          const db = getDb();
+          console.log(
+            `Syncing issue batch ${index + 1} (${issueIds.length} issues)...`,
+          );
+          await syncIssueBatch(db, issueIds);
+        },
+      );
+    }
+
+    await step.do('delete-service-orphans', syncStepConfig, async () => {
+      const db = getDb();
+      console.log('Deleting service orphans...');
+      await deleteServiceOrphans(db);
+    });
+
+    await step.do('delete-station-orphans', syncStepConfig, async () => {
+      const db = getDb();
+      console.log('Deleting station orphans...');
+      await deleteStationOrphans(db);
+    });
+
+    await step.do('delete-line-orphans', syncStepConfig, async () => {
+      const db = getDb();
+      console.log('Deleting line orphans...');
+      await deleteLineOrphans(db);
+    });
+
+    await step.do(
+      'delete-operators-towns-landmarks-orphans',
+      syncStepConfig,
+      async () => {
+        const db = getDb();
+        console.log('Deleting operators, towns and landmarks orphans...');
+        await deleteOperatorsTownsLandmarksOrphans(db);
+      },
+    );
 
     await step.do('finalize', syncStepConfig, async () => {
       const db = getDb();
