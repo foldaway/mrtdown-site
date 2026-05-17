@@ -22,8 +22,8 @@ jobs:
       name: preview
       url: ${{ steps.deploy.outputs.deployment-url }}
     concurrency:
-      group: deploy-preview-${{ github.ref }}
-      cancel-in-progress: true
+      group: deploy-preview-shared-database
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v6
