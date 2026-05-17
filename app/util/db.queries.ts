@@ -33,9 +33,11 @@ import {
   impactEventCausesTable,
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
+  impactEventFacilityEffectsTable,
+  issueDayFactsTable,
   impactEventPeriodsTable,
   impactEventsTable,
-  issueDayFactsTable,
+  impactEventServiceEffectsTable,
   issuesTable,
   landmarksTable,
   lineDayFactsTable,
@@ -52,10 +54,19 @@ import {
   stationsTable,
   townsTable,
 } from '~/db/schema';
+import {
+  issueContributesToLineDowntime,
+  issueContributesToLineStatus,
+} from '~/util/issueOperationalEffects';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 
 type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
+
+type IssueWithOperationalEffects = Issue & {
+  serviceEffectKinds: string[];
+  facilityEffectKinds: string[];
+};
 
 type BranchWithEntries = LineBranch & {
   entries: Array<{
@@ -71,13 +82,32 @@ type BaseDataset = {
   branchByServiceId: Record<string, BranchWithEntries>;
   metadata: Record<string, string>;
   publicHolidaySet: Set<string>;
-  allIssues: Record<string, Issue>;
+  allIssues: Record<string, IssueWithOperationalEffects>;
   issueUpdatesById: Record<string, IssueUpdate[]>;
 };
 
 type IssueIntervalBounds = {
   start: DateTime;
   end: DateTime | null;
+};
+
+type IssueTypeCounts = Record<IssueType, number>;
+
+type IssueTypeBreakdown = IssueTypeCounts & {
+  totalIssues: number;
+};
+
+type IssueDayFactRow = {
+  date: string;
+  issue_id: string;
+  issue_type: IssueType;
+  active_anytime: boolean;
+  duration_seconds: number;
+};
+
+type LineDayCoverageRow = {
+  date: string;
+  line_id: string;
 };
 
 function nowSg() {
@@ -345,6 +375,57 @@ function pickIssueDurationByType<
   return counts;
 }
 
+function createIssueTypeCounts(): IssueTypeCounts {
+  return {
+    disruption: 0,
+    maintenance: 0,
+    infra: 0,
+  };
+}
+
+function createIssueTypeBreakdown(): IssueTypeBreakdown {
+  return {
+    ...createIssueTypeCounts(),
+    totalIssues: 0,
+  };
+}
+
+function addIssueTypeCount(
+  counts: IssueTypeCounts,
+  issueType: IssueType,
+  amount: number,
+) {
+  counts[issueType] += amount;
+}
+
+function groupIssueFactCountsByDate(
+  rows: IssueDayFactRow[],
+  durationMode = false,
+) {
+  const countsByDate = new Map<string, IssueTypeCounts>();
+
+  for (const row of rows) {
+    const amount = durationMode
+      ? row.duration_seconds
+      : row.active_anytime
+        ? 1
+        : 0;
+    if (amount === 0) {
+      continue;
+    }
+
+    let counts = countsByDate.get(row.date);
+    if (counts == null) {
+      counts = createIssueTypeCounts();
+      countsByDate.set(row.date, counts);
+    }
+
+    addIssueTypeCount(counts, row.issue_type, amount);
+  }
+
+  return countsByDate;
+}
+
 function getIssueBounds(issue: Issue): IssueIntervalBounds[] {
   return issue.intervals.map((interval) => ({
     start: parseDateTime(interval.startAt),
@@ -447,6 +528,8 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     impactEventServiceRows,
     impactEventFacilityRows,
     impactEventCauseRows,
+    impactEventServiceEffectRows,
+    impactEventFacilityEffectRows,
   ] = await Promise.all([
     db.select().from(metadataTable),
     db.select().from(linesTable),
@@ -476,6 +559,8 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     db.select().from(impactEventEntityServicesTable),
     db.select().from(impactEventEntityFacilitiesTable),
     db.select().from(impactEventCausesTable),
+    db.select().from(impactEventServiceEffectsTable),
+    db.select().from(impactEventFacilityEffectsTable),
   ]);
 
   const metadata = Object.fromEntries(
@@ -819,6 +904,26 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     return acc;
   }, {});
 
+  const serviceEffectsByImpactEventId = impactEventServiceEffectRows.reduce<
+    Record<string, typeof impactEventServiceEffectRows>
+  >((acc, row) => {
+    if (acc[row.impact_event_id] == null) {
+      acc[row.impact_event_id] = [];
+    }
+    acc[row.impact_event_id].push(row);
+    return acc;
+  }, {});
+
+  const facilityEffectsByImpactEventId = impactEventFacilityEffectRows.reduce<
+    Record<string, typeof impactEventFacilityEffectRows>
+  >((acc, row) => {
+    if (acc[row.impact_event_id] == null) {
+      acc[row.impact_event_id] = [];
+    }
+    acc[row.impact_event_id].push(row);
+    return acc;
+  }, {});
+
   const evidenceByIssueId = evidenceRows.reduce<
     Record<string, typeof evidenceRows>
   >((acc, row) => {
@@ -837,7 +942,7 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     ]),
   ) as Record<string, DateTime | null>;
 
-  const allIssues: Record<string, Issue> = {};
+  const allIssues: Record<string, IssueWithOperationalEffects> = {};
   const issueUpdatesById: Record<string, IssueUpdate[]> = {};
   for (const row of issueRows) {
     const { fallback, translations } = parseTranslations(row.title);
@@ -955,6 +1060,21 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
       referenceNow,
     );
 
+    const serviceEffectKinds =
+      latestEventByType['service_effects.set'] != null
+        ? (serviceEffectsByImpactEventId[latestEventByType['service_effects.set'].id] ??
+            []
+          ).map((row) => row.kind)
+        : [];
+
+    const facilityEffectKinds =
+      latestEventByType['facility_effects.set'] != null
+        ? (facilityEffectsByImpactEventId[
+            latestEventByType['facility_effects.set'].id
+          ] ?? []
+          ).map((row) => row.kind)
+        : [];
+
     allIssues[row.id] = {
       id: row.id,
       title: fallback,
@@ -965,6 +1085,8 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
       lineIds,
       branchesAffected,
       intervals,
+      serviceEffectKinds,
+      facilityEffectKinds,
     };
 
     issueUpdatesById[row.id] = [...(evidenceByIssueId[row.id] ?? [])]
@@ -972,6 +1094,7 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
       .map((evidence) => ({
         type: evidence.type,
         text: evidence.text,
+        textTranslations: evidence.render?.text ?? null,
         sourceUrl: evidence.source_url,
         createdAt: evidence.ts,
       }));
@@ -996,10 +1119,10 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
 
 function withIssues(
   baseIncluded: BaseIncludedEntities,
-  allIssues: Record<string, Issue>,
+  allIssues: Record<string, IssueWithOperationalEffects>,
   issueIds?: string[],
 ): IncludedEntities {
-  const selectedIssues =
+  const selectedIssuesWithEffects =
     issueIds == null
       ? allIssues
       : Object.fromEntries(
@@ -1007,6 +1130,13 @@ function withIssues(
             .filter((issueId) => allIssues[issueId] != null)
             .map((issueId) => [issueId, allIssues[issueId]]),
         );
+
+  const selectedIssues = Object.fromEntries(
+    Object.entries(selectedIssuesWithEffects).map(([issueId, issue]) => {
+      const { serviceEffectKinds, facilityEffectKinds, ...publicIssue } = issue;
+      return [issueId, publicIssue];
+    }),
+  ) as Record<string, Issue>;
 
   return {
     ...baseIncluded,
@@ -1016,7 +1146,7 @@ function withIssues(
 
 function buildLineSummary(
   line: Line,
-  issues: Issue[],
+  issues: IssueWithOperationalEffects[],
   days: number,
   publicHolidaySet: Set<string>,
   referenceNow = nowSg(),
@@ -1073,22 +1203,29 @@ function buildLineSummary(
         continue;
       }
 
-      durationSecondsByIssueType[issue.type] =
-        (durationSecondsByIssueType[issue.type] ?? 0) + dayOverlap;
+      if (issueContributesToLineDowntime(issue)) {
+        durationSecondsByIssueType[issue.type] =
+          (durationSecondsByIssueType[issue.type] ?? 0) + dayOverlap;
+      }
 
-      if (issue.type === 'disruption' || issue.type === 'maintenance') {
+      if (
+        issueContributesToLineDowntime(issue) &&
+        (issue.type === 'disruption' || issue.type === 'maintenance')
+      ) {
         dailyDowntimeIntervals.push(...contributingBounds);
       }
 
-      const current = dayBreakdown.breakdownByIssueTypes[issue.type] ?? {
-        totalDurationSeconds: 0,
-        issueIds: [],
-      };
-      current.totalDurationSeconds += dayOverlap;
-      if (!current.issueIds.includes(issue.id)) {
-        current.issueIds.push(issue.id);
+      if (issueContributesToLineDowntime(issue)) {
+        const current = dayBreakdown.breakdownByIssueTypes[issue.type] ?? {
+          totalDurationSeconds: 0,
+          issueIds: [],
+        };
+        current.totalDurationSeconds += dayOverlap;
+        if (!current.issueIds.includes(issue.id)) {
+          current.issueIds.push(issue.id);
+        }
+        dayBreakdown.breakdownByIssueTypes[issue.type] = current;
       }
-      dayBreakdown.breakdownByIssueTypes[issue.type] = current;
     }
 
     totalDowntimeSeconds += sumIntervalSeconds(
@@ -1107,11 +1244,26 @@ function buildLineSummary(
     status = 'future_service';
   } else if (!isLineOperatingNow(line, publicHolidaySet, referenceNow)) {
     status = 'closed_for_day';
-  } else if (activeNow.some((issue) => issue.type === 'disruption')) {
+  } else if (
+    activeNow.some(
+      (issue) =>
+        issue.type === 'disruption' && issueContributesToLineStatus(issue),
+    )
+  ) {
     status = 'ongoing_disruption';
-  } else if (activeNow.some((issue) => issue.type === 'maintenance')) {
+  } else if (
+    activeNow.some(
+      (issue) =>
+        issue.type === 'maintenance' && issueContributesToLineStatus(issue),
+    )
+  ) {
     status = 'ongoing_maintenance';
-  } else if (activeNow.some((issue) => issue.type === 'infra')) {
+  } else if (
+    activeNow.some(
+      (issue) =>
+        issue.type === 'infra' && issueContributesToLineStatus(issue),
+    )
+  ) {
     status = 'ongoing_infra';
   }
 
@@ -1269,7 +1421,7 @@ function buildPreviousWindowSummary(
 
 function buildUptimeGraph(
   line: Line,
-  issues: Issue[],
+  issues: IssueWithOperationalEffects[],
   publicHolidaySet: Set<string>,
   count: number,
 ): TimeScaleChart {
@@ -1297,6 +1449,10 @@ function buildUptimeGraph(
         );
       }, 0);
       if (overlap <= 0) {
+        continue;
+      }
+
+      if (!issueContributesToLineDowntime(issue)) {
         continue;
       }
 
@@ -1328,7 +1484,7 @@ function buildUptimeGraph(
       const serviceWindow = serviceWindowForDate(line, date, publicHolidaySet);
       serviceSeconds += serviceWindow.seconds;
       for (const issue of issues) {
-        if (issue.type === 'infra') {
+        if (!issueContributesToLineDowntime(issue)) {
           continue;
         }
         downtime += getIssueBounds(issue).reduce((total, interval) => {
@@ -1368,7 +1524,7 @@ function buildUptimeGraph(
 
 function buildOperatorUptimeGraph(
   lines: Line[],
-  issuesByLineId: Record<string, Issue[]>,
+  issuesByLineId: Record<string, IssueWithOperationalEffects[]>,
   publicHolidaySet: Set<string>,
   count: number,
 ): TimeScaleChart {
@@ -1392,7 +1548,7 @@ function buildOperatorUptimeGraph(
         serviceSeconds += serviceWindow.seconds;
 
         for (const issue of issuesByLineId[line.id] ?? []) {
-          if (issue.type === 'infra') {
+          if (!issueContributesToLineDowntime(issue)) {
             continue;
           }
 
@@ -1493,40 +1649,34 @@ function chunk<T>(items: T[], size: number) {
 }
 
 function buildCountChartsFromIssueFacts(
-  rows: Array<{
-    date: string;
-    issue_type: IssueType;
-    duration_seconds: number;
-    active_anytime: boolean;
-  }>,
+  rows: IssueDayFactRow[],
   durationMode = false,
 ) {
   const end = nowSg().startOf('day');
+  const countsByDate = groupIssueFactCountsByDate(rows, durationMode);
   const aggregateForRange = (
     start: DateTime,
     count: number,
     previous = false,
-  ): Record<string, number> => {
+  ): IssueTypeCounts => {
     const rangeStart = previous
       ? start.minus({ days: count })
       : start;
-    const rangeEnd = rangeStart.plus({ days: count });
-    return rows.reduce<Record<string, number>>(
-      (acc, row) => {
-        const date = DateTime.fromISO(row.date, { zone: SG_TIMEZONE });
-        if (date < rangeStart || date >= rangeEnd) {
-          return acc;
-        }
+    const aggregate = createIssueTypeCounts();
 
-        if (durationMode) {
-          acc[row.issue_type] += row.duration_seconds;
-        } else if (row.active_anytime) {
-          acc[row.issue_type] += 1;
-        }
-        return acc;
-      },
-      { disruption: 0, maintenance: 0, infra: 0 },
-    );
+    for (let offset = 0; offset < count; offset++) {
+      const date = rangeStart.plus({ days: offset }).toISODate()!;
+      const dayCounts = countsByDate.get(date);
+      if (dayCounts == null) {
+        continue;
+      }
+
+      aggregate.disruption += dayCounts.disruption;
+      aggregate.maintenance += dayCounts.maintenance;
+      aggregate.infra += dayCounts.infra;
+    }
+
+    return aggregate;
   };
 
   return [7, 30, 90].map((count) => {
@@ -1534,20 +1684,11 @@ function buildCountChartsFromIssueFacts(
     const data: ChartEntry[] = [];
     for (let offset = 0; offset < count; offset++) {
       const date = start.plus({ days: offset }).toISODate()!;
-      const dayRows = rows.filter((row) => row.date === date);
       data.push({
         name: date,
-        payload: dayRows.reduce<Record<string, number>>(
-          (acc, row) => {
-            acc[row.issue_type] += durationMode
-              ? row.duration_seconds
-              : row.active_anytime
-                ? 1
-                : 0;
-            return acc;
-          },
-          { disruption: 0, maintenance: 0, infra: 0 },
-        ),
+        payload: {
+          ...(countsByDate.get(date) ?? createIssueTypeCounts()),
+        },
       });
     }
 
@@ -1576,7 +1717,13 @@ async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
   const db = getDb();
   try {
     return await db
-      .select()
+      .select({
+        date: issueDayFactsTable.date,
+        issue_id: issueDayFactsTable.issue_id,
+        issue_type: issueDayFactsTable.issue_type,
+        active_anytime: issueDayFactsTable.active_anytime,
+        duration_seconds: issueDayFactsTable.duration_seconds,
+      })
       .from(issueDayFactsTable)
       .where(
         and(
@@ -1596,7 +1743,10 @@ async function getLineDayFactsInRange(start: DateTime, end: DateTime) {
   const db = getDb();
   try {
     return await db
-      .select()
+      .select({
+        date: lineDayFactsTable.date,
+        line_id: lineDayFactsTable.line_id,
+      })
       .from(lineDayFactsTable)
       .where(
         and(
@@ -1613,7 +1763,7 @@ async function getLineDayFactsInRange(start: DateTime, end: DateTime) {
 }
 
 function hasLineFactsCoverage(
-  rows: Array<{ date: string; line_id: string }>,
+  rows: LineDayCoverageRow[],
   start: DateTime,
   end: DateTime,
   lineIds: string[],
@@ -1635,6 +1785,50 @@ function hasLineFactsCoverage(
   return expectedDates.every((date) =>
     lineIds.every((lineId) => rowKeys.has(`${date}::${lineId}`)),
   );
+}
+
+function buildDailyIssueTypeCountsFromIssues(
+  issues: Issue[],
+  start: DateTime,
+  end: DateTime,
+) {
+  const countsByDate = new Map<string, IssueTypeCounts>();
+  const rangeStart = start.startOf('day');
+  const rangeEndExclusive = end.startOf('day').plus({ days: 1 });
+
+  for (const issue of issues) {
+    const touchedDates = new Set<string>();
+
+    for (const interval of getIssueBounds(issue)) {
+      const boundedStart = interval.start > rangeStart ? interval.start : rangeStart;
+      const rawEnd = interval.end ?? nowSg();
+      const boundedEnd = rawEnd < rangeEndExclusive ? rawEnd : rangeEndExclusive;
+
+      if (boundedStart >= boundedEnd) {
+        continue;
+      }
+
+      for (
+        let cursor = boundedStart.startOf('day');
+        cursor < boundedEnd;
+        cursor = cursor.plus({ days: 1 })
+      ) {
+        touchedDates.add(cursor.toISODate()!);
+      }
+    }
+
+    for (const date of touchedDates) {
+      let counts = countsByDate.get(date);
+      if (counts == null) {
+        counts = createIssueTypeCounts();
+        countsByDate.set(date, counts);
+      }
+
+      addIssueTypeCount(counts, issue.type, 1);
+    }
+  }
+
+  return countsByDate;
 }
 
 export async function rebuildOperationalFactsForDate(date: DateTime) {
@@ -2013,7 +2207,7 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
         issue.lineIds.includes(lineId),
       ),
     ]),
-  ) as Record<string, Issue[]>;
+  ) as Record<string, IssueWithOperationalEffects[]>;
 
   const operatorIssues = Object.values(dataset.allIssues).filter((issue) =>
     issue.lineIds.some((lineId) => lineIds.includes(lineId)),
@@ -2383,6 +2577,29 @@ export async function getStatisticsData() {
     rollingYearEnd,
     Object.keys(dataset.included.lines),
   );
+  const lineCountsById: Record<string, IssueTypeBreakdown> = {};
+  const stationCountsById: Record<string, IssueTypeBreakdown> = {};
+
+  for (const issue of issues) {
+    for (const lineId of new Set(issue.lineIds)) {
+      const counts =
+        lineCountsById[lineId] ?? (lineCountsById[lineId] = createIssueTypeBreakdown());
+      addIssueTypeCount(counts, issue.type, 1);
+      counts.totalIssues += 1;
+    }
+
+    const stationIds = new Set(
+      issue.branchesAffected.flatMap((branch) => branch.stationIds),
+    );
+    for (const stationId of stationIds) {
+      const counts =
+        stationCountsById[stationId] ??
+        (stationCountsById[stationId] = createIssueTypeBreakdown());
+      addIssueTypeCount(counts, issue.type, 1);
+      counts.totalIssues += 1;
+    }
+  }
+
   const longestDisruptions = [...issues]
     .filter((issue) => issue.type === 'disruption')
     .sort((a, b) => b.durationSeconds - a.durationSeconds)
@@ -2392,15 +2609,14 @@ export async function getStatisticsData() {
   const chartTotalIssueCountByLine: Chart = {
     title: 'Issue Count by Line',
     data: Object.values(dataset.included.lines).map((line) => {
-      const lineIssues = issues.filter((issue) => issue.lineIds.includes(line.id));
-      const counts = pickIssueTypes(lineIssues);
+      const counts = lineCountsById[line.id] ?? createIssueTypeBreakdown();
       return {
         name: line.id,
         payload: {
-          disruption: counts.disruption ?? 0,
-          maintenance: counts.maintenance ?? 0,
-          infra: counts.infra ?? 0,
-          totalIssues: lineIssues.length,
+          disruption: counts.disruption,
+          maintenance: counts.maintenance,
+          infra: counts.infra,
+          totalIssues: counts.totalIssues,
         },
       };
     }),
@@ -2408,23 +2624,26 @@ export async function getStatisticsData() {
 
   const stationIssueCounts = Object.values(dataset.included.stations).map(
     (station) => {
-      const stationIssues = issues.filter((issue) =>
-        issue.branchesAffected.some((branch) =>
-          branch.stationIds.includes(station.id),
-        ),
-      );
-      const counts = pickIssueTypes(stationIssues);
+      const counts = stationCountsById[station.id] ?? createIssueTypeBreakdown();
       return {
         name: station.id,
         payload: {
-          disruption: counts.disruption ?? 0,
-          maintenance: counts.maintenance ?? 0,
-          infra: counts.infra ?? 0,
-          totalIssues: stationIssues.length,
+          disruption: counts.disruption,
+          maintenance: counts.maintenance,
+          infra: counts.infra,
+          totalIssues: counts.totalIssues,
         },
       };
     },
   );
+
+  const heatmapCountsByDate = hasRollingYearCoverage
+    ? groupIssueFactCountsByDate(issueFactRows)
+    : buildDailyIssueTypeCountsFromIssues(
+        issues,
+        rollingYearStart,
+        rollingYearEnd,
+      );
 
   const chartTotalIssueCountByStation: Chart = {
     title: 'Issue Count by Station',
@@ -2440,31 +2659,10 @@ export async function getStatisticsData() {
     title: 'Rolling Year Heatmap',
     data: Array.from({ length: 365 }, (_, index) => {
       const date = rollingYearStart.plus({ days: index }).toISODate()!;
-      const dayRows =
-        hasRollingYearCoverage
-          ? issueFactRows.filter((row) => row.date === date && row.active_anytime)
-          : [];
-      if (hasRollingYearCoverage) {
-        return {
-          name: date,
-          payload: dayRows.reduce<Record<string, number>>(
-            (acc, row) => {
-              acc[row.issue_type] += 1;
-              return acc;
-            },
-            { disruption: 0, maintenance: 0, infra: 0 },
-          ),
-        };
-      }
-      const dayDate = DateTime.fromISO(date, { zone: SG_TIMEZONE });
-      const dayIssues = issues.filter((issue) => issueTouchesDate(issue, dayDate));
-      const counts = pickIssueTypes(dayIssues);
       return {
         name: date,
         payload: {
-          disruption: counts.disruption ?? 0,
-          maintenance: counts.maintenance ?? 0,
-          infra: counts.infra ?? 0,
+          ...(heatmapCountsByDate.get(date) ?? createIssueTypeCounts()),
         },
       };
     }),
