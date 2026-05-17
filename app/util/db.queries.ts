@@ -2391,7 +2391,7 @@ export async function getStatisticsData() {
       );
       const counts = pickIssueTypes(stationIssues);
       return {
-        name: station.memberships[0]?.code ?? station.name,
+        name: station.id,
         payload: {
           disruption: counts.disruption ?? 0,
           maintenance: counts.maintenance ?? 0,

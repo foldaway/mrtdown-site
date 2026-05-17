@@ -19,6 +19,8 @@ export const Tick: React.FC<TickProps> = (props) => {
   const station = useMemo(() => {
     return stations[stationId];
   }, [stations, stationId]);
+  const stationName =
+    station?.nameTranslations[intl.locale] ?? station?.name ?? stationId;
 
   return (
     <g transform={`translate(${x},${y})`}>
@@ -35,7 +37,7 @@ export const Tick: React.FC<TickProps> = (props) => {
           letterSpacing: '0.025em',
         }}
       >
-        {station.nameTranslations[intl.locale] ?? station.name}
+        {stationName}
       </text>
     </g>
   );
