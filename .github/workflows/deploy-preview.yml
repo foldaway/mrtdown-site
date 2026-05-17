@@ -61,6 +61,9 @@ jobs:
       - name: Build
         run: npm run build
         env:
+          CLOUDFLARE_ENV: preview
+          GIT_SHA: ${{ github.sha }}
+          TIER: preview
           VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY }}
           VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
           VITE_ROOT_URL: "https://www.mrtdown.org"
@@ -73,7 +76,7 @@ jobs:
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
-          command: versions upload --preview-alias "${{ steps.branch_name.outputs.current_branch }}" --secrets-file preview.env
+          command: versions upload --env preview --preview-alias "${{ steps.branch_name.outputs.current_branch }}" --secrets-file preview.env
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 

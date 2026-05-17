@@ -27,11 +27,34 @@
     "workflows": [
         {
             "binding": "PULL_WORKFLOW",
-            "name": "mrtdown-pull",
+            "name": "mrtdown-pull-preview",
             "class_name": "PullWorkflow"
         }
     ],
     "env": {
+        "preview": {
+            "workflows": [
+                {
+                    "binding": "PULL_WORKFLOW",
+                    "name": "mrtdown-pull-preview",
+                    "class_name": "PullWorkflow"
+                }
+            ],
+            "hyperdrive": [
+                {
+                    "binding": "HYPERDRIVE",
+                    "id": "e9034596011b46179c4c7f65c2ebc773"
+                }
+            ],
+            "observability": {
+                "enabled": true,
+                "head_sampling_rate": 1,
+                "traces": {
+                    "enabled": true,
+                    "head_sampling_rate": 1
+                }
+            }
+        },
         "staging": {
             "triggers": {
                 "crons": [
@@ -41,7 +64,7 @@
             "workflows": [
                 {
                     "binding": "PULL_WORKFLOW",
-                    "name": "mrtdown-pull",
+                    "name": "mrtdown-pull-staging",
                     "class_name": "PullWorkflow"
                 }
             ],
@@ -86,7 +109,7 @@
             "workflows": [
                 {
                     "binding": "PULL_WORKFLOW",
-                    "name": "mrtdown-pull",
+                    "name": "mrtdown-pull-production",
                     "class_name": "PullWorkflow"
                 }
             ]
