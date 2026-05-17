@@ -1492,14 +1492,12 @@ function chunk<T>(items: T[], size: number) {
   return chunks;
 }
 
-function buildCountChartsFromIssueFacts(
+function buildDurationChartsFromIssueFacts(
   rows: Array<{
     date: string;
     issue_type: IssueType;
     duration_seconds: number;
-    active_anytime: boolean;
   }>,
-  durationMode = false,
 ) {
   const end = nowSg().startOf('day');
   const aggregateForRange = (
@@ -1507,9 +1505,7 @@ function buildCountChartsFromIssueFacts(
     count: number,
     previous = false,
   ): Record<string, number> => {
-    const rangeStart = previous
-      ? start.minus({ days: count })
-      : start;
+    const rangeStart = previous ? start.minus({ days: count }) : start;
     const rangeEnd = rangeStart.plus({ days: count });
     return rows.reduce<Record<string, number>>(
       (acc, row) => {
@@ -1518,11 +1514,7 @@ function buildCountChartsFromIssueFacts(
           return acc;
         }
 
-        if (durationMode) {
-          acc[row.issue_type] += row.duration_seconds;
-        } else if (row.active_anytime) {
-          acc[row.issue_type] += 1;
-        }
+        acc[row.issue_type] += row.duration_seconds;
         return acc;
       },
       { disruption: 0, maintenance: 0, infra: 0 },
@@ -1539,11 +1531,7 @@ function buildCountChartsFromIssueFacts(
         name: date,
         payload: dayRows.reduce<Record<string, number>>(
           (acc, row) => {
-            acc[row.issue_type] += durationMode
-              ? row.duration_seconds
-              : row.active_anytime
-                ? 1
-                : 0;
+            acc[row.issue_type] += row.duration_seconds;
             return acc;
           },
           { disruption: 0, maintenance: 0, infra: 0 },
@@ -1582,26 +1570,6 @@ async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
         and(
           gte(issueDayFactsTable.date, start.toISODate()!),
           lte(issueDayFactsTable.date, end.toISODate()!),
-        ),
-      );
-  } catch (error) {
-    if (isUndefinedTableError(error)) {
-      return [];
-    }
-    throw error;
-  }
-}
-
-async function getLineDayFactsInRange(start: DateTime, end: DateTime) {
-  const db = getDb();
-  try {
-    return await db
-      .select()
-      .from(lineDayFactsTable)
-      .where(
-        and(
-          gte(lineDayFactsTable.date, start.toISODate()!),
-          lte(lineDayFactsTable.date, end.toISODate()!),
         ),
       );
   } catch (error) {
@@ -2329,7 +2297,6 @@ export async function getStatisticsData() {
   const rollingYearEnd = nowSg().startOf('day');
   const rollingYearStart = rollingYearEnd.minus({ days: 364 });
   const issueFactRows = await getIssueDayFactsInRange(rollingYearStart, rollingYearEnd);
-  const lineFactRows = await getLineDayFactsInRange(rollingYearStart, rollingYearEnd);
   const longestDisruptions = [...issues]
     .filter((issue) => issue.type === 'disruption')
     .sort((a, b) => b.durationSeconds - a.durationSeconds)
@@ -2338,48 +2305,19 @@ export async function getStatisticsData() {
 
   const chartTotalIssueCountByLine: Chart = {
     title: 'Issue Count by Line',
-    data:
-      lineFactRows.length > 0
-        ? Object.values(dataset.included.lines).map((line) => {
-            const rows = lineFactRows.filter((row) => row.line_id === line.id);
-            return {
-              name: line.id,
-              payload: {
-                disruption: rows.reduce(
-                  (sum, row) => sum + row.issue_count_disruption,
-                  0,
-                ),
-                maintenance: rows.reduce(
-                  (sum, row) => sum + row.issue_count_maintenance,
-                  0,
-                ),
-                infra: rows.reduce((sum, row) => sum + row.issue_count_infra, 0),
-                totalIssues: rows.reduce(
-                  (sum, row) =>
-                    sum +
-                    row.issue_count_disruption +
-                    row.issue_count_maintenance +
-                    row.issue_count_infra,
-                  0,
-                ),
-              },
-            };
-          })
-        : Object.values(dataset.included.lines).map((line) => {
-            const lineIssues = issues.filter((issue) =>
-              issue.lineIds.includes(line.id),
-            );
-            const counts = pickIssueTypes(lineIssues);
-            return {
-              name: line.id,
-              payload: {
-                disruption: counts.disruption ?? 0,
-                maintenance: counts.maintenance ?? 0,
-                infra: counts.infra ?? 0,
-                totalIssues: lineIssues.length,
-              },
-            };
-          }),
+    data: Object.values(dataset.included.lines).map((line) => {
+      const lineIssues = issues.filter((issue) => issue.lineIds.includes(line.id));
+      const counts = pickIssueTypes(lineIssues);
+      return {
+        name: line.id,
+        payload: {
+          disruption: counts.disruption ?? 0,
+          maintenance: counts.maintenance ?? 0,
+          infra: counts.infra ?? 0,
+          totalIssues: lineIssues.length,
+        },
+      };
+    }),
   };
 
   const stationIssueCounts = Object.values(dataset.included.stations).map(
@@ -2447,13 +2385,10 @@ export async function getStatisticsData() {
   };
 
   const statistics: SystemAnalytics = {
-    timeScaleChartsIssueCount:
-      issueFactRows.length > 0
-        ? buildCountChartsFromIssueFacts(issueFactRows, false)
-        : buildIssueCountGraphs(issues),
+    timeScaleChartsIssueCount: buildIssueCountGraphs(issues),
     timeScaleChartsIssueDuration:
       issueFactRows.length > 0
-        ? buildCountChartsFromIssueFacts(issueFactRows, true)
+        ? buildDurationChartsFromIssueFacts(issueFactRows)
         : buildIssueDurationGraphs(issues),
     chartTotalIssueCountByLine,
     chartTotalIssueCountByStation,
