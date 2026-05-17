@@ -12,9 +12,6 @@ import {
   type Line,
   LineTypeSchema,
   type OperatingHours,
-  ResolvePeriodsEndAtReasonSchema,
-  ResolvePeriodsEndAtSourceSchema,
-  ResolvePeriodsModeKindSchema,
   type Service,
   ServiceEffectKindSchema,
   ServiceScopeTypeSchema,
@@ -505,22 +502,8 @@ export const impactEventBasisEvidencesTable = pgTable(
   },
 );
 
-export const resolvePeriodsEndAtSourceEnum = pgEnum(
-  'resolve_periods_end_at_source',
-  enumToPgEnum(ResolvePeriodsEndAtSourceSchema.enum),
-);
-
-export const resolvePeriodsEndAtReasonEnum = pgEnum(
-  'resolve_periods_end_at_reason',
-  enumToPgEnum(ResolvePeriodsEndAtReasonSchema.enum),
-);
-
-export const resolvePeriodsModeKindEnum = pgEnum(
-  'resolve_periods_mode_kind',
-  enumToPgEnum(ResolvePeriodsModeKindSchema.enum),
-);
-
-// Normalized Entity Field: ImpactEventPeriodsSet.periods
+// Canonical periods as emitted by `periods.set` events. Operational resolution is
+// derived at read time or during analytics fact generation.
 export const impactEventPeriodsTable = pgTable(
   'impact_event_periods',
   {
@@ -528,28 +511,20 @@ export const impactEventPeriodsTable = pgTable(
       .references(() => impactEventsTable.id)
       .notNull(),
     index: integer('index').notNull(),
-    mode: resolvePeriodsModeKindEnum().notNull(),
     start_at: timestamp('start_ts', {
       withTimezone: true,
       mode: 'string',
     }).notNull(),
     end_at: timestamp('end_ts', { withTimezone: true, mode: 'string' }),
-    end_at_resolved: timestamp('end_ts_resolved', {
-      withTimezone: true,
-      mode: 'string',
-    }),
-    end_at_source: resolvePeriodsEndAtSourceEnum().notNull(),
-    end_at_reason: resolvePeriodsEndAtReasonEnum(),
     ...timestampColumns,
   },
   (table) => {
     return [
-      primaryKey({ columns: [table.impact_event_id, table.index, table.mode] }),
+      primaryKey({ columns: [table.impact_event_id, table.index] }),
       index('impact_event_periods_set_periods_impact_event_id_idx').on(
         table.impact_event_id,
         table.index,
       ),
-      index('impact_event_periods_mode_idx').on(table.mode),
       index('impact_event_periods_start_at_idx').using(
         'btree',
         table.start_at.asc(),
@@ -558,12 +533,6 @@ export const impactEventPeriodsTable = pgTable(
         'btree',
         table.end_at.asc(),
       ),
-      index('impact_event_periods_end_at_resolved_idx').using(
-        'btree',
-        table.end_at_resolved.asc(),
-      ),
-      index('impact_event_periods_end_at_source_idx').on(table.end_at_source),
-      index('impact_event_periods_end_at_reason_idx').on(table.end_at_reason),
     ];
   },
 );

@@ -20,5 +20,11 @@ export default Sentry.withSentry(
   },
   {
     fetch: wrappedFetch.fetch,
+    async scheduled(_event, env, ctx) {
+      const workflow = env.PULL_WORKFLOW?.create();
+      if (workflow != null) {
+        ctx.waitUntil(workflow);
+      }
+    },
   } satisfies ExportedHandler<Env>,
 );
