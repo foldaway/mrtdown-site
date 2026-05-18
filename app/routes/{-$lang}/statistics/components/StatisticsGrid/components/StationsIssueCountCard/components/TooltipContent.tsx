@@ -23,7 +23,7 @@ export const TooltipContent: React.FC<Props> = ({ active, payload, label }) => {
 
   const station = stations[label];
   const stationName =
-    station?.nameTranslations[intl.locale] ?? station?.name ?? label;
+    station?.nameTranslations?.[intl.locale] ?? station?.name ?? label;
 
   return (
     <div

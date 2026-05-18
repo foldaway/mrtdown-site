@@ -20,7 +20,7 @@ export const Tick: React.FC<TickProps> = (props) => {
     return stations[stationId];
   }, [stations, stationId]);
   const stationName =
-    station?.nameTranslations[intl.locale] ?? station?.name ?? stationId;
+    station?.nameTranslations?.[intl.locale] ?? station?.name ?? stationId;
 
   return (
     <g transform={`translate(${x},${y})`}>
