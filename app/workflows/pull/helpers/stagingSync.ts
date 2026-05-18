@@ -875,6 +875,16 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         });
 
       if (row.evidences.length > 0) {
+        const evidenceIds = row.evidences.map((evidence) => evidence.id);
+        await tx
+          .delete(impactEventBasisEvidencesTable)
+          .where(
+            inArray(impactEventBasisEvidencesTable.evidence_id, evidenceIds),
+          );
+        await tx
+          .delete(evidencesTable)
+          .where(inArray(evidencesTable.id, evidenceIds));
+
         await tx.insert(evidencesTable).values(
           row.evidences.map((evidence) => {
             return {
