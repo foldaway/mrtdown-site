@@ -934,7 +934,27 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
         }
 
         const stationMemberships =
-          station.memberships.length > 0 ? station.memberships : [];
+          facilityRef.line_id != null
+            ? station.memberships.filter(
+                (membership) => membership.lineId === facilityRef.line_id,
+              )
+            : station.memberships;
+
+        if (
+          stationMemberships.length === 0 &&
+          facilityRef.line_id != null &&
+          linesById[facilityRef.line_id] != null
+        ) {
+          const key = `${facilityRef.line_id}::${station.id}`;
+          if (!facilityBranches.has(key)) {
+            facilityBranches.set(key, {
+              lineId: facilityRef.line_id,
+              branchId: `${facilityRef.line_id}:${station.id}`,
+              stationIds: [station.id],
+            });
+          }
+        }
+
         for (const membership of stationMemberships) {
           const key = `${membership.lineId}::${station.id}`;
           if (!facilityBranches.has(key)) {

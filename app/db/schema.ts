@@ -797,6 +797,7 @@ export const impactEventEntityFacilitiesTable = pgTable(
     station_id: text('station_id')
       .references(() => stationsTable.id)
       .notNull(),
+    line_id: text('line_id').references(() => linesTable.id),
     kind: affectedEntityFacilityKindEnum().notNull(),
     ...timestampColumns,
   },
@@ -811,6 +812,7 @@ export const impactEventEntityFacilitiesTable = pgTable(
       index('impact_event_entity_facilities_station_id_idx').on(
         table.station_id,
       ),
+      index('impact_event_entity_facilities_line_id_idx').on(table.line_id),
     ];
   },
 );

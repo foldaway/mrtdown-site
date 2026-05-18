@@ -947,9 +947,14 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
               break;
             }
             case 'facility': {
+              const entity = impactEvent.entity as ImpactEvent['entity'] & {
+                lineId?: string | null;
+              };
+
               await tx.insert(impactEventEntityFacilitiesTable).values({
                 impact_event_id: impactEvent.id,
                 station_id: impactEvent.entity.stationId,
+                line_id: entity.lineId ?? null,
                 kind: impactEvent.entity.kind,
               } satisfies InferInsertModel<
                 typeof impactEventEntityFacilitiesTable
