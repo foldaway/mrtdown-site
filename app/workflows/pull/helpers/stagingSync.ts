@@ -1116,23 +1116,25 @@ export async function syncChangedIssuesBatch(
   db: Db,
   limit = BATCH,
 ): Promise<number> {
-  return db.transaction(async (tx) => {
-    const rows = await tx
-      .select({ id: issuesNextTable.id })
-      .from(issuesNextTable)
-      .leftJoin(issuesTable, eq(issuesNextTable.id, issuesTable.id))
-      .where(
-        or(
-          isNull(issuesTable.hash),
-          ne(issuesNextTable.hash, issuesTable.hash),
-        ),
-      )
-      .orderBy(asc(issuesNextTable.id))
-      .limit(limit);
-    const issueIds = rows.map((r) => r.id);
-    await syncIssueIds(tx, issueIds);
-    return issueIds.length;
-  });
+  return db.transaction((tx) => syncChangedIssuesBatchTx(tx, limit));
+}
+
+async function syncChangedIssuesBatchTx(
+  tx: Tx,
+  limit = BATCH,
+): Promise<number> {
+  const rows = await tx
+    .select({ id: issuesNextTable.id })
+    .from(issuesNextTable)
+    .leftJoin(issuesTable, eq(issuesNextTable.id, issuesTable.id))
+    .where(
+      or(isNull(issuesTable.hash), ne(issuesNextTable.hash, issuesTable.hash)),
+    )
+    .orderBy(asc(issuesNextTable.id))
+    .limit(limit);
+  const issueIds = rows.map((r) => r.id);
+  await syncIssueIds(tx, issueIds);
+  return issueIds.length;
 }
 
 /**
@@ -1144,24 +1146,29 @@ export async function deleteOrphanIssuesBatch(
   db: Db,
   limit = BATCH,
 ): Promise<number> {
-  return db.transaction(async (tx) => {
-    const orphanIssueRows = await tx
-      .select({ id: issuesTable.id })
-      .from(issuesTable)
-      .where(
-        notExists(
-          tx
-            .select()
-            .from(issuesNextTable)
-            .where(eq(issuesNextTable.id, issuesTable.id)),
-        ),
-      )
-      .orderBy(asc(issuesTable.id))
-      .limit(limit);
-    const orphanIds = orphanIssueRows.map((r) => r.id);
-    await deleteIssueIds(tx, orphanIds);
-    return orphanIds.length;
-  });
+  return db.transaction((tx) => deleteOrphanIssuesBatchTx(tx, limit));
+}
+
+async function deleteOrphanIssuesBatchTx(
+  tx: Tx,
+  limit = BATCH,
+): Promise<number> {
+  const orphanIssueRows = await tx
+    .select({ id: issuesTable.id })
+    .from(issuesTable)
+    .where(
+      notExists(
+        tx
+          .select()
+          .from(issuesNextTable)
+          .where(eq(issuesNextTable.id, issuesTable.id)),
+      ),
+    )
+    .orderBy(asc(issuesTable.id))
+    .limit(limit);
+  const orphanIds = orphanIssueRows.map((r) => r.id);
+  await deleteIssueIds(tx, orphanIds);
+  return orphanIds.length;
 }
 
 /**
@@ -1170,12 +1177,14 @@ export async function deleteOrphanIssuesBatch(
  * missing from `issues_next` (with full subtree cleanup).
  */
 export async function syncIssues(db: Db): Promise<void> {
-  while ((await syncChangedIssuesBatch(db)) > 0) {
-    // Keep syncing until staging and live issue hashes converge.
-  }
-  while ((await deleteOrphanIssuesBatch(db)) > 0) {
-    // Keep deleting until there are no live issues absent from staging.
-  }
+  await db.transaction(async (tx) => {
+    while ((await syncChangedIssuesBatchTx(tx)) > 0) {
+      // Keep syncing until staging and live issue hashes converge.
+    }
+    while ((await deleteOrphanIssuesBatchTx(tx)) > 0) {
+      // Keep deleting until there are no live issues absent from staging.
+    }
+  });
 }
 
 /** Truncates staging tables and records `manifest_last_pulled_at` in one transaction. */
