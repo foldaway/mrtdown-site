@@ -1045,13 +1045,34 @@ export async function syncIssues(db: Db): Promise<void> {
                 if (impactEvent.serviceScopes.length > 0) {
                   await tx.insert(impactEventServiceScopesTable).values(
                     impactEvent.serviceScopes.map((serviceScope, index) => {
-                      return {
+                      const row = {
                         impact_event_id: impactEvent.id,
                         type: serviceScope.type,
                         index,
                       } satisfies InferInsertModel<
                         typeof impactEventServiceScopesTable
                       >;
+
+                      switch (serviceScope.type) {
+                        case 'service.whole':
+                          return row;
+                        case 'service.point':
+                          return {
+                            ...row,
+                            station_id: serviceScope.stationId,
+                          };
+                        case 'service.segment':
+                          return {
+                            ...row,
+                            from_station_id: serviceScope.fromStationId,
+                            to_station_id: serviceScope.toStationId,
+                          };
+                        default:
+                          return assertUnreachable(
+                            serviceScope,
+                            'Unhandled service scope type',
+                          );
+                      }
                     }),
                   );
                 }
