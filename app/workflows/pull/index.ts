@@ -9,6 +9,7 @@ import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
 import {
+  deleteOrphanIssuesBatch,
   finalizePull,
   insertIssuesStaging,
   insertLandmarksStaging,
@@ -17,7 +18,7 @@ import {
   insertServicesStaging,
   insertStationsStaging,
   insertTownsStaging,
-  syncIssues,
+  syncChangedIssuesBatch,
   syncLines,
   syncOperatorsTownsLandmarks,
   syncServices,
@@ -45,6 +46,8 @@ const syncStepConfig = {
     backoff: 'exponential' as const,
   },
 };
+
+const ISSUE_SYNC_BATCH_SIZE = 100;
 
 /**
  * Durable pull pipeline: manifest → parse into staging → promote by domain →
@@ -194,16 +197,41 @@ export class PullWorkflow extends WorkflowEntrypoint<Env, Params> {
       await syncServices(db);
     });
 
-    await step.do('sync-issues', syncStepConfig, async () => {
-      const db = getDb();
-      console.log('Syncing issues...');
-      try {
-        await syncIssues(db);
-      } catch (error) {
-        console.error('Error syncing issues', error);
-        throw error;
-      }
-    });
+    for (let batch = 1; ; batch++) {
+      const processed = await step.do(
+        `sync-issues-changed-${batch}`,
+        syncStepConfig,
+        async () => {
+          const db = getDb();
+          console.log(`Syncing changed issues batch ${batch}...`);
+          try {
+            return await syncChangedIssuesBatch(db, ISSUE_SYNC_BATCH_SIZE);
+          } catch (error) {
+            console.error(`Error syncing changed issues batch ${batch}`, error);
+            throw error;
+          }
+        },
+      );
+      if (processed === 0) break;
+    }
+
+    for (let batch = 1; ; batch++) {
+      const processed = await step.do(
+        `sync-issues-orphans-${batch}`,
+        syncStepConfig,
+        async () => {
+          const db = getDb();
+          console.log(`Deleting orphan issues batch ${batch}...`);
+          try {
+            return await deleteOrphanIssuesBatch(db, ISSUE_SYNC_BATCH_SIZE);
+          } catch (error) {
+            console.error(`Error deleting orphan issues batch ${batch}`, error);
+            throw error;
+          }
+        },
+      );
+      if (processed === 0) break;
+    }
 
     await step.do('finalize', syncStepConfig, async () => {
       const db = getDb();
