@@ -13,6 +13,7 @@ assert(
 
 const migrations = readMigrationFiles({ migrationsFolder: 'drizzle' });
 const client = new Client({ connectionString: DATABASE_URL });
+const MIGRATION_LOCK_ID = 612348731;
 
 try {
   await client.connect();
@@ -24,6 +25,9 @@ try {
       created_at bigint
     )
   `);
+
+  await client.query('BEGIN');
+  await client.query('SELECT pg_advisory_xact_lock($1)', [MIGRATION_LOCK_ID]);
 
   const lastMigrationResult = await client.query<{
     created_at: string | number;
@@ -43,7 +47,6 @@ try {
     `Applying ${pendingMigrations.length} pending database migration(s)`,
   );
 
-  await client.query('BEGIN');
   for (const migration of pendingMigrations) {
     console.log(`Applying migration ${migration.folderMillis}`);
     for (const [index, statement] of migration.sql.entries()) {
