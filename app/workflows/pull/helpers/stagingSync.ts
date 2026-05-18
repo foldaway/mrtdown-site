@@ -951,14 +951,28 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
                 lineId?: string | null;
               };
 
-              await tx.insert(impactEventEntityFacilitiesTable).values({
-                impact_event_id: impactEvent.id,
-                station_id: impactEvent.entity.stationId,
-                line_id: entity.lineId ?? null,
-                kind: impactEvent.entity.kind,
-              } satisfies InferInsertModel<
-                typeof impactEventEntityFacilitiesTable
-              >);
+              await tx
+                .insert(impactEventEntityFacilitiesTable)
+                .values({
+                  impact_event_id: impactEvent.id,
+                  station_id: impactEvent.entity.stationId,
+                  line_id: entity.lineId ?? null,
+                  kind: impactEvent.entity.kind,
+                } satisfies InferInsertModel<
+                  typeof impactEventEntityFacilitiesTable
+                >)
+                .onConflictDoUpdate({
+                  target: [
+                    impactEventEntityFacilitiesTable.impact_event_id,
+                    impactEventEntityFacilitiesTable.station_id,
+                    impactEventEntityFacilitiesTable.kind,
+                  ],
+                  set: {
+                    line_id: sql.raw(
+                      `excluded.${impactEventEntityFacilitiesTable.line_id.name}`,
+                    ),
+                  },
+                });
               break;
             }
             default: {
