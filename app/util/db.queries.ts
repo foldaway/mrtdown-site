@@ -85,6 +85,10 @@ function nowSg() {
 }
 
 function parseDateTime(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return DateTime.fromISO(value, { zone: SG_TIMEZONE });
+  }
+
   const iso = DateTime.fromISO(value, { setZone: true });
   if (iso.isValid) {
     return iso.setZone(SG_TIMEZONE);
