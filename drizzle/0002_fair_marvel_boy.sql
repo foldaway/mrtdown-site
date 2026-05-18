@@ -28,8 +28,8 @@ CREATE TABLE "line_day_facts" (
 	CONSTRAINT "line_day_facts_date_line_id_pk" PRIMARY KEY("date","line_id")
 );
 --> statement-breakpoint
-ALTER TABLE "issue_day_facts" ADD CONSTRAINT "issue_day_facts_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "line_day_facts" ADD CONSTRAINT "line_day_facts_line_id_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."lines"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "issue_day_facts" ADD CONSTRAINT "issue_day_facts_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
+ALTER TABLE "line_day_facts" ADD CONSTRAINT "line_day_facts_line_id_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."lines"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 CREATE INDEX "issue_day_facts_issue_id_idx" ON "issue_day_facts" USING btree ("issue_id");--> statement-breakpoint
 CREATE INDEX "issue_day_facts_date_issue_type_idx" ON "issue_day_facts" USING btree ("date","issue_type");--> statement-breakpoint
 CREATE INDEX "issue_day_facts_as_of_idx" ON "issue_day_facts" USING btree ("as_of");--> statement-breakpoint

@@ -575,7 +575,10 @@ export const issueDayFactsTable = pgTable(
   {
     date: date('date', { mode: 'string' }).notNull(),
     issue_id: text('issue_id')
-      .references(() => issuesTable.id)
+      .references(() => issuesTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     issue_type: issueTypeEnum().notNull(),
     as_of: timestamp('as_of', {
@@ -609,7 +612,10 @@ export const lineDayFactsTable = pgTable(
   {
     date: date('date', { mode: 'string' }).notNull(),
     line_id: text('line_id')
-      .references(() => linesTable.id)
+      .references(() => linesTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     as_of: timestamp('as_of', {
       withTimezone: true,
