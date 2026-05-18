@@ -204,7 +204,9 @@ function buildIssueIntervals(
     const normalizedStartAt = parseDateTime(row.start_at).toISO()!;
     const resolvedEndAtRaw = row.end_at_resolved ?? row.end_at ?? null;
     const normalizedEndAt =
-      resolvedEndAtRaw != null ? parseDateTime(resolvedEndAtRaw).toISO()! : null;
+      resolvedEndAtRaw != null
+        ? parseDateTime(resolvedEndAtRaw).toISO()!
+        : null;
     const key = `${normalizedStartAt}::${normalizedEndAt ?? 'null'}`;
     if (unique.has(key)) {
       continue;
@@ -213,12 +215,18 @@ function buildIssueIntervals(
     unique.set(key, {
       startAt: normalizedStartAt,
       endAt: normalizedEndAt,
-      status: classifyInterval(normalizedStartAt, normalizedEndAt, referenceNow),
+      status: classifyInterval(
+        normalizedStartAt,
+        normalizedEndAt,
+        referenceNow,
+      ),
     });
   }
 
   return [...unique.values()].sort((a, b) => {
-    return parseDateTime(a.startAt).toMillis() - parseDateTime(b.startAt).toMillis();
+    return (
+      parseDateTime(a.startAt).toMillis() - parseDateTime(b.startAt).toMillis()
+    );
   });
 }
 
@@ -300,6 +308,25 @@ function serviceWindowForDate(
   };
 }
 
+function serviceWindowAfterLineStart(
+  line: Line,
+  serviceWindow: ReturnType<typeof serviceWindowForDate>,
+) {
+  const windowStart =
+    line.startedAt == null
+      ? serviceWindow.start
+      : DateTime.max(serviceWindow.start, parseDateTime(line.startedAt));
+  const seconds = Math.max(
+    0,
+    serviceWindow.end.diff(windowStart, 'seconds').seconds,
+  );
+  return {
+    start: windowStart,
+    end: serviceWindow.end,
+    seconds,
+  };
+}
+
 function isLineFuture(line: Line, referenceNow = nowSg()) {
   if (line.startedAt == null) {
     return false;
@@ -366,7 +393,9 @@ function issueOverlapsRange(
   rangeEnd: DateTime,
 ) {
   return getIssueBounds(issue).some((interval) => {
-    return overlapSeconds(interval.start, interval.end, rangeStart, rangeEnd) > 0;
+    return (
+      overlapSeconds(interval.start, interval.end, rangeStart, rangeEnd) > 0
+    );
   });
 }
 
@@ -842,7 +871,8 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
   for (const row of issueRows) {
     const { fallback, translations } = parseTranslations(row.title);
     const events = [...(impactEventsByIssueId[row.id] ?? [])].sort((a, b) => {
-      const tsDiff = parseDateTime(b.ts).toMillis() - parseDateTime(a.ts).toMillis();
+      const tsDiff =
+        parseDateTime(b.ts).toMillis() - parseDateTime(a.ts).toMillis();
       if (tsDiff !== 0) {
         return tsDiff;
       }
@@ -1279,30 +1309,35 @@ function buildUptimeGraph(
 
   for (let offset = 0; offset < count; offset++) {
     const date = start.plus({ days: offset });
-    const serviceWindow = serviceWindowForDate(line, date, publicHolidaySet);
+    const serviceWindow = serviceWindowAfterLineStart(
+      line,
+      serviceWindowForDate(line, date, publicHolidaySet),
+    );
     let breakdownDisruption = 0;
     let breakdownMaintenance = 0;
     let breakdownInfra = 0;
 
-    for (const issue of issues) {
-      const overlap = getIssueBounds(issue).reduce((total, interval) => {
-        return (
-          total +
-          overlapSeconds(
-            interval.start,
-            interval.end,
-            serviceWindow.start,
-            serviceWindow.end,
-          )
-        );
-      }, 0);
-      if (overlap <= 0) {
-        continue;
-      }
+    if (serviceWindow.seconds > 0) {
+      for (const issue of issues) {
+        const overlap = getIssueBounds(issue).reduce((total, interval) => {
+          return (
+            total +
+            overlapSeconds(
+              interval.start,
+              interval.end,
+              serviceWindow.start,
+              serviceWindow.end,
+            )
+          );
+        }, 0);
+        if (overlap <= 0) {
+          continue;
+        }
 
-      if (issue.type === 'disruption') breakdownDisruption += overlap;
-      if (issue.type === 'maintenance') breakdownMaintenance += overlap;
-      if (issue.type === 'infra') breakdownInfra += overlap;
+        if (issue.type === 'disruption') breakdownDisruption += overlap;
+        if (issue.type === 'maintenance') breakdownMaintenance += overlap;
+        if (issue.type === 'infra') breakdownInfra += overlap;
+      }
     }
 
     const totalDowntime = breakdownDisruption + breakdownMaintenance;
@@ -1325,7 +1360,13 @@ function buildUptimeGraph(
     let downtime = 0;
     for (let offset = 0; offset < windowCount; offset++) {
       const date = windowStart.plus({ days: offset });
-      const serviceWindow = serviceWindowForDate(line, date, publicHolidaySet);
+      const serviceWindow = serviceWindowAfterLineStart(
+        line,
+        serviceWindowForDate(line, date, publicHolidaySet),
+      );
+      if (serviceWindow.seconds <= 0) {
+        continue;
+      }
       serviceSeconds += serviceWindow.seconds;
       for (const issue of issues) {
         if (issue.type === 'infra') {
@@ -1388,7 +1429,11 @@ function buildOperatorUptimeGraph(
           continue;
         }
 
-        const serviceWindow = serviceWindowForDate(line, date, publicHolidaySet);
+        const serviceWindow = serviceWindowForDate(
+          line,
+          date,
+          publicHolidaySet,
+        );
         serviceSeconds += serviceWindow.seconds;
 
         for (const issue of issuesByLineId[line.id] ?? []) {
@@ -1580,6 +1625,21 @@ async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
   }
 }
 
+function hasFullDateCoverage(
+  rows: Array<{ date: string }>,
+  start: DateTime,
+  end: DateTime,
+) {
+  const expectedDays =
+    Math.floor(end.startOf('day').diff(start.startOf('day'), 'days').days) + 1;
+  if (expectedDays <= 0) {
+    return false;
+  }
+
+  const dates = new Set(rows.map((row) => row.date));
+  return dates.size === expectedDays;
+}
+
 export async function rebuildOperationalFactsForDate(date: DateTime) {
   const normalizedDate = date.setZone(SG_TIMEZONE).startOf('day');
   const asOf = normalizedDate.endOf('day');
@@ -1591,18 +1651,21 @@ export async function rebuildOperationalFactsForDate(date: DateTime) {
 
   const issueRows = issues
     .map((issue) => {
-      const durationSeconds = getIssueBounds(issue).reduce((total, interval) => {
-        return (
-          total +
-          overlapSeconds(
-            interval.start,
-            interval.end,
-            normalizedDate,
-            dayEnd,
-            asOf,
-          )
-        );
-      }, 0);
+      const durationSeconds = getIssueBounds(issue).reduce(
+        (total, interval) => {
+          return (
+            total +
+            overlapSeconds(
+              interval.start,
+              interval.end,
+              normalizedDate,
+              dayEnd,
+              asOf,
+            )
+          );
+        },
+        0,
+      );
 
       return {
         date: dateKey,
@@ -1618,7 +1681,9 @@ export async function rebuildOperationalFactsForDate(date: DateTime) {
     .filter((row) => row.active_anytime || row.active_end_of_day);
 
   const lineRows = Object.values(dataset.included.lines).map((line) => {
-    const lineIssues = issues.filter((issue) => issue.lineIds.includes(line.id));
+    const lineIssues = issues.filter((issue) =>
+      issue.lineIds.includes(line.id),
+    );
     const summary = buildLineSummary(
       line,
       lineIssues,
@@ -1648,10 +1713,12 @@ export async function rebuildOperationalFactsForDate(date: DateTime) {
               .seconds,
       ),
       downtime_disruption_seconds: Math.round(
-        dayBreakdown?.breakdownByIssueTypes.disruption?.totalDurationSeconds ?? 0,
+        dayBreakdown?.breakdownByIssueTypes.disruption?.totalDurationSeconds ??
+          0,
       ),
       downtime_maintenance_seconds: Math.round(
-        dayBreakdown?.breakdownByIssueTypes.maintenance?.totalDurationSeconds ?? 0,
+        dayBreakdown?.breakdownByIssueTypes.maintenance?.totalDurationSeconds ??
+          0,
       ),
       downtime_infra_seconds: Math.round(
         dayBreakdown?.breakdownByIssueTypes.infra?.totalDurationSeconds ?? 0,
@@ -1662,19 +1729,25 @@ export async function rebuildOperationalFactsForDate(date: DateTime) {
     };
   });
 
-  await db.delete(issueDayFactsTable).where(eq(issueDayFactsTable.date, dateKey));
-  await db.delete(lineDayFactsTable).where(eq(lineDayFactsTable.date, dateKey));
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(issueDayFactsTable)
+      .where(eq(issueDayFactsTable.date, dateKey));
+    await tx
+      .delete(lineDayFactsTable)
+      .where(eq(lineDayFactsTable.date, dateKey));
 
-  for (const batch of chunk(issueRows, 500)) {
-    if (batch.length > 0) {
-      await db.insert(issueDayFactsTable).values(batch);
+    for (const batch of chunk(issueRows, 500)) {
+      if (batch.length > 0) {
+        await tx.insert(issueDayFactsTable).values(batch);
+      }
     }
-  }
-  for (const batch of chunk(lineRows, 500)) {
-    if (batch.length > 0) {
-      await db.insert(lineDayFactsTable).values(batch);
+    for (const batch of chunk(lineRows, 500)) {
+      if (batch.length > 0) {
+        await tx.insert(lineDayFactsTable).values(batch);
+      }
     }
-  }
+  });
 
   return {
     date: dateKey,
@@ -1683,9 +1756,16 @@ export async function rebuildOperationalFactsForDate(date: DateTime) {
   };
 }
 
-export async function rebuildOperationalFactsRange(days: number, end = nowSg()) {
+export async function rebuildOperationalFactsRange(
+  days: number,
+  end = nowSg(),
+) {
   const normalizedEnd = end.setZone(SG_TIMEZONE).startOf('day');
-  const results: Array<{ date: string; issueCount: number; lineCount: number }> = [];
+  const results: Array<{
+    date: string;
+    issueCount: number;
+    lineCount: number;
+  }> = [];
   for (let offset = days - 1; offset >= 0; offset--) {
     const date = normalizedEnd.minus({ days: offset });
     results.push(await rebuildOperationalFactsForDate(date));
@@ -1721,9 +1801,7 @@ export async function getOverviewData(days: number) {
 
   const overview: SystemOverview = {
     issueIdsActiveNow: issues
-      .filter(
-        (issue) => issue.type === 'disruption' && issueActiveNow(issue),
-      )
+      .filter((issue) => issue.type === 'disruption' && issueActiveNow(issue))
       .map((issue) => issue.id),
     issueIdsActiveToday: issues
       .filter(
@@ -1787,14 +1865,20 @@ export async function getLineProfileData(lineId: string, days: number) {
   )!;
   const issueIdsRecent = [...lineIssues]
     .filter((issue) =>
-      issue.intervals.some((interval) => parseDateTime(interval.startAt) <= nowSg()),
+      issue.intervals.some(
+        (interval) => parseDateTime(interval.startAt) <= nowSg(),
+      ),
     )
     .sort((a, b) => {
       const earliestA = Math.min(
-        ...a.intervals.map((interval) => parseDateTime(interval.startAt).toMillis()),
+        ...a.intervals.map((interval) =>
+          parseDateTime(interval.startAt).toMillis(),
+        ),
       );
       const earliestB = Math.min(
-        ...b.intervals.map((interval) => parseDateTime(interval.startAt).toMillis()),
+        ...b.intervals.map((interval) =>
+          parseDateTime(interval.startAt).toMillis(),
+        ),
       );
       return earliestB - earliestA;
     })
@@ -2050,10 +2134,7 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
     yearsOfOperation: Math.max(
       0,
       Math.floor(
-        nowSg().diff(
-          parseDateTime(operator.foundedAt),
-          'years',
-        ).years,
+        nowSg().diff(parseDateTime(operator.foundedAt), 'years').years,
       ),
     ),
   };
@@ -2082,8 +2163,11 @@ export async function getHistoryYearSummaryData(year: number) {
     { zone: SG_TIMEZONE },
   ).startOf('day');
   const yearEnd = yearStart.plus({ years: 1 });
-  const factRows = await getIssueDayFactsInRange(yearStart, yearEnd.minus({ days: 1 }));
-  if (factRows.length > 0) {
+  const factRows = await getIssueDayFactsInRange(
+    yearStart,
+    yearEnd.minus({ days: 1 }),
+  );
+  if (hasFullDateCoverage(factRows, yearStart, yearEnd.minus({ days: 1 }))) {
     const dataset = await buildBaseDataset();
     const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
     const summaryByMonth = Array.from({ length: 12 }, (_, index) => {
@@ -2168,7 +2252,7 @@ export async function getHistoryYearMonthData(year: number, month: number) {
     monthStart,
     monthEnd.minus({ days: 1 }),
   );
-  if (factRows.length > 0) {
+  if (hasFullDateCoverage(factRows, monthStart, monthEnd.minus({ days: 1 }))) {
     const dataset = await buildBaseDataset();
     const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
     const weeks = new Map<string, string[]>();
@@ -2225,7 +2309,11 @@ export async function getHistoryYearMonthData(year: number, month: number) {
     const key = `${date.weekYear}-W${date.weekNumber.toString().padStart(2, '0')}`;
     const issueIds = issues
       .filter((issue) =>
-        issueOverlapsRange(issue, date.startOf('week'), date.startOf('week').plus({ week: 1 })),
+        issueOverlapsRange(
+          issue,
+          date.startOf('week'),
+          date.startOf('week').plus({ week: 1 }),
+        ),
       )
       .map((issue) => issue.id)
       .sort((a, b) => b.localeCompare(a));
@@ -2262,8 +2350,8 @@ export async function getHistoryDayData(
   const factRows = await getIssueDayFactsInRange(date, date);
   if (factRows.length > 0) {
     const dataset = await buildBaseDataset();
-    const issueIds = [...new Set(factRows.map((row) => row.issue_id))].sort((a, b) =>
-      b.localeCompare(a),
+    const issueIds = [...new Set(factRows.map((row) => row.issue_id))].sort(
+      (a, b) => b.localeCompare(a),
     );
     return {
       data: {
@@ -2279,7 +2367,9 @@ export async function getHistoryDayData(
   const issues = Object.values(dataset.allIssues).filter((issue) =>
     issueTouchesDate(issue, date),
   );
-  const issueIds = issues.map((issue) => issue.id).sort((a, b) => b.localeCompare(a));
+  const issueIds = issues
+    .map((issue) => issue.id)
+    .sort((a, b) => b.localeCompare(a));
 
   return {
     data: {
@@ -2296,7 +2386,15 @@ export async function getStatisticsData() {
   const issues = Object.values(dataset.allIssues);
   const rollingYearEnd = nowSg().startOf('day');
   const rollingYearStart = rollingYearEnd.minus({ days: 364 });
-  const issueFactRows = await getIssueDayFactsInRange(rollingYearStart, rollingYearEnd);
+  const issueFactRows = await getIssueDayFactsInRange(
+    rollingYearStart,
+    rollingYearEnd,
+  );
+  const hasIssueFactCoverage = hasFullDateCoverage(
+    issueFactRows,
+    rollingYearStart,
+    rollingYearEnd,
+  );
   const longestDisruptions = [...issues]
     .filter((issue) => issue.type === 'disruption')
     .sort((a, b) => b.durationSeconds - a.durationSeconds)
@@ -2306,7 +2404,9 @@ export async function getStatisticsData() {
   const chartTotalIssueCountByLine: Chart = {
     title: 'Issue Count by Line',
     data: Object.values(dataset.included.lines).map((line) => {
-      const lineIssues = issues.filter((issue) => issue.lineIds.includes(line.id));
+      const lineIssues = issues.filter((issue) =>
+        issue.lineIds.includes(line.id),
+      );
       const counts = pickIssueTypes(lineIssues);
       return {
         name: line.id,
@@ -2354,11 +2454,10 @@ export async function getStatisticsData() {
     title: 'Rolling Year Heatmap',
     data: Array.from({ length: 365 }, (_, index) => {
       const date = rollingYearStart.plus({ days: index }).toISODate()!;
-      const dayRows =
-        issueFactRows.length > 0
-          ? issueFactRows.filter((row) => row.date === date && row.active_anytime)
-          : [];
-      if (issueFactRows.length > 0) {
+      const dayRows = hasIssueFactCoverage
+        ? issueFactRows.filter((row) => row.date === date && row.active_anytime)
+        : [];
+      if (hasIssueFactCoverage) {
         return {
           name: date,
           payload: dayRows.reduce<Record<string, number>>(
@@ -2371,7 +2470,9 @@ export async function getStatisticsData() {
         };
       }
       const dayDate = DateTime.fromISO(date, { zone: SG_TIMEZONE });
-      const dayIssues = issues.filter((issue) => issueTouchesDate(issue, dayDate));
+      const dayIssues = issues.filter((issue) =>
+        issueTouchesDate(issue, dayDate),
+      );
       const counts = pickIssueTypes(dayIssues);
       return {
         name: date,
@@ -2386,10 +2487,9 @@ export async function getStatisticsData() {
 
   const statistics: SystemAnalytics = {
     timeScaleChartsIssueCount: buildIssueCountGraphs(issues),
-    timeScaleChartsIssueDuration:
-      issueFactRows.length > 0
-        ? buildDurationChartsFromIssueFacts(issueFactRows)
-        : buildIssueDurationGraphs(issues),
+    timeScaleChartsIssueDuration: hasIssueFactCoverage
+      ? buildDurationChartsFromIssueFacts(issueFactRows)
+      : buildIssueDurationGraphs(issues),
     chartTotalIssueCountByLine,
     chartTotalIssueCountByStation,
     chartRollingYearHeatmap,
