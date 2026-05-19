@@ -220,6 +220,22 @@ function overlapSeconds(
   return Math.max(0, overlapEnd.diff(overlapStart, 'seconds').seconds);
 }
 
+function clipIntervalToRange(
+  start: DateTime,
+  end: DateTime | null,
+  windowStart: DateTime,
+  windowEnd: DateTime,
+  referenceNow = nowSg(),
+): IssueIntervalBounds | null {
+  const boundedEnd = end ?? referenceNow;
+  const overlapStart = start > windowStart ? start : windowStart;
+  const overlapEnd = boundedEnd < windowEnd ? boundedEnd : windowEnd;
+  if (overlapEnd <= overlapStart) {
+    return null;
+  }
+  return { start: overlapStart, end: overlapEnd };
+}
+
 function classifyInterval(
   startAt: string,
   endAt: string | null,
@@ -1511,14 +1527,10 @@ function buildWindowCountEntries(
       Granularity,
       number
     >);
-    const payload: Record<string, number> = {
-      disruption: 0,
-      maintenance: 0,
-      infra: 0,
-    };
+    const payload = emptyIssueTypePayload();
 
-    for (const issue of issues) {
-      if (!durationMode) {
+    if (!durationMode) {
+      for (const issue of issues) {
         const firstStart = issue.intervals[0]?.startAt;
         if (firstStart == null) {
           continue;
@@ -1528,16 +1540,31 @@ function buildWindowCountEntries(
         if (firstStartAt >= bucketStart && firstStartAt < bucketEnd) {
           payload[issue.type] += 1;
         }
-        continue;
+      }
+    } else {
+      const intervalsByType: Record<IssueType, IssueIntervalBounds[]> = {
+        disruption: [],
+        maintenance: [],
+        infra: [],
+      };
+
+      for (const issue of issues) {
+        for (const interval of getIssueBounds(issue)) {
+          const clipped = clipIntervalToRange(
+            interval.start,
+            interval.end,
+            bucketStart,
+            bucketEnd,
+          );
+          if (clipped != null) {
+            intervalsByType[issue.type].push(clipped);
+          }
+        }
       }
 
-      const seconds = getIssueBounds(issue).reduce((total, interval) => {
-        return (
-          total +
-          overlapSeconds(interval.start, interval.end, bucketStart, bucketEnd)
-        );
-      }, 0);
-      payload[issue.type] += seconds;
+      payload.disruption = sumIntervalSeconds(intervalsByType.disruption);
+      payload.maintenance = sumIntervalSeconds(intervalsByType.maintenance);
+      payload.infra = sumIntervalSeconds(intervalsByType.infra);
     }
 
     entries.push({
@@ -2042,71 +2069,6 @@ function chunk<T>(items: T[], size: number) {
   return chunks;
 }
 
-function buildDurationChartsFromIssueFacts(
-  rows: Array<{
-    date: string;
-    issue_type: IssueType;
-    duration_seconds: number;
-  }>,
-) {
-  const end = nowSg().startOf('day');
-  const rowsByDate = groupIssueFactRowsByDate(rows);
-  const aggregateForRange = (
-    rangeStart: DateTime,
-    rangeEnd: DateTime,
-  ): Record<string, number> => {
-    const payload = emptyIssueTypePayload();
-    for (
-      let dateTime = rangeStart.startOf('day');
-      dateTime < rangeEnd;
-      dateTime = dateTime.plus({ days: 1 })
-    ) {
-      const date = dateTime.toFormat('yyyy-MM-dd');
-      for (const row of rowsByDate.get(date) ?? []) {
-        payload[row.issue_type] += row.duration_seconds;
-      }
-    }
-    return payload;
-  };
-
-  return STATISTICS_TIME_WINDOWS.map((window) => {
-    const start = getWindowStart(end, window.dataTimeScale);
-    const data: ChartEntry[] = [];
-    for (let offset = 0; offset < window.dataTimeScale.count; offset++) {
-      const bucketStart = getDatePlus(
-        start,
-        window.dataTimeScale.granularity,
-        offset,
-      );
-      const bucketEnd = getBucketEnd(
-        bucketStart,
-        window.dataTimeScale.granularity,
-      );
-      data.push({
-        name: bucketStart.toISODate()!,
-        payload: aggregateForRange(bucketStart, bucketEnd),
-      });
-    }
-
-    const currentEnd = getWindowEnd(start, window.dataTimeScale);
-    const previousStart = getDateMinus(
-      start,
-      window.dataTimeScale.granularity,
-      window.dataTimeScale.count,
-    );
-    return buildCountChart(
-      window.title,
-      data,
-      [
-        { name: 'current', payload: aggregateForRange(start, currentEnd) },
-        { name: 'previous', payload: aggregateForRange(previousStart, start) },
-      ],
-      window.dataTimeScale,
-      window.displayTimeScale,
-    );
-  });
-}
-
 function isUndefinedTableError(error: unknown) {
   return (
     error != null &&
@@ -2258,21 +2220,18 @@ async function rebuildOperationalFactsForDateFromDataset(
 
   const issueRows = issues
     .map((issue) => {
-      const durationSeconds = getIssueBounds(issue).reduce(
-        (total, interval) => {
-          return (
-            total +
-            overlapSeconds(
-              interval.start,
-              interval.end,
-              normalizedDate,
-              dayEnd,
-              asOf,
-            )
-          );
-        },
-        0,
-      );
+      const intervals = getIssueBounds(issue)
+        .map((interval) =>
+          clipIntervalToRange(
+            interval.start,
+            interval.end,
+            normalizedDate,
+            dayEnd,
+            asOf,
+          ),
+        )
+        .filter((interval) => interval != null);
+      const durationSeconds = sumIntervalSeconds(intervals, asOf);
 
       return {
         date: dateKey,
@@ -3131,9 +3090,7 @@ export async function getStatisticsData() {
     timeScaleChartsIssueCount: hasStatisticsIssueFactCoverage
       ? buildIssueCountChartsFromIssueFacts(issueFactRows)
       : buildStatisticsIssueCountGraphs(issues),
-    timeScaleChartsIssueDuration: hasStatisticsIssueFactCoverage
-      ? buildDurationChartsFromIssueFacts(issueFactRows)
-      : buildIssueDurationGraphs(issues),
+    timeScaleChartsIssueDuration: buildIssueDurationGraphs(issues),
     chartTotalIssueCountByLine,
     chartTotalIssueCountByStation,
     chartRollingYearHeatmap,
