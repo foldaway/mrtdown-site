@@ -1,9 +1,14 @@
-import type { Duration } from 'luxon';
+import type { Duration, DurationObjectUnits } from 'luxon';
 import type React from 'react';
-import { FormattedList, FormattedNumber, useIntl } from 'react-intl';
+import {
+  FormattedList,
+  FormattedNumber,
+  type FormatNumberOptions,
+  useIntl,
+} from 'react-intl';
 import { useHydrated } from '~/hooks/useHydrated';
 
-interface Props extends Intl.NumberFormatOptions {
+interface Props extends FormatNumberOptions {
   duration: Duration;
 }
 
@@ -21,8 +26,13 @@ export const FormattedDuration: React.FC<Props> = (props) => {
 
   if (isHydrated && 'DurationFormat' in Intl) {
     const durationObj = duration.shiftToAll().toObject();
-    for (const [key, value] of Object.entries(durationObj)) {
-      durationObj[key] = Math.round(value);
+    for (const key of Object.keys(durationObj) as Array<
+      keyof DurationObjectUnits
+    >) {
+      const value = durationObj[key];
+      if (value != null) {
+        durationObj[key] = Math.round(value);
+      }
     }
     // @ts-expect-error missing types https://github.com/microsoft/TypeScript/issues/60608
     const nativeString = new Intl.DurationFormat(intl.locale).format(

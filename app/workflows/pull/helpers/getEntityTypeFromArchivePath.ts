@@ -20,7 +20,8 @@ export function getEntityTypeFromArchivePath(path: string) {
   if (path.startsWith('data/issue/')) {
     if (path.endsWith('/evidence.ndjson')) {
       return 'issue.evidence';
-    } else if (path.endsWith('/impact.ndjson')) {
+    }
+    if (path.endsWith('/impact.ndjson')) {
       return 'issue.impact';
     }
     return 'issue';
