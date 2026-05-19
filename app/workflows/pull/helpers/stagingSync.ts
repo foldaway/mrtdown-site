@@ -1070,6 +1070,15 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         });
     }
     if (evidenceRows.length > 0) {
+      const evidenceIds = Array.from(
+        new Set(evidenceRows.map((evidence) => evidence.id)),
+      );
+      for (const ids of chunk(evidenceIds, DELETE_BATCH)) {
+        await tx
+          .delete(impactEventBasisEvidencesTable)
+          .where(inArray(impactEventBasisEvidencesTable.evidence_id, ids));
+        await tx.delete(evidencesTable).where(inArray(evidencesTable.id, ids));
+      }
       for (const rows of chunk(evidenceRows, BATCH)) {
         await tx.insert(evidencesTable).values(rows);
       }
