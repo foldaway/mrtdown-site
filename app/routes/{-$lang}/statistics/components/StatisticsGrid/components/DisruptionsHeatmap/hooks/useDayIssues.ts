@@ -2,6 +2,14 @@ import { DateTime } from 'luxon';
 import { useEffect, useState } from 'react';
 import type { IncludedEntities, Issue } from '~/client';
 
+interface IssuesDayResponse {
+  success: boolean;
+  data?: {
+    issueIds?: string[];
+  };
+  included?: IncludedEntities;
+}
+
 interface UseDayIssuesReturn {
   issues: Issue[];
   included: IncludedEntities | null;
@@ -44,7 +52,7 @@ export const useDayIssues = (dateString: string | null): UseDayIssuesReturn => {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const result = await response.json();
+        const result = (await response.json()) as IssuesDayResponse;
 
         if (result.success && result.data?.issueIds) {
           const issueList: Issue[] = result.data.issueIds

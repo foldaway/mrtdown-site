@@ -12,7 +12,7 @@ This repository is mid-overhaul on the stacked `codex/overhaul-*` branches.
 
 ## Verification
 
-Run `npm run verify` before publishing changes. The command runs the currently green baseline check for this point in the overhaul stack.
+Run `npm run verify` before publishing changes. The command runs typechecking, linting, formatting checks, and tests.
 
 Use narrower commands while iterating:
 

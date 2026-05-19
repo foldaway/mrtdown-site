@@ -4,7 +4,9 @@ import {
   HeadContent,
   Outlet,
   Scripts,
+  useRouterState,
 } from '@tanstack/react-router';
+import { LANGUAGES } from '~/constants';
 import { getPosthogOptions } from '~/helpers/getPosthogOptions';
 import stylesheet from '../index.css?url';
 
@@ -71,7 +73,11 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-  const { lang = 'en-SG' } = Route.useParams();
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const pathLocale = pathname.split('/')[1];
+  const lang = LANGUAGES.includes(pathLocale) ? pathLocale : 'en-SG';
 
   return (
     <html lang={lang}>

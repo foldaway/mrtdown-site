@@ -4,7 +4,7 @@ import type {
   IssueType,
   LineSummaryStatus,
   LineType,
-  StationComponentMemberStructureType,
+  StationLineMemberStructureType,
 } from './client';
 
 export const LANGUAGES_NON_DEFAULT = ['zh-Hans', 'ms', 'ta'];
@@ -135,7 +135,7 @@ export const LineTypeLabels: Record<LineType, MessageDescriptor> = {
 };
 
 export const StationStructureTypeLabels: Record<
-  StationComponentMemberStructureType,
+  StationLineMemberStructureType,
   MessageDescriptor
 > = {
   elevated: defineMessage({

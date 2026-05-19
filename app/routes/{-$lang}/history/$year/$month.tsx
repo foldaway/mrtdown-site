@@ -37,9 +37,8 @@ export const Route = createFileRoute('/{-$lang}/history/$year/$month')({
       messages,
     });
 
-    const dateTimeStartAt = DateTime.fromISO(
-      ctx.loaderData?.data.startAt,
-    ).setZone('Asia/Singapore');
+    const startAt = ctx.loaderData?.data.startAt ?? `${year}-${month}-01`;
+    const dateTimeStartAt = DateTime.fromISO(startAt).setZone('Asia/Singapore');
 
     const title = intl.formatMessage(
       {
