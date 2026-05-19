@@ -1027,7 +1027,9 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
     }
     if (evidenceRows.length > 0) {
       const dedupedEvidenceRows = Array.from(
-        new Map(evidenceRows.map((evidence) => [evidence.id, evidence])).values(),
+        new Map(
+          evidenceRows.map((evidence) => [evidence.id, evidence]),
+        ).values(),
       );
       const evidenceIds = dedupedEvidenceRows.map((evidence) => evidence.id);
       for (const ids of chunk(evidenceIds, DELETE_BATCH)) {
