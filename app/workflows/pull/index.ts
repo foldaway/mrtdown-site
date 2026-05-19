@@ -6,6 +6,7 @@ import {
 import { MRTDownRepository } from '@mrtdown/fs';
 import * as Sentry from '@sentry/cloudflare';
 import { ZipStore } from '~/helpers/ZipStore.js';
+import { rebuildOperationalFactsRange } from '~/util/db.queries.js';
 import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
@@ -49,6 +50,16 @@ const syncStepConfig = {
 };
 
 const ISSUE_SYNC_BATCH_SIZE = 500;
+const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
+
+const factsStepConfig = {
+  retries: {
+    limit: 2,
+    delay: '10 seconds' as const,
+    backoff: 'exponential' as const,
+  },
+  timeout: '10 minutes' as const,
+};
 
 /**
  * Durable pull pipeline: manifest → parse into staging → promote by domain →
@@ -240,6 +251,18 @@ class PullWorkflowBase extends WorkflowEntrypoint<Env, Params> {
       await finalizePull(db);
     });
 
+    const facts = await step.do(
+      'rebuild-operational-facts',
+      factsStepConfig,
+      async () => {
+        console.log(
+          `Rebuilding operational facts for ${OPERATIONAL_FACTS_REBUILD_DAYS} days...`,
+        );
+        return rebuildOperationalFactsRange(OPERATIONAL_FACTS_REBUILD_DAYS);
+      },
+    );
+
+    console.log(`[PULL] Rebuilt operational facts for ${facts.length} days`);
     console.log('[PULL] Pull complete', counts);
   }
 }
