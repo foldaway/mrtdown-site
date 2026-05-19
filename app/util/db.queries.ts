@@ -1871,66 +1871,6 @@ function buildDurationChartsFromIssueFacts(
   });
 }
 
-function buildIssueCountChartsFromIssueFacts(
-  rows: Array<{
-    date: string;
-    issue_id: string;
-    issue_type: IssueType;
-    active_anytime: boolean;
-  }>,
-) {
-  const end = nowSg().startOf('day');
-  const activeRowsByDate = groupIssueFactRowsByDate(
-    rows.filter((row) => row.active_anytime),
-  );
-  const aggregateForRange = (
-    start: DateTime,
-    count: number,
-    previous = false,
-  ): Record<string, number> => {
-    const rangeStart = previous ? start.minus({ days: count }) : start;
-    const issueTypesById = new Map<string, IssueType>();
-    for (let offset = 0; offset < count; offset++) {
-      const date = rangeStart.plus({ days: offset }).toFormat('yyyy-MM-dd');
-      for (const row of activeRowsByDate.get(date) ?? []) {
-        issueTypesById.set(row.issue_id, row.issue_type);
-      }
-    }
-    return [...issueTypesById.values()].reduce<Record<IssueType, number>>(
-      (payload, issueType) => {
-        payload[issueType] += 1;
-        return payload;
-      },
-      emptyIssueTypePayload(),
-    );
-  };
-
-  return [7, 30, 90].map((count) => {
-    const start = end.minus({ days: count - 1 });
-    const data: ChartEntry[] = [];
-    for (let offset = 0; offset < count; offset++) {
-      const date = start.plus({ days: offset }).toFormat('yyyy-MM-dd');
-      data.push({
-        name: date,
-        payload: summarizeIssueFactRows(
-          activeRowsByDate.get(date) ?? [],
-          'count',
-        ),
-      });
-    }
-
-    return buildCountChart(
-      `${count}d`,
-      data,
-      [
-        { name: 'current', payload: aggregateForRange(start, count, false) },
-        { name: 'previous', payload: aggregateForRange(start, count, true) },
-      ],
-      makeTimeScale('day', count),
-    );
-  });
-}
-
 function isUndefinedTableError(error: unknown) {
   return (
     error != null &&
@@ -2024,7 +1964,7 @@ async function shouldUseLegacyHistoryFallback(
   context: string,
 ) {
   const today = nowSg().startOf('day');
-  if (end.startOf('day') > today) {
+  if (end.startOf('day') >= today) {
     return true;
   }
 
@@ -2942,9 +2882,7 @@ export async function getStatisticsData() {
   };
 
   const statistics: SystemAnalytics = {
-    timeScaleChartsIssueCount: hasIssueFactCoverage
-      ? buildIssueCountChartsFromIssueFacts(issueFactRows)
-      : buildIssueCountGraphs(issues),
+    timeScaleChartsIssueCount: buildIssueCountGraphs(issues),
     timeScaleChartsIssueDuration: hasIssueFactCoverage
       ? buildDurationChartsFromIssueFacts(issueFactRows)
       : buildIssueDurationGraphs(issues),
