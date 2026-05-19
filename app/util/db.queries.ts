@@ -1986,6 +1986,23 @@ async function getOperationalFactCoverageDatesInRange(
   }
 }
 
+async function getOperationalFactCoverageStartDate() {
+  const db = await getDefaultDb();
+  try {
+    const [row] = await db
+      .select({
+        startDate: sql<string | null>`min(${lineDayFactsTable.date})`,
+      })
+      .from(lineDayFactsTable);
+    return row?.startDate ?? null;
+  } catch (error) {
+    if (isUndefinedTableError(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 function hasFullDateCoverage(
   rows: Array<{ date: string }>,
   start: DateTime,
@@ -1999,6 +2016,29 @@ function hasFullDateCoverage(
 
   const dates = new Set(rows.map((row) => row.date));
   return dates.size === expectedDays;
+}
+
+async function shouldUseLegacyHistoryFallback(
+  start: DateTime,
+  end: DateTime,
+  context: string,
+) {
+  const coverageRows = await getOperationalFactCoverageDatesInRange(start, end);
+  if (hasFullDateCoverage(coverageRows, start, end)) {
+    return false;
+  }
+
+  const coverageStart = await getOperationalFactCoverageStartDate();
+  if (
+    coverageStart != null &&
+    start.startOf('day') < DateTime.fromISO(coverageStart, { zone: SG_TIMEZONE })
+  ) {
+    return true;
+  }
+
+  throw new Error(
+    `Missing operational fact coverage for ${context}: ${start.toISODate()} to ${end.toISODate()}`,
+  );
 }
 
 async function assertOperationalFactCoverage(
@@ -2572,11 +2612,47 @@ export async function getHistoryYearSummaryData(year: number) {
     yearStart,
     yearEnd.minus({ days: 1 }),
   );
-  await assertOperationalFactCoverage(
-    yearStart,
-    yearEnd.minus({ days: 1 }),
-    `history year ${year}`,
-  );
+  if (
+    await shouldUseLegacyHistoryFallback(
+      yearStart,
+      yearEnd.minus({ days: 1 }),
+      `history year ${year}`,
+    )
+  ) {
+    const dataset = await getBaseDataset();
+    const issues = Object.values(dataset.allIssues).filter((issue) =>
+      issueOverlapsRange(issue, yearStart, yearEnd),
+    );
+
+    const summaryByMonth = Array.from({ length: 12 }, (_, index) => {
+      const monthStart = DateTime.fromObject(
+        { year, month: index + 1, day: 1 },
+        { zone: SG_TIMEZONE },
+      ).startOf('day');
+      const monthEnd = monthStart.plus({ months: 1 });
+      const monthIssues = issues.filter((issue) =>
+        issueOverlapsRange(issue, monthStart, monthEnd),
+      );
+      return {
+        month: monthStart.toISODate()!,
+        issueCountsByType: pickIssueTypes(monthIssues),
+        totalCount: monthIssues.length,
+      };
+    }).reverse();
+
+    return {
+      data: {
+        startAt: yearStart.toISODate()!,
+        endAt: yearEnd.minus({ day: 1 }).toISODate()!,
+        summaryByMonth,
+      },
+      included: withIssues(
+        dataset.included,
+        dataset.allIssues,
+        issues.map((issue) => issue.id),
+      ),
+    };
+  }
   const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
   const included = await getIncludedForIssueIds(issueIds);
   const uniqueIssuesByMonth = Array.from(
@@ -2632,11 +2708,59 @@ export async function getHistoryYearMonthData(year: number, month: number) {
     monthStart,
     monthEnd.minus({ days: 1 }),
   );
-  await assertOperationalFactCoverage(
-    monthStart,
-    monthEnd.minus({ days: 1 }),
-    `history month ${year}-${month.toString().padStart(2, '0')}`,
-  );
+  if (
+    await shouldUseLegacyHistoryFallback(
+      monthStart,
+      monthEnd.minus({ days: 1 }),
+      `history month ${year}-${month.toString().padStart(2, '0')}`,
+    )
+  ) {
+    const dataset = await getBaseDataset();
+
+    const issues = Object.values(dataset.allIssues).filter((issue) =>
+      issueOverlapsRange(issue, monthStart, monthEnd),
+    );
+
+    const weeks = new Map<string, string[]>();
+    for (
+      let date = monthStart.startOf('week');
+      date < monthEnd.endOf('week');
+      date = date.plus({ week: 1 })
+    ) {
+      const key = `${date.weekYear}-W${date.weekNumber.toString().padStart(2, '0')}`;
+      const issueIds = issues
+        .filter((issue) =>
+          issueOverlapsRange(
+            issue,
+            date.startOf('week'),
+            date.startOf('week').plus({ week: 1 }),
+          ),
+        )
+        .map((issue) => issue.id)
+        .sort((a, b) => b.localeCompare(a));
+      if (issueIds.length > 0 || !weeks.has(key)) {
+        weeks.set(key, issueIds);
+      }
+    }
+
+    return {
+      data: {
+        startAt: monthStart.toISODate()!,
+        endAt: monthEnd.minus({ day: 1 }).toISODate()!,
+        issuesByWeek: [...weeks.entries()]
+          .sort(([a], [b]) => b.localeCompare(a))
+          .map(([week, issueIds]) => ({
+            week,
+            issueIds,
+          })),
+      },
+      included: withIssues(
+        dataset.included,
+        dataset.allIssues,
+        issues.map((issue) => issue.id),
+      ),
+    };
+  }
   const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
   const included = await getIncludedForIssueIds(issueIds);
   const weeks = new Map<string, Set<string>>();
@@ -2681,7 +2805,24 @@ export async function getHistoryDayData(
 ) {
   const date = DateTime.fromObject({ year, month, day }, { zone: SG_TIMEZONE });
   const factRows = await getIssueDayFactsInRange(date, date);
-  await assertOperationalFactCoverage(date, date, `history day ${date}`);
+  if (await shouldUseLegacyHistoryFallback(date, date, `history day ${date}`)) {
+    const dataset = await getBaseDataset();
+    const issues = Object.values(dataset.allIssues).filter((issue) =>
+      issueTouchesDate(issue, date),
+    );
+    const issueIds = issues
+      .map((issue) => issue.id)
+      .sort((a, b) => b.localeCompare(a));
+
+    return {
+      data: {
+        startAt: date.toISODate()!,
+        endAt: date.toISODate()!,
+        issueIds,
+      },
+      included: withIssues(dataset.included, dataset.allIssues, issueIds),
+    };
+  }
   const issueIds = [...new Set(factRows.map((row) => row.issue_id))].sort(
     (a, b) => b.localeCompare(a),
   );

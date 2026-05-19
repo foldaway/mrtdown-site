@@ -10,5 +10,5 @@ This is the web app that presents data on MRT/LRT disruptions in Singapore.
 
 ### Contributions
 
-Pull request titles should follow Conventional Commits, for example
+Pull request titles should follow [Conventional Commits](https://www.conventionalcommits.org/), for example
 `feat: add station history filters` or `fix: handle missing fact coverage`.
