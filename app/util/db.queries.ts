@@ -572,11 +572,14 @@ function buildCountChart(
   };
 }
 
-async function buildBaseDataset(
+async function buildDataset(
   referenceNow = nowSg(),
   db?: AppDb,
+  issueIds?: readonly string[],
 ): Promise<BaseDataset> {
   const database = db ?? (await getDefaultDb());
+  const selectedIssueIds =
+    issueIds == null ? undefined : [...new Set(issueIds)];
 
   const [
     metadataRows,
@@ -615,15 +618,40 @@ async function buildBaseDataset(
     database.select().from(servicesTable),
     database.select().from(serviceRevisionsTable),
     database.select().from(publicHolidaysTable),
-    database.select().from(issuesTable),
-    database
-      .select({
-        issue_id: evidencesTable.issue_id,
-        latest_ts: sql<string>`max(${evidencesTable.ts})`,
-      })
-      .from(evidencesTable)
-      .groupBy(evidencesTable.issue_id),
-    database.select().from(impactEventsTable),
+    selectedIssueIds == null
+      ? database.select().from(issuesTable)
+      : selectedIssueIds.length > 0
+        ? database
+            .select()
+            .from(issuesTable)
+            .where(inArray(issuesTable.id, selectedIssueIds))
+        : [],
+    selectedIssueIds == null
+      ? database
+          .select({
+            issue_id: evidencesTable.issue_id,
+            latest_ts: sql<string>`max(${evidencesTable.ts})`,
+          })
+          .from(evidencesTable)
+          .groupBy(evidencesTable.issue_id)
+      : selectedIssueIds.length > 0
+        ? database
+            .select({
+              issue_id: evidencesTable.issue_id,
+              latest_ts: sql<string>`max(${evidencesTable.ts})`,
+            })
+            .from(evidencesTable)
+            .where(inArray(evidencesTable.issue_id, selectedIssueIds))
+            .groupBy(evidencesTable.issue_id)
+        : [],
+    selectedIssueIds == null
+      ? database.select().from(impactEventsTable)
+      : selectedIssueIds.length > 0
+        ? database
+            .select()
+            .from(impactEventsTable)
+            .where(inArray(impactEventsTable.issue_id, selectedIssueIds))
+        : [],
   ]);
 
   const latestEventByTypeByIssueId = impactEventRows.reduce<
@@ -1253,6 +1281,13 @@ async function buildBaseDataset(
   };
 }
 
+async function buildBaseDataset(
+  referenceNow = nowSg(),
+  db?: AppDb,
+): Promise<BaseDataset> {
+  return buildDataset(referenceNow, db);
+}
+
 async function getBaseDataset() {
   const now = Date.now();
   if (cachedBaseDataset != null && cachedBaseDataset.expiresAt > now) {
@@ -1267,10 +1302,15 @@ async function getBaseDataset() {
   return dataset;
 }
 
+async function getIncludedForIssueIds(issueIds: readonly string[]) {
+  const dataset = await buildDataset(nowSg(), undefined, issueIds);
+  return withIssues(dataset.included, dataset.allIssues, issueIds);
+}
+
 function withIssues(
   baseIncluded: BaseIncludedEntities,
   allIssues: Record<string, Issue>,
-  issueIds?: string[],
+  issueIds?: readonly string[],
 ): IncludedEntities {
   const selectedIssues =
     issueIds == null
@@ -1860,6 +1900,49 @@ async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
   }
 }
 
+async function getOperationalFactCoverageDatesInRange(
+  start: DateTime,
+  end: DateTime,
+) {
+  const db = await getDefaultDb();
+  try {
+    return await db
+      .select({
+        date: lineDayFactsTable.date,
+      })
+      .from(lineDayFactsTable)
+      .where(
+        and(
+          gte(lineDayFactsTable.date, start.toISODate()!),
+          lte(lineDayFactsTable.date, end.toISODate()!),
+        ),
+      )
+      .groupBy(lineDayFactsTable.date);
+  } catch (error) {
+    if (isUndefinedTableError(error)) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+async function getOperationalFactCoverageStartDate() {
+  const db = await getDefaultDb();
+  try {
+    const [row] = await db
+      .select({
+        startDate: sql<string | null>`min(${lineDayFactsTable.date})`,
+      })
+      .from(lineDayFactsTable);
+    return row?.startDate ?? null;
+  } catch (error) {
+    if (isUndefinedTableError(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 function hasFullDateCoverage(
   rows: Array<{ date: string }>,
   start: DateTime,
@@ -1873,6 +1956,56 @@ function hasFullDateCoverage(
 
   const dates = new Set(rows.map((row) => row.date));
   return dates.size === expectedDays;
+}
+
+async function shouldUseLegacyHistoryFallback(
+  start: DateTime,
+  end: DateTime,
+  context: string,
+) {
+  const today = nowSg().startOf('day');
+  if (end.startOf('day') >= today) {
+    return true;
+  }
+
+  const coverageEnd =
+    end.startOf('day') < today ? end.startOf('day') : today;
+  if (coverageEnd < start.startOf('day')) {
+    return false;
+  }
+
+  const coverageRows = await getOperationalFactCoverageDatesInRange(
+    start,
+    coverageEnd,
+  );
+  if (hasFullDateCoverage(coverageRows, start, coverageEnd)) {
+    return false;
+  }
+
+  const coverageStart = await getOperationalFactCoverageStartDate();
+  if (
+    coverageStart != null &&
+    start.startOf('day') < DateTime.fromISO(coverageStart, { zone: SG_TIMEZONE })
+  ) {
+    return true;
+  }
+
+  throw new Error(
+    `Missing operational fact coverage for ${context}: ${start.toISODate()} to ${coverageEnd.toISODate()}`,
+  );
+}
+
+async function assertOperationalFactCoverage(
+  start: DateTime,
+  end: DateTime,
+  context: string,
+) {
+  const coverageRows = await getOperationalFactCoverageDatesInRange(start, end);
+  if (!hasFullDateCoverage(coverageRows, start, end)) {
+    throw new Error(
+      `Missing operational fact coverage for ${context}: ${start.toISODate()} to ${end.toISODate()}`,
+    );
+  }
 }
 
 async function rebuildOperationalFactsForDateFromDataset(
@@ -2433,39 +2566,31 @@ export async function getHistoryYearSummaryData(year: number) {
     yearStart,
     yearEnd.minus({ days: 1 }),
   );
-  if (hasFullDateCoverage(factRows, yearStart, yearEnd.minus({ days: 1 }))) {
+  if (
+    await shouldUseLegacyHistoryFallback(
+      yearStart,
+      yearEnd.minus({ days: 1 }),
+      `history year ${year}`,
+    )
+  ) {
     const dataset = await getBaseDataset();
-    const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
-    const uniqueIssuesByMonth = Array.from(
-      { length: 12 },
-      () => new Map<string, IssueType>(),
+    const issues = Object.values(dataset.allIssues).filter((issue) =>
+      issueOverlapsRange(issue, yearStart, yearEnd),
     );
-
-    for (const row of factRows) {
-      const date = parseDateTime(row.date);
-      uniqueIssuesByMonth[date.month - 1]?.set(
-        row.issue_id,
-        row.issue_type as IssueType,
-      );
-    }
 
     const summaryByMonth = Array.from({ length: 12 }, (_, index) => {
       const monthStart = DateTime.fromObject(
         { year, month: index + 1, day: 1 },
         { zone: SG_TIMEZONE },
       ).startOf('day');
-      const uniqueIssues =
-        uniqueIssuesByMonth[index] ?? new Map<string, IssueType>();
-      const issueCountsByType = [...uniqueIssues.values()].reduce<
-        Partial<Record<IssueType, number>>
-      >((acc, type) => {
-        acc[type] = (acc[type] ?? 0) + 1;
-        return acc;
-      }, {});
+      const monthEnd = monthStart.plus({ months: 1 });
+      const monthIssues = issues.filter((issue) =>
+        issueOverlapsRange(issue, monthStart, monthEnd),
+      );
       return {
         month: monthStart.toISODate()!,
-        issueCountsByType,
-        totalCount: uniqueIssues.size,
+        issueCountsByType: pickIssueTypes(monthIssues),
+        totalCount: monthIssues.length,
       };
     }).reverse();
 
@@ -2475,28 +2600,45 @@ export async function getHistoryYearSummaryData(year: number) {
         endAt: yearEnd.minus({ day: 1 }).toISODate()!,
         summaryByMonth,
       },
-      included: withIssues(dataset.included, dataset.allIssues, issueIds),
+      included: withIssues(
+        dataset.included,
+        dataset.allIssues,
+        issues.map((issue) => issue.id),
+      ),
     };
   }
-
-  const dataset = await getBaseDataset();
-  const issues = Object.values(dataset.allIssues).filter((issue) =>
-    issueOverlapsRange(issue, yearStart, yearEnd),
+  const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
+  const included = await getIncludedForIssueIds(issueIds);
+  const uniqueIssuesByMonth = Array.from(
+    { length: 12 },
+    () => new Map<string, IssueType>(),
   );
+
+  for (const row of factRows) {
+    const date = parseDateTime(row.date);
+    uniqueIssuesByMonth[date.month - 1]?.set(
+      row.issue_id,
+      row.issue_type as IssueType,
+    );
+  }
 
   const summaryByMonth = Array.from({ length: 12 }, (_, index) => {
     const monthStart = DateTime.fromObject(
       { year, month: index + 1, day: 1 },
       { zone: SG_TIMEZONE },
     ).startOf('day');
-    const monthEnd = monthStart.plus({ months: 1 });
-    const monthIssues = issues.filter((issue) =>
-      issueOverlapsRange(issue, monthStart, monthEnd),
-    );
+    const uniqueIssues =
+      uniqueIssuesByMonth[index] ?? new Map<string, IssueType>();
+    const issueCountsByType = [...uniqueIssues.values()].reduce<
+      Partial<Record<IssueType, number>>
+    >((acc, type) => {
+      acc[type] = (acc[type] ?? 0) + 1;
+      return acc;
+    }, {});
     return {
       month: monthStart.toISODate()!,
-      issueCountsByType: pickIssueTypes(monthIssues),
-      totalCount: monthIssues.length,
+      issueCountsByType,
+      totalCount: uniqueIssues.size,
     };
   }).reverse();
 
@@ -2506,11 +2648,7 @@ export async function getHistoryYearSummaryData(year: number) {
       endAt: yearEnd.minus({ day: 1 }).toISODate()!,
       summaryByMonth,
     },
-    included: withIssues(
-      dataset.included,
-      dataset.allIssues,
-      issues.map((issue) => issue.id),
-    ),
+    included,
   };
 }
 
@@ -2524,25 +2662,38 @@ export async function getHistoryYearMonthData(year: number, month: number) {
     monthStart,
     monthEnd.minus({ days: 1 }),
   );
-  if (hasFullDateCoverage(factRows, monthStart, monthEnd.minus({ days: 1 }))) {
+  if (
+    await shouldUseLegacyHistoryFallback(
+      monthStart,
+      monthEnd.minus({ days: 1 }),
+      `history month ${year}-${month.toString().padStart(2, '0')}`,
+    )
+  ) {
     const dataset = await getBaseDataset();
-    const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
-    const weeks = new Map<string, Set<string>>();
+
+    const issues = Object.values(dataset.allIssues).filter((issue) =>
+      issueOverlapsRange(issue, monthStart, monthEnd),
+    );
+
+    const weeks = new Map<string, string[]>();
     for (
       let date = monthStart.startOf('week');
       date < monthEnd.endOf('week');
       date = date.plus({ week: 1 })
     ) {
       const key = `${date.weekYear}-W${date.weekNumber.toString().padStart(2, '0')}`;
-      weeks.set(key, new Set());
-    }
-
-    for (const row of factRows) {
-      const date = parseDateTime(row.date);
-      const key = `${date.weekYear}-W${date.weekNumber.toString().padStart(2, '0')}`;
-      const issueIdsForWeek = weeks.get(key);
-      if (issueIdsForWeek != null) {
-        issueIdsForWeek.add(row.issue_id);
+      const issueIds = issues
+        .filter((issue) =>
+          issueOverlapsRange(
+            issue,
+            date.startOf('week'),
+            date.startOf('week').plus({ week: 1 }),
+          ),
+        )
+        .map((issue) => issue.id)
+        .sort((a, b) => b.localeCompare(a));
+      if (issueIds.length > 0 || !weeks.has(key)) {
+        weeks.set(key, issueIds);
       }
     }
 
@@ -2552,40 +2703,37 @@ export async function getHistoryYearMonthData(year: number, month: number) {
         endAt: monthEnd.minus({ day: 1 }).toISODate()!,
         issuesByWeek: [...weeks.entries()]
           .sort(([a], [b]) => b.localeCompare(a))
-          .map(([week, ids]) => ({
+          .map(([week, issueIds]) => ({
             week,
-            issueIds: [...ids].sort((a, b) => b.localeCompare(a)),
+            issueIds,
           })),
       },
-      included: withIssues(dataset.included, dataset.allIssues, issueIds),
+      included: withIssues(
+        dataset.included,
+        dataset.allIssues,
+        issues.map((issue) => issue.id),
+      ),
     };
   }
+  const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
+  const included = await getIncludedForIssueIds(issueIds);
+  const weeks = new Map<string, Set<string>>();
 
-  const dataset = await getBaseDataset();
-
-  const issues = Object.values(dataset.allIssues).filter((issue) =>
-    issueOverlapsRange(issue, monthStart, monthEnd),
-  );
-
-  const weeks = new Map<string, string[]>();
   for (
     let date = monthStart.startOf('week');
     date < monthEnd.endOf('week');
     date = date.plus({ week: 1 })
   ) {
     const key = `${date.weekYear}-W${date.weekNumber.toString().padStart(2, '0')}`;
-    const issueIds = issues
-      .filter((issue) =>
-        issueOverlapsRange(
-          issue,
-          date.startOf('week'),
-          date.startOf('week').plus({ week: 1 }),
-        ),
-      )
-      .map((issue) => issue.id)
-      .sort((a, b) => b.localeCompare(a));
-    if (issueIds.length > 0 || !weeks.has(key)) {
-      weeks.set(key, issueIds);
+    weeks.set(key, new Set());
+  }
+
+  for (const row of factRows) {
+    const date = parseDateTime(row.date);
+    const key = `${date.weekYear}-W${date.weekNumber.toString().padStart(2, '0')}`;
+    const issueIdsForWeek = weeks.get(key);
+    if (issueIdsForWeek != null) {
+      issueIdsForWeek.add(row.issue_id);
     }
   }
 
@@ -2595,16 +2743,12 @@ export async function getHistoryYearMonthData(year: number, month: number) {
       endAt: monthEnd.minus({ day: 1 }).toISODate()!,
       issuesByWeek: [...weeks.entries()]
         .sort(([a], [b]) => b.localeCompare(a))
-        .map(([week, issueIds]) => ({
+        .map(([week, ids]) => ({
           week,
-          issueIds,
+          issueIds: [...ids].sort((a, b) => b.localeCompare(a)),
         })),
     },
-    included: withIssues(
-      dataset.included,
-      dataset.allIssues,
-      issues.map((issue) => issue.id),
-    ),
+    included,
   };
 }
 
@@ -2615,11 +2759,15 @@ export async function getHistoryDayData(
 ) {
   const date = DateTime.fromObject({ year, month, day }, { zone: SG_TIMEZONE });
   const factRows = await getIssueDayFactsInRange(date, date);
-  if (factRows.length > 0) {
+  if (await shouldUseLegacyHistoryFallback(date, date, `history day ${date}`)) {
     const dataset = await getBaseDataset();
-    const issueIds = [...new Set(factRows.map((row) => row.issue_id))].sort(
-      (a, b) => b.localeCompare(a),
+    const issues = Object.values(dataset.allIssues).filter((issue) =>
+      issueTouchesDate(issue, date),
     );
+    const issueIds = issues
+      .map((issue) => issue.id)
+      .sort((a, b) => b.localeCompare(a));
+
     return {
       data: {
         startAt: date.toISODate()!,
@@ -2629,14 +2777,10 @@ export async function getHistoryDayData(
       included: withIssues(dataset.included, dataset.allIssues, issueIds),
     };
   }
-
-  const dataset = await getBaseDataset();
-  const issues = Object.values(dataset.allIssues).filter((issue) =>
-    issueTouchesDate(issue, date),
+  const issueIds = [...new Set(factRows.map((row) => row.issue_id))].sort(
+    (a, b) => b.localeCompare(a),
   );
-  const issueIds = issues
-    .map((issue) => issue.id)
-    .sort((a, b) => b.localeCompare(a));
+  const included = await getIncludedForIssueIds(issueIds);
 
   return {
     data: {
@@ -2644,7 +2788,7 @@ export async function getHistoryDayData(
       endAt: date.toISODate()!,
       issueIds,
     },
-    included: withIssues(dataset.included, dataset.allIssues, issueIds),
+    included,
   };
 }
 
@@ -2657,8 +2801,12 @@ export async function getStatisticsData() {
     rollingYearStart,
     rollingYearEnd,
   );
+  const factCoverageRows = await getOperationalFactCoverageDatesInRange(
+    rollingYearStart,
+    rollingYearEnd,
+  );
   const hasIssueFactCoverage = hasFullDateCoverage(
-    issueFactRows,
+    factCoverageRows,
     rollingYearStart,
     rollingYearEnd,
   );
