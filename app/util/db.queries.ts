@@ -1,5 +1,5 @@
 import { resolvePeriods } from '@mrtdown/core';
-import { and, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { DateTime, Interval } from 'luxon';
 import type {
   Chart,
@@ -27,7 +27,6 @@ import type {
   TimeScale,
   TimeScaleChart,
 } from '~/client';
-import { getDb } from '~/db';
 import {
   evidencesTable,
   impactEventCausesTable,
@@ -72,8 +71,19 @@ type BaseDataset = {
   metadata: Record<string, string>;
   publicHolidaySet: Set<string>;
   allIssues: Record<string, Issue>;
-  issueUpdatesById: Record<string, IssueUpdate[]>;
 };
+
+const BASE_DATASET_CACHE_TTL_MS = 60_000;
+let cachedBaseDataset:
+  | {
+      expiresAt: number;
+      value: BaseDataset;
+    }
+  | undefined;
+const dateTimeCache = new Map<string, DateTime>();
+const issueBoundsCache = new WeakMap<Issue, IssueIntervalBounds[]>();
+
+type AppDb = ReturnType<typeof import('~/db').getDb>;
 
 type IssueIntervalBounds = {
   start: DateTime;
@@ -84,22 +94,34 @@ function nowSg() {
   return DateTime.now().setZone(SG_TIMEZONE);
 }
 
+async function getDefaultDb() {
+  const { getDb } = await import('~/db');
+  return getDb();
+}
+
 function parseDateTime(value: string) {
+  const cached = dateTimeCache.get(value);
+  if (cached != null) {
+    return cached;
+  }
+
+  let parsed: DateTime;
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return DateTime.fromISO(value, { zone: SG_TIMEZONE });
+    parsed = DateTime.fromISO(value, { zone: SG_TIMEZONE });
+  } else {
+    const iso = DateTime.fromISO(value, { setZone: true });
+    if (iso.isValid) {
+      parsed = iso.setZone(SG_TIMEZONE);
+    } else {
+      const sqlDateTime = DateTime.fromSQL(value, { setZone: true });
+      parsed = sqlDateTime.isValid
+        ? sqlDateTime.setZone(SG_TIMEZONE)
+        : DateTime.fromJSDate(new Date(value)).setZone(SG_TIMEZONE);
+    }
   }
 
-  const iso = DateTime.fromISO(value, { setZone: true });
-  if (iso.isValid) {
-    return iso.setZone(SG_TIMEZONE);
-  }
-
-  const sqlDateTime = DateTime.fromSQL(value, { setZone: true });
-  if (sqlDateTime.isValid) {
-    return sqlDateTime.setZone(SG_TIMEZONE);
-  }
-
-  return DateTime.fromJSDate(new Date(value)).setZone(SG_TIMEZONE);
+  dateTimeCache.set(value, parsed);
+  return parsed;
 }
 
 function parseTranslations(value: unknown) {
@@ -366,6 +388,88 @@ function pickIssueTypes<T extends { type: IssueType }>(items: T[]) {
   return counts;
 }
 
+function emptyIssueTypePayload(): Record<IssueType, number> {
+  return { disruption: 0, maintenance: 0, infra: 0 };
+}
+
+function groupIssueFactRowsByDate<T extends { date: string }>(rows: T[]) {
+  const rowsByDate = new Map<string, T[]>();
+  for (const row of rows) {
+    const dayRows = rowsByDate.get(row.date);
+    if (dayRows == null) {
+      rowsByDate.set(row.date, [row]);
+      continue;
+    }
+    dayRows.push(row);
+  }
+  return rowsByDate;
+}
+
+function summarizeIssueFactRows(
+  rows: Array<{
+    issue_type: IssueType;
+    duration_seconds?: number;
+  }>,
+  value: 'count' | 'duration',
+) {
+  const payload = emptyIssueTypePayload();
+  for (const row of rows) {
+    payload[row.issue_type] +=
+      value === 'duration' ? (row.duration_seconds ?? 0) : 1;
+  }
+  return payload;
+}
+
+function buildIssuesByLineId(issues: Issue[]) {
+  const issuesByLineId = new Map<string, Issue[]>();
+  for (const issue of issues) {
+    for (const lineId of issue.lineIds) {
+      const lineIssues = issuesByLineId.get(lineId);
+      if (lineIssues == null) {
+        issuesByLineId.set(lineId, [issue]);
+        continue;
+      }
+      lineIssues.push(issue);
+    }
+  }
+  return issuesByLineId;
+}
+
+function buildStationIssueCountEntries(
+  issues: Issue[],
+  stations: Record<string, Station>,
+) {
+  const countsByStationId = new Map<string, Record<IssueType, number>>();
+
+  for (const issue of issues) {
+    const stationIds = new Set<string>();
+    for (const branch of issue.branchesAffected) {
+      for (const stationId of branch.stationIds) {
+        stationIds.add(stationId);
+      }
+    }
+
+    for (const stationId of stationIds) {
+      const counts = countsByStationId.get(stationId) ?? emptyIssueTypePayload();
+      counts[issue.type] += 1;
+      countsByStationId.set(stationId, counts);
+    }
+  }
+
+  return Object.values(stations).map((station) => {
+    const counts = countsByStationId.get(station.id) ?? emptyIssueTypePayload();
+    return {
+      name: station.id,
+      payload: {
+        disruption: counts.disruption,
+        maintenance: counts.maintenance,
+        infra: counts.infra,
+        totalIssues: counts.disruption + counts.maintenance + counts.infra,
+      },
+    };
+  });
+}
+
 function pickIssueDurationByType<
   T extends { type: IssueType; durationSeconds: number },
 >(items: T[]) {
@@ -377,10 +481,17 @@ function pickIssueDurationByType<
 }
 
 function getIssueBounds(issue: Issue): IssueIntervalBounds[] {
-  return issue.intervals.map((interval) => ({
+  const cached = issueBoundsCache.get(issue);
+  if (cached != null) {
+    return cached;
+  }
+
+  const bounds = issue.intervals.map((interval) => ({
     start: parseDateTime(interval.startAt),
     end: interval.endAt != null ? parseDateTime(interval.endAt) : null,
   }));
+  issueBoundsCache.set(issue, bounds);
+  return bounds;
 }
 
 function issueTouchesDate(issue: Issue, date: DateTime) {
@@ -404,7 +515,12 @@ function issueOverlapsRange(
 }
 
 function issueActiveNow(issue: Issue, referenceNow = nowSg()) {
-  return issue.intervals.some((interval) => interval.status === 'ongoing');
+  return getIssueBounds(issue).some((interval) => {
+    return (
+      interval.start <= referenceNow &&
+      (interval.end == null || interval.end > referenceNow)
+    );
+  });
 }
 
 function issueActiveToday(issue: Issue, referenceNow = nowSg()) {
@@ -456,8 +572,11 @@ function buildCountChart(
   };
 }
 
-async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
-  const db = getDb();
+async function buildBaseDataset(
+  referenceNow = nowSg(),
+  db?: AppDb,
+): Promise<BaseDataset> {
+  const database = db ?? (await getDefaultDb());
 
   const [
     metadataRows,
@@ -471,23 +590,18 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     stationLandmarksRows,
     serviceRows,
     serviceRevisionRows,
-    servicePathRows,
     publicHolidayRows,
     issueRows,
-    evidenceRows,
+    latestEvidenceRows,
     impactEventRows,
-    impactEventPeriodRows,
-    impactEventServiceRows,
-    impactEventFacilityRows,
-    impactEventCauseRows,
   ] = await Promise.all([
-    db.select().from(metadataTable),
-    db.select().from(linesTable),
-    db.select().from(lineOperatorsTable),
-    db.select().from(operatorsTable),
-    db.select().from(townsTable),
-    db.select().from(landmarksTable),
-    db
+    database.select().from(metadataTable),
+    database.select().from(linesTable),
+    database.select().from(lineOperatorsTable),
+    database.select().from(operatorsTable),
+    database.select().from(townsTable),
+    database.select().from(landmarksTable),
+    database
       .select({
         id: stationsTable.id,
         name: stationsTable.name,
@@ -496,19 +610,123 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
         longitude: sql<number>`ST_X(${stationsTable.geo})`,
       })
       .from(stationsTable),
-    db.select().from(stationCodesTable),
-    db.select().from(stationLandmarksTable),
-    db.select().from(servicesTable),
-    db.select().from(serviceRevisionsTable),
-    db.select().from(serviceRevisionPathStationEntriesTable),
-    db.select().from(publicHolidaysTable),
-    db.select().from(issuesTable),
-    db.select().from(evidencesTable),
-    db.select().from(impactEventsTable),
-    db.select().from(impactEventPeriodsTable),
-    db.select().from(impactEventEntityServicesTable),
-    db.select().from(impactEventEntityFacilitiesTable),
-    db.select().from(impactEventCausesTable),
+    database.select().from(stationCodesTable),
+    database.select().from(stationLandmarksTable),
+    database.select().from(servicesTable),
+    database.select().from(serviceRevisionsTable),
+    database.select().from(publicHolidaysTable),
+    database.select().from(issuesTable),
+    database
+      .select({
+        issue_id: evidencesTable.issue_id,
+        latest_ts: sql<string>`max(${evidencesTable.ts})`,
+      })
+      .from(evidencesTable)
+      .groupBy(evidencesTable.issue_id),
+    database.select().from(impactEventsTable),
+  ]);
+
+  const latestEventByTypeByIssueId = impactEventRows.reduce<
+    Record<
+      string,
+      Partial<
+        Record<
+          (typeof impactEventRows)[number]['type'],
+          (typeof impactEventRows)[number]
+        >
+      >
+    >
+  >((acc, event) => {
+    acc[event.issue_id] ??= {};
+    const current = acc[event.issue_id][event.type];
+    if (current == null) {
+      acc[event.issue_id][event.type] = event;
+      return acc;
+    }
+
+    const tsDiff =
+      parseDateTime(event.ts).toMillis() - parseDateTime(current.ts).toMillis();
+    if (tsDiff > 0 || (tsDiff === 0 && event.id > current.id)) {
+      acc[event.issue_id][event.type] = event;
+    }
+    return acc;
+  }, {});
+
+  const selectedStateEventIds = [
+    ...new Set(
+      Object.values(latestEventByTypeByIssueId).flatMap((latestEventByType) =>
+        [
+          latestEventByType['periods.set'],
+          latestEventByType['causes.set'],
+          latestEventByType['service_scopes.set'],
+          latestEventByType['service_effects.set'],
+          latestEventByType['facility_effects.set'],
+        ]
+          .filter(
+            (event): event is (typeof impactEventRows)[number] =>
+              event != null,
+          )
+          .map((event) => event.id),
+      ),
+    ),
+  ];
+  const periodImpactEventIds = [
+    ...new Set(
+      Object.values(latestEventByTypeByIssueId)
+        .map((latestEventByType) => latestEventByType['periods.set']?.id)
+        .filter((eventId): eventId is string => eventId != null),
+    ),
+  ];
+  const [
+    impactEventPeriodRows,
+    impactEventServiceRows,
+    impactEventFacilityRows,
+    impactEventCauseRows,
+  ] = await Promise.all([
+    periodImpactEventIds.length > 0
+      ? database
+          .select()
+          .from(impactEventPeriodsTable)
+          .where(
+            inArray(
+              impactEventPeriodsTable.impact_event_id,
+              periodImpactEventIds,
+            ),
+          )
+      : ([] as (typeof impactEventPeriodsTable.$inferSelect)[]),
+    selectedStateEventIds.length > 0
+      ? database
+          .select()
+          .from(impactEventEntityServicesTable)
+          .where(
+            inArray(
+              impactEventEntityServicesTable.impact_event_id,
+              selectedStateEventIds,
+            ),
+          )
+      : ([] as (typeof impactEventEntityServicesTable.$inferSelect)[]),
+    selectedStateEventIds.length > 0
+      ? database
+          .select()
+          .from(impactEventEntityFacilitiesTable)
+          .where(
+            inArray(
+              impactEventEntityFacilitiesTable.impact_event_id,
+              selectedStateEventIds,
+            ),
+          )
+      : ([] as (typeof impactEventEntityFacilitiesTable.$inferSelect)[]),
+    selectedStateEventIds.length > 0
+      ? database
+          .select()
+          .from(impactEventCausesTable)
+          .where(
+            inArray(
+              impactEventCausesTable.impact_event_id,
+              selectedStateEventIds,
+            ),
+          )
+      : ([] as (typeof impactEventCausesTable.$inferSelect)[]),
   ]);
 
   const metadata = Object.fromEntries(
@@ -599,6 +817,49 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     return acc;
   }, {});
 
+  const latestRevisionByServiceId = Object.fromEntries(
+    serviceRows
+      .map((service) => {
+        const revisions = revisionsByServiceId[service.id] ?? [];
+        if (revisions.length === 0) {
+          return null;
+        }
+
+        const latestRevision = [...revisions].sort((a, b) => {
+          const aTs = new Date(a.updated_at).getTime();
+          const bTs = new Date(b.updated_at).getTime();
+          if (aTs !== bTs) {
+            return bTs - aTs;
+          }
+          return b.id.localeCompare(a.id);
+        })[0];
+
+        return [service.id, latestRevision] as const;
+      })
+      .filter((entry): entry is readonly [
+        string,
+        (typeof serviceRevisionRows)[number],
+      ] => entry != null),
+  );
+
+  const latestRevisionIds = [
+    ...new Set(
+      Object.values(latestRevisionByServiceId).map((revision) => revision.id),
+    ),
+  ];
+  const servicePathRows =
+    latestRevisionIds.length > 0
+      ? await database
+          .select()
+          .from(serviceRevisionPathStationEntriesTable)
+          .where(
+            inArray(
+              serviceRevisionPathStationEntriesTable.service_revision_id,
+              latestRevisionIds,
+            ),
+          )
+      : [];
+
   const pathEntriesByRevisionKey = servicePathRows.reduce<
     Record<string, typeof servicePathRows>
   >((acc, row) => {
@@ -628,19 +889,8 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
   const branchByServiceId: Record<string, BranchWithEntries> = {};
 
   for (const service of serviceRows) {
-    const revisions = revisionsByServiceId[service.id] ?? [];
-    if (revisions.length === 0) {
-      continue;
-    }
-
-    const latestRevision = [...revisions].sort((a, b) => {
-      const aTs = new Date(a.updated_at).getTime();
-      const bTs = new Date(b.updated_at).getTime();
-      if (aTs !== bTs) {
-        return bTs - aTs;
-      }
-      return b.id.localeCompare(a.id);
-    })[0];
+    const latestRevision = latestRevisionByServiceId[service.id];
+    if (latestRevision == null) continue;
 
     const revisionKey = `${latestRevision.id}::${service.id}`;
     const entries = [...(pathEntriesByRevisionKey[revisionKey] ?? [])].sort(
@@ -672,7 +922,6 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
       .map((value) => parseDateTime(value));
 
     const { fallback, translations } = parseTranslations(service.name);
-    const referenceNow = nowSg();
     const minStart = startedDates.sort(
       (a, b) => a.toMillis() - b.toMillis(),
     )[0];
@@ -802,16 +1051,6 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     }),
   ) as IncludedEntities['stations'];
 
-  const impactEventsByIssueId = impactEventRows.reduce<
-    Record<string, typeof impactEventRows>
-  >((acc, row) => {
-    if (acc[row.issue_id] == null) {
-      acc[row.issue_id] = [];
-    }
-    acc[row.issue_id].push(row);
-    return acc;
-  }, {});
-
   const periodsByImpactEventId = impactEventPeriodRows.reduce<
     Record<string, typeof impactEventPeriodRows>
   >((acc, row) => {
@@ -852,51 +1091,26 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     return acc;
   }, {});
 
-  const evidenceByIssueId = evidenceRows.reduce<
-    Record<string, typeof evidenceRows>
-  >((acc, row) => {
-    if (acc[row.issue_id] == null) {
-      acc[row.issue_id] = [];
-    }
-    acc[row.issue_id].push(row);
-    return acc;
-  }, {});
   const latestEvidenceAtByIssueId = Object.fromEntries(
-    Object.entries(evidenceByIssueId).map(([issueId, rows]) => [
-      issueId,
-      rows
-        .map((row) => parseDateTime(row.ts))
-        .sort((a, b) => b.toMillis() - a.toMillis())[0] ?? null,
+    latestEvidenceRows.map((row) => [
+      row.issue_id,
+      row.latest_ts != null ? parseDateTime(row.latest_ts) : null,
     ]),
   ) as Record<string, DateTime | null>;
 
   const allIssues: Record<string, Issue> = {};
-  const issueUpdatesById: Record<string, IssueUpdate[]> = {};
   for (const row of issueRows) {
     const { fallback, translations } = parseTranslations(row.title);
-    const events = [...(impactEventsByIssueId[row.id] ?? [])].sort((a, b) => {
-      const tsDiff =
-        parseDateTime(b.ts).toMillis() - parseDateTime(a.ts).toMillis();
-      if (tsDiff !== 0) {
-        return tsDiff;
-      }
-      return b.id.localeCompare(a.id);
-    });
-    const latestEventByType = events.reduce<
-      Partial<Record<(typeof events)[number]['type'], (typeof events)[number]>>
-    >((acc, event) => {
-      if (acc[event.type] == null) {
-        acc[event.type] = event;
-      }
-      return acc;
-    }, {});
+    const latestEventByType = latestEventByTypeByIssueId[row.id] ?? {};
     const selectedStateEvents = [
       latestEventByType['periods.set'],
       latestEventByType['causes.set'],
       latestEventByType['service_scopes.set'],
       latestEventByType['service_effects.set'],
       latestEventByType['facility_effects.set'],
-    ].filter((event): event is (typeof events)[number] => event != null);
+    ].filter(
+      (event): event is (typeof impactEventRows)[number] => event != null,
+    );
     const serviceBranches = new Map<string, IssueAffectedBranch>();
     const facilityBranches = new Map<string, IssueAffectedBranch>();
     const causeSet = new Set<Issue['subtypes'][number]>();
@@ -1021,14 +1235,6 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
       intervals,
     };
 
-    issueUpdatesById[row.id] = [...(evidenceByIssueId[row.id] ?? [])]
-      .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
-      .map((evidence) => ({
-        type: evidence.type,
-        text: evidence.text,
-        sourceUrl: evidence.source_url,
-        createdAt: evidence.ts,
-      }));
   }
 
   return {
@@ -1044,8 +1250,21 @@ async function buildBaseDataset(referenceNow = nowSg()): Promise<BaseDataset> {
     metadata,
     publicHolidaySet,
     allIssues,
-    issueUpdatesById,
   };
+}
+
+async function getBaseDataset() {
+  const now = Date.now();
+  if (cachedBaseDataset != null && cachedBaseDataset.expiresAt > now) {
+    return cachedBaseDataset.value;
+  }
+
+  const dataset = await buildBaseDataset();
+  cachedBaseDataset = {
+    expiresAt: Date.now() + BASE_DATASET_CACHE_TTL_MS,
+    value: dataset,
+  };
+  return dataset;
 }
 
 function withIssues(
@@ -1569,41 +1788,33 @@ function buildDurationChartsFromIssueFacts(
   }>,
 ) {
   const end = nowSg().startOf('day');
+  const rowsByDate = groupIssueFactRowsByDate(rows);
   const aggregateForRange = (
     start: DateTime,
     count: number,
     previous = false,
   ): Record<string, number> => {
     const rangeStart = previous ? start.minus({ days: count }) : start;
-    const rangeEnd = rangeStart.plus({ days: count });
-    return rows.reduce<Record<string, number>>(
-      (acc, row) => {
-        const date = DateTime.fromISO(row.date, { zone: SG_TIMEZONE });
-        if (date < rangeStart || date >= rangeEnd) {
-          return acc;
-        }
-
-        acc[row.issue_type] += row.duration_seconds;
-        return acc;
-      },
-      { disruption: 0, maintenance: 0, infra: 0 },
-    );
+    const payload = emptyIssueTypePayload();
+    for (let offset = 0; offset < count; offset++) {
+      const date = rangeStart.plus({ days: offset }).toFormat('yyyy-MM-dd');
+      for (const row of rowsByDate.get(date) ?? []) {
+        payload[row.issue_type] += row.duration_seconds;
+      }
+    }
+    return payload;
   };
 
   return [7, 30, 90].map((count) => {
     const start = end.minus({ days: count - 1 });
     const data: ChartEntry[] = [];
     for (let offset = 0; offset < count; offset++) {
-      const date = start.plus({ days: offset }).toISODate()!;
-      const dayRows = rows.filter((row) => row.date === date);
+      const date = start.plus({ days: offset }).toFormat('yyyy-MM-dd');
       data.push({
         name: date,
-        payload: dayRows.reduce<Record<string, number>>(
-          (acc, row) => {
-            acc[row.issue_type] += row.duration_seconds;
-            return acc;
-          },
-          { disruption: 0, maintenance: 0, infra: 0 },
+        payload: summarizeIssueFactRows(
+          rowsByDate.get(date) ?? [],
+          'duration',
         ),
       });
     }
@@ -1630,7 +1841,7 @@ function isUndefinedTableError(error: unknown) {
 }
 
 async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
-  const db = getDb();
+  const db = await getDefaultDb();
   try {
     return await db
       .select()
@@ -1664,11 +1875,14 @@ function hasFullDateCoverage(
   return dates.size === expectedDays;
 }
 
-export async function rebuildOperationalFactsForDate(date: DateTime) {
+async function rebuildOperationalFactsForDateFromDataset(
+  date: DateTime,
+  dataset: BaseDataset,
+  db?: AppDb,
+) {
   const normalizedDate = date.setZone(SG_TIMEZONE).startOf('day');
   const asOf = normalizedDate.endOf('day');
-  const dataset = await buildBaseDataset(asOf);
-  const db = getDb();
+  const database = db ?? (await getDefaultDb());
   const dateKey = normalizedDate.toISODate()!;
   const dayEnd = normalizedDate.plus({ days: 1 });
   const issues = Object.values(dataset.allIssues);
@@ -1753,7 +1967,7 @@ export async function rebuildOperationalFactsForDate(date: DateTime) {
     };
   });
 
-  await db.transaction(async (tx) => {
+  await database.transaction(async (tx) => {
     await tx
       .delete(issueDayFactsTable)
       .where(eq(issueDayFactsTable.date, dateKey));
@@ -1780,11 +1994,22 @@ export async function rebuildOperationalFactsForDate(date: DateTime) {
   };
 }
 
+export async function rebuildOperationalFactsForDate(
+  date: DateTime,
+  db?: AppDb,
+) {
+  const normalizedDate = date.setZone(SG_TIMEZONE).startOf('day');
+  const dataset = await buildBaseDataset(normalizedDate.endOf('day'), db);
+  return rebuildOperationalFactsForDateFromDataset(normalizedDate, dataset, db);
+}
+
 export async function rebuildOperationalFactsRange(
   days: number,
   end = nowSg(),
+  db?: AppDb,
 ) {
   const normalizedEnd = end.setZone(SG_TIMEZONE).startOf('day');
+  const dataset = await buildBaseDataset(normalizedEnd.endOf('day'), db);
   const results: Array<{
     date: string;
     issueCount: number;
@@ -1792,13 +2017,15 @@ export async function rebuildOperationalFactsRange(
   }> = [];
   for (let offset = days - 1; offset >= 0; offset--) {
     const date = normalizedEnd.minus({ days: offset });
-    results.push(await rebuildOperationalFactsForDate(date));
+    results.push(
+      await rebuildOperationalFactsForDateFromDataset(date, dataset, db),
+    );
   }
   return results;
 }
 
 export async function getRootData() {
-  const dataset = await buildBaseDataset();
+  const dataset = await getBaseDataset();
   return {
     lineIds: Object.keys(dataset.included.lines).sort(),
     included: withIssues(dataset.included, dataset.allIssues, []),
@@ -1812,7 +2039,7 @@ export async function getRootData() {
 }
 
 export async function getOverviewData(days: number) {
-  const dataset = await buildBaseDataset();
+  const dataset = await getBaseDataset();
   const issues = Object.values(dataset.allIssues);
   const lineSummaries = rankLineSummaries(
     Object.values(dataset.included.lines).map((line) => {
@@ -1858,7 +2085,7 @@ export async function getOverviewData(days: number) {
 }
 
 export async function getLineProfileData(lineId: string, days: number) {
-  const dataset = await buildBaseDataset();
+  const dataset = await getBaseDataset();
   const line = dataset.included.lines[lineId];
   if (line == null) {
     throw new Response('Line not found', {
@@ -1968,7 +2195,15 @@ export async function getLineProfileData(lineId: string, days: number) {
 }
 
 export async function getIssueData(issueId: string) {
-  const dataset = await buildBaseDataset();
+  const db = await getDefaultDb();
+  const [dataset, evidenceRows] = await Promise.all([
+    getBaseDataset(),
+    db
+      .select()
+      .from(evidencesTable)
+      .where(eq(evidencesTable.issue_id, issueId))
+      .orderBy(desc(evidencesTable.ts)),
+  ]);
   const issue = dataset.allIssues[issueId];
   if (issue == null) {
     throw new Response('Issue not found', {
@@ -1980,14 +2215,21 @@ export async function getIssueData(issueId: string) {
   return {
     data: {
       id: issueId,
-      updates: dataset.issueUpdatesById[issueId] ?? [],
+      updates: evidenceRows.map(
+        (evidence): IssueUpdate => ({
+          type: evidence.type,
+          text: evidence.text,
+          sourceUrl: evidence.source_url,
+          createdAt: evidence.ts,
+        }),
+      ),
     },
     included: withIssues(dataset.included, dataset.allIssues, [issueId]),
   };
 }
 
 export async function getStationProfileData(stationId: string) {
-  const dataset = await buildBaseDataset();
+  const dataset = await getBaseDataset();
   const station = dataset.included.stations[stationId];
   if (station == null) {
     throw new Response('Station not found', {
@@ -2029,7 +2271,7 @@ export async function getStationProfileData(stationId: string) {
 }
 
 export async function getOperatorProfileData(operatorId: string, days: number) {
-  const dataset = await buildBaseDataset();
+  const dataset = await getBaseDataset();
   const operator = dataset.included.operators[operatorId];
   if (operator == null) {
     throw new Response('Operator not found', {
@@ -2192,22 +2434,28 @@ export async function getHistoryYearSummaryData(year: number) {
     yearEnd.minus({ days: 1 }),
   );
   if (hasFullDateCoverage(factRows, yearStart, yearEnd.minus({ days: 1 }))) {
-    const dataset = await buildBaseDataset();
+    const dataset = await getBaseDataset();
     const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
+    const uniqueIssuesByMonth = Array.from(
+      { length: 12 },
+      () => new Map<string, IssueType>(),
+    );
+
+    for (const row of factRows) {
+      const date = parseDateTime(row.date);
+      uniqueIssuesByMonth[date.month - 1]?.set(
+        row.issue_id,
+        row.issue_type as IssueType,
+      );
+    }
+
     const summaryByMonth = Array.from({ length: 12 }, (_, index) => {
       const monthStart = DateTime.fromObject(
         { year, month: index + 1, day: 1 },
         { zone: SG_TIMEZONE },
       ).startOf('day');
-      const monthEnd = monthStart.plus({ months: 1 });
-      const monthRows = factRows.filter((row) => {
-        const date = DateTime.fromISO(row.date, { zone: SG_TIMEZONE });
-        return date >= monthStart && date < monthEnd;
-      });
-      const uniqueIssues = new Map<string, IssueType>();
-      for (const row of monthRows) {
-        uniqueIssues.set(row.issue_id, row.issue_type as IssueType);
-      }
+      const uniqueIssues =
+        uniqueIssuesByMonth[index] ?? new Map<string, IssueType>();
       const issueCountsByType = [...uniqueIssues.values()].reduce<
         Partial<Record<IssueType, number>>
       >((acc, type) => {
@@ -2231,7 +2479,7 @@ export async function getHistoryYearSummaryData(year: number) {
     };
   }
 
-  const dataset = await buildBaseDataset();
+  const dataset = await getBaseDataset();
   const issues = Object.values(dataset.allIssues).filter((issue) =>
     issueOverlapsRange(issue, yearStart, yearEnd),
   );
@@ -2277,29 +2525,24 @@ export async function getHistoryYearMonthData(year: number, month: number) {
     monthEnd.minus({ days: 1 }),
   );
   if (hasFullDateCoverage(factRows, monthStart, monthEnd.minus({ days: 1 }))) {
-    const dataset = await buildBaseDataset();
+    const dataset = await getBaseDataset();
     const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
-    const weeks = new Map<string, string[]>();
+    const weeks = new Map<string, Set<string>>();
     for (
       let date = monthStart.startOf('week');
       date < monthEnd.endOf('week');
       date = date.plus({ week: 1 })
     ) {
-      const weekStart = date.startOf('week');
-      const weekEnd = weekStart.plus({ week: 1 });
       const key = `${date.weekYear}-W${date.weekNumber.toString().padStart(2, '0')}`;
-      const weekIssueIds = [
-        ...new Set(
-          factRows
-            .filter((row) => {
-              const rowDate = DateTime.fromISO(row.date, { zone: SG_TIMEZONE });
-              return rowDate >= weekStart && rowDate < weekEnd;
-            })
-            .map((row) => row.issue_id),
-        ),
-      ].sort((a, b) => b.localeCompare(a));
-      if (weekIssueIds.length > 0 || !weeks.has(key)) {
-        weeks.set(key, weekIssueIds);
+      weeks.set(key, new Set());
+    }
+
+    for (const row of factRows) {
+      const date = parseDateTime(row.date);
+      const key = `${date.weekYear}-W${date.weekNumber.toString().padStart(2, '0')}`;
+      const issueIdsForWeek = weeks.get(key);
+      if (issueIdsForWeek != null) {
+        issueIdsForWeek.add(row.issue_id);
       }
     }
 
@@ -2311,14 +2554,14 @@ export async function getHistoryYearMonthData(year: number, month: number) {
           .sort(([a], [b]) => b.localeCompare(a))
           .map(([week, ids]) => ({
             week,
-            issueIds: ids,
+            issueIds: [...ids].sort((a, b) => b.localeCompare(a)),
           })),
       },
       included: withIssues(dataset.included, dataset.allIssues, issueIds),
     };
   }
 
-  const dataset = await buildBaseDataset();
+  const dataset = await getBaseDataset();
 
   const issues = Object.values(dataset.allIssues).filter((issue) =>
     issueOverlapsRange(issue, monthStart, monthEnd),
@@ -2373,7 +2616,7 @@ export async function getHistoryDayData(
   const date = DateTime.fromObject({ year, month, day }, { zone: SG_TIMEZONE });
   const factRows = await getIssueDayFactsInRange(date, date);
   if (factRows.length > 0) {
-    const dataset = await buildBaseDataset();
+    const dataset = await getBaseDataset();
     const issueIds = [...new Set(factRows.map((row) => row.issue_id))].sort(
       (a, b) => b.localeCompare(a),
     );
@@ -2387,7 +2630,7 @@ export async function getHistoryDayData(
     };
   }
 
-  const dataset = await buildBaseDataset();
+  const dataset = await getBaseDataset();
   const issues = Object.values(dataset.allIssues).filter((issue) =>
     issueTouchesDate(issue, date),
   );
@@ -2406,7 +2649,7 @@ export async function getHistoryDayData(
 }
 
 export async function getStatisticsData() {
-  const dataset = await buildBaseDataset();
+  const dataset = await getBaseDataset();
   const issues = Object.values(dataset.allIssues);
   const rollingYearEnd = nowSg().startOf('day');
   const rollingYearStart = rollingYearEnd.minus({ days: 364 });
@@ -2419,6 +2662,10 @@ export async function getStatisticsData() {
     rollingYearStart,
     rollingYearEnd,
   );
+  const issuesByLineId = buildIssuesByLineId(issues);
+  const issueFactRowsByDate = groupIssueFactRowsByDate(
+    issueFactRows.filter((row) => row.active_anytime),
+  );
   const longestDisruptions = [...issues]
     .filter((issue) => issue.type === 'disruption')
     .sort((a, b) => b.durationSeconds - a.durationSeconds)
@@ -2428,9 +2675,7 @@ export async function getStatisticsData() {
   const chartTotalIssueCountByLine: Chart = {
     title: 'Issue Count by Line',
     data: Object.values(dataset.included.lines).map((line) => {
-      const lineIssues = issues.filter((issue) =>
-        issue.lineIds.includes(line.id),
-      );
+      const lineIssues = issuesByLineId.get(line.id) ?? [];
       const counts = pickIssueTypes(lineIssues);
       return {
         name: line.id,
@@ -2444,24 +2689,9 @@ export async function getStatisticsData() {
     }),
   };
 
-  const stationIssueCounts = Object.values(dataset.included.stations).map(
-    (station) => {
-      const stationIssues = issues.filter((issue) =>
-        issue.branchesAffected.some((branch) =>
-          branch.stationIds.includes(station.id),
-        ),
-      );
-      const counts = pickIssueTypes(stationIssues);
-      return {
-        name: station.id,
-        payload: {
-          disruption: counts.disruption ?? 0,
-          maintenance: counts.maintenance ?? 0,
-          infra: counts.infra ?? 0,
-          totalIssues: stationIssues.length,
-        },
-      };
-    },
+  const stationIssueCounts = buildStationIssueCountEntries(
+    issues,
+    dataset.included.stations,
   );
 
   const chartTotalIssueCountByStation: Chart = {
@@ -2478,18 +2708,12 @@ export async function getStatisticsData() {
     title: 'Rolling Year Heatmap',
     data: Array.from({ length: 365 }, (_, index) => {
       const date = rollingYearStart.plus({ days: index }).toISODate()!;
-      const dayRows = hasIssueFactCoverage
-        ? issueFactRows.filter((row) => row.date === date && row.active_anytime)
-        : [];
       if (hasIssueFactCoverage) {
         return {
           name: date,
-          payload: dayRows.reduce<Record<string, number>>(
-            (acc, row) => {
-              acc[row.issue_type] += 1;
-              return acc;
-            },
-            { disruption: 0, maintenance: 0, infra: 0 },
+          payload: summarizeIssueFactRows(
+            issueFactRowsByDate.get(date) ?? [],
+            'count',
           ),
         };
       }
@@ -2531,7 +2755,7 @@ export async function getStatisticsData() {
 }
 
 export async function getSitemapData() {
-  const dataset = await buildBaseDataset();
+  const dataset = await getBaseDataset();
   const issues = Object.values(dataset.allIssues).filter(
     (issue) => issue.intervals[0] != null,
   );

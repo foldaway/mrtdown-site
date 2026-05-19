@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import * as schema from '../db/schema.js';
 import { ZipStore } from '../helpers/ZipStore.js';
+import { rebuildOperationalFactsRange } from '../util/db.queries.js';
 import { fetchArchive } from '../workflows/pull/helpers/fetchArchive.js';
 import { fetchManifest } from '../workflows/pull/helpers/fetchManifest.js';
 import {
@@ -26,6 +27,7 @@ const { Pool } = pg;
 
 const DEFAULT_FIXTURES_BASE_URL =
   'https://foldaway.github.io/mrtdown-data/fixtures';
+const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
 
 type Db = Parameters<typeof truncateStagingTables>[0];
 
@@ -134,6 +136,12 @@ async function main(): Promise<void> {
     console.log(`Seeding preview database from ${fixturesBaseUrl}`);
     await stageFixtures(db, fixturesBaseUrl);
     await syncSeededData(db);
+    const facts = await rebuildOperationalFactsRange(
+      OPERATIONAL_FACTS_REBUILD_DAYS,
+      undefined,
+      db,
+    );
+    console.log(`Rebuilt operational facts for ${facts.length} preview days`);
     console.log('Preview fixture seed complete');
   } finally {
     await pool.end();
