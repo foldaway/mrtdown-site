@@ -48,7 +48,7 @@ const syncStepConfig = {
   },
 };
 
-const ISSUE_SYNC_BATCH_SIZE = 100;
+const ISSUE_SYNC_BATCH_SIZE = 500;
 
 /**
  * Durable pull pipeline: manifest → parse into staging → promote by domain →
