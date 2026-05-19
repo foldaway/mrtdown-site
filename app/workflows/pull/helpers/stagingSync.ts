@@ -65,6 +65,8 @@ import {
 
 /** Max rows per `insert().values()` batch to stay within driver/param limits. */
 const BATCH = 500;
+/** Max ids per `IN (...)` cleanup query. Keep below proxy/driver bind limits. */
+const DELETE_BATCH = 50;
 
 type Db = ReturnType<typeof getDb>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -252,42 +254,32 @@ async function deleteImpactEventChildren(
   impactEventIds: string[],
 ): Promise<void> {
   if (impactEventIds.length === 0) return;
-  await tx
-    .delete(impactEventPeriodsTable)
-    .where(inArray(impactEventPeriodsTable.impact_event_id, impactEventIds));
-  await tx
-    .delete(impactEventBasisEvidencesTable)
-    .where(
-      inArray(impactEventBasisEvidencesTable.impact_event_id, impactEventIds),
-    );
-  await tx
-    .delete(impactEventServiceScopesTable)
-    .where(
-      inArray(impactEventServiceScopesTable.impact_event_id, impactEventIds),
-    );
-  await tx
-    .delete(impactEventServiceEffectsTable)
-    .where(
-      inArray(impactEventServiceEffectsTable.impact_event_id, impactEventIds),
-    );
-  await tx
-    .delete(impactEventFacilityEffectsTable)
-    .where(
-      inArray(impactEventFacilityEffectsTable.impact_event_id, impactEventIds),
-    );
-  await tx
-    .delete(impactEventCausesTable)
-    .where(inArray(impactEventCausesTable.impact_event_id, impactEventIds));
-  await tx
-    .delete(impactEventEntityServicesTable)
-    .where(
-      inArray(impactEventEntityServicesTable.impact_event_id, impactEventIds),
-    );
-  await tx
-    .delete(impactEventEntityFacilitiesTable)
-    .where(
-      inArray(impactEventEntityFacilitiesTable.impact_event_id, impactEventIds),
-    );
+  for (const ids of chunk(impactEventIds, DELETE_BATCH)) {
+    await tx
+      .delete(impactEventPeriodsTable)
+      .where(inArray(impactEventPeriodsTable.impact_event_id, ids));
+    await tx
+      .delete(impactEventBasisEvidencesTable)
+      .where(inArray(impactEventBasisEvidencesTable.impact_event_id, ids));
+    await tx
+      .delete(impactEventServiceScopesTable)
+      .where(inArray(impactEventServiceScopesTable.impact_event_id, ids));
+    await tx
+      .delete(impactEventServiceEffectsTable)
+      .where(inArray(impactEventServiceEffectsTable.impact_event_id, ids));
+    await tx
+      .delete(impactEventFacilityEffectsTable)
+      .where(inArray(impactEventFacilityEffectsTable.impact_event_id, ids));
+    await tx
+      .delete(impactEventCausesTable)
+      .where(inArray(impactEventCausesTable.impact_event_id, ids));
+    await tx
+      .delete(impactEventEntityServicesTable)
+      .where(inArray(impactEventEntityServicesTable.impact_event_id, ids));
+    await tx
+      .delete(impactEventEntityFacilitiesTable)
+      .where(inArray(impactEventEntityFacilitiesTable.impact_event_id, ids));
+  }
 }
 
 /** Hash diff staging vs live; upsert changed rows; delete live rows absent from staging. */
@@ -837,7 +829,7 @@ function lastEvidenceAtFromList(evidences: Evidence[]): DateTime | null {
 }
 
 async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
-  for (const ch of chunk(issueIds, BATCH)) {
+  for (const ch of chunk(issueIds, DELETE_BATCH)) {
     if (ch.length === 0) continue;
     const impactRows = await tx
       .select({ id: impactEventsTable.id })
@@ -1120,7 +1112,7 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
 }
 
 async function deleteIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
-  for (const ch of chunk(issueIds, BATCH)) {
+  for (const ch of chunk(issueIds, DELETE_BATCH)) {
     if (ch.length === 0) continue;
     const impRows = await tx
       .select({ id: impactEventsTable.id })
