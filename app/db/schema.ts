@@ -451,7 +451,10 @@ export const evidencesTable = pgTable(
     render: jsonb('render').$type<EvidenceRender>(),
     source_url: text('source_url').notNull(),
     issue_id: text('issue_id')
-      .references(() => issuesTable.id)
+      .references(() => issuesTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     ...timestampColumns,
   },
@@ -470,7 +473,10 @@ export const impactEventsTable = pgTable(
     id: text('id').primaryKey(),
     ts: timestamp('ts', { withTimezone: true, mode: 'string' }).notNull(),
     issue_id: text('issue_id')
-      .references(() => issuesTable.id)
+      .references(() => issuesTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     type: text('type').$type<ImpactEvent['type']>().notNull(),
     ...timestampColumns,
@@ -485,10 +491,16 @@ export const impactEventBasisEvidencesTable = pgTable(
   'impact_event_basis_evidences',
   {
     impact_event_id: text('impact_event_id')
-      .references(() => impactEventsTable.id)
+      .references(() => impactEventsTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     evidence_id: text('evidence_id')
-      .references(() => evidencesTable.id)
+      .references(() => evidencesTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     ...timestampColumns,
   },
@@ -525,7 +537,10 @@ export const impactEventPeriodsTable = pgTable(
   'impact_event_periods',
   {
     impact_event_id: text('impact_event_id')
-      .references(() => impactEventsTable.id)
+      .references(() => impactEventsTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     index: integer('index').notNull(),
     mode: resolvePeriodsModeKindEnum().notNull(),
@@ -654,7 +669,10 @@ export const impactEventServiceScopesTable = pgTable(
   'impact_event_service_scopes',
   {
     impact_event_id: text('impact_event_id')
-      .references(() => impactEventsTable.id)
+      .references(() => impactEventsTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     index: integer('index').notNull(),
     type: impactEventServiceScopeTypeEnum().notNull(),
@@ -715,7 +733,10 @@ export const impactEventServiceEffectsTable = pgTable(
   'impact_event_service_effects',
   {
     impact_event_id: text('impact_event_id')
-      .references(() => impactEventsTable.id)
+      .references(() => impactEventsTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     kind: serviceEffectKindEnum().notNull(),
     // Present only when kind=delay
@@ -743,7 +764,10 @@ export const impactEventFacilityEffectsTable = pgTable(
   'impact_event_facility_effects',
   {
     impact_event_id: text('impact_event_id')
-      .references(() => impactEventsTable.id)
+      .references(() => impactEventsTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     kind: facilityEffectKindEnum().notNull(),
     ...timestampColumns,
@@ -764,7 +788,10 @@ export const impactEventEntityServicesTable = pgTable(
   'impact_event_entity_services',
   {
     impact_event_id: text('impact_event_id')
-      .references(() => impactEventsTable.id)
+      .references(() => impactEventsTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     service_id: text('service_id')
       .references(() => servicesTable.id)
@@ -792,7 +819,10 @@ export const impactEventEntityFacilitiesTable = pgTable(
   'impact_event_entity_facilities',
   {
     impact_event_id: text('impact_event_id')
-      .references(() => impactEventsTable.id)
+      .references(() => impactEventsTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     station_id: text('station_id')
       .references(() => stationsTable.id)
@@ -830,7 +860,10 @@ export const impactEventCausesTable = pgTable(
   'impact_event_causes',
   {
     impact_event_id: text('impact_event_id')
-      .references(() => impactEventsTable.id)
+      .references(() => impactEventsTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
       .notNull(),
     type: impactEventCauseTypeEnum().notNull(),
     ...timestampColumns,
