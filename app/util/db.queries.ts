@@ -2023,8 +2023,19 @@ async function shouldUseLegacyHistoryFallback(
   end: DateTime,
   context: string,
 ) {
-  const coverageRows = await getOperationalFactCoverageDatesInRange(start, end);
-  if (hasFullDateCoverage(coverageRows, start, end)) {
+  const coverageEnd =
+    end.startOf('day') < nowSg().startOf('day')
+      ? end.startOf('day')
+      : nowSg().startOf('day');
+  if (coverageEnd < start.startOf('day')) {
+    return false;
+  }
+
+  const coverageRows = await getOperationalFactCoverageDatesInRange(
+    start,
+    coverageEnd,
+  );
+  if (hasFullDateCoverage(coverageRows, start, coverageEnd)) {
     return false;
   }
 
@@ -2037,7 +2048,7 @@ async function shouldUseLegacyHistoryFallback(
   }
 
   throw new Error(
-    `Missing operational fact coverage for ${context}: ${start.toISODate()} to ${end.toISODate()}`,
+    `Missing operational fact coverage for ${context}: ${start.toISODate()} to ${coverageEnd.toISODate()}`,
   );
 }
 
