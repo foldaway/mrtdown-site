@@ -2023,10 +2023,13 @@ async function shouldUseLegacyHistoryFallback(
   end: DateTime,
   context: string,
 ) {
+  const today = nowSg().startOf('day');
+  if (end.startOf('day') > today) {
+    return true;
+  }
+
   const coverageEnd =
-    end.startOf('day') < nowSg().startOf('day')
-      ? end.startOf('day')
-      : nowSg().startOf('day');
+    end.startOf('day') < today ? end.startOf('day') : today;
   if (coverageEnd < start.startOf('day')) {
     return false;
   }
@@ -2858,10 +2861,14 @@ export async function getStatisticsData() {
     rollingYearStart,
     rollingYearEnd,
   );
-  await assertOperationalFactCoverage(
+  const factCoverageRows = await getOperationalFactCoverageDatesInRange(
     rollingYearStart,
     rollingYearEnd,
-    'statistics rolling year',
+  );
+  const hasIssueFactCoverage = hasFullDateCoverage(
+    factCoverageRows,
+    rollingYearStart,
+    rollingYearEnd,
   );
   const issuesByLineId = buildIssuesByLineId(issues);
   const issueFactRowsByDate = groupIssueFactRowsByDate(
@@ -2909,23 +2916,38 @@ export async function getStatisticsData() {
     title: 'Rolling Year Heatmap',
     data: Array.from({ length: 365 }, (_, index) => {
       const date = rollingYearStart.plus({ days: index }).toISODate()!;
+      if (hasIssueFactCoverage) {
+        return {
+          name: date,
+          payload: summarizeIssueFactRows(
+            issueFactRowsByDate.get(date) ?? [],
+            'count',
+          ),
+        };
+      }
+      const dayDate = DateTime.fromISO(date, { zone: SG_TIMEZONE });
+      const dayIssues = issues.filter((issue) =>
+        issueTouchesDate(issue, dayDate),
+      );
+      const counts = pickIssueTypes(dayIssues);
       return {
         name: date,
-        payload: summarizeIssueFactRows(
-          issueFactRowsByDate.get(date) ?? [],
-          'count',
-        ),
+        payload: {
+          disruption: counts.disruption ?? 0,
+          maintenance: counts.maintenance ?? 0,
+          infra: counts.infra ?? 0,
+        },
       };
     }),
   };
 
   const statistics: SystemAnalytics = {
-    timeScaleChartsIssueCount: buildIssueCountChartsFromIssueFacts(
-      issueFactRows,
-    ),
-    timeScaleChartsIssueDuration: buildDurationChartsFromIssueFacts(
-      issueFactRows,
-    ),
+    timeScaleChartsIssueCount: hasIssueFactCoverage
+      ? buildIssueCountChartsFromIssueFacts(issueFactRows)
+      : buildIssueCountGraphs(issues),
+    timeScaleChartsIssueDuration: hasIssueFactCoverage
+      ? buildDurationChartsFromIssueFacts(issueFactRows)
+      : buildIssueDurationGraphs(issues),
     chartTotalIssueCountByLine,
     chartTotalIssueCountByStation,
     chartRollingYearHeatmap,
