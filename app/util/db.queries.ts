@@ -1310,7 +1310,7 @@ async function getIncludedForIssueIds(issueIds: readonly string[]) {
 function withIssues(
   baseIncluded: BaseIncludedEntities,
   allIssues: Record<string, Issue>,
-  issueIds?: string[],
+  issueIds?: readonly string[],
 ): IncludedEntities {
   const selectedIssues =
     issueIds == null
