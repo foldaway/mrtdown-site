@@ -127,14 +127,12 @@ async function main(): Promise<void> {
     throw new Error('DATABASE_URL must be set');
   }
 
-  const fixturesBaseUrl =
-    process.env.FIXTURES_BASE_URL ?? DEFAULT_FIXTURES_BASE_URL;
   const pool = new Pool({ connectionString: DATABASE_URL });
   const db = drizzle(pool, { schema }) as Db;
 
   try {
-    console.log(`Seeding preview database from ${fixturesBaseUrl}`);
-    await stageFixtures(db, fixturesBaseUrl);
+    console.log(`Seeding preview database from ${DEFAULT_FIXTURES_BASE_URL}`);
+    await stageFixtures(db, DEFAULT_FIXTURES_BASE_URL);
     await syncSeededData(db);
     const facts = await rebuildOperationalFactsRange(
       OPERATIONAL_FACTS_REBUILD_DAYS,

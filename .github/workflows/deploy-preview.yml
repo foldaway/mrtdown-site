@@ -37,12 +37,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Reset, migrate, and seed preview database
+      - name: Reset and migrate preview database
         run: npm run db:preview:prepare
         env:
           ALLOW_DATABASE_RESET: "true"
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          FIXTURES_BASE_URL: https://foldaway.github.io/mrtdown-data/fixtures
 
       - name: Build
         run: npm run build
@@ -75,6 +74,34 @@ jobs:
           command: deploy --secrets-file preview.env
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Run preview pull workflow
+        timeout-minutes: 30
+        run: |-
+          set -euo pipefail
+
+          instance_id="$(uuidgen)"
+          npx wrangler workflows trigger mrtdown-pull-preview --id "$instance_id"
+
+          while true; do
+            output="$(npx wrangler workflows instances describe mrtdown-pull-preview "$instance_id" --step-output=false)"
+            echo "$output"
+
+            status="$(echo "$output" | sed -n 's/^Status:[[:space:]]*//p')"
+            case "$status" in
+              *Completed*)
+                exit 0
+                ;;
+              *Errored*|*Terminated*)
+                exit 1
+                ;;
+            esac
+
+            sleep 30
+          done
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Remove preview.env
         run: rm preview.env
