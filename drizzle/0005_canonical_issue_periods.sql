@@ -1,4 +1,5 @@
 ALTER TABLE "impact_event_periods" DROP CONSTRAINT "impact_event_periods_impact_event_id_index_mode_pk";--> statement-breakpoint
+DROP INDEX "impact_event_periods_set_periods_impact_event_id_idx";--> statement-breakpoint
 DROP INDEX "impact_event_periods_mode_idx";--> statement-breakpoint
 DROP INDEX "impact_event_periods_end_at_resolved_idx";--> statement-breakpoint
 DROP INDEX "impact_event_periods_end_at_source_idx";--> statement-breakpoint
@@ -23,5 +24,7 @@ ALTER TABLE "impact_event_periods" DROP COLUMN "mode";--> statement-breakpoint
 ALTER TABLE "impact_event_periods" DROP COLUMN "end_ts_resolved";--> statement-breakpoint
 ALTER TABLE "impact_event_periods" DROP COLUMN "end_at_source";--> statement-breakpoint
 ALTER TABLE "impact_event_periods" DROP COLUMN "end_at_reason";--> statement-breakpoint
+DROP TYPE "public"."resolve_periods_end_at_source";--> statement-breakpoint
+DROP TYPE "public"."resolve_periods_end_at_reason";--> statement-breakpoint
 ALTER TABLE "impact_event_periods" ADD CONSTRAINT "impact_event_periods_impact_event_id_index_pk" PRIMARY KEY("impact_event_id","index");--> statement-breakpoint
 DROP TYPE "public"."resolve_periods_mode_kind";--> statement-breakpoint

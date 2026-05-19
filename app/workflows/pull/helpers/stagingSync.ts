@@ -1201,14 +1201,12 @@ async function deleteOrphanIssuesBatchTx(
  * missing from `issues_next` (with full subtree cleanup).
  */
 export async function syncIssues(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
-    while ((await syncChangedIssuesBatchTx(tx)) > 0) {
-      // Keep syncing until staging and live issue hashes converge.
-    }
-    while ((await deleteOrphanIssuesBatchTx(tx)) > 0) {
-      // Keep deleting until there are no live issues absent from staging.
-    }
-  });
+  while ((await syncChangedIssuesBatch(db)) > 0) {
+    // Keep syncing until staging and live issue hashes converge.
+  }
+  while ((await deleteOrphanIssuesBatch(db)) > 0) {
+    // Keep deleting until there are no live issues absent from staging.
+  }
 }
 
 /** Truncates staging tables and records `manifest_last_pulled_at` in one transaction. */

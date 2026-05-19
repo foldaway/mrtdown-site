@@ -536,10 +536,6 @@ export const impactEventPeriodsTable = pgTable(
   (table) => {
     return [
       primaryKey({ columns: [table.impact_event_id, table.index] }),
-      index('impact_event_periods_set_periods_impact_event_id_idx').on(
-        table.impact_event_id,
-        table.index,
-      ),
       index('impact_event_periods_start_at_idx').using(
         'btree',
         table.start_at.asc(),

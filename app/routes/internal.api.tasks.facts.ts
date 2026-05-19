@@ -12,8 +12,29 @@ export const Route = createFileRoute('/internal/api/tasks/facts')({
     middleware: [internalMiddleware],
     handlers: {
       async POST({ request }) {
-        const json = await request.json().catch(() => ({}));
-        const { days } = RequestSchema.parse(json);
+        let json: unknown;
+        try {
+          json = await request.json();
+        } catch {
+          return Response.json(
+            { success: false, error: 'Invalid JSON request body' },
+            { status: 400 },
+          );
+        }
+
+        const parsed = RequestSchema.safeParse(json);
+        if (!parsed.success) {
+          return Response.json(
+            {
+              success: false,
+              error: 'Invalid facts rebuild request',
+              issues: parsed.error.issues,
+            },
+            { status: 400 },
+          );
+        }
+
+        const { days } = parsed.data;
         const rows = await rebuildOperationalFactsRange(days);
         return Response.json(
           {
