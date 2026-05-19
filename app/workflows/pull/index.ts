@@ -4,6 +4,7 @@ import {
   type WorkflowStep,
 } from 'cloudflare:workers';
 import { MRTDownRepository } from '@mrtdown/fs';
+import * as Sentry from '@sentry/cloudflare';
 import { ZipStore } from '~/helpers/ZipStore.js';
 import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
@@ -53,7 +54,7 @@ const ISSUE_SYNC_BATCH_SIZE = 100;
  * Durable pull pipeline: manifest → parse into staging → promote by domain →
  * truncate staging + metadata. Staging is the handoff between steps (no large step returns).
  */
-export class PullWorkflow extends WorkflowEntrypoint<Env, Params> {
+class PullWorkflowBase extends WorkflowEntrypoint<Env, Params> {
   async run(_event: WorkflowEvent<Params>, step: WorkflowStep) {
     const dataUrl = this.env.MRTDOWN_DATA_URL;
 
@@ -242,3 +243,10 @@ export class PullWorkflow extends WorkflowEntrypoint<Env, Params> {
     console.log('[PULL] Pull complete', counts);
   }
 }
+
+export const PullWorkflow = Sentry.instrumentWorkflowWithSentry((env: Env) => {
+  return {
+    dsn: env.SENTRY_DSN ?? '',
+    environment: env.TIER ?? 'development',
+  };
+}, PullWorkflowBase);

@@ -15,7 +15,6 @@ export default Sentry.withSentry(
     return {
       dsn: env.SENTRY_DSN ?? '',
       environment: env.TIER ?? 'development',
-      release: env.GIT_SHA ?? 'development',
     };
   },
   {
