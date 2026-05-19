@@ -25,6 +25,30 @@ function scheduledPullWorkflowId(scheduledTime: number) {
   return `pull-scheduled-${slot}`;
 }
 
+function getErrorField(error: unknown, field: 'code' | 'status') {
+  if (typeof error !== 'object' || error == null || !(field in error)) {
+    return null;
+  }
+  const value = error[field as keyof typeof error];
+  return typeof value === 'number' || typeof value === 'string' ? value : null;
+}
+
+function isMissingWorkflowInstanceError(error: unknown) {
+  const code = getErrorField(error, 'code');
+  const status = getErrorField(error, 'status');
+  const message = error instanceof Error ? error.message : String(error);
+
+  // Cloudflare Workflows currently surfaces missing instance lookups from
+  // instance.status(); keep the matcher explicit so live response drift is
+  // visible in logs instead of being treated as safe to ignore.
+  return (
+    status === 404 ||
+    code === 404 ||
+    code === 'not_found' ||
+    /not\s*found|unknown instance|does not exist/i.test(message)
+  );
+}
+
 async function hasActiveScheduledPullWorkflow(
   workflow: Env['PULL_WORKFLOW'],
   scheduledTime: number,
@@ -48,8 +72,14 @@ async function hasActiveScheduledPullWorkflow(
         );
         return true;
       }
-    } catch {
-      // Missing instance IDs are expected while scanning recent cron slots.
+    } catch (error) {
+      if (isMissingWorkflowInstanceError(error)) {
+        continue;
+      }
+      console.error(`Scheduled pull lookup failed for workflow ${id}`, {
+        error,
+      });
+      return true;
     }
   }
   return false;

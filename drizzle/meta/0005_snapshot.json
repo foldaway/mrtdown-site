@@ -103,12 +103,8 @@
           "name": "evidences_issue_id_issues_id_fk",
           "tableFrom": "evidences",
           "tableTo": "issues",
-          "columnsFrom": [
-            "issue_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["issue_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         }
@@ -187,12 +183,8 @@
           "name": "impact_event_basis_evidences_impact_event_id_impact_events_id_fk",
           "tableFrom": "impact_event_basis_evidences",
           "tableTo": "impact_events",
-          "columnsFrom": [
-            "impact_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["impact_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         },
@@ -200,12 +192,8 @@
           "name": "impact_event_basis_evidences_evidence_id_evidences_id_fk",
           "tableFrom": "impact_event_basis_evidences",
           "tableTo": "evidences",
-          "columnsFrom": [
-            "evidence_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["evidence_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         }
@@ -213,10 +201,7 @@
       "compositePrimaryKeys": {
         "impact_event_basis_evidences_impact_event_id_evidence_id_pk": {
           "name": "impact_event_basis_evidences_impact_event_id_evidence_id_pk",
-          "columns": [
-            "impact_event_id",
-            "evidence_id"
-          ]
+          "columns": ["impact_event_id", "evidence_id"]
         }
       },
       "uniqueConstraints": {},
@@ -278,12 +263,8 @@
           "name": "impact_event_causes_impact_event_id_impact_events_id_fk",
           "tableFrom": "impact_event_causes",
           "tableTo": "impact_events",
-          "columnsFrom": [
-            "impact_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["impact_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         }
@@ -291,10 +272,7 @@
       "compositePrimaryKeys": {
         "impact_event_causes_impact_event_id_type_pk": {
           "name": "impact_event_causes_impact_event_id_type_pk",
-          "columns": [
-            "impact_event_id",
-            "type"
-          ]
+          "columns": ["impact_event_id", "type"]
         }
       },
       "uniqueConstraints": {},
@@ -398,12 +376,8 @@
           "name": "impact_event_entity_facilities_impact_event_id_impact_events_id_fk",
           "tableFrom": "impact_event_entity_facilities",
           "tableTo": "impact_events",
-          "columnsFrom": [
-            "impact_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["impact_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         },
@@ -411,12 +385,8 @@
           "name": "impact_event_entity_facilities_station_id_stations_id_fk",
           "tableFrom": "impact_event_entity_facilities",
           "tableTo": "stations",
-          "columnsFrom": [
-            "station_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["station_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -424,12 +394,8 @@
           "name": "impact_event_entity_facilities_line_id_lines_id_fk",
           "tableFrom": "impact_event_entity_facilities",
           "tableTo": "lines",
-          "columnsFrom": [
-            "line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["line_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -437,11 +403,7 @@
       "compositePrimaryKeys": {
         "impact_event_entity_facilities_impact_event_id_station_id_kind_pk": {
           "name": "impact_event_entity_facilities_impact_event_id_station_id_kind_pk",
-          "columns": [
-            "impact_event_id",
-            "station_id",
-            "kind"
-          ]
+          "columns": ["impact_event_id", "station_id", "kind"]
         }
       },
       "uniqueConstraints": {},
@@ -517,12 +479,8 @@
           "name": "impact_event_entity_services_impact_event_id_impact_events_id_fk",
           "tableFrom": "impact_event_entity_services",
           "tableTo": "impact_events",
-          "columnsFrom": [
-            "impact_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["impact_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         },
@@ -530,12 +488,8 @@
           "name": "impact_event_entity_services_service_id_services_id_fk",
           "tableFrom": "impact_event_entity_services",
           "tableTo": "services",
-          "columnsFrom": [
-            "service_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["service_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -543,10 +497,7 @@
       "compositePrimaryKeys": {
         "impact_event_entity_services_impact_event_id_service_id_pk": {
           "name": "impact_event_entity_services_impact_event_id_service_id_pk",
-          "columns": [
-            "impact_event_id",
-            "service_id"
-          ]
+          "columns": ["impact_event_id", "service_id"]
         }
       },
       "uniqueConstraints": {},
@@ -623,12 +574,8 @@
           "name": "impact_event_facility_effects_impact_event_id_impact_events_id_fk",
           "tableFrom": "impact_event_facility_effects",
           "tableTo": "impact_events",
-          "columnsFrom": [
-            "impact_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["impact_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         }
@@ -636,10 +583,7 @@
       "compositePrimaryKeys": {
         "impact_event_facility_effects_impact_event_id_kind_pk": {
           "name": "impact_event_facility_effects_impact_event_id_kind_pk",
-          "columns": [
-            "impact_event_id",
-            "kind"
-          ]
+          "columns": ["impact_event_id", "kind"]
         }
       },
       "uniqueConstraints": {},
@@ -727,12 +671,8 @@
           "name": "impact_event_periods_impact_event_id_impact_events_id_fk",
           "tableFrom": "impact_event_periods",
           "tableTo": "impact_events",
-          "columnsFrom": [
-            "impact_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["impact_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         }
@@ -740,10 +680,7 @@
       "compositePrimaryKeys": {
         "impact_event_periods_impact_event_id_index_pk": {
           "name": "impact_event_periods_impact_event_id_index_pk",
-          "columns": [
-            "impact_event_id",
-            "index"
-          ]
+          "columns": ["impact_event_id", "index"]
         }
       },
       "uniqueConstraints": {},
@@ -826,12 +763,8 @@
           "name": "impact_event_service_effects_impact_event_id_impact_events_id_fk",
           "tableFrom": "impact_event_service_effects",
           "tableTo": "impact_events",
-          "columnsFrom": [
-            "impact_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["impact_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         }
@@ -839,10 +772,7 @@
       "compositePrimaryKeys": {
         "impact_event_service_effects_impact_event_id_kind_pk": {
           "name": "impact_event_service_effects_impact_event_id_kind_pk",
-          "columns": [
-            "impact_event_id",
-            "kind"
-          ]
+          "columns": ["impact_event_id", "kind"]
         }
       },
       "uniqueConstraints": {},
@@ -988,12 +918,8 @@
           "name": "impact_event_service_scopes_impact_event_id_impact_events_id_fk",
           "tableFrom": "impact_event_service_scopes",
           "tableTo": "impact_events",
-          "columnsFrom": [
-            "impact_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["impact_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         },
@@ -1001,12 +927,8 @@
           "name": "impact_event_service_scopes_station_id_stations_id_fk",
           "tableFrom": "impact_event_service_scopes",
           "tableTo": "stations",
-          "columnsFrom": [
-            "station_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["station_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1014,12 +936,8 @@
           "name": "impact_event_service_scopes_from_station_id_stations_id_fk",
           "tableFrom": "impact_event_service_scopes",
           "tableTo": "stations",
-          "columnsFrom": [
-            "from_station_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["from_station_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1027,12 +945,8 @@
           "name": "impact_event_service_scopes_to_station_id_stations_id_fk",
           "tableFrom": "impact_event_service_scopes",
           "tableTo": "stations",
-          "columnsFrom": [
-            "to_station_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["to_station_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1040,10 +954,7 @@
       "compositePrimaryKeys": {
         "impact_event_service_scopes_impact_event_id_index_pk": {
           "name": "impact_event_service_scopes_impact_event_id_index_pk",
-          "columns": [
-            "impact_event_id",
-            "index"
-          ]
+          "columns": ["impact_event_id", "index"]
         }
       },
       "uniqueConstraints": {},
@@ -1121,12 +1032,8 @@
           "name": "impact_events_issue_id_issues_id_fk",
           "tableFrom": "impact_events",
           "tableTo": "issues",
-          "columnsFrom": [
-            "issue_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["issue_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         }
@@ -1263,12 +1170,8 @@
           "name": "issue_day_facts_issue_id_issues_id_fk",
           "tableFrom": "issue_day_facts",
           "tableTo": "issues",
-          "columnsFrom": [
-            "issue_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["issue_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         }
@@ -1276,10 +1179,7 @@
       "compositePrimaryKeys": {
         "issue_day_facts_date_issue_id_pk": {
           "name": "issue_day_facts_date_issue_id_pk",
-          "columns": [
-            "date",
-            "issue_id"
-          ]
+          "columns": ["date", "issue_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1608,12 +1508,8 @@
           "name": "line_day_facts_line_id_lines_id_fk",
           "tableFrom": "line_day_facts",
           "tableTo": "lines",
-          "columnsFrom": [
-            "line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["line_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         }
@@ -1621,10 +1517,7 @@
       "compositePrimaryKeys": {
         "line_day_facts_date_line_id_pk": {
           "name": "line_day_facts_date_line_id_pk",
-          "columns": [
-            "date",
-            "line_id"
-          ]
+          "columns": ["date", "line_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1704,12 +1597,8 @@
           "name": "line_operators_line_id_lines_id_fk",
           "tableFrom": "line_operators",
           "tableTo": "lines",
-          "columnsFrom": [
-            "line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["line_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1717,12 +1606,8 @@
           "name": "line_operators_operator_id_operators_id_fk",
           "tableFrom": "line_operators",
           "tableTo": "operators",
-          "columnsFrom": [
-            "operator_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["operator_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1730,10 +1615,7 @@
       "compositePrimaryKeys": {
         "line_operators_line_id_operator_id_pk": {
           "name": "line_operators_line_id_operator_id_pk",
-          "columns": [
-            "line_id",
-            "operator_id"
-          ]
+          "columns": ["line_id", "operator_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1809,12 +1691,8 @@
           "name": "line_services_line_id_lines_id_fk",
           "tableFrom": "line_services",
           "tableTo": "lines",
-          "columnsFrom": [
-            "line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["line_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1822,12 +1700,8 @@
           "name": "line_services_service_id_services_id_fk",
           "tableFrom": "line_services",
           "tableTo": "services",
-          "columnsFrom": [
-            "service_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["service_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1835,10 +1709,7 @@
       "compositePrimaryKeys": {
         "line_services_line_id_service_id_pk": {
           "name": "line_services_line_id_service_id_pk",
-          "columns": [
-            "line_id",
-            "service_id"
-          ]
+          "columns": ["line_id", "service_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2282,14 +2153,8 @@
           "name": "sr_path_entries_revision_fk",
           "tableFrom": "service_revision_path_station_entries",
           "tableTo": "service_revisions",
-          "columnsFrom": [
-            "service_revision_id",
-            "service_id"
-          ],
-          "columnsTo": [
-            "id",
-            "service_id"
-          ],
+          "columnsFrom": ["service_revision_id", "service_id"],
+          "columnsTo": ["id", "service_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2297,12 +2162,8 @@
           "name": "sr_path_entries_station_fk",
           "tableFrom": "service_revision_path_station_entries",
           "tableTo": "stations",
-          "columnsFrom": [
-            "station_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["station_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2382,12 +2243,8 @@
           "name": "service_revisions_service_id_services_id_fk",
           "tableFrom": "service_revisions",
           "tableTo": "services",
-          "columnsFrom": [
-            "service_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["service_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2395,10 +2252,7 @@
       "compositePrimaryKeys": {
         "service_revisions_id_service_id_pk": {
           "name": "service_revisions_id_service_id_pk",
-          "columns": [
-            "id",
-            "service_id"
-          ]
+          "columns": ["id", "service_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2514,12 +2368,8 @@
           "name": "services_line_id_lines_id_fk",
           "tableFrom": "services",
           "tableTo": "lines",
-          "columnsFrom": [
-            "line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["line_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2623,12 +2473,8 @@
           "name": "station_codes_line_id_lines_id_fk",
           "tableFrom": "station_codes",
           "tableTo": "lines",
-          "columnsFrom": [
-            "line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["line_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2636,12 +2482,8 @@
           "name": "station_codes_station_id_stations_id_fk",
           "tableFrom": "station_codes",
           "tableTo": "stations",
-          "columnsFrom": [
-            "station_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["station_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2649,11 +2491,7 @@
       "compositePrimaryKeys": {
         "station_codes_line_id_station_id_code_pk": {
           "name": "station_codes_line_id_station_id_code_pk",
-          "columns": [
-            "line_id",
-            "station_id",
-            "code"
-          ]
+          "columns": ["line_id", "station_id", "code"]
         }
       },
       "uniqueConstraints": {},
@@ -2729,12 +2567,8 @@
           "name": "station_landmarks_station_id_stations_id_fk",
           "tableFrom": "station_landmarks",
           "tableTo": "stations",
-          "columnsFrom": [
-            "station_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["station_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2742,12 +2576,8 @@
           "name": "station_landmarks_landmark_id_landmarks_id_fk",
           "tableFrom": "station_landmarks",
           "tableTo": "landmarks",
-          "columnsFrom": [
-            "landmark_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["landmark_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2755,10 +2585,7 @@
       "compositePrimaryKeys": {
         "station_landmarks_station_id_landmark_id_pk": {
           "name": "station_landmarks_station_id_landmark_id_pk",
-          "columns": [
-            "station_id",
-            "landmark_id"
-          ]
+          "columns": ["station_id", "landmark_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2908,12 +2735,8 @@
           "name": "stations_town_id_towns_id_fk",
           "tableFrom": "stations",
           "tableTo": "towns",
-          "columnsFrom": [
-            "town_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["town_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3005,28 +2828,17 @@
     "public.affected_entity_facility_kind": {
       "name": "affected_entity_facility_kind",
       "schema": "public",
-      "values": [
-        "lift",
-        "escalator",
-        "screen-door"
-      ]
+      "values": ["lift", "escalator", "screen-door"]
     },
     "public.evidence_type": {
       "name": "evidence_type",
       "schema": "public",
-      "values": [
-        "statement.official",
-        "report.public",
-        "report.media"
-      ]
+      "values": ["statement.official", "report.public", "report.media"]
     },
     "public.facility_effect_kind": {
       "name": "facility_effect_kind",
       "schema": "public",
-      "values": [
-        "out-of-service",
-        "degraded"
-      ]
+      "values": ["out-of-service", "degraded"]
     },
     "public.impact_event_cause_type": {
       "name": "impact_event_cause_type",
@@ -3053,29 +2865,17 @@
     "public.impact_event_service_scope_type": {
       "name": "impact_event_service_scope_type",
       "schema": "public",
-      "values": [
-        "service.whole",
-        "service.segment",
-        "service.point"
-      ]
+      "values": ["service.whole", "service.segment", "service.point"]
     },
     "public.issue_type": {
       "name": "issue_type",
       "schema": "public",
-      "values": [
-        "disruption",
-        "maintenance",
-        "infra"
-      ]
+      "values": ["disruption", "maintenance", "infra"]
     },
     "public.line_type": {
       "name": "line_type",
       "schema": "public",
-      "values": [
-        "mrt.high",
-        "mrt.medium",
-        "lrt"
-      ]
+      "values": ["mrt.high", "mrt.medium", "lrt"]
     },
     "public.service_effect_kind": {
       "name": "service_effect_kind",
@@ -3090,12 +2890,7 @@
     "public.station_structure_type": {
       "name": "station_structure_type",
       "schema": "public",
-      "values": [
-        "elevated",
-        "underground",
-        "at_grade",
-        "in_building"
-      ]
+      "values": ["elevated", "underground", "at_grade", "in_building"]
     }
   },
   "schemas": {},
