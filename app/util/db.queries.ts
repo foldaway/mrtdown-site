@@ -90,6 +90,28 @@ type IssueIntervalBounds = {
   end: DateTime | null;
 };
 
+type StatisticsTimeWindow = {
+  title: string;
+  dataTimeScale: TimeScale;
+  displayTimeScale?: TimeScale;
+};
+
+const STATISTICS_TIME_WINDOWS: StatisticsTimeWindow[] = [
+  { title: '7d', dataTimeScale: makeTimeScale('day', 7) },
+  {
+    title: '1m',
+    dataTimeScale: makeTimeScale('day', 30),
+    displayTimeScale: makeTimeScale('month', 1),
+  },
+  {
+    title: '1y',
+    dataTimeScale: makeTimeScale('month', 12),
+    displayTimeScale: makeTimeScale('year', 1),
+  },
+  { title: '10y', dataTimeScale: makeTimeScale('year', 10) },
+  { title: '20y', dataTimeScale: makeTimeScale('year', 20) },
+];
+
 function nowSg() {
   return DateTime.now().setZone(SG_TIMEZONE);
 }
@@ -1792,22 +1814,222 @@ function buildIssueCountGraphs(issues: Issue[]) {
   });
 }
 
+function getWindowStart(end: DateTime, timeScale: TimeScale) {
+  switch (timeScale.granularity) {
+    case 'day':
+      return end.startOf('day').minus({ days: timeScale.count - 1 });
+    case 'month':
+      return end.startOf('month').minus({ months: timeScale.count - 1 });
+    case 'year':
+      return end.startOf('year').minus({ years: timeScale.count - 1 });
+  }
+}
+
+function getWindowEnd(start: DateTime, timeScale: TimeScale) {
+  switch (timeScale.granularity) {
+    case 'day':
+      return start.plus({ days: timeScale.count });
+    case 'month':
+      return start.plus({ months: timeScale.count });
+    case 'year':
+      return start.plus({ years: timeScale.count });
+  }
+}
+
+function getBucketEnd(start: DateTime, granularity: Granularity) {
+  switch (granularity) {
+    case 'day':
+      return start.plus({ days: 1 });
+    case 'month':
+      return start.plus({ months: 1 });
+    case 'year':
+      return start.plus({ years: 1 });
+  }
+}
+
+function getDatePlus(date: DateTime, granularity: Granularity, count: number) {
+  switch (granularity) {
+    case 'day':
+      return date.plus({ days: count });
+    case 'month':
+      return date.plus({ months: count });
+    case 'year':
+      return date.plus({ years: count });
+  }
+}
+
+function getDateMinus(date: DateTime, granularity: Granularity, count: number) {
+  switch (granularity) {
+    case 'day':
+      return date.minus({ days: count });
+    case 'month':
+      return date.minus({ months: count });
+    case 'year':
+      return date.minus({ years: count });
+  }
+}
+
+function buildStatisticsIssueCountGraphs(issues: Issue[]) {
+  const end = nowSg().startOf('day');
+  const aggregateForRange = (rangeStart: DateTime, rangeEnd: DateTime) => {
+    const payload = emptyIssueTypePayload();
+    for (const issue of issues) {
+      if (issueOverlapsRange(issue, rangeStart, rangeEnd)) {
+        payload[issue.type] += 1;
+      }
+    }
+    return payload;
+  };
+
+  return STATISTICS_TIME_WINDOWS.map((window) => {
+    const start = getWindowStart(end, window.dataTimeScale);
+    const data: ChartEntry[] = [];
+    for (let offset = 0; offset < window.dataTimeScale.count; offset++) {
+      const bucketStart = getDatePlus(
+        start,
+        window.dataTimeScale.granularity,
+        offset,
+      );
+      const bucketEnd = getBucketEnd(
+        bucketStart,
+        window.dataTimeScale.granularity,
+      );
+      data.push({
+        name: bucketStart.toISODate()!,
+        payload: aggregateForRange(bucketStart, bucketEnd),
+      });
+    }
+
+    const currentEnd = getWindowEnd(start, window.dataTimeScale);
+    const previousStart = getDateMinus(
+      start,
+      window.dataTimeScale.granularity,
+      window.dataTimeScale.count,
+    );
+    return buildCountChart(
+      window.title,
+      data,
+      [
+        { name: 'current', payload: aggregateForRange(start, currentEnd) },
+        { name: 'previous', payload: aggregateForRange(previousStart, start) },
+      ],
+      window.dataTimeScale,
+      window.displayTimeScale,
+    );
+  });
+}
+
+function getStatisticsFactStart(end: DateTime) {
+  const earliestWindow = STATISTICS_TIME_WINDOWS.reduce<DateTime | null>(
+    (earliest, window) => {
+      const start = getWindowStart(end, window.dataTimeScale);
+      const previousStart = getDateMinus(
+        start,
+        window.dataTimeScale.granularity,
+        window.dataTimeScale.count,
+      );
+      return earliest == null || previousStart < earliest
+        ? previousStart
+        : earliest;
+    },
+    null,
+  );
+  return earliestWindow ?? end;
+}
+
+function buildIssueCountChartsFromIssueFacts(
+  rows: Array<{
+    date: string;
+    issue_id: string;
+    issue_type: IssueType;
+    active_anytime: boolean;
+  }>,
+) {
+  const end = nowSg().startOf('day');
+  const rowsByDate = groupIssueFactRowsByDate(
+    rows.filter((row) => row.active_anytime),
+  );
+  const aggregateForRange = (
+    rangeStart: DateTime,
+    rangeEnd: DateTime,
+  ): Record<string, number> => {
+    const issueIdsByType: Record<IssueType, Set<string>> = {
+      disruption: new Set(),
+      maintenance: new Set(),
+      infra: new Set(),
+    };
+    for (
+      let dateTime = rangeStart.startOf('day');
+      dateTime < rangeEnd;
+      dateTime = dateTime.plus({ days: 1 })
+    ) {
+      const date = dateTime.toFormat('yyyy-MM-dd');
+      for (const row of rowsByDate.get(date) ?? []) {
+        issueIdsByType[row.issue_type].add(row.issue_id);
+      }
+    }
+    return {
+      disruption: issueIdsByType.disruption.size,
+      maintenance: issueIdsByType.maintenance.size,
+      infra: issueIdsByType.infra.size,
+    };
+  };
+
+  return STATISTICS_TIME_WINDOWS.map((window) => {
+    const start = getWindowStart(end, window.dataTimeScale);
+    const data: ChartEntry[] = [];
+    for (let offset = 0; offset < window.dataTimeScale.count; offset++) {
+      const bucketStart = getDatePlus(
+        start,
+        window.dataTimeScale.granularity,
+        offset,
+      );
+      const bucketEnd = getBucketEnd(
+        bucketStart,
+        window.dataTimeScale.granularity,
+      );
+      data.push({
+        name: bucketStart.toISODate()!,
+        payload: aggregateForRange(bucketStart, bucketEnd),
+      });
+    }
+
+    const currentEnd = getWindowEnd(start, window.dataTimeScale);
+    const previousStart = getDateMinus(
+      start,
+      window.dataTimeScale.granularity,
+      window.dataTimeScale.count,
+    );
+    return buildCountChart(
+      window.title,
+      data,
+      [
+        { name: 'current', payload: aggregateForRange(start, currentEnd) },
+        { name: 'previous', payload: aggregateForRange(previousStart, start) },
+      ],
+      window.dataTimeScale,
+      window.displayTimeScale,
+    );
+  });
+}
+
 function buildIssueDurationGraphs(issues: Issue[]) {
   const end = nowSg().startOf('day');
-  return [7, 30, 90].map((count) => {
-    const start = end.minus({ days: count - 1 });
+  return STATISTICS_TIME_WINDOWS.map((window) => {
+    const start = getWindowStart(end, window.dataTimeScale);
     const { data, cumulative } = buildPreviousWindowSummary(
       issues,
       start,
-      count,
-      'day',
+      window.dataTimeScale.count,
+      window.dataTimeScale.granularity,
       true,
     );
     return buildCountChart(
-      `${count}d`,
+      window.title,
       data,
       cumulative,
-      makeTimeScale('day', count),
+      window.dataTimeScale,
+      window.displayTimeScale,
     );
   });
 }
@@ -1830,14 +2052,16 @@ function buildDurationChartsFromIssueFacts(
   const end = nowSg().startOf('day');
   const rowsByDate = groupIssueFactRowsByDate(rows);
   const aggregateForRange = (
-    start: DateTime,
-    count: number,
-    previous = false,
+    rangeStart: DateTime,
+    rangeEnd: DateTime,
   ): Record<string, number> => {
-    const rangeStart = previous ? start.minus({ days: count }) : start;
     const payload = emptyIssueTypePayload();
-    for (let offset = 0; offset < count; offset++) {
-      const date = rangeStart.plus({ days: offset }).toFormat('yyyy-MM-dd');
+    for (
+      let dateTime = rangeStart.startOf('day');
+      dateTime < rangeEnd;
+      dateTime = dateTime.plus({ days: 1 })
+    ) {
+      const date = dateTime.toFormat('yyyy-MM-dd');
       for (const row of rowsByDate.get(date) ?? []) {
         payload[row.issue_type] += row.duration_seconds;
       }
@@ -1845,28 +2069,40 @@ function buildDurationChartsFromIssueFacts(
     return payload;
   };
 
-  return [7, 30, 90].map((count) => {
-    const start = end.minus({ days: count - 1 });
+  return STATISTICS_TIME_WINDOWS.map((window) => {
+    const start = getWindowStart(end, window.dataTimeScale);
     const data: ChartEntry[] = [];
-    for (let offset = 0; offset < count; offset++) {
-      const date = start.plus({ days: offset }).toFormat('yyyy-MM-dd');
+    for (let offset = 0; offset < window.dataTimeScale.count; offset++) {
+      const bucketStart = getDatePlus(
+        start,
+        window.dataTimeScale.granularity,
+        offset,
+      );
+      const bucketEnd = getBucketEnd(
+        bucketStart,
+        window.dataTimeScale.granularity,
+      );
       data.push({
-        name: date,
-        payload: summarizeIssueFactRows(
-          rowsByDate.get(date) ?? [],
-          'duration',
-        ),
+        name: bucketStart.toISODate()!,
+        payload: aggregateForRange(bucketStart, bucketEnd),
       });
     }
 
+    const currentEnd = getWindowEnd(start, window.dataTimeScale);
+    const previousStart = getDateMinus(
+      start,
+      window.dataTimeScale.granularity,
+      window.dataTimeScale.count,
+    );
     return buildCountChart(
-      `${count}d`,
+      window.title,
       data,
       [
-        { name: 'current', payload: aggregateForRange(start, count, false) },
-        { name: 'previous', payload: aggregateForRange(start, count, true) },
+        { name: 'current', payload: aggregateForRange(start, currentEnd) },
+        { name: 'previous', payload: aggregateForRange(previousStart, start) },
       ],
-      makeTimeScale('day', count),
+      window.dataTimeScale,
+      window.displayTimeScale,
     );
   });
 }
@@ -2797,17 +3033,27 @@ export async function getStatisticsData() {
   const issues = Object.values(dataset.allIssues);
   const rollingYearEnd = nowSg().startOf('day');
   const rollingYearStart = rollingYearEnd.minus({ days: 364 });
+  const statisticsFactStart = getStatisticsFactStart(rollingYearEnd);
   const issueFactRows = await getIssueDayFactsInRange(
+    statisticsFactStart,
+    rollingYearEnd,
+  );
+  const rollingYearFactCoverageRows = await getOperationalFactCoverageDatesInRange(
     rollingYearStart,
     rollingYearEnd,
   );
-  const factCoverageRows = await getOperationalFactCoverageDatesInRange(
+  const statisticsFactCoverageRows = await getOperationalFactCoverageDatesInRange(
+    statisticsFactStart,
+    rollingYearEnd,
+  );
+  const hasRollingYearIssueFactCoverage = hasFullDateCoverage(
+    rollingYearFactCoverageRows,
     rollingYearStart,
     rollingYearEnd,
   );
-  const hasIssueFactCoverage = hasFullDateCoverage(
-    factCoverageRows,
-    rollingYearStart,
+  const hasStatisticsIssueFactCoverage = hasFullDateCoverage(
+    statisticsFactCoverageRows,
+    statisticsFactStart,
     rollingYearEnd,
   );
   const issuesByLineId = buildIssuesByLineId(issues);
@@ -2856,7 +3102,7 @@ export async function getStatisticsData() {
     title: 'Rolling Year Heatmap',
     data: Array.from({ length: 365 }, (_, index) => {
       const date = rollingYearStart.plus({ days: index }).toISODate()!;
-      if (hasIssueFactCoverage) {
+      if (hasRollingYearIssueFactCoverage) {
         return {
           name: date,
           payload: summarizeIssueFactRows(
@@ -2882,8 +3128,10 @@ export async function getStatisticsData() {
   };
 
   const statistics: SystemAnalytics = {
-    timeScaleChartsIssueCount: buildIssueCountGraphs(issues),
-    timeScaleChartsIssueDuration: hasIssueFactCoverage
+    timeScaleChartsIssueCount: hasStatisticsIssueFactCoverage
+      ? buildIssueCountChartsFromIssueFacts(issueFactRows)
+      : buildStatisticsIssueCountGraphs(issues),
+    timeScaleChartsIssueDuration: hasStatisticsIssueFactCoverage
       ? buildDurationChartsFromIssueFacts(issueFactRows)
       : buildIssueDurationGraphs(issues),
     chartTotalIssueCountByLine,
