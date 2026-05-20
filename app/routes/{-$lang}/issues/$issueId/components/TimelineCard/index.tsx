@@ -1,11 +1,10 @@
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { FormattedMessage } from 'react-intl';
-import type { LocalizedIssueUpdate } from '~/util/issueUpdates';
 import { TimelineItem } from './components/TimelineItem';
 
 interface Props {
-  updates: LocalizedIssueUpdate[];
+  updates: React.ComponentProps<typeof TimelineItem>['update'][];
 }
 
 const INITIAL_DISPLAY_COUNT = 3;

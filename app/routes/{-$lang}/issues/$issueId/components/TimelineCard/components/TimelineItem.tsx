@@ -1,22 +1,24 @@
 import { LinkIcon } from '@heroicons/react/16/solid';
+import type { Evidence, EvidenceRender } from '@mrtdown/core';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
-import {
-  isIssueUpdateLocale,
-  type LocalizedIssueUpdate,
-} from '~/util/issueUpdates';
 import { Source } from './Source';
 
+export type TimelineItemUpdate = {
+  type: Evidence['type'];
+  text: Evidence['text'];
+  sourceUrl: Evidence['sourceUrl'];
+  createdAt: Evidence['ts'];
+  textTranslations: EvidenceRender['text'] | null;
+};
+
 interface Props {
-  update: LocalizedIssueUpdate;
+  update: TimelineItemUpdate;
 }
 
 export const TimelineItem: React.FC<Props> = (props) => {
   const { update } = props;
   const intl = useIntl();
-  const localizedText =
-    update.textTranslations != null && isIssueUpdateLocale(intl.locale)
-      ? (update.textTranslations[intl.locale] ?? update.text)
-      : update.text;
+  const localizedText = getLocalizedText(update, intl.locale);
 
   return (
     <div className="relative flex items-start space-x-4 pb-8 last:pb-0">
@@ -64,3 +66,18 @@ export const TimelineItem: React.FC<Props> = (props) => {
     </div>
   );
 };
+
+function getLocalizedText(update: TimelineItemUpdate, locale: string) {
+  if (update.textTranslations == null) {
+    return update.text;
+  }
+
+  if (!(locale in update.textTranslations)) {
+    return update.text;
+  }
+
+  return (
+    update.textTranslations[locale as keyof EvidenceRender['text']] ??
+    update.text
+  );
+}

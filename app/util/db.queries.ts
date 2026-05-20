@@ -56,7 +56,6 @@ import {
   issueContributesToLineDowntime,
   issueContributesToLineStatus,
 } from '~/util/issueOperationalEffects';
-import type { LocalizedIssueUpdate } from '~/util/issueUpdates';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 
@@ -2825,15 +2824,13 @@ export async function getIssueData(issueId: string) {
   return {
     data: {
       id: issueId,
-      updates: evidenceRows.map(
-        (evidence): LocalizedIssueUpdate => ({
-          type: evidence.type,
-          text: evidence.text,
-          textTranslations: evidence.render?.text ?? null,
-          sourceUrl: evidence.source_url,
-          createdAt: evidence.ts,
-        }),
-      ),
+      updates: evidenceRows.map((evidence) => ({
+        type: evidence.type,
+        text: evidence.text,
+        textTranslations: evidence.render?.text ?? null,
+        sourceUrl: evidence.source_url,
+        createdAt: evidence.ts,
+      })),
     },
     included: withIssues(dataset.included, dataset.allIssues, [issueId]),
   };

@@ -8,18 +8,18 @@ describe('issueTypeHasLineDowntimeByServiceEffect', () => {
     );
   });
 
-  it('counts maintenance no-service windows as downtime', () => {
+  it('does not count maintenance no-service windows as downtime', () => {
     expect(
       issueTypeHasLineDowntimeByServiceEffect('maintenance', ['no-service']),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it('counts maintenance service-hours adjustments as downtime', () => {
+  it('does not count maintenance service-hours adjustments as downtime', () => {
     expect(
       issueTypeHasLineDowntimeByServiceEffect('maintenance', [
         'service-hours-adjustment',
       ]),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('counts infra reduced-service windows as downtime', () => {

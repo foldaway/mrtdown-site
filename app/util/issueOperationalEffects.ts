@@ -1,7 +1,11 @@
-import { ServiceEffectKindSchema, type ServiceEffectKind } from '@mrtdown/core';
-import type { Issue, IssueType } from '../client';
+import {
+  type IssueType,
+  ServiceEffectKindSchema,
+  type ServiceEffectKind,
+} from '@mrtdown/core';
 
-type IssueWithServiceEffects = Pick<Issue, 'type'> & {
+type IssueWithServiceEffects = {
+  type: IssueType;
   serviceEffectKinds: ServiceEffectKind[];
 };
 
@@ -19,6 +23,10 @@ function serviceEffectContributesToLineDowntime(kind: ServiceEffectKind) {
 export function issueContributesToLineDowntime(issue: IssueWithServiceEffects) {
   if (issue.type === 'disruption') {
     return true;
+  }
+
+  if (issue.type === 'maintenance') {
+    return false;
   }
 
   return issue.serviceEffectKinds.some(serviceEffectContributesToLineDowntime);
