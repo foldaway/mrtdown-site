@@ -27,7 +27,6 @@ import {
   or,
   sql,
 } from 'drizzle-orm';
-import { DateTime } from 'luxon';
 import type { getDb } from '../../../db/index.js';
 import {
   evidencesTable,
@@ -814,20 +813,6 @@ export async function syncServices(db: Db): Promise<void> {
   });
 }
 
-/** Latest evidence timestamp; used for operational period resolution (`resolvePeriods`). */
-function lastEvidenceAtFromList(evidences: Evidence[]): DateTime | null {
-  return evidences.reduce(
-    (max, evidence) => {
-      const evidenceAt = DateTime.fromISO(evidence.ts);
-      if (max == null || evidenceAt > max) {
-        return evidenceAt;
-      }
-      return max;
-    },
-    null as DateTime | null,
-  );
-}
-
 async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
   for (const ch of chunk(issueIds, DELETE_BATCH)) {
     if (ch.length === 0) continue;
@@ -892,7 +877,6 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         });
       }
 
-      const lastEvidenceAt = lastEvidenceAtFromList(row.evidences);
       for (const impactEvent of row.impact_events) {
         impactEventRows.push({
           id: impactEvent.id,
@@ -936,30 +920,6 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
 
         switch (impactEvent.type) {
           case 'periods.set': {
-            const resolvedPeriodsOperational = resolvePeriods({
-              mode: {
-                kind: 'operational',
-                lastEvidenceAt: lastEvidenceAt?.toISO() ?? null,
-              },
-              periods: impactEvent.periods,
-              asOf: impactEvent.ts,
-            });
-            for (const [
-              index,
-              period,
-            ] of resolvedPeriodsOperational.entries()) {
-              periodRows.push({
-                impact_event_id: impactEvent.id,
-                mode: 'operational',
-                index,
-                start_at: period.startAt,
-                end_at: period.endAt,
-                end_at_resolved: period.endAtResolved,
-                end_at_source: period.endAtSource,
-                end_at_reason: period.endAtReason,
-              });
-            }
-
             const resolvedPeriodsCanonical = resolvePeriods({
               mode: {
                 kind: 'canonical',
@@ -970,13 +930,9 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
             for (const [index, period] of resolvedPeriodsCanonical.entries()) {
               periodRows.push({
                 impact_event_id: impactEvent.id,
-                mode: 'canonical',
                 index,
                 start_at: period.startAt,
                 end_at: period.endAt,
-                end_at_resolved: period.endAtResolved,
-                end_at_source: period.endAtSource,
-                end_at_reason: period.endAtReason,
               });
             }
             break;
@@ -1071,7 +1027,9 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
     }
     if (evidenceRows.length > 0) {
       const dedupedEvidenceRows = Array.from(
-        new Map(evidenceRows.map((evidence) => [evidence.id, evidence])).values(),
+        new Map(
+          evidenceRows.map((evidence) => [evidence.id, evidence]),
+        ).values(),
       );
       const evidenceIds = dedupedEvidenceRows.map((evidence) => evidence.id);
       for (const ids of chunk(evidenceIds, DELETE_BATCH)) {
@@ -1237,21 +1195,18 @@ async function deleteOrphanIssuesBatchTx(
   await deleteIssueIds(tx, orphanIds);
   return orphanIds.length;
 }
-
 /**
  * Issues, evidences, impact events and all impact child tables. For changed issues:
  * remove impact subtree + evidences, reinsert from staging. Then remove issues
  * missing from `issues_next` (with full subtree cleanup).
  */
 export async function syncIssues(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
-    while ((await syncChangedIssuesBatchTx(tx)) > 0) {
-      // Keep syncing until staging and live issue hashes converge.
-    }
-    while ((await deleteOrphanIssuesBatchTx(tx)) > 0) {
-      // Keep deleting until there are no live issues absent from staging.
-    }
-  });
+  while ((await syncChangedIssuesBatch(db)) > 0) {
+    // Keep syncing until staging and live issue hashes converge.
+  }
+  while ((await deleteOrphanIssuesBatch(db)) > 0) {
+    // Keep deleting until there are no live issues absent from staging.
+  }
 }
 
 /** Truncates staging tables and records `manifest_last_pulled_at` in one transaction. */

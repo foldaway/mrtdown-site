@@ -36,6 +36,13 @@
       "when": 1779165097689,
       "tag": "0004_eager_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776355200000,
+      "tag": "0005_canonical_issue_periods",
+      "breakpoints": true
     }
   ]
 }
