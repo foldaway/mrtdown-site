@@ -1,12 +1,10 @@
-import { LinkIcon } from '@heroicons/react/20/solid';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
-import { FormattedDate, FormattedMessage } from 'react-intl';
-import type { IssueUpdate } from '~/client';
+import { FormattedMessage } from 'react-intl';
 import { TimelineItem } from './components/TimelineItem';
 
 interface Props {
-  updates: IssueUpdate[];
+  updates: React.ComponentProps<typeof TimelineItem>['update'][];
 }
 
 const INITIAL_DISPLAY_COUNT = 3;
