@@ -1,10 +1,10 @@
 import { LinkIcon } from '@heroicons/react/16/solid';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
-import type { IssueUpdate } from '~/client';
+import type { LocalizedIssueUpdate } from '~/util/issueUpdates';
 import { Source } from './Source';
 
 interface Props {
-  update: IssueUpdate;
+  update: LocalizedIssueUpdate;
 }
 
 export const TimelineItem: React.FC<Props> = (props) => {

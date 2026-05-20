@@ -1,14 +1,16 @@
+import { ServiceEffectKindSchema, type ServiceEffectKind } from '@mrtdown/core';
 import type { Issue, IssueType } from '../client';
 
 type IssueWithServiceEffects = Pick<Issue, 'type'> & {
-  serviceEffectKinds: string[];
+  serviceEffectKinds: ServiceEffectKind[];
 };
 
-const LINE_DOWNTIME_SERVICE_EFFECT_KINDS = new Set([
-  'no-service',
-  'reduced-service',
-  'service-hours-adjustment',
-]);
+const LINE_DOWNTIME_SERVICE_EFFECT_KINDS: ReadonlySet<ServiceEffectKind> =
+  new Set([
+    ServiceEffectKindSchema.enum['no-service'],
+    ServiceEffectKindSchema.enum['reduced-service'],
+    ServiceEffectKindSchema.enum['service-hours-adjustment'],
+  ]);
 
 export function issueContributesToLineDowntime(issue: IssueWithServiceEffects) {
   if (issue.type === 'disruption') {
@@ -26,7 +28,7 @@ export function issueContributesToLineStatus(issue: IssueWithServiceEffects) {
 
 export function issueTypeHasLineDowntimeByServiceEffect(
   issueType: IssueType,
-  serviceEffectKinds: string[],
+  serviceEffectKinds: ServiceEffectKind[],
 ) {
   return issueContributesToLineDowntime({
     type: issueType,

@@ -1,4 +1,4 @@
-import { resolvePeriods } from '@mrtdown/core';
+import { resolvePeriods, type ServiceEffectKind } from '@mrtdown/core';
 import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { DateTime, Interval } from 'luxon';
 import type {
@@ -10,7 +10,6 @@ import type {
   IssueAffectedBranch,
   IssueInterval,
   IssueType,
-  IssueUpdate,
   Line,
   LineBranch,
   LineProfile,
@@ -57,13 +56,14 @@ import {
   issueContributesToLineDowntime,
   issueContributesToLineStatus,
 } from '~/util/issueOperationalEffects';
+import type { LocalizedIssueUpdate } from '~/util/issueUpdates';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 
 type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
 
 type IssueWithOperationalEffects = Issue & {
-  serviceEffectKinds: string[];
+  serviceEffectKinds: ServiceEffectKind[];
   facilityEffectKinds: string[];
 };
 
@@ -1850,7 +1850,8 @@ function buildUptimeGraph(
       }
     }
 
-    const totalDowntime = breakdownDisruption + breakdownMaintenance;
+    const totalDowntime =
+      breakdownDisruption + breakdownMaintenance + breakdownInfra;
     data.push({
       name: date.toISODate()!,
       payload: {
@@ -2825,7 +2826,7 @@ export async function getIssueData(issueId: string) {
     data: {
       id: issueId,
       updates: evidenceRows.map(
-        (evidence): IssueUpdate => ({
+        (evidence): LocalizedIssueUpdate => ({
           type: evidence.type,
           text: evidence.text,
           textTranslations: evidence.render?.text ?? null,
