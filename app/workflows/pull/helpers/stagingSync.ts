@@ -39,10 +39,12 @@ import {
   impactEventServiceEffectsTable,
   impactEventServiceScopesTable,
   impactEventsTable,
+  issueDayFactsTable,
   issuesNextTable,
   issuesTable,
   landmarksNextTable,
   landmarksTable,
+  lineDayFactsTable,
   lineOperatorsTable,
   lineServicesTable,
   linesNextTable,
@@ -140,7 +142,7 @@ export async function insertLandmarksStaging(
 
 export async function insertLinesStaging(
   db: Db,
-  lines: readonly (Line & { hash: string })[],
+  lines: readonly (Line & { hash: string; endedAt?: string | null })[],
 ): Promise<void> {
   const skippedLines = lines.flatMap((l) => {
     const missing = [
@@ -170,7 +172,7 @@ export async function insertLinesStaging(
         type: l.type,
         color: l.color,
         started_at: l.startedAt,
-        ended_at: null,
+        ended_at: l.endedAt ?? null,
         operating_hours: l.operatingHours,
         operators: l.operators,
       },
@@ -281,7 +283,7 @@ async function deleteImpactEventChildren(
   }
 }
 
-/** Hash diff staging vs live; upsert changed rows; delete live rows absent from staging. */
+/** Hash diff staging vs live; upsert changed rows. */
 async function upsertChangedOperators(
   tx: Parameters<Parameters<Db['transaction']>[0]>[0],
 ): Promise<void> {
@@ -328,6 +330,21 @@ async function upsertChangedOperators(
         },
       });
   }
+}
+
+async function deleteOrphanOperators(
+  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
+): Promise<void> {
+  await tx
+    .delete(lineOperatorsTable)
+    .where(
+      notExists(
+        tx
+          .select()
+          .from(operatorsNextTable)
+          .where(eq(operatorsNextTable.id, lineOperatorsTable.operator_id)),
+      ),
+    );
   await tx
     .delete(operatorsTable)
     .where(
@@ -378,6 +395,11 @@ async function upsertChangedTowns(
         });
     }
   }
+}
+
+async function deleteOrphanTowns(
+  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
+): Promise<void> {
   await tx
     .delete(townsTable)
     .where(
@@ -428,6 +450,21 @@ async function upsertChangedLandmarks(
         });
     }
   }
+}
+
+async function deleteOrphanLandmarks(
+  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
+): Promise<void> {
+  await tx
+    .delete(stationLandmarksTable)
+    .where(
+      notExists(
+        tx
+          .select()
+          .from(landmarksNextTable)
+          .where(eq(landmarksNextTable.id, stationLandmarksTable.landmark_id)),
+      ),
+    );
   await tx
     .delete(landmarksTable)
     .where(
@@ -440,8 +477,10 @@ async function upsertChangedLandmarks(
     );
 }
 
-/** Operators, towns, landmarks — independent order; single transaction. */
-export async function syncOperatorsTownsLandmarks(db: Db): Promise<void> {
+/** Upsert parent tables before child syncs so new FK targets are available. */
+export async function syncOperatorsTownsLandmarksUpserts(
+  db: Db,
+): Promise<void> {
   await db.transaction(async (tx) => {
     await upsertChangedOperators(tx);
     await upsertChangedTowns(tx);
@@ -449,9 +488,26 @@ export async function syncOperatorsTownsLandmarks(db: Db): Promise<void> {
   });
 }
 
+/** Delete parent-table orphans after dependent tables have been reconciled. */
+export async function deleteOperatorsTownsLandmarksOrphans(
+  db: Db,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await deleteOrphanOperators(tx);
+    await deleteOrphanTowns(tx);
+    await deleteOrphanLandmarks(tx);
+  });
+}
+
+/** Convenience full sync for callers that are not orchestrating FK-safe phases. */
+export async function syncOperatorsTownsLandmarks(db: Db): Promise<void> {
+  await syncOperatorsTownsLandmarksUpserts(db);
+  await deleteOperatorsTownsLandmarksOrphans(db);
+}
+
 /**
  * Lines plus `line_operators`. For changed lines: replace operator rows for those
- * line ids, then orphan-delete lines (and operators) not in `lines_next`.
+ * line ids. Orphan deletes run later after services/stations/issues are reconciled.
  */
 export async function syncLines(db: Db): Promise<void> {
   await db.transaction(async (tx) => {
@@ -484,6 +540,7 @@ export async function syncLines(db: Db): Promise<void> {
             type: row.type,
             color: row.color,
             started_at: row.started_at,
+            ended_at: row.ended_at,
             operating_hours: row.operating_hours,
           })
           .onConflictDoUpdate({
@@ -491,6 +548,11 @@ export async function syncLines(db: Db): Promise<void> {
             set: {
               hash: row.hash,
               name: row.name,
+              type: row.type,
+              color: row.color,
+              started_at: row.started_at,
+              ended_at: row.ended_at,
+              operating_hours: row.operating_hours,
               updated_at: new Date(),
             },
           });
@@ -514,7 +576,11 @@ export async function syncLines(db: Db): Promise<void> {
         }
       }
     }
+  });
+}
 
+export async function deleteLineOrphans(db: Db): Promise<void> {
+  await db.transaction(async (tx) => {
     await tx
       .delete(lineOperatorsTable)
       .where(
@@ -525,6 +591,46 @@ export async function syncLines(db: Db): Promise<void> {
             .where(eq(linesNextTable.id, lineOperatorsTable.line_id)),
         ),
       );
+    await tx
+      .delete(stationCodesTable)
+      .where(
+        notExists(
+          tx
+            .select()
+            .from(linesNextTable)
+            .where(eq(linesNextTable.id, stationCodesTable.line_id)),
+        ),
+      );
+    await tx
+      .delete(lineServicesTable)
+      .where(
+        notExists(
+          tx
+            .select()
+            .from(linesNextTable)
+            .where(eq(linesNextTable.id, lineServicesTable.line_id)),
+        ),
+      );
+    await tx
+      .delete(lineDayFactsTable)
+      .where(
+        notExists(
+          tx
+            .select()
+            .from(linesNextTable)
+            .where(eq(linesNextTable.id, lineDayFactsTable.line_id)),
+        ),
+      );
+    await tx
+      .update(impactEventEntityFacilitiesTable)
+      .set({ line_id: null })
+      .where(sql`
+        ${impactEventEntityFacilitiesTable.line_id} IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM ${linesNextTable}
+          WHERE ${linesNextTable.id} = ${impactEventEntityFacilitiesTable.line_id}
+        )
+      `);
     await tx
       .delete(linesTable)
       .where(
@@ -616,7 +722,11 @@ export async function syncStations(db: Db): Promise<void> {
         }
       }
     }
+  });
+}
 
+export async function deleteStationOrphans(db: Db): Promise<void> {
+  await db.transaction(async (tx) => {
     await tx
       .delete(stationCodesTable)
       .where(
@@ -635,6 +745,50 @@ export async function syncStations(db: Db): Promise<void> {
             .select()
             .from(stationsNextTable)
             .where(eq(stationsNextTable.id, stationLandmarksTable.station_id)),
+        ),
+      );
+    await tx
+      .delete(serviceRevisionPathStationEntriesTable)
+      .where(
+        notExists(
+          tx
+            .select()
+            .from(stationsNextTable)
+            .where(
+              eq(
+                stationsNextTable.id,
+                serviceRevisionPathStationEntriesTable.station_id,
+              ),
+            ),
+        ),
+      );
+    await tx.delete(impactEventServiceScopesTable).where(sql`
+        (${impactEventServiceScopesTable.station_id} IS NOT NULL AND NOT EXISTS (
+          SELECT 1 FROM ${stationsNextTable}
+          WHERE ${stationsNextTable.id} = ${impactEventServiceScopesTable.station_id}
+        ))
+        OR (${impactEventServiceScopesTable.from_station_id} IS NOT NULL AND NOT EXISTS (
+          SELECT 1 FROM ${stationsNextTable}
+          WHERE ${stationsNextTable.id} = ${impactEventServiceScopesTable.from_station_id}
+        ))
+        OR (${impactEventServiceScopesTable.to_station_id} IS NOT NULL AND NOT EXISTS (
+          SELECT 1 FROM ${stationsNextTable}
+          WHERE ${stationsNextTable.id} = ${impactEventServiceScopesTable.to_station_id}
+        ))
+      `);
+    await tx
+      .delete(impactEventEntityFacilitiesTable)
+      .where(
+        notExists(
+          tx
+            .select()
+            .from(stationsNextTable)
+            .where(
+              eq(
+                stationsNextTable.id,
+                impactEventEntityFacilitiesTable.station_id,
+              ),
+            ),
         ),
       );
     await tx
@@ -764,7 +918,26 @@ export async function syncServices(db: Db): Promise<void> {
         }
       }
     }
+  });
+}
 
+export async function deleteServiceOrphans(db: Db): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(impactEventEntityServicesTable)
+      .where(
+        notExists(
+          tx
+            .select()
+            .from(servicesNextTable)
+            .where(
+              eq(
+                servicesNextTable.id,
+                impactEventEntityServicesTable.service_id,
+              ),
+            ),
+        ),
+      );
     await tx
       .delete(serviceRevisionPathStationEntriesTable)
       .where(
@@ -1124,6 +1297,9 @@ async function deleteIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
       .where(inArray(impactEventsTable.issue_id, ch));
     const orphanImpactIds = impRows.map((r) => r.id);
     await deleteImpactEventChildren(tx, orphanImpactIds);
+    await tx
+      .delete(issueDayFactsTable)
+      .where(inArray(issueDayFactsTable.issue_id, ch));
     await tx
       .delete(impactEventsTable)
       .where(inArray(impactEventsTable.issue_id, ch));

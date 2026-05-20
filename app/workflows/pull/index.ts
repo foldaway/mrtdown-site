@@ -12,6 +12,10 @@ import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
 import {
   deleteOrphanIssuesBatch,
+  deleteLineOrphans,
+  deleteOperatorsTownsLandmarksOrphans,
+  deleteServiceOrphans,
+  deleteStationOrphans,
   finalizePull,
   insertIssuesStaging,
   insertLandmarksStaging,
@@ -22,7 +26,7 @@ import {
   insertTownsStaging,
   syncChangedIssuesBatch,
   syncLines,
-  syncOperatorsTownsLandmarks,
+  syncOperatorsTownsLandmarksUpserts,
   syncServices,
   syncStations,
   truncateStagingTables,
@@ -183,11 +187,11 @@ class PullWorkflowBase extends WorkflowEntrypoint<Env, Params> {
     });
 
     await step.do(
-      'sync-operators-towns-landmarks',
+      'sync-operators-towns-landmarks-upserts',
       syncStepConfig,
       async () => {
         const db = getDb();
-        await syncOperatorsTownsLandmarks(db);
+        await syncOperatorsTownsLandmarksUpserts(db);
       },
     );
 
@@ -244,6 +248,34 @@ class PullWorkflowBase extends WorkflowEntrypoint<Env, Params> {
       );
       if (processed === 0) break;
     }
+
+    await step.do('delete-service-orphans', syncStepConfig, async () => {
+      const db = getDb();
+      console.log('Deleting service orphans...');
+      await deleteServiceOrphans(db);
+    });
+
+    await step.do('delete-station-orphans', syncStepConfig, async () => {
+      const db = getDb();
+      console.log('Deleting station orphans...');
+      await deleteStationOrphans(db);
+    });
+
+    await step.do('delete-line-orphans', syncStepConfig, async () => {
+      const db = getDb();
+      console.log('Deleting line orphans...');
+      await deleteLineOrphans(db);
+    });
+
+    await step.do(
+      'delete-operators-towns-landmarks-orphans',
+      syncStepConfig,
+      async () => {
+        const db = getDb();
+        console.log('Deleting operators, towns and landmarks orphans...');
+        await deleteOperatorsTownsLandmarksOrphans(db);
+      },
+    );
 
     await step.do('finalize', syncStepConfig, async () => {
       const db = getDb();
