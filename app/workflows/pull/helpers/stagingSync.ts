@@ -621,6 +621,16 @@ export async function deleteLineOrphans(db: Db): Promise<void> {
         ),
       );
     await tx
+      .update(impactEventEntityFacilitiesTable)
+      .set({ line_id: null })
+      .where(sql`
+        ${impactEventEntityFacilitiesTable.line_id} IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM ${linesNextTable}
+          WHERE ${linesNextTable.id} = ${impactEventEntityFacilitiesTable.line_id}
+        )
+      `);
+    await tx
       .delete(linesTable)
       .where(
         notExists(
