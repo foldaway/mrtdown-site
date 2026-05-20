@@ -1581,10 +1581,7 @@ function buildLineSummary(
           (durationSecondsByIssueType[issue.type] ?? 0) + dayOverlap;
       }
 
-      if (
-        issueContributesToLineDowntime(issue) &&
-        (issue.type === 'disruption' || issue.type === 'maintenance')
-      ) {
+      if (issueContributesToLineDowntime(issue)) {
         dailyDowntimeIntervals.push(...contributingBounds);
       }
 
@@ -2251,15 +2248,17 @@ function buildDurationChartsFromIssueFacts(rows: IssueDayFactRow[]) {
   const end = nowSg().startOf('day');
   const countsByDate = groupIssueFactCountsByDate(rows, true);
   const aggregateForRange = (
-    start: DateTime,
-    count: number,
-    previous = false,
+    rangeStart: DateTime,
+    rangeEnd: DateTime,
   ): IssueTypeCounts => {
-    const rangeStart = previous ? start.minus({ days: count }) : start;
     const aggregate = createIssueTypeCounts();
 
-    for (let offset = 0; offset < count; offset++) {
-      const date = rangeStart.plus({ days: offset }).toISODate()!;
+    for (
+      let cursor = rangeStart.startOf('day');
+      cursor < rangeEnd;
+      cursor = cursor.plus({ days: 1 })
+    ) {
+      const date = cursor.toISODate()!;
       const dayCounts = countsByDate.get(date);
       if (dayCounts == null) {
         continue;
@@ -2273,27 +2272,40 @@ function buildDurationChartsFromIssueFacts(rows: IssueDayFactRow[]) {
     return aggregate;
   };
 
-  return [7, 30, 90].map((count) => {
-    const start = end.minus({ days: count - 1 });
+  return STATISTICS_TIME_WINDOWS.map((window) => {
+    const start = getWindowStart(end, window.dataTimeScale);
     const data: ChartEntry[] = [];
-    for (let offset = 0; offset < count; offset++) {
-      const date = start.plus({ days: offset }).toISODate()!;
+    for (let offset = 0; offset < window.dataTimeScale.count; offset++) {
+      const bucketStart = getDatePlus(
+        start,
+        window.dataTimeScale.granularity,
+        offset,
+      );
+      const bucketEnd = getBucketEnd(
+        bucketStart,
+        window.dataTimeScale.granularity,
+      );
       data.push({
-        name: date,
-        payload: {
-          ...(countsByDate.get(date) ?? createIssueTypeCounts()),
-        },
+        name: bucketStart.toISODate()!,
+        payload: aggregateForRange(bucketStart, bucketEnd),
       });
     }
 
+    const currentEnd = getWindowEnd(start, window.dataTimeScale);
+    const previousStart = getDateMinus(
+      start,
+      window.dataTimeScale.granularity,
+      window.dataTimeScale.count,
+    );
     return buildCountChart(
-      `${count}d`,
+      window.title,
       data,
       [
-        { name: 'current', payload: aggregateForRange(start, count, false) },
-        { name: 'previous', payload: aggregateForRange(start, count, true) },
+        { name: 'current', payload: aggregateForRange(start, currentEnd) },
+        { name: 'previous', payload: aggregateForRange(previousStart, start) },
       ],
-      makeTimeScale('day', count),
+      window.dataTimeScale,
+      window.displayTimeScale,
     );
   });
 }
