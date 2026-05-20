@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { issueTypeHasLineDowntimeByServiceEffect } from './issueOperationalEffects';
+import {
+  issueContributesToLineStatus,
+  issueTypeHasLineDowntimeByServiceEffect,
+} from './issueOperationalEffects';
 
 describe('issueTypeHasLineDowntimeByServiceEffect', () => {
   it('always counts disruptions as line downtime', () => {
@@ -22,10 +25,10 @@ describe('issueTypeHasLineDowntimeByServiceEffect', () => {
     ).toBe(false);
   });
 
-  it('counts infra reduced-service windows as downtime', () => {
+  it('does not count infra reduced-service windows as downtime', () => {
     expect(
       issueTypeHasLineDowntimeByServiceEffect('infra', ['reduced-service']),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('does not count line issues that only report delays', () => {
@@ -36,5 +39,43 @@ describe('issueTypeHasLineDowntimeByServiceEffect', () => {
 
   it('does not count issues without a service-impacting effect', () => {
     expect(issueTypeHasLineDowntimeByServiceEffect('infra', [])).toBe(false);
+  });
+});
+
+describe('issueContributesToLineStatus', () => {
+  it('always counts disruptions as line status changes', () => {
+    expect(
+      issueContributesToLineStatus({
+        type: 'disruption',
+        serviceEffectKinds: [],
+      }),
+    ).toBe(true);
+  });
+
+  it('counts maintenance service effects as line status changes', () => {
+    expect(
+      issueContributesToLineStatus({
+        type: 'maintenance',
+        serviceEffectKinds: ['service-hours-adjustment'],
+      }),
+    ).toBe(true);
+  });
+
+  it('counts infra service effects as line status changes', () => {
+    expect(
+      issueContributesToLineStatus({
+        type: 'infra',
+        serviceEffectKinds: ['reduced-service'],
+      }),
+    ).toBe(true);
+  });
+
+  it('does not count delay-only service effects as line status changes', () => {
+    expect(
+      issueContributesToLineStatus({
+        type: 'infra',
+        serviceEffectKinds: ['delay'],
+      }),
+    ).toBe(false);
   });
 });

@@ -9,7 +9,7 @@ type IssueWithServiceEffects = {
   serviceEffectKinds: ServiceEffectKind[];
 };
 
-function serviceEffectContributesToLineDowntime(kind: ServiceEffectKind) {
+function serviceEffectContributesToLineStatus(kind: ServiceEffectKind) {
   switch (kind) {
     case ServiceEffectKindSchema.enum.delay:
       return false;
@@ -21,19 +21,14 @@ function serviceEffectContributesToLineDowntime(kind: ServiceEffectKind) {
 }
 
 export function issueContributesToLineDowntime(issue: IssueWithServiceEffects) {
-  if (issue.type === 'disruption') {
-    return true;
-  }
-
-  if (issue.type === 'maintenance') {
-    return false;
-  }
-
-  return issue.serviceEffectKinds.some(serviceEffectContributesToLineDowntime);
+  return issue.type === 'disruption';
 }
 
 export function issueContributesToLineStatus(issue: IssueWithServiceEffects) {
-  return issueContributesToLineDowntime(issue);
+  return (
+    issue.type === 'disruption' ||
+    issue.serviceEffectKinds.some(serviceEffectContributesToLineStatus)
+  );
 }
 
 export function issueTypeHasLineDowntimeByServiceEffect(
