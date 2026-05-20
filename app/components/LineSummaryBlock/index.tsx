@@ -137,7 +137,7 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
         </span>
         {data.status !== 'future_service' && (
           <div className="flex items-center">
-            <UptimeCard data={data} dateTimes={dateTimes} />
+            <UptimeCard data={data} />
           </div>
         )}
         <span className="text-gray-500 text-xs capitalize dark:text-gray-400">

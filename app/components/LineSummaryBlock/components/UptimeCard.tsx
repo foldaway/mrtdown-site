@@ -1,26 +1,21 @@
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
-import classNames from 'classnames';
-import { type DateTime, Duration } from 'luxon';
+import { Duration } from 'luxon';
 import { Popover } from 'radix-ui';
 import { useState } from 'react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import { useDebounce } from 'use-debounce';
 import type { LineSummary } from '~/client';
 import { FormattedDuration } from '~/components/FormattedDuration';
-import { IssueTypeLabels } from '~/constants';
 import { assert } from '~/util/assert';
 
 interface Props {
   data: Pick<
     LineSummary,
-    | 'durationSecondsByIssueType'
-    | 'durationSecondsTotalForIssues'
     | 'uptimeRatio'
     | 'totalDowntimeSeconds'
     | 'totalServiceSeconds'
     | 'downtimeBreakdown'
   >;
-  dateTimes: DateTime<true>[];
 }
 
 export const UptimeCard: React.FC<Props> = (props) => {
@@ -29,6 +24,13 @@ export const UptimeCard: React.FC<Props> = (props) => {
 
   const [isOpen, setIsOpen] = useState(false);
   const [isOpenDebounced] = useDebounce(isOpen, 100);
+  const disruptionDowntimeSeconds =
+    data.downtimeBreakdown?.find((breakdown) => breakdown.type === 'disruption')
+      ?.downtimeSeconds ?? 0;
+  const disruptionDowntimeRatio =
+    data.totalServiceSeconds != null && data.totalServiceSeconds > 0
+      ? disruptionDowntimeSeconds / data.totalServiceSeconds
+      : 0;
 
   return (
     <>
@@ -66,81 +68,79 @@ export const UptimeCard: React.FC<Props> = (props) => {
             >
               <Popover.Arrow className="fill-white dark:fill-gray-800" />
 
-              <span className="mb-2 font-medium text-gray-800 text-sm dark:text-gray-100">
+              <span className="font-semibold text-gray-900 text-sm dark:text-gray-100">
                 <FormattedMessage
-                  id="general.uptime_duration_display"
-                  defaultMessage="{duration} within service hours"
-                  values={{
-                    duration: (
-                      <FormattedDuration
-                        duration={Duration.fromObject({
-                          seconds: data.totalDowntimeSeconds,
-                        })}
-                      />
-                    ),
-                  }}
+                  id="general.disruption_downtime"
+                  defaultMessage="Disruption downtime"
                 />
               </span>
 
-              <table className="w-full table-auto text-gray-600 text-xs dark:text-gray-300">
-                <tbody>
-                  {data.downtimeBreakdown?.map((breakdown) => (
-                    <tr
-                      key={breakdown.type}
-                      className="border-gray-100 border-b last:border-b-0 dark:border-gray-700"
-                    >
-                      <td className="py-2">
-                        <div className="flex items-center">
-                          <div
-                            className={classNames('me-2 size-3 rounded-full', {
-                              'bg-disruption-light dark:bg-disruption-dark':
-                                breakdown.type === 'disruption',
-                              'bg-maintenance-light dark:bg-maintenance-dark':
-                                breakdown.type === 'maintenance',
-                              'bg-infra-light dark:bg-infra-dark':
-                                breakdown.type === 'infra',
-                            })}
-                          />
-                          <span className="font-medium text-xs">
-                            <FormattedMessage
-                              {...IssueTypeLabels[breakdown.type]}
-                            />
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-2 text-right">
-                        <span className="font-mono text-xs">
-                          <FormattedDuration
-                            duration={Duration.fromObject({
-                              seconds: breakdown.downtimeSeconds,
-                            })}
-                          />
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {'infra' in data.durationSecondsByIssueType && (
-                    <tr className="border-gray-100 border-b last:border-b-0 dark:border-gray-700">
-                      <td className="py-2">
-                        <div className="flex items-center">
-                          <div className="me-2 size-3 rounded-full bg-infra-light dark:bg-infra-dark" />
-                          <span className="font-medium text-xs">
-                            <FormattedMessage
-                              id="general.infrastructure"
-                              defaultMessage="Infrastructure"
-                            />
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-2 text-right">
-                        <span className="font-mono text-gray-400 text-xs dark:text-gray-500">
-                          -
-                        </span>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              <div className="mt-3 flex items-end justify-between gap-x-4">
+                <span className="font-semibold text-2xl text-disruption-light tabular-nums dark:text-disruption-dark">
+                  <FormattedDuration
+                    duration={Duration.fromObject({
+                      seconds: disruptionDowntimeSeconds,
+                    })}
+                  />
+                </span>
+                <span className="pb-1 text-gray-500 text-xs dark:text-gray-400">
+                  <FormattedMessage
+                    id="general.service_hours_share"
+                    defaultMessage="{percent} of service hours"
+                    values={{
+                      percent: (
+                        <FormattedNumber
+                          value={disruptionDowntimeRatio}
+                          style="percent"
+                          maximumFractionDigits={2}
+                        />
+                      ),
+                    }}
+                  />
+                </span>
+              </div>
+
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+                <div
+                  className="h-full rounded-full bg-disruption-light dark:bg-disruption-dark"
+                  style={{
+                    width: `${Math.min(disruptionDowntimeRatio * 100, 100).toFixed(2)}%`,
+                  }}
+                />
+              </div>
+
+              <span className="mt-3 text-gray-600 text-xs leading-relaxed dark:text-gray-300">
+                {disruptionDowntimeSeconds > 0 ? (
+                  <FormattedMessage
+                    id="general.disruption_downtime_description"
+                    defaultMessage="Disruption time counted against uptime for this period."
+                  />
+                ) : (
+                  <FormattedMessage
+                    id="general.no_disruption_downtime_description"
+                    defaultMessage="No disruption downtime recorded in this period."
+                  />
+                )}
+              </span>
+
+              <div className="mt-3 flex items-center justify-between border-gray-100 border-t pt-3 text-xs dark:border-gray-700">
+                <div className="flex items-center">
+                  <div className="me-2 size-3 rounded-full bg-disruption-light dark:bg-disruption-dark" />
+                  <span className="font-medium text-gray-700 dark:text-gray-200">
+                    <FormattedMessage
+                      id="general.disruption"
+                      defaultMessage="Disruption"
+                    />
+                  </span>
+                </div>
+                <span className="font-mono text-gray-600 dark:text-gray-300">
+                  <FormattedDuration
+                    duration={Duration.fromObject({
+                      seconds: disruptionDowntimeSeconds,
+                    })}
+                  />
+                </span>
+              </div>
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>
