@@ -1585,17 +1585,15 @@ function buildLineSummary(
         dailyDowntimeIntervals.push(...contributingBounds);
       }
 
-      if (issueContributesToLineDowntime(issue)) {
-        const current = dayBreakdown.breakdownByIssueTypes[issue.type] ?? {
-          totalDurationSeconds: 0,
-          issueIds: [],
-        };
-        current.totalDurationSeconds += dayOverlap;
-        if (!current.issueIds.includes(issue.id)) {
-          current.issueIds.push(issue.id);
-        }
-        dayBreakdown.breakdownByIssueTypes[issue.type] = current;
+      const current = dayBreakdown.breakdownByIssueTypes[issue.type] ?? {
+        totalDurationSeconds: 0,
+        issueIds: [],
+      };
+      current.totalDurationSeconds += dayOverlap;
+      if (!current.issueIds.includes(issue.id)) {
+        current.issueIds.push(issue.id);
       }
+      dayBreakdown.breakdownByIssueTypes[issue.type] = current;
     }
 
     totalDowntimeSeconds += sumIntervalSeconds(
@@ -1677,6 +1675,16 @@ function rankLineSummaries(lineSummaries: LineSummary[]) {
       totalLines: ranked.length > 0 ? ranked.length : null,
     };
   });
+}
+
+function getLineSummaryDowntimeSeconds(
+  summary: LineSummary,
+  issueType: IssueType,
+) {
+  return (
+    summary.downtimeBreakdown?.find((breakdown) => breakdown.type === issueType)
+      ?.downtimeSeconds ?? 0
+  );
 }
 
 function buildWindowCountEntries(
@@ -2550,7 +2558,6 @@ async function rebuildOperationalFactsForDateFromDataset(
       dataset.publicHolidaySet,
       asOf,
     );
-    const dayBreakdown = summary.breakdownByDates[dateKey];
     const counts = lineIssues.reduce<Record<IssueType, number>>(
       (acc, issue) => {
         if (issueTouchesDate(issue, normalizedDate)) {
@@ -2572,15 +2579,13 @@ async function rebuildOperationalFactsForDateFromDataset(
               .seconds,
       ),
       downtime_disruption_seconds: Math.round(
-        dayBreakdown?.breakdownByIssueTypes.disruption?.totalDurationSeconds ??
-          0,
+        getLineSummaryDowntimeSeconds(summary, 'disruption'),
       ),
       downtime_maintenance_seconds: Math.round(
-        dayBreakdown?.breakdownByIssueTypes.maintenance?.totalDurationSeconds ??
-          0,
+        getLineSummaryDowntimeSeconds(summary, 'maintenance'),
       ),
       downtime_infra_seconds: Math.round(
-        dayBreakdown?.breakdownByIssueTypes.infra?.totalDurationSeconds ?? 0,
+        getLineSummaryDowntimeSeconds(summary, 'infra'),
       ),
       issue_count_disruption: counts.disruption,
       issue_count_maintenance: counts.maintenance,
