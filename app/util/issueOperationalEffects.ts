@@ -5,21 +5,23 @@ type IssueWithServiceEffects = Pick<Issue, 'type'> & {
   serviceEffectKinds: ServiceEffectKind[];
 };
 
-const LINE_DOWNTIME_SERVICE_EFFECT_KINDS: ReadonlySet<ServiceEffectKind> =
-  new Set([
-    ServiceEffectKindSchema.enum['no-service'],
-    ServiceEffectKindSchema.enum['reduced-service'],
-    ServiceEffectKindSchema.enum['service-hours-adjustment'],
-  ]);
+function serviceEffectContributesToLineDowntime(kind: ServiceEffectKind) {
+  switch (kind) {
+    case ServiceEffectKindSchema.enum.delay:
+      return false;
+    case ServiceEffectKindSchema.enum['no-service']:
+    case ServiceEffectKindSchema.enum['reduced-service']:
+    case ServiceEffectKindSchema.enum['service-hours-adjustment']:
+      return true;
+  }
+}
 
 export function issueContributesToLineDowntime(issue: IssueWithServiceEffects) {
   if (issue.type === 'disruption') {
     return true;
   }
 
-  return issue.serviceEffectKinds.some((kind) =>
-    LINE_DOWNTIME_SERVICE_EFFECT_KINDS.has(kind),
-  );
+  return issue.serviceEffectKinds.some(serviceEffectContributesToLineDowntime);
 }
 
 export function issueContributesToLineStatus(issue: IssueWithServiceEffects) {
