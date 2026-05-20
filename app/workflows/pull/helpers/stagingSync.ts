@@ -142,7 +142,7 @@ export async function insertLandmarksStaging(
 
 export async function insertLinesStaging(
   db: Db,
-  lines: readonly (Line & { hash: string })[],
+  lines: readonly (Line & { hash: string; endedAt?: string | null })[],
 ): Promise<void> {
   const skippedLines = lines.flatMap((l) => {
     const missing = [
@@ -172,7 +172,7 @@ export async function insertLinesStaging(
         type: l.type,
         color: l.color,
         started_at: l.startedAt,
-        ended_at: null,
+        ended_at: l.endedAt ?? null,
         operating_hours: l.operatingHours,
         operators: l.operators,
       },
@@ -540,6 +540,7 @@ export async function syncLines(db: Db): Promise<void> {
             type: row.type,
             color: row.color,
             started_at: row.started_at,
+            ended_at: row.ended_at,
             operating_hours: row.operating_hours,
           })
           .onConflictDoUpdate({
