@@ -1,6 +1,6 @@
 import type React from 'react';
 import { FormattedDate, FormattedMessage } from 'react-intl';
-import type { ChartEntry, Granularity } from '~/client';
+import type { ChartEntry, Granularity } from '~/types';
 import { getDateFormatOptions } from '~/helpers/getDateFormatOptions';
 
 interface Props {

@@ -8,7 +8,7 @@ import {
   FormattedRelativeTime,
   useIntl,
 } from 'react-intl';
-import type { LineSummary } from '~/client';
+import type { LineSummary } from '~/types';
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { useHydrated } from '../../hooks/useHydrated';

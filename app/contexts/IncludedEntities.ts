@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { IncludedEntities } from '~/client';
+import type { IncludedEntities } from '~/types';
 import { assert } from '~/util/assert';
 
 export const IncludedEntitiesContext = createContext<IncludedEntities | null>(

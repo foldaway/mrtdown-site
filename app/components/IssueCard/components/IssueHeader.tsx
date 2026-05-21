@@ -5,7 +5,7 @@ import {
 } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
 import { FormattedMessage } from 'react-intl';
-import type { Issue, IssueInterval } from '~/client';
+import type { Issue, IssueInterval } from '~/types';
 import { IssueTypeLabels } from '~/constants';
 import { IssueStatusBadge } from '../../IssueStatusBadge';
 import { IssueTimestamp } from './IssueTimestamp';

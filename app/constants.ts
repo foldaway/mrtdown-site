@@ -1,11 +1,11 @@
-import { defineMessage, type MessageDescriptor } from 'react-intl';
 import type {
-  IssueSubtype,
+  CauseSubtype,
   IssueType,
-  LineSummaryStatus,
   LineType,
-  StationLineMemberStructureType,
-} from './client';
+  StationStructureType,
+} from '@mrtdown/core';
+import { defineMessage, type MessageDescriptor } from 'react-intl';
+import type { LineSummaryStatus } from './types';
 
 export const LANGUAGES_NON_DEFAULT = ['zh-Hans', 'ms', 'ta'];
 export const LANGUAGES = ['en-SG', ...LANGUAGES_NON_DEFAULT];
@@ -55,7 +55,7 @@ export const IssueTypeLabels: Record<IssueType, MessageDescriptor> = {
   }),
 };
 
-export const IssueSubtypeLabels: Record<IssueSubtype, MessageDescriptor> = {
+export const IssueSubtypeLabels: Record<CauseSubtype, MessageDescriptor> = {
   'signal.fault': defineMessage({
     id: 'issue.subtype.signal_fault',
     defaultMessage: 'Signal Fault',
@@ -135,7 +135,7 @@ export const LineTypeLabels: Record<LineType, MessageDescriptor> = {
 };
 
 export const StationStructureTypeLabels: Record<
-  StationLineMemberStructureType,
+  StationStructureType,
   MessageDescriptor
 > = {
   elevated: defineMessage({

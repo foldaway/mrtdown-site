@@ -1,7 +1,7 @@
 import { CheckCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
 import { FormattedMessage } from 'react-intl';
-import type { Issue, IssueInterval } from '~/client';
+import type { Issue, IssueInterval } from '~/types';
 
 interface Props {
   interval: IssueInterval;
@@ -33,10 +33,7 @@ export const IssueStatusBadge: React.FC<Props> = ({ interval, issue }) => {
         <>
           <CheckCircleIcon className="size-3" />
           {issue.type === 'disruption' ? (
-            <FormattedMessage
-              id="general.resolved"
-              defaultMessage="Resolved"
-            />
+            <FormattedMessage id="general.resolved" defaultMessage="Resolved" />
           ) : (
             <FormattedMessage
               id="general.completed"

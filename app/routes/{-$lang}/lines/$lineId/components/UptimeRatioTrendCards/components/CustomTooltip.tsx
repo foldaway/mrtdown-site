@@ -1,7 +1,7 @@
 import { Duration } from 'luxon';
 import type React from 'react';
 import { FormattedDate, FormattedMessage, FormattedNumber } from 'react-intl';
-import type { ChartEntry, Granularity } from '~/client';
+import type { ChartEntry, Granularity } from '~/types';
 import { FormattedDuration } from '~/components/FormattedDuration';
 import { getDateFormatOptions } from '~/helpers/getDateFormatOptions';
 

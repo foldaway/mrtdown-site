@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { FormattedDateTimeRange, FormattedMessage } from 'react-intl';
-import type { Issue } from '~/client';
+import type { Issue } from '~/types';
 
 interface Props {
   issue: Issue;

@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { FormattedDateTimeRange, FormattedMessage } from 'react-intl';
-import type { IssueInterval } from '~/client';
+import type { IssueInterval } from '~/types';
 import { useHydrated } from '~/hooks/useHydrated';
 
 interface Props {

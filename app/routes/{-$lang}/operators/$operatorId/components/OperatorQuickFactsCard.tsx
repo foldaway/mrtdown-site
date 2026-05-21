@@ -1,6 +1,6 @@
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import { Duration } from 'luxon';
-import type { OperatorProfile } from '~/client';
+import type { OperatorProfile } from '~/types';
 import { FormattedDuration } from '~/components/FormattedDuration';
 
 interface Props {
@@ -73,4 +73,3 @@ export const OperatorQuickFactsCard: React.FC<Props> = (props) => {
     </div>
   );
 };
-

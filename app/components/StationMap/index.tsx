@@ -4,7 +4,7 @@ import { Tabs } from 'radix-ui';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { FormattedList, FormattedMessage, useIntl } from 'react-intl';
-import type { IssueAffectedBranch } from '~/client';
+import type { IssueAffectedBranch } from '~/types';
 import { ZoomControls } from '~/components/ZoomControls';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';

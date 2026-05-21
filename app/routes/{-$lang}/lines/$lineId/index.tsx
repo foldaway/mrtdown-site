@@ -1,3 +1,4 @@
+import type { IssueType } from '@mrtdown/core';
 import { createFileRoute } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
@@ -7,7 +8,6 @@ import {
   FormattedMessage,
   useIntl,
 } from 'react-intl';
-import type { IssueType } from '~/client';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';

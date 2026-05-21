@@ -1,5 +1,5 @@
 import classNames from 'classnames';
-import type { Issue } from '~/client';
+import type { Issue } from '~/types';
 import { IssueContent } from './components/IssueContent';
 import { IssueHeader } from './components/IssueHeader';
 import { useIssueInterval } from './hooks/useIssueInterval';

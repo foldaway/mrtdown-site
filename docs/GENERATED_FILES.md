@@ -2,12 +2,6 @@
 
 Several large files are generated or mechanically produced and should not be hand-edited during normal work.
 
-## API Client
-
-- Path: `app/client/**`
-- Source: `@hey-api/openapi-ts`
-- Script: `npm run api:client:generate`
-
 ## Route Tree
 
 - Path: `app/routeTree.gen.ts`

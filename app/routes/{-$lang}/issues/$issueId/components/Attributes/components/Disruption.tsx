@@ -1,6 +1,6 @@
 import { Duration } from 'luxon';
 import { FormattedDate, FormattedMessage } from 'react-intl';
-import type { Issue } from '~/client';
+import type { Issue } from '~/types';
 import { FormattedDuration } from '~/components/FormattedDuration';
 
 interface Props {

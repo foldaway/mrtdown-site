@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { SystemAnalytics } from '~/client';
+import type { SystemAnalytics } from '~/types';
 import { CountTrendCards } from './components/CountTrendCards';
 import { DisruptionsHeatmap } from './components/DisruptionsHeatmap';
 import { DurationTrendCards } from './components/DurationTrendCards';

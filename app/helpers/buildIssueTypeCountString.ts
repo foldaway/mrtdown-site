@@ -1,5 +1,5 @@
+import type { IssueType } from '@mrtdown/core';
 import type { IntlShape } from 'react-intl';
-import type { IssueType } from '~/client';
 
 export function buildIssueTypeCountString(
   issueCountByType: Record<IssueType, number>,

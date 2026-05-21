@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
 import { FormattedDateTimeRange, FormattedMessage, useIntl } from 'react-intl';
-import type { Issue } from '~/client';
+import type { Issue } from '~/types';
 import { IssueAffectedBranchPill } from '~/components/IssueAffectedBranchPill';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 

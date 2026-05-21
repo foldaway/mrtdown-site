@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
 import { createIntl, FormattedMessage, useIntl } from 'react-intl';
-import type { IssueAffectedBranch } from '~/client';
+import type { IssueAffectedBranch } from '~/types';
 import { CurrentAdvisoriesSection } from '~/components/CurrentAdvisoriesSection';
 import { StationMap } from '~/components/StationMap';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';

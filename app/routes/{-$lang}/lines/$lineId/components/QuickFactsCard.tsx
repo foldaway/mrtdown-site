@@ -9,7 +9,7 @@ import {
   FormattedNumber,
   useIntl,
 } from 'react-intl';
-import type { Line, LineBranch } from '~/client';
+import type { Line, LineBranch } from '~/types';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 
 interface Props {

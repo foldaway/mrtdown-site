@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { IssueAffectedBranch, Line, Station } from '~/client';
+import type { IssueAffectedBranch, Line, Station } from '~/types';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 
 interface UseAffectedStationsReturn {

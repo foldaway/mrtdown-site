@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { useMemo } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import type { Line, LineSummaryStatus } from '~/client';
+import type { Line, LineSummaryStatus } from '~/types';
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';

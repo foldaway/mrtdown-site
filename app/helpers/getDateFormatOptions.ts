@@ -1,4 +1,4 @@
-import type { Granularity } from '~/client';
+import type { Granularity } from '~/types';
 
 export function getDateFormatOptions(
   granularity: Granularity,

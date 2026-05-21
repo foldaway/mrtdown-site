@@ -1,4 +1,5 @@
 import { InformationCircleIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import type { IssueType } from '@mrtdown/core';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
@@ -9,7 +10,7 @@ import {
   type IntlShape,
   useIntl,
 } from 'react-intl';
-import type { IncludedEntities, IssueType, Station } from '~/client';
+import type { IncludedEntities, Station } from '~/types';
 import { IssueCard } from '~/components/IssueCard';
 import type { IssueCardContext } from '~/components/IssueCard/types';
 import { StationBar } from '~/components/StationBar';

@@ -1,11 +1,11 @@
+import type { CauseSubtype, IssueType } from '@mrtdown/core';
 import classNames from 'classnames';
 import { FormattedMessage } from 'react-intl';
-import type { IssueSubtype, IssueType } from '~/client';
 import { IssueSubtypeLabels } from '~/constants';
 
 interface Props {
   type: IssueType;
-  subtype: IssueSubtype;
+  subtype: CauseSubtype;
 }
 
 export const IssueSubtypeBadge: React.FC<Props> = (props) => {

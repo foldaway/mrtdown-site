@@ -1,7 +1,7 @@
 import { Duration } from 'luxon';
 import { useMemo } from 'react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
-import type { Issue } from '~/client';
+import type { Issue } from '~/types';
 
 interface Props {
   issue: Issue;

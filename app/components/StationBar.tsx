@@ -1,9 +1,9 @@
 import type React from 'react';
-import type { StationLineMembership } from '~/client';
+import type { Station } from '~/types';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 
 interface Props {
-  memberships: StationLineMembership[];
+  memberships: Station['memberships'];
 }
 
 export const StationBar: React.FC<Props> = (props) => {

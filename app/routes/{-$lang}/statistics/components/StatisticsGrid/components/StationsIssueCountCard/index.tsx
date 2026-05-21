@@ -10,12 +10,12 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { Chart } from '~/client';
+import type { SystemAnalytics } from '~/types';
 import { Tick } from './components/Tick';
 import { TooltipContent } from './components/TooltipContent';
 
 interface Props {
-  chart: Chart;
+  chart: SystemAnalytics['chartTotalIssueCountByStation'];
 }
 
 export const StationsIssueCountCard: React.FC<Props> = (props) => {

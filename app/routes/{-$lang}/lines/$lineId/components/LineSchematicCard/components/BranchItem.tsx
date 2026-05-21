@@ -1,5 +1,5 @@
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
-import type { LineBranch } from '~/client';
+import type { LineBranch } from '~/types';
 
 interface Props {
   branch: LineBranch;

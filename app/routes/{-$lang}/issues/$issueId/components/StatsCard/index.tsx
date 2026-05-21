@@ -1,5 +1,5 @@
 import { FormattedMessage } from 'react-intl';
-import type { Issue } from '~/client';
+import type { Issue } from '~/types';
 import { Disruption } from './components/Disruption';
 import { Infrastructure } from './components/Infrastructure';
 import { Maintenance } from './components/Maintenance';

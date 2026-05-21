@@ -1,6 +1,6 @@
 import classNames from 'classnames';
 import { FormattedMessage } from 'react-intl';
-import type { LineSummary } from '~/client';
+import type { LineSummary } from '~/types';
 import { LineSummaryStatusLabels } from '~/constants';
 
 interface Props {
