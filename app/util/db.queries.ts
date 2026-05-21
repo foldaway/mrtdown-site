@@ -203,17 +203,19 @@ function parseTranslations(value: unknown): {
   fallback: string;
   translations: AppTranslations;
 } {
+  const isNonEmptyTranslation = (
+    translation: string | null | undefined,
+  ): translation is string =>
+    typeof translation === 'string' && translation.trim().length > 0;
   const rawTranslations =
     value != null && typeof value === 'object'
       ? (value as Record<string, string | null | undefined>)
       : {};
   const fallback =
-    rawTranslations['en-SG'] ??
-    rawTranslations.en ??
-    Object.values(rawTranslations).find(
-      (translation): translation is string =>
-        typeof translation === 'string' && translation.length > 0,
+    [rawTranslations['en-SG'], rawTranslations.en].find(
+      isNonEmptyTranslation,
     ) ??
+    Object.values(rawTranslations).find(isNonEmptyTranslation) ??
     '';
   const translations: AppTranslations = {
     ...rawTranslations,
