@@ -46,4 +46,3 @@ export const OperatorUptimeCard: React.FC<Props> = (props) => {
     </div>
   );
 };
-

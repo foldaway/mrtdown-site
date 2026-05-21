@@ -15,6 +15,12 @@ Several large files are generated or mechanically produced and should not be han
 - Script: `npm run db:generate`
 - Check: `npm run db:generate:check`
 
+## Extracted Message Catalog
+
+- Path: `lang/en-SG.json`
+- Source: FormatJS extraction
+- Script: `npm run i18n:extract`
+
 ## Station Map Snapshots
 
 - Path: `app/components/StationMap/components/Map*.tsx`

@@ -1,130 +1,124 @@
 {
-    "$schema": "node_modules/wrangler/config-schema.json",
-    "name": "mrtdown-site",
-    "main": "app/server.ts",
-    "compatibility_date": "2026-04-08",
-    "compatibility_flags": [
-        "nodejs_compat"
-    ],
-    "observability": {
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mrtdown-site",
+  "main": "app/server.ts",
+  "compatibility_date": "2026-04-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  },
+  "limits": {
+    "cpu_ms": 300000
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "e9034596011b46179c4c7f65c2ebc773",
+      "localConnectionString": "postgresql://postgres:postgres@localhost:5432/mrtdown-db"
+    }
+  ],
+  "workflows": [
+    {
+      "binding": "PULL_WORKFLOW",
+      "name": "mrtdown-pull-preview",
+      "class_name": "PullWorkflow"
+    }
+  ],
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
+  "env": {
+    "preview": {
+      "workflows": [
+        {
+          "binding": "PULL_WORKFLOW",
+          "name": "mrtdown-pull-preview",
+          "class_name": "PullWorkflow"
+        }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "e9034596011b46179c4c7f65c2ebc773"
+        }
+      ],
+      "observability": {
         "enabled": true,
         "head_sampling_rate": 1,
         "traces": {
-            "enabled": true,
-            "head_sampling_rate": 1
+          "enabled": true,
+          "head_sampling_rate": 1
         }
+      },
+      "version_metadata": {
+        "binding": "CF_VERSION_METADATA"
+      }
     },
-    "limits": {
+    "staging": {
+      "triggers": {
+        "crons": ["0 * * * *"]
+      },
+      "workflows": [
+        {
+          "binding": "PULL_WORKFLOW",
+          "name": "mrtdown-pull-staging",
+          "class_name": "PullWorkflow"
+        }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "1413ff84b6ef40a19973b1bc8a662736"
+        }
+      ],
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "traces": {
+          "enabled": true,
+          "head_sampling_rate": 1
+        }
+      },
+      "version_metadata": {
+        "binding": "CF_VERSION_METADATA"
+      }
+    },
+    "production": {
+      "triggers": {
+        "crons": ["*/30 * * * *"]
+      },
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 0.1,
+        "traces": {
+          "enabled": true,
+          "head_sampling_rate": 0.1
+        }
+      },
+      "limits": {
         "cpu_ms": 300000
-    },
-    "hyperdrive": [
+      },
+      "hyperdrive": [
         {
-            "binding": "HYPERDRIVE",
-            "id": "e9034596011b46179c4c7f65c2ebc773",
-            "localConnectionString": "postgresql://postgres:postgres@localhost:5432/mrtdown-db"
+          "binding": "HYPERDRIVE",
+          "id": "1d9561e9411649a6afe8612881ff926d"
         }
-    ],
-    "workflows": [
+      ],
+      "workflows": [
         {
-            "binding": "PULL_WORKFLOW",
-            "name": "mrtdown-pull-preview",
-            "class_name": "PullWorkflow"
+          "binding": "PULL_WORKFLOW",
+          "name": "mrtdown-pull-production",
+          "class_name": "PullWorkflow"
         }
-    ],
-    "version_metadata": {
-      "binding": "CF_VERSION_METADATA"
-    },
-    "env": {
-        "preview": {
-            "workflows": [
-                {
-                    "binding": "PULL_WORKFLOW",
-                    "name": "mrtdown-pull-preview",
-                    "class_name": "PullWorkflow"
-                }
-            ],
-            "hyperdrive": [
-                {
-                    "binding": "HYPERDRIVE",
-                    "id": "e9034596011b46179c4c7f65c2ebc773"
-                }
-            ],
-            "observability": {
-                "enabled": true,
-                "head_sampling_rate": 1,
-                "traces": {
-                    "enabled": true,
-                    "head_sampling_rate": 1
-                }
-            },
-            "version_metadata": {
-              "binding": "CF_VERSION_METADATA"
-            },
-        },
-        "staging": {
-            "triggers": {
-                "crons": [
-                    "0 * * * *"
-                ]
-            },
-            "workflows": [
-                {
-                    "binding": "PULL_WORKFLOW",
-                    "name": "mrtdown-pull-staging",
-                    "class_name": "PullWorkflow"
-                }
-            ],
-            "hyperdrive": [
-                {
-                    "binding": "HYPERDRIVE",
-                    "id": "1413ff84b6ef40a19973b1bc8a662736"
-                }
-            ],
-            "observability": {
-                "enabled": true,
-                "head_sampling_rate": 1,
-                "traces": {
-                    "enabled": true,
-                    "head_sampling_rate": 1
-                }
-            },
-            "version_metadata": {
-              "binding": "CF_VERSION_METADATA"
-            },
-        },
-        "production": {
-            "triggers": {
-                "crons": [
-                    "*/30 * * * *"
-                ]
-            },
-            "observability": {
-                "enabled": true,
-                "head_sampling_rate": 0.1,
-                "traces": {
-                    "enabled": true,
-                    "head_sampling_rate": 0.1
-                }
-            },
-            "limits": {
-                "cpu_ms": 300000
-            },
-            "hyperdrive": [
-                {
-                    "binding": "HYPERDRIVE",
-                    "id": "1d9561e9411649a6afe8612881ff926d"
-                }
-            ],
-            "workflows": [
-                {
-                    "binding": "PULL_WORKFLOW",
-                    "name": "mrtdown-pull-production",
-                    "class_name": "PullWorkflow"
-                }
-            ],
-            "version_metadata": {
-              "binding": "CF_VERSION_METADATA"
-            },
-        }
+      ],
+      "version_metadata": {
+        "binding": "CF_VERSION_METADATA"
+      }
     }
+  }
 }
