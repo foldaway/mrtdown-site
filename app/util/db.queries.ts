@@ -1108,9 +1108,11 @@ async function buildDataset(
           return null;
         }
 
-        return new Date(latestOverallRevision.updated_at)
-          .toISOString()
-          .slice(0, 10);
+        return isoDate(
+          DateTime.fromJSDate(latestOverallRevision.updated_at).setZone(
+            SG_TIMEZONE,
+          ),
+        );
       })(),
       stationIds: [...new Set(entries.map((entry) => entry.station_id))],
       entries: entries.map((entry) => ({
