@@ -43,6 +43,13 @@
       "when": 1776355200000,
       "tag": "0005_canonical_issue_periods",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779349162790,
+      "tag": "0006_repair_impact_event_cascades",
+      "breakpoints": true
     }
   ]
 }
