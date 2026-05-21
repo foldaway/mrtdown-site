@@ -1,23 +1,15 @@
 name: Deploy Preview
 
 on:
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - synchronize
+  push:
+    branches:
+      - preview
+  workflow_dispatch:
 
 jobs:
   deploy:
     name: Deploy preview
     runs-on: ubuntu-latest
-    # pull_request workflows from forks do not receive repository secrets
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository && (
-      github.event.action == 'synchronize'
-      || github.event.action == 'opened'
-      || github.event.action == 'reopened')
     environment:
       name: preview
       url: ${{ steps.deploy.outputs.deployment-url }}
@@ -53,25 +45,11 @@ jobs:
           VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
           VITE_ROOT_URL: "https://www.mrtdown.org"
 
-      - name: Create preview.env
-        run: |-
-          echo "VITE_ROOT_URL=https://www.mrtdown.org" >> preview.env
-
       - name: Deploy to Cloudflare Workers
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
-          # Preview deployments intentionally use the top-level Wrangler config,
-          # not per-PR preview aliases. All open PRs deploy over the same preview
-          # Worker/Workflow resources, so newer preview deploys override older
-          # ones and share the same HYPERDRIVE and PULL_WORKFLOW config.
-          # `versions upload --preview-alias` does not deploy/update Workflows,
-          # so use `deploy` here to keep the Worker and Workflow in sync.
-          # Fully isolated previews would need per-PR Worker, Workflow,
-          # Hyperdrive, and Neon resources plus reliable teardown. That
-          # operational cost is not worth it while preview deploys are mostly
-          # for one active contributor.
-          command: deploy --secrets-file preview.env
+          command: deploy --env preview
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -103,5 +81,3 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Remove preview.env
-        run: rm preview.env
