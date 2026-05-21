@@ -10,6 +10,7 @@ import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { useViewport, ViewportSchema } from '~/hooks/useViewport';
 import { getOverviewFn } from '~/util/overview.functions';
 import { CurrentAdvisoriesSection } from '../../components/CurrentAdvisoriesSection';
+import { countOperationalLinesOutsideCurrentAdvisories } from '../../components/CurrentAdvisoriesSection/helpers';
 import { assert } from '../../util/assert';
 
 const SearchParamsSchema = z.object({
@@ -155,9 +156,12 @@ function HomePage() {
   }, [overview.issueIdsActiveToday, issues]);
 
   const lineOperationalCount = useMemo(() => {
-    return overview.lineSummaries.filter((line) => line.status === 'normal')
-      .length;
-  }, [overview.lineSummaries]);
+    return countOperationalLinesOutsideCurrentAdvisories({
+      issuesActiveNow,
+      issuesActiveToday,
+      lineSummaries: overview.lineSummaries,
+    });
+  }, [issuesActiveNow, issuesActiveToday, overview.lineSummaries]);
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
