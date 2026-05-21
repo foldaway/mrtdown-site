@@ -4,8 +4,10 @@ import classNames from 'classnames';
 import { DropdownMenu } from 'radix-ui';
 import { Fragment, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import type { Line, LineBranch } from '~/types';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import type { LineBranch } from '~/util/db.queries';
+import type { Line } from '~/types';
 import { BranchItem } from './components/BranchItem';
 
 interface Props {
@@ -154,8 +156,10 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                         className="group flex"
                       >
                         <span className="text-gray-800 text-sm group-hover:underline dark:text-gray-200">
-                          {stations[stationId].nameTranslations[intl.locale] ??
-                            stations[stationId].name}
+                          {getLocalizedTranslation(
+                            stations[stationId].name,
+                            intl.locale,
+                          )}
                         </span>
                       </Link>
                     </div>

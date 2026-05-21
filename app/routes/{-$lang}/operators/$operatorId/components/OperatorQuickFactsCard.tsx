@@ -1,7 +1,7 @@
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import { Duration } from 'luxon';
-import type { OperatorProfile } from '~/types';
 import { FormattedDuration } from '~/components/FormattedDuration';
+import type { OperatorProfile } from '~/util/db.queries';
 
 interface Props {
   operatorProfile: OperatorProfile;

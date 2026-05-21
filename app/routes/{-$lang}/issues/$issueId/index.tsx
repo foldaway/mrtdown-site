@@ -9,6 +9,7 @@ import { createIntl, FormattedMessage, useIntl } from 'react-intl';
 import { IssueTypeLabels } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { assert } from '~/util/assert';
 import { getIssueFn } from '~/util/issue.functions';
 import { Attributes } from './components/Attributes';
@@ -26,7 +27,7 @@ export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
     assert(ctx.loaderData != null);
     const { data, included } = ctx.loaderData;
     const issue = included.issues[data.id];
-    const title = issue.titleTranslations[lang] ?? issue.title;
+    const title = getLocalizedTranslation(issue.title, lang);
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
     const ogUrl = new URL(
@@ -53,7 +54,7 @@ export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
     const stationCount = stationIds.size;
     const lineNames = issue.lineIds.map((lineId) => {
       const line = included.lines[lineId];
-      return line.titleTranslations[lang] ?? line.title;
+      return getLocalizedTranslation(line.name, lang);
     });
 
     const description = intl.formatMessage(
@@ -106,7 +107,7 @@ export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
             mainEntity: issue.intervals.map((interval) => {
               return {
                 '@type': 'Event',
-                name: issue.title,
+                name: title,
                 eventAttendanceMode:
                   'https://schema.org/OfflineEventAttendanceMode',
                 startDate: interval.startAt,
@@ -175,7 +176,7 @@ function IssuePage() {
           </div>
 
           <h1 className="mt-3 font-bold text-2xl text-gray-900 dark:text-gray-100">
-            {issue.titleTranslations[intl.locale] ?? issue.title}
+            {getLocalizedTranslation(issue.title, intl.locale)}
           </h1>
 
           <Attributes issue={issue} />

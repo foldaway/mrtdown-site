@@ -6,6 +6,7 @@ import type { Line, LineSummaryStatus } from '~/types';
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 
 interface Props {
   line: Line;
@@ -39,7 +40,7 @@ export const LineItem: React.FC<Props> = (props) => {
           className="group flex-1"
         >
           <h2 className="font-semibold text-gray-800 transition-colors group-hover:text-blue-600 dark:text-gray-200 dark:group-hover:text-blue-400">
-            {line.titleTranslations[intl.locale] ?? line.title}
+            {getLocalizedTranslation(line.name, intl.locale)}
           </h2>
         </Link>
 
@@ -86,7 +87,7 @@ export const LineItem: React.FC<Props> = (props) => {
             >
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 transition-all group-hover:border-blue-300 group-hover:bg-blue-50 dark:border-gray-600 dark:bg-gray-700/50 dark:group-hover:border-blue-500 dark:group-hover:bg-blue-900/20">
                 <p className="font-medium text-gray-700 text-sm group-hover:text-blue-700 dark:text-gray-300 dark:group-hover:text-blue-300">
-                  {issue.titleTranslations[intl.locale] ?? issue.title}
+                  {getLocalizedTranslation(issue.title, intl.locale)}
                 </p>
               </div>
             </Link>

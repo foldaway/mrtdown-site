@@ -1,5 +1,6 @@
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
-import type { LineBranch } from '~/types';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import type { LineBranch } from '~/util/db.queries';
 
 interface Props {
   branch: LineBranch;
@@ -13,7 +14,7 @@ export const BranchItem: React.FC<Props> = (props) => {
   return (
     <div className="flex flex-col">
       <span className="font-medium">
-        {branch.titleTranslations[intl.locale] ?? branch.title}
+        {getLocalizedTranslation(branch.name, intl.locale)}
       </span>
       {branch.startedAt == null ? (
         <span className="text-gray-500 text-xs dark:text-gray-400">

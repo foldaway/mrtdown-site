@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 
 interface TickProps extends React.SVGProps<SVGElement> {
   x: number;
@@ -20,7 +21,9 @@ export const Tick: React.FC<TickProps> = (props) => {
     return stations[stationId];
   }, [stations, stationId]);
   const stationName =
-    station?.nameTranslations?.[intl.locale] ?? station?.name ?? stationId;
+    station != null
+      ? getLocalizedTranslation(station.name, intl.locale)
+      : stationId;
 
   return (
     <g transform={`translate(${x},${y})`}>

@@ -18,6 +18,7 @@ import { FormattedDate, FormattedMessage, IntlProvider } from 'react-intl';
 import { LocaleSwitcher } from '~/components/LocaleSwitcher';
 import Spinner from '~/components/Spinner';
 import { LANGUAGES } from '~/constants';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { getRootFn } from '~/util/root.functions';
 
 export const Route = createFileRoute('/{-$lang}')({
@@ -286,8 +287,7 @@ function RouteComponent() {
                           >
                             {line.id}
                           </span>
-                          {line.titleTranslations[lang ?? 'en-SG'] ??
-                            line.title}
+                          {getLocalizedTranslation(line.name, lang)}
                         </Link>
                       </li>
                     );
@@ -328,18 +328,6 @@ function RouteComponent() {
                         />
                       </Link>
                     </li>
-                    {/*{footerManifest.featuredStations.map((station) => (
-                      <li key={station.id}>
-                        <Link
-                          to="/{-$lang}/stations/$stationId"
-                          params={{ stationId: station.id }}
-                          className="flex text-sm transition-colors hover:text-blue-400"
-                        >
-                          {station.name_translations[lang ?? 'en-SG'] ??
-                            station.name}
-                        </Link>
-                      </li>
-                    ))}*/}
                   </ul>
                 </div>
 
@@ -362,9 +350,9 @@ function RouteComponent() {
                             params={{ operatorId }}
                             className="flex text-sm transition-colors hover:text-accent-light"
                           >
-                            {operator?.nameTranslations[lang ?? 'en-SG'] ??
-                              operator?.name ??
-                              operatorId}
+                            {operator != null
+                              ? getLocalizedTranslation(operator.name, lang)
+                              : operatorId}
                           </Link>
                         </li>
                       );
