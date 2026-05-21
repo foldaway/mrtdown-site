@@ -71,6 +71,11 @@ const DELETE_BATCH = 50;
 
 type Db = ReturnType<typeof getDb>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+type ServiceRevision = Service['revisions'][number];
+
+function serviceRevisionEndAt(revision: ServiceRevision): string | null {
+  return revision.endAt;
+}
 
 type DbDiagnosticContext = {
   operation: string;
@@ -973,12 +978,60 @@ export async function syncServices(db: Db): Promise<void> {
         id: servicesNextTable.id,
         nextHash: servicesNextTable.hash,
         liveHash: servicesTable.hash,
+        revisions: servicesNextTable.revisions,
       })
       .from(servicesNextTable)
       .leftJoin(servicesTable, eq(servicesNextTable.id, servicesTable.id));
 
+    const serviceIds = rows.map((row) => row.id);
+    const liveRevisionEndAtByKey = new Map<string, string | null>();
+    const liveRevisionIdsByServiceId = new Map<string, Set<string>>();
+    for (const serviceIdChunk of chunk(serviceIds, BATCH)) {
+      if (serviceIdChunk.length === 0) continue;
+      const revisionRows = await tx
+        .select({
+          id: serviceRevisionsTable.id,
+          service_id: serviceRevisionsTable.service_id,
+          end_at: serviceRevisionsTable.end_at,
+        })
+        .from(serviceRevisionsTable)
+        .where(inArray(serviceRevisionsTable.service_id, serviceIdChunk));
+      for (const revisionRow of revisionRows) {
+        liveRevisionEndAtByKey.set(
+          `${revisionRow.service_id}::${revisionRow.id}`,
+          revisionRow.end_at,
+        );
+        const liveRevisionIds =
+          liveRevisionIdsByServiceId.get(revisionRow.service_id) ?? new Set();
+        liveRevisionIds.add(revisionRow.id);
+        liveRevisionIdsByServiceId.set(revisionRow.service_id, liveRevisionIds);
+      }
+    }
+
     const changedIds = rows
-      .filter((r) => r.liveHash == null || r.liveHash !== r.nextHash)
+      .filter((row) => {
+        if (row.liveHash == null || row.liveHash !== row.nextHash) {
+          return true;
+        }
+
+        const stagedRevisionIds = new Set(
+          row.revisions.map((revision) => revision.id),
+        );
+        const liveRevisionIds =
+          liveRevisionIdsByServiceId.get(row.id) ?? new Set();
+        if (stagedRevisionIds.size !== liveRevisionIds.size) {
+          return true;
+        }
+
+        return row.revisions.some((revision) => {
+          const key = `${row.id}::${revision.id}`;
+          return (
+            !liveRevisionIds.has(revision.id) ||
+            !liveRevisionEndAtByKey.has(key) ||
+            liveRevisionEndAtByKey.get(key) !== serviceRevisionEndAt(revision)
+          );
+        });
+      })
       .map((r) => r.id);
 
     for (const ch of chunk(changedIds, BATCH)) {
@@ -1028,6 +1081,7 @@ export async function syncServices(db: Db): Promise<void> {
             .values({
               id: revisionData.id,
               service_id: row.id,
+              end_at: serviceRevisionEndAt(revisionData),
               operating_hours: revisionData.operatingHours,
             } satisfies InferInsertModel<typeof serviceRevisionsTable>)
             .onConflictDoUpdate({
@@ -1036,6 +1090,7 @@ export async function syncServices(db: Db): Promise<void> {
                 serviceRevisionsTable.service_id,
               ],
               set: {
+                end_at: serviceRevisionEndAt(revisionData),
                 operating_hours: revisionData.operatingHours,
                 updated_at: new Date(),
               },
