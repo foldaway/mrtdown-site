@@ -12,6 +12,7 @@ import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { useHydrated } from '~/hooks/useHydrated';
 import { useViewport, ViewportSchema } from '~/hooks/useViewport';
 import { getOperatorProfileFn } from '~/util/operator.functions';
@@ -46,7 +47,7 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
     const { data: operatorProfile, included, dateCount } = ctx.loaderData;
 
     const operator = included.operators[operatorProfile.operatorId];
-    const operatorName = operator.nameTranslations[lang] ?? operator.name;
+    const operatorName = getLocalizedTranslation(operator.name, lang);
 
     const { default: messages } = await import(
       `../../../../../lang/${lang}.json`
@@ -186,7 +187,8 @@ function OperatorPage() {
   const { data: operatorProfile, included, dateCount } = loaderData;
   const operator = included.operators[operatorProfile.operatorId];
   const intl = useIntl();
-  const operatorName = operator.nameTranslations[intl.locale] ?? operator.name;
+  const operatorName = getLocalizedTranslation(operator.name, intl.locale);
+  const operatorDefaultName = getLocalizedTranslation(operator.name, 'en-SG');
 
   const isHydrated = useHydrated();
   const navigate = Route.useNavigate();
@@ -215,9 +217,9 @@ function OperatorPage() {
             <div className="relative">
               <h1 className="mb-2 font-black text-2xl text-white leading-tight md:text-3xl">
                 {operatorName}
-                {operator.name !== operatorName && (
+                {operatorDefaultName !== operatorName && (
                   <span className="ml-2 text-gray-300 text-xl">
-                    {operator.name}
+                    {operatorDefaultName}
                   </span>
                 )}
               </h1>

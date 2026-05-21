@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { Fragment } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 
 interface Props {
   lineId: string;
@@ -77,8 +78,10 @@ export const StationInterchangesCard: React.FC<Props> = (props) => {
                       className="group flex"
                     >
                       <span className="text-gray-800 text-sm group-hover:underline dark:text-gray-200">
-                        {stations[stationId].nameTranslations[intl.locale] ??
-                          stations[stationId].name}
+                        {getLocalizedTranslation(
+                          stations[stationId].name,
+                          intl.locale,
+                        )}
                       </span>
                     </Link>
                   </div>

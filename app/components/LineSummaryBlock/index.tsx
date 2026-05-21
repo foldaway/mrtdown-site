@@ -11,6 +11,7 @@ import {
 import type { LineSummary } from '~/types';
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { useHydrated } from '../../hooks/useHydrated';
 import { DateCard } from './components/DateCard';
 import { NonOperationalDateCard } from './components/NonOperationalDateCard';
@@ -61,7 +62,7 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
             {line.id}
           </span>
           <span className="group-hover:underline">
-            {line.titleTranslations[intl.locale] ?? line.title}
+            {getLocalizedTranslation(line.name, intl.locale)}
           </span>
         </Link>
         <div className="flex grow justify-end truncate">

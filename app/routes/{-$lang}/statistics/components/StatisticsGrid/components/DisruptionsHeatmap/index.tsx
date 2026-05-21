@@ -4,8 +4,8 @@ import { DateTime } from 'luxon';
 import type React from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import type { SystemAnalytics } from '~/types';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
+import type { SystemAnalytics } from '~/util/db.queries';
 import { DayIssuesList } from './components/DayIssuesList';
 import { useDayIssues } from './hooks/useDayIssues';
 

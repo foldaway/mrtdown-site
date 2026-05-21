@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { useIntl } from 'react-intl';
 import type { Issue, IssueInterval } from '~/types';
 import { IssueSubtypeBadge } from '~/components/IssueSubtypeBadge';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { IssueAffectedBranchPill } from '../../IssueAffectedBranchPill';
 import { IssueTimestamp } from './IssueTimestamp';
 
@@ -22,7 +23,7 @@ export const IssueContent: React.FC<Props> = (props) => {
         params={{ issueId: issue.id }}
       >
         <h3 className="font-semibold text-gray-900 text-sm leading-tight dark:text-gray-100">
-          {issue.titleTranslations[intl.locale] ?? issue.title}
+          {getLocalizedTranslation(issue.title, intl.locale)}
         </h3>
       </Link>
 

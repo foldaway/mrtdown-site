@@ -8,6 +8,7 @@ import type { IssueAffectedBranch } from '~/types';
 import { ZoomControls } from '~/components/ZoomControls';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { assert } from '~/util/assert';
 import { MapApr2025 } from './components/MapApr2025';
 import { MapDec2019 } from './components/MapDec2019';
@@ -192,8 +193,7 @@ export const StationMap: React.FC<Props> = (props) => {
           continue;
         }
         const station = included.stations[stationId];
-        const stationName =
-          station.nameTranslations[intl.locale] ?? station.name;
+        const stationName = getLocalizedTranslation(station.name, intl.locale);
         const segments = segmentText(stationName, intl.locale);
         for (let i = 0; i < tspans.length; i++) {
           const tspan = tspans[i];
@@ -365,9 +365,7 @@ export const StationMap: React.FC<Props> = (props) => {
                     to="/{-$lang}/stations/$stationId"
                     params={{ stationId }}
                   >
-                    {station.nameTranslations[intl.locale] ??
-                      station.name ??
-                      stationId}
+                    {getLocalizedTranslation(station.name, intl.locale)}
                   </Link>
                 );
               })}

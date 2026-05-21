@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { SystemAnalytics } from '~/types';
+import type { SystemAnalytics } from '~/util/db.queries';
 import { Tick } from './components/Tick';
 import { TooltipContent } from './components/TooltipContent';
 

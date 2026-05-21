@@ -5,6 +5,7 @@ import { FormattedDateTimeRange, FormattedMessage, useIntl } from 'react-intl';
 import type { Issue } from '~/types';
 import { IssueAffectedBranchPill } from '~/components/IssueAffectedBranchPill';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 
 interface InternalContentProps {
   lineId: string;
@@ -45,7 +46,7 @@ const InternalContent: React.FC<InternalContentProps> = (props) => {
         params={{ issueId: issue.id }}
       >
         <span className="font-semibold text-base text-gray-800 leading-tight dark:text-gray-200">
-          {issue.titleTranslations[intl.locale] ?? issue.title}
+          {getLocalizedTranslation(issue.title, intl.locale)}
         </span>
       </Link>
 

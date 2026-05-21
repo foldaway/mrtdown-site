@@ -14,6 +14,7 @@ import type {
 } from '~/types';
 import { FormattedDuration } from '~/components/FormattedDuration';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { useHydrated } from '../../../hooks/useHydrated';
 import { DAY_TYPE_MESSAGE_DESCRIPTORS } from '../constants';
 import { useOperatingHours } from '../hooks/useOperatingHours';
@@ -280,8 +281,7 @@ export const DateCard: React.FC<Props> = (props) => {
                         })}
                       />
                       <span className="leading-tight">
-                        {issueRef.titleTranslations[intl.locale] ??
-                          issueRef.title}
+                        {getLocalizedTranslation(issueRef.title, intl.locale)}
                       </span>
                     </Link>
                   );

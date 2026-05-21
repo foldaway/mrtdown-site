@@ -11,6 +11,7 @@ import {
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { assert } from '~/util/assert';
 import { getLineProfileFn } from '~/util/lines.functions';
 import { CountTrendCards } from './components/CountTrendCards';
@@ -35,7 +36,7 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
     const { data: lineProfile, included } = ctx.loaderData;
     const { branches, issueCountByType } = lineProfile;
     const line = included.lines[lineId];
-    const componentName = line.titleTranslations[lang] ?? line.title;
+    const componentName = getLocalizedTranslation(line.name, lang);
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
@@ -156,8 +157,10 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
               containsPlace: branches.flatMap((branch) => {
                 return branch.stationIds.map((stationId) => {
                   const station = included.stations[stationId];
-                  const stationName =
-                    station.nameTranslations[lang] ?? station.name;
+                  const stationName = getLocalizedTranslation(
+                    station.name,
+                    lang,
+                  );
 
                   const alternateName = station.memberships
                     .map((membership) => membership.code)
@@ -186,7 +189,7 @@ function ComponentPage() {
   const line = included.lines[lineId];
 
   const intl = useIntl();
-  const componentName = line.titleTranslations[intl.locale] ?? line.title;
+  const componentName = getLocalizedTranslation(line.name, intl.locale);
 
   const stationCount = useMemo(() => {
     const stationIds = new Set<string>();
@@ -240,8 +243,7 @@ function ComponentPage() {
                     id="general.component_status.heading"
                     defaultMessage="{componentName} outages in the last {dateCount} days"
                     values={{
-                      componentName:
-                        line.titleTranslations[intl.locale] ?? line.title,
+                      componentName,
                       dateCount: DATE_COUNT,
                     }}
                   />

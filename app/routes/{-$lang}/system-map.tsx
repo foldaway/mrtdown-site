@@ -7,6 +7,7 @@ import { CurrentAdvisoriesSection } from '~/components/CurrentAdvisoriesSection'
 import { StationMap } from '~/components/StationMap';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { getSystemMapFn } from '~/util/system-map.functions';
 
 export const Route = createFileRoute('/{-$lang}/system-map')({
@@ -153,7 +154,7 @@ function SystemMapPage() {
                   </div>
 
                   <span className="text-gray-800 text-sm group-hover:underline dark:text-gray-200">
-                    {line.titleTranslations[intl.locale] ?? line.title}
+                    {getLocalizedTranslation(line.name, intl.locale)}
                   </span>
                 </Link>
               ))}

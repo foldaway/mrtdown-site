@@ -10,6 +10,7 @@ import { FormattedMessage, useIntl } from 'react-intl';
 import type { IssueAffectedBranch } from '~/types';
 import { useAffectedStations } from '~/components/IssueAffectedBranchPill/hooks/useAffectedStations';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 
 interface Props {
   branch: IssueAffectedBranch;
@@ -29,13 +30,10 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
   const renderStationRange = () => {
     if (source == null) return null;
 
-    const sourceName =
-      source.nameTranslations[intl.locale] ?? source.name ?? 'N/A';
+    const sourceName = getLocalizedTranslation(source.name, intl.locale);
     const destinationName =
       destination != null
-        ? (destination.nameTranslations[intl.locale] ??
-          destination.name ??
-          'N/A')
+        ? getLocalizedTranslation(destination.name, intl.locale)
         : null;
 
     if (destination) {
@@ -69,7 +67,7 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
               params={{ stationId: source.id }}
               className="font-medium text-gray-700 text-xs transition-colors hover:underline dark:text-gray-200"
             >
-              {source.nameTranslations[intl.locale] ?? source.name ?? 'N/A'}
+              {getLocalizedTranslation(source.name, intl.locale)}
             </Link>
           )}
           {destination != null && (
@@ -80,7 +78,7 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
                 params={{ stationId: destination.id }}
                 className="font-medium text-gray-700 text-xs transition-colors hover:underline dark:text-gray-200"
               >
-                {destination.nameTranslations[intl.locale] ?? destination.name}
+                {getLocalizedTranslation(destination.name, intl.locale)}
               </Link>
             </>
           )}
@@ -108,14 +106,15 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
 
           <div className="flex items-center gap-x-1">
             <span className="font-medium text-gray-700 text-xs dark:text-gray-200">
-              {source?.nameTranslations[intl.locale] ?? source?.name ?? 'N/A'}
+              {source != null
+                ? getLocalizedTranslation(source.name, intl.locale)
+                : 'N/A'}
             </span>
             {destination != null && (
               <>
                 <ArrowsRightLeftIcon className="size-3 text-gray-400" />
                 <span className="font-medium text-gray-700 text-xs dark:text-gray-200">
-                  {destination.nameTranslations[intl.locale] ??
-                    destination.name}
+                  {getLocalizedTranslation(destination.name, intl.locale)}
                 </span>
               </>
             )}
@@ -206,8 +205,7 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
                         className="group flex items-center gap-1"
                       >
                         <span className="text-gray-700 text-xs group-hover:underline dark:text-gray-300">
-                          {station.nameTranslations[intl.locale] ??
-                            station.name}
+                          {getLocalizedTranslation(station.name, intl.locale)}
                         </span>
                       </Link>
                     </div>

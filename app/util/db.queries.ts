@@ -2,6 +2,7 @@ import {
   type IssueType,
   resolvePeriods,
   type FacilityEffectKind,
+  type Service as CoreService,
   type ServiceEffectKind,
 } from '@mrtdown/core';
 import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
@@ -14,13 +15,10 @@ import type {
   IssueAffectedBranch,
   IssueInterval,
   Line,
-  LineBranch,
   LineSummary,
   LineSummaryDayType,
   LineSummaryStatus,
-  OperatorProfile,
   Station,
-  SystemAnalytics,
   TimeScaleChart,
 } from '~/types';
 import {
@@ -58,12 +56,35 @@ const SG_TIMEZONE = 'Asia/Singapore';
 
 type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
 
+type DatasetLineBranch = {
+  id: CoreService['id'];
+  name: CoreService['name'];
+  startedAt: CoreService['revisions'][number]['startAt'] | null;
+  endedAt: CoreService['revisions'][number]['endAt'];
+  stationIds: Array<
+    CoreService['revisions'][number]['path']['stations'][number]['stationId']
+  >;
+};
+
+type OperatorOperationalStatus =
+  | 'all_operational'
+  | 'some_lines_disrupted'
+  | 'some_lines_under_maintenance'
+  | 'all_lines_closed_for_day';
+
+type OperatorLinePerformance = {
+  lineId: string;
+  status: LineSummaryStatus;
+  uptimeRatio: number | null;
+  issueCount: number;
+};
+
 type IssueWithOperationalEffects = Issue & {
   serviceEffectKinds: ServiceEffectKind[];
   facilityEffectKinds: FacilityEffectKind[];
 };
 
-type BranchWithEntries = LineBranch & {
+type BranchWithEntries = DatasetLineBranch & {
   entries: Array<{
     stationId: string;
     displayCode: string;
@@ -98,7 +119,6 @@ type IssueIntervalBounds = {
   end: DateTime | null;
 };
 
-type AppTranslations = Line['titleTranslations'];
 type TimeScale = TimeScaleChart['dataTimeScale'];
 
 type StatisticsTimeWindow = {
@@ -199,10 +219,7 @@ function isoDateTime(value: DateTime) {
   return dateTime;
 }
 
-function parseTranslations(value: unknown): {
-  fallback: string;
-  translations: AppTranslations;
-} {
+function parseTranslations(value: unknown): Line['name'] {
   const isNonEmptyTranslation = (
     translation: string | null | undefined,
   ): translation is string =>
@@ -217,17 +234,11 @@ function parseTranslations(value: unknown): {
     ) ??
     Object.values(rawTranslations).find(isNonEmptyTranslation) ??
     '';
-  const translations: AppTranslations = {
-    ...rawTranslations,
+  return {
     'en-SG': fallback,
     'zh-Hans': rawTranslations['zh-Hans'] ?? null,
     ms: rawTranslations.ms ?? null,
     ta: rawTranslations.ta ?? null,
-  };
-
-  return {
-    fallback,
-    translations,
   };
 }
 
@@ -880,11 +891,10 @@ async function buildDataset(
 
   const operatorsById = Object.fromEntries(
     operatorsRows.map((row) => {
-      const { fallback, translations } = parseTranslations(row.name);
+      const name = parseTranslations(row.name);
       const operator: IncludedEntities['operators'][string] = {
         id: row.id,
-        name: fallback,
-        nameTranslations: translations,
+        name,
         foundedAt: row.founded_at,
         url: row.url,
       };
@@ -894,13 +904,12 @@ async function buildDataset(
 
   const townsById = Object.fromEntries(
     townsRows.map((row) => {
-      const { fallback, translations } = parseTranslations(row.name);
+      const name = parseTranslations(row.name);
       return [
         row.id,
         {
           id: row.id,
-          name: fallback,
-          nameTranslations: translations,
+          name,
         },
       ];
     }),
@@ -908,13 +917,12 @@ async function buildDataset(
 
   const landmarksById = Object.fromEntries(
     landmarksRows.map((row) => {
-      const { fallback, translations } = parseTranslations(row.name);
+      const name = parseTranslations(row.name);
       return [
         row.id,
         {
           id: row.id,
-          name: fallback,
-          nameTranslations: translations,
+          name,
         },
       ];
     }),
@@ -936,11 +944,10 @@ async function buildDataset(
 
   const linesById = Object.fromEntries(
     linesRows.map((row) => {
-      const { fallback, translations } = parseTranslations(row.name);
+      const name = parseTranslations(row.name);
       const line: Line = {
         id: row.id,
-        title: fallback,
-        titleTranslations: translations,
+        name,
         type: row.type,
         color: row.color,
         startedAt: row.started_at,
@@ -1092,7 +1099,7 @@ async function buildDataset(
       .filter((value): value is string => value != null)
       .map((value) => parseDateTime(value));
 
-    const { fallback, translations } = parseTranslations(service.name);
+    const name = parseTranslations(service.name);
     const minStart = startedDates.sort(
       (a, b) => a.toMillis() - b.toMillis(),
     )[0];
@@ -1100,8 +1107,7 @@ async function buildDataset(
       minStart != null && startedDates.every((date) => date > referenceNow);
     const branch: BranchWithEntries = {
       id: service.id,
-      title: fallback,
-      titleTranslations: translations,
+      name,
       startedAt:
         minStart != null && !allStartsInFuture ? minStart.toISODate() : null,
       endedAt: (() => {
@@ -1219,11 +1225,10 @@ async function buildDataset(
 
   const stationsById = Object.fromEntries(
     stationRows.map((row) => {
-      const { fallback, translations } = parseTranslations(row.name);
+      const name = parseTranslations(row.name);
       const station: Station = {
         id: row.id,
-        name: fallback,
-        nameTranslations: translations,
+        name,
         geo: {
           latitude: Number(row.latitude),
           longitude: Number(row.longitude),
@@ -1310,7 +1315,7 @@ async function buildDataset(
 
   const allIssues: Record<string, IssueWithOperationalEffects> = {};
   for (const row of issueRows) {
-    const { fallback, translations } = parseTranslations(row.title);
+    const title = parseTranslations(row.title);
     const latestEventByType = latestEventByTypeByIssueId[row.id] ?? {};
     const selectedStateEvents = [
       latestEventByType['periods.set'],
@@ -1453,8 +1458,7 @@ async function buildDataset(
 
     allIssues[row.id] = {
       id: row.id,
-      title: fallback,
-      titleTranslations: translations,
+      title,
       type: row.type,
       subtypes: [...causeSet],
       durationSeconds,
@@ -3034,15 +3038,16 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
     ),
   ).size;
 
-  const linePerformanceComparison: OperatorProfile['linePerformanceComparison'] =
-    lineIds.map((lineId) => ({
+  const linePerformanceComparison: OperatorLinePerformance[] = lineIds.map(
+    (lineId) => ({
       lineId,
       status: lineSummaries[lineId].status,
       uptimeRatio: lineSummaries[lineId].uptimeRatio,
       issueCount: operatorIssues.filter((issue) =>
         issue.lineIds.includes(lineId),
       ).length,
-    }));
+    }),
+  );
 
   const activeSummaries = Object.values(lineSummaries);
   const linesAffected = activeSummaries
@@ -3053,8 +3058,7 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
     )
     .map((summary) => summary.lineId);
 
-  let currentOperationalStatus: OperatorProfile['currentOperationalStatus'] =
-    'all_operational';
+  let currentOperationalStatus: OperatorOperationalStatus = 'all_operational';
   if (
     activeSummaries.length > 0 &&
     activeSummaries.every((summary) =>
@@ -3083,7 +3087,7 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
     0,
   );
 
-  const profile: OperatorProfile = {
+  const profile = {
     operatorId,
     lineIds,
     aggregateUptimeRatio:
@@ -3430,22 +3434,21 @@ export async function getStatisticsData() {
     .slice(0, 10)
     .map((issue) => issue.id);
 
-  const chartTotalIssueCountByLine: SystemAnalytics['chartTotalIssueCountByLine'] =
-    {
-      title: 'Issue Count by Line',
-      data: Object.values(dataset.included.lines).map((line) => {
-        const counts = lineCountsById[line.id] ?? createIssueTypeBreakdown();
-        return {
-          name: line.id,
-          payload: {
-            disruption: counts.disruption,
-            maintenance: counts.maintenance,
-            infra: counts.infra,
-            totalIssues: counts.totalIssues,
-          },
-        };
-      }),
-    };
+  const chartTotalIssueCountByLine = {
+    title: 'Issue Count by Line',
+    data: Object.values(dataset.included.lines).map((line) => {
+      const counts = lineCountsById[line.id] ?? createIssueTypeBreakdown();
+      return {
+        name: line.id,
+        payload: {
+          disruption: counts.disruption,
+          maintenance: counts.maintenance,
+          infra: counts.infra,
+          totalIssues: counts.totalIssues,
+        },
+      };
+    }),
+  };
 
   const stationIssueCounts = Object.values(dataset.included.stations).map(
     (station) => {
@@ -3471,19 +3474,17 @@ export async function getStatisticsData() {
         rollingYearEnd,
       );
 
-  const chartTotalIssueCountByStation: SystemAnalytics['chartTotalIssueCountByStation'] =
-    {
-      title: 'Issue Count by Station',
-      data: stationIssueCounts
-        .sort(
-          (a, b) =>
-            (b.payload.totalIssues as number) -
-            (a.payload.totalIssues as number),
-        )
-        .slice(0, 15),
-    };
+  const chartTotalIssueCountByStation = {
+    title: 'Issue Count by Station',
+    data: stationIssueCounts
+      .sort(
+        (a, b) =>
+          (b.payload.totalIssues as number) - (a.payload.totalIssues as number),
+      )
+      .slice(0, 15),
+  };
 
-  const chartRollingYearHeatmap: SystemAnalytics['chartRollingYearHeatmap'] = {
+  const chartRollingYearHeatmap = {
     title: 'Rolling Year Heatmap',
     data: Array.from({ length: 365 }, (_, index) => {
       const date = isoDate(rollingYearStart.plus({ days: index }));
@@ -3496,7 +3497,7 @@ export async function getStatisticsData() {
     }),
   };
 
-  const statistics: SystemAnalytics = {
+  const statistics = {
     timeScaleChartsIssueCount: hasStatisticsIssueFactCoverage
       ? buildIssueCountChartsFromIssueFacts(issueFactRows)
       : buildStatisticsIssueCountGraphs(issues),
@@ -3541,3 +3542,15 @@ export async function getSitemapData() {
       latest != null ? isoDate(latest.startOf('month')) : isoDate(nowSg()),
   };
 }
+
+export type LineBranch = Awaited<
+  ReturnType<typeof getLineProfileData>
+>['data']['branches'][number];
+
+export type OperatorProfile = Awaited<
+  ReturnType<typeof getOperatorProfileData>
+>['data'];
+
+export type SystemAnalytics = Awaited<
+  ReturnType<typeof getStatisticsData>
+>['data'];

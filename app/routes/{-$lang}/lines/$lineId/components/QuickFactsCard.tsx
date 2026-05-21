@@ -9,8 +9,10 @@ import {
   FormattedNumber,
   useIntl,
 } from 'react-intl';
-import type { Line, LineBranch } from '~/types';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import type { LineBranch } from '~/util/db.queries';
+import type { Line } from '~/types';
 
 interface Props {
   line: Line;
@@ -51,7 +53,7 @@ export const QuickFactsCard: React.FC<Props> = (props) => {
         }
         return {
           id: operator.id,
-          name: operator.nameTranslations[intl.locale] ?? operator.name,
+          name: getLocalizedTranslation(operator.name, intl.locale),
         };
       })
       .filter((op): op is { id: string; name: string } => op != null);

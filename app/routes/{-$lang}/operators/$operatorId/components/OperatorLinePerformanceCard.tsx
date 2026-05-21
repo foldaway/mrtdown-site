@@ -1,9 +1,10 @@
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { FormattedMessage, FormattedNumber, useIntl } from 'react-intl';
-import type { OperatorProfile } from '~/types';
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import type { OperatorProfile } from '~/util/db.queries';
 
 interface Props {
   linePerformanceComparison: OperatorProfile['linePerformanceComparison'];
@@ -33,7 +34,7 @@ export const OperatorLinePerformanceCard: React.FC<Props> = (props) => {
           if (line == null) {
             return null;
           }
-          const lineName = line.titleTranslations[intl.locale] ?? line.title;
+          const lineName = getLocalizedTranslation(line.name, intl.locale);
 
           return (
             <Link

@@ -1,6 +1,7 @@
 import classNames from 'classnames';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 
 interface Props {
   active?: boolean;
@@ -31,7 +32,7 @@ export const TooltipContent: React.FC<Props> = ({ active, payload, label }) => {
       {isVisible && (
         <div className="z-50 flex w-52 flex-col rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-lg outline-none ring-1 ring-black/5 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800 dark:ring-white/10">
           <span className="mb-2 font-semibold text-gray-900 text-sm dark:text-gray-100">
-            {line.titleTranslations[intl.locale] ?? line.title}
+            {getLocalizedTranslation(line.name, intl.locale)}
           </span>
           {payload.map((item) => (
             <div key={item.dataKey} className="flex items-center py-0.5">

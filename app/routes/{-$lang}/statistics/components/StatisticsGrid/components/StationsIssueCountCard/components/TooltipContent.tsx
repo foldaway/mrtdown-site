@@ -1,6 +1,7 @@
 import classNames from 'classnames';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 
 interface Props {
   active?: boolean;
@@ -23,7 +24,9 @@ export const TooltipContent: React.FC<Props> = ({ active, payload, label }) => {
 
   const station = stations[label];
   const stationName =
-    station?.nameTranslations?.[intl.locale] ?? station?.name ?? label;
+    station != null
+      ? getLocalizedTranslation(station.name, intl.locale)
+      : label;
 
   return (
     <div

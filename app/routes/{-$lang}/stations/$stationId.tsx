@@ -18,6 +18,7 @@ import { LineTypeLabels, StationStructureTypeLabels } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { useHydrated } from '~/hooks/useHydrated';
 import { getStationProfileFn } from '~/util/station.functions';
 import { assert } from '../../../util/assert';
@@ -29,10 +30,10 @@ function computeStationStrings(
   now = DateTime.now(),
 ) {
   const town = included.towns[station.townId];
-  const townName = town.nameTranslations[intl.locale] ?? town.name;
+  const townName = getLocalizedTranslation(town.name, intl.locale);
   const landmarkNames = station.landmarkIds.map((id) => {
     const landmark = included.landmarks[id];
-    return landmark.nameTranslations[intl.locale] ?? landmark.name;
+    return getLocalizedTranslation(landmark.name, intl.locale);
   });
 
   const operationalMemberSet = new Set<string>();
@@ -81,7 +82,7 @@ export const Route = createFileRoute('/{-$lang}/stations/$stationId')({
       messages,
     });
 
-    const stationName = station.nameTranslations[lang] ?? station.name;
+    const stationName = getLocalizedTranslation(station.name, lang);
 
     const title = intl.formatMessage(
       {
@@ -197,7 +198,8 @@ function StationPage() {
   const { data: stationProfile, included } = loaderData;
   const station = included.stations[stationProfile.stationId];
   const intl = useIntl();
-  const stationName = station.nameTranslations[intl.locale] ?? station.name;
+  const stationName = getLocalizedTranslation(station.name, intl.locale);
+  const stationDefaultName = getLocalizedTranslation(station.name, 'en-SG');
   const isHydrated = useHydrated();
 
   const { townName, landmarkNames, componentTypeStrings, isInterchange } =
@@ -258,9 +260,9 @@ function StationPage() {
 
                 <h1 className="mb-2 font-bold text-3xl text-gray-900 dark:text-white">
                   {stationName}
-                  {station.name !== stationName && (
+                  {stationDefaultName !== stationName && (
                     <span className="ml-2 text-gray-600 text-xl dark:text-gray-300">
-                      {station.name}
+                      {stationDefaultName}
                     </span>
                   )}
                 </h1>
@@ -378,9 +380,10 @@ function StationPage() {
                             {membership.lineId}
                           </span>
                           <span className="text-sm group-hover:underline">
-                            {included.lines[membership.lineId]
-                              .titleTranslations[intl.locale] ??
-                              included.lines[membership.lineId].title}
+                            {getLocalizedTranslation(
+                              included.lines[membership.lineId].name,
+                              intl.locale,
+                            )}
                           </span>
                         </Link>
                       </td>
