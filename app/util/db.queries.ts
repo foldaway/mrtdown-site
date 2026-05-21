@@ -1114,6 +1114,9 @@ async function buildDataset(
         if (endedAtByStationCode != null) {
           return endedAtByStationCode;
         }
+        if (latestRevision.end_at != null) {
+          return latestRevision.end_at;
+        }
 
         const latestOverallRevision =
           latestOverallRevisionByServiceId[service.id];
@@ -1124,11 +1127,7 @@ async function buildDataset(
           return null;
         }
 
-        return isoDate(
-          DateTime.fromJSDate(latestOverallRevision.updated_at).setZone(
-            SG_TIMEZONE,
-          ),
-        );
+        return latestOverallRevision.end_at;
       })(),
       stationIds: [...new Set(entries.map((entry) => entry.station_id))],
       entries: entries.map((entry) => ({

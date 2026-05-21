@@ -57,6 +57,13 @@
       "when": 1779352561183,
       "tag": "0007_repair_skipped_period_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779360133146,
+      "tag": "0008_busy_midnight",
+      "breakpoints": true
     }
   ]
 }
