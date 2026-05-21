@@ -24,6 +24,10 @@ Use narrower commands while iterating:
 - `npm run test:run`
 - `npm run verify:strict`
 
+## Pull Requests
+
+PR titles must follow Conventional Commits, for example `chore: retire generated API client types`. Keep the title aligned with the commit scope so release tooling and changelog readers can classify the change without opening the PR.
+
 ## Generated Files
 
 Do not manually edit generated files unless the task is explicitly about generated output. Prefer regenerating them with the relevant script or tool, then review the generated diff.
