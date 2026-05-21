@@ -985,6 +985,7 @@ export async function syncServices(db: Db): Promise<void> {
 
     const serviceIds = rows.map((row) => row.id);
     const liveRevisionEndAtByKey = new Map<string, string | null>();
+    const liveRevisionIdsByServiceId = new Map<string, Set<string>>();
     for (const serviceIdChunk of chunk(serviceIds, BATCH)) {
       if (serviceIdChunk.length === 0) continue;
       const revisionRows = await tx
@@ -1000,6 +1001,10 @@ export async function syncServices(db: Db): Promise<void> {
           `${revisionRow.service_id}::${revisionRow.id}`,
           revisionRow.end_at,
         );
+        const liveRevisionIds =
+          liveRevisionIdsByServiceId.get(revisionRow.service_id) ?? new Set();
+        liveRevisionIds.add(revisionRow.id);
+        liveRevisionIdsByServiceId.set(revisionRow.service_id, liveRevisionIds);
       }
     }
 
@@ -1009,9 +1014,19 @@ export async function syncServices(db: Db): Promise<void> {
           return true;
         }
 
+        const stagedRevisionIds = new Set(
+          row.revisions.map((revision) => revision.id),
+        );
+        const liveRevisionIds =
+          liveRevisionIdsByServiceId.get(row.id) ?? new Set();
+        if (stagedRevisionIds.size !== liveRevisionIds.size) {
+          return true;
+        }
+
         return row.revisions.some((revision) => {
           const key = `${row.id}::${revision.id}`;
           return (
+            !liveRevisionIds.has(revision.id) ||
             !liveRevisionEndAtByKey.has(key) ||
             liveRevisionEndAtByKey.get(key) !== serviceRevisionEndAt(revision)
           );
