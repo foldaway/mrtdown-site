@@ -50,6 +50,13 @@
       "when": 1779349162790,
       "tag": "0006_repair_impact_event_cascades",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779352561183,
+      "tag": "0007_repair_skipped_period_schema",
+      "breakpoints": true
     }
   ]
 }

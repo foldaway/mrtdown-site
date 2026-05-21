@@ -26,6 +26,10 @@ Use narrower commands while iterating:
 
 Do not manually edit generated files unless the task is explicitly about generated output. Prefer regenerating them with the relevant script or tool, then review the generated diff.
 
+## Database Migrations
+
+Create database migrations through the Drizzle CLI (`npm run db:generate` or `drizzle-kit generate`) so `drizzle/meta/_journal.json`, snapshot files, and migration timestamps stay consistent. Do not hand-create numbered migration files or manually edit the Drizzle journal unless repairing existing migration metadata.
+
 ## Overhaul Context
 
 The overhaul moves data reads from the generated MRTDown API client toward a local Postgres/PostGIS-backed read model populated from canonical mrtdown data archives. See `docs/OVERHAUL_BASELINE.md`, `docs/ARCHITECTURE.md`, `docs/DATA_PIPELINE.md`, and `docs/GENERATED_FILES.md`.
