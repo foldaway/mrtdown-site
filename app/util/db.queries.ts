@@ -1003,7 +1003,6 @@ async function buildDataset(
     return acc;
   }, {});
 
-
   const latestRevisionByServiceId = Object.fromEntries(
     serviceRows
       .map((service) => {
@@ -1100,14 +1099,18 @@ async function buildDataset(
           return endedAtByStationCode;
         }
 
-        const latestOverallRevision = latestOverallRevisionByServiceId[service.id];
+        const latestOverallRevision =
+          latestOverallRevisionByServiceId[service.id];
         const hasNewerRevisionWithoutPath =
-          latestOverallRevision != null && latestOverallRevision.id !== latestRevision.id;
+          latestOverallRevision != null &&
+          latestOverallRevision.id !== latestRevision.id;
         if (!hasNewerRevisionWithoutPath) {
           return null;
         }
 
-        return new Date(latestOverallRevision.updated_at).toISOString().slice(0, 10);
+        return new Date(latestOverallRevision.updated_at)
+          .toISOString()
+          .slice(0, 10);
       })(),
       stationIds: [...new Set(entries.map((entry) => entry.station_id))],
       entries: entries.map((entry) => ({
