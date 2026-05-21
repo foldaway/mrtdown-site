@@ -86,7 +86,6 @@ export const Route = createFileRoute('/{-$lang}/history/$year/$month')({
 
 function HistoryMonthPage() {
   const loaderData = Route.useLoaderData();
-  const { lang, year, month } = Route.useParams();
   const { data, included } = loaderData;
   const { startAt, issuesByWeek } = data;
   const navigate = Route.useNavigate();

@@ -10,7 +10,7 @@ import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { Collapsible } from 'radix-ui';
 import { useMemo } from 'react';
-import { defineMessage, FormattedMessage, useIntl } from 'react-intl';
+import { defineMessage, FormattedMessage } from 'react-intl';
 import type { Issue, IssueType } from '~/client';
 import { IssueCard } from '~/components/IssueCard';
 import { LineBar } from '~/components/LineBar';
@@ -59,7 +59,6 @@ interface Props {
 export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
   const { issuesActiveNow, issuesActiveToday, lineOperationalCount } = props;
 
-  const intl = useIntl();
   const { issueCountsByType, issueLineIdsByType } = useMemo(() => {
     const countsByType: Partial<Record<IssueType, number>> = {};
     const lineIdsByType: Partial<Record<IssueType, Set<string>>> = {};
@@ -68,8 +67,9 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
       for (const issue of issues) {
         countsByType[issue.type] = (countsByType[issue.type] ?? 0) + 1;
         for (const lineId of issue.lineIds) {
-          lineIdsByType[issue.type] ??= new Set();
-          lineIdsByType[issue.type]!.add(lineId);
+          const lineIds = lineIdsByType[issue.type] ?? new Set<string>();
+          lineIds.add(lineId);
+          lineIdsByType[issue.type] = lineIds;
         }
       }
     };

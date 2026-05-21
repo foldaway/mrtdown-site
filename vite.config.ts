@@ -23,7 +23,7 @@ const sentryConfig: SentryTanstackStartOptions = {
 };
 
 // https://vite.dev/config/
-export default defineConfig((config) => {
+export default defineConfig(() => {
   return {
     server: {
       port: 3000,

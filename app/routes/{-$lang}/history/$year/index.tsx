@@ -91,7 +91,7 @@ export const Route = createFileRoute('/{-$lang}/history/$year/')({
 
 function HistoryYearPage() {
   const loaderData = Route.useLoaderData();
-  const { lang, year } = Route.useParams();
+  const { year } = Route.useParams();
   const { data, included } = loaderData;
   const { startAt, summaryByMonth } = data;
   const navigate = Route.useNavigate();
