@@ -283,6 +283,10 @@ async function deleteImpactEventChildren(
   }
 }
 
+function uniqueBy<T>(rows: T[], keyForRow: (row: T) => string): T[] {
+  return Array.from(new Map(rows.map((row) => [keyForRow(row), row])).values());
+}
+
 /** Hash diff staging vs live; upsert changed rows. */
 async function upsertChangedOperators(
   tx: Parameters<Parameters<Db['transaction']>[0]>[0],
@@ -1199,10 +1203,9 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         });
     }
     if (evidenceRows.length > 0) {
-      const dedupedEvidenceRows = Array.from(
-        new Map(
-          evidenceRows.map((evidence) => [evidence.id, evidence]),
-        ).values(),
+      const dedupedEvidenceRows = uniqueBy(
+        evidenceRows,
+        (evidence) => evidence.id,
       );
       const evidenceIds = dedupedEvidenceRows.map((evidence) => evidence.id);
       for (const ids of chunk(evidenceIds, DELETE_BATCH)) {
@@ -1215,73 +1218,92 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         await tx.insert(evidencesTable).values(rows);
       }
     }
-    if (impactEventRows.length > 0) {
-      for (const rows of chunk(impactEventRows, BATCH)) {
+    const dedupedImpactEventRows = uniqueBy(
+      impactEventRows,
+      (impactEvent) => impactEvent.id,
+    );
+    if (dedupedImpactEventRows.length > 0) {
+      const impactEventIds = dedupedImpactEventRows.map(
+        (impactEvent) => impactEvent.id,
+      );
+      for (const ids of chunk(impactEventIds, DELETE_BATCH)) {
         await tx
-          .insert(impactEventsTable)
-          .values(rows)
-          .onConflictDoUpdate({
-            target: [impactEventsTable.id],
-            set: {
-              ts: sql.raw(`excluded.${impactEventsTable.ts.name}`),
-              type: sql.raw(`excluded.${impactEventsTable.type.name}`),
-              issue_id: sql.raw(`excluded.${impactEventsTable.issue_id.name}`),
-              updated_at: new Date(),
-            },
-          });
+          .delete(impactEventsTable)
+          .where(inArray(impactEventsTable.id, ids));
+      }
+      for (const rows of chunk(dedupedImpactEventRows, BATCH)) {
+        await tx.insert(impactEventsTable).values(rows);
       }
     }
     if (basisEvidenceRows.length > 0) {
-      for (const rows of chunk(basisEvidenceRows, BATCH)) {
+      const dedupedRows = uniqueBy(
+        basisEvidenceRows,
+        (row) => `${row.impact_event_id}\0${row.evidence_id}`,
+      );
+      for (const rows of chunk(dedupedRows, BATCH)) {
         await tx.insert(impactEventBasisEvidencesTable).values(rows);
       }
     }
     if (entityServiceRows.length > 0) {
-      for (const rows of chunk(entityServiceRows, BATCH)) {
+      const dedupedRows = uniqueBy(
+        entityServiceRows,
+        (row) => `${row.impact_event_id}\0${row.service_id}`,
+      );
+      for (const rows of chunk(dedupedRows, BATCH)) {
         await tx.insert(impactEventEntityServicesTable).values(rows);
       }
     }
     if (entityFacilityRows.length > 0) {
-      for (const rows of chunk(entityFacilityRows, BATCH)) {
-        await tx
-          .insert(impactEventEntityFacilitiesTable)
-          .values(rows)
-          .onConflictDoUpdate({
-            target: [
-              impactEventEntityFacilitiesTable.impact_event_id,
-              impactEventEntityFacilitiesTable.station_id,
-              impactEventEntityFacilitiesTable.kind,
-            ],
-            set: {
-              line_id: sql.raw(
-                `excluded.${impactEventEntityFacilitiesTable.line_id.name}`,
-              ),
-            },
-          });
+      const dedupedRows = uniqueBy(
+        entityFacilityRows,
+        (row) => `${row.impact_event_id}\0${row.station_id}\0${row.kind}`,
+      );
+      for (const rows of chunk(dedupedRows, BATCH)) {
+        await tx.insert(impactEventEntityFacilitiesTable).values(rows);
       }
     }
     if (periodRows.length > 0) {
-      for (const rows of chunk(periodRows, BATCH)) {
+      const dedupedRows = uniqueBy(
+        periodRows,
+        (row) => `${row.impact_event_id}\0${row.index}`,
+      );
+      for (const rows of chunk(dedupedRows, BATCH)) {
         await tx.insert(impactEventPeriodsTable).values(rows);
       }
     }
     if (causeRows.length > 0) {
-      for (const rows of chunk(causeRows, BATCH)) {
+      const dedupedRows = uniqueBy(
+        causeRows,
+        (row) => `${row.impact_event_id}\0${row.type}`,
+      );
+      for (const rows of chunk(dedupedRows, BATCH)) {
         await tx.insert(impactEventCausesTable).values(rows);
       }
     }
     if (serviceScopeRows.length > 0) {
-      for (const rows of chunk(serviceScopeRows, BATCH)) {
+      const dedupedRows = uniqueBy(
+        serviceScopeRows,
+        (row) => `${row.impact_event_id}\0${row.index}`,
+      );
+      for (const rows of chunk(dedupedRows, BATCH)) {
         await tx.insert(impactEventServiceScopesTable).values(rows);
       }
     }
     if (serviceEffectRows.length > 0) {
-      for (const rows of chunk(serviceEffectRows, BATCH)) {
+      const dedupedRows = uniqueBy(
+        serviceEffectRows,
+        (row) => `${row.impact_event_id}\0${row.kind}`,
+      );
+      for (const rows of chunk(dedupedRows, BATCH)) {
         await tx.insert(impactEventServiceEffectsTable).values(rows);
       }
     }
     if (facilityEffectRows.length > 0) {
-      for (const rows of chunk(facilityEffectRows, BATCH)) {
+      const dedupedRows = uniqueBy(
+        facilityEffectRows,
+        (row) => `${row.impact_event_id}\0${row.kind}`,
+      );
+      for (const rows of chunk(dedupedRows, BATCH)) {
         await tx.insert(impactEventFacilityEffectsTable).values(rows);
       }
     }
