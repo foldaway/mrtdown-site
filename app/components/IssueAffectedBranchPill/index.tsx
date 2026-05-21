@@ -7,7 +7,7 @@ import classNames from 'classnames';
 import { DropdownMenu } from 'radix-ui';
 import { Fragment } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import type { IssueAffectedBranch } from '~/client';
+import type { IssueAffectedBranch } from '~/types';
 import { useAffectedStations } from '~/components/IssueAffectedBranchPill/hooks/useAffectedStations';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 

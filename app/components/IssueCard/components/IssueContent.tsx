@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { useIntl } from 'react-intl';
-import type { Issue, IssueInterval } from '~/client';
+import type { Issue, IssueInterval } from '~/types';
 import { IssueSubtypeBadge } from '~/components/IssueSubtypeBadge';
 import { IssueAffectedBranchPill } from '../../IssueAffectedBranchPill';
 import { IssueTimestamp } from './IssueTimestamp';

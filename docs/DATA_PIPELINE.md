@@ -19,4 +19,4 @@ Staging tables are named with a `_next` suffix. They are the durable handoff bet
 
 ## Live Reads
 
-Server functions call `app/util/db.queries.ts`, which reads normalized live tables and returns shapes matching the generated client types.
+Server functions call `app/util/db.queries.ts`, which reads normalized live tables and returns the source-owned shapes in `app/types.ts`.

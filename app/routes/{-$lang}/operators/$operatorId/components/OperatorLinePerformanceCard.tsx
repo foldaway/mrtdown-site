@@ -1,12 +1,12 @@
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { FormattedMessage, FormattedNumber, useIntl } from 'react-intl';
-import type { OperatorLinePerformance } from '~/client';
+import type { OperatorProfile } from '~/types';
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 
 interface Props {
-  linePerformanceComparison: OperatorLinePerformance[];
+  linePerformanceComparison: OperatorProfile['linePerformanceComparison'];
   dateCount: number;
 }
 

@@ -4,7 +4,7 @@ import { Popover } from 'radix-ui';
 import { useState } from 'react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import { useDebounce } from 'use-debounce';
-import type { LineSummary } from '~/client';
+import type { LineSummary } from '~/types';
 import { FormattedDuration } from '~/components/FormattedDuration';
 import { assert } from '~/util/assert';
 

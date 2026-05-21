@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import type { Line } from '~/client';
+import type { Line } from '~/types';
 
 interface Props {
   component: Line;

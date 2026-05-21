@@ -4,7 +4,7 @@ import classNames from 'classnames';
 import { DropdownMenu } from 'radix-ui';
 import { Fragment, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import type { Line, LineBranch } from '~/client';
+import type { Line, LineBranch } from '~/types';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { BranchItem } from './components/BranchItem';
 

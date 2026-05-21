@@ -4,7 +4,7 @@ import { Popover } from 'radix-ui';
 import { useState } from 'react';
 import { FormattedDate, FormattedMessage } from 'react-intl';
 import { useDebounce } from 'use-debounce';
-import type { Line, LineSummaryDayType } from '~/client';
+import type { Line, LineSummaryDayType } from '~/types';
 import { useHydrated } from '../../../hooks/useHydrated';
 import { DAY_TYPE_MESSAGE_DESCRIPTORS } from '../constants';
 import { useOperatingHours } from '../hooks/useOperatingHours';

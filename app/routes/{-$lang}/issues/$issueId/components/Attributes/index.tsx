@@ -1,5 +1,5 @@
 import { FormattedMessage } from 'react-intl';
-import type { Issue } from '~/client';
+import type { Issue } from '~/types';
 import { IssueAffectedBranchPill } from '~/components/IssueAffectedBranchPill';
 import { IssueSubtypeBadge } from '~/components/IssueSubtypeBadge';
 import { Disruption } from './components/Disruption';

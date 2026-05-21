@@ -1,5 +1,5 @@
 import { FormattedMessage, FormattedNumber } from 'react-intl';
-import type { LineSummary } from '~/client';
+import type { LineSummary } from '~/types';
 
 interface Props {
   lineSummary: LineSummary;

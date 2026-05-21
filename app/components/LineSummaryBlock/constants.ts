@@ -1,5 +1,5 @@
 import { defineMessage, type MessageDescriptor } from 'react-intl';
-import type { LineSummaryDayType } from '~/client';
+import type { LineSummaryDayType } from '~/types';
 
 export const DAY_TYPE_MESSAGE_DESCRIPTORS: Record<
   LineSummaryDayType,

@@ -11,7 +11,7 @@ import type {
   Line,
   LineSummaryDateRecord,
   LineSummaryStatus,
-} from '~/client';
+} from '~/types';
 import { FormattedDuration } from '~/components/FormattedDuration';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '../../../hooks/useHydrated';

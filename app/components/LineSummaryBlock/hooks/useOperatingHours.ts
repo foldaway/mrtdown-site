@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
-import type { Line } from '~/client';
+import type { Line } from '~/types';
 import { assert } from '~/util/assert';
 
 export function useOperatingHours(

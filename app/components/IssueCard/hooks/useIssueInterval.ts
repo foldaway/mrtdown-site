@@ -1,6 +1,6 @@
 import { DateTime, Interval } from 'luxon';
 import { useMemo } from 'react';
-import type { Issue, IssueInterval } from '~/client';
+import type { Issue, IssueInterval } from '~/types';
 import type { IssueCardContext } from '../types';
 
 export const useIssueInterval = (

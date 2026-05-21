@@ -1,7 +1,7 @@
 import { CheckCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
 import { FormattedMessage } from 'react-intl';
-import type { Issue, IssueInterval } from '~/client';
+import type { Issue, IssueInterval } from '~/types';
 
 interface Props {
   interval: IssueInterval;

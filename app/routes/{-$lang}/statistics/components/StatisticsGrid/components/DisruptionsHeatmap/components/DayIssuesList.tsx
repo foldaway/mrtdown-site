@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { FormattedMessage, useIntl } from 'react-intl';
-import type { IncludedEntities, Issue } from '~/client';
+import type { IncludedEntities, Issue } from '~/types';
 import { IssueCard } from '~/components/IssueCard';
 import Spinner from '~/components/Spinner';
 

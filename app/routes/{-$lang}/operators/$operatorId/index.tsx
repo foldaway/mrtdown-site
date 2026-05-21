@@ -1,3 +1,4 @@
+import type { IssueType } from '@mrtdown/core';
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import {
@@ -7,7 +8,6 @@ import {
   useIntl,
 } from 'react-intl';
 import { z } from 'zod';
-import type { IssueType } from '~/client';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';

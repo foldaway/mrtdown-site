@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { useEffect, useState } from 'react';
-import type { IncludedEntities, Issue } from '~/client';
+import type { IncludedEntities, Issue } from '~/types';
 
 interface IssuesDayResponse {
   success: boolean;

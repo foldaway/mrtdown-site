@@ -1,4 +1,5 @@
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
+import type { IssueType } from '@mrtdown/core';
 import {
   BuildingOfficeIcon,
   ChevronDownIcon,
@@ -11,7 +12,7 @@ import { DateTime } from 'luxon';
 import { Collapsible } from 'radix-ui';
 import { useMemo } from 'react';
 import { defineMessage, FormattedMessage } from 'react-intl';
-import type { Issue, IssueType } from '~/client';
+import type { Issue } from '~/types';
 import { IssueCard } from '~/components/IssueCard';
 import { LineBar } from '~/components/LineBar';
 import type { IssueCardContext } from './IssueCard/types';

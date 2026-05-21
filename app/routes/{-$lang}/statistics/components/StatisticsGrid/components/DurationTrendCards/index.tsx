@@ -11,7 +11,7 @@ import {
   Tooltip,
   XAxis,
 } from 'recharts';
-import type { TimeScaleChart } from '~/client';
+import type { TimeScaleChart } from '~/types';
 import { FormattedDuration } from '~/components/FormattedDuration';
 import { getDateFormatOptions } from '~/helpers/getDateFormatOptions';
 import { CustomTooltip } from './components/CustomTooltip';
