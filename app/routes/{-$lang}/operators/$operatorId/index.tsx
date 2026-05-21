@@ -7,7 +7,7 @@ import {
   useIntl,
 } from 'react-intl';
 import { z } from 'zod';
-import { getOperatorsOperatorIdProfile, type IssueType } from '~/client';
+import type { IssueType } from '~/client';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';

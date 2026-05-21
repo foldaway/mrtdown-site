@@ -403,27 +403,25 @@ function StationPage() {
                       <td className="p-2 align-middle">
                         <span className="inline-block text-sm">
                           {isHydrated ? (
-                            <>
-                              {DateTime.fromISO(membership.startedAt)
-                                .diffNow()
-                                .as('days') < 0 ? (
-                                <>
-                                  <FormattedDate
-                                    value={membership.startedAt}
-                                    day="numeric"
-                                    month="long"
-                                    year="numeric"
-                                  />{' '}
-                                  (
-                                  {DateTime.fromISO(membership.startedAt)
-                                    .reconfigure({ locale: intl.locale })
-                                    .toRelative()}
-                                  )
-                                </>
-                              ) : (
-                                '-'
-                              )}
-                            </>
+                            DateTime.fromISO(membership.startedAt)
+                              .diffNow()
+                              .as('days') < 0 ? (
+                              <>
+                                <FormattedDate
+                                  value={membership.startedAt}
+                                  day="numeric"
+                                  month="long"
+                                  year="numeric"
+                                />{' '}
+                                (
+                                {DateTime.fromISO(membership.startedAt)
+                                  .reconfigure({ locale: intl.locale })
+                                  .toRelative()}
+                                )
+                              </>
+                            ) : (
+                              '-'
+                            )
                           ) : (
                             membership.startedAt
                           )}
@@ -432,25 +430,23 @@ function StationPage() {
                       <td className="p-2 align-middle">
                         <span className="text-sm">
                           {membership.endedAt != null ? (
-                            <>
-                              {isHydrated ? (
-                                <>
-                                  <FormattedDate
-                                    value={membership.endedAt}
-                                    day="numeric"
-                                    month="long"
-                                    year="numeric"
-                                  />{' '}
-                                  (
-                                  {DateTime.fromISO(membership.endedAt)
-                                    .reconfigure({ locale: intl.locale })
-                                    .toRelative()}
-                                  )
-                                </>
-                              ) : (
-                                membership.endedAt
-                              )}
-                            </>
+                            isHydrated ? (
+                              <>
+                                <FormattedDate
+                                  value={membership.endedAt}
+                                  day="numeric"
+                                  month="long"
+                                  year="numeric"
+                                />{' '}
+                                (
+                                {DateTime.fromISO(membership.endedAt)
+                                  .reconfigure({ locale: intl.locale })
+                                  .toRelative()}
+                                )
+                              </>
+                            ) : (
+                              membership.endedAt
+                            )
                           ) : (
                             '-'
                           )}

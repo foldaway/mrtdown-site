@@ -14,8 +14,12 @@ export const timestampColumns = {
  * @param myEnum
  * @returns
  */
-export function enumToPgEnum<T extends Record<string, any>>(
+export function enumToPgEnum<const T extends Record<string, string>>(
   myEnum: T,
 ): [T[keyof T], ...T[keyof T][]] {
-  return Object.values(myEnum).map((value: any) => `${value}`) as any;
+  const values = Object.values(myEnum) as T[keyof T][];
+  if (values.length === 0) {
+    throw new Error('Cannot create a Postgres enum from an empty object');
+  }
+  return values as [T[keyof T], ...T[keyof T][]];
 }

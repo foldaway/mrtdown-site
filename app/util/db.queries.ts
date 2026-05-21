@@ -1,6 +1,6 @@
 import { resolvePeriods, type ServiceEffectKind } from '@mrtdown/core';
 import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
-import { DateTime, Interval } from 'luxon';
+import { DateTime } from 'luxon';
 import type {
   Chart,
   ChartEntry,
@@ -136,11 +136,6 @@ type IssueDayFactRow = {
   duration_seconds: number;
 };
 
-type LineDayCoverageRow = {
-  date: string;
-  line_id: string;
-};
-
 function nowSg() {
   return DateTime.now().setZone(SG_TIMEZONE);
 }
@@ -173,6 +168,22 @@ function parseDateTime(value: string) {
 
   dateTimeCache.set(value, parsed);
   return parsed;
+}
+
+function isoDate(value: DateTime) {
+  const date = value.toISODate();
+  if (date == null) {
+    throw new Error(`Invalid DateTime value: ${value.invalidReason ?? value}`);
+  }
+  return date;
+}
+
+function isoDateTime(value: DateTime) {
+  const dateTime = value.toISO();
+  if (dateTime == null) {
+    throw new Error(`Invalid DateTime value: ${value.invalidReason ?? value}`);
+  }
+  return dateTime;
 }
 
 function parseTranslations(value: unknown) {
@@ -294,11 +305,11 @@ function buildIssueIntervals(
   const unique = new Map<string, IssueInterval>();
 
   for (const row of rows) {
-    const normalizedStartAt = parseDateTime(row.start_at).toISO()!;
+    const normalizedStartAt = isoDateTime(parseDateTime(row.start_at));
     const resolvedEndAtRaw = row.end_at_resolved ?? row.end_at ?? null;
     const normalizedEndAt =
       resolvedEndAtRaw != null
-        ? parseDateTime(resolvedEndAtRaw).toISO()!
+        ? isoDateTime(parseDateTime(resolvedEndAtRaw))
         : null;
     const key = `${normalizedStartAt}::${normalizedEndAt ?? 'null'}`;
     if (unique.has(key)) {
@@ -338,10 +349,10 @@ function resolveOperationalIssueIntervals(
   const resolved = resolvePeriods({
     periods: rows.map((row) => ({
       kind: 'fixed' as const,
-      startAt: parseDateTime(row.start_at).toISO()!,
-      endAt: row.end_at != null ? parseDateTime(row.end_at).toISO()! : null,
+      startAt: isoDateTime(parseDateTime(row.start_at)),
+      endAt: row.end_at != null ? isoDateTime(parseDateTime(row.end_at)) : null,
     })),
-    asOf: asOf.toISO()!,
+    asOf: isoDateTime(asOf),
     mode: {
       kind: 'operational',
       lastEvidenceAt: lastEvidenceAt?.toISO() ?? null,
@@ -362,7 +373,7 @@ function lineDayType(
   date: DateTime,
   publicHolidaySet: Set<string>,
 ): LineSummaryDayType {
-  if (publicHolidaySet.has(date.toISODate()!)) {
+  if (publicHolidaySet.has(isoDate(date))) {
     return 'public_holiday';
   }
   return date.weekday >= 6 ? 'weekend' : 'weekday';
@@ -470,72 +481,6 @@ function groupIssueFactRowsByDate<T extends { date: string }>(rows: T[]) {
     dayRows.push(row);
   }
   return rowsByDate;
-}
-
-function summarizeIssueFactRows(
-  rows: Array<{
-    issue_type: IssueType;
-    duration_seconds?: number;
-  }>,
-  value: 'count' | 'duration',
-) {
-  const payload = emptyIssueTypePayload();
-  for (const row of rows) {
-    payload[row.issue_type] +=
-      value === 'duration' ? (row.duration_seconds ?? 0) : 1;
-  }
-  return payload;
-}
-
-function buildIssuesByLineId(issues: Issue[]) {
-  const issuesByLineId = new Map<string, Issue[]>();
-  for (const issue of issues) {
-    for (const lineId of issue.lineIds) {
-      const lineIssues = issuesByLineId.get(lineId);
-      if (lineIssues == null) {
-        issuesByLineId.set(lineId, [issue]);
-        continue;
-      }
-      lineIssues.push(issue);
-    }
-  }
-  return issuesByLineId;
-}
-
-function buildStationIssueCountEntries(
-  issues: Issue[],
-  stations: Record<string, Station>,
-) {
-  const countsByStationId = new Map<string, Record<IssueType, number>>();
-
-  for (const issue of issues) {
-    const stationIds = new Set<string>();
-    for (const branch of issue.branchesAffected) {
-      for (const stationId of branch.stationIds) {
-        stationIds.add(stationId);
-      }
-    }
-
-    for (const stationId of stationIds) {
-      const counts =
-        countsByStationId.get(stationId) ?? emptyIssueTypePayload();
-      counts[issue.type] += 1;
-      countsByStationId.set(stationId, counts);
-    }
-  }
-
-  return Object.values(stations).map((station) => {
-    const counts = countsByStationId.get(station.id) ?? emptyIssueTypePayload();
-    return {
-      name: station.id,
-      payload: {
-        disruption: counts.disruption,
-        maintenance: counts.maintenance,
-        infra: counts.infra,
-        totalIssues: counts.disruption + counts.maintenance + counts.infra,
-      },
-    };
-  });
 }
 
 function pickIssueDurationByType<
@@ -1506,7 +1451,11 @@ function withIssues(
 
   const selectedIssues = Object.fromEntries(
     Object.entries(selectedIssuesWithEffects).map(([issueId, issue]) => {
-      const { serviceEffectKinds, facilityEffectKinds, ...publicIssue } = issue;
+      const {
+        serviceEffectKinds: _serviceEffectKinds,
+        facilityEffectKinds: _facilityEffectKinds,
+        ...publicIssue
+      } = issue;
       return [issueId, publicIssue];
     }),
   ) as Record<string, Issue>;
@@ -1601,7 +1550,7 @@ function buildLineSummary(
       referenceNow,
     );
 
-    breakdownByDates[date.toISODate()!] = dayBreakdown;
+    breakdownByDates[isoDate(date)] = dayBreakdown;
   }
 
   const activeNow = issues.filter((issue) =>
@@ -1746,7 +1695,7 @@ function buildWindowCountEntries(
     }
 
     entries.push({
-      name: bucketStart.toISODate()!,
+      name: isoDate(bucketStart),
       payload,
     });
   }
@@ -1857,7 +1806,7 @@ function buildUptimeGraph(
     const totalDowntime =
       breakdownDisruption + breakdownMaintenance + breakdownInfra;
     data.push({
-      name: date.toISODate()!,
+      name: isoDate(date),
       payload: {
         uptimeRatio:
           serviceWindow.seconds > 0
@@ -1985,7 +1934,7 @@ function buildOperatorUptimeGraph(
     const date = start.plus({ days: offset });
     const summary = computeWindow(date, 1);
     data.push({
-      name: date.toISODate()!,
+      name: isoDate(date),
       payload: { uptimeRatio: summary.uptimeRatio },
     });
   }
@@ -2105,7 +2054,7 @@ function buildStatisticsIssueCountGraphs(issues: Issue[]) {
         window.dataTimeScale.granularity,
       );
       data.push({
-        name: bucketStart.toISODate()!,
+        name: isoDate(bucketStart),
         payload: aggregateForRange(bucketStart, bucketEnd),
       });
     }
@@ -2199,7 +2148,7 @@ function buildIssueCountChartsFromIssueFacts(
         window.dataTimeScale.granularity,
       );
       data.push({
-        name: bucketStart.toISODate()!,
+        name: isoDate(bucketStart),
         payload: aggregateForRange(bucketStart, bucketEnd),
       });
     }
@@ -2266,7 +2215,7 @@ function buildDurationChartsFromIssueFacts(rows: IssueDayFactRow[]) {
       cursor < rangeEnd;
       cursor = cursor.plus({ days: 1 })
     ) {
-      const date = cursor.toISODate()!;
+      const date = isoDate(cursor);
       const dayCounts = countsByDate.get(date);
       if (dayCounts == null) {
         continue;
@@ -2294,7 +2243,7 @@ function buildDurationChartsFromIssueFacts(rows: IssueDayFactRow[]) {
         window.dataTimeScale.granularity,
       );
       data.push({
-        name: bucketStart.toISODate()!,
+        name: isoDate(bucketStart),
         payload: aggregateForRange(bucketStart, bucketEnd),
       });
     }
@@ -2341,8 +2290,8 @@ async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
       .from(issueDayFactsTable)
       .where(
         and(
-          gte(issueDayFactsTable.date, start.toISODate()!),
-          lte(issueDayFactsTable.date, end.toISODate()!),
+          gte(issueDayFactsTable.date, isoDate(start)),
+          lte(issueDayFactsTable.date, isoDate(end)),
         ),
       );
   } catch (error) {
@@ -2366,8 +2315,8 @@ async function getOperationalFactCoverageDatesInRange(
       .from(lineDayFactsTable)
       .where(
         and(
-          gte(lineDayFactsTable.date, start.toISODate()!),
-          lte(lineDayFactsTable.date, end.toISODate()!),
+          gte(lineDayFactsTable.date, isoDate(start)),
+          lte(lineDayFactsTable.date, isoDate(end)),
         ),
       )
       .groupBy(lineDayFactsTable.date);
@@ -2448,19 +2397,6 @@ async function shouldUseLegacyHistoryFallback(
   );
 }
 
-async function assertOperationalFactCoverage(
-  start: DateTime,
-  end: DateTime,
-  context: string,
-) {
-  const coverageRows = await getOperationalFactCoverageDatesInRange(start, end);
-  if (!hasFullDateCoverage(coverageRows, start, end)) {
-    throw new Error(
-      `Missing operational fact coverage for ${context}: ${start.toISODate()} to ${end.toISODate()}`,
-    );
-  }
-}
-
 function buildDailyIssueTypeCountsFromIssues(
   issues: Issue[],
   start: DateTime,
@@ -2489,7 +2425,7 @@ function buildDailyIssueTypeCountsFromIssues(
         cursor < boundedEnd;
         cursor = cursor.plus({ days: 1 })
       ) {
-        touchedDates.add(cursor.toISODate()!);
+        touchedDates.add(isoDate(cursor));
       }
     }
 
@@ -2515,7 +2451,7 @@ async function rebuildOperationalFactsForDateFromDataset(
   const normalizedDate = date.setZone(SG_TIMEZONE).startOf('day');
   const asOf = normalizedDate.endOf('day');
   const database = db ?? (await getDefaultDb());
-  const dateKey = normalizedDate.toISODate()!;
+  const dateKey = isoDate(normalizedDate);
   const dayEnd = normalizedDate.plus({ days: 1 });
   const issues = Object.values(dataset.allIssues);
 
@@ -2538,7 +2474,7 @@ async function rebuildOperationalFactsForDateFromDataset(
         date: dateKey,
         issue_id: issue.id,
         issue_type: issue.type,
-        as_of: asOf.toISO()!,
+        as_of: isoDateTime(asOf),
         active_anytime: durationSeconds > 0,
         active_end_of_day: issueActiveNow(issue, asOf),
         duration_seconds: Math.round(durationSeconds),
@@ -2571,7 +2507,7 @@ async function rebuildOperationalFactsForDateFromDataset(
     return {
       date: dateKey,
       line_id: line.id,
-      as_of: asOf.toISO()!,
+      as_of: isoDateTime(asOf),
       service_seconds: Math.round(
         isLineFuture(line, normalizedDate.endOf('day'))
           ? 0
@@ -2739,7 +2675,13 @@ export async function getLineProfileData(lineId: string, days: number) {
   );
   const rankedSummary = allLineSummaries.find(
     (summary) => summary.lineId === lineId,
-  )!;
+  );
+  if (rankedSummary == null) {
+    throw new Response('Line not found', {
+      status: 404,
+      statusText: 'Not Found',
+    });
+  }
   const issueIdsRecent = [...lineIssues]
     .filter((issue) =>
       issue.intervals.some(
@@ -3080,7 +3022,7 @@ export async function getHistoryYearSummaryData(year: number) {
         issueOverlapsRange(issue, monthStart, monthEnd),
       );
       return {
-        month: monthStart.toISODate()!,
+        month: isoDate(monthStart),
         issueCountsByType: pickIssueTypes(monthIssues),
         totalCount: monthIssues.length,
       };
@@ -3088,8 +3030,8 @@ export async function getHistoryYearSummaryData(year: number) {
 
     return {
       data: {
-        startAt: yearStart.toISODate()!,
-        endAt: yearEnd.minus({ day: 1 }).toISODate()!,
+        startAt: isoDate(yearStart),
+        endAt: isoDate(yearEnd.minus({ day: 1 })),
         summaryByMonth,
       },
       included: withIssues(
@@ -3128,7 +3070,7 @@ export async function getHistoryYearSummaryData(year: number) {
       return acc;
     }, {});
     return {
-      month: monthStart.toISODate()!,
+      month: isoDate(monthStart),
       issueCountsByType,
       totalCount: uniqueIssues.size,
     };
@@ -3136,8 +3078,8 @@ export async function getHistoryYearSummaryData(year: number) {
 
   return {
     data: {
-      startAt: yearStart.toISODate()!,
-      endAt: yearEnd.minus({ day: 1 }).toISODate()!,
+      startAt: isoDate(yearStart),
+      endAt: isoDate(yearEnd.minus({ day: 1 })),
       summaryByMonth,
     },
     included,
@@ -3191,8 +3133,8 @@ export async function getHistoryYearMonthData(year: number, month: number) {
 
     return {
       data: {
-        startAt: monthStart.toISODate()!,
-        endAt: monthEnd.minus({ day: 1 }).toISODate()!,
+        startAt: isoDate(monthStart),
+        endAt: isoDate(monthEnd.minus({ day: 1 })),
         issuesByWeek: [...weeks.entries()]
           .sort(([a], [b]) => b.localeCompare(a))
           .map(([week, issueIds]) => ({
@@ -3231,8 +3173,8 @@ export async function getHistoryYearMonthData(year: number, month: number) {
 
   return {
     data: {
-      startAt: monthStart.toISODate()!,
-      endAt: monthEnd.minus({ day: 1 }).toISODate()!,
+      startAt: isoDate(monthStart),
+      endAt: isoDate(monthEnd.minus({ day: 1 })),
       issuesByWeek: [...weeks.entries()]
         .sort(([a], [b]) => b.localeCompare(a))
         .map(([week, ids]) => ({
@@ -3262,8 +3204,8 @@ export async function getHistoryDayData(
 
     return {
       data: {
-        startAt: date.toISODate()!,
-        endAt: date.toISODate()!,
+        startAt: isoDate(date),
+        endAt: isoDate(date),
         issueIds,
       },
       included: withIssues(dataset.included, dataset.allIssues, issueIds),
@@ -3276,8 +3218,8 @@ export async function getHistoryDayData(
 
   return {
     data: {
-      startAt: date.toISODate()!,
-      endAt: date.toISODate()!,
+      startAt: isoDate(date),
+      endAt: isoDate(date),
       issueIds,
     },
     included,
@@ -3395,7 +3337,7 @@ export async function getStatisticsData() {
   const chartRollingYearHeatmap: Chart = {
     title: 'Rolling Year Heatmap',
     data: Array.from({ length: 365 }, (_, index) => {
-      const date = rollingYearStart.plus({ days: index }).toISODate()!;
+      const date = isoDate(rollingYearStart.plus({ days: index }));
       return {
         name: date,
         payload: {
@@ -3445,7 +3387,8 @@ export async function getSitemapData() {
     operatorIds: Object.keys(dataset.included.operators).sort(),
     issueIds: issues.map((issue) => issue.id),
     monthEarliest:
-      earliest?.startOf('month').toISODate() ?? nowSg().toISODate()!,
-    monthLatest: latest?.startOf('month').toISODate() ?? nowSg().toISODate()!,
+      earliest != null ? isoDate(earliest.startOf('month')) : isoDate(nowSg()),
+    monthLatest:
+      latest != null ? isoDate(latest.startOf('month')) : isoDate(nowSg()),
   };
 }

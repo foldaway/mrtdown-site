@@ -60,24 +60,22 @@ const InternalContent: React.FC<InternalContentProps> = (props) => {
 
       <span className="mt-2 text-gray-400 text-xs">
         {interval != null ? (
-          <>
-            {interval.endAt != null ? (
-              <FormattedDateTimeRange
-                timeStyle="short"
-                dateStyle="medium"
-                from={DateTime.fromISO(interval.startAt).toMillis()}
-                to={DateTime.fromISO(interval.endAt).toMillis()}
-              />
-            ) : (
-              <FormattedMessage
-                id="general.ongoing_timestamp"
-                defaultMessage="{start, date, medium} {start, time, short} to present"
-                values={{
-                  start: interval.startAt,
-                }}
-              />
-            )}
-          </>
+          interval.endAt != null ? (
+            <FormattedDateTimeRange
+              timeStyle="short"
+              dateStyle="medium"
+              from={DateTime.fromISO(interval.startAt).toMillis()}
+              to={DateTime.fromISO(interval.endAt).toMillis()}
+            />
+          ) : (
+            <FormattedMessage
+              id="general.ongoing_timestamp"
+              defaultMessage="{start, date, medium} {start, time, short} to present"
+              values={{
+                start: interval.startAt,
+              }}
+            />
+          )
         ) : (
           <p>Unknown Interval</p>
         )}
