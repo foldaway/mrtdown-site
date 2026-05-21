@@ -3042,10 +3042,7 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
   ) as Record<string, LineSummary>;
   const operatorLines = lineIds.map((lineId) => dataset.included.lines[lineId]);
   const operatorIssuesByLineId = Object.fromEntries(
-    lineIds.map((lineId) => [
-      lineId,
-      dataset.issuesByLineId[lineId] ?? [],
-    ]),
+    lineIds.map((lineId) => [lineId, dataset.issuesByLineId[lineId] ?? []]),
   ) as Record<string, IssueWithOperationalEffects[]>;
 
   const operatorIssues = Object.values(dataset.allIssues).filter((issue) =>
