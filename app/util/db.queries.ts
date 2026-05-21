@@ -84,6 +84,7 @@ type BaseDataset = {
 };
 
 const BASE_DATASET_CACHE_TTL_MS = 60_000;
+const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 30;
 let cachedBaseDataset:
   | {
       expiresAt: number;
@@ -134,6 +135,18 @@ type IssueDayFactRow = {
   issue_type: IssueType;
   active_anytime: boolean;
   duration_seconds: number;
+};
+
+type OperationalFactsRebuildContext = {
+  issues: IssueWithOperationalEffects[];
+  lines: Line[];
+  issuesByLineId: Record<string, IssueWithOperationalEffects[]>;
+};
+
+type OperationalFactRowsForDate = {
+  date: string;
+  issueRows: (typeof issueDayFactsTable.$inferInsert)[];
+  lineRows: (typeof lineDayFactsTable.$inferInsert)[];
 };
 
 function nowSg() {
@@ -1626,16 +1639,6 @@ function rankLineSummaries(lineSummaries: LineSummary[]) {
   });
 }
 
-function getLineSummaryDowntimeSeconds(
-  summary: LineSummary,
-  issueType: IssueType,
-) {
-  return (
-    summary.downtimeBreakdown?.find((breakdown) => breakdown.type === issueType)
-      ?.downtimeSeconds ?? 0
-  );
-}
-
 function buildWindowCountEntries(
   issues: Issue[],
   start: DateTime,
@@ -2201,6 +2204,27 @@ function chunk<T>(items: T[], size: number) {
   return chunks;
 }
 
+function buildOperationalFactsRebuildContext(
+  dataset: BaseDataset,
+): OperationalFactsRebuildContext {
+  const issues = Object.values(dataset.allIssues);
+  const issuesByLineId: Record<string, IssueWithOperationalEffects[]> = {};
+
+  for (const issue of issues) {
+    for (const lineId of issue.lineIds) {
+      const lineIssues = issuesByLineId[lineId] ?? [];
+      lineIssues.push(issue);
+      issuesByLineId[lineId] = lineIssues;
+    }
+  }
+
+  return {
+    issues,
+    lines: Object.values(dataset.included.lines),
+    issuesByLineId,
+  };
+}
+
 function buildDurationChartsFromIssueFacts(rows: IssueDayFactRow[]) {
   const end = nowSg().startOf('day');
   const countsByDate = groupIssueFactCountsByDate(rows, true);
@@ -2443,19 +2467,73 @@ function buildDailyIssueTypeCountsFromIssues(
   return countsByDate;
 }
 
-async function rebuildOperationalFactsForDateFromDataset(
+function buildLineOperationalFactRow(
+  line: Line,
+  lineIssues: IssueWithOperationalEffects[],
+  normalizedDate: DateTime,
+  publicHolidaySet: Set<string>,
+  asOf: DateTime,
+): typeof lineDayFactsTable.$inferInsert {
+  const issueCounts = createIssueTypeCounts();
+  const downtimeSeconds = createIssueTypeCounts();
+  const lineFuture = isLineFuture(line, normalizedDate.endOf('day'));
+  const serviceWindow = serviceWindowForDate(
+    line,
+    normalizedDate,
+    publicHolidaySet,
+  );
+
+  for (const issue of lineIssues) {
+    if (issueTouchesDate(issue, normalizedDate)) {
+      addIssueTypeCount(issueCounts, issue.type, 1);
+    }
+
+    if (lineFuture || !issueContributesToLineDowntime(issue)) {
+      continue;
+    }
+
+    const dayOverlap = getIssueBounds(issue).reduce(
+      (total, interval) =>
+        total +
+        overlapSeconds(
+          interval.start,
+          interval.end,
+          serviceWindow.start,
+          serviceWindow.end,
+          asOf,
+        ),
+      0,
+    );
+    if (dayOverlap > 0) {
+      downtimeSeconds[issue.type] += dayOverlap;
+    }
+  }
+
+  return {
+    date: isoDate(normalizedDate),
+    line_id: line.id,
+    as_of: isoDateTime(asOf),
+    service_seconds: Math.round(lineFuture ? 0 : serviceWindow.seconds),
+    downtime_disruption_seconds: Math.round(downtimeSeconds.disruption),
+    downtime_maintenance_seconds: Math.round(downtimeSeconds.maintenance),
+    downtime_infra_seconds: Math.round(downtimeSeconds.infra),
+    issue_count_disruption: issueCounts.disruption,
+    issue_count_maintenance: issueCounts.maintenance,
+    issue_count_infra: issueCounts.infra,
+  };
+}
+
+function buildOperationalFactRowsForDate(
   date: DateTime,
   dataset: BaseDataset,
-  db?: AppDb,
-) {
+  context: OperationalFactsRebuildContext,
+): OperationalFactRowsForDate {
   const normalizedDate = date.setZone(SG_TIMEZONE).startOf('day');
   const asOf = normalizedDate.endOf('day');
-  const database = db ?? (await getDefaultDb());
   const dateKey = isoDate(normalizedDate);
   const dayEnd = normalizedDate.plus({ days: 1 });
-  const issues = Object.values(dataset.allIssues);
 
-  const issueRows = issues
+  const issueRows = context.issues
     .map((issue) => {
       const intervals = getIssueBounds(issue)
         .map((interval) =>
@@ -2483,59 +2561,43 @@ async function rebuildOperationalFactsForDateFromDataset(
     })
     .filter((row) => row.active_anytime || row.active_end_of_day);
 
-  const lineRows = Object.values(dataset.included.lines).map((line) => {
-    const lineIssues = issues.filter((issue) =>
-      issue.lineIds.includes(line.id),
-    );
-    const summary = buildLineSummary(
+  const lineRows = context.lines.map((line) =>
+    buildLineOperationalFactRow(
       line,
-      lineIssues,
-      1,
+      context.issuesByLineId[line.id] ?? [],
+      normalizedDate,
       dataset.publicHolidaySet,
       asOf,
-    );
-    const counts = lineIssues.reduce<Record<IssueType, number>>(
-      (acc, issue) => {
-        if (issueTouchesDate(issue, normalizedDate)) {
-          acc[issue.type] += 1;
-        }
-        return acc;
-      },
-      { disruption: 0, maintenance: 0, infra: 0 },
-    );
+    ),
+  );
 
-    return {
-      date: dateKey,
-      line_id: line.id,
-      as_of: isoDateTime(asOf),
-      service_seconds: Math.round(
-        isLineFuture(line, normalizedDate.endOf('day'))
-          ? 0
-          : serviceWindowForDate(line, normalizedDate, dataset.publicHolidaySet)
-              .seconds,
-      ),
-      downtime_disruption_seconds: Math.round(
-        getLineSummaryDowntimeSeconds(summary, 'disruption'),
-      ),
-      downtime_maintenance_seconds: Math.round(
-        getLineSummaryDowntimeSeconds(summary, 'maintenance'),
-      ),
-      downtime_infra_seconds: Math.round(
-        getLineSummaryDowntimeSeconds(summary, 'infra'),
-      ),
-      issue_count_disruption: counts.disruption,
-      issue_count_maintenance: counts.maintenance,
-      issue_count_infra: counts.infra,
-    };
-  });
+  return {
+    date: dateKey,
+    issueRows,
+    lineRows,
+  };
+}
+
+async function replaceOperationalFactRows(
+  database: AppDb,
+  rowsByDate: OperationalFactRowsForDate[],
+) {
+  const dates = rowsByDate.map((rows) => rows.date);
+  const issueRows = rowsByDate.flatMap((rows) => rows.issueRows);
+  const lineRows = rowsByDate.flatMap((rows) => rows.lineRows);
 
   await database.transaction(async (tx) => {
-    await tx
-      .delete(issueDayFactsTable)
-      .where(eq(issueDayFactsTable.date, dateKey));
-    await tx
-      .delete(lineDayFactsTable)
-      .where(eq(lineDayFactsTable.date, dateKey));
+    for (const batch of chunk(dates, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
+      if (batch.length === 0) {
+        continue;
+      }
+      await tx
+        .delete(issueDayFactsTable)
+        .where(inArray(issueDayFactsTable.date, batch));
+      await tx
+        .delete(lineDayFactsTable)
+        .where(inArray(lineDayFactsTable.date, batch));
+    }
 
     for (const batch of chunk(issueRows, 500)) {
       if (batch.length > 0) {
@@ -2548,11 +2610,23 @@ async function rebuildOperationalFactsForDateFromDataset(
       }
     }
   });
+}
+
+async function rebuildOperationalFactsForDateFromDataset(
+  date: DateTime,
+  dataset: BaseDataset,
+  db?: AppDb,
+  context = buildOperationalFactsRebuildContext(dataset),
+) {
+  const database = db ?? (await getDefaultDb());
+  const rows = buildOperationalFactRowsForDate(date, dataset, context);
+
+  await replaceOperationalFactRows(database, [rows]);
 
   return {
-    date: dateKey,
-    issueCount: issueRows.length,
-    lineCount: lineRows.length,
+    date: rows.date,
+    issueCount: rows.issueRows.length,
+    lineCount: rows.lineRows.length,
   };
 }
 
@@ -2572,15 +2646,28 @@ export async function rebuildOperationalFactsRange(
 ) {
   const normalizedEnd = end.setZone(SG_TIMEZONE).startOf('day');
   const dataset = await buildBaseDataset(normalizedEnd.endOf('day'), db);
+  const context = buildOperationalFactsRebuildContext(dataset);
+  const database = db ?? (await getDefaultDb());
   const results: Array<{
     date: string;
     issueCount: number;
     lineCount: number;
   }> = [];
-  for (let offset = days - 1; offset >= 0; offset--) {
-    const date = normalizedEnd.minus({ days: offset });
+
+  const dates = Array.from({ length: days }, (_, index) =>
+    normalizedEnd.minus({ days: days - 1 - index }),
+  );
+  for (const batch of chunk(dates, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
+    const rowsByDate = batch.map((date) =>
+      buildOperationalFactRowsForDate(date, dataset, context),
+    );
+    await replaceOperationalFactRows(database, rowsByDate);
     results.push(
-      await rebuildOperationalFactsForDateFromDataset(date, dataset, db),
+      ...rowsByDate.map((rows) => ({
+        date: rows.date,
+        issueCount: rows.issueRows.length,
+        lineCount: rows.lineRows.length,
+      })),
     );
   }
   return results;
