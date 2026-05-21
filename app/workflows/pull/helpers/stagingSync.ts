@@ -72,8 +72,127 @@ const DELETE_BATCH = 50;
 type Db = ReturnType<typeof getDb>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
+type DbDiagnosticContext = {
+  operation: string;
+  table: string;
+  rowCount?: number;
+  sample?: readonly string[];
+};
+
+class PullDbDiagnosticError extends Error {
+  constructor(message: string, options: { cause: unknown }) {
+    super(message, { cause: options.cause });
+    this.name = 'PullDbDiagnosticError';
+  }
+}
+
 function assertUnreachable(value: never, message: string): never {
   throw new Error(`${message}: ${String(value)}`);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function stringifyErrorField(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return null;
+}
+
+function readErrorField(error: unknown, field: string): string | null {
+  if (!isRecord(error)) return null;
+  return stringifyErrorField(error[field]);
+}
+
+function formatErrorCauseChain(error: unknown): string[] {
+  const lines: string[] = [];
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+
+  for (let depth = 0; current != null && depth < 6; depth++) {
+    if (seen.has(current)) break;
+    seen.add(current);
+
+    const name =
+      current instanceof Error
+        ? current.name
+        : (readErrorField(current, 'name') ?? typeof current);
+    const message =
+      current instanceof Error
+        ? current.message
+        : (readErrorField(current, 'message') ?? String(current));
+    const fields = [
+      'code',
+      'severity',
+      'schema',
+      'table',
+      'column',
+      'constraint',
+      'detail',
+      'hint',
+      'where',
+      'routine',
+    ]
+      .map((field) => {
+        const value = readErrorField(current, field);
+        return value == null ? null : `${field}=${value}`;
+      })
+      .filter((field): field is string => field != null);
+
+    lines.push(
+      `cause[${depth}] ${name}: ${message}${
+        fields.length > 0 ? ` (${fields.join(', ')})` : ''
+      }`,
+    );
+
+    current = isRecord(current) ? current.cause : null;
+  }
+
+  return lines;
+}
+
+function formatDbDiagnosticMessage(
+  context: DbDiagnosticContext,
+  error: unknown,
+): string {
+  const lines = [
+    `[PULL_DB_ERROR] ${context.operation} failed on ${context.table}`,
+  ];
+  if (context.rowCount != null) {
+    lines.push(`row_count=${context.rowCount}`);
+  }
+  if (context.sample != null && context.sample.length > 0) {
+    lines.push(`sample=${context.sample.join(' | ')}`);
+  }
+  lines.push(...formatErrorCauseChain(error));
+  return lines.join('\n');
+}
+
+async function withDbDiagnostics<T>(
+  context: DbDiagnosticContext,
+  operation: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof PullDbDiagnosticError) {
+      throw error;
+    }
+    const message = formatDbDiagnosticMessage(context, error);
+    console.error(message);
+    throw new PullDbDiagnosticError(message, { cause: error });
+  }
+}
+
+function sampleRows<T>(
+  rows: readonly T[],
+  format: (row: T) => string,
+): string[] {
+  return rows.slice(0, 5).map(format);
 }
 
 /** Splits an array into fixed-size chunks for batched inserts. */
@@ -256,30 +375,65 @@ async function deleteImpactEventChildren(
 ): Promise<void> {
   if (impactEventIds.length === 0) return;
   for (const ids of chunk(impactEventIds, DELETE_BATCH)) {
-    await tx
-      .delete(impactEventPeriodsTable)
-      .where(inArray(impactEventPeriodsTable.impact_event_id, ids));
-    await tx
-      .delete(impactEventBasisEvidencesTable)
-      .where(inArray(impactEventBasisEvidencesTable.impact_event_id, ids));
-    await tx
-      .delete(impactEventServiceScopesTable)
-      .where(inArray(impactEventServiceScopesTable.impact_event_id, ids));
-    await tx
-      .delete(impactEventServiceEffectsTable)
-      .where(inArray(impactEventServiceEffectsTable.impact_event_id, ids));
-    await tx
-      .delete(impactEventFacilityEffectsTable)
-      .where(inArray(impactEventFacilityEffectsTable.impact_event_id, ids));
-    await tx
-      .delete(impactEventCausesTable)
-      .where(inArray(impactEventCausesTable.impact_event_id, ids));
-    await tx
-      .delete(impactEventEntityServicesTable)
-      .where(inArray(impactEventEntityServicesTable.impact_event_id, ids));
-    await tx
-      .delete(impactEventEntityFacilitiesTable)
-      .where(inArray(impactEventEntityFacilitiesTable.impact_event_id, ids));
+    const context = {
+      operation: 'delete impact-event children',
+      rowCount: ids.length,
+      sample: ids.slice(0, 5),
+    };
+    await withDbDiagnostics({ ...context, table: 'impact_event_periods' }, () =>
+      tx
+        .delete(impactEventPeriodsTable)
+        .where(inArray(impactEventPeriodsTable.impact_event_id, ids)),
+    );
+    await withDbDiagnostics(
+      { ...context, table: 'impact_event_basis_evidences' },
+      () =>
+        tx
+          .delete(impactEventBasisEvidencesTable)
+          .where(inArray(impactEventBasisEvidencesTable.impact_event_id, ids)),
+    );
+    await withDbDiagnostics(
+      { ...context, table: 'impact_event_service_scopes' },
+      () =>
+        tx
+          .delete(impactEventServiceScopesTable)
+          .where(inArray(impactEventServiceScopesTable.impact_event_id, ids)),
+    );
+    await withDbDiagnostics(
+      { ...context, table: 'impact_event_service_effects' },
+      () =>
+        tx
+          .delete(impactEventServiceEffectsTable)
+          .where(inArray(impactEventServiceEffectsTable.impact_event_id, ids)),
+    );
+    await withDbDiagnostics(
+      { ...context, table: 'impact_event_facility_effects' },
+      () =>
+        tx
+          .delete(impactEventFacilityEffectsTable)
+          .where(inArray(impactEventFacilityEffectsTable.impact_event_id, ids)),
+    );
+    await withDbDiagnostics({ ...context, table: 'impact_event_causes' }, () =>
+      tx
+        .delete(impactEventCausesTable)
+        .where(inArray(impactEventCausesTable.impact_event_id, ids)),
+    );
+    await withDbDiagnostics(
+      { ...context, table: 'impact_event_entity_services' },
+      () =>
+        tx
+          .delete(impactEventEntityServicesTable)
+          .where(inArray(impactEventEntityServicesTable.impact_event_id, ids)),
+    );
+    await withDbDiagnostics(
+      { ...context, table: 'impact_event_entity_facilities' },
+      () =>
+        tx
+          .delete(impactEventEntityFacilitiesTable)
+          .where(
+            inArray(impactEventEntityFacilitiesTable.impact_event_id, ids),
+          ),
+    );
   }
 }
 
@@ -999,10 +1153,28 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
       .where(inArray(impactEventsTable.issue_id, ch));
     const impactEventIds = impactRows.map((r) => r.id);
     await deleteImpactEventChildren(tx, impactEventIds);
-    await tx
-      .delete(impactEventsTable)
-      .where(inArray(impactEventsTable.issue_id, ch));
-    await tx.delete(evidencesTable).where(inArray(evidencesTable.issue_id, ch));
+    await withDbDiagnostics(
+      {
+        operation: 'delete changed issue impact events',
+        table: 'impact_events',
+        rowCount: ch.length,
+        sample: ch,
+      },
+      () =>
+        tx
+          .delete(impactEventsTable)
+          .where(inArray(impactEventsTable.issue_id, ch)),
+    );
+    await withDbDiagnostics(
+      {
+        operation: 'delete changed issue evidences',
+        table: 'evidences',
+        rowCount: ch.length,
+        sample: ch,
+      },
+      () =>
+        tx.delete(evidencesTable).where(inArray(evidencesTable.issue_id, ch)),
+    );
 
     const full = await tx
       .select()
@@ -1209,13 +1381,42 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
       );
       const evidenceIds = dedupedEvidenceRows.map((evidence) => evidence.id);
       for (const ids of chunk(evidenceIds, DELETE_BATCH)) {
-        await tx
-          .delete(impactEventBasisEvidencesTable)
-          .where(inArray(impactEventBasisEvidencesTable.evidence_id, ids));
-        await tx.delete(evidencesTable).where(inArray(evidencesTable.id, ids));
+        await withDbDiagnostics(
+          {
+            operation: 'delete replaced evidence basis links',
+            table: 'impact_event_basis_evidences',
+            rowCount: ids.length,
+            sample: ids,
+          },
+          () =>
+            tx
+              .delete(impactEventBasisEvidencesTable)
+              .where(inArray(impactEventBasisEvidencesTable.evidence_id, ids)),
+        );
+        await withDbDiagnostics(
+          {
+            operation: 'delete replaced evidences',
+            table: 'evidences',
+            rowCount: ids.length,
+            sample: ids,
+          },
+          () =>
+            tx.delete(evidencesTable).where(inArray(evidencesTable.id, ids)),
+        );
       }
       for (const rows of chunk(dedupedEvidenceRows, BATCH)) {
-        await tx.insert(evidencesTable).values(rows);
+        await withDbDiagnostics(
+          {
+            operation: 'insert changed issue evidences',
+            table: 'evidences',
+            rowCount: rows.length,
+            sample: sampleRows(
+              rows,
+              (row) => `${row.id} issue=${row.issue_id}`,
+            ),
+          },
+          () => tx.insert(evidencesTable).values(rows),
+        );
       }
     }
     const dedupedImpactEventRows = uniqueBy(
@@ -1227,12 +1428,32 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         (impactEvent) => impactEvent.id,
       );
       for (const ids of chunk(impactEventIds, DELETE_BATCH)) {
-        await tx
-          .delete(impactEventsTable)
-          .where(inArray(impactEventsTable.id, ids));
+        await withDbDiagnostics(
+          {
+            operation: 'delete replaced impact events',
+            table: 'impact_events',
+            rowCount: ids.length,
+            sample: ids,
+          },
+          () =>
+            tx
+              .delete(impactEventsTable)
+              .where(inArray(impactEventsTable.id, ids)),
+        );
       }
       for (const rows of chunk(dedupedImpactEventRows, BATCH)) {
-        await tx.insert(impactEventsTable).values(rows);
+        await withDbDiagnostics(
+          {
+            operation: 'insert changed issue impact events',
+            table: 'impact_events',
+            rowCount: rows.length,
+            sample: sampleRows(
+              rows,
+              (row) => `${row.id} issue=${row.issue_id}`,
+            ),
+          },
+          () => tx.insert(impactEventsTable).values(rows),
+        );
       }
     }
     if (basisEvidenceRows.length > 0) {
@@ -1241,7 +1462,18 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         (row) => `${row.impact_event_id}\0${row.evidence_id}`,
       );
       for (const rows of chunk(dedupedRows, BATCH)) {
-        await tx.insert(impactEventBasisEvidencesTable).values(rows);
+        await withDbDiagnostics(
+          {
+            operation: 'insert impact-event basis evidences',
+            table: 'impact_event_basis_evidences',
+            rowCount: rows.length,
+            sample: sampleRows(
+              rows,
+              (row) => `${row.impact_event_id} evidence=${row.evidence_id}`,
+            ),
+          },
+          () => tx.insert(impactEventBasisEvidencesTable).values(rows),
+        );
       }
     }
     if (entityServiceRows.length > 0) {
@@ -1250,7 +1482,18 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         (row) => `${row.impact_event_id}\0${row.service_id}`,
       );
       for (const rows of chunk(dedupedRows, BATCH)) {
-        await tx.insert(impactEventEntityServicesTable).values(rows);
+        await withDbDiagnostics(
+          {
+            operation: 'insert impact-event entity services',
+            table: 'impact_event_entity_services',
+            rowCount: rows.length,
+            sample: sampleRows(
+              rows,
+              (row) => `${row.impact_event_id} service=${row.service_id}`,
+            ),
+          },
+          () => tx.insert(impactEventEntityServicesTable).values(rows),
+        );
       }
     }
     if (entityFacilityRows.length > 0) {
@@ -1259,7 +1502,19 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         (row) => `${row.impact_event_id}\0${row.station_id}\0${row.kind}`,
       );
       for (const rows of chunk(dedupedRows, BATCH)) {
-        await tx.insert(impactEventEntityFacilitiesTable).values(rows);
+        await withDbDiagnostics(
+          {
+            operation: 'insert impact-event entity facilities',
+            table: 'impact_event_entity_facilities',
+            rowCount: rows.length,
+            sample: sampleRows(
+              rows,
+              (row) =>
+                `${row.impact_event_id} station=${row.station_id} kind=${row.kind}`,
+            ),
+          },
+          () => tx.insert(impactEventEntityFacilitiesTable).values(rows),
+        );
       }
     }
     if (periodRows.length > 0) {
@@ -1268,7 +1523,19 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         (row) => `${row.impact_event_id}\0${row.index}`,
       );
       for (const rows of chunk(dedupedRows, BATCH)) {
-        await tx.insert(impactEventPeriodsTable).values(rows);
+        await withDbDiagnostics(
+          {
+            operation: 'insert impact-event periods',
+            table: 'impact_event_periods',
+            rowCount: rows.length,
+            sample: sampleRows(
+              rows,
+              (row) =>
+                `${row.impact_event_id} index=${row.index} start=${row.start_at} end=${row.end_at}`,
+            ),
+          },
+          () => tx.insert(impactEventPeriodsTable).values(rows),
+        );
       }
     }
     if (causeRows.length > 0) {
@@ -1277,7 +1544,18 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         (row) => `${row.impact_event_id}\0${row.type}`,
       );
       for (const rows of chunk(dedupedRows, BATCH)) {
-        await tx.insert(impactEventCausesTable).values(rows);
+        await withDbDiagnostics(
+          {
+            operation: 'insert impact-event causes',
+            table: 'impact_event_causes',
+            rowCount: rows.length,
+            sample: sampleRows(
+              rows,
+              (row) => `${row.impact_event_id} type=${row.type}`,
+            ),
+          },
+          () => tx.insert(impactEventCausesTable).values(rows),
+        );
       }
     }
     if (serviceScopeRows.length > 0) {
@@ -1286,7 +1564,19 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         (row) => `${row.impact_event_id}\0${row.index}`,
       );
       for (const rows of chunk(dedupedRows, BATCH)) {
-        await tx.insert(impactEventServiceScopesTable).values(rows);
+        await withDbDiagnostics(
+          {
+            operation: 'insert impact-event service scopes',
+            table: 'impact_event_service_scopes',
+            rowCount: rows.length,
+            sample: sampleRows(
+              rows,
+              (row) =>
+                `${row.impact_event_id} index=${row.index} type=${row.type}`,
+            ),
+          },
+          () => tx.insert(impactEventServiceScopesTable).values(rows),
+        );
       }
     }
     if (serviceEffectRows.length > 0) {
@@ -1295,7 +1585,18 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         (row) => `${row.impact_event_id}\0${row.kind}`,
       );
       for (const rows of chunk(dedupedRows, BATCH)) {
-        await tx.insert(impactEventServiceEffectsTable).values(rows);
+        await withDbDiagnostics(
+          {
+            operation: 'insert impact-event service effects',
+            table: 'impact_event_service_effects',
+            rowCount: rows.length,
+            sample: sampleRows(
+              rows,
+              (row) => `${row.impact_event_id} kind=${row.kind}`,
+            ),
+          },
+          () => tx.insert(impactEventServiceEffectsTable).values(rows),
+        );
       }
     }
     if (facilityEffectRows.length > 0) {
@@ -1304,7 +1605,18 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         (row) => `${row.impact_event_id}\0${row.kind}`,
       );
       for (const rows of chunk(dedupedRows, BATCH)) {
-        await tx.insert(impactEventFacilityEffectsTable).values(rows);
+        await withDbDiagnostics(
+          {
+            operation: 'insert impact-event facility effects',
+            table: 'impact_event_facility_effects',
+            rowCount: rows.length,
+            sample: sampleRows(
+              rows,
+              (row) => `${row.impact_event_id} kind=${row.kind}`,
+            ),
+          },
+          () => tx.insert(impactEventFacilityEffectsTable).values(rows),
+        );
       }
     }
   }
