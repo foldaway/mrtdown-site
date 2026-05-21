@@ -10,17 +10,14 @@ export const getRootFn = createServerFn({ method: 'GET' })
   .inputValidator((val) => InputSchema.parse(val))
   .handler(async (val) => {
     const { lang } = val.data;
-    const { lineIds, included, metadata, operatorIds, operatorsIncluded } =
-      await getRootData();
+    const { lineNavItems, metadata, operatorNavItems } = await getRootData();
 
     const { default: messages } = await import(`../../lang/${lang}.json`);
 
     return {
-      lineIds,
-      included,
+      lineNavItems,
       metadata,
-      operatorIds,
-      operatorsIncluded,
+      operatorNavItems,
       messages,
     };
   });

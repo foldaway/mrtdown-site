@@ -5,7 +5,7 @@ import {
   type Service as CoreService,
   type ServiceEffectKind,
 } from '@mrtdown/core';
-import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import type {
   ChartEntry,
@@ -99,9 +99,10 @@ type BaseDataset = {
   metadata: Record<string, string>;
   publicHolidaySet: Set<string>;
   allIssues: Record<string, IssueWithOperationalEffects>;
+  issuesByLineId: Record<string, IssueWithOperationalEffects[]>;
 };
 
-const BASE_DATASET_CACHE_TTL_MS = 60_000;
+const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
 const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 30;
 let cachedBaseDataset:
   | {
@@ -109,6 +110,7 @@ let cachedBaseDataset:
       value: BaseDataset;
     }
   | undefined;
+let pendingBaseDataset: Promise<BaseDataset> | undefined;
 const dateTimeCache = new Map<string, DateTime>();
 const issueBoundsCache = new WeakMap<Issue, IssueIntervalBounds[]>();
 
@@ -1470,6 +1472,8 @@ async function buildDataset(
     };
   }
 
+  const issuesByLineId = buildIssuesByLineId(Object.values(allIssues));
+
   return {
     included: {
       lines: linesById,
@@ -1483,6 +1487,7 @@ async function buildDataset(
     metadata,
     publicHolidaySet,
     allIssues,
+    issuesByLineId,
   };
 }
 
@@ -1499,12 +1504,19 @@ async function getBaseDataset() {
     return cachedBaseDataset.value;
   }
 
-  const dataset = await buildBaseDataset();
-  cachedBaseDataset = {
-    expiresAt: Date.now() + BASE_DATASET_CACHE_TTL_MS,
-    value: dataset,
-  };
-  return dataset;
+  pendingBaseDataset ??= buildBaseDataset()
+    .then((dataset) => {
+      cachedBaseDataset = {
+        expiresAt: Date.now() + BASE_DATASET_CACHE_TTL_MS,
+        value: dataset,
+      };
+      return dataset;
+    })
+    .finally(() => {
+      pendingBaseDataset = undefined;
+    });
+
+  return pendingBaseDataset;
 }
 
 async function getIncludedForIssueIds(issueIds: readonly string[]) {
@@ -2268,24 +2280,29 @@ function chunk<T>(items: T[], size: number) {
   return chunks;
 }
 
-function buildOperationalFactsRebuildContext(
-  dataset: BaseDataset,
-): OperationalFactsRebuildContext {
-  const issues = Object.values(dataset.allIssues);
+function buildIssuesByLineId(issues: Iterable<IssueWithOperationalEffects>) {
   const issuesByLineId: Record<string, IssueWithOperationalEffects[]> = {};
 
   for (const issue of issues) {
-    for (const lineId of issue.lineIds) {
+    for (const lineId of new Set(issue.lineIds)) {
       const lineIssues = issuesByLineId[lineId] ?? [];
       lineIssues.push(issue);
       issuesByLineId[lineId] = lineIssues;
     }
   }
 
+  return issuesByLineId;
+}
+
+function buildOperationalFactsRebuildContext(
+  dataset: BaseDataset,
+): OperationalFactsRebuildContext {
+  const issues = Object.values(dataset.allIssues);
+
   return {
     issues,
     lines: Object.values(dataset.included.lines),
-    issuesByLineId,
+    issuesByLineId: dataset.issuesByLineId,
   };
 }
 
@@ -2738,16 +2755,30 @@ export async function rebuildOperationalFactsRange(
 }
 
 export async function getRootData() {
-  const dataset = await getBaseDataset();
+  const db = await getDefaultDb();
+  const [lineRows, metadataRows, operatorRows] = await Promise.all([
+    db
+      .select({
+        id: linesTable.id,
+        name: linesTable.name,
+        color: linesTable.color,
+      })
+      .from(linesTable)
+      .orderBy(asc(linesTable.id)),
+    db.select().from(metadataTable).orderBy(asc(metadataTable.key)),
+    db
+      .select({
+        id: operatorsTable.id,
+        name: operatorsTable.name,
+      })
+      .from(operatorsTable)
+      .orderBy(asc(operatorsTable.id)),
+  ]);
+
   return {
-    lineIds: Object.keys(dataset.included.lines).sort(),
-    included: withIssues(dataset.included, dataset.allIssues, []),
-    metadata: Object.entries(dataset.metadata).map(([key, value]) => ({
-      key,
-      value,
-    })),
-    operatorIds: Object.keys(dataset.included.operators).sort(),
-    operatorsIncluded: dataset.included.operators,
+    lineNavItems: lineRows,
+    metadata: metadataRows,
+    operatorNavItems: operatorRows,
   };
 }
 
@@ -2756,9 +2787,7 @@ export async function getOverviewData(days: number) {
   const issues = Object.values(dataset.allIssues);
   const lineSummaries = rankLineSummaries(
     Object.values(dataset.included.lines).map((line) => {
-      const lineIssues = issues.filter((issue) =>
-        issue.lineIds.includes(line.id),
-      );
+      const lineIssues = dataset.issuesByLineId[line.id] ?? [];
       return buildLineSummary(line, lineIssues, days, dataset.publicHolidaySet);
     }),
   );
@@ -2809,9 +2838,7 @@ export async function getLineProfileData(lineId: string, days: number) {
 
   const allLineSummaries = rankLineSummaries(
     Object.values(dataset.included.lines).map((candidateLine) => {
-      const candidateIssues = Object.values(dataset.allIssues).filter((issue) =>
-        issue.lineIds.includes(candidateLine.id),
-      );
+      const candidateIssues = dataset.issuesByLineId[candidateLine.id] ?? [];
       return buildLineSummary(
         candidateLine,
         candidateIssues,
@@ -2821,9 +2848,7 @@ export async function getLineProfileData(lineId: string, days: number) {
     }),
   );
 
-  const lineIssues = Object.values(dataset.allIssues).filter((issue) =>
-    issue.lineIds.includes(lineId),
-  );
+  const lineIssues = dataset.issuesByLineId[lineId] ?? [];
   const rankedSummary = allLineSummaries.find(
     (summary) => summary.lineId === lineId,
   );
@@ -3003,13 +3028,12 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
       line.operators.some((entry) => entry.operatorId === operatorId),
     )
     .map((line) => line.id);
+  const lineIdSet = new Set(lineIds);
 
   const lineSummaries = Object.fromEntries(
     lineIds.map((lineId) => {
       const line = dataset.included.lines[lineId];
-      const lineIssues = Object.values(dataset.allIssues).filter((issue) =>
-        issue.lineIds.includes(lineId),
-      );
+      const lineIssues = dataset.issuesByLineId[lineId] ?? [];
       return [
         lineId,
         buildLineSummary(line, lineIssues, days, dataset.publicHolidaySet),
@@ -3018,16 +3042,11 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
   ) as Record<string, LineSummary>;
   const operatorLines = lineIds.map((lineId) => dataset.included.lines[lineId]);
   const operatorIssuesByLineId = Object.fromEntries(
-    lineIds.map((lineId) => [
-      lineId,
-      Object.values(dataset.allIssues).filter((issue) =>
-        issue.lineIds.includes(lineId),
-      ),
-    ]),
+    lineIds.map((lineId) => [lineId, dataset.issuesByLineId[lineId] ?? []]),
   ) as Record<string, IssueWithOperationalEffects[]>;
 
   const operatorIssues = Object.values(dataset.allIssues).filter((issue) =>
-    issue.lineIds.some((lineId) => lineIds.includes(lineId)),
+    issue.lineIds.some((lineId) => lineIdSet.has(lineId)),
   );
 
   const totalStationsOperated = new Set(
@@ -3043,9 +3062,7 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
       lineId,
       status: lineSummaries[lineId].status,
       uptimeRatio: lineSummaries[lineId].uptimeRatio,
-      issueCount: operatorIssues.filter((issue) =>
-        issue.lineIds.includes(lineId),
-      ).length,
+      issueCount: (operatorIssuesByLineId[lineId] ?? []).length,
     }),
   );
 

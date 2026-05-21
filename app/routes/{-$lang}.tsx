@@ -50,14 +50,7 @@ function RouteComponent() {
   const { lang = 'en-SG' } = Route.useParams();
   const loaderData = Route.useLoaderData();
 
-  const {
-    messages,
-    lineIds,
-    included,
-    metadata,
-    operatorIds,
-    operatorsIncluded,
-  } = loaderData;
+  const { messages, lineNavItems, metadata, operatorNavItems } = loaderData;
 
   const isHydrated = useHydrated();
 
@@ -271,14 +264,12 @@ function RouteComponent() {
                   />
                 </h3>
                 <ul className="space-y-3">
-                  {lineIds.map((lineId) => {
-                    const line = included.lines[lineId];
-
+                  {lineNavItems.map((line) => {
                     return (
-                      <li key={lineId}>
+                      <li key={line.id}>
                         <Link
                           to="/{-$lang}/lines/$lineId"
-                          params={{ lineId }}
+                          params={{ lineId: line.id }}
                           className="flex items-center gap-x-1.5 text-sm transition-colors hover:text-accent-light"
                         >
                           <span
@@ -340,19 +331,15 @@ function RouteComponent() {
                     />
                   </h3>
                   <ul className="space-y-3">
-                    {operatorIds.map((operatorId) => {
-                      const operator = operatorsIncluded[operatorId];
-
+                    {operatorNavItems.map((operator) => {
                       return (
-                        <li key={operatorId}>
+                        <li key={operator.id}>
                           <Link
                             to="/{-$lang}/operators/$operatorId"
-                            params={{ operatorId }}
+                            params={{ operatorId: operator.id }}
                             className="flex text-sm transition-colors hover:text-accent-light"
                           >
-                            {operator != null
-                              ? getLocalizedTranslation(operator.name, lang)
-                              : operatorId}
+                            {getLocalizedTranslation(operator.name, lang)}
                           </Link>
                         </li>
                       );
