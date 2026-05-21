@@ -73,4 +73,3 @@ export const OperatorQuickFactsCard: React.FC<Props> = (props) => {
     </div>
   );
 };
-

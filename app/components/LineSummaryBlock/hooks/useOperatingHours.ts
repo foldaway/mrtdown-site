@@ -23,9 +23,13 @@ export function useOperatingHours(
       }
     }
 
-    const start = DateTime.fromISO(`${dateTime.toISODate()}T${startTime}`, { zone: 'Asia/Singapore'});
+    const start = DateTime.fromISO(`${dateTime.toISODate()}T${startTime}`, {
+      zone: 'Asia/Singapore',
+    });
     assert(start.isValid);
-    let end = DateTime.fromISO(`${dateTime.toISODate()}T${endTime}`, { zone: 'Asia/Singapore'});
+    let end = DateTime.fromISO(`${dateTime.toISODate()}T${endTime}`, {
+      zone: 'Asia/Singapore',
+    });
     assert(end.isValid);
     if (end < start) {
       // If the end time is before the start time, it means the end time is on the next day

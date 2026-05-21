@@ -33,10 +33,7 @@ export const IssueStatusBadge: React.FC<Props> = ({ interval, issue }) => {
         <>
           <CheckCircleIcon className="size-3" />
           {issue.type === 'disruption' ? (
-            <FormattedMessage
-              id="general.resolved"
-              defaultMessage="Resolved"
-            />
+            <FormattedMessage id="general.resolved" defaultMessage="Resolved" />
           ) : (
             <FormattedMessage
               id="general.completed"

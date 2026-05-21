@@ -8,11 +8,13 @@ This repository is mid-overhaul on the stacked `codex/overhaul-*` branches.
 - Server functions live in `app/util/*.functions.ts`.
 - Database schema and connection helpers live in `app/db`.
 - Canonical data pull workflow code lives in `app/workflows/pull`.
-- Generated files include `app/client/**`, `app/routeTree.gen.ts`, and large station map snapshots under `app/components/StationMap/components/Map*.tsx`.
+- Generated files include `app/routeTree.gen.ts` and large station map snapshots under `app/components/StationMap/components/Map*.tsx`.
 
 ## Verification
 
-Run `npm run verify` before publishing changes. The command runs typechecking, linting, formatting checks, and tests.
+Run `npm run verify` before handing work back or publishing changes. The command runs typechecking, linting, formatting checks, migration drift checks, and tests.
+
+Agents must treat validation as part of the task, not as an optional follow-up. If validation cannot be run, or if any validation step fails, document the exact command, failure, and remaining risk in the final response and do not claim the work is ready.
 
 Use narrower commands while iterating:
 
@@ -32,4 +34,4 @@ Create database migrations through the Drizzle CLI (`npm run db:generate` or `dr
 
 ## Overhaul Context
 
-The overhaul moves data reads from the generated MRTDown API client toward a local Postgres/PostGIS-backed read model populated from canonical mrtdown data archives. See `docs/OVERHAUL_BASELINE.md`, `docs/ARCHITECTURE.md`, `docs/DATA_PIPELINE.md`, and `docs/GENERATED_FILES.md`.
+The overhaul moves data reads from the generated MRTDown API client toward a local Postgres/PostGIS-backed read model populated from canonical mrtdown data archives. The generated API client has been retired, and the remaining extracted read-model type surface should continue shrinking toward canonical `@mrtdown/core` types. See `docs/OVERHAUL_BASELINE.md`, `docs/ARCHITECTURE.md`, `docs/DATA_PIPELINE.md`, and `docs/GENERATED_FILES.md`.

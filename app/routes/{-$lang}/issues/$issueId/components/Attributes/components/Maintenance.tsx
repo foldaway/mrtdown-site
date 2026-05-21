@@ -175,7 +175,9 @@ export const Maintenance: React.FC<Props> = (props) => {
                             id="general.ongoing_timestamp"
                             defaultMessage="{start, date, medium} {start, time, short} to present"
                             values={{
-                              start: DateTime.fromISO(interval.startAt).toMillis(),
+                              start: DateTime.fromISO(
+                                interval.startAt,
+                              ).toMillis(),
                             }}
                           />
                         )}
