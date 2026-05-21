@@ -961,24 +961,28 @@ async function buildDataset(
     return acc;
   }, {});
 
-  const latestRevisionByServiceId = Object.fromEntries(
-    serviceRows
-      .map((service) => {
-        const revisions = revisionsByServiceId[service.id] ?? [];
-        if (revisions.length === 0) {
+  const revisionsSortedByServiceId = Object.fromEntries(
+    Object.entries(revisionsByServiceId).map(([serviceId, revisions]) => [
+      serviceId,
+      [...revisions].sort((a, b) => {
+        const aTs = new Date(a.updated_at).getTime();
+        const bTs = new Date(b.updated_at).getTime();
+        if (aTs !== bTs) {
+          return bTs - aTs;
+        }
+        return b.id.localeCompare(a.id);
+      }),
+    ]),
+  ) as Record<string, typeof serviceRevisionRows>;
+
+  const latestOverallRevisionByServiceId = Object.fromEntries(
+    Object.entries(revisionsSortedByServiceId)
+      .map(([serviceId, revisions]) => {
+        const latestRevision = revisions[0];
+        if (latestRevision == null) {
           return null;
         }
-
-        const latestRevision = [...revisions].sort((a, b) => {
-          const aTs = new Date(a.updated_at).getTime();
-          const bTs = new Date(b.updated_at).getTime();
-          if (aTs !== bTs) {
-            return bTs - aTs;
-          }
-          return b.id.localeCompare(a.id);
-        })[0];
-
-        return [service.id, latestRevision] as const;
+        return [serviceId, latestRevision] as const;
       })
       .filter(
         (
@@ -988,20 +992,18 @@ async function buildDataset(
       ),
   );
 
-  const latestRevisionIds = [
-    ...new Set(
-      Object.values(latestRevisionByServiceId).map((revision) => revision.id),
-    ),
+  const allRevisionIds = [
+    ...new Set(serviceRevisionRows.map((revision) => revision.id)),
   ];
   const servicePathRows =
-    latestRevisionIds.length > 0
+    allRevisionIds.length > 0
       ? await database
           .select()
           .from(serviceRevisionPathStationEntriesTable)
           .where(
             inArray(
               serviceRevisionPathStationEntriesTable.service_revision_id,
-              latestRevisionIds,
+              allRevisionIds,
             ),
           )
       : [];
@@ -1016,6 +1018,29 @@ async function buildDataset(
     acc[key].push(row);
     return acc;
   }, {});
+
+  const latestRevisionByServiceId = Object.fromEntries(
+    serviceRows
+      .map((service) => {
+        const revisions = revisionsSortedByServiceId[service.id] ?? [];
+        const latestRevisionWithPath = revisions.find((revision) => {
+          const revisionKey = `${revision.id}::${service.id}`;
+          const entries = pathEntriesByRevisionKey[revisionKey] ?? [];
+          return entries.length > 0;
+        });
+        if (latestRevisionWithPath == null) {
+          return null;
+        }
+
+        return [service.id, latestRevisionWithPath] as const;
+      })
+      .filter(
+        (
+          entry,
+        ): entry is readonly [string, (typeof serviceRevisionRows)[number]] =>
+          entry != null,
+      ),
+  );
 
   const stationCodeLookup = new Map<
     string,
@@ -1079,12 +1104,32 @@ async function buildDataset(
       titleTranslations: translations,
       startedAt:
         minStart != null && !allStartsInFuture ? minStart.toISODate() : null,
-      endedAt:
-        endedDates.length === entries.length
-          ? (endedDates
-              .sort((a, b) => b.toMillis() - a.toMillis())[0]
-              ?.toISODate() ?? null)
-          : null,
+      endedAt: (() => {
+        const endedAtByStationCode =
+          endedDates.length === entries.length
+            ? (endedDates
+                .sort((a, b) => b.toMillis() - a.toMillis())[0]
+                ?.toISODate() ?? null)
+            : null;
+        if (endedAtByStationCode != null) {
+          return endedAtByStationCode;
+        }
+
+        const latestOverallRevision =
+          latestOverallRevisionByServiceId[service.id];
+        const hasNewerRevisionWithoutPath =
+          latestOverallRevision != null &&
+          latestOverallRevision.id !== latestRevision.id;
+        if (!hasNewerRevisionWithoutPath) {
+          return null;
+        }
+
+        return isoDate(
+          DateTime.fromJSDate(latestOverallRevision.updated_at).setZone(
+            SG_TIMEZONE,
+          ),
+        );
+      })(),
       stationIds: [...new Set(entries.map((entry) => entry.station_id))],
       entries: entries.map((entry) => ({
         stationId: entry.station_id,
