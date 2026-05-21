@@ -54,8 +54,14 @@ function buildEntries(path: string, rootUrl: string): Element {
 
 export const getSitemapFn = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const { lineIds, stationIds, operatorIds, issueIds, monthEarliest, monthLatest } =
-      await getSitemapData();
+    const {
+      lineIds,
+      stationIds,
+      operatorIds,
+      issueIds,
+      monthEarliest,
+      monthLatest,
+    } = await getSitemapData();
     const paths: string[] = [
       '/',
       '/history',

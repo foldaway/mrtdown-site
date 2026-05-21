@@ -58,8 +58,7 @@ populated from data archives.
 - `npm run deploy`: build and deploy with Wrangler.
 - `npm run typecheck`: run TypeScript without emitting files.
 - `npm run lint`: run Biome linting.
-- `npm run format:check`: check formatting for files changed since
-  `origin/main`.
+- `npm run format:check`: check formatting across the repository.
 - `npm run test:run`: run Vitest once.
 - `npm run verify`: run typecheck, lint, formatting check, migration drift
   check, and tests.

@@ -10,7 +10,9 @@ The default verification script currently runs:
 - `npm run db:generate:check`
 - `npm run test:run`
 
-`npm run format:check` uses Biome's non-writing check mode over files changed since `origin/main`, avoiding unrelated formatting churn while the overhaul stack is still being cleaned up. Empty changed-file sets are accepted so GitHub's pull request merge checkout does not fail spuriously.
+`npm run format:check` uses Biome's non-writing check mode across the repository. This keeps local verification aligned with CI and catches uncommitted formatting issues before a branch is pushed.
+
+Generated files listed in `docs/GENERATED_FILES.md` are excluded from normal Biome checks in `biome.json`.
 
 `npm run verify:strict` currently mirrors the default verification script so existing references continue to work during the overhaul.
 

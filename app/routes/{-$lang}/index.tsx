@@ -1,4 +1,5 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
+import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { useEffect, useMemo } from 'react';
 import { createIntl, FormattedMessage } from 'react-intl';
@@ -19,6 +20,9 @@ const SearchParamsSchema = z.object({
 
 export const Route = createFileRoute('/{-$lang}/')({
   component: HomePage,
+  pendingComponent: HomePagePending,
+  pendingMs: 0,
+  pendingMinMs: 0,
 
   validateSearch: SearchParamsSchema,
   loaderDeps({ search }) {
@@ -123,6 +127,23 @@ function HomePage() {
   const navigate = Route.useNavigate();
 
   const measuredViewport = useViewport();
+  const measuredDateCount = useMemo(
+    () => getDateCountForViewport(measuredViewport),
+    [measuredViewport],
+  );
+  const measuredDateKeys = useMemo(() => {
+    const dateRangeEnd = DateTime.now()
+      .startOf('hour')
+      .setZone('Asia/Singapore');
+    return Array.from({ length: measuredDateCount }, (_, daysAgo) => {
+      return (
+        dateRangeEnd
+          .minus({ days: measuredDateCount - daysAgo - 1 })
+          .toISODate() ?? `date-${daysAgo}`
+      );
+    });
+  }, [measuredDateCount]);
+  const isLineSummaryViewportPending = dateCount !== measuredDateCount;
 
   useEffect(() => {
     if (viewport === measuredViewport) {
@@ -187,17 +208,26 @@ function HomePage() {
           lineOperationalCount={lineOperationalCount}
         />
 
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex flex-col gap-y-4 px-2 py-2 sm:gap-y-6 sm:px-3 sm:py-4">
-            {overview.lineSummaries.map((lineSummary) => (
-              <LineSummaryBlock
-                key={lineSummary.lineId}
-                data={lineSummary}
-                dateTimes={dateTimes}
-              />
-            ))}
+        {isLineSummaryViewportPending ? (
+          <HomeLineSummariesSkeleton
+            dateKeys={measuredDateKeys}
+            lineIds={overview.lineSummaries.map((lineSummary) => {
+              return lineSummary.lineId;
+            })}
+          />
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="flex flex-col gap-y-4 px-2 py-2 sm:gap-y-6 sm:px-3 sm:py-4">
+              {overview.lineSummaries.map((lineSummary) => (
+                <LineSummaryBlock
+                  key={lineSummary.lineId}
+                  data={lineSummary}
+                  dateTimes={dateTimes}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800/50">
           <h3 className="mb-4 text-center font-semibold text-gray-700 text-sm dark:text-gray-300">
@@ -260,3 +290,123 @@ function HomePage() {
     </IncludedEntitiesContext.Provider>
   );
 }
+
+function HomePagePending() {
+  return (
+    <div className="flex flex-col space-y-6 sm:space-y-8">
+      <header className="flex flex-col items-center space-y-2 text-center">
+        <div className="h-9 w-72 max-w-full animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+        <div className="h-6 w-80 max-w-full animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+      </header>
+
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-4 h-6 w-44 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+          <div className="h-12 grow animate-pulse rounded-lg bg-gray-100 dark:bg-gray-700" />
+          <div className="h-10 w-36 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700" />
+        </div>
+      </div>
+
+      <HomeLineSummariesSkeleton lineIds={PENDING_LINE_IDS} />
+
+      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800/50">
+        <div className="mx-auto mb-4 h-5 w-36 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
+        <div className="flex flex-wrap justify-center gap-x-6 gap-y-3">
+          {PENDING_LEGEND_IDS.map((legendId) => (
+            <div className="inline-flex items-center gap-x-2" key={legendId}>
+              <div className="size-3 animate-pulse rounded-full bg-gray-300 dark:bg-gray-700" />
+              <div className="h-4 w-24 animate-pulse rounded-sm bg-gray-200 dark:bg-gray-700" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface HomeLineSummariesSkeletonProps {
+  dateKeys?: string[];
+  lineIds: string[];
+}
+
+function HomeLineSummariesSkeleton(props: HomeLineSummariesSkeletonProps) {
+  const { dateKeys, lineIds } = props;
+  const skeletonLineIds =
+    lineIds.length > 0 ? lineIds : ['line-summary-skeleton'];
+
+  return (
+    <div
+      aria-busy="true"
+      className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
+    >
+      <span className="sr-only">Loading service status</span>
+      <div className="flex flex-col gap-y-4 px-2 py-2 sm:gap-y-6 sm:px-3 sm:py-4">
+        {skeletonLineIds.map((lineId) => (
+          <div
+            className="flex animate-pulse flex-col rounded-lg bg-gray-100 px-4 py-2 dark:bg-gray-800"
+            key={lineId}
+          >
+            <div className="mb-1.5 flex items-center">
+              <div className="h-5 w-12 rounded-sm bg-gray-300 dark:bg-gray-700" />
+              <div className="ms-1.5 h-4 w-36 rounded-sm bg-gray-300 dark:bg-gray-700" />
+              <div className="ms-auto h-4 w-20 rounded-sm bg-gray-300 dark:bg-gray-700" />
+            </div>
+
+            <div className="flex items-center justify-between gap-x-1">
+              <HomeSkeletonDateBars dateKeys={dateKeys} />
+            </div>
+
+            <div className="mt-1.5 flex items-center justify-between gap-x-1">
+              <div className="h-3 w-20 rounded-sm bg-gray-300 dark:bg-gray-700" />
+              <div className="h-3 w-24 rounded-sm bg-gray-300 dark:bg-gray-700" />
+              <div className="h-3 w-14 rounded-sm bg-gray-300 dark:bg-gray-700" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface HomeSkeletonDateBarsProps {
+  dateKeys?: string[];
+}
+
+function HomeSkeletonDateBars(props: HomeSkeletonDateBarsProps) {
+  const { dateKeys } = props;
+
+  if (dateKeys != null) {
+    return dateKeys.map((dateKey) => (
+      <div
+        className="h-7 w-1.5 shrink-0 rounded-xs bg-gray-300 dark:bg-gray-700"
+        key={dateKey}
+      />
+    ));
+  }
+
+  return PENDING_DATE_BAR_IDS.map((barId, index) => (
+    <div
+      className={classNames(
+        'h-7 w-1.5 shrink-0 rounded-xs bg-gray-300 dark:bg-gray-700',
+        {
+          'hidden sm:block': index >= 30 && index < 60,
+          'hidden lg:block': index >= 60,
+        },
+      )}
+      key={barId}
+    />
+  ));
+}
+
+const PENDING_LINE_IDS = ['skeleton-line-1', 'skeleton-line-2'];
+const PENDING_LEGEND_IDS = [
+  'operational',
+  'disruption',
+  'maintenance',
+  'infrastructure',
+  'closed',
+];
+const PENDING_DATE_BAR_IDS = Array.from(
+  { length: 90 },
+  (_, index) => `date-bar-${index}`,
+);
