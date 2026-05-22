@@ -384,7 +384,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                       </div>
                     )}
                     {loopColumns.bottomStationId != null && (
-                      <div className="col-start-1 col-end-6 flex justify-center pt-4">
+                      <div className="col-start-1 col-end-6 flex justify-center pt-6">
                         {renderBottomStationLabel(loopColumns.bottomStationId)}
                       </div>
                     )}
