@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
+import { DismissableLayer } from 'radix-ui/internal';
 import { useMemo, useState } from 'react';
 import {
   FormattedDate,
@@ -75,29 +76,46 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
   const activeDateRecord =
     activeDateCard == null ? null : breakdownByDates[activeDateCard.isoDate];
 
+  const hasActivePanel =
+    activeDateTime != null &&
+    (activeDateCard?.type === 'service-ended' ||
+      (activeDateCard?.type === 'date' && activeDateRecord != null));
+
   const activateDateCard = (nextDateCard: ActiveDateCard) => {
     setActiveDateCard(nextDateCard);
   };
 
+  const closeActiveDateCard = () => {
+    setActiveDateCard(null);
+  };
+
+  const LineSummaryRoot = hasActivePanel ? DismissableLayer.Root : 'fieldset';
+  const lineSummaryRootProps = hasActivePanel
+    ? {
+        onDismiss: closeActiveDateCard,
+        onFocusOutside: (event: Event) => {
+          event.preventDefault();
+        },
+      }
+    : {};
+
   return (
     <>
-      {activeDateCard != null && (
-        <button
-          type="button"
-          aria-label="Close date details"
+      {hasActivePanel && (
+        <div
+          aria-hidden="true"
           className="fixed inset-0 z-20 cursor-default bg-transparent"
-          onClick={() => {
-            setActiveDateCard(null);
-          }}
         />
       )}
-      <fieldset
+      <LineSummaryRoot
+        {...lineSummaryRootProps}
         className={classNames(
           'relative m-0 flex min-w-0 flex-col rounded-lg border-0 bg-gray-100 px-4 py-2 dark:bg-gray-800',
           {
-            'z-30': activeDateCard != null,
+            'z-30': hasActivePanel,
           },
         )}
+        role={hasActivePanel ? 'group' : undefined}
         aria-label={line.id}
       >
         <div className="mb-1.5 flex items-center">
@@ -229,7 +247,8 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
           </span>
         </div>
 
-        {activeDateCard != null &&
+        {hasActivePanel &&
+          activeDateCard != null &&
           activeDateTime != null &&
           (activeDateCard.type === 'date' && activeDateRecord != null ? (
             <div
@@ -255,7 +274,7 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
               />
             </div>
           ) : null)}
-      </fieldset>
+      </LineSummaryRoot>
     </>
   );
 };
