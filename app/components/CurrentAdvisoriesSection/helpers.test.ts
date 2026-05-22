@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { countOperationalLinesOutsideCurrentAdvisories } from './helpers';
+import { countOperationalLineSummaries } from './helpers';
 
-describe('countOperationalLinesOutsideCurrentAdvisories', () => {
-  it('excludes normal lines that already appear in service advisories', () => {
+describe('countOperationalLineSummaries', () => {
+  it('counts normal line summaries as operational', () => {
     expect(
-      countOperationalLinesOutsideCurrentAdvisories({
-        issuesActiveNow: [{ lineIds: ['NSL'] }],
-        issuesActiveToday: [{ lineIds: ['EWL'] }],
+      countOperationalLineSummaries({
         lineSummaries: [
           { lineId: 'NSL', status: 'ongoing_disruption' },
           { lineId: 'EWL', status: 'normal' },
@@ -14,18 +12,17 @@ describe('countOperationalLinesOutsideCurrentAdvisories', () => {
           { lineId: 'DTL', status: 'closed_for_day' },
         ],
       }),
-    ).toBe(1);
+    ).toBe(2);
   });
 
-  it('deduplicates advisories that touch the same line', () => {
+  it('does not count closed or future lines as operational', () => {
     expect(
-      countOperationalLinesOutsideCurrentAdvisories({
-        issuesActiveNow: [{ lineIds: ['NSL'] }],
-        issuesActiveToday: [{ lineIds: ['NSL', 'EWL'] }],
+      countOperationalLineSummaries({
         lineSummaries: [
           { lineId: 'NSL', status: 'normal' },
-          { lineId: 'EWL', status: 'normal' },
-          { lineId: 'CCL', status: 'normal' },
+          { lineId: 'EWL', status: 'closed_for_day' },
+          { lineId: 'CCL', status: 'future_service' },
+          { lineId: 'DTL', status: 'ongoing_maintenance' },
         ],
       }),
     ).toBe(1);

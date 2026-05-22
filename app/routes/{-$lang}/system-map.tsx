@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { createIntl, FormattedMessage, useIntl } from 'react-intl';
 import type { IssueAffectedBranch } from '~/types';
 import { CurrentAdvisoriesSection } from '~/components/CurrentAdvisoriesSection';
-import { countOperationalLinesOutsideCurrentAdvisories } from '~/components/CurrentAdvisoriesSection/helpers';
+import { countOperationalLineSummaries } from '~/components/CurrentAdvisoriesSection/helpers';
 import { StationMap } from '~/components/StationMap';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
@@ -81,12 +81,10 @@ function SystemMapPage() {
   }, [overview.issueIdsActiveToday, included.issues]);
 
   const lineOperationalCount = useMemo(() => {
-    return countOperationalLinesOutsideCurrentAdvisories({
-      issuesActiveNow,
-      issuesActiveToday,
+    return countOperationalLineSummaries({
       lineSummaries: overview.lineSummaries,
     });
-  }, [issuesActiveNow, issuesActiveToday, overview.lineSummaries]);
+  }, [overview.lineSummaries]);
 
   const lines = useMemo(() => {
     return Object.values(included.lines);
