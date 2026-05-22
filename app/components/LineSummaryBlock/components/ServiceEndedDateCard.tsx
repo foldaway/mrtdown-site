@@ -1,8 +1,7 @@
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
 import type { DateTime } from 'luxon';
-import type { PointerEvent } from 'react';
-import { FormattedDate, FormattedMessage } from 'react-intl';
+import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import type { Line, LineSummaryDayType } from '~/types';
 import { useHydrated } from '../../../hooks/useHydrated';
 import { DAY_TYPE_MESSAGE_DESCRIPTORS } from '../constants';
@@ -17,32 +16,39 @@ interface Props {
 }
 
 export const ServiceEndedDateCard: React.FC<Props> = (props) => {
-  const { isActive, onActivate } = props;
-
-  const activateOnHoverPointer = (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
-      onActivate();
-    }
-  };
+  const { isActive, onActivate, dateTime } = props;
+  const intl = useIntl();
+  const isoDate = dateTime.toISODate();
+  const ariaLabel =
+    isoDate == null
+      ? undefined
+      : intl.formatMessage(
+          {
+            id: 'component.view_details_for_date',
+            defaultMessage: 'View details for {date}',
+          },
+          { date: isoDate },
+        );
 
   return (
     <button
       type="button"
       onClick={onActivate}
-      onFocus={onActivate}
-      onMouseEnter={onActivate}
-      onPointerEnter={activateOnHoverPointer}
-      aria-label={props.dateTime.toISODate() ?? undefined}
+      aria-label={ariaLabel}
       aria-expanded={isActive}
       className={classNames(
-        'group cursor-pointer rounded-sm transition-all duration-200 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-1 dark:focus:ring-accent-dark dark:hover:bg-gray-800',
+        'group hover:-translate-y-0.5 flex h-9 min-w-0 cursor-pointer items-center justify-center rounded-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-light focus-visible:ring-offset-1 active:translate-y-0 active:scale-95 dark:focus-visible:ring-accent-dark',
         {
-          'bg-gray-100 ring-2 ring-accent-light ring-offset-1 dark:bg-gray-800 dark:ring-accent-dark':
-            isActive,
+          'bg-accent-light/10 shadow-inner dark:bg-accent-dark/15': isActive,
         },
       )}
     >
-      <div className="h-7 w-1.5 rounded-xs bg-gray-400 shadow-sm transition-all duration-200 group-hover:scale-125 group-hover:shadow-md group-focus:scale-125 dark:bg-gray-600" />
+      <div
+        className={classNames(
+          'w-full rounded-xs bg-gray-400 transition-all duration-150 group-hover:scale-105 group-hover:brightness-110 group-focus-visible:scale-105 dark:bg-gray-600',
+          isActive ? 'h-9 brightness-110' : 'h-7',
+        )}
+      />
     </button>
   );
 };

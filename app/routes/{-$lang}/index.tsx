@@ -1,5 +1,4 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
-import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { useEffect, useMemo } from 'react';
 import { createIntl, FormattedMessage } from 'react-intl';
@@ -10,10 +9,11 @@ import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { useViewport, ViewportSchema } from '~/hooks/useViewport';
 import { getOverviewFn } from '~/util/overview.functions';
-import { sortLineSummariesWithFutureServiceLast } from './helpers/sortLineSummaries';
 import { CurrentAdvisoriesSection } from '../../components/CurrentAdvisoriesSection';
 import { countOperationalLineSummaries } from '../../components/CurrentAdvisoriesSection/helpers';
 import { assert } from '../../util/assert';
+import { HomeLineSummariesSkeleton } from './components/HomeLineSummariesSkeleton';
+import { sortLineSummariesWithFutureServiceLast } from './helpers/sortLineSummaries';
 
 const SearchParamsSchema = z.object({
   viewport: ViewportSchema.optional(),
@@ -327,80 +327,6 @@ function HomePagePending() {
   );
 }
 
-interface HomeLineSummariesSkeletonProps {
-  dateKeys?: string[];
-  lineIds: string[];
-}
-
-function HomeLineSummariesSkeleton(props: HomeLineSummariesSkeletonProps) {
-  const { dateKeys, lineIds } = props;
-  const skeletonLineIds =
-    lineIds.length > 0 ? lineIds : ['line-summary-skeleton'];
-
-  return (
-    <div
-      aria-busy="true"
-      className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
-    >
-      <span className="sr-only">Loading service status</span>
-      <div className="flex flex-col gap-y-4 px-2 py-2 sm:gap-y-6 sm:px-3 sm:py-4">
-        {skeletonLineIds.map((lineId) => (
-          <div
-            className="flex animate-pulse flex-col rounded-lg bg-gray-100 px-4 py-2 dark:bg-gray-800"
-            key={lineId}
-          >
-            <div className="mb-1.5 flex items-center">
-              <div className="h-5 w-12 rounded-sm bg-gray-300 dark:bg-gray-700" />
-              <div className="ms-1.5 h-4 w-36 rounded-sm bg-gray-300 dark:bg-gray-700" />
-              <div className="ms-auto h-4 w-20 rounded-sm bg-gray-300 dark:bg-gray-700" />
-            </div>
-
-            <div className="flex items-center justify-between gap-x-1">
-              <HomeSkeletonDateBars dateKeys={dateKeys} />
-            </div>
-
-            <div className="mt-1.5 flex items-center justify-between gap-x-1">
-              <div className="h-3 w-20 rounded-sm bg-gray-300 dark:bg-gray-700" />
-              <div className="h-3 w-24 rounded-sm bg-gray-300 dark:bg-gray-700" />
-              <div className="h-3 w-14 rounded-sm bg-gray-300 dark:bg-gray-700" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-interface HomeSkeletonDateBarsProps {
-  dateKeys?: string[];
-}
-
-function HomeSkeletonDateBars(props: HomeSkeletonDateBarsProps) {
-  const { dateKeys } = props;
-
-  if (dateKeys != null) {
-    return dateKeys.map((dateKey) => (
-      <div
-        className="h-7 w-1.5 shrink-0 rounded-xs bg-gray-300 dark:bg-gray-700"
-        key={dateKey}
-      />
-    ));
-  }
-
-  return PENDING_DATE_BAR_IDS.map((barId, index) => (
-    <div
-      className={classNames(
-        'h-7 w-1.5 shrink-0 rounded-xs bg-gray-300 dark:bg-gray-700',
-        {
-          'hidden sm:block': index >= 30 && index < 60,
-          'hidden lg:block': index >= 60,
-        },
-      )}
-      key={barId}
-    />
-  ));
-}
-
 const PENDING_LINE_IDS = ['skeleton-line-1', 'skeleton-line-2'];
 const PENDING_LEGEND_IDS = [
   'operational',
@@ -409,7 +335,3 @@ const PENDING_LEGEND_IDS = [
   'infrastructure',
   'closed',
 ];
-const PENDING_DATE_BAR_IDS = Array.from(
-  { length: 90 },
-  (_, index) => `date-bar-${index}`,
-);

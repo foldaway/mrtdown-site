@@ -2,17 +2,17 @@ import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { type DateTime, Duration } from 'luxon';
-import { Fragment, type PointerEvent, useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
+import { FormattedDuration } from '~/components/FormattedDuration';
+import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import type {
   Issue,
   Line,
   LineSummaryDateRecord,
   LineSummaryStatus,
 } from '~/types';
-import { FormattedDuration } from '~/components/FormattedDuration';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
-import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { useHydrated } from '../../../hooks/useHydrated';
 import { DAY_TYPE_MESSAGE_DESCRIPTORS } from '../constants';
 import { useOperatingHours } from '../hooks/useOperatingHours';
@@ -94,35 +94,43 @@ function useDateBreakdown(
 export const DateCard: React.FC<Props> = (props) => {
   const { line, dateTime, data } = props;
   const { segments } = useDateBreakdown(line, dateTime, data);
-
-  const activateOnHoverPointer = (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
-      props.onActivate();
-    }
-  };
+  const intl = useIntl();
+  const isoDate = dateTime.toISODate();
+  const ariaLabel =
+    isoDate == null
+      ? undefined
+      : intl.formatMessage(
+          {
+            id: 'component.view_details_for_date',
+            defaultMessage: 'View details for {date}',
+          },
+          { date: isoDate },
+        );
 
   return (
     <button
       type="button"
       onClick={props.onActivate}
-      onFocus={props.onActivate}
-      onMouseEnter={props.onActivate}
-      onPointerEnter={activateOnHoverPointer}
-      aria-label={dateTime.toISODate() ?? undefined}
+      aria-label={ariaLabel}
       aria-expanded={props.isActive}
       className={classNames(
-        'group cursor-pointer rounded-sm transition-all duration-200 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-1 dark:focus:ring-accent-dark dark:hover:bg-gray-800',
+        'group hover:-translate-y-0.5 flex h-9 min-w-0 cursor-pointer items-center justify-center rounded-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-light focus-visible:ring-offset-1 active:translate-y-0 active:scale-95 dark:focus-visible:ring-accent-dark',
         {
-          'bg-gray-100 ring-2 ring-accent-light ring-offset-1 dark:bg-gray-800 dark:ring-accent-dark':
+          'bg-accent-light/10 shadow-inner dark:bg-accent-dark/15':
             props.isActive,
         },
       )}
     >
-      <div className="flex h-7 w-1.5 flex-col-reverse overflow-hidden rounded-xs bg-operational-light shadow-sm transition-all duration-200 group-hover:scale-125 group-hover:shadow-md group-focus:scale-125 dark:bg-operational-dark">
+      <div
+        className={classNames(
+          'flex w-full flex-col-reverse overflow-hidden rounded-xs bg-operational-light transition-all duration-150 group-hover:scale-105 group-hover:brightness-110 group-focus-visible:scale-105 dark:bg-operational-dark',
+          props.isActive ? 'h-9 brightness-110' : 'h-7',
+        )}
+      >
         {segments.map((segment) => (
           <div
             key={segment.type}
-            className={classNames('flex w-1.5', {
+            className={classNames('flex w-full', {
               'bg-disruption-light dark:bg-disruption-dark':
                 segment.type === 'ongoing_disruption',
               'bg-maintenance-light dark:bg-maintenance-dark':
