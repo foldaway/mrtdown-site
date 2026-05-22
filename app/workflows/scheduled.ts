@@ -1,6 +1,7 @@
 const SCHEDULED_PULL_SLOT_MS = 30 * 60 * 1000;
 const SCHEDULED_PULL_LOOKBACK_SLOTS = 48;
-const SCHEDULED_PUBLIC_HOLIDAYS_SLOT_MS = 7 * 24 * 60 * 60 * 1000;
+const SCHEDULED_PULL_CRONS = new Set(['*/30 * * * *', '0 * * * *']);
+const SCHEDULED_PUBLIC_HOLIDAYS_CRON = '0 18 * * SUN';
 const ACTIVE_WORKFLOW_STATUSES = new Set([
   'queued',
   'running',
@@ -17,8 +18,7 @@ function scheduledPullWorkflowId(scheduledTime: number) {
 }
 
 function scheduledPublicHolidaysWorkflowId(scheduledTime: number) {
-  const slot = Math.floor(scheduledTime / SCHEDULED_PUBLIC_HOLIDAYS_SLOT_MS);
-  return `public-holidays-scheduled-${slot}`;
+  return `public-holidays-scheduled-${scheduledTime}`;
 }
 
 function scheduledPublicHolidaysRetryWorkflowId(scheduledTime: number) {
@@ -130,11 +130,30 @@ export async function handleScheduledWorkflows(
   env: Env,
   ctx: ExecutionContext,
 ) {
+  if (SCHEDULED_PULL_CRONS.has(event.cron)) {
+    await handleScheduledPullWorkflow(event, env, ctx);
+    return;
+  }
+
+  if (event.cron === SCHEDULED_PUBLIC_HOLIDAYS_CRON) {
+    await handleScheduledPublicHolidaysWorkflow(event, env, ctx);
+    return;
+  }
+
+  console.warn(`Ignoring unknown scheduled cron trigger: ${event.cron}`);
+}
+
+async function handleScheduledPullWorkflow(
+  event: ScheduledController,
+  env: Env,
+  ctx: ExecutionContext,
+) {
   const workflow = env.PULL_WORKFLOW;
-  if (
-    workflow != null &&
-    !(await hasActiveScheduledPullWorkflow(workflow, event.scheduledTime))
-  ) {
+  if (workflow == null) {
+    return;
+  }
+
+  if (!(await hasActiveScheduledPullWorkflow(workflow, event.scheduledTime))) {
     ctx.waitUntil(
       workflow
         .create({
@@ -148,7 +167,13 @@ export async function handleScheduledWorkflows(
         }),
     );
   }
+}
 
+async function handleScheduledPublicHolidaysWorkflow(
+  event: ScheduledController,
+  env: Env,
+  ctx: ExecutionContext,
+) {
   const publicHolidaysWorkflow = env.PUBLIC_HOLIDAYS_WORKFLOW;
   if (publicHolidaysWorkflow == null) {
     return;

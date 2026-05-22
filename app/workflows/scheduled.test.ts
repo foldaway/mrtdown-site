@@ -3,15 +3,20 @@ import { handleScheduledWorkflows } from './scheduled';
 
 type WorkflowStatus = Awaited<ReturnType<WorkflowInstance['status']>>['status'];
 
+const PULL_CRON = '*/30 * * * *';
+const PUBLIC_HOLIDAYS_CRON = '0 18 * * SUN';
+
 function scheduledPublicHolidaysWorkflowId(scheduledTime: number) {
-  const slot = Math.floor(scheduledTime / (7 * 24 * 60 * 60 * 1000));
-  return `public-holidays-scheduled-${slot}`;
+  return `public-holidays-scheduled-${scheduledTime}`;
 }
 
-function createScheduledEvent(scheduledTime: number) {
+function createScheduledEvent(
+  scheduledTime: number,
+  cron = PUBLIC_HOLIDAYS_CRON,
+) {
   return {
     scheduledTime,
-    cron: '0 0 * * *',
+    cron,
     noRetry: vi.fn(),
   } satisfies ScheduledController;
 }
@@ -58,6 +63,28 @@ function createWorkflow(statuses: Record<string, WorkflowStatus | 'missing'>) {
 }
 
 describe('handleScheduledWorkflows', () => {
+  it('routes pull cron triggers to the pull workflow', async () => {
+    const scheduledTime = Date.UTC(2026, 4, 1);
+    const pullWorkflow = createWorkflow({});
+    const publicHolidaysWorkflow = createWorkflow({});
+    const { ctx, pending } = createExecutionContext();
+
+    await handleScheduledWorkflows(
+      createScheduledEvent(scheduledTime, PULL_CRON),
+      {
+        PULL_WORKFLOW: pullWorkflow.workflow,
+        PUBLIC_HOLIDAYS_WORKFLOW: publicHolidaysWorkflow.workflow,
+      } as Env,
+      ctx,
+    );
+    await Promise.all(pending);
+
+    expect(pullWorkflow.createdIds).toEqual([
+      `pull-scheduled-${Math.floor(scheduledTime / (30 * 60 * 1000))}`,
+    ]);
+    expect(publicHolidaysWorkflow.createdIds).toEqual([]);
+  });
+
   it('creates a retry public holidays workflow when the scheduled instance errored', async () => {
     const scheduledTime = Date.UTC(2026, 4, 1);
     const workflowId = scheduledPublicHolidaysWorkflowId(scheduledTime);
@@ -68,7 +95,10 @@ describe('handleScheduledWorkflows', () => {
 
     await handleScheduledWorkflows(
       createScheduledEvent(scheduledTime),
-      { PUBLIC_HOLIDAYS_WORKFLOW: workflow } as Env,
+      {
+        PULL_WORKFLOW: createWorkflow({}).workflow,
+        PUBLIC_HOLIDAYS_WORKFLOW: workflow,
+      } as Env,
       ctx,
     );
     await Promise.all(pending);
@@ -88,11 +118,34 @@ describe('handleScheduledWorkflows', () => {
 
     await handleScheduledWorkflows(
       createScheduledEvent(scheduledTime),
-      { PUBLIC_HOLIDAYS_WORKFLOW: workflow } as Env,
+      {
+        PULL_WORKFLOW: createWorkflow({}).workflow,
+        PUBLIC_HOLIDAYS_WORKFLOW: workflow,
+      } as Env,
       ctx,
     );
     await Promise.all(pending);
 
     expect(createdIds).toEqual([]);
+  });
+
+  it('ignores unknown cron triggers', async () => {
+    const scheduledTime = Date.UTC(2026, 4, 1);
+    const pullWorkflow = createWorkflow({});
+    const publicHolidaysWorkflow = createWorkflow({});
+    const { ctx, pending } = createExecutionContext();
+
+    await handleScheduledWorkflows(
+      createScheduledEvent(scheduledTime, '15 3 * * *'),
+      {
+        PULL_WORKFLOW: pullWorkflow.workflow,
+        PUBLIC_HOLIDAYS_WORKFLOW: publicHolidaysWorkflow.workflow,
+      } as Env,
+      ctx,
+    );
+    await Promise.all(pending);
+
+    expect(pullWorkflow.createdIds).toEqual([]);
+    expect(publicHolidaysWorkflow.createdIds).toEqual([]);
   });
 });
