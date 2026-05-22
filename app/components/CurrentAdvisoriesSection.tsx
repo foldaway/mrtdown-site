@@ -24,25 +24,28 @@ const ISSUE_CARD_CONTEXT_NOW: IssueCardContext = {
 const ISSUE_TYPES = [
   {
     type: 'disruption',
-    label: defineMessage({
-      id: 'general.disruptions',
-      defaultMessage: 'Disruptions',
+    message: defineMessage({
+      id: 'general.active_disruptions',
+      defaultMessage:
+        '<bold>{count}</bold> Active {count, plural, one {Disruption} other {Disruptions}}',
     }),
     Icon: ExclamationTriangleIcon,
   },
   {
     type: 'maintenance',
-    label: defineMessage({
-      id: 'general.maintenance',
-      defaultMessage: 'Maintenance',
+    message: defineMessage({
+      id: 'general.planned_maintenance',
+      defaultMessage:
+        '<bold>{count}</bold> Maintenance {count, plural, one {Work} other {Works}}',
     }),
     Icon: CogIcon,
   },
   {
     type: 'infra',
-    label: defineMessage({
-      id: 'general.infrastructure',
-      defaultMessage: 'Infrastructure',
+    message: defineMessage({
+      id: 'general.infrastructure_works',
+      defaultMessage:
+        '<bold>{count}</bold> Infrastructure {count, plural, one {Work} other {Works}}',
     }),
     Icon: BuildingOfficeIcon,
   },
@@ -102,32 +105,68 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
                 defaultMessage="Service Advisories"
               />
             </h2>
-            <div className="grid grid-cols-2 gap-2 text-gray-800 sm:gap-3 lg:grid-cols-4 dark:text-gray-200">
-              {ISSUE_TYPES.map(({ type, label, Icon }) => {
+            <div className="grid grid-cols-[repeat(auto-fit,_minmax(9.5rem,_1fr))] gap-2 text-gray-800 sm:gap-3 md:grid-cols-[repeat(auto-fit,_minmax(14rem,_1fr))] dark:text-gray-200">
+              {ISSUE_TYPES.map(({ type, message, Icon }) => {
                 const count = issueCountsByType[type] ?? 0;
                 const lineIds = issueLineIdsByType[type] ?? new Set();
-                return (
-                  <AdvisorySummaryTile
-                    count={count}
-                    Icon={Icon}
+                return count > 0 ? (
+                  <div
                     key={type}
-                    label={<FormattedMessage {...label} />}
-                    lineIds={Array.from(lineIds).sort()}
-                    tone={type}
-                  />
-                );
+                    className="grid min-w-0 grid-cols-[auto_1fr] gap-x-2 gap-y-1 rounded-lg bg-gray-50 p-2.5 text-xs sm:p-3 sm:text-sm dark:bg-gray-700/50"
+                  >
+                    <div
+                      className={classNames(
+                        'row-span-2 inline-flex size-5 shrink-0 items-center justify-center rounded-full shadow-sm ring-1 sm:size-7',
+                        {
+                          'bg-disruption-light/20 text-disruption-light ring-disruption-light/40 dark:bg-disruption-dark/30 dark:text-disruption-dark dark:ring-disruption-dark/60':
+                            type === 'disruption',
+                          'bg-maintenance-light/20 text-maintenance-light ring-maintenance-light/40 dark:bg-maintenance-dark/30 dark:text-maintenance-dark dark:ring-maintenance-dark/60':
+                            type === 'maintenance',
+                          'bg-infra-light/20 text-infra-light ring-infra-light/40 dark:bg-infra-dark/30 dark:text-infra-dark dark:ring-infra-dark/60':
+                            type === 'infra',
+                        },
+                      )}
+                    >
+                      <Icon className="size-3.5 sm:size-5" />
+                    </div>
+                    <div className="flex min-w-0 items-center whitespace-pre-wrap leading-tight">
+                      <FormattedMessage
+                        {...message}
+                        values={{
+                          count,
+                          bold: (chunks) => (
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">
+                              {chunks}
+                            </span>
+                          ),
+                        }}
+                      />
+                    </div>
+                    <LineBar lineIds={Array.from(lineIds).sort()} />
+                  </div>
+                ) : null;
               })}
-              <AdvisorySummaryTile
-                count={lineOperationalCount}
-                Icon={CheckCircleIcon}
-                label={
-                  <FormattedMessage
-                    id="status.operational"
-                    defaultMessage="Operational"
-                  />
-                }
-                tone="operational"
-              />
+              {lineOperationalCount > 0 && (
+                <div className="flex min-w-0 items-center gap-x-2 rounded-lg bg-gray-50 p-2.5 text-xs sm:p-3 sm:text-sm dark:bg-gray-700/50">
+                  <div className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-operational-light/20 text-operational-light shadow-sm ring-1 ring-operational-light/40 sm:size-7 dark:bg-operational-dark/30 dark:text-operational-dark dark:ring-operational-dark/60">
+                    <CheckCircleIcon className="size-3.5 sm:size-5" />
+                  </div>
+                  <div className="flex min-w-0 items-center whitespace-pre-wrap leading-tight">
+                    <FormattedMessage
+                      id="general.count_line_operational"
+                      defaultMessage="<bold>{count}</bold> {count, plural, one {Line} other {Lines}} Operational"
+                      values={{
+                        count: lineOperationalCount,
+                        bold: (chunks) => (
+                          <span className="font-semibold text-gray-900 dark:text-gray-100">
+                            {chunks}
+                          </span>
+                        ),
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -188,83 +227,5 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
         </Collapsible.Content>
       )}
     </Collapsible.Root>
-  );
-};
-
-interface AdvisorySummaryTileProps {
-  count: number;
-  Icon: React.ComponentType<React.ComponentProps<'svg'>>;
-  label: React.ReactNode;
-  lineIds?: string[];
-  tone: IssueType | 'operational';
-}
-
-const AdvisorySummaryTile: React.FC<AdvisorySummaryTileProps> = (props) => {
-  const { count, Icon, label, lineIds = [], tone } = props;
-  const hasActiveIssues = tone !== 'operational' && count > 0;
-
-  return (
-    <div
-      className={classNames(
-        'flex min-h-20 min-w-0 flex-col justify-between rounded-lg border p-2.5 shadow-sm sm:min-h-24 sm:p-3',
-        {
-          'border-disruption-light/25 bg-disruption-light/5 dark:border-disruption-dark/35 dark:bg-disruption-dark/10':
-            tone === 'disruption' && hasActiveIssues,
-          'border-maintenance-light/25 bg-maintenance-light/5 dark:border-maintenance-dark/35 dark:bg-maintenance-dark/10':
-            tone === 'maintenance' && hasActiveIssues,
-          'border-infra-light/25 bg-infra-light/5 dark:border-infra-dark/35 dark:bg-infra-dark/10':
-            tone === 'infra' && hasActiveIssues,
-          'border-operational-light/25 bg-operational-light/5 dark:border-operational-dark/35 dark:bg-operational-dark/10':
-            tone === 'operational',
-          'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700/40':
-            tone !== 'operational' && !hasActiveIssues,
-        },
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate font-medium text-gray-600 text-xs dark:text-gray-300">
-            {label}
-          </p>
-          <p className="mt-0.5 font-bold text-2xl text-gray-950 tabular-nums leading-none sm:text-3xl dark:text-gray-50">
-            {count}
-          </p>
-        </div>
-        <div
-          className={classNames(
-            'inline-flex size-7 shrink-0 items-center justify-center rounded-md ring-1 sm:size-8',
-            {
-              'bg-disruption-light/15 text-disruption-light ring-disruption-light/25 dark:bg-disruption-dark/20 dark:text-disruption-dark dark:ring-disruption-dark/30':
-                tone === 'disruption',
-              'bg-maintenance-light/15 text-maintenance-light ring-maintenance-light/25 dark:bg-maintenance-dark/20 dark:text-maintenance-dark dark:ring-maintenance-dark/30':
-                tone === 'maintenance',
-              'bg-infra-light/15 text-infra-light ring-infra-light/25 dark:bg-infra-dark/20 dark:text-infra-dark dark:ring-infra-dark/30':
-                tone === 'infra',
-              'bg-operational-light/15 text-operational-light ring-operational-light/25 dark:bg-operational-dark/20 dark:text-operational-dark dark:ring-operational-dark/30':
-                tone === 'operational',
-            },
-          )}
-        >
-          <Icon className="size-4 sm:size-4.5" />
-        </div>
-      </div>
-
-      <div className="mt-2 min-h-4 text-gray-500 text-xs leading-tight dark:text-gray-400">
-        {lineIds.length > 0 ? (
-          <LineBar lineIds={lineIds} />
-        ) : tone === 'operational' ? (
-          <FormattedMessage
-            id="general.lines_in_service"
-            defaultMessage="{count, plural, one {line in service} other {lines in service}}"
-            values={{ count }}
-          />
-        ) : (
-          <FormattedMessage
-            id="general.no_lines_affected"
-            defaultMessage="No lines affected"
-          />
-        )}
-      </div>
-    </div>
   );
 };
