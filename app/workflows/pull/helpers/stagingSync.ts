@@ -63,6 +63,10 @@ import {
   townsNextTable,
   townsTable,
 } from '../../../db/schema.js';
+import {
+  type DbDiagnosticContext,
+  withDbDiagnostics as withSharedDbDiagnostics,
+} from '../../../util/dbDiagnostics.js';
 
 /** Max rows per `insert().values()` batch to stay within driver/param limits. */
 const BATCH = 500;
@@ -77,120 +81,19 @@ function serviceRevisionEndAt(revision: ServiceRevision): string | null {
   return revision.endAt;
 }
 
-type DbDiagnosticContext = {
-  operation: string;
-  table: string;
-  rowCount?: number;
-  sample?: readonly string[];
-};
-
-class PullDbDiagnosticError extends Error {
-  constructor(message: string, options: { cause: unknown }) {
-    super(message, { cause: options.cause });
-    this.name = 'PullDbDiagnosticError';
-  }
-}
-
 function assertUnreachable(value: never, message: string): never {
   throw new Error(`${message}: ${String(value)}`);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function stringifyErrorField(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  return null;
-}
-
-function readErrorField(error: unknown, field: string): string | null {
-  if (!isRecord(error)) return null;
-  return stringifyErrorField(error[field]);
-}
-
-function formatErrorCauseChain(error: unknown): string[] {
-  const lines: string[] = [];
-  let current: unknown = error;
-  const seen = new Set<unknown>();
-
-  for (let depth = 0; current != null && depth < 6; depth++) {
-    if (seen.has(current)) break;
-    seen.add(current);
-
-    const name =
-      current instanceof Error
-        ? current.name
-        : (readErrorField(current, 'name') ?? typeof current);
-    const message =
-      current instanceof Error
-        ? current.message
-        : (readErrorField(current, 'message') ?? String(current));
-    const fields = [
-      'code',
-      'severity',
-      'schema',
-      'table',
-      'column',
-      'constraint',
-      'detail',
-      'hint',
-      'where',
-      'routine',
-    ]
-      .map((field) => {
-        const value = readErrorField(current, field);
-        return value == null ? null : `${field}=${value}`;
-      })
-      .filter((field): field is string => field != null);
-
-    lines.push(
-      `cause[${depth}] ${name}: ${message}${
-        fields.length > 0 ? ` (${fields.join(', ')})` : ''
-      }`,
-    );
-
-    current = isRecord(current) ? current.cause : null;
-  }
-
-  return lines;
-}
-
-function formatDbDiagnosticMessage(
-  context: DbDiagnosticContext,
-  error: unknown,
-): string {
-  const lines = [
-    `[PULL_DB_ERROR] ${context.operation} failed on ${context.table}`,
-  ];
-  if (context.rowCount != null) {
-    lines.push(`row_count=${context.rowCount}`);
-  }
-  if (context.sample != null && context.sample.length > 0) {
-    lines.push(`sample=${context.sample.join(' | ')}`);
-  }
-  lines.push(...formatErrorCauseChain(error));
-  return lines.join('\n');
-}
-
 async function withDbDiagnostics<T>(
-  context: DbDiagnosticContext,
+  context: Omit<DbDiagnosticContext, 'prefix'>,
   operation: () => Promise<T>,
 ): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    if (error instanceof PullDbDiagnosticError) {
-      throw error;
-    }
-    const message = formatDbDiagnosticMessage(context, error);
-    console.error(message);
-    throw new PullDbDiagnosticError(message, { cause: error });
-  }
+  return withSharedDbDiagnostics(
+    { prefix: 'PULL_DB_ERROR', ...context },
+    operation,
+    { errorName: 'PullDbDiagnosticError' },
+  );
 }
 
 function sampleRows<T>(
