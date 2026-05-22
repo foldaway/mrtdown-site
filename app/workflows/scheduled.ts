@@ -8,6 +8,8 @@ const ACTIVE_WORKFLOW_STATUSES = new Set([
   'waiting',
   'waitingForPause',
 ]);
+const COMPLETED_WORKFLOW_STATUSES = new Set(['complete']);
+const RETRYABLE_WORKFLOW_STATUSES = new Set(['errored', 'terminated']);
 
 function scheduledPullWorkflowId(scheduledTime: number) {
   const slot = Math.floor(scheduledTime / SCHEDULED_PULL_SLOT_MS);
@@ -17,6 +19,10 @@ function scheduledPullWorkflowId(scheduledTime: number) {
 function scheduledPublicHolidaysWorkflowId(scheduledTime: number) {
   const slot = Math.floor(scheduledTime / SCHEDULED_PUBLIC_HOLIDAYS_SLOT_MS);
   return `public-holidays-scheduled-${slot}`;
+}
+
+function scheduledPublicHolidaysRetryWorkflowId(scheduledTime: number) {
+  return `public-holidays-scheduled-retry-${scheduledTime}`;
 }
 
 function getErrorField(error: unknown, field: 'code' | 'status') {
@@ -79,7 +85,7 @@ async function hasActiveScheduledPullWorkflow(
   return false;
 }
 
-async function hasScheduledPublicHolidaysWorkflow(
+async function getScheduledPublicHolidaysWorkflowId(
   workflow: Env['PUBLIC_HOLIDAYS_WORKFLOW'],
   scheduledTime: number,
 ) {
@@ -88,15 +94,25 @@ async function hasScheduledPublicHolidaysWorkflow(
     const status = await workflow.get(id).then((instance) => {
       return instance.status();
     });
-    if (status.status !== 'unknown') {
+    if (
+      ACTIVE_WORKFLOW_STATUSES.has(status.status) ||
+      COMPLETED_WORKFLOW_STATUSES.has(status.status)
+    ) {
       console.log(
         `Skipping scheduled public holidays sync; workflow ${id} already exists with ${status.status} status`,
       );
-      return true;
+      return null;
+    }
+    if (RETRYABLE_WORKFLOW_STATUSES.has(status.status)) {
+      const retryId = scheduledPublicHolidaysRetryWorkflowId(scheduledTime);
+      console.warn(
+        `Retrying scheduled public holidays sync; workflow ${id} is ${status.status}, creating ${retryId}`,
+      );
+      return retryId;
     }
   } catch (error) {
     if (isMissingWorkflowInstanceError(error)) {
-      return false;
+      return id;
     }
     console.error(
       `Scheduled public holidays lookup failed for workflow ${id}`,
@@ -104,9 +120,9 @@ async function hasScheduledPublicHolidaysWorkflow(
         error,
       },
     );
-    return true;
+    return null;
   }
-  return false;
+  return id;
 }
 
 export async function handleScheduledWorkflows(
@@ -138,19 +154,18 @@ export async function handleScheduledWorkflows(
     return;
   }
 
-  if (
-    await hasScheduledPublicHolidaysWorkflow(
-      publicHolidaysWorkflow,
-      event.scheduledTime,
-    )
-  ) {
+  const publicHolidaysWorkflowId = await getScheduledPublicHolidaysWorkflowId(
+    publicHolidaysWorkflow,
+    event.scheduledTime,
+  );
+  if (publicHolidaysWorkflowId == null) {
     return;
   }
 
   ctx.waitUntil(
     publicHolidaysWorkflow
       .create({
-        id: scheduledPublicHolidaysWorkflowId(event.scheduledTime),
+        id: publicHolidaysWorkflowId,
       })
       .catch((error) => {
         console.error('Scheduled public holidays workflow creation failed', {
