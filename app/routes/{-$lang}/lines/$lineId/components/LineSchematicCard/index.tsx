@@ -132,21 +132,44 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
     );
   };
 
-  const renderRailMarker = (index: number) => (
+  const renderLoopRailMarker = (index: number, hasStation: boolean) => (
     <div className="relative flex h-14 items-center justify-center">
       <div
         className={classNames('-translate-x-1/2 absolute left-1/2 z-10 w-1', {
-          'top-1/2 bottom-0': index === 0,
-          'top-0 bottom-0': index > 0,
+          'top-1/2 bottom-0': index === 0 && hasStation,
+          'top-0 bottom-0': index > 0 || !hasStation,
         })}
         style={{
           backgroundColor: line.color,
         }}
       />
+      {hasStation && (
+        <div
+          className="z-20 size-4 rounded-full border-4 bg-white dark:bg-gray-900"
+          style={{
+            borderColor: line.color,
+          }}
+        />
+      )}
+    </div>
+  );
+
+  const renderStraightRailMarker = (index: number, total: number) => (
+    <div className="relative flex h-12 items-center justify-center">
       <div
         className="z-20 size-4 rounded-full border-4 bg-white dark:bg-gray-900"
         style={{
           borderColor: line.color,
+        }}
+      />
+      <div
+        className={classNames('-translate-x-1/2 absolute left-1/2 z-10 w-1', {
+          'top-1/2 bottom-0': index === 0,
+          'top-0 bottom-1/2': index === total - 1,
+          'top-0 bottom-0': index > 0 && index < total - 1,
+        })}
+        style={{
+          backgroundColor: line.color,
         }}
       />
     </div>
@@ -237,32 +260,54 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                   },
                 )}
               >
-                <div className="overflow-x-auto">
+                <div className="md:hidden">
+                  <div
+                    key={`${selectedBranchId}-mobile`}
+                    className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3"
+                  >
+                    {selectedBranch.stationIds.map((stationId, index) => (
+                      <Fragment key={stationId}>
+                        {renderStraightRailMarker(
+                          index,
+                          selectedBranch.stationIds.length,
+                        )}
+                        <div className="flex min-w-0 items-center">
+                          {renderStationLabel(stationId, 'right')}
+                        </div>
+                      </Fragment>
+                    ))}
+                  </div>
+                </div>
+                <div className="hidden overflow-x-auto md:block">
                   <div
                     key={selectedBranchId}
-                    className="grid min-w-[42rem] grid-cols-[minmax(12rem,1fr)_2.5rem_minmax(3rem,6rem)_2.5rem_minmax(12rem,1fr)] items-stretch"
+                    className="grid grid-cols-[minmax(12rem,1fr)_2.5rem_minmax(3rem,6rem)_2.5rem_minmax(12rem,1fr)] items-stretch"
                   >
                     {Array.from({ length: rowCount }).map((_, index) => {
                       const leftStationId = loopColumns.leftStationIds[index];
                       const rightStationId = loopColumns.rightStationIds[index];
+                      const hasLeftStation = leftStationId != null;
+                      const hasRightStation = rightStationId != null;
 
                       return (
                         <Fragment
                           key={`${leftStationId ?? 'empty'}-${rightStationId ?? 'empty'}`}
                         >
                           <div className="flex min-w-0 items-center pr-2">
-                            {leftStationId != null &&
+                            {hasLeftStation &&
                               renderStationLabel(leftStationId, 'left')}
                           </div>
                           <div>
-                            {leftStationId != null && renderRailMarker(index)}
+                            {(hasLeftStation || index > 0) &&
+                              renderLoopRailMarker(index, hasLeftStation)}
                           </div>
                           <div />
                           <div>
-                            {rightStationId != null && renderRailMarker(index)}
+                            {(hasRightStation || index > 0) &&
+                              renderLoopRailMarker(index, hasRightStation)}
                           </div>
                           <div className="flex min-w-0 items-center pl-2">
-                            {rightStationId != null &&
+                            {hasRightStation &&
                               renderStationLabel(rightStationId, 'right')}
                           </div>
                         </Fragment>
