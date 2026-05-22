@@ -16,8 +16,18 @@ describe('normalizeDataGovPublicHolidayRecord', () => {
       id: 'sg-public-holiday-2026-05-01-labour-day',
       date: '2026-05-01',
       holidayName: 'Labour Day',
-      hash: '2026-05-01\0Labour Day',
+      hash: '["2026-05-01","Labour Day"]',
     });
+  });
+
+  it('uses a Postgres text-safe hash', () => {
+    const row = normalizeDataGovPublicHolidayRecord({
+      date: '2026-01-01',
+      day: 'Thursday',
+      holiday: "New Year's Day",
+    });
+
+    expect(row.hash).not.toContain('\0');
   });
 
   it('rejects invalid calendar dates', () => {

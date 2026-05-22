@@ -2,6 +2,7 @@ import { and, gte, lte, notInArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { getDb } from '../../../db/index.js';
 import { publicHolidaysTable } from '../../../db/schema.js';
+import { withDbDiagnostics } from '../../../util/dbDiagnostics.js';
 
 const DATA_GOV_PUBLIC_HOLIDAYS_DATASET_ID =
   'd_8ef23381f9417e4d4254ee8b4dcdb176';
@@ -75,6 +76,29 @@ function slug(value: string): string {
     .replace(/^-|-$/g, '');
 }
 
+function publicHolidayHash(date: string, holidayName: string): string {
+  return JSON.stringify([date, holidayName]);
+}
+
+async function withPublicHolidayDbDiagnostics<T>(
+  rows: readonly PublicHolidaySyncRow[],
+  operation: () => Promise<T>,
+): Promise<T> {
+  return withDbDiagnostics(
+    {
+      prefix: 'PUBLIC_HOLIDAYS_DB_ERROR',
+      operation: 'sync',
+      table: 'public_holidays',
+      rowCount: rows.length,
+      sample: rows
+        .slice(0, 5)
+        .map((row) => `${row.id}:${row.date}:${row.holidayName}`),
+    },
+    operation,
+    { errorName: 'PublicHolidayDbSyncError' },
+  );
+}
+
 export function normalizeDataGovPublicHolidayRecord(
   record: Record<string, unknown>,
 ): PublicHolidaySyncRow {
@@ -86,7 +110,7 @@ export function normalizeDataGovPublicHolidayRecord(
     id,
     date,
     holidayName,
-    hash: `${date}\0${holidayName}`,
+    hash: publicHolidayHash(date, holidayName),
   };
 }
 
@@ -181,40 +205,42 @@ export async function syncPublicHolidays(
     changedDates.add(row.date);
   }
 
-  await db.transaction(async (tx) => {
-    const now = new Date();
-    await tx
-      .insert(publicHolidaysTable)
-      .values(
-        sortedRows.map((row) => ({
-          id: row.id,
-          date: row.date,
-          holiday_name: row.holidayName,
-          hash: row.hash,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: publicHolidaysTable.id,
-        set: {
-          date: sql.raw(`excluded.${publicHolidaysTable.date.name}`),
-          holiday_name: sql.raw(
-            `excluded.${publicHolidaysTable.holiday_name.name}`,
-          ),
-          hash: sql.raw(`excluded.${publicHolidaysTable.hash.name}`),
-          updated_at: now,
-        },
-      });
+  await withPublicHolidayDbDiagnostics(sortedRows, () =>
+    db.transaction(async (tx) => {
+      const now = new Date();
+      await tx
+        .insert(publicHolidaysTable)
+        .values(
+          sortedRows.map((row) => ({
+            id: row.id,
+            date: row.date,
+            holiday_name: row.holidayName,
+            hash: row.hash,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: publicHolidaysTable.id,
+          set: {
+            date: sql.raw(`excluded.${publicHolidaysTable.date.name}`),
+            holiday_name: sql.raw(
+              `excluded.${publicHolidaysTable.holiday_name.name}`,
+            ),
+            hash: sql.raw(`excluded.${publicHolidaysTable.hash.name}`),
+            updated_at: now,
+          },
+        });
 
-    await tx
-      .delete(publicHolidaysTable)
-      .where(
-        and(
-          gte(publicHolidaysTable.date, start),
-          lte(publicHolidaysTable.date, end),
-          notInArray(publicHolidaysTable.id, [...incomingIds]),
-        ),
-      );
-  });
+      await tx
+        .delete(publicHolidaysTable)
+        .where(
+          and(
+            gte(publicHolidaysTable.date, start),
+            lte(publicHolidaysTable.date, end),
+            notInArray(publicHolidaysTable.id, [...incomingIds]),
+          ),
+        );
+    }),
+  );
 
   return {
     fetched: sortedRows.length,
