@@ -191,7 +191,7 @@
   "status.ongoing_infra": "கட்டமைப்பு",
   "status.ongoing_maintenance": "பராமரிப்பு",
   "status.operational": "இயங்குகிறது",
-  "status.service_ended": "சேவை முடிந்தது",
+  "status.service_ended": "சேவை நேரத்திற்கு வெளியே",
   "operator.description": "{operatorName} சிங்கப்பூர் MRT வலையமைப்பில் {lineCount, plural, one {# வழித்தடம்} other {# வழித்தடங்கள்}} இயக்குகிறது, கடந்த {dateCount} நாட்களில் {issueTypeCountString} பதிவு செய்யப்பட்டுள்ளது.",
   "operator.founded": "{date} அன்று நிறுவப்பட்டது",
   "operator.website": "வலைத்தளத்தைப் பார்வையிடவும்",

@@ -191,7 +191,7 @@
   "status.ongoing_infra": "基础设施",
   "status.ongoing_maintenance": "维护",
   "status.operational": "正常运营",
-  "status.service_ended": "运营已结束",
+  "status.service_ended": "非运营时间",
   "operator.description": "{operatorName}在新加坡地铁网络中运营{lineCount, plural, one {# 条线路} other {# 条线路}}，在过去{dateCount}天内报告了{issueTypeCountString}。",
   "operator.founded": "成立于{date}",
   "operator.website": "访问网站",

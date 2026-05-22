@@ -207,5 +207,5 @@
   "status.ongoing_infra": "Infrastructure",
   "status.ongoing_maintenance": "Maintenance",
   "status.operational": "Operational",
-  "status.service_ended": "Service Ended"
+  "status.service_ended": "Outside Service Hours"
 }

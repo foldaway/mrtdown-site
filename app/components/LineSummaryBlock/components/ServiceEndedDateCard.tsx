@@ -50,52 +50,50 @@ export const ServiceEndedDateCardDetails: React.FC<
   const operatingHours = useOperatingHours(componentRef, dateTime, dayType);
 
   return (
-    <div className="grid gap-3 text-sm sm:grid-cols-3">
-      <div className="flex items-start gap-x-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/70">
-        <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-gray-600 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-700">
-          <CalendarDaysIcon className="size-4" />
-        </div>
-        <div className="min-w-0">
-          <p className="font-semibold text-gray-900 leading-tight dark:text-gray-100">
-            {isHydrated ? (
-              <FormattedDate
-                value={dateTime.toJSDate()}
-                year="numeric"
-                month="short"
-                day="numeric"
-                weekday="long"
+    <div className="flex flex-col text-sm">
+      <div className="grid gap-3 pb-3 sm:grid-cols-[minmax(0,_1.35fr)_minmax(0,_1fr)]">
+        <div className="flex items-start gap-x-3">
+          <CalendarDaysIcon className="mt-0.5 size-5 shrink-0 text-gray-500 dark:text-gray-400" />
+          <div className="min-w-0">
+            <p className="font-semibold text-gray-900 leading-tight dark:text-gray-100">
+              {isHydrated ? (
+                <FormattedDate
+                  value={dateTime.toJSDate()}
+                  year="numeric"
+                  month="short"
+                  day="numeric"
+                  weekday="long"
+                />
+              ) : (
+                dateTime.toISO()
+              )}
+            </p>
+            <p className="mt-1 text-gray-500 text-xs dark:text-gray-400">
+              <FormattedMessage
+                id="component.service_hours_title"
+                defaultMessage="Service hours ({type})"
+                values={{
+                  type: (
+                    <FormattedMessage
+                      {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]}
+                    />
+                  ),
+                }}
               />
-            ) : (
-              dateTime.toISO()
-            )}
-          </p>
-          <p className="mt-2 font-medium text-gray-500 text-xs uppercase dark:text-gray-400">
-            <FormattedMessage
-              id="component.service_hours_title"
-              defaultMessage="Service hours ({type})"
-              values={{
-                type: (
-                  <FormattedMessage
-                    {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]}
-                  />
-                ),
-              }}
-            />
-          </p>
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/70">
-        <div className="grid grid-cols-[auto_1fr] gap-x-3">
+        <div className="grid grid-cols-[auto_1fr] gap-x-3 sm:border-gray-200 sm:border-l sm:pl-4 dark:sm:border-gray-700">
           <ClockIcon className="mt-0.5 size-5 text-gray-500 dark:text-gray-400" />
-          <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <div className="min-w-0">
             <span className="font-medium text-gray-500 text-xs uppercase dark:text-gray-400">
               <FormattedMessage
                 id="component.service_hours"
                 defaultMessage="Service hours"
               />
             </span>
-            <span className="w-full font-semibold text-gray-900 dark:text-gray-100">
+            <p className="mt-1 font-semibold text-gray-900 dark:text-gray-100">
               <FormattedMessage
                 id="component.service_hours_description"
                 defaultMessage="{start, time, short} to {end, time, short}"
@@ -104,12 +102,12 @@ export const ServiceEndedDateCardDetails: React.FC<
                   end: operatingHours.end.toMillis(),
                 }}
               />
-            </span>
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/70">
+      <div className="border-gray-200 border-t pt-3 dark:border-gray-700">
         <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
           <FormattedMessage id="general.status" defaultMessage="Status" />
         </span>

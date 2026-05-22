@@ -191,7 +191,7 @@
   "status.ongoing_infra": "Infrastruktur",
   "status.ongoing_maintenance": "Penyelenggaraan",
   "status.operational": "Beroperasi",
-  "status.service_ended": "Perkhidmatan Tamat",
+  "status.service_ended": "Di Luar Waktu Perkhidmatan",
   "operator.description": "{operatorName} mengendalikan {lineCount, plural, one {# laluan} other {# laluan}} dalam rangkaian MRT Singapura, dengan {issueTypeCountString} dilaporkan dalam {dateCount} hari yang lalu.",
   "operator.founded": "Ditubuhkan {date}",
   "operator.website": "Lawati laman web",
