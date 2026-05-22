@@ -38,13 +38,21 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
 
   const loopColumns = useMemo(() => {
     if (selectedBranch == null) {
-      return { leftStationIds: [], rightStationIds: [] };
+      return { bottomStationId: null, leftStationIds: [], rightStationIds: [] };
     }
 
-    const midpoint = Math.ceil(selectedBranch.stationIds.length / 2);
+    const hasBottomStation = selectedBranch.stationIds.length % 2 === 1;
+    const sideCount = Math.floor(selectedBranch.stationIds.length / 2);
+    const rightStartIndex = hasBottomStation ? sideCount + 1 : sideCount;
+
     return {
-      leftStationIds: selectedBranch.stationIds.slice(0, midpoint),
-      rightStationIds: selectedBranch.stationIds.slice(midpoint).reverse(),
+      bottomStationId: hasBottomStation
+        ? selectedBranch.stationIds[sideCount]
+        : null,
+      leftStationIds: selectedBranch.stationIds.slice(0, sideCount),
+      rightStationIds: selectedBranch.stationIds
+        .slice(rightStartIndex)
+        .reverse(),
     };
   }, [selectedBranch]);
 
@@ -255,7 +263,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                 className={classNames(
                   'relative mt-4 overflow-hidden transition-all duration-300',
                   {
-                    'max-h-[60rem]': !isExpanded,
+                    'max-h-96 md:max-h-none': !isExpanded,
                     'max-h-none': isExpanded,
                   },
                 )}
@@ -313,26 +321,64 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                         </Fragment>
                       );
                     })}
-                    {loopColumns.rightStationIds.length > 0 && (
-                      <div className="col-start-2 col-end-5 h-8 px-[1.25rem]">
-                        <div
-                          className="h-full rounded-b-[2rem] border-r-4 border-b-4 border-l-4"
-                          style={{
-                            borderColor: line.color,
-                          }}
-                        />
+                    {(loopColumns.rightStationIds.length > 0 ||
+                      loopColumns.bottomStationId != null) && (
+                      <div
+                        className={classNames(
+                          'relative col-start-2 col-end-5',
+                          {
+                            'h-8': loopColumns.bottomStationId == null,
+                            'h-10': loopColumns.bottomStationId != null,
+                          },
+                        )}
+                      >
+                        <svg
+                          aria-hidden="true"
+                          className="absolute inset-y-0 right-[1.25rem] left-[1.25rem] overflow-visible"
+                          preserveAspectRatio="none"
+                          viewBox="0 0 100 40"
+                        >
+                          <path
+                            d="M 0 0 V 12 C 0 26 12 32 28 32 H 72 C 88 32 100 26 100 12 V 0"
+                            fill="none"
+                            stroke={line.color}
+                            strokeLinecap="butt"
+                            strokeLinejoin="round"
+                            strokeWidth="4"
+                            vectorEffect="non-scaling-stroke"
+                          />
+                          {loopColumns.bottomStationId != null && (
+                            <circle
+                              className="fill-white dark:fill-gray-900"
+                              cx="50"
+                              cy="32"
+                              r="6"
+                              stroke={line.color}
+                              strokeWidth="4"
+                              vectorEffect="non-scaling-stroke"
+                            />
+                          )}
+                        </svg>
+                      </div>
+                    )}
+                    {loopColumns.bottomStationId != null && (
+                      <div className="col-start-1 col-end-6 flex justify-center pt-1">
+                        {renderStationLabel(
+                          loopColumns.bottomStationId,
+                          'right',
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
                 {!isExpanded && (
-                  <div className="pointer-events-none absolute right-0 bottom-0 left-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent dark:from-gray-900/95 dark:via-gray-900/60 dark:to-transparent" />
+                  <div className="pointer-events-none absolute right-0 bottom-0 left-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent md:hidden dark:from-gray-900/95 dark:via-gray-900/60 dark:to-transparent" />
                 )}
               </div>
               <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="mt-2 flex items-center justify-center gap-2 rounded-md px-4 py-2 text-blue-600 text-sm hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                className="mt-2 flex items-center justify-center gap-2 rounded-md px-4 py-2 text-blue-600 text-sm hover:bg-blue-50 md:hidden dark:text-blue-400 dark:hover:bg-blue-900/20"
               >
                 {isExpanded ? (
                   <>
