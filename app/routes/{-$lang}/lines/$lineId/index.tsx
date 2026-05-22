@@ -17,6 +17,7 @@ import { getLineProfileFn } from '~/util/lines.functions';
 import { CountTrendCards } from './components/CountTrendCards';
 import { CurrentStatusCard } from './components/CurrentStatusCard';
 import { LineSchematicCard } from './components/LineSchematicCard';
+import { LineSystemMapCard } from './components/LineSystemMapCard';
 import { NextMaintenanceCard } from './components/NextMaintenanceCard';
 import { QuickFactsCard } from './components/QuickFactsCard';
 import { RecentIssuesSection } from './components/RecentIssuesSection';
@@ -303,6 +304,8 @@ function ComponentPage() {
         <LineSchematicCard line={line} branches={branches} />
 
         <QuickFactsCard line={line} branches={branches} />
+
+        <LineSystemMapCard line={line} branches={branches} />
 
         {lineProfile.lineSummary.status !== 'future_service' && (
           <UptimeRatioTrendCards
