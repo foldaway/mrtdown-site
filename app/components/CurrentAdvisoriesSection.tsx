@@ -105,7 +105,7 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
                 defaultMessage="Service Advisories"
               />
             </h2>
-            <div className="grid grid-cols-2 gap-2 text-gray-800 sm:grid-cols-[repeat(auto-fit,_minmax(14rem,_1fr))] sm:gap-3 dark:text-gray-200">
+            <div className="grid grid-cols-1 gap-2 text-gray-800 sm:grid-cols-[repeat(auto-fit,_minmax(14rem,_1fr))] sm:gap-3 dark:text-gray-200">
               {ISSUE_TYPES.map(({ type, message, Icon }) => {
                 const count = issueCountsByType[type] ?? 0;
                 const lineIds = issueLineIdsByType[type] ?? new Set();
