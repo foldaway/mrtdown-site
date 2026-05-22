@@ -308,14 +308,32 @@ export const StationMap: React.FC<Props> = (props) => {
 
     if (mode.type === 'focused-line') {
       const normalizedLineId = mode.lineId.toLowerCase();
-      const lineGroupElements = [
-        ...ref.querySelectorAll<SVGGElement>("g[id^='line_']"),
-      ].filter((element) => !element.id.includes(':'));
+      const focusedSegmentIds = new Set<string>();
+      const focusedComponentIds = new Set<string>();
 
-      for (const lineGroupElement of lineGroupElements) {
-        const lineGroupId = lineGroupElement.id.replace(/^line_/, '');
-        lineGroupElement.style.opacity =
-          lineGroupId === normalizedLineId ? '1' : '0.18';
+      for (const branch of mode.branches) {
+        for (let index = 0; index < branch.stationIds.length - 1; index++) {
+          const stationId = branch.stationIds[index].toLowerCase();
+          const nextStationId = branch.stationIds[index + 1].toLowerCase();
+          focusedSegmentIds.add(`line_${stationId}:${nextStationId}`);
+          focusedSegmentIds.add(`line_${nextStationId}:${stationId}`);
+        }
+      }
+
+      const lineSegmentElements = [
+        ...ref.querySelectorAll<SVGGElement>("g[id^='line_']"),
+      ].filter((element) => element.id.includes(':'));
+
+      for (const lineSegmentElement of lineSegmentElements) {
+        const isFocusedSegment = focusedSegmentIds.has(lineSegmentElement.id);
+        lineSegmentElement.style.opacity = isFocusedSegment ? '1' : '0.18';
+
+        if (isFocusedSegment) {
+          const parentElement = lineSegmentElement.parentElement;
+          if (parentElement?.id.startsWith('line_')) {
+            focusedComponentIds.add(parentElement.id.replace(/^line_/, ''));
+          }
+        }
       }
 
       const nodeElements = [
@@ -333,8 +351,12 @@ export const StationMap: React.FC<Props> = (props) => {
         for (const componentElement of nodeElement.querySelectorAll(
           ':scope > g',
         )) {
-          (componentElement as SVGGElement).style.opacity =
-            componentElement.id === normalizedLineId ? '1' : '0.25';
+          const isFocusedComponent =
+            componentElement.id === normalizedLineId ||
+            focusedComponentIds.has(componentElement.id);
+          (componentElement as SVGGElement).style.opacity = isFocusedComponent
+            ? '1'
+            : '0.25';
         }
       }
 

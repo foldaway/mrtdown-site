@@ -232,7 +232,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                 className={classNames(
                   'relative mt-4 overflow-hidden transition-all duration-300',
                   {
-                    'max-h-96': !isExpanded,
+                    'max-h-[60rem]': !isExpanded,
                     'max-h-none': isExpanded,
                   },
                 )}
