@@ -94,16 +94,24 @@ function useDateBreakdown(
 export const DateCard: React.FC<Props> = (props) => {
   const { line, dateTime, data } = props;
   const { segments } = useDateBreakdown(line, dateTime, data);
+  const intl = useIntl();
+  const isoDate = dateTime.toISODate();
+  const ariaLabel =
+    isoDate == null
+      ? undefined
+      : intl.formatMessage(
+          {
+            id: 'component.view_details_for_date',
+            defaultMessage: 'View details for {date}',
+          },
+          { date: isoDate },
+        );
 
   return (
     <button
       type="button"
       onClick={props.onActivate}
-      aria-label={
-        dateTime.toISODate() == null
-          ? undefined
-          : `View details for ${dateTime.toISODate()}`
-      }
+      aria-label={ariaLabel}
       aria-expanded={props.isActive}
       className={classNames(
         'group hover:-translate-y-0.5 flex h-9 min-w-0 cursor-pointer items-center justify-center rounded-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-light focus-visible:ring-offset-1 active:translate-y-0 active:scale-95 dark:focus-visible:ring-accent-dark',

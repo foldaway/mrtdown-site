@@ -1,7 +1,7 @@
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
 import type { DateTime } from 'luxon';
-import { FormattedDate, FormattedMessage } from 'react-intl';
+import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import type { Line, LineSummaryDayType } from '~/types';
 import { useHydrated } from '../../../hooks/useHydrated';
 import { DAY_TYPE_MESSAGE_DESCRIPTORS } from '../constants';
@@ -16,17 +16,25 @@ interface Props {
 }
 
 export const ServiceEndedDateCard: React.FC<Props> = (props) => {
-  const { isActive, onActivate } = props;
+  const { isActive, onActivate, dateTime } = props;
+  const intl = useIntl();
+  const isoDate = dateTime.toISODate();
+  const ariaLabel =
+    isoDate == null
+      ? undefined
+      : intl.formatMessage(
+          {
+            id: 'component.view_details_for_date',
+            defaultMessage: 'View details for {date}',
+          },
+          { date: isoDate },
+        );
 
   return (
     <button
       type="button"
       onClick={onActivate}
-      aria-label={
-        props.dateTime.toISODate() == null
-          ? undefined
-          : `View details for ${props.dateTime.toISODate()}`
-      }
+      aria-label={ariaLabel}
       aria-expanded={isActive}
       className={classNames(
         'group hover:-translate-y-0.5 flex h-9 min-w-0 cursor-pointer items-center justify-center rounded-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-light focus-visible:ring-offset-1 active:translate-y-0 active:scale-95 dark:focus-visible:ring-accent-dark',
