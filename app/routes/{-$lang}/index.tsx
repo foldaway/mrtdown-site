@@ -278,7 +278,7 @@ function HomePage() {
               <span className="font-medium text-gray-600 text-sm dark:text-gray-400">
                 <FormattedMessage
                   id="status.service_ended"
-                  defaultMessage="Service Ended"
+                  defaultMessage="Outside Service Hours"
                 />
                 {' / '}
                 <FormattedMessage

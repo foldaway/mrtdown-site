@@ -92,51 +92,44 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
     };
   }, []);
 
+  const activeIssueCount = issuesActiveNow.length + issuesActiveToday.length;
+
   return (
     <Collapsible.Root>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4 dark:border-gray-700 dark:bg-gray-800">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex-1 shrink space-y-4">
+          <div className="flex-1 shrink space-y-3">
             <h2 className="font-bold text-gray-900 text-lg sm:text-xl dark:text-gray-100">
               <FormattedMessage
                 id="site.landing.service_advisories"
                 defaultMessage="Service Advisories"
               />
             </h2>
-            <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-3 text-gray-800 dark:text-gray-200">
+            <div className="grid grid-cols-[repeat(auto-fit,_minmax(9.5rem,_1fr))] gap-2 text-gray-800 sm:gap-3 md:grid-cols-[repeat(auto-fit,_minmax(14rem,_1fr))] dark:text-gray-200">
               {ISSUE_TYPES.map(({ type, message, Icon }) => {
                 const count = issueCountsByType[type] ?? 0;
                 const lineIds = issueLineIdsByType[type] ?? new Set();
                 return count > 0 ? (
                   <div
                     key={type}
-                    className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 rounded-lg bg-gray-50 p-2.5 text-sm sm:p-3 dark:bg-gray-700/50"
+                    className="grid min-w-0 grid-cols-[auto_1fr] gap-x-2 gap-y-1 rounded-lg bg-gray-50 p-2.5 text-xs sm:p-3 sm:text-sm dark:bg-gray-700/50"
                   >
                     <div
                       className={classNames(
-                        'row-span-2 inline-flex size-6 shrink-0 items-center justify-center rounded-full shadow-sm sm:size-7',
+                        'row-span-2 inline-flex size-5 shrink-0 items-center justify-center rounded-full shadow-sm ring-1 sm:size-7',
                         {
-                          'bg-disruption-light/20 ring-1 ring-disruption-light/40 dark:bg-disruption-dark/30 dark:ring-disruption-dark/60':
+                          'bg-disruption-light/20 text-disruption-light ring-disruption-light/40 dark:bg-disruption-dark/30 dark:text-disruption-dark dark:ring-disruption-dark/60':
                             type === 'disruption',
-                          'bg-maintenance-light/20 ring-1 ring-maintenance-light/40 dark:bg-maintenance-dark/30 dark:ring-maintenance-dark/60':
+                          'bg-maintenance-light/20 text-maintenance-light ring-maintenance-light/40 dark:bg-maintenance-dark/30 dark:text-maintenance-dark dark:ring-maintenance-dark/60':
                             type === 'maintenance',
-                          'bg-infra-light/20 ring-1 ring-infra-light/40 dark:bg-infra-dark/30 dark:ring-infra-dark/60':
+                          'bg-infra-light/20 text-infra-light ring-infra-light/40 dark:bg-infra-dark/30 dark:text-infra-dark dark:ring-infra-dark/60':
                             type === 'infra',
                         },
                       )}
                     >
-                      <Icon
-                        className={classNames('size-4 sm:size-5', {
-                          'text-disruption-light dark:text-disruption-dark':
-                            type === 'disruption',
-                          'text-maintenance-light dark:text-maintenance-dark':
-                            type === 'maintenance',
-                          'text-infra-light dark:text-infra-dark':
-                            type === 'infra',
-                        })}
-                      />
+                      <Icon className="size-3.5 sm:size-5" />
                     </div>
-                    <div className="flex items-center whitespace-pre-wrap">
+                    <div className="flex min-w-0 items-center whitespace-pre-wrap leading-tight">
                       <FormattedMessage
                         {...message}
                         values={{
@@ -154,16 +147,11 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
                 ) : null;
               })}
               {lineOperationalCount > 0 && (
-                <div className="flex items-center gap-x-2 rounded-lg bg-gray-50 p-2.5 text-sm sm:p-3 dark:bg-gray-700/50">
-                  <div
-                    className={classNames(
-                      'inline-flex size-6 shrink-0 items-center justify-center rounded-full shadow-sm sm:size-7',
-                      'bg-operational-light/20 ring-1 ring-operational-light/40 dark:bg-operational-dark/30 dark:ring-operational-dark/60',
-                    )}
-                  >
-                    <CheckCircleIcon className="size-4 text-operational-light sm:size-5 dark:text-operational-dark" />
+                <div className="flex min-w-0 items-center gap-x-2 rounded-lg bg-gray-50 p-2.5 text-xs sm:p-3 sm:text-sm dark:bg-gray-700/50">
+                  <div className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-operational-light/20 text-operational-light shadow-sm ring-1 ring-operational-light/40 sm:size-7 dark:bg-operational-dark/30 dark:text-operational-dark dark:ring-operational-dark/60">
+                    <CheckCircleIcon className="size-3.5 sm:size-5" />
                   </div>
-                  <div className="flex items-center whitespace-pre-wrap">
+                  <div className="flex min-w-0 items-center whitespace-pre-wrap leading-tight">
                     <FormattedMessage
                       id="general.count_line_operational"
                       defaultMessage="<bold>{count}</bold> {count, plural, one {Line} other {Lines}} Operational"
@@ -182,58 +170,62 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
             </div>
           </div>
 
-          <div className="flex shrink-0 gap-2">
-            <Collapsible.Trigger className="group w-36 shrink-0 rounded-xl bg-accent-light px-4 py-2.5 font-medium text-sm text-white transition-all duration-200 hover:bg-accent-light/80 hover:shadow-md dark:bg-accent-dark dark:hover:bg-accent-dark/80">
-              <div className="flex items-center justify-between gap-x-2 group-data-[state=open]:hidden">
-                <FormattedMessage
-                  id="general.show_details"
-                  defaultMessage="Show details"
-                />
-                <ChevronDownIcon className="size-4" />
-              </div>
-              <div className="flex items-center justify-between group-data-[state=closed]:hidden">
+          {activeIssueCount > 0 && (
+            <div className="flex shrink-0 gap-2">
+              <Collapsible.Trigger className="group w-36 shrink-0 rounded-xl bg-accent-light px-4 py-2.5 font-medium text-sm text-white transition-all duration-200 hover:bg-accent-light/80 hover:shadow-md dark:bg-accent-dark dark:hover:bg-accent-dark/80">
+                <div className="flex items-center justify-between gap-x-2 group-data-[state=open]:hidden">
+                  <FormattedMessage
+                    id="general.show_details"
+                    defaultMessage="Show details"
+                  />
+                  <ChevronDownIcon className="size-4" />
+                </div>
+                <div className="flex items-center justify-between group-data-[state=closed]:hidden">
+                  <FormattedMessage
+                    id="general.hide_details"
+                    defaultMessage="Hide details"
+                  />
+                  <ChevronUpIcon className="size-4" />
+                </div>
+              </Collapsible.Trigger>
+            </div>
+          )}
+        </div>
+      </div>
+      {activeIssueCount > 0 && (
+        <Collapsible.Content asChild>
+          <div className="mt-4 flex flex-col space-y-3">
+            {issuesActiveNow.map((issue) => (
+              <IssueCard
+                key={issue.id}
+                issue={issue}
+                className="!w-auto"
+                context={ISSUE_CARD_CONTEXT_NOW}
+              />
+            ))}
+            {issuesActiveToday.map((issue) => (
+              <IssueCard
+                key={issue.id}
+                issue={issue}
+                className="!w-auto"
+                context={issueCardContextToday}
+              />
+            ))}
+            <Collapsible.Trigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-x-2 self-center rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:focus:ring-accent-dark dark:hover:bg-gray-700"
+              >
                 <FormattedMessage
                   id="general.hide_details"
                   defaultMessage="Hide details"
                 />
                 <ChevronUpIcon className="size-4" />
-              </div>
+              </button>
             </Collapsible.Trigger>
           </div>
-        </div>
-      </div>
-      <Collapsible.Content asChild>
-        <div className="mt-4 flex flex-col space-y-3">
-          {issuesActiveNow.map((issue) => (
-            <IssueCard
-              key={issue.id}
-              issue={issue}
-              className="!w-auto"
-              context={ISSUE_CARD_CONTEXT_NOW}
-            />
-          ))}
-          {issuesActiveToday.map((issue) => (
-            <IssueCard
-              key={issue.id}
-              issue={issue}
-              className="!w-auto"
-              context={issueCardContextToday}
-            />
-          ))}
-          <Collapsible.Trigger asChild>
-            <button
-              type="button"
-              className="inline-flex items-center gap-x-2 self-center rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:focus:ring-accent-dark dark:hover:bg-gray-700"
-            >
-              <FormattedMessage
-                id="general.hide_details"
-                defaultMessage="Hide details"
-              />
-              <ChevronUpIcon className="size-4" />
-            </button>
-          </Collapsible.Trigger>
-        </div>
-      </Collapsible.Content>
+        </Collapsible.Content>
+      )}
     </Collapsible.Root>
   );
 };

@@ -2,7 +2,7 @@ import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { type DateTime, Duration } from 'luxon';
-import { Fragment, useMemo } from 'react';
+import { Fragment, type PointerEvent, useMemo } from 'react';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import type {
   Issue,
@@ -30,7 +30,7 @@ interface Props {
   dateTime: DateTime;
   data: LineSummaryDateRecord;
   isActive: boolean;
-  onToggle: () => void;
+  onActivate: () => void;
 }
 
 function useDateBreakdown(
@@ -95,10 +95,19 @@ export const DateCard: React.FC<Props> = (props) => {
   const { line, dateTime, data } = props;
   const { segments } = useDateBreakdown(line, dateTime, data);
 
+  const activateOnHoverPointer = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+      props.onActivate();
+    }
+  };
+
   return (
     <button
       type="button"
-      onClick={props.onToggle}
+      onClick={props.onActivate}
+      onFocus={props.onActivate}
+      onMouseEnter={props.onActivate}
+      onPointerEnter={activateOnHoverPointer}
       aria-label={dateTime.toISODate() ?? undefined}
       aria-expanded={props.isActive}
       className={classNames(
@@ -132,9 +141,9 @@ export const DateCard: React.FC<Props> = (props) => {
   );
 };
 
-export const DateCardDetails: React.FC<Omit<Props, 'isActive' | 'onToggle'>> = (
-  props,
-) => {
+export const DateCardDetails: React.FC<
+  Omit<Props, 'isActive' | 'onActivate'>
+> = (props) => {
   const { line, dateTime, data, issues } = props;
   const { breakdownByIssueTypes, dayType } = data;
 
@@ -148,51 +157,49 @@ export const DateCardDetails: React.FC<Omit<Props, 'isActive' | 'onToggle'>> = (
 
   return (
     <div className="flex flex-col text-sm">
-      <div className="flex items-start gap-x-3 pb-3">
-        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-          <CalendarDaysIcon className="size-4" />
-        </div>
-        <div className="min-w-0">
-          <p className="font-semibold text-gray-900 leading-tight dark:text-gray-100">
-            {isHydrated ? (
-              <FormattedDate
-                value={dateTime.toJSDate()}
-                day="numeric"
-                month="long"
-                year="numeric"
-                weekday="long"
+      <div className="grid gap-3 pb-3 sm:grid-cols-[minmax(0,_1.35fr)_minmax(0,_1fr)]">
+        <div className="flex items-start gap-x-3">
+          <CalendarDaysIcon className="mt-0.5 size-5 shrink-0 text-gray-500 dark:text-gray-400" />
+          <div className="min-w-0">
+            <p className="font-semibold text-gray-900 leading-tight dark:text-gray-100">
+              {isHydrated ? (
+                <FormattedDate
+                  value={dateTime.toJSDate()}
+                  day="numeric"
+                  month="long"
+                  year="numeric"
+                  weekday="long"
+                />
+              ) : (
+                dateTime.toISO()
+              )}
+            </p>
+            <p className="mt-1 text-gray-500 text-xs dark:text-gray-400">
+              <FormattedMessage
+                id="component.service_hours_title"
+                defaultMessage="Service hours ({type})"
+                values={{
+                  type: (
+                    <FormattedMessage
+                      {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]}
+                    />
+                  ),
+                }}
               />
-            ) : (
-              dateTime.toISO()
-            )}
-          </p>
-          <p className="mt-1 text-gray-500 text-xs dark:text-gray-400">
-            <FormattedMessage
-              id="component.service_hours_title"
-              defaultMessage="Service hours ({type})"
-              values={{
-                type: (
-                  <FormattedMessage
-                    {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]}
-                  />
-                ),
-              }}
-            />
-          </p>
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="border-gray-200 border-t py-3 dark:border-gray-700">
-        <div className="grid grid-cols-[auto_1fr] gap-x-3">
-          <ClockIcon className="mt-0.5 size-4 text-gray-500 dark:text-gray-400" />
-          <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <span className="font-medium text-gray-700 dark:text-gray-200">
+        <div className="grid grid-cols-[auto_1fr] gap-x-3 sm:border-gray-200 sm:border-l sm:pl-4 dark:sm:border-gray-700">
+          <ClockIcon className="mt-0.5 size-5 text-gray-500 dark:text-gray-400" />
+          <div className="min-w-0">
+            <span className="font-medium text-gray-500 text-xs uppercase dark:text-gray-400">
               <FormattedMessage
                 id="component.service_hours"
                 defaultMessage="Service hours"
               />
             </span>
-            <span className="text-gray-600 dark:text-gray-300">
+            <p className="mt-1 font-semibold text-gray-900 dark:text-gray-100">
               <FormattedMessage
                 id="component.service_hours_description"
                 defaultMessage="{start, time, short} to {end, time, short}"
@@ -201,140 +208,155 @@ export const DateCardDetails: React.FC<Omit<Props, 'isActive' | 'onToggle'>> = (
                   end: operatingHours.end.toMillis(),
                 }}
               />
-            </span>
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="border-gray-200 border-t py-3 dark:border-gray-700">
-        <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
-          <FormattedMessage id="general.impact" defaultMessage="Impact" />
-        </span>
-        <div className="mt-2 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
-          {notInServiceDuration.as('seconds') > 0 && (
-            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 py-2">
-              <div className="size-2.5 rounded-full bg-gray-400 dark:bg-gray-600" />
-              <span className="font-medium text-gray-700 capitalize dark:text-gray-200">
-                <FormattedMessage
-                  id="status.service_ended"
-                  defaultMessage="Service Ended"
-                />
-              </span>
-              <span className="text-gray-600 dark:text-gray-300">
-                {isHydrated ? (
-                  <FormattedDuration
-                    duration={notInServiceDuration.rescale()}
+      <div className="grid gap-4 border-gray-200 border-t pt-3 lg:grid-cols-[minmax(0,_1fr)_minmax(16rem,_0.55fr)] dark:border-gray-700">
+        <section>
+          <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
+            <FormattedMessage id="general.impact" defaultMessage="Impact" />
+          </span>
+          <div className="mt-2 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
+            {notInServiceDuration.as('seconds') === 0 &&
+              Object.keys(breakdownByIssueTypes).length === 0 && (
+                <p className="py-2 text-gray-600 italic dark:text-gray-300">
+                  <FormattedMessage
+                    id="general.no_downtime_on_this_day"
+                    defaultMessage="No downtime recorded on this day."
                   />
-                ) : (
-                  notInServiceDuration.toISO()
-                )}
-              </span>
-            </div>
-          )}
-
-          {Object.entries(breakdownByIssueTypes).map(([key, entry]) => {
-            const issueType = key as Issue['type'];
-            return (
-              <div
-                key={issueType}
-                className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 py-2"
-              >
-                <div
-                  className={classNames('size-2.5 rounded-full', {
-                    'bg-disruption-light dark:bg-disruption-dark':
-                      issueType === 'disruption',
-                    'bg-maintenance-light dark:bg-maintenance-dark':
-                      issueType === 'maintenance',
-                    'bg-infra-light dark:bg-infra-dark': issueType === 'infra',
-                  })}
-                />
+                </p>
+              )}
+            {notInServiceDuration.as('seconds') > 0 && (
+              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 py-2">
+                <div className="size-2.5 rounded-full bg-gray-400 dark:bg-gray-600" />
                 <span className="font-medium text-gray-700 capitalize dark:text-gray-200">
-                  {issueType === 'disruption' && (
-                    <FormattedMessage
-                      id="general.disruption"
-                      defaultMessage="Disruption"
-                    />
-                  )}
-                  {issueType === 'maintenance' && (
-                    <FormattedMessage
-                      id="general.maintenance"
-                      defaultMessage="Maintenance"
-                    />
-                  )}
-                  {issueType === 'infra' && (
-                    <FormattedMessage
-                      id="general.infrastructure"
-                      defaultMessage="Infrastructure"
-                    />
-                  )}
+                  <FormattedMessage
+                    id="status.service_ended"
+                    defaultMessage="Outside Service Hours"
+                  />
                 </span>
                 <span className="text-gray-600 dark:text-gray-300">
                   {isHydrated ? (
                     <FormattedDuration
-                      duration={Duration.fromObject({
-                        seconds: entry.totalDurationSeconds,
-                      })
-                        .rescale()
-                        .set({ seconds: 0 })
-                        .rescale()}
+                      duration={notInServiceDuration.rescale()}
                     />
                   ) : (
-                    Duration.fromObject({
-                      seconds: entry.totalDurationSeconds,
-                    }).toISO()
+                    notInServiceDuration.toISO()
                   )}
                 </span>
               </div>
-            );
-          })}
-        </div>
-      </div>
+            )}
 
-      <div className="border-gray-200 border-t pt-3 dark:border-gray-700">
-        <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
-          <FormattedMessage id="general.related" defaultMessage="Related" />
-        </span>
-        {Object.keys(breakdownByIssueTypes).length === 0 && (
-          <p className="mt-1 text-gray-600 italic dark:text-gray-300">
-            <FormattedMessage
-              id="general.no_downtime_on_this_day"
-              defaultMessage="No downtime recorded on this day."
-            />
-          </p>
-        )}
-        <div className="mt-2 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
-          {Object.entries(breakdownByIssueTypes).map(([issueType, entry]) => (
-            <Fragment key={issueType}>
-              {entry.issueIds.map((issueId) => {
-                const issueRef = issues[issueId];
-                return (
-                  <Link
-                    key={issueRef.id}
-                    to={buildLocaleAwareLink(
-                      `/issues/${issueRef.id}`,
-                      intl.locale,
+            {Object.entries(breakdownByIssueTypes).map(([key, entry]) => {
+              const issueType = key as Issue['type'];
+              return (
+                <div
+                  key={issueType}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 py-2"
+                >
+                  <div
+                    className={classNames('size-2.5 rounded-full', {
+                      'bg-disruption-light dark:bg-disruption-dark':
+                        issueType === 'disruption',
+                      'bg-maintenance-light dark:bg-maintenance-dark':
+                        issueType === 'maintenance',
+                      'bg-infra-light dark:bg-infra-dark':
+                        issueType === 'infra',
+                    })}
+                  />
+                  <span className="font-medium text-gray-700 capitalize dark:text-gray-200">
+                    {issueType === 'disruption' && (
+                      <FormattedMessage
+                        id="general.disruption"
+                        defaultMessage="Disruption"
+                      />
                     )}
-                    className="flex items-center gap-x-2 py-2 text-gray-700 transition-colors hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-accent-light dark:text-gray-200 dark:focus:ring-accent-dark dark:hover:text-gray-100"
-                  >
-                    <div
-                      className={classNames('size-2.5 shrink-0 rounded-full', {
-                        'bg-disruption-light dark:bg-disruption-dark':
-                          issueType === 'disruption',
-                        'bg-maintenance-light dark:bg-maintenance-dark':
-                          issueType === 'maintenance',
-                        'bg-infra-light dark:bg-infra-dark':
-                          issueType === 'infra',
-                      })}
-                    />
-                    <span className="leading-tight">
-                      {getLocalizedTranslation(issueRef.title, intl.locale)}
-                    </span>
-                  </Link>
-                );
-              })}
-            </Fragment>
-          ))}
-        </div>
+                    {issueType === 'maintenance' && (
+                      <FormattedMessage
+                        id="general.maintenance"
+                        defaultMessage="Maintenance"
+                      />
+                    )}
+                    {issueType === 'infra' && (
+                      <FormattedMessage
+                        id="general.infrastructure"
+                        defaultMessage="Infrastructure"
+                      />
+                    )}
+                  </span>
+                  <span className="text-gray-600 dark:text-gray-300">
+                    {isHydrated ? (
+                      <FormattedDuration
+                        duration={Duration.fromObject({
+                          seconds: entry.totalDurationSeconds,
+                        })
+                          .rescale()
+                          .set({ seconds: 0 })
+                          .rescale()}
+                      />
+                    ) : (
+                      Duration.fromObject({
+                        seconds: entry.totalDurationSeconds,
+                      }).toISO()
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="border-gray-200 border-t pt-3 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-4 dark:border-gray-700">
+          <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
+            <FormattedMessage id="general.related" defaultMessage="Related" />
+          </span>
+          {Object.keys(breakdownByIssueTypes).length === 0 && (
+            <p className="mt-2 text-gray-600 italic dark:text-gray-300">
+              <FormattedMessage
+                id="general.no_related_issues"
+                defaultMessage="No related issues."
+              />
+            </p>
+          )}
+          <div className="mt-2 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
+            {Object.entries(breakdownByIssueTypes).map(([issueType, entry]) => (
+              <Fragment key={issueType}>
+                {entry.issueIds.map((issueId) => {
+                  const issueRef = issues[issueId];
+                  return (
+                    <Link
+                      key={issueRef.id}
+                      to={buildLocaleAwareLink(
+                        `/issues/${issueRef.id}`,
+                        intl.locale,
+                      )}
+                      className="flex items-center gap-x-2 py-2 text-gray-700 transition-colors hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-accent-light dark:text-gray-200 dark:focus:ring-accent-dark dark:hover:text-gray-100"
+                    >
+                      <div
+                        className={classNames(
+                          'size-2.5 shrink-0 rounded-full',
+                          {
+                            'bg-disruption-light dark:bg-disruption-dark':
+                              issueType === 'disruption',
+                            'bg-maintenance-light dark:bg-maintenance-dark':
+                              issueType === 'maintenance',
+                            'bg-infra-light dark:bg-infra-dark':
+                              issueType === 'infra',
+                          },
+                        )}
+                      />
+                      <span className="leading-tight">
+                        {getLocalizedTranslation(issueRef.title, intl.locale)}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );

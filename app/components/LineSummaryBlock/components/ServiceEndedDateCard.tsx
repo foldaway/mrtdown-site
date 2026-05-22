@@ -1,6 +1,7 @@
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
 import type { DateTime } from 'luxon';
+import type { PointerEvent } from 'react';
 import { FormattedDate, FormattedMessage } from 'react-intl';
 import type { Line, LineSummaryDayType } from '~/types';
 import { useHydrated } from '../../../hooks/useHydrated';
@@ -12,16 +13,25 @@ interface Props {
   dateTime: DateTime;
   dayType: LineSummaryDayType;
   isActive: boolean;
-  onToggle: () => void;
+  onActivate: () => void;
 }
 
 export const ServiceEndedDateCard: React.FC<Props> = (props) => {
-  const { isActive, onToggle } = props;
+  const { isActive, onActivate } = props;
+
+  const activateOnHoverPointer = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+      onActivate();
+    }
+  };
 
   return (
     <button
       type="button"
-      onClick={onToggle}
+      onClick={onActivate}
+      onFocus={onActivate}
+      onMouseEnter={onActivate}
+      onPointerEnter={activateOnHoverPointer}
       aria-label={props.dateTime.toISODate() ?? undefined}
       aria-expanded={isActive}
       className={classNames(
@@ -38,7 +48,7 @@ export const ServiceEndedDateCard: React.FC<Props> = (props) => {
 };
 
 export const ServiceEndedDateCardDetails: React.FC<
-  Omit<Props, 'isActive' | 'onToggle'>
+  Omit<Props, 'isActive' | 'onActivate'>
 > = (props) => {
   const { dateTime, dayType, componentRef } = props;
 
@@ -48,51 +58,49 @@ export const ServiceEndedDateCardDetails: React.FC<
 
   return (
     <div className="flex flex-col text-sm">
-      <div className="flex items-start gap-x-3 pb-3">
-        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-          <CalendarDaysIcon className="size-4" />
-        </div>
-        <div className="min-w-0">
-          <p className="font-semibold text-gray-900 leading-tight dark:text-gray-100">
-            {isHydrated ? (
-              <FormattedDate
-                value={dateTime.toJSDate()}
-                year="numeric"
-                month="short"
-                day="numeric"
-                weekday="long"
+      <div className="grid gap-3 pb-3 sm:grid-cols-[minmax(0,_1.35fr)_minmax(0,_1fr)]">
+        <div className="flex items-start gap-x-3">
+          <CalendarDaysIcon className="mt-0.5 size-5 shrink-0 text-gray-500 dark:text-gray-400" />
+          <div className="min-w-0">
+            <p className="font-semibold text-gray-900 leading-tight dark:text-gray-100">
+              {isHydrated ? (
+                <FormattedDate
+                  value={dateTime.toJSDate()}
+                  year="numeric"
+                  month="short"
+                  day="numeric"
+                  weekday="long"
+                />
+              ) : (
+                dateTime.toISO()
+              )}
+            </p>
+            <p className="mt-1 text-gray-500 text-xs dark:text-gray-400">
+              <FormattedMessage
+                id="component.service_hours_title"
+                defaultMessage="Service hours ({type})"
+                values={{
+                  type: (
+                    <FormattedMessage
+                      {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]}
+                    />
+                  ),
+                }}
               />
-            ) : (
-              dateTime.toISO()
-            )}
-          </p>
-          <p className="mt-1 text-gray-500 text-xs dark:text-gray-400">
-            <FormattedMessage
-              id="component.service_hours_title"
-              defaultMessage="Service hours ({type})"
-              values={{
-                type: (
-                  <FormattedMessage
-                    {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]}
-                  />
-                ),
-              }}
-            />
-          </p>
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="border-gray-200 border-t py-3 dark:border-gray-700">
-        <div className="grid grid-cols-[auto_1fr] gap-x-3">
-          <ClockIcon className="mt-0.5 size-4 text-gray-500 dark:text-gray-400" />
-          <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <span className="font-medium text-gray-700 dark:text-gray-200">
+        <div className="grid grid-cols-[auto_1fr] gap-x-3 sm:border-gray-200 sm:border-l sm:pl-4 dark:sm:border-gray-700">
+          <ClockIcon className="mt-0.5 size-5 text-gray-500 dark:text-gray-400" />
+          <div className="min-w-0">
+            <span className="font-medium text-gray-500 text-xs uppercase dark:text-gray-400">
               <FormattedMessage
                 id="component.service_hours"
                 defaultMessage="Service hours"
               />
             </span>
-            <span className="text-gray-600 dark:text-gray-300">
+            <p className="mt-1 font-semibold text-gray-900 dark:text-gray-100">
               <FormattedMessage
                 id="component.service_hours_description"
                 defaultMessage="{start, time, short} to {end, time, short}"
@@ -101,18 +109,21 @@ export const ServiceEndedDateCardDetails: React.FC<
                   end: operatingHours.end.toMillis(),
                 }}
               />
-            </span>
+            </p>
           </div>
         </div>
       </div>
 
       <div className="border-gray-200 border-t pt-3 dark:border-gray-700">
-        <span className="text-gray-700 dark:text-gray-200">
+        <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
+          <FormattedMessage id="general.status" defaultMessage="Status" />
+        </span>
+        <p className="mt-2 text-gray-700 dark:text-gray-200">
           <FormattedMessage
             id="general.service_not_started"
             defaultMessage="Service on this day has not started."
           />
-        </span>
+        </p>
       </div>
     </div>
   );

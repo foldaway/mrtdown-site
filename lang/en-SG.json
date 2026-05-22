@@ -84,6 +84,7 @@
   "general.no_issues_on_day": "No issues recorded on this day",
   "general.no_longest_disruptions": "No disruptions found",
   "general.no_recent_issues": "No recent issues reported",
+  "general.no_related_issues": "No related issues.",
   "general.no_scheduled_maintenance": "There is no scheduled maintenance for this line.",
   "general.no_upcoming_maintenance": "No upcoming maintenance",
   "general.ongoing": "Ongoing",
@@ -110,6 +111,7 @@
   "general.show_more_with_count": "Show {count, number} more",
   "general.show_remaining_count": "Show {count, number} more",
   "general.started": "Started",
+  "general.status": "Status",
   "general.station_code": "Station Code",
   "general.station_count": "{count, plural, one { {count} stations } other { {count} stations }}",
   "general.station_details": "Station Details",
@@ -207,5 +209,5 @@
   "status.ongoing_infra": "Infrastructure",
   "status.ongoing_maintenance": "Maintenance",
   "status.operational": "Operational",
-  "status.service_ended": "Service Ended"
+  "status.service_ended": "Outside Service Hours"
 }
