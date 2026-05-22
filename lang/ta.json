@@ -52,6 +52,7 @@
   "general.home": "முகப்பு",
   "general.home_page_description": "இப்போது MRT இயங்குகிறதா என்பதை பாருங்கள். திடீர் மாற்றங்கள், பராமரிப்பு அறிவிப்புகள் மற்றும் பயணிகளின் தகவல்களை mrtdown-ல் பெறுங்கள்.",
   "general.home_page_title": "MRT இயக்கத்தில் தாமதமா? சிங்கப்பூரின் ரயில்பாதை தடையமைப்பு நிலை",
+  "home.service_status_legend": "சேவை நிலை விளக்கம்",
   "general.infra_count": "{count, plural, one {{count} கட்டமைப்பு சிக்கல்} other {{count} கட்டமைப்பு சிக்கல்கள்}}",
   "general.infrastructure": "அடித்தளம்",
   "general.infrastructure_works": "<bold>{count}</bold> {count, plural, one {அடிப்படை வசதி பணி} other {அடிப்படை வசதி பணிகள்}}",

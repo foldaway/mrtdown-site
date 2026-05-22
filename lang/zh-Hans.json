@@ -52,6 +52,7 @@
   "general.home": "首页",
   "general.home_page_description": "查看MRT目前是否停运。获取最新更新、维护通知和来自通勤者的实时报告，尽在mrtdown。",
   "general.home_page_title": "MRT有故障吗？新加坡地铁服务中断状态",
+  "home.service_status_legend": "服务状态图例",
   "general.infra_count": "{count, plural, one {{count}项基础设施问题} other {{count}项基础设施问题}}",
   "general.infrastructure": "基础设施问题",
   "general.infrastructure_works": "<bold>{count}</bold> {count, plural, one {基础设施施工} other {基础设施施工}}",
