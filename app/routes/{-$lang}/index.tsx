@@ -1,5 +1,4 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
-import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { useEffect, useMemo } from 'react';
 import { createIntl, FormattedMessage } from 'react-intl';
@@ -13,6 +12,7 @@ import { getOverviewFn } from '~/util/overview.functions';
 import { CurrentAdvisoriesSection } from '../../components/CurrentAdvisoriesSection';
 import { countOperationalLineSummaries } from '../../components/CurrentAdvisoriesSection/helpers';
 import { assert } from '../../util/assert';
+import { HomeLineSummariesSkeleton } from './components/HomeLineSummariesSkeleton';
 import { sortLineSummariesWithFutureServiceLast } from './helpers/sortLineSummaries';
 
 const SearchParamsSchema = z.object({
@@ -327,99 +327,6 @@ function HomePagePending() {
   );
 }
 
-interface HomeLineSummariesSkeletonProps {
-  dateKeys?: string[];
-  lineIds: string[];
-}
-
-function HomeLineSummariesSkeleton(props: HomeLineSummariesSkeletonProps) {
-  const { dateKeys, lineIds } = props;
-  const skeletonLineIds =
-    lineIds.length > 0 ? lineIds : ['line-summary-skeleton'];
-  const dateBarCount = dateKeys?.length;
-
-  return (
-    <div
-      aria-busy="true"
-      className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
-    >
-      <span className="sr-only">Loading service status</span>
-      <div className="flex flex-col gap-y-4 px-2 py-2 sm:gap-y-6 sm:px-3 sm:py-4">
-        {skeletonLineIds.map((lineId) => (
-          <div
-            className="flex animate-pulse flex-col rounded-lg bg-gray-100 px-4 py-2 dark:bg-gray-800"
-            key={lineId}
-          >
-            <div className="mb-1.5 flex items-center">
-              <div className="h-5 w-12 rounded-sm bg-gray-300 dark:bg-gray-700" />
-              <div className="ms-1.5 h-4 w-36 rounded-sm bg-gray-300 dark:bg-gray-700" />
-              <div className="ms-auto h-4 w-20 rounded-sm bg-gray-300 dark:bg-gray-700" />
-            </div>
-
-            <div
-              className={classNames(
-                'grid items-center gap-x-1 sm:gap-x-0.5 lg:gap-x-px',
-                dateBarCount == null &&
-                  'grid-cols-30 sm:grid-cols-60 lg:grid-cols-90',
-              )}
-              style={
-                dateBarCount == null
-                  ? undefined
-                  : {
-                      gridTemplateColumns: `repeat(${dateBarCount}, minmax(0, 1fr))`,
-                    }
-              }
-            >
-              <HomeSkeletonDateBars dateKeys={dateKeys} />
-            </div>
-
-            <div className="mt-1.5 flex items-center justify-between gap-x-1">
-              <div className="h-3 w-20 rounded-sm bg-gray-300 dark:bg-gray-700" />
-              <div className="h-3 w-24 rounded-sm bg-gray-300 dark:bg-gray-700" />
-              <div className="h-3 w-14 rounded-sm bg-gray-300 dark:bg-gray-700" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-interface HomeSkeletonDateBarsProps {
-  dateKeys?: string[];
-}
-
-function HomeSkeletonDateBars(props: HomeSkeletonDateBarsProps) {
-  const { dateKeys } = props;
-
-  if (dateKeys != null) {
-    return dateKeys.map((dateKey) => <HomeSkeletonDateBar key={dateKey} />);
-  }
-
-  return PENDING_DATE_BAR_IDS.map((barId, index) => (
-    <HomeSkeletonDateBar
-      className={classNames({
-        'hidden sm:flex': index >= 30 && index < 60,
-        'hidden lg:flex': index >= 60,
-      })}
-      key={barId}
-    />
-  ));
-}
-
-function HomeSkeletonDateBar(props: { className?: string }) {
-  return (
-    <div
-      className={classNames(
-        'flex h-9 min-w-0 items-center justify-center rounded-sm',
-        props.className,
-      )}
-    >
-      <div className="h-7 w-full rounded-xs bg-gray-300 dark:bg-gray-700" />
-    </div>
-  );
-}
-
 const PENDING_LINE_IDS = ['skeleton-line-1', 'skeleton-line-2'];
 const PENDING_LEGEND_IDS = [
   'operational',
@@ -428,7 +335,3 @@ const PENDING_LEGEND_IDS = [
   'infrastructure',
   'closed',
 ];
-const PENDING_DATE_BAR_IDS = Array.from(
-  { length: 90 },
-  (_, index) => `date-bar-${index}`,
-);
