@@ -94,7 +94,7 @@
   "general.operator": "Operator",
   "general.operator_title": "{operatorName}",
   "general.planned": "Planned",
-  "general.planned_maintenance": "<bold>{count}</bold> Planned Maintenance {count, plural, one {} other {Activities}}",
+  "general.planned_maintenance": "<bold>{count}</bold> Maintenance {count, plural, one {Work} other {Works}}",
   "general.public_holiday": "Public Holiday",
   "general.quick_facts": "Quick Facts",
   "general.related": "Related",

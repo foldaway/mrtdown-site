@@ -90,7 +90,7 @@
   "general.planned": "计划中",
   "general.unknown": "未知",
   "general.future": "未来",
-  "general.planned_maintenance": "<bold>{count}</bold> {count, plural, one {计划维护} other {计划维护}}",
+  "general.planned_maintenance": "<bold>{count}</bold> {count, plural, one {维修工程} other {维修工程}}",
   "general.public_holiday": "公共假期",
   "general.quick_facts": "快速事实",
   "general.related": "相关",

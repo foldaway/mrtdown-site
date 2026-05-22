@@ -90,7 +90,7 @@
   "general.planned": "Dirancang",
   "general.unknown": "Tidak diketahui",
   "general.future": "Masa Hadapan",
-  "general.planned_maintenance": "<bold>{count}</bold> {count, plural, one {Penyelenggaraan Terancang} other {Aktiviti Penyelenggaraan Terancang}}",
+  "general.planned_maintenance": "<bold>{count}</bold> {count, plural, one {Kerja Penyelenggaraan} other {Kerja Penyelenggaraan}}",
   "general.public_holiday": "Cuti Umum",
   "general.quick_facts": "Fakta Pantas",
   "general.related": "Berkaitan",

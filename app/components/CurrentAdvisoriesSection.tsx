@@ -36,7 +36,7 @@ const ISSUE_TYPES = [
     message: defineMessage({
       id: 'general.planned_maintenance',
       defaultMessage:
-        '<bold>{count}</bold> Planned Maintenance {count, plural, one {} other {Activities}}',
+        '<bold>{count}</bold> Maintenance {count, plural, one {Work} other {Works}}',
     }),
     Icon: CogIcon,
   },

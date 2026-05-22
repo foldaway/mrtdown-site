@@ -90,7 +90,7 @@
   "general.planned": "திட்டமிடப்பட்ட",
   "general.unknown": "தெரியவில்லை",
   "general.future": "எதிர்காலம்",
-  "general.planned_maintenance": "<bold>{count}</bold> {count, plural, one {திட்டமிட்ட பராமரிப்பு} other {திட்டமிட்ட பராமரிப்பு நடவடிக்கைகள்}}",
+  "general.planned_maintenance": "<bold>{count}</bold> {count, plural, one {பராமரிப்பு பணி} other {பராமரிப்பு பணிகள்}}",
   "general.public_holiday": "பொது விடுமுறை",
   "general.quick_facts": "விரைவு உண்மைகள்",
   "general.related": "தொடர்புடையவை",
