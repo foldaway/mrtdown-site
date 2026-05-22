@@ -12,7 +12,7 @@ import { useViewport, ViewportSchema } from '~/hooks/useViewport';
 import { getOverviewFn } from '~/util/overview.functions';
 import { sortLineSummariesWithFutureServiceLast } from './helpers/sortLineSummaries';
 import { CurrentAdvisoriesSection } from '../../components/CurrentAdvisoriesSection';
-import { countOperationalLinesOutsideCurrentAdvisories } from '../../components/CurrentAdvisoriesSection/helpers';
+import { countOperationalLineSummaries } from '../../components/CurrentAdvisoriesSection/helpers';
 import { assert } from '../../util/assert';
 
 const SearchParamsSchema = z.object({
@@ -178,12 +178,10 @@ function HomePage() {
   }, [overview.issueIdsActiveToday, issues]);
 
   const lineOperationalCount = useMemo(() => {
-    return countOperationalLinesOutsideCurrentAdvisories({
-      issuesActiveNow,
-      issuesActiveToday,
+    return countOperationalLineSummaries({
       lineSummaries: overview.lineSummaries,
     });
-  }, [issuesActiveNow, issuesActiveToday, overview.lineSummaries]);
+  }, [overview.lineSummaries]);
 
   const sortedLineSummaries = useMemo(() => {
     return sortLineSummariesWithFutureServiceLast(overview.lineSummaries);
