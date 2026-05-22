@@ -248,7 +248,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
         <div className="flex flex-col">
           <div
             className={classNames(
-              'relative mt-4 overflow-hidden transition-all duration-300',
+              'relative mt-4 overflow-hidden transition-all duration-300 md:overflow-visible',
               {
                 'max-h-96 md:max-h-none': !isExpanded,
                 'max-h-none': isExpanded,
