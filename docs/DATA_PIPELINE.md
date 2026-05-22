@@ -18,7 +18,9 @@ The overhaul introduces a local read model for canonical mrtdown data.
 `app/workflows/publicHolidays/index.ts` syncs Singapore public holidays from the
 data.gov.sg consolidated public holidays dataset into `public_holidays`.
 Holiday changes rebuild operational facts for affected dates so line service
-windows use weekend timings on public holidays.
+windows use weekend timings on public holidays. Scheduled runs are deduplicated
+to one sync per week; use `/internal/api/tasks/public-holidays` for an immediate
+manual refresh after an out-of-cycle update.
 
 ## Staging Tables
 
