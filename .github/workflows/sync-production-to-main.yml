@@ -7,35 +7,22 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pull-requests: write
+  contents: write
 
 jobs:
-  open-sync-pr:
-    name: Open production → main sync PR
+  sync-main:
+    name: Sync production to main
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/production'
     steps:
-      - name: Create pull request from production to main
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Checkout production
+        uses: actions/checkout@v6
+        with:
+          ref: production
+          fetch-depth: 0
+
+      - name: Push production to main
         run: |
           set -euo pipefail
 
-          existing_pr_count="$(gh pr list \
-            --base main \
-            --head production \
-            --state open \
-            --json number \
-            --jq 'length')"
-
-          if [ "$existing_pr_count" -gt 0 ]; then
-            echo "Open production -> main PR already exists; skipping creation."
-            exit 0
-          fi
-
-          gh pr create \
-            --base main \
-            --head production \
-            --title "chore: sync production into main" \
-            --body "Automated sync PR to bring \`main\` (staging) up to date with \`production\`."
+          git push origin HEAD:main
