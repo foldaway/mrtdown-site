@@ -52,6 +52,11 @@ import {
   issueContributesToLineStatus,
 } from '~/util/issueOperationalEffects';
 import { sortServiceRevisionsByRecency } from '~/util/serviceRevisions';
+import {
+  recordServerTiming,
+  timeServerSpan,
+  timeSyncServerSpan,
+} from '~/util/serverTiming';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 
@@ -684,7 +689,8 @@ async function buildDataset(
   db?: AppDb,
   issueIds?: readonly string[],
 ): Promise<BaseDataset> {
-  const database = db ?? (await getDefaultDb());
+  const database =
+    db ?? (await timeServerSpan('db_connect', () => getDefaultDb()));
   const selectedIssueIds =
     issueIds == null ? undefined : [...new Set(issueIds)];
 
@@ -704,62 +710,64 @@ async function buildDataset(
     issueRows,
     latestEvidenceRows,
     impactEventRows,
-  ] = await Promise.all([
-    database.select().from(metadataTable),
-    database.select().from(linesTable),
-    database.select().from(lineOperatorsTable),
-    database.select().from(operatorsTable),
-    database.select().from(townsTable),
-    database.select().from(landmarksTable),
-    database
-      .select({
-        id: stationsTable.id,
-        name: stationsTable.name,
-        townId: stationsTable.townId,
-        latitude: sql<number>`ST_Y(${stationsTable.geo})`,
-        longitude: sql<number>`ST_X(${stationsTable.geo})`,
-      })
-      .from(stationsTable),
-    database.select().from(stationCodesTable),
-    database.select().from(stationLandmarksTable),
-    database.select().from(servicesTable),
-    database.select().from(serviceRevisionsTable),
-    database.select().from(publicHolidaysTable),
-    selectedIssueIds == null
-      ? database.select().from(issuesTable)
-      : selectedIssueIds.length > 0
-        ? database
-            .select()
-            .from(issuesTable)
-            .where(inArray(issuesTable.id, selectedIssueIds))
-        : [],
-    selectedIssueIds == null
-      ? database
-          .select({
-            issue_id: evidencesTable.issue_id,
-            latest_ts: sql<string>`max(${evidencesTable.ts})`,
-          })
-          .from(evidencesTable)
-          .groupBy(evidencesTable.issue_id)
-      : selectedIssueIds.length > 0
+  ] = await timeServerSpan('dataset_base_queries', () =>
+    Promise.all([
+      database.select().from(metadataTable),
+      database.select().from(linesTable),
+      database.select().from(lineOperatorsTable),
+      database.select().from(operatorsTable),
+      database.select().from(townsTable),
+      database.select().from(landmarksTable),
+      database
+        .select({
+          id: stationsTable.id,
+          name: stationsTable.name,
+          townId: stationsTable.townId,
+          latitude: sql<number>`ST_Y(${stationsTable.geo})`,
+          longitude: sql<number>`ST_X(${stationsTable.geo})`,
+        })
+        .from(stationsTable),
+      database.select().from(stationCodesTable),
+      database.select().from(stationLandmarksTable),
+      database.select().from(servicesTable),
+      database.select().from(serviceRevisionsTable),
+      database.select().from(publicHolidaysTable),
+      selectedIssueIds == null
+        ? database.select().from(issuesTable)
+        : selectedIssueIds.length > 0
+          ? database
+              .select()
+              .from(issuesTable)
+              .where(inArray(issuesTable.id, selectedIssueIds))
+          : [],
+      selectedIssueIds == null
         ? database
             .select({
               issue_id: evidencesTable.issue_id,
               latest_ts: sql<string>`max(${evidencesTable.ts})`,
             })
             .from(evidencesTable)
-            .where(inArray(evidencesTable.issue_id, selectedIssueIds))
             .groupBy(evidencesTable.issue_id)
-        : [],
-    selectedIssueIds == null
-      ? database.select().from(impactEventsTable)
-      : selectedIssueIds.length > 0
-        ? database
-            .select()
-            .from(impactEventsTable)
-            .where(inArray(impactEventsTable.issue_id, selectedIssueIds))
-        : [],
-  ]);
+        : selectedIssueIds.length > 0
+          ? database
+              .select({
+                issue_id: evidencesTable.issue_id,
+                latest_ts: sql<string>`max(${evidencesTable.ts})`,
+              })
+              .from(evidencesTable)
+              .where(inArray(evidencesTable.issue_id, selectedIssueIds))
+              .groupBy(evidencesTable.issue_id)
+          : [],
+      selectedIssueIds == null
+        ? database.select().from(impactEventsTable)
+        : selectedIssueIds.length > 0
+          ? database
+              .select()
+              .from(impactEventsTable)
+              .where(inArray(impactEventsTable.issue_id, selectedIssueIds))
+          : [],
+    ]),
+  );
 
   const latestEventByTypeByIssueId = impactEventRows.reduce<
     Record<
@@ -818,74 +826,76 @@ async function buildDataset(
     impactEventCauseRows,
     impactEventServiceEffectRows,
     impactEventFacilityEffectRows,
-  ] = await Promise.all([
-    periodImpactEventIds.length > 0
-      ? database
-          .select()
-          .from(impactEventPeriodsTable)
-          .where(
-            inArray(
-              impactEventPeriodsTable.impact_event_id,
-              periodImpactEventIds,
-            ),
-          )
-      : ([] as (typeof impactEventPeriodsTable.$inferSelect)[]),
-    selectedStateEventIds.length > 0
-      ? database
-          .select()
-          .from(impactEventEntityServicesTable)
-          .where(
-            inArray(
-              impactEventEntityServicesTable.impact_event_id,
-              selectedStateEventIds,
-            ),
-          )
-      : ([] as (typeof impactEventEntityServicesTable.$inferSelect)[]),
-    selectedStateEventIds.length > 0
-      ? database
-          .select()
-          .from(impactEventEntityFacilitiesTable)
-          .where(
-            inArray(
-              impactEventEntityFacilitiesTable.impact_event_id,
-              selectedStateEventIds,
-            ),
-          )
-      : ([] as (typeof impactEventEntityFacilitiesTable.$inferSelect)[]),
-    selectedStateEventIds.length > 0
-      ? database
-          .select()
-          .from(impactEventCausesTable)
-          .where(
-            inArray(
-              impactEventCausesTable.impact_event_id,
-              selectedStateEventIds,
-            ),
-          )
-      : ([] as (typeof impactEventCausesTable.$inferSelect)[]),
-    selectedStateEventIds.length > 0
-      ? database
-          .select()
-          .from(impactEventServiceEffectsTable)
-          .where(
-            inArray(
-              impactEventServiceEffectsTable.impact_event_id,
-              selectedStateEventIds,
-            ),
-          )
-      : ([] as (typeof impactEventServiceEffectsTable.$inferSelect)[]),
-    selectedStateEventIds.length > 0
-      ? database
-          .select()
-          .from(impactEventFacilityEffectsTable)
-          .where(
-            inArray(
-              impactEventFacilityEffectsTable.impact_event_id,
-              selectedStateEventIds,
-            ),
-          )
-      : ([] as (typeof impactEventFacilityEffectsTable.$inferSelect)[]),
-  ]);
+  ] = await timeServerSpan('dataset_issue_detail_queries', () =>
+    Promise.all([
+      periodImpactEventIds.length > 0
+        ? database
+            .select()
+            .from(impactEventPeriodsTable)
+            .where(
+              inArray(
+                impactEventPeriodsTable.impact_event_id,
+                periodImpactEventIds,
+              ),
+            )
+        : ([] as (typeof impactEventPeriodsTable.$inferSelect)[]),
+      selectedStateEventIds.length > 0
+        ? database
+            .select()
+            .from(impactEventEntityServicesTable)
+            .where(
+              inArray(
+                impactEventEntityServicesTable.impact_event_id,
+                selectedStateEventIds,
+              ),
+            )
+        : ([] as (typeof impactEventEntityServicesTable.$inferSelect)[]),
+      selectedStateEventIds.length > 0
+        ? database
+            .select()
+            .from(impactEventEntityFacilitiesTable)
+            .where(
+              inArray(
+                impactEventEntityFacilitiesTable.impact_event_id,
+                selectedStateEventIds,
+              ),
+            )
+        : ([] as (typeof impactEventEntityFacilitiesTable.$inferSelect)[]),
+      selectedStateEventIds.length > 0
+        ? database
+            .select()
+            .from(impactEventCausesTable)
+            .where(
+              inArray(
+                impactEventCausesTable.impact_event_id,
+                selectedStateEventIds,
+              ),
+            )
+        : ([] as (typeof impactEventCausesTable.$inferSelect)[]),
+      selectedStateEventIds.length > 0
+        ? database
+            .select()
+            .from(impactEventServiceEffectsTable)
+            .where(
+              inArray(
+                impactEventServiceEffectsTable.impact_event_id,
+                selectedStateEventIds,
+              ),
+            )
+        : ([] as (typeof impactEventServiceEffectsTable.$inferSelect)[]),
+      selectedStateEventIds.length > 0
+        ? database
+            .select()
+            .from(impactEventFacilityEffectsTable)
+            .where(
+              inArray(
+                impactEventFacilityEffectsTable.impact_event_id,
+                selectedStateEventIds,
+              ),
+            )
+        : ([] as (typeof impactEventFacilityEffectsTable.$inferSelect)[]),
+    ]),
+  );
 
   const metadata = Object.fromEntries(
     metadataRows.map((row) => [row.key, row.value]),
@@ -998,18 +1008,22 @@ async function buildDataset(
   const allRevisionIds = [
     ...new Set(serviceRevisionRows.map((revision) => revision.id)),
   ];
-  const servicePathRows =
-    allRevisionIds.length > 0
-      ? await database
-          .select()
-          .from(serviceRevisionPathStationEntriesTable)
-          .where(
-            inArray(
-              serviceRevisionPathStationEntriesTable.service_revision_id,
-              allRevisionIds,
-            ),
-          )
-      : [];
+  const servicePathRows = await timeServerSpan(
+    'dataset_service_path_query',
+    () =>
+      allRevisionIds.length > 0
+        ? database
+            .select()
+            .from(serviceRevisionPathStationEntriesTable)
+            .where(
+              inArray(
+                serviceRevisionPathStationEntriesTable.service_revision_id,
+                allRevisionIds,
+              ),
+            )
+        : Promise.resolve([]),
+  );
+  const assemblyStartedAt = performance.now();
 
   const pathEntriesByRevisionKey = servicePathRows.reduce<
     Record<string, typeof servicePathRows>
@@ -1467,6 +1481,7 @@ async function buildDataset(
   }
 
   const issuesByLineId = buildIssuesByLineId(Object.values(allIssues));
+  recordServerTiming('dataset_assembly', performance.now() - assemblyStartedAt);
 
   return {
     included: {
@@ -1489,15 +1504,18 @@ async function buildBaseDataset(
   referenceNow = nowSg(),
   db?: AppDb,
 ): Promise<BaseDataset> {
-  return buildDataset(referenceNow, db);
+  return timeServerSpan('build_dataset', () => buildDataset(referenceNow, db));
 }
 
 async function getBaseDataset() {
   const now = Date.now();
   if (cachedBaseDataset != null && cachedBaseDataset.expiresAt > now) {
+    recordServerTiming('base_dataset', 0, 'cache=hit');
     return cachedBaseDataset.value;
   }
 
+  const startedAt = performance.now();
+  const cacheState = pendingBaseDataset == null ? 'miss' : 'pending';
   pendingBaseDataset ??= buildBaseDataset()
     .then((dataset) => {
       cachedBaseDataset = {
@@ -1510,7 +1528,15 @@ async function getBaseDataset() {
       pendingBaseDataset = undefined;
     });
 
-  return pendingBaseDataset;
+  try {
+    return await pendingBaseDataset;
+  } finally {
+    recordServerTiming(
+      'base_dataset',
+      performance.now() - startedAt,
+      `cache=${cacheState}`,
+    );
+  }
 }
 
 async function getIncludedForIssueIds(issueIds: readonly string[]) {
@@ -2378,21 +2404,23 @@ function isUndefinedTableError(error: unknown) {
 async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
   const db = await getDefaultDb();
   try {
-    return await db
-      .select({
-        date: issueDayFactsTable.date,
-        issue_id: issueDayFactsTable.issue_id,
-        issue_type: issueDayFactsTable.issue_type,
-        active_anytime: issueDayFactsTable.active_anytime,
-        duration_seconds: issueDayFactsTable.duration_seconds,
-      })
-      .from(issueDayFactsTable)
-      .where(
-        and(
-          gte(issueDayFactsTable.date, isoDate(start)),
-          lte(issueDayFactsTable.date, isoDate(end)),
+    return await timeServerSpan('fact_issue_day_query', () =>
+      db
+        .select({
+          date: issueDayFactsTable.date,
+          issue_id: issueDayFactsTable.issue_id,
+          issue_type: issueDayFactsTable.issue_type,
+          active_anytime: issueDayFactsTable.active_anytime,
+          duration_seconds: issueDayFactsTable.duration_seconds,
+        })
+        .from(issueDayFactsTable)
+        .where(
+          and(
+            gte(issueDayFactsTable.date, isoDate(start)),
+            lte(issueDayFactsTable.date, isoDate(end)),
+          ),
         ),
-      );
+    );
   } catch (error) {
     if (isUndefinedTableError(error)) {
       return [];
@@ -2407,18 +2435,20 @@ async function getOperationalFactCoverageDatesInRange(
 ) {
   const db = await getDefaultDb();
   try {
-    return await db
-      .select({
-        date: lineDayFactsTable.date,
-      })
-      .from(lineDayFactsTable)
-      .where(
-        and(
-          gte(lineDayFactsTable.date, isoDate(start)),
-          lte(lineDayFactsTable.date, isoDate(end)),
-        ),
-      )
-      .groupBy(lineDayFactsTable.date);
+    return await timeServerSpan('fact_coverage_query', () =>
+      db
+        .select({
+          date: lineDayFactsTable.date,
+        })
+        .from(lineDayFactsTable)
+        .where(
+          and(
+            gte(lineDayFactsTable.date, isoDate(start)),
+            lte(lineDayFactsTable.date, isoDate(end)),
+          ),
+        )
+        .groupBy(lineDayFactsTable.date),
+    );
   } catch (error) {
     if (isUndefinedTableError(error)) {
       return [];
@@ -2430,11 +2460,13 @@ async function getOperationalFactCoverageDatesInRange(
 async function getOperationalFactCoverageStartDate() {
   const db = await getDefaultDb();
   try {
-    const [row] = await db
-      .select({
-        startDate: sql<string | null>`min(${lineDayFactsTable.date})`,
-      })
-      .from(lineDayFactsTable);
+    const [row] = await timeServerSpan('fact_coverage_start_query', () =>
+      db
+        .select({
+          startDate: sql<string | null>`min(${lineDayFactsTable.date})`,
+        })
+        .from(lineDayFactsTable),
+    );
     return row?.startDate ?? null;
   } catch (error) {
     if (isUndefinedTableError(error)) {
@@ -2800,75 +2832,94 @@ export async function rebuildOperationalFactsRange(
 }
 
 export async function getRootData() {
-  const db = await getDefaultDb();
-  const [lineRows, metadataRows, operatorRows] = await Promise.all([
-    db
-      .select({
-        id: linesTable.id,
-        name: linesTable.name,
-        color: linesTable.color,
-      })
-      .from(linesTable)
-      .orderBy(asc(linesTable.id)),
-    db.select().from(metadataTable).orderBy(asc(metadataTable.key)),
-    db
-      .select({
-        id: operatorsTable.id,
-        name: operatorsTable.name,
-      })
-      .from(operatorsTable)
-      .orderBy(asc(operatorsTable.id)),
-  ]);
+  return timeServerSpan('root_data', async () => {
+    const db = await getDefaultDb();
+    const [lineRows, metadataRows, operatorRows] = await timeServerSpan(
+      'root_nav_queries',
+      () =>
+        Promise.all([
+          db
+            .select({
+              id: linesTable.id,
+              name: linesTable.name,
+              color: linesTable.color,
+            })
+            .from(linesTable)
+            .orderBy(asc(linesTable.id)),
+          db.select().from(metadataTable).orderBy(asc(metadataTable.key)),
+          db
+            .select({
+              id: operatorsTable.id,
+              name: operatorsTable.name,
+            })
+            .from(operatorsTable)
+            .orderBy(asc(operatorsTable.id)),
+        ]),
+    );
 
-  return {
-    lineNavItems: lineRows,
-    metadata: metadataRows,
-    operatorNavItems: operatorRows,
-  };
+    return {
+      lineNavItems: lineRows,
+      metadata: metadataRows,
+      operatorNavItems: operatorRows,
+    };
+  });
 }
 
 export async function getOverviewData(days: number) {
-  const dataset = await getBaseDataset();
-  const issues = Object.values(dataset.allIssues);
-  const lineSummaries = rankLineSummaries(
-    Object.values(dataset.included.lines).map((line) => {
-      const lineIssues = dataset.issuesByLineId[line.id] ?? [];
-      return buildLineSummary(line, lineIssues, days, dataset.publicHolidaySet);
-    }),
-  );
+  return timeServerSpan('overview_data', async () => {
+    const dataset = await getBaseDataset();
+    const issues = Object.values(dataset.allIssues);
+    const lineSummaries = timeSyncServerSpan('overview_line_summaries', () =>
+      rankLineSummaries(
+        Object.values(dataset.included.lines).map((line) => {
+          const lineIssues = dataset.issuesByLineId[line.id] ?? [];
+          return buildLineSummary(
+            line,
+            lineIssues,
+            days,
+            dataset.publicHolidaySet,
+          );
+        }),
+      ),
+    );
 
-  const overview = {
-    issueIdsActiveNow: issues
-      .filter((issue) => issue.type === 'disruption' && issueActiveNow(issue))
-      .map((issue) => issue.id),
-    issueIdsActiveToday: issues
-      .filter(
-        (issue) =>
-          (issue.type === 'maintenance' || issue.type === 'infra') &&
-          issueActiveToday(issue),
-      )
-      .map((issue) => issue.id),
-    lineSummaries,
-  };
+    const overview = {
+      issueIdsActiveNow: issues
+        .filter((issue) => issue.type === 'disruption' && issueActiveNow(issue))
+        .map((issue) => issue.id),
+      issueIdsActiveToday: issues
+        .filter(
+          (issue) =>
+            (issue.type === 'maintenance' || issue.type === 'infra') &&
+            issueActiveToday(issue),
+        )
+        .map((issue) => issue.id),
+      lineSummaries,
+    };
 
-  const overviewIssueIds = [
-    ...new Set([
-      ...overview.issueIdsActiveNow,
-      ...overview.issueIdsActiveToday,
-      ...overview.lineSummaries.flatMap((summary) =>
-        Object.values(summary.breakdownByDates).flatMap((entry) =>
-          Object.values(entry.breakdownByIssueTypes).flatMap(
-            (breakdown) => breakdown.issueIds,
+    const overviewIssueIds = [
+      ...new Set([
+        ...overview.issueIdsActiveNow,
+        ...overview.issueIdsActiveToday,
+        ...overview.lineSummaries.flatMap((summary) =>
+          Object.values(summary.breakdownByDates).flatMap((entry) =>
+            Object.values(entry.breakdownByIssueTypes).flatMap(
+              (breakdown) => breakdown.issueIds,
+            ),
           ),
         ),
-      ),
-    ]),
-  ];
+      ]),
+    ];
 
-  return {
-    data: overview,
-    included: withIssues(dataset.included, dataset.allIssues, overviewIssueIds),
-  };
+    return {
+      data: overview,
+      included: withIssues(
+        dataset.included,
+        dataset.allIssues,
+        overviewIssueIds,
+      ),
+    };
+  });
 }
 
 export async function getLineProfileData(lineId: string, days: number) {
@@ -3439,147 +3490,184 @@ export async function getHistoryDayData(
 }
 
 export async function getStatisticsData() {
-  const dataset = await getBaseDataset();
-  const issues = Object.values(dataset.allIssues);
-  const rollingYearEnd = nowSg().startOf('day');
-  const rollingYearStart = rollingYearEnd.minus({ days: 364 });
-  const statisticsFactStart = getStatisticsFactStart(rollingYearEnd);
-  const issueFactRows = await getIssueDayFactsInRange(
-    statisticsFactStart,
-    rollingYearEnd,
-  );
-  const rollingYearFactCoverageRows =
-    await getOperationalFactCoverageDatesInRange(
-      rollingYearStart,
-      rollingYearEnd,
-    );
-  const statisticsFactCoverageRows =
-    await getOperationalFactCoverageDatesInRange(
+  return timeServerSpan('statistics_data', async () => {
+    const dataset = await getBaseDataset();
+    const issues = Object.values(dataset.allIssues);
+    const rollingYearEnd = nowSg().startOf('day');
+    const rollingYearStart = rollingYearEnd.minus({ days: 364 });
+    const statisticsFactStart = getStatisticsFactStart(rollingYearEnd);
+    const issueFactRows = await getIssueDayFactsInRange(
       statisticsFactStart,
       rollingYearEnd,
     );
-  const hasRollingYearIssueFactCoverage = hasFullDateCoverage(
-    rollingYearFactCoverageRows,
-    rollingYearStart,
-    rollingYearEnd,
-  );
-  const hasStatisticsIssueFactCoverage = hasFullDateCoverage(
-    statisticsFactCoverageRows,
-    statisticsFactStart,
-    rollingYearEnd,
-  );
-  const lineCountsById: Record<string, IssueTypeBreakdown> = {};
-  const stationCountsById: Record<string, IssueTypeBreakdown> = {};
-
-  for (const issue of issues) {
-    for (const lineId of new Set(issue.lineIds)) {
-      lineCountsById[lineId] ??= createIssueTypeBreakdown();
-      const counts = lineCountsById[lineId];
-      addIssueTypeCount(counts, issue.type, 1);
-      counts.totalIssues += 1;
-    }
-
-    const stationIds = new Set(
-      issue.branchesAffected.flatMap((branch) => branch.stationIds),
-    );
-    for (const stationId of stationIds) {
-      stationCountsById[stationId] ??= createIssueTypeBreakdown();
-      const counts = stationCountsById[stationId];
-      addIssueTypeCount(counts, issue.type, 1);
-      counts.totalIssues += 1;
-    }
-  }
-
-  const longestDisruptions = [...issues]
-    .filter((issue) => issue.type === 'disruption')
-    .sort((a, b) => b.durationSeconds - a.durationSeconds)
-    .slice(0, 10)
-    .map((issue) => issue.id);
-
-  const chartTotalIssueCountByLine = {
-    title: 'Issue Count by Line',
-    data: Object.values(dataset.included.lines).map((line) => {
-      const counts = lineCountsById[line.id] ?? createIssueTypeBreakdown();
-      return {
-        name: line.id,
-        payload: {
-          disruption: counts.disruption,
-          maintenance: counts.maintenance,
-          infra: counts.infra,
-          totalIssues: counts.totalIssues,
-        },
-      };
-    }),
-  };
-
-  const stationIssueCounts = Object.values(dataset.included.stations).map(
-    (station) => {
-      const counts =
-        stationCountsById[station.id] ?? createIssueTypeBreakdown();
-      return {
-        name: station.id,
-        payload: {
-          disruption: counts.disruption,
-          maintenance: counts.maintenance,
-          infra: counts.infra,
-          totalIssues: counts.totalIssues,
-        },
-      };
-    },
-  );
-
-  const heatmapCountsByDate = hasRollingYearIssueFactCoverage
-    ? groupIssueFactCountsByDate(issueFactRows)
-    : buildDailyIssueTypeCountsFromIssues(
-        issues,
+    const rollingYearFactCoverageRows =
+      await getOperationalFactCoverageDatesInRange(
         rollingYearStart,
         rollingYearEnd,
       );
+    const statisticsFactCoverageRows =
+      await getOperationalFactCoverageDatesInRange(
+        statisticsFactStart,
+        rollingYearEnd,
+      );
+    const hasRollingYearIssueFactCoverage = hasFullDateCoverage(
+      rollingYearFactCoverageRows,
+      rollingYearStart,
+      rollingYearEnd,
+    );
+    const hasStatisticsIssueFactCoverage = hasFullDateCoverage(
+      statisticsFactCoverageRows,
+      statisticsFactStart,
+      rollingYearEnd,
+    );
+    const { lineCountsById, stationCountsById } = timeSyncServerSpan(
+      'statistics_entity_counts',
+      () => {
+        const lineCountsById: Record<string, IssueTypeBreakdown> = {};
+        const stationCountsById: Record<string, IssueTypeBreakdown> = {};
 
-  const chartTotalIssueCountByStation = {
-    title: 'Issue Count by Station',
-    data: stationIssueCounts
-      .sort(
-        (a, b) =>
-          (b.payload.totalIssues as number) - (a.payload.totalIssues as number),
-      )
-      .slice(0, 15),
-  };
+        for (const issue of issues) {
+          for (const lineId of new Set(issue.lineIds)) {
+            lineCountsById[lineId] ??= createIssueTypeBreakdown();
+            const counts = lineCountsById[lineId];
+            addIssueTypeCount(counts, issue.type, 1);
+            counts.totalIssues += 1;
+          }
 
-  const chartRollingYearHeatmap = {
-    title: 'Rolling Year Heatmap',
-    data: Array.from({ length: 365 }, (_, index) => {
-      const date = isoDate(rollingYearStart.plus({ days: index }));
-      return {
-        name: date,
-        payload: {
-          ...(heatmapCountsByDate.get(date) ?? createIssueTypeCounts()),
-        },
-      };
-    }),
-  };
+          const stationIds = new Set(
+            issue.branchesAffected.flatMap((branch) => branch.stationIds),
+          );
+          for (const stationId of stationIds) {
+            stationCountsById[stationId] ??= createIssueTypeBreakdown();
+            const counts = stationCountsById[stationId];
+            addIssueTypeCount(counts, issue.type, 1);
+            counts.totalIssues += 1;
+          }
+        }
 
-  const statistics = {
-    timeScaleChartsIssueCount: hasStatisticsIssueFactCoverage
-      ? buildIssueCountChartsFromIssueFacts(issueFactRows)
-      : buildStatisticsIssueCountGraphs(issues),
-    timeScaleChartsIssueDuration: hasStatisticsIssueFactCoverage
-      ? buildDurationChartsFromIssueFacts(issueFactRows)
-      : buildIssueDurationGraphs(issues),
-    chartTotalIssueCountByLine,
-    chartTotalIssueCountByStation,
-    chartRollingYearHeatmap,
-    issueIdsDisruptionLongest: longestDisruptions,
-  };
+        return { lineCountsById, stationCountsById };
+      },
+    );
 
-  return {
-    data: statistics,
-    included: withIssues(
-      dataset.included,
-      dataset.allIssues,
-      longestDisruptions,
-    ),
-  };
+    const longestDisruptions = timeSyncServerSpan(
+      'statistics_longest_disruptions',
+      () =>
+        [...issues]
+          .filter((issue) => issue.type === 'disruption')
+          .sort((a, b) => b.durationSeconds - a.durationSeconds)
+          .slice(0, 10)
+          .map((issue) => issue.id),
+    );
+
+    const chartTotalIssueCountByLine = timeSyncServerSpan(
+      'statistics_line_chart',
+      () => ({
+        title: 'Issue Count by Line',
+        data: Object.values(dataset.included.lines).map((line) => {
+          const counts = lineCountsById[line.id] ?? createIssueTypeBreakdown();
+          return {
+            name: line.id,
+            payload: {
+              disruption: counts.disruption,
+              maintenance: counts.maintenance,
+              infra: counts.infra,
+              totalIssues: counts.totalIssues,
+            },
+          };
+        }),
+      }),
+    );
+
+    const stationIssueCounts = timeSyncServerSpan(
+      'statistics_station_counts',
+      () =>
+        Object.values(dataset.included.stations).map((station) => {
+          const counts =
+            stationCountsById[station.id] ?? createIssueTypeBreakdown();
+          return {
+            name: station.id,
+            payload: {
+              disruption: counts.disruption,
+              maintenance: counts.maintenance,
+              infra: counts.infra,
+              totalIssues: counts.totalIssues,
+            },
+          };
+        }),
+    );
+
+    const heatmapCountsByDate = timeSyncServerSpan(
+      'statistics_heatmap_counts',
+      () =>
+        hasRollingYearIssueFactCoverage
+          ? groupIssueFactCountsByDate(issueFactRows)
+          : buildDailyIssueTypeCountsFromIssues(
+              issues,
+              rollingYearStart,
+              rollingYearEnd,
+            ),
+    );
+
+    const chartTotalIssueCountByStation = timeSyncServerSpan(
+      'statistics_station_chart',
+      () => ({
+        title: 'Issue Count by Station',
+        data: stationIssueCounts
+          .sort(
+            (a, b) =>
+              (b.payload.totalIssues as number) -
+              (a.payload.totalIssues as number),
+          )
+          .slice(0, 15),
+      }),
+    );
+
+    const chartRollingYearHeatmap = timeSyncServerSpan(
+      'statistics_heatmap_chart',
+      () => ({
+        title: 'Rolling Year Heatmap',
+        data: Array.from({ length: 365 }, (_, index) => {
+          const date = isoDate(rollingYearStart.plus({ days: index }));
+          return {
+            name: date,
+            payload: {
+              ...(heatmapCountsByDate.get(date) ?? createIssueTypeCounts()),
+            },
+          };
+        }),
+      }),
+    );
+
+    const statistics = {
+      timeScaleChartsIssueCount: timeSyncServerSpan(
+        'statistics_count_charts',
+        () =>
+          hasStatisticsIssueFactCoverage
+            ? buildIssueCountChartsFromIssueFacts(issueFactRows)
+            : buildStatisticsIssueCountGraphs(issues),
+      ),
+      timeScaleChartsIssueDuration: timeSyncServerSpan(
+        'statistics_duration_charts',
+        () =>
+          hasStatisticsIssueFactCoverage
+            ? buildDurationChartsFromIssueFacts(issueFactRows)
+            : buildIssueDurationGraphs(issues),
+      ),
+      chartTotalIssueCountByLine,
+      chartTotalIssueCountByStation,
+      chartRollingYearHeatmap,
+      issueIdsDisruptionLongest: longestDisruptions,
+    };
+
+    return {
+      data: statistics,
+      included: withIssues(
+        dataset.included,
+        dataset.allIssues,
+        longestDisruptions,
+      ),
+    };
+  });
 }
 
 export async function getSitemapData() {
