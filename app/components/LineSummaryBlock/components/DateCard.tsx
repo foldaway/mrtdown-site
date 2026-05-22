@@ -2,7 +2,7 @@ import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { type DateTime, Duration } from 'luxon';
-import { Fragment, useMemo } from 'react';
+import { Fragment, type PointerEvent, useMemo } from 'react';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import type {
   Issue,
@@ -95,13 +95,19 @@ export const DateCard: React.FC<Props> = (props) => {
   const { line, dateTime, data } = props;
   const { segments } = useDateBreakdown(line, dateTime, data);
 
+  const activateOnHoverPointer = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+      props.onActivate();
+    }
+  };
+
   return (
     <button
       type="button"
       onClick={props.onActivate}
       onFocus={props.onActivate}
       onMouseEnter={props.onActivate}
-      onPointerEnter={props.onActivate}
+      onPointerEnter={activateOnHoverPointer}
       aria-label={dateTime.toISODate() ?? undefined}
       aria-expanded={props.isActive}
       className={classNames(

@@ -1,6 +1,7 @@
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
 import type { DateTime } from 'luxon';
+import type { PointerEvent } from 'react';
 import { FormattedDate, FormattedMessage } from 'react-intl';
 import type { Line, LineSummaryDayType } from '~/types';
 import { useHydrated } from '../../../hooks/useHydrated';
@@ -18,13 +19,19 @@ interface Props {
 export const ServiceEndedDateCard: React.FC<Props> = (props) => {
   const { isActive, onActivate } = props;
 
+  const activateOnHoverPointer = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+      onActivate();
+    }
+  };
+
   return (
     <button
       type="button"
       onClick={onActivate}
       onFocus={onActivate}
       onMouseEnter={onActivate}
-      onPointerEnter={onActivate}
+      onPointerEnter={activateOnHoverPointer}
       aria-label={props.dateTime.toISODate() ?? undefined}
       aria-expanded={isActive}
       className={classNames(
