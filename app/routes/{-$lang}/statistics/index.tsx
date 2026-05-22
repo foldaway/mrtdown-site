@@ -3,10 +3,8 @@ import { createIntl, FormattedMessage } from 'react-intl';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getStatisticsFn } from '~/util/statistics.functions';
-import {
-  StatisticsGrid,
-  StatisticsGridSkeleton,
-} from './components/StatisticsGrid';
+import { StatisticsGrid } from './components/StatisticsGrid';
+import { StatisticsGridSkeleton } from './components/StatisticsGrid/components/StatisticsGridSkeleton';
 
 export const Route = createFileRoute('/{-$lang}/statistics/')({
   component: StatisticsPage,
