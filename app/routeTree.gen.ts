@@ -27,6 +27,7 @@ import { Route as Char123LangChar125HistoryYearIndexRouteImport } from './routes
 import { Route as Char123LangChar125HistoryPagePageNumRouteImport } from './routes/{-$lang}/history/page.$pageNum'
 import { Route as Char123LangChar125HistoryYearMonthRouteImport } from './routes/{-$lang}/history/$year/$month'
 import { Route as InternalApiTasksPullRouteImport } from './routes/internal.api.tasks.pull'
+import { Route as InternalApiTasksPublicHolidaysRouteImport } from './routes/internal.api.tasks.public-holidays'
 import { Route as InternalApiTasksFactsRouteImport } from './routes/internal.api.tasks.facts'
 
 const Char123LangChar125Route = Char123LangChar125RouteImport.update({
@@ -131,6 +132,12 @@ const InternalApiTasksPullRoute = InternalApiTasksPullRouteImport.update({
   path: '/internal/api/tasks/pull',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InternalApiTasksPublicHolidaysRoute =
+  InternalApiTasksPublicHolidaysRouteImport.update({
+    id: '/internal/api/tasks/public-holidays',
+    path: '/internal/api/tasks/public-holidays',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const InternalApiTasksFactsRoute = InternalApiTasksFactsRouteImport.update({
   id: '/internal/api/tasks/facts',
   path: '/internal/api/tasks/facts',
@@ -150,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
+  '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
@@ -170,6 +178,7 @@ export interface FileRoutesByTo {
   '/{-$lang}/history': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/statistics': typeof Char123LangChar125StatisticsIndexRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
+  '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
@@ -192,6 +201,7 @@ export interface FileRoutesById {
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
+  '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/history/'
     | '/{-$lang}/statistics/'
     | '/internal/api/tasks/facts'
+    | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
@@ -235,6 +246,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/history'
     | '/{-$lang}/statistics'
     | '/internal/api/tasks/facts'
+    | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
@@ -256,6 +268,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/history/'
     | '/{-$lang}/statistics/'
     | '/internal/api/tasks/facts'
+    | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
@@ -270,6 +283,7 @@ export interface RootRouteChildren {
   ApiIssuesDayRoute: typeof ApiIssuesDayRoute
   ApiPhSplatRoute: typeof ApiPhSplatRoute
   InternalApiTasksFactsRoute: typeof InternalApiTasksFactsRoute
+  InternalApiTasksPublicHolidaysRoute: typeof InternalApiTasksPublicHolidaysRoute
   InternalApiTasksPullRoute: typeof InternalApiTasksPullRoute
 }
 
@@ -401,6 +415,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InternalApiTasksPullRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/internal/api/tasks/public-holidays': {
+      id: '/internal/api/tasks/public-holidays'
+      path: '/internal/api/tasks/public-holidays'
+      fullPath: '/internal/api/tasks/public-holidays'
+      preLoaderRoute: typeof InternalApiTasksPublicHolidaysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/internal/api/tasks/facts': {
       id: '/internal/api/tasks/facts'
       path: '/internal/api/tasks/facts'
@@ -461,6 +482,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiIssuesDayRoute: ApiIssuesDayRoute,
   ApiPhSplatRoute: ApiPhSplatRoute,
   InternalApiTasksFactsRoute: InternalApiTasksFactsRoute,
+  InternalApiTasksPublicHolidaysRoute: InternalApiTasksPublicHolidaysRoute,
   InternalApiTasksPullRoute: InternalApiTasksPullRoute,
 }
 export const routeTree = rootRouteImport

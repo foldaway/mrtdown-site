@@ -22,6 +22,7 @@ import {
   syncStations,
   truncateStagingTables,
 } from '../workflows/pull/helpers/stagingSync.js';
+import { syncPublicHolidaysFromDataGov } from '../workflows/publicHolidays/helpers/syncPublicHolidays.js';
 
 const { Pool } = pg;
 
@@ -134,6 +135,10 @@ async function main(): Promise<void> {
     console.log(`Seeding preview database from ${DEFAULT_FIXTURES_BASE_URL}`);
     await stageFixtures(db, DEFAULT_FIXTURES_BASE_URL);
     await syncSeededData(db);
+    const publicHolidaySyncResult = await syncPublicHolidaysFromDataGov(db);
+    console.log(
+      `Synced ${publicHolidaySyncResult.fetched} public holidays from data.gov.sg`,
+    );
     const facts = await rebuildOperationalFactsRange(
       OPERATIONAL_FACTS_REBUILD_DAYS,
       undefined,
