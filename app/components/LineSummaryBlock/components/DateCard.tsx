@@ -1,11 +1,9 @@
-import { ClockIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { type DateTime, Duration } from 'luxon';
-import { Popover } from 'radix-ui';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo } from 'react';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
-import { useDebounce } from 'use-debounce';
 import type {
   Issue,
   Line,
@@ -31,17 +29,16 @@ interface Props {
   issues: Record<string, Issue>;
   dateTime: DateTime;
   data: LineSummaryDateRecord;
+  isActive: boolean;
+  onToggle: () => void;
 }
 
-export const DateCard: React.FC<Props> = (props) => {
-  const { line, dateTime, data, issues } = props;
+function useDateBreakdown(
+  line: Line,
+  dateTime: DateTime,
+  data: LineSummaryDateRecord,
+) {
   const { breakdownByIssueTypes, dayType } = data;
-
-  const [isOpen, setIsOpen] = useState(false);
-  const [isOpenDebounced] = useDebounce(isOpen, 100);
-
-  const isHydrated = useHydrated();
-  const intl = useIntl();
 
   const operatingHours = useOperatingHours(line, dateTime, dayType);
 
@@ -91,43 +88,72 @@ export const DateCard: React.FC<Props> = (props) => {
     return results;
   }, [breakdownByIssueTypes, notInServiceDuration]);
 
+  return { operatingHours, notInServiceDuration, segments };
+}
+
+export const DateCard: React.FC<Props> = (props) => {
+  const { line, dateTime, data } = props;
+  const { segments } = useDateBreakdown(line, dateTime, data);
+
   return (
-    <Popover.Root open={isOpenDebounced} onOpenChange={setIsOpen}>
-      <Popover.Trigger
-        onMouseEnter={() => setIsOpen(true)}
-        onMouseLeave={() => setIsOpen(false)}
-        className="group cursor-pointer rounded-sm transition-all duration-200 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-1 dark:focus:ring-accent-dark dark:hover:bg-gray-800"
-      >
-        <div className="flex h-7 w-1.5 flex-col-reverse overflow-hidden rounded-xs bg-operational-light shadow-sm transition-all duration-200 group-hover:scale-125 group-hover:shadow-md group-focus:scale-125 dark:bg-operational-dark">
-          {segments.map((segment) => (
-            <div
-              key={segment.type}
-              className={classNames('flex w-1.5', {
-                'bg-disruption-light dark:bg-disruption-dark':
-                  segment.type === 'ongoing_disruption',
-                'bg-maintenance-light dark:bg-maintenance-dark':
-                  segment.type === 'ongoing_maintenance',
-                'bg-infra-light dark:bg-infra-dark':
-                  segment.type === 'ongoing_infra',
-                'bg-gray-400 dark:bg-gray-600':
-                  segment.type === 'closed_for_day',
-              })}
-              style={{
-                height: `${(segment.percentage * 100).toFixed(1)}%`,
-              }}
-            />
-          ))}
+    <button
+      type="button"
+      onClick={props.onToggle}
+      aria-label={dateTime.toISODate() ?? undefined}
+      aria-expanded={props.isActive}
+      className={classNames(
+        'group cursor-pointer rounded-sm transition-all duration-200 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-1 dark:focus:ring-accent-dark dark:hover:bg-gray-800',
+        {
+          'bg-gray-100 ring-2 ring-accent-light ring-offset-1 dark:bg-gray-800 dark:ring-accent-dark':
+            props.isActive,
+        },
+      )}
+    >
+      <div className="flex h-7 w-1.5 flex-col-reverse overflow-hidden rounded-xs bg-operational-light shadow-sm transition-all duration-200 group-hover:scale-125 group-hover:shadow-md group-focus:scale-125 dark:bg-operational-dark">
+        {segments.map((segment) => (
+          <div
+            key={segment.type}
+            className={classNames('flex w-1.5', {
+              'bg-disruption-light dark:bg-disruption-dark':
+                segment.type === 'ongoing_disruption',
+              'bg-maintenance-light dark:bg-maintenance-dark':
+                segment.type === 'ongoing_maintenance',
+              'bg-infra-light dark:bg-infra-dark':
+                segment.type === 'ongoing_infra',
+              'bg-gray-400 dark:bg-gray-600': segment.type === 'closed_for_day',
+            })}
+            style={{
+              height: `${(segment.percentage * 100).toFixed(1)}%`,
+            }}
+          />
+        ))}
+      </div>
+    </button>
+  );
+};
+
+export const DateCardDetails: React.FC<Omit<Props, 'isActive' | 'onToggle'>> = (
+  props,
+) => {
+  const { line, dateTime, data, issues } = props;
+  const { breakdownByIssueTypes, dayType } = data;
+
+  const isHydrated = useHydrated();
+  const intl = useIntl();
+  const { operatingHours, notInServiceDuration } = useDateBreakdown(
+    line,
+    dateTime,
+    data,
+  );
+
+  return (
+    <div className="flex flex-col text-sm">
+      <div className="flex items-start gap-x-3 pb-3">
+        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+          <CalendarDaysIcon className="size-4" />
         </div>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          className="z-50 flex w-72 flex-col rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-lg outline-none ring-1 ring-black/5 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800 dark:ring-white/10"
-          onMouseEnter={() => setIsOpen(true)}
-          onMouseLeave={() => setIsOpen(false)}
-          side="top"
-          sideOffset={8}
-        >
-          <span className="mb-2 font-semibold text-base text-gray-900 dark:text-gray-100">
+        <div className="min-w-0">
+          <p className="font-semibold text-gray-900 leading-tight dark:text-gray-100">
             {isHydrated ? (
               <FormattedDate
                 value={dateTime.toJSDate()}
@@ -139,25 +165,34 @@ export const DateCard: React.FC<Props> = (props) => {
             ) : (
               dateTime.toISO()
             )}
-          </span>
+          </p>
+          <p className="mt-1 text-gray-500 text-xs dark:text-gray-400">
+            <FormattedMessage
+              id="component.service_hours_title"
+              defaultMessage="Service hours ({type})"
+              values={{
+                type: (
+                  <FormattedMessage
+                    {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]}
+                  />
+                ),
+              }}
+            />
+          </p>
+        </div>
+      </div>
 
-          <div className="mb-3 grid grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-2 gap-y-1">
-            <ClockIcon className="size-4 shrink-0 text-gray-600 dark:text-gray-300" />
-            <span className="font-medium text-gray-700 text-sm dark:text-gray-200">
+      <div className="border-gray-200 border-t py-3 dark:border-gray-700">
+        <div className="grid grid-cols-[auto_1fr] gap-x-3">
+          <ClockIcon className="mt-0.5 size-4 text-gray-500 dark:text-gray-400" />
+          <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <span className="font-medium text-gray-700 dark:text-gray-200">
               <FormattedMessage
-                id="component.service_hours_title"
-                defaultMessage="Service hours ({type})"
-                values={{
-                  type: (
-                    <FormattedMessage
-                      {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]}
-                    />
-                  ),
-                }}
+                id="component.service_hours"
+                defaultMessage="Service hours"
               />
             </span>
-            <div />
-            <span className="text-gray-600 text-sm dark:text-gray-300">
+            <span className="text-gray-600 dark:text-gray-300">
               <FormattedMessage
                 id="component.service_hours_description"
                 defaultMessage="{start, time, short} to {end, time, short}"
@@ -168,17 +203,24 @@ export const DateCard: React.FC<Props> = (props) => {
               />
             </span>
           </div>
+        </div>
+      </div>
 
+      <div className="border-gray-200 border-t py-3 dark:border-gray-700">
+        <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
+          <FormattedMessage id="general.impact" defaultMessage="Impact" />
+        </span>
+        <div className="mt-2 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
           {notInServiceDuration.as('seconds') > 0 && (
-            <div className="flex items-center py-1">
-              <div className="me-2 size-3 rounded-full bg-gray-400 dark:bg-gray-600" />
-              <span className="font-medium text-gray-700 text-sm capitalize dark:text-gray-200">
+            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 py-2">
+              <div className="size-2.5 rounded-full bg-gray-400 dark:bg-gray-600" />
+              <span className="font-medium text-gray-700 capitalize dark:text-gray-200">
                 <FormattedMessage
                   id="status.service_ended"
                   defaultMessage="Service Ended"
                 />
               </span>
-              <span className="ms-auto text-gray-600 text-sm dark:text-gray-300">
+              <span className="text-gray-600 dark:text-gray-300">
                 {isHydrated ? (
                   <FormattedDuration
                     duration={notInServiceDuration.rescale()}
@@ -193,9 +235,12 @@ export const DateCard: React.FC<Props> = (props) => {
           {Object.entries(breakdownByIssueTypes).map(([key, entry]) => {
             const issueType = key as Issue['type'];
             return (
-              <div key={issueType} className="flex items-center py-1">
+              <div
+                key={issueType}
+                className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 py-2"
+              >
                 <div
-                  className={classNames('me-2 size-3 rounded-full', {
+                  className={classNames('size-2.5 rounded-full', {
                     'bg-disruption-light dark:bg-disruption-dark':
                       issueType === 'disruption',
                     'bg-maintenance-light dark:bg-maintenance-dark':
@@ -203,7 +248,7 @@ export const DateCard: React.FC<Props> = (props) => {
                     'bg-infra-light dark:bg-infra-dark': issueType === 'infra',
                   })}
                 />
-                <span className="font-medium text-gray-700 text-sm capitalize dark:text-gray-200">
+                <span className="font-medium text-gray-700 capitalize dark:text-gray-200">
                   {issueType === 'disruption' && (
                     <FormattedMessage
                       id="general.disruption"
@@ -223,7 +268,7 @@ export const DateCard: React.FC<Props> = (props) => {
                     />
                   )}
                 </span>
-                <span className="ms-auto text-gray-600 text-sm dark:text-gray-300">
+                <span className="text-gray-600 dark:text-gray-300">
                   {isHydrated ? (
                     <FormattedDuration
                       duration={Duration.fromObject({
@@ -242,56 +287,55 @@ export const DateCard: React.FC<Props> = (props) => {
               </div>
             );
           })}
+        </div>
+      </div>
 
-          <div className="mt-4 mb-2 border-gray-200 border-t pt-3 dark:border-gray-600">
-            <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
-              <FormattedMessage id="general.related" defaultMessage="Related" />
-            </span>
-          </div>
-          {Object.keys(breakdownByIssueTypes).length === 0 && (
-            <span className="text-gray-600 text-sm italic dark:text-gray-300">
-              <FormattedMessage
-                id="general.no_downtime_on_this_day"
-                defaultMessage="No downtime recorded on this day."
-              />
-            </span>
-          )}
-          <div className="flex flex-col gap-y-2">
-            {Object.entries(breakdownByIssueTypes).map(([issueType, entry]) => (
-              <Fragment key={issueType}>
-                {entry.issueIds.map((issueId) => {
-                  const issueRef = issues[issueId];
-                  return (
-                    <Link
-                      key={issueRef.id}
-                      to={buildLocaleAwareLink(
-                        `/issues/${issueRef.id}`,
-                        intl.locale,
-                      )}
-                      className="flex items-center gap-x-2 rounded-md px-2 py-1.5 text-gray-700 text-sm transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-accent-light dark:text-gray-200 dark:focus:ring-accent-dark dark:hover:bg-gray-700 dark:hover:text-gray-100"
-                    >
-                      <div
-                        className={classNames('size-3 shrink-0 rounded-full', {
-                          'bg-disruption-light dark:bg-disruption-dark':
-                            issueType === 'disruption',
-                          'bg-maintenance-light dark:bg-maintenance-dark':
-                            issueType === 'maintenance',
-                          'bg-infra-light dark:bg-infra-dark':
-                            issueType === 'infra',
-                        })}
-                      />
-                      <span className="leading-tight">
-                        {getLocalizedTranslation(issueRef.title, intl.locale)}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </Fragment>
-            ))}
-          </div>
-          <Popover.Arrow className="fill-white dark:fill-gray-800" />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+      <div className="border-gray-200 border-t pt-3 dark:border-gray-700">
+        <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
+          <FormattedMessage id="general.related" defaultMessage="Related" />
+        </span>
+        {Object.keys(breakdownByIssueTypes).length === 0 && (
+          <p className="mt-1 text-gray-600 italic dark:text-gray-300">
+            <FormattedMessage
+              id="general.no_downtime_on_this_day"
+              defaultMessage="No downtime recorded on this day."
+            />
+          </p>
+        )}
+        <div className="mt-2 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
+          {Object.entries(breakdownByIssueTypes).map(([issueType, entry]) => (
+            <Fragment key={issueType}>
+              {entry.issueIds.map((issueId) => {
+                const issueRef = issues[issueId];
+                return (
+                  <Link
+                    key={issueRef.id}
+                    to={buildLocaleAwareLink(
+                      `/issues/${issueRef.id}`,
+                      intl.locale,
+                    )}
+                    className="flex items-center gap-x-2 py-2 text-gray-700 transition-colors hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-accent-light dark:text-gray-200 dark:focus:ring-accent-dark dark:hover:text-gray-100"
+                  >
+                    <div
+                      className={classNames('size-2.5 shrink-0 rounded-full', {
+                        'bg-disruption-light dark:bg-disruption-dark':
+                          issueType === 'disruption',
+                        'bg-maintenance-light dark:bg-maintenance-dark':
+                          issueType === 'maintenance',
+                        'bg-infra-light dark:bg-infra-dark':
+                          issueType === 'infra',
+                      })}
+                    />
+                    <span className="leading-tight">
+                      {getLocalizedTranslation(issueRef.title, intl.locale)}
+                    </span>
+                  </Link>
+                );
+              })}
+            </Fragment>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 };
