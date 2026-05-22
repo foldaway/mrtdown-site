@@ -234,7 +234,10 @@ function HomePage() {
 
         <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800/50">
           <h3 className="mb-4 text-center font-semibold text-gray-700 text-sm dark:text-gray-300">
-            Service Status Legend
+            <FormattedMessage
+              id="home.service_status_legend"
+              defaultMessage="Service Status Legend"
+            />
           </h3>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-3">
             <div className="inline-flex items-center gap-x-2">
