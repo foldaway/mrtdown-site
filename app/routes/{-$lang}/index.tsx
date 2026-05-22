@@ -10,10 +10,10 @@ import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { useViewport, ViewportSchema } from '~/hooks/useViewport';
 import { getOverviewFn } from '~/util/overview.functions';
-import { sortLineSummariesWithFutureServiceLast } from './helpers/sortLineSummaries';
 import { CurrentAdvisoriesSection } from '../../components/CurrentAdvisoriesSection';
 import { countOperationalLineSummaries } from '../../components/CurrentAdvisoriesSection/helpers';
 import { assert } from '../../util/assert';
+import { sortLineSummariesWithFutureServiceLast } from './helpers/sortLineSummaries';
 
 const SearchParamsSchema = z.object({
   viewport: ViewportSchema.optional(),
@@ -336,6 +336,7 @@ function HomeLineSummariesSkeleton(props: HomeLineSummariesSkeletonProps) {
   const { dateKeys, lineIds } = props;
   const skeletonLineIds =
     lineIds.length > 0 ? lineIds : ['line-summary-skeleton'];
+  const dateBarCount = dateKeys?.length;
 
   return (
     <div
@@ -355,7 +356,20 @@ function HomeLineSummariesSkeleton(props: HomeLineSummariesSkeletonProps) {
               <div className="ms-auto h-4 w-20 rounded-sm bg-gray-300 dark:bg-gray-700" />
             </div>
 
-            <div className="flex items-center justify-between gap-x-1">
+            <div
+              className={classNames(
+                'grid items-center gap-x-1 sm:gap-x-0.5 lg:gap-x-px',
+                dateBarCount == null &&
+                  'grid-cols-30 sm:grid-cols-60 lg:grid-cols-90',
+              )}
+              style={
+                dateBarCount == null
+                  ? undefined
+                  : {
+                      gridTemplateColumns: `repeat(${dateBarCount}, minmax(0, 1fr))`,
+                    }
+              }
+            >
               <HomeSkeletonDateBars dateKeys={dateKeys} />
             </div>
 
@@ -379,26 +393,31 @@ function HomeSkeletonDateBars(props: HomeSkeletonDateBarsProps) {
   const { dateKeys } = props;
 
   if (dateKeys != null) {
-    return dateKeys.map((dateKey) => (
-      <div
-        className="h-7 w-1.5 shrink-0 rounded-xs bg-gray-300 dark:bg-gray-700"
-        key={dateKey}
-      />
-    ));
+    return dateKeys.map((dateKey) => <HomeSkeletonDateBar key={dateKey} />);
   }
 
   return PENDING_DATE_BAR_IDS.map((barId, index) => (
-    <div
-      className={classNames(
-        'h-7 w-1.5 shrink-0 rounded-xs bg-gray-300 dark:bg-gray-700',
-        {
-          'hidden sm:block': index >= 30 && index < 60,
-          'hidden lg:block': index >= 60,
-        },
-      )}
+    <HomeSkeletonDateBar
+      className={classNames({
+        'hidden sm:flex': index >= 30 && index < 60,
+        'hidden lg:flex': index >= 60,
+      })}
       key={barId}
     />
   ));
+}
+
+function HomeSkeletonDateBar(props: { className?: string }) {
+  return (
+    <div
+      className={classNames(
+        'flex h-9 min-w-0 items-center justify-center rounded-sm',
+        props.className,
+      )}
+    >
+      <div className="h-7 w-full rounded-xs bg-gray-300 dark:bg-gray-700" />
+    </div>
+  );
 }
 
 const PENDING_LINE_IDS = ['skeleton-line-1', 'skeleton-line-2'];

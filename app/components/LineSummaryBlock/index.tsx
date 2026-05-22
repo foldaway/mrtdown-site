@@ -9,10 +9,10 @@ import {
   FormattedRelativeTime,
   useIntl,
 } from 'react-intl';
-import type { LineSummary } from '~/types';
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import type { LineSummary } from '~/types';
 import { useHydrated } from '../../hooks/useHydrated';
 import { DateCard, DateCardDetails } from './components/DateCard';
 import { NonOperationalDateCard } from './components/NonOperationalDateCard';
@@ -154,7 +154,12 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-x-1">
+        <div
+          className="grid items-center gap-x-1 sm:gap-x-0.5 lg:gap-x-px"
+          style={{
+            gridTemplateColumns: `repeat(${dateTimes.length}, minmax(0, 1fr))`,
+          }}
+        >
           {dateTimes.map((dateTime) => {
             const dateTimeIsoDate = dateTime.toISODate();
             if (
