@@ -61,7 +61,8 @@ function RouteComponent() {
   const lastUpdatedAt = useMemo(() => {
     if (metadata.length === 0) return null;
     return (
-      metadata.find((item) => item.key === 'db_generated_at')?.value ?? null
+      metadata.find((item) => item.key === 'manifest_last_pulled_at')?.value ??
+      null
     );
   }, [metadata]);
 
