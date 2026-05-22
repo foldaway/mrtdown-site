@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
@@ -21,8 +22,19 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Push main to production
+      - name: Merge main into production
         run: |
           set -euo pipefail
 
-          git push origin HEAD:production
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin main production
+          git switch -C production origin/production
+          git merge --no-edit origin/main
+          git push origin production
+
+      - name: Dispatch production deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref production
