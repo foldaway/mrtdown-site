@@ -51,6 +51,7 @@ import {
   issueContributesToLineDowntime,
   issueContributesToLineStatus,
 } from '~/util/issueOperationalEffects';
+import { sortServiceRevisionsByRecency } from '~/util/serviceRevisions';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 
@@ -973,14 +974,7 @@ async function buildDataset(
   const revisionsSortedByServiceId = Object.fromEntries(
     Object.entries(revisionsByServiceId).map(([serviceId, revisions]) => [
       serviceId,
-      [...revisions].sort((a, b) => {
-        const aTs = new Date(a.updated_at).getTime();
-        const bTs = new Date(b.updated_at).getTime();
-        if (aTs !== bTs) {
-          return bTs - aTs;
-        }
-        return b.id.localeCompare(a.id);
-      }),
+      sortServiceRevisionsByRecency(revisions),
     ]),
   ) as Record<string, typeof serviceRevisionRows>;
 
