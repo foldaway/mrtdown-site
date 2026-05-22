@@ -3,10 +3,16 @@ import { createIntl, FormattedMessage } from 'react-intl';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getStatisticsFn } from '~/util/statistics.functions';
-import { StatisticsGrid } from './components/StatisticsGrid';
+import {
+  StatisticsGrid,
+  StatisticsGridSkeleton,
+} from './components/StatisticsGrid';
 
 export const Route = createFileRoute('/{-$lang}/statistics/')({
   component: StatisticsPage,
+  pendingComponent: StatisticsPagePending,
+  pendingMs: 0,
+  pendingMinMs: 0,
   loader: () => getStatisticsFn(),
   async head(ctx) {
     const { lang = 'en-SG' } = ctx.params;
@@ -79,5 +85,17 @@ function StatisticsPage() {
         <StatisticsGrid statistics={loaderData.data} />
       </div>
     </IncludedEntitiesContext.Provider>
+  );
+}
+
+function StatisticsPagePending() {
+  return (
+    <div className="flex flex-col space-y-8">
+      <header className="space-y-2 text-center">
+        <div className="mx-auto h-9 w-40 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+        <div className="mx-auto h-6 w-full max-w-2xl animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+      </header>
+      <StatisticsGridSkeleton />
+    </div>
   );
 }
