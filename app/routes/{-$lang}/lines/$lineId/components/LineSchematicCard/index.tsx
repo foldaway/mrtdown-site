@@ -199,7 +199,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
   );
 
   return (
-    <div className="flex flex-col rounded-lg border border-gray-300 p-6 text-gray-800 shadow-lg md:col-span-8 md:row-span-2 dark:border-gray-700 dark:text-gray-200">
+    <div className="flex flex-col self-start rounded-lg border border-gray-300 p-6 text-gray-800 shadow-lg md:col-span-8 md:row-span-2 dark:border-gray-700 dark:text-gray-200">
       <span className="mb-2 font-semibold text-base text-gray-900 dark:text-white">
         <FormattedMessage
           id="general.line_schematic"
@@ -273,7 +273,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                 ))}
               </div>
             </div>
-            <div className="hidden overflow-x-auto md:block">
+            <div className="hidden md:block">
               <div
                 key={selectedBranchId}
                 className="grid grid-cols-[minmax(12rem,1fr)_2.5rem_minmax(3rem,6rem)_2.5rem_minmax(12rem,1fr)] items-stretch"
