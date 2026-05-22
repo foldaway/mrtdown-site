@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   FormattedDate,
   FormattedMessage,
@@ -13,9 +13,12 @@ import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { useHydrated } from '../../hooks/useHydrated';
-import { DateCard } from './components/DateCard';
+import { DateCard, DateCardDetails } from './components/DateCard';
 import { NonOperationalDateCard } from './components/NonOperationalDateCard';
-import { ServiceEndedDateCard } from './components/ServiceEndedDateCard';
+import {
+  ServiceEndedDateCard,
+  ServiceEndedDateCardDetails,
+} from './components/ServiceEndedDateCard';
 import { UptimeCard } from './components/UptimeCard';
 
 interface Props {
@@ -23,9 +26,16 @@ interface Props {
   dateTimes: DateTime<true>[];
 }
 
+type ActiveDateCard =
+  | { type: 'date'; isoDate: string }
+  | { type: 'service-ended'; isoDate: string };
+
 export const LineSummaryBlock: React.FC<Props> = (props) => {
   const { data, dateTimes } = props;
   const { lineId, status, breakdownByDates } = data;
+  const [activeDateCard, setActiveDateCard] = useState<ActiveDateCard | null>(
+    null,
+  );
 
   const intl = useIntl();
 
@@ -47,8 +57,49 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
 
   const isHydrated = useHydrated();
 
+  const activeDateTime = useMemo(() => {
+    if (activeDateCard == null) {
+      return null;
+    }
+
+    return (
+      dateTimes.find((dateTime) => {
+        return dateTime.toISODate() === activeDateCard.isoDate;
+      }) ?? null
+    );
+  }, [activeDateCard, dateTimes]);
+
+  const activeDateRecord =
+    activeDateCard == null ? null : breakdownByDates[activeDateCard.isoDate];
+
+  const toggleActiveDateCard = (nextDateCard: ActiveDateCard) => {
+    setActiveDateCard((currentDateCard) => {
+      if (
+        currentDateCard?.type === nextDateCard.type &&
+        currentDateCard.isoDate === nextDateCard.isoDate
+      ) {
+        return null;
+      }
+      return nextDateCard;
+    });
+  };
+
   return (
-    <div className="flex flex-col rounded-lg bg-gray-100 px-4 py-2 dark:bg-gray-800">
+    <fieldset
+      className={classNames(
+        'relative m-0 flex min-w-0 flex-col rounded-lg border-0 bg-gray-100 px-4 py-2 dark:bg-gray-800',
+        {
+          'z-30': activeDateCard != null,
+        },
+      )}
+      aria-label={line.id}
+      onBlur={(event) => {
+        const relatedTarget = event.relatedTarget as Node | null;
+        if (!event.currentTarget.contains(relatedTarget)) {
+          setActiveDateCard(null);
+        }
+      }}
+    >
       <div className="mb-1.5 flex items-center">
         <Link
           className="group flex items-center gap-x-1.5 overflow-hidden truncate font-bold text-base text-gray-700 dark:text-gray-200"
@@ -95,6 +146,7 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
             return <NonOperationalDateCard key={dateTime.valueOf()} />;
           }
           if (dateTime.hasSame(now, 'day') && now < serviceStartToday) {
+            const isoDate = dateTime.toISODate();
             return (
               <ServiceEndedDateCard
                 key={dateTime.valueOf()}
@@ -103,6 +155,15 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
                   breakdownByDates[dateTimeIsoDate]?.dayType ?? 'weekday'
                 }
                 componentRef={line}
+                isActive={
+                  activeDateCard?.type === 'service-ended' &&
+                  activeDateCard.isoDate === isoDate
+                }
+                onToggle={() => {
+                  if (isoDate != null) {
+                    toggleActiveDateCard({ type: 'service-ended', isoDate });
+                  }
+                }}
               />
             );
           }
@@ -118,6 +179,18 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
               data={breakdownByDates[dateTimeIsoDate]}
               line={line}
               issues={issues}
+              isActive={
+                activeDateCard?.type === 'date' &&
+                activeDateCard.isoDate === dateTimeIsoDate
+              }
+              onToggle={() => {
+                if (dateTimeIsoDate != null) {
+                  toggleActiveDateCard({
+                    type: 'date',
+                    isoDate: dateTimeIsoDate,
+                  });
+                }
+              }}
             />
           );
         })}
@@ -155,6 +228,33 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
           )}
         </span>
       </div>
-    </div>
+
+      {activeDateCard != null &&
+        activeDateTime != null &&
+        (activeDateCard.type === 'date' && activeDateRecord != null ? (
+          <div
+            className="absolute inset-x-0 top-full z-30 mt-2 flex flex-col rounded-lg border border-gray-200 border-t-4 bg-white px-4 py-3 shadow-gray-900/10 shadow-xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/30 dark:ring-white/10"
+            style={{ borderTopColor: line.color }}
+          >
+            <DateCardDetails
+              dateTime={activeDateTime}
+              data={activeDateRecord}
+              line={line}
+              issues={issues}
+            />
+          </div>
+        ) : activeDateCard.type === 'service-ended' ? (
+          <div
+            className="absolute inset-x-0 top-full z-30 mt-2 flex flex-col rounded-lg border border-gray-200 border-t-4 bg-white px-4 py-3 shadow-gray-900/10 shadow-xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/30 dark:ring-white/10"
+            style={{ borderTopColor: line.color }}
+          >
+            <ServiceEndedDateCardDetails
+              dateTime={activeDateTime}
+              dayType={activeDateRecord?.dayType ?? 'weekday'}
+              componentRef={line}
+            />
+          </div>
+        ) : null)}
+    </fieldset>
   );
 };
