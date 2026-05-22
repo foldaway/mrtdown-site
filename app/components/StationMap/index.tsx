@@ -321,7 +321,7 @@ export const StationMap: React.FC<Props> = (props) => {
       }
 
       const lineSegmentElements = [
-        ...ref.querySelectorAll<SVGGElement>("g[id^='line_']"),
+        ...ref.querySelectorAll<SVGElement>("[id^='line_']"),
       ].filter((element) => element.id.includes(':'));
 
       for (const lineSegmentElement of lineSegmentElements) {
@@ -336,6 +336,17 @@ export const StationMap: React.FC<Props> = (props) => {
         }
       }
 
+      const focusedComponentIdPrefixes = [
+        normalizedLineId,
+        ...focusedComponentIds,
+      ];
+      const isFocusedComponentId = (componentId: string) =>
+        focusedComponentIdPrefixes.some(
+          (focusedComponentId) =>
+            componentId === focusedComponentId ||
+            componentId.startsWith(`${focusedComponentId}_`),
+        );
+
       const nodeElements = [
         ...ref.querySelectorAll<SVGGElement>("g[id^='node_']"),
       ];
@@ -348,15 +359,11 @@ export const StationMap: React.FC<Props> = (props) => {
           continue;
         }
 
-        for (const componentElement of nodeElement.querySelectorAll(
-          ':scope > g',
+        for (const componentElement of nodeElement.querySelectorAll<SVGGElement>(
+          ':scope g[id]',
         )) {
-          const isFocusedComponent =
-            componentElement.id === normalizedLineId ||
-            focusedComponentIds.has(componentElement.id);
-          (componentElement as SVGGElement).style.opacity = isFocusedComponent
-            ? '1'
-            : '0.25';
+          const isFocusedComponent = isFocusedComponentId(componentElement.id);
+          componentElement.style.opacity = isFocusedComponent ? '1' : '0.25';
         }
       }
 
