@@ -1,0 +1,28 @@
+name: Sync main to production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-production:
+    name: Sync main to production
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Push main to production
+        run: |
+          set -euo pipefail
+
+          git push origin HEAD:production
