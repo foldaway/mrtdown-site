@@ -104,7 +104,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
 
     return (
       <div
-        className={classNames('flex items-center gap-x-2', {
+        className={classNames('flex w-full items-center gap-x-2', {
           'justify-end text-right': side === 'left',
         })}
       >
@@ -136,6 +136,28 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
             </Link>
           </>
         )}
+      </div>
+    );
+  };
+
+  const renderBottomStationLabel = (stationId: string) => {
+    const stationName = getLocalizedTranslation(
+      stations[stationId].name,
+      intl.locale,
+    );
+
+    return (
+      <div className="flex flex-col items-center gap-y-1 text-center">
+        {renderCodePills(stationId)}
+        <Link
+          to="/{-$lang}/stations/$stationId"
+          params={{ stationId }}
+          className="group min-w-0"
+        >
+          <span className="text-gray-800 text-sm group-hover:underline dark:text-gray-200">
+            {stationName}
+          </span>
+        </Link>
       </div>
     );
   };
@@ -301,7 +323,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                         <Fragment
                           key={`${leftStationId ?? 'empty'}-${rightStationId ?? 'empty'}`}
                         >
-                          <div className="flex min-w-0 items-center pr-2">
+                          <div className="flex min-w-0 items-center justify-end pr-2">
                             {hasLeftStation &&
                               renderStationLabel(leftStationId, 'left')}
                           </div>
@@ -362,11 +384,8 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                       </div>
                     )}
                     {loopColumns.bottomStationId != null && (
-                      <div className="col-start-1 col-end-6 flex justify-center pt-1">
-                        {renderStationLabel(
-                          loopColumns.bottomStationId,
-                          'right',
-                        )}
+                      <div className="col-start-1 col-end-6 flex justify-center pt-4">
+                        {renderBottomStationLabel(loopColumns.bottomStationId)}
                       </div>
                     )}
                   </div>
