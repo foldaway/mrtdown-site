@@ -19,6 +19,16 @@ describe('normalizeDataGovPublicHolidayRecord', () => {
       hash: '2026-05-01\0Labour Day',
     });
   });
+
+  it('rejects invalid calendar dates', () => {
+    expect(() =>
+      normalizeDataGovPublicHolidayRecord({
+        date: '2026-02-30',
+        day: 'Monday',
+        holiday: 'Invalid Holiday',
+      }),
+    ).toThrow('Invalid public holiday date: 2026-02-30');
+  });
 });
 
 describe('fetchDataGovPublicHolidays', () => {
