@@ -2714,6 +2714,57 @@ export async function rebuildOperationalFactsForDate(
   return rebuildOperationalFactsForDateFromDataset(normalizedDate, dataset, db);
 }
 
+export async function rebuildOperationalFactsForDates(
+  dates: readonly string[],
+  db?: AppDb,
+) {
+  const normalizedDates = [
+    ...new Set(
+      dates.map((date) => {
+        const parsed = DateTime.fromISO(date, { zone: SG_TIMEZONE });
+        if (!parsed.isValid) {
+          throw new Error(`Invalid operational fact date: ${date}`);
+        }
+        return isoDate(parsed.startOf('day'));
+      }),
+    ),
+  ].sort();
+  if (normalizedDates.length === 0) {
+    return [];
+  }
+
+  const dateTimes = normalizedDates.map((date) =>
+    DateTime.fromISO(date, { zone: SG_TIMEZONE }),
+  );
+  const latestDate = dateTimes.reduce((latest, date) =>
+    date > latest ? date : latest,
+  );
+  const dataset = await buildBaseDataset(latestDate.endOf('day'), db);
+  const context = buildOperationalFactsRebuildContext(dataset);
+  const database = db ?? (await getDefaultDb());
+  const results: Array<{
+    date: string;
+    issueCount: number;
+    lineCount: number;
+  }> = [];
+
+  for (const batch of chunk(dateTimes, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
+    const rowsByDate = batch.map((date) =>
+      buildOperationalFactRowsForDate(date, dataset, context),
+    );
+    await replaceOperationalFactRows(database, rowsByDate);
+    results.push(
+      ...rowsByDate.map((rows) => ({
+        date: rows.date,
+        issueCount: rows.issueRows.length,
+        lineCount: rows.lineRows.length,
+      })),
+    );
+  }
+
+  return results;
+}
+
 export async function rebuildOperationalFactsRange(
   days: number,
   end = nowSg(),

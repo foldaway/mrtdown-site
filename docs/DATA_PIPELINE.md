@@ -13,6 +13,13 @@ The overhaul introduces a local read model for canonical mrtdown data.
 - deletes orphans after dependents are synchronized;
 - finalizes metadata for the completed pull.
 
+## Public Holiday Workflow
+
+`app/workflows/publicHolidays/index.ts` syncs Singapore public holidays from the
+data.gov.sg consolidated public holidays dataset into `public_holidays`.
+Holiday changes rebuild operational facts for affected dates so line service
+windows use weekend timings on public holidays.
+
 ## Staging Tables
 
 Staging tables are named with a `_next` suffix. They are the durable handoff between workflow steps and avoid returning large parsed payloads between Cloudflare Workflow steps.

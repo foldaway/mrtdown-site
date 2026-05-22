@@ -27,6 +27,11 @@
       "binding": "PULL_WORKFLOW",
       "name": "mrtdown-pull-preview",
       "class_name": "PullWorkflow"
+    },
+    {
+      "binding": "PUBLIC_HOLIDAYS_WORKFLOW",
+      "name": "mrtdown-public-holidays-preview",
+      "class_name": "PublicHolidaysWorkflow"
     }
   ],
   "version_metadata": {
@@ -39,6 +44,11 @@
           "binding": "PULL_WORKFLOW",
           "name": "mrtdown-pull-preview",
           "class_name": "PullWorkflow"
+        },
+        {
+          "binding": "PUBLIC_HOLIDAYS_WORKFLOW",
+          "name": "mrtdown-public-holidays-preview",
+          "class_name": "PublicHolidaysWorkflow"
         }
       ],
       "hyperdrive": [
@@ -68,6 +78,11 @@
           "binding": "PULL_WORKFLOW",
           "name": "mrtdown-pull-staging",
           "class_name": "PullWorkflow"
+        },
+        {
+          "binding": "PUBLIC_HOLIDAYS_WORKFLOW",
+          "name": "mrtdown-public-holidays-staging",
+          "class_name": "PublicHolidaysWorkflow"
         }
       ],
       "hyperdrive": [
@@ -114,6 +129,11 @@
           "binding": "PULL_WORKFLOW",
           "name": "mrtdown-pull-production",
           "class_name": "PullWorkflow"
+        },
+        {
+          "binding": "PUBLIC_HOLIDAYS_WORKFLOW",
+          "name": "mrtdown-public-holidays-production",
+          "class_name": "PublicHolidaysWorkflow"
         }
       ],
       "version_metadata": {
