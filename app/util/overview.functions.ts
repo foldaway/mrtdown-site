@@ -3,6 +3,7 @@ import z from 'zod';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { ViewportSchema } from '~/hooks/useViewport';
 import { getOverviewData } from './db.queries';
+import { timeServerSpan } from './serverTiming';
 
 const RequestSchema = z.object({
   viewport: ViewportSchema.optional(),
@@ -13,5 +14,9 @@ export const getOverviewFn = createServerFn({ method: 'GET' })
   .handler(async (val) => {
     const viewport = val.data.viewport ?? 'xs';
     const dateCount = getDateCountForViewport(viewport);
-    return getOverviewData(dateCount);
+    return timeServerSpan(
+      'overview_loader',
+      () => getOverviewData(dateCount),
+      `viewport=${viewport}`,
+    );
   });
