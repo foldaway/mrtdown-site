@@ -93,9 +93,9 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
 
   return (
     <Collapsible.Root>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4 dark:border-gray-700 dark:bg-gray-800">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex-1 shrink space-y-4">
+          <div className="flex-1 shrink space-y-3">
             <h2 className="font-bold text-gray-900 text-lg sm:text-xl dark:text-gray-100">
               <FormattedMessage
                 id="site.landing.service_advisories"
@@ -206,7 +206,7 @@ const AdvisorySummaryTile: React.FC<AdvisorySummaryTileProps> = (props) => {
   return (
     <div
       className={classNames(
-        'flex min-h-28 min-w-0 flex-col justify-between rounded-xl border p-3 shadow-sm sm:min-h-32 sm:p-4',
+        'flex min-h-20 min-w-0 flex-col justify-between rounded-lg border p-2.5 shadow-sm sm:min-h-24 sm:p-3',
         {
           'border-disruption-light/25 bg-disruption-light/5 dark:border-disruption-dark/35 dark:bg-disruption-dark/10':
             tone === 'disruption' && hasActiveIssues,
@@ -226,13 +226,13 @@ const AdvisorySummaryTile: React.FC<AdvisorySummaryTileProps> = (props) => {
           <p className="truncate font-medium text-gray-600 text-xs dark:text-gray-300">
             {label}
           </p>
-          <p className="mt-1 font-bold text-3xl text-gray-950 tabular-nums leading-none sm:text-4xl dark:text-gray-50">
+          <p className="mt-0.5 font-bold text-2xl text-gray-950 tabular-nums leading-none sm:text-3xl dark:text-gray-50">
             {count}
           </p>
         </div>
         <div
           className={classNames(
-            'inline-flex size-8 shrink-0 items-center justify-center rounded-lg ring-1 sm:size-9',
+            'inline-flex size-7 shrink-0 items-center justify-center rounded-md ring-1 sm:size-8',
             {
               'bg-disruption-light/15 text-disruption-light ring-disruption-light/25 dark:bg-disruption-dark/20 dark:text-disruption-dark dark:ring-disruption-dark/30':
                 tone === 'disruption',
@@ -245,11 +245,11 @@ const AdvisorySummaryTile: React.FC<AdvisorySummaryTileProps> = (props) => {
             },
           )}
         >
-          <Icon className="size-5" />
+          <Icon className="size-4 sm:size-4.5" />
         </div>
       </div>
 
-      <div className="mt-3 min-h-5 text-gray-500 text-xs dark:text-gray-400">
+      <div className="mt-2 min-h-4 text-gray-500 text-xs leading-tight dark:text-gray-400">
         {lineIds.length > 0 ? (
           <LineBar lineIds={lineIds} />
         ) : tone === 'operational' ? (
