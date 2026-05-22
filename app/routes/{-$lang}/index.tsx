@@ -10,6 +10,7 @@ import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { useViewport, ViewportSchema } from '~/hooks/useViewport';
 import { getOverviewFn } from '~/util/overview.functions';
+import { sortLineSummariesWithFutureServiceLast } from './helpers/sortLineSummaries';
 import { CurrentAdvisoriesSection } from '../../components/CurrentAdvisoriesSection';
 import { countOperationalLinesOutsideCurrentAdvisories } from '../../components/CurrentAdvisoriesSection/helpers';
 import { assert } from '../../util/assert';
@@ -184,6 +185,10 @@ function HomePage() {
     });
   }, [issuesActiveNow, issuesActiveToday, overview.lineSummaries]);
 
+  const sortedLineSummaries = useMemo(() => {
+    return sortLineSummariesWithFutureServiceLast(overview.lineSummaries);
+  }, [overview.lineSummaries]);
+
   return (
     <IncludedEntitiesContext.Provider value={included}>
       <div className="flex flex-col space-y-6 sm:space-y-8">
@@ -211,14 +216,14 @@ function HomePage() {
         {isLineSummaryViewportPending ? (
           <HomeLineSummariesSkeleton
             dateKeys={measuredDateKeys}
-            lineIds={overview.lineSummaries.map((lineSummary) => {
+            lineIds={sortedLineSummaries.map((lineSummary) => {
               return lineSummary.lineId;
             })}
           />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div className="flex flex-col gap-y-4 px-2 py-2 sm:gap-y-6 sm:px-3 sm:py-4">
-              {overview.lineSummaries.map((lineSummary) => (
+              {sortedLineSummaries.map((lineSummary) => (
                 <LineSummaryBlock
                   key={lineSummary.lineId}
                   data={lineSummary}
