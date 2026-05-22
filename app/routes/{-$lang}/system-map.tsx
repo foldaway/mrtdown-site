@@ -131,8 +131,11 @@ function SystemMapPage() {
 
         <div className="flex flex-col bg-gray-100 p-4 dark:bg-gray-800">
           <StationMap
-            branchesAffected={branchesAffected}
             currentDate={DateTime.now().toISODate()}
+            mode={{
+              type: 'network',
+              branchesAffected,
+            }}
           />
 
           <div className="mt-2 flex bg-gray-50 px-4 py-2.5 dark:bg-gray-900">

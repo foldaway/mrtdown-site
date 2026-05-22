@@ -22,13 +22,32 @@ import { MapNov2024 } from './components/MapNov2024';
 import { Timeline } from './components/Timeline';
 import { segmentText } from './helpers/segmentText';
 
+type FocusedLineBranch = {
+  id: string;
+  stationIds: string[];
+};
+
+export type StationMapMode =
+  | {
+      type: 'network';
+      branchesAffected: IssueAffectedBranch[];
+      showAffectedStationsSummary?: boolean;
+      showTimeline?: boolean;
+    }
+  | {
+      type: 'focused-line';
+      branches: FocusedLineBranch[];
+      lineId: string;
+      showTimeline?: boolean;
+    };
+
 interface Props {
-  branchesAffected: IssueAffectedBranch[];
   currentDate?: string;
+  mode: StationMapMode;
 }
 
 export const StationMap: React.FC<Props> = (props) => {
-  const { branchesAffected, currentDate } = props;
+  const { currentDate, mode } = props;
 
   const intl = useIntl();
   const navigate = useNavigate();
@@ -37,21 +56,41 @@ export const StationMap: React.FC<Props> = (props) => {
 
   const [ref, setRef] = useState<SVGElement | null>(null);
 
-  const stationIds = useMemo(() => {
+  const affectedStationIds = useMemo(() => {
     const result = new Set<string>();
-    for (const entry of branchesAffected) {
+    if (mode.type !== 'network') {
+      return result;
+    }
+
+    for (const entry of mode.branchesAffected) {
       for (const stationId of entry.stationIds) {
         result.add(stationId);
       }
     }
     return result;
-  }, [branchesAffected]);
+  }, [mode]);
+
+  const focusedStationIds = useMemo(() => {
+    const result = new Set<string>();
+    if (mode.type !== 'focused-line') {
+      return result;
+    }
+
+    for (const entry of mode.branches) {
+      for (const stationId of entry.stationIds) {
+        result.add(stationId);
+      }
+    }
+    return result;
+  }, [mode]);
 
   useEffect(() => {
     if (ref == null) {
       return;
     }
 
+    const branchesAffected =
+      mode.type === 'network' ? mode.branchesAffected : [];
     const linesByStationId: Record<string, Set<string>> = {};
     const linesPatchedByStationId: Record<string, Set<string>> = {};
     const componentByLineId: Record<string, string> = {};
@@ -266,7 +305,81 @@ export const StationMap: React.FC<Props> = (props) => {
         titleElement.textContent = stationName;
       }
     }
-  }, [ref, branchesAffected, included.stations, intl.locale, navigate]);
+
+    if (mode.type === 'focused-line') {
+      const normalizedLineId = mode.lineId.toLowerCase();
+      const focusedSegmentIds = new Set<string>();
+      const focusedComponentIds = new Set<string>();
+
+      for (const branch of mode.branches) {
+        for (let index = 0; index < branch.stationIds.length - 1; index++) {
+          const stationId = branch.stationIds[index].toLowerCase();
+          const nextStationId = branch.stationIds[index + 1].toLowerCase();
+          focusedSegmentIds.add(`line_${stationId}:${nextStationId}`);
+          focusedSegmentIds.add(`line_${nextStationId}:${stationId}`);
+        }
+      }
+
+      const lineSegmentElements = [
+        ...ref.querySelectorAll<SVGElement>("[id^='line_']"),
+      ].filter((element) => element.id.includes(':'));
+
+      for (const lineSegmentElement of lineSegmentElements) {
+        const isFocusedSegment = focusedSegmentIds.has(lineSegmentElement.id);
+        lineSegmentElement.style.opacity = isFocusedSegment ? '1' : '0.18';
+
+        if (isFocusedSegment) {
+          const parentElement = lineSegmentElement.parentElement;
+          if (parentElement?.id.startsWith('line_')) {
+            focusedComponentIds.add(parentElement.id.replace(/^line_/, ''));
+          }
+        }
+      }
+
+      const focusedComponentIdPrefixes = [
+        normalizedLineId,
+        ...focusedComponentIds,
+      ];
+      const isFocusedComponentId = (componentId: string) =>
+        focusedComponentIdPrefixes.some(
+          (focusedComponentId) =>
+            componentId === focusedComponentId ||
+            componentId.startsWith(`${focusedComponentId}_`),
+        );
+
+      const nodeElements = [
+        ...ref.querySelectorAll<SVGGElement>("g[id^='node_']"),
+      ];
+      for (const nodeElement of nodeElements) {
+        const stationId = nodeElement.id.replace(/^node_/, '').toUpperCase();
+        const isFocusedStation = focusedStationIds.has(stationId);
+        nodeElement.style.opacity = isFocusedStation ? '1' : '0.2';
+
+        if (!isFocusedStation) {
+          continue;
+        }
+
+        for (const componentElement of nodeElement.querySelectorAll<SVGGElement>(
+          ':scope g[id]',
+        )) {
+          const isFocusedComponent = isFocusedComponentId(componentElement.id);
+          componentElement.style.opacity = isFocusedComponent ? '1' : '0.25';
+        }
+      }
+
+      const labelsElement: SVGGElement | null = ref.querySelector('#labels');
+      if (labelsElement != null) {
+        for (const labelElement of labelsElement.querySelectorAll('text')) {
+          const stationId = labelElement.id
+            .replace(/^label_/, '')
+            .toUpperCase();
+          labelElement.style.opacity = focusedStationIds.has(stationId)
+            ? '1'
+            : '0.18';
+        }
+      }
+    }
+  }, [ref, focusedStationIds, included.stations, intl.locale, mode, navigate]);
 
   const defaultTab = useMemo(() => {
     if (currentDate == null) {
@@ -301,13 +414,17 @@ export const StationMap: React.FC<Props> = (props) => {
     return '2012-01';
   }, [currentDate]);
 
+  const showTimeline = mode.showTimeline ?? mode.type === 'network';
+  const showAffectedStationsSummary =
+    mode.type === 'network' && mode.showAffectedStationsSummary !== false;
+
   return (
     <div className="flex flex-col fill-gray-800 dark:fill-gray-50">
       {/* Tailwind Class trappers */}
       <div className="hidden fill-gray-800 stroke-gray-800 dark:fill-gray-300 dark:stroke-gray-300" />
 
       <Tabs.Root defaultValue={defaultTab}>
-        <Timeline currentDate={currentDate} />
+        {showTimeline && <Timeline currentDate={currentDate} />}
         <div className="relative overflow-hidden">
           <div className="overflow-auto">
             <Tabs.Content value="2032-12">
@@ -342,20 +459,20 @@ export const StationMap: React.FC<Props> = (props) => {
         </div>
       </Tabs.Root>
 
-      {stationIds.size > 0 && (
+      {showAffectedStationsSummary && affectedStationIds.size > 0 && (
         <>
           <span className="font-bold text-gray-500 text-sm dark:text-gray-400">
             <FormattedMessage
               id="general.station_count"
               defaultMessage="{count, plural, one { {count} stations } other { {count} stations }}"
               values={{
-                count: stationIds.size,
+                count: affectedStationIds.size,
               }}
             />
           </span>
           <span className="text-gray-500 text-sm dark:text-gray-400">
             <FormattedList
-              value={Array.from(stationIds).map((stationId) => {
+              value={Array.from(affectedStationIds).map((stationId) => {
                 const station = included.stations[stationId];
 
                 return (
