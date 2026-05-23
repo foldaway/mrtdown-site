@@ -39,3 +39,12 @@ Create database migrations through the Drizzle CLI (`npm run db:generate` or `dr
 ## Overhaul Context
 
 The overhaul moves data reads from the generated MRTDown API client toward a local Postgres/PostGIS-backed read model populated from canonical mrtdown data archives. The generated API client has been retired, and the remaining extracted read-model type surface should continue shrinking toward canonical `@mrtdown/core` types. See `docs/OVERHAUL_BASELINE.md`, `docs/ARCHITECTURE.md`, `docs/DATA_PIPELINE.md`, and `docs/GENERATED_FILES.md`.
+
+## Current Plans
+
+Use checked-in plans for multi-phase work that needs durable context across agent runs. Active plans live in `docs/plans/active`, completed plans live in `docs/plans/completed`, and plan conventions live in `docs/plans/README.md`.
+
+Current active plans:
+
+- `docs/plans/active/overhaul-read-model.md`
+- `docs/plans/active/production-performance.md`

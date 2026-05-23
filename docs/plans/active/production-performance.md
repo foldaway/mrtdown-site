@@ -7,6 +7,9 @@ the Worker spends several seconds preparing SSR HTML before it sends the first
 byte. Static assets are served quickly from Cloudflare, so asset delivery is not
 the primary bottleneck.
 
+This plan follows the investigation in
+`docs/investigations/2026-05-21-site-slowness.md`.
+
 Measured from Singapore with `curl --compressed -L`:
 
 | Route | TTFB samples | Transfer size |
