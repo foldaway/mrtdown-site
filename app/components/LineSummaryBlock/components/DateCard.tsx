@@ -15,6 +15,7 @@ import type {
 } from '~/types';
 import { useHydrated } from '../../../hooks/useHydrated';
 import { DAY_TYPE_MESSAGE_DESCRIPTORS } from '../constants';
+import { getOrderedIssueTypeBreakdowns } from '../helpers/orderIssueTypeBreakdowns';
 import { useOperatingHours } from '../hooks/useOperatingHours';
 
 const DAY_IN_SECONDS = 24 * 60 * 60;
@@ -70,8 +71,8 @@ function useDateBreakdown(
       results.push(notInServiceSegment);
     }
 
-    for (const [issueType, entry] of Object.entries(breakdownByIssueTypes).sort(
-      (a, b) => a[1].totalDurationSeconds - b[1].totalDurationSeconds,
+    for (const [issueType, entry] of getOrderedIssueTypeBreakdowns(
+      breakdownByIssueTypes,
     )) {
       const percentage = Math.max(
         entry.totalDurationSeconds / DAY_IN_SECONDS,
@@ -157,6 +158,9 @@ export const DateCardDetails: React.FC<
 
   const isHydrated = useHydrated();
   const intl = useIntl();
+  const orderedIssueTypeBreakdowns = getOrderedIssueTypeBreakdowns(
+    breakdownByIssueTypes,
+  );
   const { operatingHours, notInServiceDuration } = useDateBreakdown(
     line,
     dateTime,
@@ -257,8 +261,7 @@ export const DateCardDetails: React.FC<
               </div>
             )}
 
-            {Object.entries(breakdownByIssueTypes).map(([key, entry]) => {
-              const issueType = key as Issue['type'];
+            {orderedIssueTypeBreakdowns.map(([issueType, entry]) => {
               return (
                 <div
                   key={issueType}
@@ -329,7 +332,7 @@ export const DateCardDetails: React.FC<
             </p>
           )}
           <div className="mt-2 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
-            {Object.entries(breakdownByIssueTypes).map(([issueType, entry]) => (
+            {orderedIssueTypeBreakdowns.map(([issueType, entry]) => (
               <Fragment key={issueType}>
                 {entry.issueIds.map((issueId) => {
                   const issueRef = issues[issueId];
