@@ -111,6 +111,11 @@ See `docs/GENERATED_FILES.md` for more detail.
 - `docs/QUALITY.md`: verification harness and current test gaps.
 - `docs/OVERHAUL_BASELINE.md`: historical baseline for the read-model
   migration.
+- `docs/plans/README.md`: conventions for checked-in execution plans.
+- `docs/plans/active/`: active multi-phase work, including read-model overhaul
+  and production performance plans.
+- `docs/investigations/`: dated investigation notes that inform plans and
+  architecture docs.
 
 ## Contributions
 
