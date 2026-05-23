@@ -30,7 +30,7 @@ export function getOperatingHours(
     zone: 'Asia/Singapore',
   });
   assert(end.isValid);
-  if (end < start) {
+  if (end <= start) {
     // If the end time is before the start time, it means the end time is on the next day
     end = end.plus({ days: 1 });
   }
