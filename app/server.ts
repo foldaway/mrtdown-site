@@ -1,26 +1,23 @@
 import * as Sentry from '@sentry/cloudflare';
-import { wrapFetchWithSentry } from '@sentry/tanstackstart-react';
 import handler from '@tanstack/react-start/server-entry';
 import { handleScheduledWorkflows } from './workflows/scheduled';
 
-const wrappedFetch = wrapFetchWithSentry({
-  async fetch(request) {
-    const startedAt = performance.now();
-    const response = await handler.fetch(request);
-    const elapsedMs = performance.now() - startedAt;
+async function appFetch(request: Request) {
+  const startedAt = performance.now();
+  const response = await handler.fetch(request);
+  const elapsedMs = performance.now() - startedAt;
 
-    const responseWithHeaders = addResponseInstrumentationHeaders(
-      response,
-      elapsedMs,
-    );
+  const responseWithHeaders = addResponseInstrumentationHeaders(
+    response,
+    elapsedMs,
+  );
 
-    if (import.meta.env.DEV && responseWithHeaders.status !== 101) {
-      logResponseByteEstimate(request, responseWithHeaders.clone(), elapsedMs);
-    }
+  if (import.meta.env.DEV && responseWithHeaders.status !== 101) {
+    logResponseByteEstimate(request, responseWithHeaders.clone(), elapsedMs);
+  }
 
-    return responseWithHeaders;
-  },
-});
+  return responseWithHeaders;
+}
 
 function addResponseInstrumentationHeaders(
   response: Response,
@@ -94,7 +91,7 @@ export default Sentry.withSentry(
     };
   },
   {
-    fetch: wrappedFetch.fetch,
+    fetch: appFetch,
     async scheduled(event, env, ctx) {
       await handleScheduledWorkflows(event, env, ctx);
     },
