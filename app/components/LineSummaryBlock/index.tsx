@@ -21,6 +21,7 @@ import {
   ServiceEndedDateCardDetails,
 } from './components/ServiceEndedDateCard';
 import { UptimeCard } from './components/UptimeCard';
+import { getOperatingHours } from './hooks/useOperatingHours';
 
 interface Props {
   data: LineSummary;
@@ -54,10 +55,11 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
   }, [line.startedAt]);
 
   const now = dateTimes[dateTimes.length - 1];
-  const serviceStartToday = useMemo(
-    () => now.set({ hour: 5, minute: 30 }),
-    [now],
-  );
+  const serviceStartToday = useMemo(() => {
+    const todayDayType =
+      breakdownByDates[now.toISODate() ?? '']?.dayType ?? 'weekday';
+    return getOperatingHours(line, now, todayDayType).start;
+  }, [breakdownByDates, line, now]);
 
   const isHydrated = useHydrated();
 
@@ -165,7 +167,11 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
             ) {
               return <NonOperationalDateCard key={dateTime.valueOf()} />;
             }
-            if (dateTime.hasSame(now, 'day') && now < serviceStartToday) {
+            if (
+              dateTime.hasSame(now, 'day') &&
+              status === 'closed_for_day' &&
+              now < serviceStartToday
+            ) {
               const isoDate = dateTime.toISODate();
               return (
                 <ServiceEndedDateCard
