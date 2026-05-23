@@ -59,6 +59,11 @@ import {
 } from '~/util/serverTiming';
 
 const SG_TIMEZONE = 'Asia/Singapore';
+const ISSUE_TYPES = [
+  'disruption',
+  'maintenance',
+  'infra',
+] as const satisfies readonly IssueType[];
 
 type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
 
@@ -312,6 +317,25 @@ function overlapSeconds(
   return Math.max(0, overlapEnd.diff(overlapStart, 'seconds').seconds);
 }
 
+function clipIssueIntervalsToRange(
+  issue: Issue,
+  windowStart: DateTime,
+  windowEnd: DateTime,
+  referenceNow = nowSg(),
+) {
+  return getIssueBounds(issue)
+    .map((interval) =>
+      clipIntervalToRange(
+        interval.start,
+        interval.end,
+        windowStart,
+        windowEnd,
+        referenceNow,
+      ),
+    )
+    .filter((interval): interval is IssueIntervalBounds => interval != null);
+}
+
 function clipIntervalToRange(
   start: DateTime,
   end: DateTime | null,
@@ -553,6 +577,31 @@ function createIssueTypeCounts(): IssueTypeCounts {
   };
 }
 
+function createIssueTypeIntervalGroups(): Record<
+  IssueType,
+  IssueIntervalBounds[]
+> {
+  return {
+    disruption: [],
+    maintenance: [],
+    infra: [],
+  };
+}
+
+function sumIssueTypeIntervalGroups(
+  intervalGroups: Record<IssueType, IssueIntervalBounds[]>,
+  referenceNow = nowSg(),
+) {
+  const counts = createIssueTypeCounts();
+  for (const issueType of ISSUE_TYPES) {
+    counts[issueType] = sumIntervalSeconds(
+      intervalGroups[issueType],
+      referenceNow,
+    );
+  }
+  return counts;
+}
+
 function createIssueTypeBreakdown(): IssueTypeBreakdown {
   return {
     ...createIssueTypeCounts(),
@@ -602,10 +651,12 @@ function getIssueBounds(issue: Issue): IssueIntervalBounds[] {
     return cached;
   }
 
-  const bounds = issue.intervals.map((interval) => ({
-    start: parseDateTime(interval.startAt),
-    end: interval.endAt != null ? parseDateTime(interval.endAt) : null,
-  }));
+  const bounds = mergeIntervals(
+    issue.intervals.map((interval) => ({
+      start: parseDateTime(interval.startAt),
+      end: interval.endAt != null ? parseDateTime(interval.endAt) : null,
+    })),
+  );
   issueBoundsCache.set(issue, bounds);
   return bounds;
 }
@@ -1623,7 +1674,7 @@ function withIssues(
   };
 }
 
-function buildLineSummary(
+export function buildLineSummary(
   line: Line,
   issues: IssueWithOperationalEffects[],
   days: number,
@@ -1632,7 +1683,7 @@ function buildLineSummary(
 ): LineSummary {
   const startDate = referenceNow.startOf('day').minus({ days: days - 1 });
   const breakdownByDates: LineSummary['breakdownByDates'] = {};
-  const durationSecondsByIssueType: Partial<Record<IssueType, number>> = {};
+  const downtimeIntervalsByIssueType = createIssueTypeIntervalGroups();
 
   let totalServiceSeconds = 0;
   let totalDowntimeSeconds = 0;
@@ -1650,56 +1701,48 @@ function buildLineSummary(
     }
 
     const dailyDowntimeIntervals: IssueIntervalBounds[] = [];
+    const dailyIntervalsByIssueType = createIssueTypeIntervalGroups();
 
     for (const issue of issues) {
-      const issueBounds = getIssueBounds(issue);
-      const contributingBounds: IssueIntervalBounds[] = [];
-      const dayOverlap = issueBounds.reduce((total, interval) => {
-        const clippedStart =
-          interval.start > dayWindow.start ? interval.start : dayWindow.start;
-        const intervalEnd = interval.end ?? referenceNow;
-        const clippedEnd =
-          intervalEnd < dayWindow.end ? intervalEnd : dayWindow.end;
-        if (clippedEnd > clippedStart) {
-          contributingBounds.push({
-            start: clippedStart,
-            end: clippedEnd,
-          });
-        }
-        return (
-          total +
-          overlapSeconds(
-            interval.start,
-            interval.end,
-            dayWindow.start,
-            dayWindow.end,
-            referenceNow,
-          )
-        );
-      }, 0);
+      const contributingBounds = clipIssueIntervalsToRange(
+        issue,
+        dayWindow.start,
+        dayWindow.end,
+        referenceNow,
+      );
+      const dayOverlap = sumIntervalSeconds(contributingBounds, referenceNow);
 
       if (dayOverlap <= 0) {
         continue;
       }
 
-      if (issueContributesToLineDowntime(issue)) {
-        durationSecondsByIssueType[issue.type] =
-          (durationSecondsByIssueType[issue.type] ?? 0) + dayOverlap;
-      }
+      dailyIntervalsByIssueType[issue.type].push(...contributingBounds);
 
       if (issueContributesToLineDowntime(issue)) {
         dailyDowntimeIntervals.push(...contributingBounds);
+        downtimeIntervalsByIssueType[issue.type].push(...contributingBounds);
       }
 
       const current = dayBreakdown.breakdownByIssueTypes[issue.type] ?? {
         totalDurationSeconds: 0,
         issueIds: [],
       };
-      current.totalDurationSeconds += dayOverlap;
       if (!current.issueIds.includes(issue.id)) {
         current.issueIds.push(issue.id);
       }
       dayBreakdown.breakdownByIssueTypes[issue.type] = current;
+    }
+
+    const dailyDurationSecondsByIssueType = sumIssueTypeIntervalGroups(
+      dailyIntervalsByIssueType,
+      referenceNow,
+    );
+    for (const issueType of ISSUE_TYPES) {
+      const current = dayBreakdown.breakdownByIssueTypes[issueType];
+      if (current != null) {
+        current.totalDurationSeconds =
+          dailyDurationSecondsByIssueType[issueType];
+      }
     }
 
     totalDowntimeSeconds += sumIntervalSeconds(
@@ -1739,6 +1782,11 @@ function buildLineSummary(
   ) {
     status = 'ongoing_infra';
   }
+
+  const durationSecondsByIssueType = sumIssueTypeIntervalGroups(
+    downtimeIntervalsByIssueType,
+    referenceNow,
+  );
 
   return {
     lineId: line.id,
@@ -1919,39 +1967,33 @@ function buildUptimeGraph(
       line,
       serviceWindowForDate(line, date, publicHolidaySet),
     );
-    let breakdownDisruption = 0;
-    let breakdownMaintenance = 0;
-    let breakdownInfra = 0;
+    const downtimeIntervals: IssueIntervalBounds[] = [];
+    const downtimeIntervalsByIssueType = createIssueTypeIntervalGroups();
 
     if (serviceWindow.seconds > 0) {
       for (const issue of issues) {
-        const overlap = getIssueBounds(issue).reduce((total, interval) => {
-          return (
-            total +
-            overlapSeconds(
-              interval.start,
-              interval.end,
-              serviceWindow.start,
-              serviceWindow.end,
-            )
-          );
-        }, 0);
-        if (overlap <= 0) {
-          continue;
-        }
-
         if (!issueContributesToLineDowntime(issue)) {
           continue;
         }
 
-        if (issue.type === 'disruption') breakdownDisruption += overlap;
-        if (issue.type === 'maintenance') breakdownMaintenance += overlap;
-        if (issue.type === 'infra') breakdownInfra += overlap;
+        const intervals = clipIssueIntervalsToRange(
+          issue,
+          serviceWindow.start,
+          serviceWindow.end,
+        );
+        if (intervals.length === 0) {
+          continue;
+        }
+
+        downtimeIntervals.push(...intervals);
+        downtimeIntervalsByIssueType[issue.type].push(...intervals);
       }
     }
 
-    const totalDowntime =
-      breakdownDisruption + breakdownMaintenance + breakdownInfra;
+    const totalDowntime = sumIntervalSeconds(downtimeIntervals);
+    const downtimeSecondsByIssueType = sumIssueTypeIntervalGroups(
+      downtimeIntervalsByIssueType,
+    );
     data.push({
       name: isoDate(date),
       payload: {
@@ -1959,16 +2001,16 @@ function buildUptimeGraph(
           serviceWindow.seconds > 0
             ? Math.max(0, 1 - totalDowntime / serviceWindow.seconds)
             : 1,
-        'breakdown.disruption': breakdownDisruption,
-        'breakdown.maintenance': breakdownMaintenance,
-        'breakdown.infra': breakdownInfra,
+        'breakdown.disruption': downtimeSecondsByIssueType.disruption,
+        'breakdown.maintenance': downtimeSecondsByIssueType.maintenance,
+        'breakdown.infra': downtimeSecondsByIssueType.infra,
       },
     });
   }
 
   const buildAggregate = (windowStart: DateTime, windowCount: number) => {
     let serviceSeconds = 0;
-    let downtime = 0;
+    const downtimeIntervals: IssueIntervalBounds[] = [];
     for (let offset = 0; offset < windowCount; offset++) {
       const date = windowStart.plus({ days: offset });
       const serviceWindow = serviceWindowAfterLineStart(
@@ -1983,19 +2025,16 @@ function buildUptimeGraph(
         if (!issueContributesToLineDowntime(issue)) {
           continue;
         }
-        downtime += getIssueBounds(issue).reduce((total, interval) => {
-          return (
-            total +
-            overlapSeconds(
-              interval.start,
-              interval.end,
-              serviceWindow.start,
-              serviceWindow.end,
-            )
-          );
-        }, 0);
+        downtimeIntervals.push(
+          ...clipIssueIntervalsToRange(
+            issue,
+            serviceWindow.start,
+            serviceWindow.end,
+          ),
+        );
       }
     }
+    const downtime = sumIntervalSeconds(downtimeIntervals);
     return serviceSeconds > 0 ? Math.max(0, 1 - downtime / serviceSeconds) : 1;
   };
 
@@ -2046,24 +2085,23 @@ function buildOperatorUptimeGraph(
           publicHolidaySet,
         );
         serviceSeconds += serviceWindow.seconds;
+        const lineDowntimeIntervals: IssueIntervalBounds[] = [];
 
         for (const issue of issuesByLineId[line.id] ?? []) {
           if (!issueContributesToLineDowntime(issue)) {
             continue;
           }
 
-          downtimeSeconds += getIssueBounds(issue).reduce((total, interval) => {
-            return (
-              total +
-              overlapSeconds(
-                interval.start,
-                interval.end,
-                serviceWindow.start,
-                serviceWindow.end,
-              )
-            );
-          }, 0);
+          lineDowntimeIntervals.push(
+            ...clipIssueIntervalsToRange(
+              issue,
+              serviceWindow.start,
+              serviceWindow.end,
+            ),
+          );
         }
+
+        downtimeSeconds += sumIntervalSeconds(lineDowntimeIntervals);
       }
     }
 
@@ -2630,7 +2668,7 @@ function buildLineOperationalFactRow(
   asOf: DateTime,
 ): typeof lineDayFactsTable.$inferInsert {
   const issueCounts = createIssueTypeCounts();
-  const downtimeSeconds = createIssueTypeCounts();
+  const downtimeIntervalsByIssueType = createIssueTypeIntervalGroups();
   const lineFuture = isLineFuture(line, normalizedDate.endOf('day'));
   const serviceWindow = serviceWindowForDate(
     line,
@@ -2647,22 +2685,20 @@ function buildLineOperationalFactRow(
       continue;
     }
 
-    const dayOverlap = getIssueBounds(issue).reduce(
-      (total, interval) =>
-        total +
-        overlapSeconds(
-          interval.start,
-          interval.end,
-          serviceWindow.start,
-          serviceWindow.end,
-          asOf,
-        ),
-      0,
+    downtimeIntervalsByIssueType[issue.type].push(
+      ...clipIssueIntervalsToRange(
+        issue,
+        serviceWindow.start,
+        serviceWindow.end,
+        asOf,
+      ),
     );
-    if (dayOverlap > 0) {
-      downtimeSeconds[issue.type] += dayOverlap;
-    }
   }
+
+  const downtimeSeconds = sumIssueTypeIntervalGroups(
+    downtimeIntervalsByIssueType,
+    asOf,
+  );
 
   return {
     date: isoDate(normalizedDate),
