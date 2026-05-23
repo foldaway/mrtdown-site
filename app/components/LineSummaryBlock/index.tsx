@@ -82,22 +82,20 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
       (activeDateCard?.type === 'date' && activeDateRecord != null));
 
   const activateDateCard = (nextDateCard: ActiveDateCard) => {
+    if (
+      activeDateCard?.type === nextDateCard.type &&
+      activeDateCard.isoDate === nextDateCard.isoDate
+    ) {
+      setActiveDateCard(null);
+      return;
+    }
+
     setActiveDateCard(nextDateCard);
   };
 
   const closeActiveDateCard = () => {
     setActiveDateCard(null);
   };
-
-  const LineSummaryRoot = hasActivePanel ? DismissableLayer.Root : 'fieldset';
-  const lineSummaryRootProps = hasActivePanel
-    ? {
-        onDismiss: closeActiveDateCard,
-        onFocusOutside: (event: Event) => {
-          event.preventDefault();
-        },
-      }
-    : {};
 
   return (
     <>
@@ -107,8 +105,7 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
           className="fixed inset-0 z-20 cursor-default bg-transparent"
         />
       )}
-      <LineSummaryRoot
-        {...lineSummaryRootProps}
+      <fieldset
         className={classNames(
           'relative m-0 flex min-w-0 flex-col rounded-lg border-0 bg-gray-100 px-4 py-2 dark:bg-gray-800',
           {
@@ -256,8 +253,12 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
           activeDateCard != null &&
           activeDateTime != null &&
           (activeDateCard.type === 'date' && activeDateRecord != null ? (
-            <div
+            <DismissableLayer.Root
               className={DATE_CARD_DETAILS_PANEL_CLASS_NAME}
+              onDismiss={closeActiveDateCard}
+              onFocusOutside={(event) => {
+                event.preventDefault();
+              }}
               style={{ borderTopColor: line.color }}
             >
               <DateCardDetails
@@ -266,10 +267,14 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
                 line={line}
                 issues={issues}
               />
-            </div>
+            </DismissableLayer.Root>
           ) : activeDateCard.type === 'service-ended' ? (
-            <div
+            <DismissableLayer.Root
               className={DATE_CARD_DETAILS_PANEL_CLASS_NAME}
+              onDismiss={closeActiveDateCard}
+              onFocusOutside={(event) => {
+                event.preventDefault();
+              }}
               style={{ borderTopColor: line.color }}
             >
               <ServiceEndedDateCardDetails
@@ -277,9 +282,9 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
                 dayType={activeDateRecord?.dayType ?? 'weekday'}
                 componentRef={line}
               />
-            </div>
+            </DismissableLayer.Root>
           ) : null)}
-      </LineSummaryRoot>
+      </fieldset>
     </>
   );
 };
