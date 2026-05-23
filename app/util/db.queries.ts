@@ -186,6 +186,10 @@ async function getDefaultDb() {
   return getDb();
 }
 
+async function timeDbQuery<T>(name: string, query: () => Promise<T>) {
+  return timeServerSpan(name, query);
+}
+
 function parseDateTime(value: string) {
   const cached = dateTimeCache.get(value);
   if (cached != null) {
@@ -712,59 +716,91 @@ async function buildDataset(
     impactEventRows,
   ] = await timeServerSpan('dataset_base_queries', () =>
     Promise.all([
-      database.select().from(metadataTable),
-      database.select().from(linesTable),
-      database.select().from(lineOperatorsTable),
-      database.select().from(operatorsTable),
-      database.select().from(townsTable),
-      database.select().from(landmarksTable),
-      database
-        .select({
-          id: stationsTable.id,
-          name: stationsTable.name,
-          townId: stationsTable.townId,
-          latitude: sql<number>`ST_Y(${stationsTable.geo})`,
-          longitude: sql<number>`ST_X(${stationsTable.geo})`,
-        })
-        .from(stationsTable),
-      database.select().from(stationCodesTable),
-      database.select().from(stationLandmarksTable),
-      database.select().from(servicesTable),
-      database.select().from(serviceRevisionsTable),
-      database.select().from(publicHolidaysTable),
+      timeDbQuery('dataset_q_metadata', () =>
+        database.select().from(metadataTable),
+      ),
+      timeDbQuery('dataset_q_lines', () => database.select().from(linesTable)),
+      timeDbQuery('dataset_q_line_operators', () =>
+        database.select().from(lineOperatorsTable),
+      ),
+      timeDbQuery('dataset_q_operators', () =>
+        database.select().from(operatorsTable),
+      ),
+      timeDbQuery('dataset_q_towns', () => database.select().from(townsTable)),
+      timeDbQuery('dataset_q_landmarks', () =>
+        database.select().from(landmarksTable),
+      ),
+      timeDbQuery('dataset_q_stations', () =>
+        database
+          .select({
+            id: stationsTable.id,
+            name: stationsTable.name,
+            townId: stationsTable.townId,
+            latitude: sql<number>`ST_Y(${stationsTable.geo})`,
+            longitude: sql<number>`ST_X(${stationsTable.geo})`,
+          })
+          .from(stationsTable),
+      ),
+      timeDbQuery('dataset_q_station_codes', () =>
+        database.select().from(stationCodesTable),
+      ),
+      timeDbQuery('dataset_q_station_landmarks', () =>
+        database.select().from(stationLandmarksTable),
+      ),
+      timeDbQuery('dataset_q_services', () =>
+        database.select().from(servicesTable),
+      ),
+      timeDbQuery('dataset_q_service_revisions', () =>
+        database.select().from(serviceRevisionsTable),
+      ),
+      timeDbQuery('dataset_q_public_holidays', () =>
+        database.select().from(publicHolidaysTable),
+      ),
       selectedIssueIds == null
-        ? database.select().from(issuesTable)
+        ? timeDbQuery('dataset_q_issues', () =>
+            database.select().from(issuesTable),
+          )
         : selectedIssueIds.length > 0
-          ? database
-              .select()
-              .from(issuesTable)
-              .where(inArray(issuesTable.id, selectedIssueIds))
+          ? timeDbQuery('dataset_q_issues', () =>
+              database
+                .select()
+                .from(issuesTable)
+                .where(inArray(issuesTable.id, selectedIssueIds)),
+            )
           : [],
       selectedIssueIds == null
-        ? database
-            .select({
-              issue_id: evidencesTable.issue_id,
-              latest_ts: sql<string>`max(${evidencesTable.ts})`,
-            })
-            .from(evidencesTable)
-            .groupBy(evidencesTable.issue_id)
-        : selectedIssueIds.length > 0
-          ? database
+        ? timeDbQuery('dataset_q_latest_evidence', () =>
+            database
               .select({
                 issue_id: evidencesTable.issue_id,
                 latest_ts: sql<string>`max(${evidencesTable.ts})`,
               })
               .from(evidencesTable)
-              .where(inArray(evidencesTable.issue_id, selectedIssueIds))
-              .groupBy(evidencesTable.issue_id)
+              .groupBy(evidencesTable.issue_id),
+          )
+        : selectedIssueIds.length > 0
+          ? timeDbQuery('dataset_q_latest_evidence', () =>
+              database
+                .select({
+                  issue_id: evidencesTable.issue_id,
+                  latest_ts: sql<string>`max(${evidencesTable.ts})`,
+                })
+                .from(evidencesTable)
+                .where(inArray(evidencesTable.issue_id, selectedIssueIds))
+                .groupBy(evidencesTable.issue_id),
+            )
           : [],
       selectedIssueIds == null
-        ? database.select().from(impactEventsTable)
+        ? timeDbQuery('dataset_q_impact_events', () =>
+            database.select().from(impactEventsTable),
+          )
         : selectedIssueIds.length > 0
-          ? database
-              .select()
-              .from(impactEventsTable)
-              .where(inArray(impactEventsTable.issue_id, selectedIssueIds))
+          ? timeDbQuery('dataset_q_impact_events', () =>
+              database
+                .select()
+                .from(impactEventsTable)
+                .where(inArray(impactEventsTable.issue_id, selectedIssueIds)),
+            )
           : [],
     ]),
   );
@@ -829,70 +865,82 @@ async function buildDataset(
   ] = await timeServerSpan('dataset_issue_detail_queries', () =>
     Promise.all([
       periodImpactEventIds.length > 0
-        ? database
-            .select()
-            .from(impactEventPeriodsTable)
-            .where(
-              inArray(
-                impactEventPeriodsTable.impact_event_id,
-                periodImpactEventIds,
+        ? timeDbQuery('dataset_q_impact_event_periods', () =>
+            database
+              .select()
+              .from(impactEventPeriodsTable)
+              .where(
+                inArray(
+                  impactEventPeriodsTable.impact_event_id,
+                  periodImpactEventIds,
+                ),
               ),
-            )
+          )
         : ([] as (typeof impactEventPeriodsTable.$inferSelect)[]),
       selectedStateEventIds.length > 0
-        ? database
-            .select()
-            .from(impactEventEntityServicesTable)
-            .where(
-              inArray(
-                impactEventEntityServicesTable.impact_event_id,
-                selectedStateEventIds,
+        ? timeDbQuery('dataset_q_impact_event_services', () =>
+            database
+              .select()
+              .from(impactEventEntityServicesTable)
+              .where(
+                inArray(
+                  impactEventEntityServicesTable.impact_event_id,
+                  selectedStateEventIds,
+                ),
               ),
-            )
+          )
         : ([] as (typeof impactEventEntityServicesTable.$inferSelect)[]),
       selectedStateEventIds.length > 0
-        ? database
-            .select()
-            .from(impactEventEntityFacilitiesTable)
-            .where(
-              inArray(
-                impactEventEntityFacilitiesTable.impact_event_id,
-                selectedStateEventIds,
+        ? timeDbQuery('dataset_q_impact_event_facilities', () =>
+            database
+              .select()
+              .from(impactEventEntityFacilitiesTable)
+              .where(
+                inArray(
+                  impactEventEntityFacilitiesTable.impact_event_id,
+                  selectedStateEventIds,
+                ),
               ),
-            )
+          )
         : ([] as (typeof impactEventEntityFacilitiesTable.$inferSelect)[]),
       selectedStateEventIds.length > 0
-        ? database
-            .select()
-            .from(impactEventCausesTable)
-            .where(
-              inArray(
-                impactEventCausesTable.impact_event_id,
-                selectedStateEventIds,
+        ? timeDbQuery('dataset_q_impact_event_causes', () =>
+            database
+              .select()
+              .from(impactEventCausesTable)
+              .where(
+                inArray(
+                  impactEventCausesTable.impact_event_id,
+                  selectedStateEventIds,
+                ),
               ),
-            )
+          )
         : ([] as (typeof impactEventCausesTable.$inferSelect)[]),
       selectedStateEventIds.length > 0
-        ? database
-            .select()
-            .from(impactEventServiceEffectsTable)
-            .where(
-              inArray(
-                impactEventServiceEffectsTable.impact_event_id,
-                selectedStateEventIds,
+        ? timeDbQuery('dataset_q_impact_event_service_effects', () =>
+            database
+              .select()
+              .from(impactEventServiceEffectsTable)
+              .where(
+                inArray(
+                  impactEventServiceEffectsTable.impact_event_id,
+                  selectedStateEventIds,
+                ),
               ),
-            )
+          )
         : ([] as (typeof impactEventServiceEffectsTable.$inferSelect)[]),
       selectedStateEventIds.length > 0
-        ? database
-            .select()
-            .from(impactEventFacilityEffectsTable)
-            .where(
-              inArray(
-                impactEventFacilityEffectsTable.impact_event_id,
-                selectedStateEventIds,
+        ? timeDbQuery('dataset_q_impact_event_facility_effects', () =>
+            database
+              .select()
+              .from(impactEventFacilityEffectsTable)
+              .where(
+                inArray(
+                  impactEventFacilityEffectsTable.impact_event_id,
+                  selectedStateEventIds,
+                ),
               ),
-            )
+          )
         : ([] as (typeof impactEventFacilityEffectsTable.$inferSelect)[]),
     ]),
   );
@@ -2838,22 +2886,28 @@ export async function getRootData() {
       'root_nav_queries',
       () =>
         Promise.all([
-          db
-            .select({
-              id: linesTable.id,
-              name: linesTable.name,
-              color: linesTable.color,
-            })
-            .from(linesTable)
-            .orderBy(asc(linesTable.id)),
-          db.select().from(metadataTable).orderBy(asc(metadataTable.key)),
-          db
-            .select({
-              id: operatorsTable.id,
-              name: operatorsTable.name,
-            })
-            .from(operatorsTable)
-            .orderBy(asc(operatorsTable.id)),
+          timeDbQuery('root_q_lines', () =>
+            db
+              .select({
+                id: linesTable.id,
+                name: linesTable.name,
+                color: linesTable.color,
+              })
+              .from(linesTable)
+              .orderBy(asc(linesTable.id)),
+          ),
+          timeDbQuery('root_q_metadata', () =>
+            db.select().from(metadataTable).orderBy(asc(metadataTable.key)),
+          ),
+          timeDbQuery('root_q_operators', () =>
+            db
+              .select({
+                id: operatorsTable.id,
+                name: operatorsTable.name,
+              })
+              .from(operatorsTable)
+              .orderBy(asc(operatorsTable.id)),
+          ),
         ]),
     );
 
