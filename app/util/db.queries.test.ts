@@ -109,4 +109,65 @@ describe('buildLineSummary', () => {
     expect(summary.durationSecondsByIssueType.disruption).toBe(18 * 60 * 60);
     expect(summary.uptimeRatio).toBe(0);
   });
+
+  it('treats lines as operating during service windows that spill into the next day', () => {
+    const summary = buildLineSummary(
+      {
+        ...TEST_LINE,
+        operatingHours: {
+          weekdays: { start: '05:30', end: '00:30' },
+          weekends: { start: '05:30', end: '00:30' },
+        },
+      },
+      [],
+      1,
+      new Set(),
+      DateTime.fromISO('2026-02-24T00:15:00', {
+        zone: 'Asia/Singapore',
+      }),
+    );
+
+    expect(summary.status).toBe('normal');
+  });
+
+  it('treats lines as closed after a next-day spillover service window ends', () => {
+    const summary = buildLineSummary(
+      {
+        ...TEST_LINE,
+        operatingHours: {
+          weekdays: { start: '05:30', end: '00:30' },
+          weekends: { start: '05:30', end: '00:30' },
+        },
+      },
+      [],
+      1,
+      new Set(),
+      DateTime.fromISO('2026-02-24T00:31:00', {
+        zone: 'Asia/Singapore',
+      }),
+    );
+
+    expect(summary.status).toBe('closed_for_day');
+  });
+
+  it('does not apply previous-day spillover before a line starts service', () => {
+    const summary = buildLineSummary(
+      {
+        ...TEST_LINE,
+        startedAt: '2026-02-24',
+        operatingHours: {
+          weekdays: { start: '05:30', end: '00:30' },
+          weekends: { start: '05:30', end: '00:30' },
+        },
+      },
+      [],
+      1,
+      new Set(),
+      DateTime.fromISO('2026-02-24T00:15:00', {
+        zone: 'Asia/Singapore',
+      }),
+    );
+
+    expect(summary.status).toBe('closed_for_day');
+  });
 });

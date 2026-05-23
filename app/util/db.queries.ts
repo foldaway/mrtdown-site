@@ -488,6 +488,24 @@ function serviceWindowForDate(
   };
 }
 
+function serviceWindowContains(
+  serviceWindow: ReturnType<typeof serviceWindowForDate>,
+  date: DateTime,
+) {
+  return date >= serviceWindow.start && date <= serviceWindow.end;
+}
+
+function serviceWindowIsAfterLineStart(
+  line: Line,
+  serviceWindow: ReturnType<typeof serviceWindowForDate>,
+) {
+  if (line.startedAt == null) {
+    return true;
+  }
+
+  return serviceWindow.start.startOf('day') >= parseDateTime(line.startedAt);
+}
+
 function serviceWindowAfterLineStart(
   line: Line,
   serviceWindow: ReturnType<typeof serviceWindowForDate>,
@@ -531,7 +549,19 @@ function isLineOperatingNow(
   }
 
   const window = serviceWindowForDate(line, referenceNow, publicHolidaySet);
-  return referenceNow >= window.start && referenceNow <= window.end;
+  if (serviceWindowContains(window, referenceNow)) {
+    return true;
+  }
+
+  const previousWindow = serviceWindowForDate(
+    line,
+    referenceNow.minus({ day: 1 }),
+    publicHolidaySet,
+  );
+  return (
+    serviceWindowIsAfterLineStart(line, previousWindow) &&
+    serviceWindowContains(previousWindow, referenceNow)
+  );
 }
 
 function pickIssueTypes<T extends { type: IssueType }>(items: T[]) {
