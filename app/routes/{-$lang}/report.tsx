@@ -49,6 +49,14 @@ type ReportSearch = {
 
 type ReportScope = 'line' | 'station' | 'train';
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
+type FieldErrorKey =
+  | 'scope'
+  | 'station'
+  | 'line'
+  | 'effect'
+  | 'direction'
+  | 'description'
+  | 'observedAt';
 
 type TurnstileApi = {
   render: (
@@ -250,6 +258,14 @@ function ReportPage() {
   const intl = useIntl();
   const posthog = usePostHog();
   const errorRef = useRef<HTMLDivElement>(null);
+  const scopeRef = useRef<HTMLDivElement>(null);
+  const stationSearchRef = useRef<HTMLInputElement>(null);
+  const lineRef = useRef<HTMLDivElement>(null);
+  const effectRef = useRef<HTMLDivElement>(null);
+  const directionSelectRef = useRef<HTMLSelectElement>(null);
+  const directionOtherRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const observedAtRef = useRef<HTMLInputElement>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetIdRef = useRef<string | undefined>(undefined);
   const prefilledLineId =
@@ -288,6 +304,9 @@ function ReportPage() {
   const [isStillHappening, setIsStillHappening] = useState(true);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [clientError, setClientError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<FieldErrorKey, string>>
+  >({});
   const [submitState, setSubmitState] = useState<
     'idle' | 'submitting' | 'success'
   >('idle');
@@ -395,7 +414,17 @@ function ReportPage() {
     setDirectionChoice('');
   }, [directionChoice, selectedLineDirectionOptions]);
 
+  const clearFieldError = (field: FieldErrorKey) => {
+    setClientError(null);
+    setFieldErrors((current) => {
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
   const toggleLine = (lineId: string) => {
+    clearFieldError('line');
     setSelectedLineIds((current) => {
       if (current.includes(lineId)) {
         return current.filter((id) => id !== lineId);
@@ -411,8 +440,50 @@ function ReportPage() {
     });
   };
 
+  const focusField = (field: FieldErrorKey) => {
+    window.requestAnimationFrame(() => {
+      if (field === 'scope') {
+        scopeRef.current?.focus();
+        return;
+      }
+      if (field === 'station') {
+        stationSearchRef.current?.focus();
+        return;
+      }
+      if (field === 'line') {
+        lineRef.current?.focus();
+        return;
+      }
+      if (field === 'effect') {
+        effectRef.current?.focus();
+        return;
+      }
+      if (field === 'direction') {
+        (directionOtherRef.current ?? directionSelectRef.current)?.focus();
+        return;
+      }
+      if (field === 'description') {
+        descriptionRef.current?.focus();
+        return;
+      }
+      observedAtRef.current?.focus();
+    });
+  };
+
+  const showFieldError = (
+    field: FieldErrorKey,
+    message: string,
+    reason: string,
+  ) => {
+    setFieldErrors({ [field]: message });
+    setClientError(message);
+    posthog.capture('crowd_report_validation_failed', { reason });
+    focusField(field);
+  };
+
   const selectStation = (stationId: string) => {
     const station = stationById[stationId];
+    clearFieldError('station');
     setSelectedStationIds([stationId]);
     setStationSearch('');
     if (reportScope === '') {
@@ -499,15 +570,15 @@ function ReportPage() {
       return;
     }
 
+    setFieldErrors({});
+    setClientError(null);
+
     if (!reportScope) {
       const message = intl.formatMessage({
         id: 'report.error.report_scope_required',
         defaultMessage: 'Choose what kind of issue you are reporting.',
       });
-      showClientError(message);
-      posthog.capture('crowd_report_validation_failed', {
-        reason: 'report_scope_required',
-      });
+      showFieldError('scope', message, 'report_scope_required');
       return;
     }
 
@@ -516,10 +587,7 @@ function ReportPage() {
         id: 'report.error.line_required',
         defaultMessage: 'Select the affected line.',
       });
-      showClientError(message);
-      posthog.capture('crowd_report_validation_failed', {
-        reason: 'line_required',
-      });
+      showFieldError('line', message, 'line_required');
       return;
     }
 
@@ -528,10 +596,7 @@ function ReportPage() {
         id: 'report.error.station_required',
         defaultMessage: 'Select the affected station.',
       });
-      showClientError(message);
-      posthog.capture('crowd_report_validation_failed', {
-        reason: 'station_required',
-      });
+      showFieldError('station', message, 'station_required');
       return;
     }
 
@@ -540,10 +605,7 @@ function ReportPage() {
         id: 'report.error.train_line_required',
         defaultMessage: 'Select the line you are travelling on.',
       });
-      showClientError(message);
-      posthog.capture('crowd_report_validation_failed', {
-        reason: 'train_line_required',
-      });
+      showFieldError('line', message, 'train_line_required');
       return;
     }
 
@@ -552,44 +614,58 @@ function ReportPage() {
         id: 'report.error.effect_required',
         defaultMessage: 'Choose what is happening.',
       });
-      showClientError(message);
-      posthog.capture('crowd_report_validation_failed', {
-        reason: 'effect_required',
+      showFieldError('effect', message, 'effect_required');
+      return;
+    }
+
+    if (directionChoice === 'other' && directionOtherText.trim().length === 0) {
+      const message = intl.formatMessage({
+        id: 'report.error.direction_other_required',
+        defaultMessage: 'Add the direction or destination.',
       });
+      showFieldError('direction', message, 'direction_other_required');
       return;
     }
 
     const observedAtIso = datetimeLocalToSgIso(observedAt);
     if (observedAtIso == null) {
-      showClientError(
-        intl.formatMessage({
-          id: 'report.error.observed_at_invalid',
-          defaultMessage: 'Choose a valid observed time.',
-        }),
-      );
-      posthog.capture('crowd_report_validation_failed', {
-        reason: 'observed_at_invalid',
+      const message = intl.formatMessage({
+        id: 'report.error.observed_at_invalid',
+        defaultMessage: 'Choose a valid observed time.',
       });
+      showFieldError('observedAt', message, 'observed_at_invalid');
       return;
     }
 
     const directionText = getDirectionText();
     const trimmedText = text.trim();
+    if (
+      (effect === 'unknown' || directionChoice === 'other') &&
+      trimmedText.length < 8
+    ) {
+      const message = intl.formatMessage({
+        id: 'report.error.description_required_for_ambiguous_report',
+        defaultMessage:
+          'Add a short note so reviewers can understand the report.',
+      });
+      showFieldError(
+        'description',
+        message,
+        'description_required_for_ambiguous_report',
+      );
+      return;
+    }
     if (trimmedText.length > 0 && trimmedText.length < 8) {
       const message = intl.formatMessage({
         id: 'report.error.description_too_short',
         defaultMessage: 'Add a little more detail, or leave the note blank.',
       });
-      showClientError(message);
-      posthog.capture('crowd_report_validation_failed', {
-        reason: 'description_too_short',
-      });
+      showFieldError('description', message, 'description_too_short');
       return;
     }
     const reportText = trimmedText || buildFallbackText();
 
     setSubmitState('submitting');
-    setClientError(null);
 
     let response: Response;
     try {
@@ -732,7 +808,10 @@ function ReportPage() {
       <button
         key={effectValue}
         type="button"
-        onClick={() => setEffect(effectValue)}
+        onClick={() => {
+          clearFieldError('effect');
+          setEffect(effectValue);
+        }}
         className={classNames(
           'flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-center font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-accent-light/30',
           selected
@@ -811,7 +890,14 @@ function ReportPage() {
           </div>
         )}
 
-        <section className="flex flex-col gap-3">
+        <section
+          className="flex flex-col gap-3"
+          ref={scopeRef}
+          tabIndex={-1}
+          aria-describedby={
+            fieldErrors.scope ? 'report-scope-error' : undefined
+          }
+        >
           <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
             <FormattedMessage
               id="report.scope"
@@ -826,7 +912,10 @@ function ReportPage() {
                 <button
                   key={scope}
                   type="button"
-                  onClick={() => setReportScope(scope)}
+                  onClick={() => {
+                    clearFieldError('scope');
+                    setReportScope(scope);
+                  }}
                   className={classNames(
                     'min-h-24 rounded-lg border p-3 text-start transition-colors focus:outline-none focus:ring-2 focus:ring-accent-light/30',
                     selected
@@ -857,6 +946,14 @@ function ReportPage() {
               );
             })}
           </div>
+          {fieldErrors.scope != null && (
+            <p
+              className="text-red-700 text-sm dark:text-red-300"
+              id="report-scope-error"
+            >
+              {fieldErrors.scope}
+            </p>
+          )}
         </section>
 
         {reportScope &&
@@ -933,16 +1030,32 @@ function ReportPage() {
               </span>
               <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-gray-400" />
               <input
+                ref={stationSearchRef}
                 type="search"
                 value={stationSearch}
-                onChange={(event) => setStationSearch(event.target.value)}
+                onChange={(event) => {
+                  clearFieldError('station');
+                  setStationSearch(event.target.value);
+                }}
                 placeholder={intl.formatMessage({
                   id: 'report.station_search_placeholder',
                   defaultMessage: 'Search by station name or code',
                 })}
+                aria-invalid={fieldErrors.station != null}
+                aria-describedby={
+                  fieldErrors.station ? 'report-station-error' : undefined
+                }
                 className="w-full rounded-lg border border-gray-300 bg-white py-2 pr-3 pl-9 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
               />
             </label>
+            {fieldErrors.station != null && (
+              <p
+                className="text-red-700 text-sm dark:text-red-300"
+                id="report-station-error"
+              >
+                {fieldErrors.station}
+              </p>
+            )}
             {(stationSearch || selectedStation == null) && (
               <div className="grid gap-2 sm:grid-cols-2">
                 {stationSearchResults.map((station) => (
@@ -962,7 +1075,14 @@ function ReportPage() {
 
         {reportScope &&
           (reportScope !== 'station' || selectedStation != null) && (
-            <section className="flex flex-col gap-2">
+            <section
+              className="flex flex-col gap-2"
+              ref={lineRef}
+              tabIndex={-1}
+              aria-describedby={
+                fieldErrors.line ? 'report-line-error' : undefined
+              }
+            >
               <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
                 {reportScope === 'train' ? (
                   <FormattedMessage
@@ -1000,11 +1120,26 @@ function ReportPage() {
                   </div>
                 </details>
               )}
+              {fieldErrors.line != null && (
+                <p
+                  className="text-red-700 text-sm dark:text-red-300"
+                  id="report-line-error"
+                >
+                  {fieldErrors.line}
+                </p>
+              )}
             </section>
           )}
 
         <section className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
-          <div className="flex flex-col gap-2">
+          <div
+            className="flex flex-col gap-2"
+            ref={effectRef}
+            tabIndex={-1}
+            aria-describedby={
+              fieldErrors.effect ? 'report-effect-error' : undefined
+            }
+          >
             <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
               <FormattedMessage
                 id="report.effect"
@@ -1014,6 +1149,14 @@ function ReportPage() {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {IngestContentCrowdReportEffects.map(renderEffectButton)}
             </div>
+            {fieldErrors.effect != null && (
+              <p
+                className="text-red-700 text-sm dark:text-red-300"
+                id="report-effect-error"
+              >
+                {fieldErrors.effect}
+              </p>
+            )}
           </div>
           <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-900">
             <input
@@ -1041,8 +1184,16 @@ function ReportPage() {
                 />
               </span>
               <select
+                ref={directionSelectRef}
                 value={directionChoice}
-                onChange={(event) => setDirectionChoice(event.target.value)}
+                onChange={(event) => {
+                  clearFieldError('direction');
+                  setDirectionChoice(event.target.value);
+                }}
+                aria-invalid={fieldErrors.direction != null}
+                aria-describedby={
+                  fieldErrors.direction ? 'report-direction-error' : undefined
+                }
                 className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
               >
                 <option value="">
@@ -1090,12 +1241,18 @@ function ReportPage() {
                   />
                 </span>
                 <input
+                  ref={directionOtherRef}
                   type="text"
                   value={directionOtherText}
-                  onChange={(event) =>
-                    setDirectionOtherText(event.target.value)
-                  }
+                  onChange={(event) => {
+                    clearFieldError('direction');
+                    setDirectionOtherText(event.target.value);
+                  }}
                   maxLength={120}
+                  aria-invalid={fieldErrors.direction != null}
+                  aria-describedby={
+                    fieldErrors.direction ? 'report-direction-error' : undefined
+                  }
                   placeholder={intl.formatMessage({
                     id: 'report.direction_other_placeholder',
                     defaultMessage: 'Example: towards Jurong East',
@@ -1103,6 +1260,14 @@ function ReportPage() {
                   className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                 />
               </label>
+            )}
+            {fieldErrors.direction != null && (
+              <p
+                className="text-red-700 text-sm sm:col-span-2 dark:text-red-300"
+                id="report-direction-error"
+              >
+                {fieldErrors.direction}
+              </p>
             )}
           </section>
         )}
@@ -1121,10 +1286,18 @@ function ReportPage() {
             </span>
           </span>
           <textarea
+            ref={descriptionRef}
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              clearFieldError('description');
+              setText(event.target.value);
+            }}
             maxLength={1000}
             rows={5}
+            aria-invalid={fieldErrors.description != null}
+            aria-describedby={
+              fieldErrors.description ? 'report-description-error' : undefined
+            }
             placeholder={intl.formatMessage({
               id: 'report.description_placeholder',
               defaultMessage:
@@ -1132,6 +1305,14 @@ function ReportPage() {
             })}
             className="resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
           />
+          {fieldErrors.description != null && (
+            <p
+              className="text-red-700 text-sm dark:text-red-300"
+              id="report-description-error"
+            >
+              {fieldErrors.description}
+            </p>
+          )}
         </label>
 
         <details className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
@@ -1171,13 +1352,31 @@ function ReportPage() {
                 />
               </span>
               <input
+                ref={observedAtRef}
                 type="datetime-local"
                 value={observedAt}
                 max={toSgDatetimeLocal(DateTime.now().plus({ minutes: 15 }))}
-                onChange={(event) => setObservedAt(event.target.value)}
+                onChange={(event) => {
+                  clearFieldError('observedAt');
+                  setObservedAt(event.target.value);
+                }}
+                aria-invalid={fieldErrors.observedAt != null}
+                aria-describedby={
+                  fieldErrors.observedAt
+                    ? 'report-observed-at-error'
+                    : undefined
+                }
                 className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
                 required
               />
+              {fieldErrors.observedAt != null && (
+                <p
+                  className="text-red-700 text-sm dark:text-red-300"
+                  id="report-observed-at-error"
+                >
+                  {fieldErrors.observedAt}
+                </p>
+              )}
             </label>
           </div>
         </details>
