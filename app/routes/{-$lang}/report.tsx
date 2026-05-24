@@ -401,6 +401,16 @@ function ReportPage() {
   }, [reportScope, selectedLineIds.length, selectedStation]);
 
   useEffect(() => {
+    if (selectedLineIds.length === 0) {
+      if (directionChoice !== '') {
+        setDirectionChoice('');
+      }
+      if (directionOtherText !== '') {
+        setDirectionOtherText('');
+      }
+      return;
+    }
+
     if (
       directionChoice === 'not-sure' ||
       directionChoice === 'other' ||
@@ -412,7 +422,12 @@ function ReportPage() {
       return;
     }
     setDirectionChoice('');
-  }, [directionChoice, selectedLineDirectionOptions]);
+  }, [
+    directionChoice,
+    directionOtherText,
+    selectedLineDirectionOptions,
+    selectedLineIds.length,
+  ]);
 
   const clearFieldError = (field: FieldErrorKey) => {
     setClientError(null);
@@ -618,7 +633,11 @@ function ReportPage() {
       return;
     }
 
-    if (directionChoice === 'other' && directionOtherText.trim().length === 0) {
+    if (
+      selectedLineIds.length > 0 &&
+      directionChoice === 'other' &&
+      directionOtherText.trim().length === 0
+    ) {
       const message = intl.formatMessage({
         id: 'report.error.direction_other_required',
         defaultMessage: 'Add the direction or destination.',
@@ -640,7 +659,8 @@ function ReportPage() {
     const directionText = getDirectionText();
     const trimmedText = text.trim();
     if (
-      (effect === 'unknown' || directionChoice === 'other') &&
+      (effect === 'unknown' ||
+        (selectedLineIds.length > 0 && directionChoice === 'other')) &&
       trimmedText.length < 8
     ) {
       const message = intl.formatMessage({
