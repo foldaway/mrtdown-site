@@ -252,20 +252,29 @@ function ReportPage() {
   const errorRef = useRef<HTMLDivElement>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetIdRef = useRef<string | undefined>(undefined);
+  const prefilledLineId =
+    search.lineId != null && lines.some((line) => line.id === search.lineId)
+      ? search.lineId
+      : undefined;
+  const prefilledStationId =
+    search.stationId != null &&
+    stations.some((station) => station.id === search.stationId)
+      ? search.stationId
+      : undefined;
   const [reportScope, setReportScope] = useState<ReportScope | ''>(() => {
-    if (search.stationId) {
+    if (prefilledStationId != null) {
       return 'station';
     }
-    if (search.lineId) {
+    if (prefilledLineId != null) {
       return 'line';
     }
     return '';
   });
   const [selectedLineIds, setSelectedLineIds] = useState<string[]>(
-    search.lineId ? [search.lineId] : [],
+    prefilledLineId != null ? [prefilledLineId] : [],
   );
   const [selectedStationIds, setSelectedStationIds] = useState<string[]>(
-    search.stationId ? [search.stationId] : [],
+    prefilledStationId != null ? [prefilledStationId] : [],
   );
   const [observedAt, setObservedAt] = useState(() =>
     toSgDatetimeLocal(DateTime.now()),
