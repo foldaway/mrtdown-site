@@ -20,6 +20,8 @@ Use plans for:
 
 - [Crowdsourced reports](active/crowdsourced-reports.md): site-local public
   report collection, moderation, clustering, and canonical ingest dispatch.
+- [Dynamic system map](active/dynamic-system-map.md): canonical schematic map
+  data and data-driven site rendering.
 - [Overhaul read model](active/overhaul-read-model.md): local Postgres-backed
   read model migration.
 - [Production performance](active/production-performance.md): public route
