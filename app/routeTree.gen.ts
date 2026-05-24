@@ -13,6 +13,7 @@ import { Route as Char123LangChar125RouteImport } from './routes/{-$lang}'
 import { Route as Char123LangChar125IndexRouteImport } from './routes/{-$lang}/index'
 import { Route as Char123LangChar125SystemMapRouteImport } from './routes/{-$lang}/system-map'
 import { Route as Char123LangChar125SitemapDotxmlRouteImport } from './routes/{-$lang}/sitemap[.]xml'
+import { Route as Char123LangChar125ReportRouteImport } from './routes/{-$lang}/report'
 import { Route as Char123LangChar125AboutRouteImport } from './routes/{-$lang}/about'
 import { Route as ApiReportsRouteImport } from './routes/api.reports'
 import { Route as ApiIssuesDayRouteImport } from './routes/api.issues-day'
@@ -51,6 +52,12 @@ const Char123LangChar125SitemapDotxmlRoute =
   Char123LangChar125SitemapDotxmlRouteImport.update({
     id: '/sitemap.xml',
     path: '/sitemap.xml',
+    getParentRoute: () => Char123LangChar125Route,
+  } as any)
+const Char123LangChar125ReportRoute =
+  Char123LangChar125ReportRouteImport.update({
+    id: '/report',
+    path: '/report',
     getParentRoute: () => Char123LangChar125Route,
   } as any)
 const Char123LangChar125AboutRoute = Char123LangChar125AboutRouteImport.update({
@@ -155,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutRoute
+  '/{-$lang}/report': typeof Char123LangChar125ReportRoute
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapRoute
   '/{-$lang}/': typeof Char123LangChar125IndexRoute
@@ -177,6 +185,7 @@ export interface FileRoutesByTo {
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutRoute
+  '/{-$lang}/report': typeof Char123LangChar125ReportRoute
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapRoute
   '/{-$lang}': typeof Char123LangChar125IndexRoute
@@ -201,6 +210,7 @@ export interface FileRoutesById {
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutRoute
+  '/{-$lang}/report': typeof Char123LangChar125ReportRoute
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapRoute
   '/{-$lang}/': typeof Char123LangChar125IndexRoute
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/api/issues-day'
     | '/api/reports'
     | '/{-$lang}/about'
+    | '/{-$lang}/report'
     | '/{-$lang}/sitemap.xml'
     | '/{-$lang}/system-map'
     | '/{-$lang}/'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '/api/issues-day'
     | '/api/reports'
     | '/{-$lang}/about'
+    | '/{-$lang}/report'
     | '/{-$lang}/sitemap.xml'
     | '/{-$lang}/system-map'
     | '/{-$lang}'
@@ -271,6 +283,7 @@ export interface FileRouteTypes {
     | '/api/issues-day'
     | '/api/reports'
     | '/{-$lang}/about'
+    | '/{-$lang}/report'
     | '/{-$lang}/sitemap.xml'
     | '/{-$lang}/system-map'
     | '/{-$lang}/'
@@ -328,6 +341,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/{-$lang}/sitemap.xml'
       preLoaderRoute: typeof Char123LangChar125SitemapDotxmlRouteImport
+      parentRoute: typeof Char123LangChar125Route
+    }
+    '/{-$lang}/report': {
+      id: '/{-$lang}/report'
+      path: '/report'
+      fullPath: '/{-$lang}/report'
+      preLoaderRoute: typeof Char123LangChar125ReportRouteImport
       parentRoute: typeof Char123LangChar125Route
     }
     '/{-$lang}/about': {
@@ -454,6 +474,7 @@ declare module '@tanstack/react-router' {
 
 interface Char123LangChar125RouteChildren {
   Char123LangChar125AboutRoute: typeof Char123LangChar125AboutRoute
+  Char123LangChar125ReportRoute: typeof Char123LangChar125ReportRoute
   Char123LangChar125SitemapDotxmlRoute: typeof Char123LangChar125SitemapDotxmlRoute
   Char123LangChar125SystemMapRoute: typeof Char123LangChar125SystemMapRoute
   Char123LangChar125IndexRoute: typeof Char123LangChar125IndexRoute
@@ -471,6 +492,7 @@ interface Char123LangChar125RouteChildren {
 
 const Char123LangChar125RouteChildren: Char123LangChar125RouteChildren = {
   Char123LangChar125AboutRoute: Char123LangChar125AboutRoute,
+  Char123LangChar125ReportRoute: Char123LangChar125ReportRoute,
   Char123LangChar125SitemapDotxmlRoute: Char123LangChar125SitemapDotxmlRoute,
   Char123LangChar125SystemMapRoute: Char123LangChar125SystemMapRoute,
   Char123LangChar125IndexRoute: Char123LangChar125IndexRoute,

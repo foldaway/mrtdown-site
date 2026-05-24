@@ -1,5 +1,5 @@
 import type { IssueType } from '@mrtdown/core';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
 import {
@@ -9,6 +9,7 @@ import {
   useIntl,
 } from 'react-intl';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
+import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
@@ -190,6 +191,7 @@ function ComponentPage() {
   const line = included.lines[lineId];
 
   const intl = useIntl();
+  const crowdReportsEnabled = useCrowdReportsFeatureEnabled();
   const componentName = getLocalizedTranslation(line.name, intl.locale);
 
   const stationCount = useMemo(() => {
@@ -284,6 +286,26 @@ function ComponentPage() {
                     )}
                   </p>
                 </div>
+                {crowdReportsEnabled && (
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Link
+                      to="/{-$lang}/report"
+                      search={{ lineId }}
+                      className="inline-flex min-h-10 items-center justify-center rounded-lg bg-white px-4 py-2 font-semibold text-gray-900 text-sm transition-colors hover:bg-gray-100"
+                    >
+                      <FormattedMessage
+                        id="line.report_cta"
+                        defaultMessage="Report an issue on this line"
+                      />
+                    </Link>
+                    <span className="max-w-md text-gray-300 text-xs leading-5">
+                      <FormattedMessage
+                        id="line.report_cta_note"
+                        defaultMessage="Community reports are reviewed separately from official operator advisories."
+                      />
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

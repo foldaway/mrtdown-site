@@ -299,6 +299,12 @@ Exit criteria:
   validation/persistence tests.
 - 2026-05-24: Added native Cloudflare Worker rate limiting as a short-window
   edge gate ahead of the persisted hourly database limiter.
+- 2026-05-24: Started Phase 2 public form work with localized `/report`,
+  line/station option loading, optional Turnstile widget wiring, PostHog
+  submission events, and home/line/station CTAs with prefilled search params.
+- 2026-05-24: Feature-flagged the public report surface and write API so
+  crowdsourced reports default to non-production only, with an explicit
+  `CROWD_REPORTS_ENABLED` runtime override.
 
 ## Decision Log
 
