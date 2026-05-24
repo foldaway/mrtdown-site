@@ -1,0 +1,401 @@
+import { inArray, sql } from 'drizzle-orm';
+import { DateTime } from 'luxon';
+import { z } from 'zod';
+import {
+  crowdReportAbuseEventsTable,
+  crowdReportLinesTable,
+  crowdReportModerationEventsTable,
+  crowdReportRateLimitsTable,
+  crowdReportsTable,
+  linesTable,
+  stationsTable,
+  crowdReportStationsTable,
+} from '~/db/schema';
+
+const SG_TIMEZONE = 'Asia/Singapore';
+const DEFAULT_RATE_LIMIT_PER_HOUR = 5;
+const MAX_REPORT_AGE_HOURS = 24;
+const MAX_REPORT_FUTURE_MINUTES = 15;
+
+export const CrowdReportEffectSchema = z.enum([
+  'delay',
+  'crowding',
+  'service_gap',
+  'skipped_stop',
+  'station_closure',
+  'train_fault',
+  'platform_issue',
+  'other',
+]);
+
+const optionalTrimmedString = (maxLength: number) =>
+  z
+    .string()
+    .trim()
+    .max(maxLength)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined));
+
+const RawCrowdReportSubmissionSchema = z
+  .object({
+    observedAt: optionalTrimmedString(64),
+    lineIds: z.array(z.string().trim().min(1).max(64)).max(8).default([]),
+    stationIds: z.array(z.string().trim().min(1).max(64)).max(16).default([]),
+    text: z.string().trim().min(8).max(1000),
+    directionText: optionalTrimmedString(120),
+    effect: CrowdReportEffectSchema.optional(),
+    delayMinutes: z.number().int().min(0).max(180).optional(),
+    isStillHappening: z.boolean().optional(),
+    turnstileToken: optionalTrimmedString(4096),
+    clientFingerprint: optionalTrimmedString(512),
+  })
+  .strict();
+
+export type CrowdReportEffect = z.infer<typeof CrowdReportEffectSchema>;
+
+export type CrowdReportSubmission = {
+  observedAt: string;
+  lineIds: string[];
+  stationIds: string[];
+  text: string;
+  directionText?: string;
+  effect?: CrowdReportEffect;
+  delayMinutes?: number;
+  isStillHappening?: boolean;
+  turnstileToken?: string;
+  clientFingerprint?: string;
+};
+
+export type CrowdReportValidationResult =
+  | { success: true; data: CrowdReportSubmission }
+  | { success: false; issues: string[] };
+
+export class CrowdReportRateLimitError extends Error {
+  constructor(
+    public readonly limit: number,
+    public readonly bucketStartAt: string,
+  ) {
+    super('Crowd report rate limit exceeded');
+  }
+}
+
+type AppDb = ReturnType<typeof import('~/db').getDb>;
+
+type PersistCrowdReportOptions = {
+  now?: DateTime;
+  rateLimitPerHour?: number;
+  idFactory?: () => string;
+};
+
+export type CrowdReportAbuseContext = {
+  ipHash: string;
+  userAgentHash?: string;
+  clientFingerprintHash?: string;
+  turnstileTokenHash?: string;
+  turnstileOutcome: string;
+};
+
+export type TurnstileVerificationResult =
+  | { success: true; outcome: 'skipped' | 'passed' }
+  | { success: false; outcome: 'missing_token' | 'failed'; error: string };
+
+export function validateCrowdReportSubmission(
+  input: unknown,
+  now = DateTime.now().setZone(SG_TIMEZONE),
+): CrowdReportValidationResult {
+  const parsed = RawCrowdReportSubmissionSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      issues: parsed.error.issues.map((issue) => issue.message),
+    };
+  }
+
+  const lineIds = [...new Set(parsed.data.lineIds)];
+  const stationIds = [...new Set(parsed.data.stationIds)];
+  const issues: string[] = [];
+  if (lineIds.length === 0 && stationIds.length === 0) {
+    issues.push('At least one affected line or station is required');
+  }
+
+  const observedAt = parsed.data.observedAt
+    ? DateTime.fromISO(parsed.data.observedAt, { setZone: true })
+    : now;
+
+  if (!observedAt.isValid) {
+    issues.push('observedAt must be a valid ISO datetime');
+  } else {
+    const observedAtSg = observedAt.setZone(SG_TIMEZONE);
+    if (observedAtSg < now.minus({ hours: MAX_REPORT_AGE_HOURS })) {
+      issues.push(
+        `observedAt cannot be more than ${MAX_REPORT_AGE_HOURS}h old`,
+      );
+    }
+    if (observedAtSg > now.plus({ minutes: MAX_REPORT_FUTURE_MINUTES })) {
+      issues.push(
+        `observedAt cannot be more than ${MAX_REPORT_FUTURE_MINUTES}m in the future`,
+      );
+    }
+  }
+
+  if (issues.length > 0) {
+    return { success: false, issues };
+  }
+
+  const observedAtIso = observedAt.setZone(SG_TIMEZONE).toISO();
+  if (observedAtIso == null) {
+    return { success: false, issues: ['observedAt must be valid'] };
+  }
+
+  return {
+    success: true,
+    data: {
+      observedAt: observedAtIso,
+      lineIds,
+      stationIds,
+      text: parsed.data.text,
+      directionText: parsed.data.directionText,
+      effect: parsed.data.effect,
+      delayMinutes: parsed.data.delayMinutes,
+      isStillHappening: parsed.data.isStillHappening,
+      turnstileToken: parsed.data.turnstileToken,
+      clientFingerprint: parsed.data.clientFingerprint,
+    },
+  };
+}
+
+export function getCrowdReportRateLimitBucketStart(
+  now = DateTime.now().setZone(SG_TIMEZONE),
+) {
+  const value = now.setZone(SG_TIMEZONE).startOf('hour').toISO();
+  if (value == null) {
+    throw new Error('Unable to calculate crowd report rate-limit bucket');
+  }
+  return value;
+}
+
+export function getClientIp(request: Request) {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  return (
+    request.headers.get('cf-connecting-ip') ??
+    request.headers.get('x-real-ip') ??
+    forwardedFor?.split(',')[0]?.trim() ??
+    'unknown'
+  );
+}
+
+export async function hashCrowdReportValue(value: string, salt: string) {
+  const bytes = new TextEncoder().encode(`${salt}:${value}`);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export async function buildCrowdReportAbuseContext(
+  request: Request,
+  submission: Pick<
+    CrowdReportSubmission,
+    'clientFingerprint' | 'turnstileToken'
+  >,
+  salt: string,
+  turnstileOutcome: string,
+): Promise<CrowdReportAbuseContext> {
+  const userAgent = request.headers.get('user-agent');
+  return {
+    ipHash: await hashCrowdReportValue(getClientIp(request), salt),
+    userAgentHash: userAgent
+      ? await hashCrowdReportValue(userAgent, salt)
+      : undefined,
+    clientFingerprintHash: submission.clientFingerprint
+      ? await hashCrowdReportValue(submission.clientFingerprint, salt)
+      : undefined,
+    turnstileTokenHash: submission.turnstileToken
+      ? await hashCrowdReportValue(submission.turnstileToken, salt)
+      : undefined,
+    turnstileOutcome,
+  };
+}
+
+export async function verifyTurnstileToken(
+  secret: string | undefined,
+  token: string | undefined,
+  remoteIp: string | undefined,
+): Promise<TurnstileVerificationResult> {
+  if (!secret) {
+    return { success: true, outcome: 'skipped' };
+  }
+  if (!token) {
+    return {
+      success: false,
+      outcome: 'missing_token',
+      error: 'Turnstile token is required',
+    };
+  }
+
+  const body = new FormData();
+  body.set('secret', secret);
+  body.set('response', token);
+  if (remoteIp && remoteIp !== 'unknown') {
+    body.set('remoteip', remoteIp);
+  }
+
+  const response = await fetch(
+    'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+    {
+      method: 'POST',
+      body,
+    },
+  );
+  if (!response.ok) {
+    return {
+      success: false,
+      outcome: 'failed',
+      error: 'Turnstile verification request failed',
+    };
+  }
+
+  const result = z
+    .object({
+      success: z.boolean(),
+      'error-codes': z.array(z.string()).optional(),
+    })
+    .safeParse(await response.json());
+
+  if (!result.success || !result.data.success) {
+    return {
+      success: false,
+      outcome: 'failed',
+      error:
+        result.success && result.data['error-codes']?.length
+          ? result.data['error-codes'].join(', ')
+          : 'Turnstile verification failed',
+    };
+  }
+
+  return { success: true, outcome: 'passed' };
+}
+
+export async function findMissingCrowdReportReferences(
+  db: AppDb,
+  submission: Pick<CrowdReportSubmission, 'lineIds' | 'stationIds'>,
+) {
+  const [lineRows, stationRows] = await Promise.all([
+    submission.lineIds.length > 0
+      ? db
+          .select({ id: linesTable.id })
+          .from(linesTable)
+          .where(inArray(linesTable.id, submission.lineIds))
+      : Promise.resolve([]),
+    submission.stationIds.length > 0
+      ? db
+          .select({ id: stationsTable.id })
+          .from(stationsTable)
+          .where(inArray(stationsTable.id, submission.stationIds))
+      : Promise.resolve([]),
+  ]);
+
+  const existingLineIds = new Set(lineRows.map((row) => row.id));
+  const existingStationIds = new Set(stationRows.map((row) => row.id));
+
+  return {
+    lineIds: submission.lineIds.filter((id) => !existingLineIds.has(id)),
+    stationIds: submission.stationIds.filter(
+      (id) => !existingStationIds.has(id),
+    ),
+  };
+}
+
+export async function persistCrowdReport(
+  db: AppDb,
+  submission: CrowdReportSubmission,
+  abuseContext: CrowdReportAbuseContext,
+  options: PersistCrowdReportOptions = {},
+) {
+  const now = options.now ?? DateTime.now().setZone(SG_TIMEZONE);
+  const bucketStartAt = getCrowdReportRateLimitBucketStart(now);
+  const limit = options.rateLimitPerHour ?? DEFAULT_RATE_LIMIT_PER_HOUR;
+  const idFactory = options.idFactory ?? (() => crypto.randomUUID());
+  const reportId = idFactory();
+
+  return db.transaction(async (tx) => {
+    const [rateLimit] = await tx
+      .insert(crowdReportRateLimitsTable)
+      .values({
+        ip_hash: abuseContext.ipHash,
+        bucket_start_at: bucketStartAt,
+        submission_count: 1,
+        client_fingerprint_hash: abuseContext.clientFingerprintHash,
+      })
+      .onConflictDoUpdate({
+        target: [
+          crowdReportRateLimitsTable.ip_hash,
+          crowdReportRateLimitsTable.bucket_start_at,
+        ],
+        set: {
+          submission_count: sql`${crowdReportRateLimitsTable.submission_count} + 1`,
+          client_fingerprint_hash:
+            abuseContext.clientFingerprintHash ??
+            sql`excluded.client_fingerprint_hash`,
+          updated_at: sql`now()`,
+        },
+      })
+      .returning({
+        submissionCount: crowdReportRateLimitsTable.submission_count,
+      });
+
+    if ((rateLimit?.submissionCount ?? 0) > limit) {
+      throw new CrowdReportRateLimitError(limit, bucketStartAt);
+    }
+
+    await tx.insert(crowdReportsTable).values({
+      id: reportId,
+      observed_at: submission.observedAt,
+      direction_text: submission.directionText,
+      effect: submission.effect,
+      delay_minutes: submission.delayMinutes,
+      still_happening: submission.isStillHappening,
+      text: submission.text,
+      status: 'pending',
+    });
+
+    if (submission.lineIds.length > 0) {
+      await tx.insert(crowdReportLinesTable).values(
+        submission.lineIds.map((lineId) => ({
+          report_id: reportId,
+          line_id: lineId,
+        })),
+      );
+    }
+
+    if (submission.stationIds.length > 0) {
+      await tx.insert(crowdReportStationsTable).values(
+        submission.stationIds.map((stationId) => ({
+          report_id: reportId,
+          station_id: stationId,
+        })),
+      );
+    }
+
+    await tx.insert(crowdReportAbuseEventsTable).values({
+      id: idFactory(),
+      report_id: reportId,
+      ip_hash: abuseContext.ipHash,
+      user_agent_hash: abuseContext.userAgentHash,
+      client_fingerprint_hash: abuseContext.clientFingerprintHash,
+      turnstile_token_hash: abuseContext.turnstileTokenHash,
+      turnstile_outcome: abuseContext.turnstileOutcome,
+      rate_limit_bucket_start_at: bucketStartAt,
+    });
+
+    await tx.insert(crowdReportModerationEventsTable).values({
+      id: idFactory(),
+      report_id: reportId,
+      actor: 'system',
+      action: 'submitted',
+      note: 'Report submitted through public API',
+    });
+
+    return { id: reportId, status: 'pending' as const };
+  });
+}

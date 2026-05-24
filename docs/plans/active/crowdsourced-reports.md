@@ -279,6 +279,10 @@ Exit criteria:
 ## Progress Log
 
 - 2026-05-24: Drafted paired site-side plan for crowdsourced reports.
+- 2026-05-24: Implemented Phase 1 collection foundation in `mrtdown-site`:
+  site-local crowd report tables and migration, `POST /api/reports`,
+  Turnstile-compatible validation gate, IP-hash rate limiting, and focused
+  validation/persistence tests.
 
 ## Decision Log
 

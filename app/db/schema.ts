@@ -151,6 +151,258 @@ export const publicHolidaysTable = pgTable('public_holidays', {
   ...timestampColumns,
 });
 
+export const crowdReportEffectEnum = pgEnum('crowd_report_effect', [
+  'delay',
+  'crowding',
+  'service_gap',
+  'skipped_stop',
+  'station_closure',
+  'train_fault',
+  'platform_issue',
+  'other',
+]);
+
+export const crowdReportStatusEnum = pgEnum('crowd_report_status', [
+  'pending',
+  'accepted',
+  'rejected',
+  'duplicate',
+  'dispatched',
+]);
+
+export const crowdReportClusterStatusEnum = pgEnum(
+  'crowd_report_cluster_status',
+  ['pending', 'accepted', 'rejected', 'dispatched'],
+);
+
+export const crowdReportClustersTable = pgTable(
+  'crowd_report_clusters',
+  {
+    id: text('id').primaryKey(),
+    effect: crowdReportEffectEnum(),
+    window_start_at: timestamp('window_start_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    window_end_at: timestamp('window_end_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    report_count: integer('report_count').notNull().default(0),
+    status: crowdReportClusterStatusEnum().notNull().default('pending'),
+    dispatched_at: timestamp('dispatched_at', {
+      withTimezone: true,
+      mode: 'string',
+    }),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      index('crowd_report_clusters_status_idx').on(table.status),
+      index('crowd_report_clusters_window_start_at_idx').using(
+        'btree',
+        table.window_start_at.asc(),
+      ),
+    ];
+  },
+);
+
+export const crowdReportsTable = pgTable(
+  'crowd_reports',
+  {
+    id: text('id').primaryKey(),
+    observed_at: timestamp('observed_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    direction_text: text('direction_text'),
+    effect: crowdReportEffectEnum(),
+    delay_minutes: integer('delay_minutes'),
+    still_happening: boolean('still_happening'),
+    text: text('text').notNull(),
+    status: crowdReportStatusEnum().notNull().default('pending'),
+    cluster_id: text('cluster_id').references(
+      () => crowdReportClustersTable.id,
+    ),
+    duplicate_of_id: text('duplicate_of_id'),
+    dispatched_at: timestamp('dispatched_at', {
+      withTimezone: true,
+      mode: 'string',
+    }),
+    dispatch_payload: jsonb('dispatch_payload').$type<unknown>(),
+    dispatch_error: text('dispatch_error'),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      index('crowd_reports_observed_at_idx').using(
+        'btree',
+        table.observed_at.desc(),
+      ),
+      index('crowd_reports_status_idx').on(table.status),
+      index('crowd_reports_cluster_id_idx').on(table.cluster_id),
+      index('crowd_reports_duplicate_of_id_idx').on(table.duplicate_of_id),
+      check(
+        'crowd_reports_delay_minutes_check',
+        sql`${table.delay_minutes} is null or (${table.delay_minutes} >= 0 and ${table.delay_minutes} <= 180)`,
+      ),
+    ];
+  },
+);
+
+export const crowdReportLinesTable = pgTable(
+  'crowd_report_lines',
+  {
+    report_id: text('report_id')
+      .references(() => crowdReportsTable.id, { onDelete: 'cascade' })
+      .notNull(),
+    line_id: text('line_id')
+      .references(() => linesTable.id)
+      .notNull(),
+  },
+  (table) => {
+    return [
+      primaryKey({ columns: [table.report_id, table.line_id] }),
+      index('crowd_report_lines_line_id_idx').on(table.line_id),
+    ];
+  },
+);
+
+export const crowdReportStationsTable = pgTable(
+  'crowd_report_stations',
+  {
+    report_id: text('report_id')
+      .references(() => crowdReportsTable.id, { onDelete: 'cascade' })
+      .notNull(),
+    station_id: text('station_id')
+      .references(() => stationsTable.id)
+      .notNull(),
+  },
+  (table) => {
+    return [
+      primaryKey({ columns: [table.report_id, table.station_id] }),
+      index('crowd_report_stations_station_id_idx').on(table.station_id),
+    ];
+  },
+);
+
+export const crowdReportModerationEventsTable = pgTable(
+  'crowd_report_moderation_events',
+  {
+    id: text('id').primaryKey(),
+    report_id: text('report_id')
+      .references(() => crowdReportsTable.id, { onDelete: 'cascade' })
+      .notNull(),
+    actor: text('actor').notNull(),
+    action: text('action').notNull(),
+    note: text('note'),
+    created_at: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return [
+      index('crowd_report_moderation_events_report_id_idx').on(table.report_id),
+      index('crowd_report_moderation_events_created_at_idx').using(
+        'btree',
+        table.created_at.desc(),
+      ),
+    ];
+  },
+);
+
+export const crowdReportClusterLinesTable = pgTable(
+  'crowd_report_cluster_lines',
+  {
+    cluster_id: text('cluster_id')
+      .references(() => crowdReportClustersTable.id, { onDelete: 'cascade' })
+      .notNull(),
+    line_id: text('line_id')
+      .references(() => linesTable.id)
+      .notNull(),
+  },
+  (table) => {
+    return [
+      primaryKey({ columns: [table.cluster_id, table.line_id] }),
+      index('crowd_report_cluster_lines_line_id_idx').on(table.line_id),
+    ];
+  },
+);
+
+export const crowdReportClusterStationsTable = pgTable(
+  'crowd_report_cluster_stations',
+  {
+    cluster_id: text('cluster_id')
+      .references(() => crowdReportClustersTable.id, { onDelete: 'cascade' })
+      .notNull(),
+    station_id: text('station_id')
+      .references(() => stationsTable.id)
+      .notNull(),
+  },
+  (table) => {
+    return [
+      primaryKey({ columns: [table.cluster_id, table.station_id] }),
+      index('crowd_report_cluster_stations_station_id_idx').on(
+        table.station_id,
+      ),
+    ];
+  },
+);
+
+export const crowdReportRateLimitsTable = pgTable(
+  'crowd_report_rate_limits',
+  {
+    ip_hash: text('ip_hash').notNull(),
+    bucket_start_at: timestamp('bucket_start_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    submission_count: integer('submission_count').notNull().default(0),
+    client_fingerprint_hash: text('client_fingerprint_hash'),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      primaryKey({ columns: [table.ip_hash, table.bucket_start_at] }),
+      index('crowd_report_rate_limits_bucket_start_at_idx').using(
+        'btree',
+        table.bucket_start_at.desc(),
+      ),
+    ];
+  },
+);
+
+export const crowdReportAbuseEventsTable = pgTable(
+  'crowd_report_abuse_events',
+  {
+    id: text('id').primaryKey(),
+    report_id: text('report_id').references(() => crowdReportsTable.id, {
+      onDelete: 'cascade',
+    }),
+    ip_hash: text('ip_hash').notNull(),
+    user_agent_hash: text('user_agent_hash'),
+    client_fingerprint_hash: text('client_fingerprint_hash'),
+    turnstile_token_hash: text('turnstile_token_hash'),
+    turnstile_outcome: text('turnstile_outcome').notNull(),
+    rate_limit_bucket_start_at: timestamp('rate_limit_bucket_start_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    created_at: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return [
+      index('crowd_report_abuse_events_report_id_idx').on(table.report_id),
+      index('crowd_report_abuse_events_ip_hash_created_at_idx').on(
+        table.ip_hash,
+        table.created_at,
+      ),
+    ];
+  },
+);
+
 // Entity Type: Town
 export const townsTable = pgTable('towns', {
   id: text('id').primaryKey(),

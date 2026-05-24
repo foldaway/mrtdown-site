@@ -14,6 +14,7 @@ import { Route as Char123LangChar125IndexRouteImport } from './routes/{-$lang}/i
 import { Route as Char123LangChar125SystemMapRouteImport } from './routes/{-$lang}/system-map'
 import { Route as Char123LangChar125SitemapDotxmlRouteImport } from './routes/{-$lang}/sitemap[.]xml'
 import { Route as Char123LangChar125AboutRouteImport } from './routes/{-$lang}/about'
+import { Route as ApiReportsRouteImport } from './routes/api.reports'
 import { Route as ApiIssuesDayRouteImport } from './routes/api.issues-day'
 import { Route as Char123LangChar125StatisticsIndexRouteImport } from './routes/{-$lang}/statistics/index'
 import { Route as Char123LangChar125HistoryIndexRouteImport } from './routes/{-$lang}/history/index'
@@ -56,6 +57,11 @@ const Char123LangChar125AboutRoute = Char123LangChar125AboutRouteImport.update({
   id: '/about',
   path: '/about',
   getParentRoute: () => Char123LangChar125Route,
+} as any)
+const ApiReportsRoute = ApiReportsRouteImport.update({
+  id: '/api/reports',
+  path: '/api/reports',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiIssuesDayRoute = ApiIssuesDayRouteImport.update({
   id: '/api/issues-day',
@@ -147,6 +153,7 @@ const InternalApiTasksFactsRoute = InternalApiTasksFactsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
   '/api/issues-day': typeof ApiIssuesDayRoute
+  '/api/reports': typeof ApiReportsRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutRoute
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/api/issues-day': typeof ApiIssuesDayRoute
+  '/api/reports': typeof ApiReportsRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutRoute
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
   '/api/issues-day': typeof ApiIssuesDayRoute
+  '/api/reports': typeof ApiReportsRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutRoute
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/{-$lang}'
     | '/api/issues-day'
+    | '/api/reports'
     | '/{-$lang}/about'
     | '/{-$lang}/sitemap.xml'
     | '/{-$lang}/system-map'
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/api/issues-day'
+    | '/api/reports'
     | '/{-$lang}/about'
     | '/{-$lang}/sitemap.xml'
     | '/{-$lang}/system-map'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/{-$lang}'
     | '/api/issues-day'
+    | '/api/reports'
     | '/{-$lang}/about'
     | '/{-$lang}/sitemap.xml'
     | '/{-$lang}/system-map'
@@ -281,6 +293,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   Char123LangChar125Route: typeof Char123LangChar125RouteWithChildren
   ApiIssuesDayRoute: typeof ApiIssuesDayRoute
+  ApiReportsRoute: typeof ApiReportsRoute
   ApiPhSplatRoute: typeof ApiPhSplatRoute
   InternalApiTasksFactsRoute: typeof InternalApiTasksFactsRoute
   InternalApiTasksPublicHolidaysRoute: typeof InternalApiTasksPublicHolidaysRoute
@@ -323,6 +336,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/{-$lang}/about'
       preLoaderRoute: typeof Char123LangChar125AboutRouteImport
       parentRoute: typeof Char123LangChar125Route
+    }
+    '/api/reports': {
+      id: '/api/reports'
+      path: '/api/reports'
+      fullPath: '/api/reports'
+      preLoaderRoute: typeof ApiReportsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/issues-day': {
       id: '/api/issues-day'
@@ -480,6 +500,7 @@ const Char123LangChar125RouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   Char123LangChar125Route: Char123LangChar125RouteWithChildren,
   ApiIssuesDayRoute: ApiIssuesDayRoute,
+  ApiReportsRoute: ApiReportsRoute,
   ApiPhSplatRoute: ApiPhSplatRoute,
   InternalApiTasksFactsRoute: InternalApiTasksFactsRoute,
   InternalApiTasksPublicHolidaysRoute: InternalApiTasksPublicHolidaysRoute,
