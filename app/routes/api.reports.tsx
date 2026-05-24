@@ -6,17 +6,17 @@ import {
   CrowdReportRateLimitError,
   findMissingCrowdReportReferences,
   getClientIp,
+  parseCrowdReportJsonBody,
   persistCrowdReport,
   validateCrowdReportSubmission,
   verifyTurnstileToken,
 } from '~/util/crowdReports';
 
-const MAX_REQUEST_BYTES = 10_000;
-
 type CrowdReportRuntimeEnv = typeof env & {
   CROWD_REPORT_HASH_SALT?: string;
   CROWD_REPORT_RATE_LIMIT_PER_HOUR?: string;
   CROWD_REPORT_TURNSTILE_SECRET_KEY?: string;
+  CROWD_REPORT_RATE_LIMITER?: RateLimit;
   TURNSTILE_SECRET_KEY?: string;
 };
 
@@ -30,31 +30,6 @@ function getRateLimitPerHour(value: string | undefined) {
   }
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
-}
-
-async function parseJsonBody(request: Request) {
-  const contentLength = request.headers.get('content-length');
-  if (contentLength && Number(contentLength) > MAX_REQUEST_BYTES) {
-    return {
-      success: false as const,
-      response: Response.json(
-        { success: false, error: 'Request body is too large' },
-        { status: 413 },
-      ),
-    };
-  }
-
-  try {
-    return { success: true as const, body: await request.json() };
-  } catch {
-    return {
-      success: false as const,
-      response: Response.json(
-        { success: false, error: 'Request body must be valid JSON' },
-        { status: 400 },
-      ),
-    };
-  }
 }
 
 export const Route = createFileRoute('/api/reports')({
@@ -72,9 +47,12 @@ export const Route = createFileRoute('/api/reports')({
           );
         }
 
-        const parsedBody = await parseJsonBody(request);
+        const parsedBody = await parseCrowdReportJsonBody(request);
         if (!parsedBody.success) {
-          return parsedBody.response;
+          return Response.json(
+            { success: false, error: parsedBody.error },
+            { status: parsedBody.status },
+          );
         }
 
         const validation = validateCrowdReportSubmission(parsedBody.body);
@@ -111,6 +89,31 @@ export const Route = createFileRoute('/api/reports')({
           hashSalt,
           turnstile.outcome,
         );
+
+        const nativeRateLimiter = runtimeEnv.CROWD_REPORT_RATE_LIMITER;
+        if (nativeRateLimiter) {
+          try {
+            const { success } = await nativeRateLimiter.limit({
+              key: abuseContext.ipHash,
+            });
+            if (!success) {
+              return Response.json(
+                {
+                  success: false,
+                  error: 'Too many reports submitted from this network',
+                },
+                {
+                  status: 429,
+                  headers: {
+                    'retry-after': String(60),
+                  },
+                },
+              );
+            }
+          } catch (error) {
+            console.warn('Native crowd report rate limiter failed', { error });
+          }
+        }
 
         const db = getDb();
         const missingReferences = await findMissingCrowdReportReferences(

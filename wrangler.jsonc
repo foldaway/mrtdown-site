@@ -15,6 +15,16 @@
   "limits": {
     "cpu_ms": 300000
   },
+  "ratelimits": [
+    {
+      "name": "CROWD_REPORT_RATE_LIMITER",
+      "namespace_id": "832900",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
+    }
+  ],
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
@@ -57,6 +67,16 @@
           "id": "e9034596011b46179c4c7f65c2ebc773"
         }
       ],
+      "ratelimits": [
+        {
+          "name": "CROWD_REPORT_RATE_LIMITER",
+          "namespace_id": "832901",
+          "simple": {
+            "limit": 5,
+            "period": 60
+          }
+        }
+      ],
       "observability": {
         "enabled": true,
         "head_sampling_rate": 1,
@@ -91,6 +111,16 @@
           "id": "1413ff84b6ef40a19973b1bc8a662736"
         }
       ],
+      "ratelimits": [
+        {
+          "name": "CROWD_REPORT_RATE_LIMITER",
+          "namespace_id": "832902",
+          "simple": {
+            "limit": 5,
+            "period": 60
+          }
+        }
+      ],
       "observability": {
         "enabled": true,
         "head_sampling_rate": 1,
@@ -122,6 +152,16 @@
         {
           "binding": "HYPERDRIVE",
           "id": "1d9561e9411649a6afe8612881ff926d"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "CROWD_REPORT_RATE_LIMITER",
+          "namespace_id": "832903",
+          "simple": {
+            "limit": 5,
+            "period": 60
+          }
         }
       ],
       "workflows": [

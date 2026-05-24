@@ -20,6 +20,7 @@ const SG_TIMEZONE = 'Asia/Singapore';
 const DEFAULT_RATE_LIMIT_PER_HOUR = 5;
 const MAX_REPORT_AGE_HOURS = 24;
 const MAX_REPORT_FUTURE_MINUTES = 15;
+export const MAX_CROWD_REPORT_REQUEST_BYTES = 10_000;
 
 export const CrowdReportEffectSchema = IngestContentCrowdReportEffectSchema;
 
@@ -73,6 +74,10 @@ export class CrowdReportRateLimitError extends Error {
     super('Crowd report rate limit exceeded');
   }
 }
+
+export type CrowdReportJsonBodyResult =
+  | { success: true; body: unknown }
+  | { success: false; status: 400 | 413; error: string };
 
 type AppDb = ReturnType<typeof import('~/db').getDb>;
 
@@ -179,6 +184,77 @@ export function getClientIp(request: Request) {
   );
 }
 
+export async function parseCrowdReportJsonBody(
+  request: Request,
+  maxBytes = MAX_CROWD_REPORT_REQUEST_BYTES,
+): Promise<CrowdReportJsonBodyResult> {
+  const contentLength = request.headers.get('content-length');
+  if (contentLength && Number(contentLength) > maxBytes) {
+    return {
+      success: false,
+      status: 413,
+      error: 'Request body is too large',
+    };
+  }
+
+  if (!request.body) {
+    return {
+      success: false,
+      status: 400,
+      error: 'Request body must be valid JSON',
+    };
+  }
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      byteLength += value.byteLength;
+      if (byteLength > maxBytes) {
+        await reader.cancel();
+        return {
+          success: false,
+          status: 413,
+          error: 'Request body is too large',
+        };
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return {
+      success: false,
+      status: 400,
+      error: 'Request body must be valid JSON',
+    };
+  }
+
+  const bodyBytes = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bodyBytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  try {
+    return {
+      success: true,
+      body: JSON.parse(new TextDecoder().decode(bodyBytes)),
+    };
+  } catch {
+    return {
+      success: false,
+      status: 400,
+      error: 'Request body must be valid JSON',
+    };
+  }
+}
+
 export async function hashCrowdReportValue(value: string, salt: string) {
   const bytes = new TextEncoder().encode(`${salt}:${value}`);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
@@ -235,13 +311,22 @@ export async function verifyTurnstileToken(
     body.set('remoteip', remoteIp);
   }
 
-  const response = await fetch(
-    'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-    {
-      method: 'POST',
-      body,
-    },
-  );
+  let response: Response;
+  try {
+    response = await fetch(
+      'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+      {
+        method: 'POST',
+        body,
+      },
+    );
+  } catch {
+    return {
+      success: false,
+      outcome: 'failed',
+      error: 'Turnstile verification request failed',
+    };
+  }
   if (!response.ok) {
     return {
       success: false,

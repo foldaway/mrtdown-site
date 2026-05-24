@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   crowdReportAbuseEventsTable,
   crowdReportLinesTable,
@@ -11,8 +11,10 @@ import {
 import {
   CrowdReportRateLimitError,
   getCrowdReportRateLimitBucketStart,
+  parseCrowdReportJsonBody,
   persistCrowdReport,
   validateCrowdReportSubmission,
+  verifyTurnstileToken,
   type CrowdReportSubmission,
 } from './crowdReports';
 
@@ -30,6 +32,21 @@ const VALID_SUBMISSION: CrowdReportSubmission = {
   delayMinutes: 10,
   isStillHappening: true,
 };
+
+function makeStreamingRequest(body: string) {
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(body));
+      controller.close();
+    },
+  });
+
+  return new Request('https://example.com/api/reports', {
+    method: 'POST',
+    body: stream,
+    duplex: 'half',
+  } as RequestInit & { duplex: 'half' });
+}
 
 function makeFakeDb(rateLimitCount: number) {
   const inserts: Array<{ table: unknown; values: unknown }> = [];
@@ -68,6 +85,41 @@ function makeFakeDb(rateLimitCount: number) {
     },
   };
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('parseCrowdReportJsonBody', () => {
+  it('parses valid streaming JSON without relying on content-length', async () => {
+    await expect(
+      parseCrowdReportJsonBody(makeStreamingRequest('{"text":"hello"}')),
+    ).resolves.toEqual({
+      success: true,
+      body: { text: 'hello' },
+    });
+  });
+
+  it('rejects streaming bodies that exceed the byte limit', async () => {
+    await expect(
+      parseCrowdReportJsonBody(makeStreamingRequest('{"text":"hello"}'), 8),
+    ).resolves.toEqual({
+      success: false,
+      status: 413,
+      error: 'Request body is too large',
+    });
+  });
+
+  it('rejects invalid streaming JSON', async () => {
+    await expect(
+      parseCrowdReportJsonBody(makeStreamingRequest('{"text":')),
+    ).resolves.toEqual({
+      success: false,
+      status: 400,
+      error: 'Request body must be valid JSON',
+    });
+  });
+});
 
 describe('validateCrowdReportSubmission', () => {
   it('normalizes a valid report submission', () => {
@@ -150,6 +202,23 @@ describe('validateCrowdReportSubmission', () => {
     if (!result.success) {
       expect(result.issues).toContain('observedAt cannot be more than 24h old');
     }
+  });
+});
+
+describe('verifyTurnstileToken', () => {
+  it('returns a controlled failure when the verification request fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('network unavailable')),
+    );
+
+    await expect(
+      verifyTurnstileToken('secret', 'token', '203.0.113.1'),
+    ).resolves.toEqual({
+      success: false,
+      outcome: 'failed',
+      error: 'Turnstile verification request failed',
+    });
   });
 });
 

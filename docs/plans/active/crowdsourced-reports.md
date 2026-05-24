@@ -208,6 +208,8 @@ to `mrtdown-data`.
   tables.
 - Add `POST /api/reports` with Zod validation.
 - Add Cloudflare Turnstile verification or a compatible anti-abuse gate.
+- Add a native Cloudflare Worker rate-limit binding as a short-window edge
+  throttle before database writes.
 - Add coarse rate limiting by IP hash and optional client fingerprint.
 - Add deterministic tests for request validation and persistence helpers.
 
@@ -295,6 +297,8 @@ Exit criteria:
   site-local crowd report tables and migration, `POST /api/reports`,
   Turnstile-compatible validation gate, IP-hash rate limiting, and focused
   validation/persistence tests.
+- 2026-05-24: Added native Cloudflare Worker rate limiting as a short-window
+  edge gate ahead of the persisted hourly database limiter.
 
 ## Decision Log
 
