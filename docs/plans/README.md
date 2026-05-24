@@ -16,6 +16,15 @@ Use plans for:
 - `active/`: plans that describe current or paused work.
 - `completed/`: plans that are finished and kept for history.
 
+## Active
+
+- [Crowdsourced reports](active/crowdsourced-reports.md): site-local public
+  report collection, moderation, clustering, and canonical ingest dispatch.
+- [Overhaul read model](active/overhaul-read-model.md): local Postgres-backed
+  read model migration.
+- [Production performance](active/production-performance.md): public route
+  latency and payload reduction plan.
+
 ## Template
 
 ```md
