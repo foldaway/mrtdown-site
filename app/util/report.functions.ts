@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { createServerFn } from '@tanstack/react-start';
-import { asc, inArray } from 'drizzle-orm';
+import { asc, desc, inArray, sql } from 'drizzle-orm';
 import { getDb } from '~/db';
 import {
   linesTable,
@@ -14,14 +14,6 @@ import {
   type CrowdReportFeatureEnv,
   isCrowdReportsFeatureEnabled,
 } from './crowdReportFeatureFlag';
-import { sortServiceRevisionsByRecency } from './serviceRevisions';
-
-type LatestServiceRevision = {
-  id: string;
-  serviceId: string;
-  end_at: string | null;
-  updated_at: Date | string;
-};
 
 export const getCrowdReportFormOptionsFn = createServerFn({
   method: 'GET',
@@ -38,7 +30,7 @@ export const getCrowdReportFormOptionsFn = createServerFn({
   }
 
   const db = getDb();
-  const [lines, stations, stationCodes, services, serviceRevisions] =
+  const [lines, stations, stationCodes, services, latestServiceRevisions] =
     await Promise.all([
       db
         .select({
@@ -71,39 +63,26 @@ export const getCrowdReportFormOptionsFn = createServerFn({
         .from(servicesTable)
         .orderBy(asc(servicesTable.id)),
       db
-        .select({
+        .selectDistinctOn([serviceRevisionsTable.service_id], {
           id: serviceRevisionsTable.id,
           serviceId: serviceRevisionsTable.service_id,
-          endAt: serviceRevisionsTable.end_at,
-          updatedAt: serviceRevisionsTable.updated_at,
         })
-        .from(serviceRevisionsTable),
+        .from(serviceRevisionsTable)
+        .orderBy(
+          serviceRevisionsTable.service_id,
+          sql`${serviceRevisionsTable.end_at} is not null`,
+          desc(serviceRevisionsTable.end_at),
+          desc(serviceRevisionsTable.updated_at),
+          desc(serviceRevisionsTable.id),
+        ),
     ]);
 
   const stationById = Object.fromEntries(
     stations.map((station) => [station.id, station]),
   );
-  const revisionsByServiceId = serviceRevisions.reduce<
-    Record<string, typeof serviceRevisions>
-  >((acc, revision) => {
-    acc[revision.serviceId] ??= [];
-    acc[revision.serviceId].push(revision);
-    return acc;
-  }, {});
-  const latestRevisionByServiceId: Record<string, LatestServiceRevision> = {};
-  for (const [serviceId, revisions] of Object.entries(revisionsByServiceId)) {
-    const latestRevision = sortServiceRevisionsByRecency(
-      revisions.map((revision) => ({
-        id: revision.id,
-        serviceId: revision.serviceId,
-        end_at: revision.endAt,
-        updated_at: revision.updatedAt,
-      })),
-    )[0];
-    if (latestRevision != null) {
-      latestRevisionByServiceId[serviceId] = latestRevision;
-    }
-  }
+  const latestRevisionByServiceId = Object.fromEntries(
+    latestServiceRevisions.map((revision) => [revision.serviceId, revision]),
+  );
 
   const latestRevisionIds = [
     ...new Set(
