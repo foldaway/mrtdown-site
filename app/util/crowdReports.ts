@@ -1,3 +1,7 @@
+import {
+  type IngestContentCrowdReportEffect,
+  IngestContentCrowdReportEffectSchema,
+} from '@mrtdown/ingest-contracts';
 import { inArray, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
@@ -17,16 +21,7 @@ const DEFAULT_RATE_LIMIT_PER_HOUR = 5;
 const MAX_REPORT_AGE_HOURS = 24;
 const MAX_REPORT_FUTURE_MINUTES = 15;
 
-export const CrowdReportEffectSchema = z.enum([
-  'delay',
-  'crowding',
-  'service_gap',
-  'skipped_stop',
-  'station_closure',
-  'train_fault',
-  'platform_issue',
-  'other',
-]);
+export const CrowdReportEffectSchema = IngestContentCrowdReportEffectSchema;
 
 const optionalTrimmedString = (maxLength: number) =>
   z
@@ -51,7 +46,7 @@ const RawCrowdReportSubmissionSchema = z
   })
   .strict();
 
-export type CrowdReportEffect = z.infer<typeof CrowdReportEffectSchema>;
+export type CrowdReportEffect = IngestContentCrowdReportEffect;
 
 export type CrowdReportSubmission = {
   observedAt: string;

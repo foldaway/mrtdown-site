@@ -20,6 +20,7 @@ import {
   type Translations,
   type TranslationsMeta,
 } from '@mrtdown/core';
+import { IngestContentCrowdReportEffects } from '@mrtdown/ingest-contracts';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -151,16 +152,10 @@ export const publicHolidaysTable = pgTable('public_holidays', {
   ...timestampColumns,
 });
 
-export const crowdReportEffectEnum = pgEnum('crowd_report_effect', [
-  'delay',
-  'crowding',
-  'service_gap',
-  'skipped_stop',
-  'station_closure',
-  'train_fault',
-  'platform_issue',
-  'other',
-]);
+export const crowdReportEffectEnum = pgEnum(
+  'crowd_report_effect',
+  IngestContentCrowdReportEffects,
+);
 
 export const crowdReportStatusEnum = pgEnum('crowd_report_status', [
   'pending',

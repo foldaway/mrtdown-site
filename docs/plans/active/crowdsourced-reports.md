@@ -108,7 +108,8 @@ Start with a compact report workflow:
   - short free-text description.
 - Optional fields:
   - direction or destination text;
-  - effect type;
+  - effect type, using `@mrtdown/ingest-contracts`
+    `IngestContentCrowdReportEffects`;
   - delay estimate;
   - whether the report is still happening.
 
@@ -136,6 +137,10 @@ Add site-local tables through Drizzle migrations:
 - `dispatched_at`
 - `dispatch_payload`
 - `dispatch_error`
+
+`effect` must use the published `@mrtdown/ingest-contracts`
+`IngestContentCrowdReportEffects` values so site-local moderation state can be
+dispatched without lossy mapping later.
 
 ### `crowd_report_lines`
 

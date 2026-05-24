@@ -1,5 +1,5 @@
 {
-  "id": "078d8b90-9c6c-4d40-a54c-51f1b5bb7807",
+  "id": "56a2561c-8ce1-43da-8790-6b9fbade029d",
   "prevId": "241605fb-edd0-4833-b410-0e36cbe46b30",
   "version": "7",
   "dialect": "postgresql",
@@ -3918,13 +3918,10 @@
       "schema": "public",
       "values": [
         "delay",
+        "no-service",
         "crowding",
-        "service_gap",
-        "skipped_stop",
-        "station_closure",
-        "train_fault",
-        "platform_issue",
-        "other"
+        "skipped-stop",
+        "unknown"
       ]
     },
     "public.crowd_report_status": {

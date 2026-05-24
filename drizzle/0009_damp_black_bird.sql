@@ -1,5 +1,5 @@
 CREATE TYPE "public"."crowd_report_cluster_status" AS ENUM('pending', 'accepted', 'rejected', 'dispatched');--> statement-breakpoint
-CREATE TYPE "public"."crowd_report_effect" AS ENUM('delay', 'crowding', 'service_gap', 'skipped_stop', 'station_closure', 'train_fault', 'platform_issue', 'other');--> statement-breakpoint
+CREATE TYPE "public"."crowd_report_effect" AS ENUM('delay', 'no-service', 'crowding', 'skipped-stop', 'unknown');--> statement-breakpoint
 CREATE TYPE "public"."crowd_report_status" AS ENUM('pending', 'accepted', 'rejected', 'duplicate', 'dispatched');--> statement-breakpoint
 CREATE TABLE "crowd_report_abuse_events" (
 	"id" text PRIMARY KEY NOT NULL,

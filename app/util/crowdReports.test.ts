@@ -120,6 +120,22 @@ describe('validateCrowdReportSubmission', () => {
     });
   });
 
+  it('accepts crowd-report effect values from the ingest contract', () => {
+    const result = validateCrowdReportSubmission(
+      {
+        lineIds: ['BPLRT'],
+        text: 'No train service is available at the station right now.',
+        effect: 'no-service',
+      },
+      NOW,
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.effect).toBe('no-service');
+    }
+  });
+
   it('rejects stale observed times', () => {
     const result = validateCrowdReportSubmission(
       {
