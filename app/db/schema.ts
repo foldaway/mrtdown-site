@@ -207,6 +207,46 @@ export const crowdReportClustersTable = pgTable(
   },
 );
 
+// Clusters carry affected-area scope through line/station joins; do not treat a
+// cluster as displayable or dispatchable unless at least one join exists.
+export const crowdReportClusterLinesTable = pgTable(
+  'crowd_report_cluster_lines',
+  {
+    cluster_id: text('cluster_id')
+      .references(() => crowdReportClustersTable.id, { onDelete: 'cascade' })
+      .notNull(),
+    line_id: text('line_id')
+      .references(() => linesTable.id)
+      .notNull(),
+  },
+  (table) => {
+    return [
+      primaryKey({ columns: [table.cluster_id, table.line_id] }),
+      index('crowd_report_cluster_lines_line_id_idx').on(table.line_id),
+    ];
+  },
+);
+
+export const crowdReportClusterStationsTable = pgTable(
+  'crowd_report_cluster_stations',
+  {
+    cluster_id: text('cluster_id')
+      .references(() => crowdReportClustersTable.id, { onDelete: 'cascade' })
+      .notNull(),
+    station_id: text('station_id')
+      .references(() => stationsTable.id)
+      .notNull(),
+  },
+  (table) => {
+    return [
+      primaryKey({ columns: [table.cluster_id, table.station_id] }),
+      index('crowd_report_cluster_stations_station_id_idx').on(
+        table.station_id,
+      ),
+    ];
+  },
+);
+
 export const crowdReportsTable = pgTable(
   'crowd_reports',
   {
@@ -306,44 +346,6 @@ export const crowdReportModerationEventsTable = pgTable(
       index('crowd_report_moderation_events_created_at_idx').using(
         'btree',
         table.created_at.desc(),
-      ),
-    ];
-  },
-);
-
-export const crowdReportClusterLinesTable = pgTable(
-  'crowd_report_cluster_lines',
-  {
-    cluster_id: text('cluster_id')
-      .references(() => crowdReportClustersTable.id, { onDelete: 'cascade' })
-      .notNull(),
-    line_id: text('line_id')
-      .references(() => linesTable.id)
-      .notNull(),
-  },
-  (table) => {
-    return [
-      primaryKey({ columns: [table.cluster_id, table.line_id] }),
-      index('crowd_report_cluster_lines_line_id_idx').on(table.line_id),
-    ];
-  },
-);
-
-export const crowdReportClusterStationsTable = pgTable(
-  'crowd_report_cluster_stations',
-  {
-    cluster_id: text('cluster_id')
-      .references(() => crowdReportClustersTable.id, { onDelete: 'cascade' })
-      .notNull(),
-    station_id: text('station_id')
-      .references(() => stationsTable.id)
-      .notNull(),
-  },
-  (table) => {
-    return [
-      primaryKey({ columns: [table.cluster_id, table.station_id] }),
-      index('crowd_report_cluster_stations_station_id_idx').on(
-        table.station_id,
       ),
     ];
   },

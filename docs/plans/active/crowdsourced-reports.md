@@ -186,6 +186,11 @@ Candidate statuses:
 - `cluster_id`
 - `station_id`
 
+Every report cluster must retain an affected-area scope through
+`crowd_report_cluster_lines`, `crowd_report_cluster_stations`, or both. Do not
+display, accept for dispatch, or dispatch a cluster unless it is tied to at
+least one affected line or station.
+
 Keep IP hashes, user-agent hashes, Turnstile outcomes, and rate-limit metadata
 either in a separate abuse-control table or in fields that are never forwarded
 to `mrtdown-data`.
@@ -237,6 +242,8 @@ Exit criteria:
 ### Phase 4: Clustering And Community Signal
 
 - Cluster reports by line, station, effect, and observed time window.
+- Persist the cluster's affected-area scope using the cluster line/station join
+  tables before it can become a public or dispatchable signal.
 - Start conservative: require at least three similar reports in a short window
   before showing a public community signal.
 - Display aggregated community signals separately from canonical advisories.
