@@ -16,7 +16,7 @@
     "cpu_ms": 300000
   },
   "vars": {
-    "TIER": "preview"
+    "TIER": "production"
   },
   "ratelimits": [
     {

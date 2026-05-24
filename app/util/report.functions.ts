@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { createServerFn } from '@tanstack/react-start';
-import { asc, desc, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { getDb } from '~/db';
 import {
   linesTable,
@@ -30,58 +30,79 @@ export const getCrowdReportFormOptionsFn = createServerFn({
   }
 
   const db = getDb();
-  const [lines, stations, stationCodes, services, latestServiceRevisions] =
-    await Promise.all([
-      db
-        .select({
-          id: linesTable.id,
-          name: linesTable.name,
-          color: linesTable.color,
-        })
-        .from(linesTable)
-        .orderBy(asc(linesTable.id)),
-      db
-        .select({
-          id: stationsTable.id,
-          name: stationsTable.name,
-        })
-        .from(stationsTable)
-        .orderBy(asc(stationsTable.id)),
-      db
-        .select({
-          lineId: stationCodesTable.line_id,
-          stationId: stationCodesTable.station_id,
-          code: stationCodesTable.code,
-        })
-        .from(stationCodesTable)
-        .orderBy(asc(stationCodesTable.code)),
-      db
-        .select({
-          id: servicesTable.id,
-          lineId: servicesTable.line_id,
-        })
-        .from(servicesTable)
-        .orderBy(asc(servicesTable.id)),
-      db
-        .selectDistinctOn([serviceRevisionsTable.service_id], {
-          id: serviceRevisionsTable.id,
-          serviceId: serviceRevisionsTable.service_id,
-        })
-        .from(serviceRevisionsTable)
-        .orderBy(
-          serviceRevisionsTable.service_id,
-          sql`${serviceRevisionsTable.end_at} is not null`,
-          desc(serviceRevisionsTable.end_at),
-          desc(serviceRevisionsTable.updated_at),
-          desc(serviceRevisionsTable.id),
+  const [
+    lines,
+    stations,
+    stationCodes,
+    services,
+    latestServiceRevisionsWithPathData,
+  ] = await Promise.all([
+    db
+      .select({
+        id: linesTable.id,
+        name: linesTable.name,
+        color: linesTable.color,
+      })
+      .from(linesTable)
+      .orderBy(asc(linesTable.id)),
+    db
+      .select({
+        id: stationsTable.id,
+        name: stationsTable.name,
+      })
+      .from(stationsTable)
+      .orderBy(asc(stationsTable.id)),
+    db
+      .select({
+        lineId: stationCodesTable.line_id,
+        stationId: stationCodesTable.station_id,
+        code: stationCodesTable.code,
+      })
+      .from(stationCodesTable)
+      .orderBy(asc(stationCodesTable.code)),
+    db
+      .select({
+        id: servicesTable.id,
+        lineId: servicesTable.line_id,
+      })
+      .from(servicesTable)
+      .orderBy(asc(servicesTable.id)),
+    db
+      .selectDistinctOn([serviceRevisionsTable.service_id], {
+        id: serviceRevisionsTable.id,
+        serviceId: serviceRevisionsTable.service_id,
+      })
+      .from(serviceRevisionsTable)
+      .innerJoin(
+        serviceRevisionPathStationEntriesTable,
+        and(
+          eq(
+            serviceRevisionPathStationEntriesTable.service_revision_id,
+            serviceRevisionsTable.id,
+          ),
+          eq(
+            serviceRevisionPathStationEntriesTable.service_id,
+            serviceRevisionsTable.service_id,
+          ),
         ),
-    ]);
+      )
+      .orderBy(
+        serviceRevisionsTable.service_id,
+        sql`${serviceRevisionsTable.end_at} is not null`,
+        desc(serviceRevisionsTable.end_at),
+        desc(serviceRevisionsTable.updated_at),
+        desc(serviceRevisionsTable.id),
+      ),
+  ]);
 
   const stationById = Object.fromEntries(
     stations.map((station) => [station.id, station]),
   );
   const latestRevisionByServiceId = Object.fromEntries(
-    latestServiceRevisions.map((revision) => [revision.serviceId, revision]),
+    latestServiceRevisionsWithPathData.map((revision) => [
+      revision.serviceId,
+      revision,
+    ]),
   );
 
   const latestRevisionIds = [
