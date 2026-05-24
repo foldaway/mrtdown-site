@@ -30,6 +30,9 @@ inside `mrtdown-site`.
   a deliberate replacement for them.
 - Support the existing fixed effective-date timeline first, then leave room for
   richer date selection once the data and renderer are stable.
+- Explore a protected map designer experience that edits canonical schematic
+  data through reviewed `mrtdown-data` pull requests instead of making
+  `mrtdown-site` a direct data authority.
 
 ## Non-Goals
 
@@ -38,6 +41,8 @@ inside `mrtdown-site`.
 - This plan does not require every map version to extend a previous version.
 - This plan does not redesign the public system map UI before the data contract
   and renderer are proven.
+- This plan does not expose canonical schematic writes directly to the public or
+  bypass `mrtdown-data` review.
 - This plan does not remove the current generated snapshots until replacement
   rendering has visual and behavioral parity.
 
@@ -58,6 +63,9 @@ inside `mrtdown-site`.
 - SVG/React rendering from the canonical schematic data;
 - current disruption and focused-line overlays;
 - station links, tooltips, localized labels, zoom controls, and timeline UI;
+- protected map designer UI, if built, including geometry editing and preview;
+- schematic edit submission to `mrtdown-data` as a branch, draft pull request,
+  or equivalent reviewed ingest workflow;
 - route-level loading, caching, bundle strategy, and visual QA.
 
 ## Phases
@@ -128,7 +136,31 @@ Exit criteria:
   station links, label localization, current incident fading, focused-line mode,
   and zoom controls.
 
-### Phase 5: Visual Parity And Incremental Migration
+### Phase 5: Protected Map Designer Spike
+
+Build an authoring surface only after the data-driven renderer is trustworthy.
+The designer should be a protected/admin or local-development experience, not a
+normal public page.
+
+- Load a canonical schematic map version and render it with the same
+  `SystemMapRenderer` used by the public map.
+- Support focused editing of high-value primitives first: station positions,
+  label anchors, segment bend points, bezier handles, and layer order.
+- Surface semantic validation while editing: unknown references, duplicate
+  segment ids, missing labels, orphan layout entries, and service-edge coverage.
+- Preview current-status and focused-line overlays against the edited map.
+- Export a schematic map edit bundle that can be submitted to `mrtdown-data`.
+- Submit changes to `mrtdown-data` as a reviewed branch or draft PR; never write
+  directly to canonical data from the site runtime.
+
+Exit criteria:
+
+- A trusted maintainer can modify one map version visually, preview it with the
+  site renderer, and produce a reviewed `mrtdown-data` change.
+- The designer output is canonical schematic data, not generated TSX or
+  site-private rendering state.
+
+### Phase 6: Visual Parity And Incremental Migration
 
 - Compare renderer output against the corresponding existing `Map*.tsx`
   snapshot.
@@ -142,7 +174,7 @@ Exit criteria:
 - All current timeline versions render from canonical schematic map data.
 - Existing hard-coded map snapshots are no longer needed for normal runtime.
 
-### Phase 6: Cutover And Cleanup
+### Phase 7: Cutover And Cleanup
 
 - Remove hard-coded `Map*.tsx` imports from `StationMap`.
 - Replace hard-coded timeline values with manifest-driven map versions.
@@ -163,6 +195,8 @@ Exit criteria:
 - 2026-05-24: Created plan after deciding that schematic map data should be
   canonical in `mrtdown-data`, with `mrtdown-site` responsible for rendering and
   interaction behavior.
+- 2026-05-24: Added protected map designer direction for visual authoring that
+  submits reviewed canonical changes back to `mrtdown-data`.
 
 ## Decision Log
 
@@ -174,6 +208,9 @@ Exit criteria:
   auto-layout algorithm.
 - 2026-05-24: Keep rendering and interaction behavior in `mrtdown-site`; only
   schematic data and validation belong in the canonical data source.
+- 2026-05-24: Treat any map designer as an authoring client for
+  `mrtdown-data`, similar in direction to crowdsourced report dispatch but with
+  higher-trust access and PR review before canonical publication.
 
 ## Validation
 
@@ -183,6 +220,8 @@ For site-side changes:
 - Add focused renderer/id-contract tests while migrating `StationMap`.
 - Use browser screenshots for visual parity on desktop and mobile.
 - Manually verify `/system-map` and line profile focused-map cards.
+- For map designer changes, verify exported edit bundles recreate the previewed
+  schematic data and open reviewed `mrtdown-data` changes.
 
 For data-side changes:
 
