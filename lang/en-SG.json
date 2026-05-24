@@ -207,7 +207,6 @@
   "report.effect.no_service": "No service",
   "report.effect.skipped_stop": "Train skipped stop",
   "report.effect.unknown": "Not sure",
-  "report.effect_placeholder": "Choose one",
   "report.error.description_too_short": "Add a little more detail, or leave the note blank.",
   "report.error.effect_required": "Choose what is happening.",
   "report.error.line_required": "Select the affected line.",
