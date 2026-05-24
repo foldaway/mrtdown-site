@@ -582,23 +582,40 @@ function ReportPage() {
     setSubmitState('submitting');
     setClientError(null);
 
-    const response = await fetch('/api/reports', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        observedAt: observedAtIso,
-        lineIds: selectedLineIds,
-        stationIds: selectedStationIds,
-        text: reportText,
-        directionText,
-        effect: effect || undefined,
-        delayMinutes: delayMinutes ? Number(delayMinutes) : undefined,
-        isStillHappening,
-        turnstileToken: turnstileToken || undefined,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch('/api/reports', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          observedAt: observedAtIso,
+          lineIds: selectedLineIds,
+          stationIds: selectedStationIds,
+          text: reportText,
+          directionText,
+          effect: effect || undefined,
+          delayMinutes: delayMinutes ? Number(delayMinutes) : undefined,
+          isStillHappening,
+          turnstileToken: turnstileToken || undefined,
+        }),
+      });
+    } catch (error) {
+      posthog.capture('crowd_report_submit_failed', {
+        error: error instanceof Error ? error.message : String(error),
+        status: 'network_error',
+      });
+      showClientError(
+        intl.formatMessage({
+          id: 'report.error.submit_failed',
+          defaultMessage: 'Report submission failed. Please try again.',
+        }),
+      );
+      resetTurnstile();
+      setSubmitState('idle');
+      return;
+    }
 
     if (response.ok) {
       posthog.capture('crowd_report_submit_success', {
