@@ -54,7 +54,7 @@ Start with a compact report workflow:
   - Optional `/report` route for direct links.
 - Required fields:
   - observed time, defaulting to now in `Asia/Singapore`;
-  - affected line or station;
+  - one or more affected lines or stations;
   - short free-text description.
 - Optional fields:
   - direction or destination text;
@@ -76,8 +76,6 @@ Add site-local tables through Drizzle migrations:
 - `created_at`
 - `updated_at`
 - `observed_at`
-- `line_id`
-- `station_id`
 - `direction_text`
 - `effect`
 - `delay_minutes`
@@ -88,6 +86,16 @@ Add site-local tables through Drizzle migrations:
 - `dispatched_at`
 - `dispatch_payload`
 - `dispatch_error`
+
+### `crowd_report_lines`
+
+- `report_id`
+- `line_id`
+
+### `crowd_report_stations`
+
+- `report_id`
+- `station_id`
 
 Candidate statuses:
 
@@ -111,14 +119,22 @@ Candidate statuses:
 - `id`
 - `created_at`
 - `updated_at`
-- `line_id`
-- `station_id`
 - `effect`
 - `window_start_at`
 - `window_end_at`
 - `report_count`
 - `status`
 - `dispatched_at`
+
+### `crowd_report_cluster_lines`
+
+- `cluster_id`
+- `line_id`
+
+### `crowd_report_cluster_stations`
+
+- `cluster_id`
+- `station_id`
 
 Keep IP hashes, user-agent hashes, Turnstile outcomes, and rate-limit metadata
 either in a separate abuse-control table or in fields that are never forwarded
