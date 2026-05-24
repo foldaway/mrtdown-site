@@ -16,6 +16,8 @@ type CrowdReportRuntimeEnv = typeof env & {
   CROWD_REPORT_HASH_SALT?: string;
   CROWD_REPORT_RATE_LIMIT_PER_HOUR?: string;
   CROWD_REPORT_TURNSTILE_SECRET_KEY?: string;
+  CROWD_REPORT_TURNSTILE_HOSTNAME?: string;
+  CROWD_REPORT_TURNSTILE_ACTION?: string;
   CROWD_REPORT_RATE_LIMITER?: RateLimit;
   TURNSTILE_SECRET_KEY?: string;
 };
@@ -72,6 +74,12 @@ export const Route = createFileRoute('/api/reports')({
             runtimeEnv.TURNSTILE_SECRET_KEY,
           validation.data.turnstileToken,
           getClientIp(request),
+          {
+            expectedHostname:
+              runtimeEnv.CROWD_REPORT_TURNSTILE_HOSTNAME ??
+              new URL(request.url).hostname,
+            expectedAction: runtimeEnv.CROWD_REPORT_TURNSTILE_ACTION,
+          },
         );
         if (!turnstile.success) {
           return Response.json(

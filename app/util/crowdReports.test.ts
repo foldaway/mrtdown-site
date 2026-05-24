@@ -50,6 +50,7 @@ function makeStreamingRequest(body: string) {
 
 function makeFakeDb(rateLimitCount: number) {
   const inserts: Array<{ table: unknown; values: unknown }> = [];
+  const conflictUpdates: unknown[] = [];
   const tx = {
     insert(table: unknown) {
       return {
@@ -58,7 +59,8 @@ function makeFakeDb(rateLimitCount: number) {
 
           if (table === crowdReportRateLimitsTable) {
             return {
-              onConflictDoUpdate() {
+              onConflictDoUpdate(config: unknown) {
+                conflictUpdates.push(config);
                 return {
                   returning() {
                     return Promise.resolve([
@@ -78,6 +80,7 @@ function makeFakeDb(rateLimitCount: number) {
 
   return {
     inserts,
+    conflictUpdates,
     db: {
       transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
         return callback(tx);
@@ -220,6 +223,54 @@ describe('verifyTurnstileToken', () => {
       error: 'Turnstile verification request failed',
     });
   });
+
+  it('rejects successful Turnstile responses with the wrong hostname', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          success: true,
+          hostname: 'other.example.com',
+          action: 'crowd-report',
+        }),
+      ),
+    );
+
+    await expect(
+      verifyTurnstileToken('secret', 'token', '203.0.113.1', {
+        expectedHostname: 'mrtdown.local',
+        expectedAction: 'crowd-report',
+      }),
+    ).resolves.toEqual({
+      success: false,
+      outcome: 'failed',
+      error: 'Turnstile verification hostname mismatch',
+    });
+  });
+
+  it('rejects successful Turnstile responses with the wrong action', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          success: true,
+          hostname: 'mrtdown.local',
+          action: 'other-flow',
+        }),
+      ),
+    );
+
+    await expect(
+      verifyTurnstileToken('secret', 'token', '203.0.113.1', {
+        expectedHostname: 'mrtdown.local',
+        expectedAction: 'crowd-report',
+      }),
+    ).resolves.toEqual({
+      success: false,
+      outcome: 'failed',
+      error: 'Turnstile verification action mismatch',
+    });
+  });
 });
 
 describe('persistCrowdReport', () => {
@@ -287,5 +338,29 @@ describe('persistCrowdReport', () => {
     expect(fake.inserts.map((insert) => insert.table)).toEqual([
       crowdReportRateLimitsTable,
     ]);
+  });
+
+  it('preserves an existing rate-limit fingerprint when the current request has none', async () => {
+    const fake = makeFakeDb(1);
+
+    await persistCrowdReport(
+      fake.db as never,
+      VALID_SUBMISSION,
+      {
+        ipHash: 'ip-hash',
+        turnstileOutcome: 'skipped',
+      },
+      {
+        now: NOW,
+        idFactory: () => 'fixed-id',
+      },
+    );
+
+    expect(fake.conflictUpdates[0]).toMatchObject({
+      set: {
+        client_fingerprint_hash:
+          crowdReportRateLimitsTable.client_fingerprint_hash,
+      },
+    });
   });
 });

@@ -95,6 +95,11 @@ export type CrowdReportAbuseContext = {
   turnstileOutcome: string;
 };
 
+export type TurnstileVerificationOptions = {
+  expectedHostname?: string;
+  expectedAction?: string;
+};
+
 export type TurnstileVerificationResult =
   | { success: true; outcome: 'skipped' | 'passed' }
   | { success: false; outcome: 'missing_token' | 'failed'; error: string };
@@ -292,6 +297,7 @@ export async function verifyTurnstileToken(
   secret: string | undefined,
   token: string | undefined,
   remoteIp: string | undefined,
+  options: TurnstileVerificationOptions = {},
 ): Promise<TurnstileVerificationResult> {
   if (!secret) {
     return { success: true, outcome: 'skipped' };
@@ -338,6 +344,8 @@ export async function verifyTurnstileToken(
   const result = z
     .object({
       success: z.boolean(),
+      hostname: z.string().optional(),
+      action: z.string().optional(),
       'error-codes': z.array(z.string()).optional(),
     })
     .safeParse(await response.json());
@@ -350,6 +358,25 @@ export async function verifyTurnstileToken(
         result.success && result.data['error-codes']?.length
           ? result.data['error-codes'].join(', ')
           : 'Turnstile verification failed',
+    };
+  }
+
+  if (
+    options.expectedHostname &&
+    result.data.hostname !== options.expectedHostname
+  ) {
+    return {
+      success: false,
+      outcome: 'failed',
+      error: 'Turnstile verification hostname mismatch',
+    };
+  }
+
+  if (options.expectedAction && result.data.action !== options.expectedAction) {
+    return {
+      success: false,
+      outcome: 'failed',
+      error: 'Turnstile verification action mismatch',
     };
   }
 
@@ -416,7 +443,7 @@ export async function persistCrowdReport(
           submission_count: sql`${crowdReportRateLimitsTable.submission_count} + 1`,
           client_fingerprint_hash:
             abuseContext.clientFingerprintHash ??
-            sql`excluded.client_fingerprint_hash`,
+            crowdReportRateLimitsTable.client_fingerprint_hash,
           updated_at: sql`now()`,
         },
       })
