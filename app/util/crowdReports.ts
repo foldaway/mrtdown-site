@@ -341,6 +341,17 @@ export async function verifyTurnstileToken(
     };
   }
 
+  let responseBody: unknown;
+  try {
+    responseBody = await response.json();
+  } catch {
+    return {
+      success: false,
+      outcome: 'failed',
+      error: 'Turnstile verification failed',
+    };
+  }
+
   const result = z
     .object({
       success: z.boolean(),
@@ -348,7 +359,7 @@ export async function verifyTurnstileToken(
       action: z.string().optional(),
       'error-codes': z.array(z.string()).optional(),
     })
-    .safeParse(await response.json());
+    .safeParse(responseBody);
 
   if (!result.success || !result.data.success) {
     return {

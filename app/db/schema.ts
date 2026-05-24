@@ -23,6 +23,7 @@ import {
 import { IngestContentCrowdReportEffects } from '@mrtdown/ingest-contracts';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -259,7 +260,10 @@ export const crowdReportsTable = pgTable(
     cluster_id: text('cluster_id').references(
       () => crowdReportClustersTable.id,
     ),
-    duplicate_of_id: text('duplicate_of_id'),
+    duplicate_of_id: text('duplicate_of_id').references(
+      (): AnyPgColumn => crowdReportsTable.id,
+      { onDelete: 'set null' },
+    ),
     dispatched_at: timestamp('dispatched_at', {
       withTimezone: true,
       mode: 'string',

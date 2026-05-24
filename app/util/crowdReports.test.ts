@@ -224,6 +224,25 @@ describe('verifyTurnstileToken', () => {
     });
   });
 
+  it('returns a controlled failure when the verification response is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('not json', {
+          headers: { 'content-type': 'text/plain' },
+        }),
+      ),
+    );
+
+    await expect(
+      verifyTurnstileToken('secret', 'token', '203.0.113.1'),
+    ).resolves.toEqual({
+      success: false,
+      outcome: 'failed',
+      error: 'Turnstile verification failed',
+    });
+  });
+
   it('rejects successful Turnstile responses with the wrong hostname', async () => {
     vi.stubGlobal(
       'fetch',
