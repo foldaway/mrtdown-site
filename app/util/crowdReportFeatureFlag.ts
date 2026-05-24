@@ -20,9 +20,10 @@ export function isCrowdReportsFeatureEnabled(
     return true;
   }
 
-  if (env.TIER == null || env.TIER.trim() === '') {
+  const tier = env.TIER?.trim().toLowerCase();
+  if (tier == null || tier === '') {
     return false;
   }
 
-  return env.TIER !== 'production';
+  return tier !== 'production';
 }

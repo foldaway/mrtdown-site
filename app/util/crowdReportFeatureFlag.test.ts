@@ -4,6 +4,7 @@ import { isCrowdReportsFeatureEnabled } from './crowdReportFeatureFlag';
 describe('isCrowdReportsFeatureEnabled', () => {
   it('defaults to disabled in production', () => {
     expect(isCrowdReportsFeatureEnabled({ TIER: 'production' })).toBe(false);
+    expect(isCrowdReportsFeatureEnabled({ TIER: ' Production ' })).toBe(false);
   });
 
   it('defaults to enabled outside production', () => {

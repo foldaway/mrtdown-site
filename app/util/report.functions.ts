@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { createServerFn } from '@tanstack/react-start';
-import { asc } from 'drizzle-orm';
+import { asc, inArray } from 'drizzle-orm';
 import { getDb } from '~/db';
 import {
   linesTable,
@@ -80,19 +80,6 @@ export const getCrowdReportFormOptionsFn = createServerFn({
         .from(serviceRevisionsTable),
     ]);
 
-  const servicePathEntries =
-    serviceRevisions.length > 0
-      ? await db
-          .select({
-            serviceRevisionId:
-              serviceRevisionPathStationEntriesTable.service_revision_id,
-            serviceId: serviceRevisionPathStationEntriesTable.service_id,
-            stationId: serviceRevisionPathStationEntriesTable.station_id,
-            pathIndex: serviceRevisionPathStationEntriesTable.path_index,
-          })
-          .from(serviceRevisionPathStationEntriesTable)
-      : [];
-
   const stationById = Object.fromEntries(
     stations.map((station) => [station.id, station]),
   );
@@ -117,6 +104,30 @@ export const getCrowdReportFormOptionsFn = createServerFn({
       latestRevisionByServiceId[serviceId] = latestRevision;
     }
   }
+
+  const latestRevisionIds = [
+    ...new Set(
+      Object.values(latestRevisionByServiceId).map((revision) => revision.id),
+    ),
+  ];
+  const servicePathEntries =
+    latestRevisionIds.length > 0
+      ? await db
+          .select({
+            serviceRevisionId:
+              serviceRevisionPathStationEntriesTable.service_revision_id,
+            serviceId: serviceRevisionPathStationEntriesTable.service_id,
+            stationId: serviceRevisionPathStationEntriesTable.station_id,
+            pathIndex: serviceRevisionPathStationEntriesTable.path_index,
+          })
+          .from(serviceRevisionPathStationEntriesTable)
+          .where(
+            inArray(
+              serviceRevisionPathStationEntriesTable.service_revision_id,
+              latestRevisionIds,
+            ),
+          )
+      : [];
 
   const servicePathEntriesByRevisionKey = servicePathEntries.reduce<
     Record<string, typeof servicePathEntries>
