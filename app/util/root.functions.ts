@@ -1,5 +1,10 @@
+import { env } from 'cloudflare:workers';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
+import {
+  type CrowdReportFeatureEnv,
+  isCrowdReportsFeatureEnabled,
+} from './crowdReportFeatureFlag';
 import { getRootData } from './db.queries';
 import { timeServerSpan } from './serverTiming';
 
@@ -23,6 +28,10 @@ export const getRootFn = createServerFn({ method: 'GET' })
     );
 
     return {
+      crowdReportsEnabled: isCrowdReportsFeatureEnabled(
+        env as CrowdReportFeatureEnv,
+        { isLocalDev: import.meta.env.DEV },
+      ),
       lineNavItems,
       metadata,
       operatorNavItems,

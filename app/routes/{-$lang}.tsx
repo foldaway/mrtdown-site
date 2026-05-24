@@ -18,6 +18,7 @@ import { FormattedDate, FormattedMessage, IntlProvider } from 'react-intl';
 import { LocaleSwitcher } from '~/components/LocaleSwitcher';
 import Spinner from '~/components/Spinner';
 import { LANGUAGES } from '~/constants';
+import { CrowdReportsFeatureContext } from '~/contexts/CrowdReportsFeature';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { getRootFn } from '~/util/root.functions';
 
@@ -50,7 +51,13 @@ function RouteComponent() {
   const { lang = 'en-SG' } = Route.useParams();
   const loaderData = Route.useLoaderData();
 
-  const { messages, lineNavItems, metadata, operatorNavItems } = loaderData;
+  const {
+    crowdReportsEnabled,
+    messages,
+    lineNavItems,
+    metadata,
+    operatorNavItems,
+  } = loaderData;
 
   const isHydrated = useHydrated();
 
@@ -217,7 +224,9 @@ function RouteComponent() {
           </div>
         </header>
         <main className="mx-4 mt-6 flex max-w-5xl flex-col bg-gray-50 sm:mt-8 lg:mx-auto dark:bg-gray-900">
-          <Outlet />
+          <CrowdReportsFeatureContext.Provider value={crowdReportsEnabled}>
+            <Outlet />
+          </CrowdReportsFeatureContext.Provider>
 
           {isNavigating && isHydrated && (
             <div className="fixed right-4 bottom-4">

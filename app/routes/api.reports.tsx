@@ -11,8 +11,13 @@ import {
   validateCrowdReportSubmission,
   verifyTurnstileToken,
 } from '~/util/crowdReports';
+import {
+  type CrowdReportFeatureEnv,
+  isCrowdReportsFeatureEnabled,
+} from '~/util/crowdReportFeatureFlag';
 
 type CrowdReportRuntimeEnv = typeof env & {
+  CROWD_REPORTS_ENABLED?: string;
   CROWD_REPORT_HASH_SALT?: string;
   CROWD_REPORT_RATE_LIMIT_PER_HOUR?: string;
   CROWD_REPORT_TURNSTILE_SECRET_KEY?: string;
@@ -39,6 +44,17 @@ export const Route = createFileRoute('/api/reports')({
     handlers: {
       async POST({ request }) {
         const runtimeEnv = getRuntimeEnv();
+        if (
+          !isCrowdReportsFeatureEnabled(runtimeEnv as CrowdReportFeatureEnv, {
+            isLocalDev: import.meta.env.DEV,
+          })
+        ) {
+          return Response.json(
+            { success: false, error: 'Crowd reports are not available' },
+            { status: 404 },
+          );
+        }
+
         const hashSalt =
           runtimeEnv.CROWD_REPORT_HASH_SALT ??
           (import.meta.env.DEV ? 'development-crowd-report-salt' : undefined);

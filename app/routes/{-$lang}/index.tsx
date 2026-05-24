@@ -1,4 +1,4 @@
-import { createFileRoute, notFound } from '@tanstack/react-router';
+import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useEffect, useMemo } from 'react';
 import { createIntl, FormattedMessage } from 'react-intl';
@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { LineSummaryBlock } from '~/components/LineSummaryBlock';
 import { LANGUAGES } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
+import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { useViewport, ViewportSchema } from '~/hooks/useViewport';
 import { getOverviewFn } from '~/util/overview.functions';
@@ -124,6 +125,7 @@ function HomePage() {
   const { viewport } = Route.useSearch();
   const { overview, included, dateCount } = loaderData;
   const { issues } = included;
+  const crowdReportsEnabled = useCrowdReportsFeatureEnabled();
 
   const navigate = Route.useNavigate();
 
@@ -210,6 +212,34 @@ function HomePage() {
           issuesActiveToday={issuesActiveToday}
           lineOperationalCount={lineOperationalCount}
         />
+
+        {crowdReportsEnabled && (
+          <section className="flex flex-col gap-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-sky-900 dark:bg-sky-950/30">
+            <div>
+              <h2 className="font-semibold text-base text-gray-900 dark:text-gray-100">
+                <FormattedMessage
+                  id="home.report_cta_title"
+                  defaultMessage="Seeing a train delay?"
+                />
+              </h2>
+              <p className="mt-1 text-gray-600 text-sm leading-5 dark:text-gray-300">
+                <FormattedMessage
+                  id="home.report_cta_body"
+                  defaultMessage="Share a community report for review. It stays separate from official service status."
+                />
+              </p>
+            </div>
+            <Link
+              to="/{-$lang}/report"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
+            >
+              <FormattedMessage
+                id="home.report_cta"
+                defaultMessage="Submit report"
+              />
+            </Link>
+          </section>
+        )}
 
         {isLineSummaryViewportPending ? (
           <HomeLineSummariesSkeleton

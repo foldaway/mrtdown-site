@@ -96,22 +96,64 @@ flowchart LR
 
 ## Product Shape
 
-Start with a compact report workflow:
+Start with a compact report workflow that asks for commuter intent before asking
+for database entities. The first screen should use a scope choice:
 
-- Entry points:
-  - Home page CTA near current advisories.
-  - Line page CTA when a commuter is viewing a specific line.
-  - Optional `/report` route for direct links.
+- `Line issue`: the whole line, a branch, or service along a line seems affected.
+- `Station issue`: a specific station, platform, gantry, or station-level
+  disruption seems affected.
+- `On-train issue`: the commuter is on a train and can describe direction,
+  destination, skipped stops, delay, or crowding.
+
+The scope choice should drive the rest of the form:
+
+- For `Line issue`, ask for the affected line first. Station remains optional.
+- For `Station issue`, ask for the station first, then show line choices served
+  by that station. Auto-select the line only when the station has exactly one
+  line; at interchanges, require or suggest the specific line.
+- For `On-train issue`, ask for line first, then direction or destination.
+  Station is optional unless the report is about a stop, skipped stop, or
+  platform event.
+
+Entry points:
+
+- Home page CTA near current advisories.
+- Line page CTA that preselects `Line issue` and the current line.
+- Station page CTA that preselects `Station issue` and the current station.
+- Optional `/report` route for direct links.
+
+Keep the first-pass form submit-able in about 10-20 seconds:
+
 - Required fields:
-  - observed time, defaulting to now in `Asia/Singapore`;
-  - one or more affected lines or stations;
-  - short free-text description.
-- Optional fields:
-  - direction or destination text;
+  - scope choice;
+  - station, line, or on-train line/direction context required by that scope;
   - effect type, using `@mrtdown/ingest-contracts`
     `IngestContentCrowdReportEffects`;
+  - whether the report is still happening;
+  - short description only when the structured fields are insufficient, such as
+    `unknown`, `other`, or ambiguous scope.
+- Defaulted or secondary fields:
+  - observed time, defaulting to now in `Asia/Singapore`;
   - delay estimate;
-  - whether the report is still happening.
+  - extra description;
+  - advanced affected-area override.
+
+Line selection should be guided by the selected station, not hard-gated. When a
+station is selected, show its served lines first and visually de-emphasize other
+lines behind an "additional line" affordance. This preserves escape hatches for
+cross-line issues and imperfect commuter knowledge.
+
+Multiple-station reporting should stay supported in the data model but should
+not be the primary public interaction. Prefer one station, one line, or one
+journey direction in the main form. Add multi-station or station-range controls
+only for explicit cases such as skipped stops, no service between two stations,
+or a branch affected by a line disruption.
+
+Direction should be structured when enough context is known. After line and
+station or line and journey scope are selected, offer terminal or branch
+direction choices derived from service revision data. Always include `Not sure`
+and `Other` fallbacks with free text so uncommon routing and commuter uncertainty
+do not block submission.
 
 The UI should describe the submission as a community report, not an official
 alert. It should avoid promising publication or immediate service-status
@@ -233,6 +275,38 @@ Exit criteria:
 - A commuter can submit a report on mobile and desktop.
 - The flow is localized and does not imply official affiliation.
 
+### Phase 2A: Public Form UX Refinement
+
+- Replace the flat form with a scope-first flow: line issue, station issue, or
+  on-train issue.
+- Show a context summary near the top when a line or station was prefilled from
+  an entry point.
+- Replace the long station select with a searchable station picker that supports
+  station name and station code search.
+- Use station selection to prioritize line choices served by that station. Keep
+  an additional-line affordance for cross-line issues instead of hard-gating.
+- Keep multiple-station input out of the default path. Add explicit range or
+  from/to controls only for skipped-stop and no-service-between-stations cases.
+- Replace free-text direction with structured terminal, branch, or destination
+  choices when line context is known. Keep `Not sure` and `Other` fallbacks.
+- Reduce visible workload by defaulting observed time to now and moving it to a
+  secondary details area.
+- Make the description optional when structured fields are sufficient, but
+  require it for ambiguous `unknown` reports or `Other` direction/effect values.
+- Add field-level validation messages and focus management for failed
+  submissions.
+- Add `role="alert"` or `aria-live` to validation and submission errors.
+
+Exit criteria:
+
+- A common report can be submitted with scope, affected context, effect, current
+  status, and no unnecessary typing.
+- Station and line entry-point links make the prefilled context obvious.
+- Mobile users can find stations without scrolling through the full network.
+- Keyboard and screen-reader users can understand and recover from validation
+  failures.
+- `npm run verify` passes.
+
 ### Phase 3: Moderation And Admin Surface
 
 - Add an internal route or protected API for listing pending reports.
@@ -299,6 +373,19 @@ Exit criteria:
   validation/persistence tests.
 - 2026-05-24: Added native Cloudflare Worker rate limiting as a short-window
   edge gate ahead of the persisted hourly database limiter.
+- 2026-05-24: Started Phase 2 public form work with localized `/report`,
+  line/station option loading, optional Turnstile widget wiring, PostHog
+  submission events, and home/line/station CTAs with prefilled search params.
+- 2026-05-24: Feature-flagged the public report surface and write API so
+  crowdsourced reports default to non-production only, with an explicit
+  `CROWD_REPORTS_ENABLED` runtime override.
+- 2026-05-24: Evaluated the initial public report form UX and added Phase 2A
+  refinement tasks for scope-first reporting, searchable station selection,
+  guided line selection, structured direction, and accessible validation.
+- 2026-05-24: Began Phase 2A implementation in `mrtdown-site`: scope-first
+  public form, searchable station results, station-guided line selection,
+  structured direction choices, optional description fallback text, and
+  accessible submission errors.
 
 ## Decision Log
 
@@ -309,6 +396,16 @@ Exit criteria:
   workflow to import canonical results.
 - 2026-05-24: Keep community-only signals separate from canonical disruptions
   and out of statistics.
+- 2026-05-24: Ask commuters to choose report scope first: line issue, station
+  issue, or on-train issue. This is clearer than exposing the line/station data
+  model first.
+- 2026-05-24: Guide line selection from the chosen station, but do not hard-gate
+  it. Cross-line issues, interchanges, and uncertain commuters need an escape
+  hatch.
+- 2026-05-24: Keep multiple-station reporting out of the default path. Model
+  skipped stops and no-service-between-stations as explicit range cases instead.
+- 2026-05-24: Prefer structured direction choices derived from line context,
+  with `Not sure` and `Other` fallbacks.
 
 ## Validation
 
