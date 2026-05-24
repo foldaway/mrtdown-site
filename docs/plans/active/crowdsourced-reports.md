@@ -24,6 +24,56 @@ Related references:
 - `app/db/schema.ts`
 - `app/routes/internal.api.tasks.pull.ts`
 
+## System Flow
+
+Keep this diagram in sync with the paired `mrtdown-data` plan.
+
+```mermaid
+flowchart LR
+  commuter["Commuter"]
+  externalProducer["Other external evidence producer"]
+  moderator["Moderator or operator"]
+  reviewer["Data reviewer"]
+
+  subgraph site["mrtdown-site runtime"]
+    reportForm["Public report form"]
+    abuseGate["Validation, Turnstile, and rate limits"]
+    crowdQueue["Site-local crowd report tables"]
+    moderation["Moderation and clustering"]
+    communitySignal["Short-lived site-local community signal"]
+    dispatch["Dispatch accepted report or cluster"]
+    pullWorkflow["Canonical archive pull workflow"]
+    readModel["Postgres/PostGIS read model"]
+    publicUi["Canonical status, history, and statistics"]
+  end
+
+  subgraph github["GitHub automation boundary"]
+    repositoryDispatch["repository_dispatch ingest event"]
+    dataPr["Automated data PR"]
+    reviewedMerge["Reviewed merge to main"]
+  end
+
+  subgraph data["mrtdown-data canonical repository"]
+    ingestContract["@mrtdown/ingest-contracts crowd-report payload"]
+    ingestWorkflow[".github/workflows/ingest.yml"]
+    triage["@mrtdown/triage LLM-assisted ingest"]
+    canonicalEvidence["data/issue/... report.public evidence"]
+    validation["data validation and review"]
+    publishedArchive["Published canonical data archive"]
+  end
+
+  commuter --> reportForm --> abuseGate --> crowdQueue --> moderation
+  moderator --> moderation
+  moderation --> communitySignal
+  moderation --> dispatch --> repositoryDispatch --> ingestContract
+  externalProducer --> repositoryDispatch
+  ingestContract --> ingestWorkflow --> triage --> canonicalEvidence
+  canonicalEvidence --> validation --> dataPr --> reviewer
+  reviewer --> reviewedMerge --> publishedArchive
+  communitySignal --> publicUi
+  publishedArchive --> pullWorkflow --> readModel --> publicUi
+```
+
 ## Goals
 
 - Let commuters submit concise MRT/LRT service reports from the public site.
