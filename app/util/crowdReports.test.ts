@@ -75,6 +75,9 @@ function makeFakeDb(
     orderBy() {
       return this;
     },
+    offset() {
+      return this;
+    },
     limit() {
       return Promise.resolve(nextSelectResult());
     },
@@ -166,6 +169,9 @@ function makeFakeAutomoderationDb(
       return this;
     },
     orderBy() {
+      return this;
+    },
+    offset() {
       return this;
     },
     limit() {
@@ -682,6 +688,53 @@ describe('automoderateCrowdReport', () => {
       values: {
         status: 'accepted',
         duplicate_of_id: null,
+      },
+    });
+  });
+
+  it('searches later duplicate candidate pages before accepting a report', async () => {
+    const firstPage = Array.from({ length: 100 }, (_, index) => ({
+      id: `other-report-${index}`,
+      status: 'accepted',
+      directionText: 'Towards Another Terminal',
+    }));
+    const fake = makeFakeAutomoderationDb(
+      [
+        firstPage,
+        [],
+        [],
+        [
+          {
+            id: 'existing-report',
+            status: 'accepted',
+            directionText: 'Towards Choa Chu Kang',
+          },
+        ],
+        [{ reportId: 'existing-report', lineId: 'BPLRT' }],
+        [{ reportId: 'existing-report', stationId: 'BP6' }],
+      ],
+      {
+        id: 'report-1',
+        status: 'duplicate',
+        duplicateOfId: 'existing-report',
+      },
+    );
+
+    await expect(
+      automoderateCrowdReport(fake.db as never, 'report-1', VALID_SUBMISSION, {
+        idFactory: () => 'event-1',
+      }),
+    ).resolves.toEqual({
+      id: 'report-1',
+      status: 'duplicate',
+      duplicateOfId: 'existing-report',
+    });
+
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'duplicate',
+        duplicate_of_id: 'existing-report',
       },
     });
   });

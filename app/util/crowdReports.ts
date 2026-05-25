@@ -21,6 +21,7 @@ const DEFAULT_RATE_LIMIT_PER_HOUR = 5;
 const MAX_REPORT_AGE_HOURS = 24;
 const MAX_REPORT_FUTURE_MINUTES = 15;
 const DEFAULT_DUPLICATE_WINDOW_MINUTES = 10;
+const DUPLICATE_CANDIDATE_PAGE_SIZE = 100;
 export const MAX_CROWD_REPORT_REQUEST_BYTES = 10_000;
 
 export const CrowdReportEffectSchema = IngestContentCrowdReportEffectSchema;
@@ -488,78 +489,85 @@ async function findDuplicateCrowdReport(
     return undefined;
   }
 
-  const candidates = await db
-    .select({
-      id: crowdReportsTable.id,
-      status: crowdReportsTable.status,
-      directionText: crowdReportsTable.direction_text,
-    })
-    .from(crowdReportsTable)
-    .where(
-      and(
-        ne(crowdReportsTable.id, reportId),
-        submission.effect == null
-          ? isNull(crowdReportsTable.effect)
-          : eq(crowdReportsTable.effect, submission.effect),
-        eq(crowdReportsTable.status, 'accepted'),
-        gte(crowdReportsTable.observed_at, windowStartAt),
-        lte(crowdReportsTable.observed_at, windowEndAt),
-      ),
-    )
-    .orderBy(desc(crowdReportsTable.created_at))
-    .limit(20);
-
-  const candidateIds = candidates.map((candidate) => candidate.id);
-  if (candidateIds.length === 0) {
-    return undefined;
-  }
-
-  const [candidateLines, candidateStations] = await Promise.all([
-    db
+  let offset = 0;
+  while (true) {
+    const candidates = await db
       .select({
-        reportId: crowdReportLinesTable.report_id,
-        lineId: crowdReportLinesTable.line_id,
+        id: crowdReportsTable.id,
+        status: crowdReportsTable.status,
+        directionText: crowdReportsTable.direction_text,
       })
-      .from(crowdReportLinesTable)
-      .where(inArray(crowdReportLinesTable.report_id, candidateIds))
-      .limit(160),
-    db
-      .select({
-        reportId: crowdReportStationsTable.report_id,
-        stationId: crowdReportStationsTable.station_id,
-      })
-      .from(crowdReportStationsTable)
-      .where(inArray(crowdReportStationsTable.report_id, candidateIds))
-      .limit(320),
-  ]);
+      .from(crowdReportsTable)
+      .where(
+        and(
+          ne(crowdReportsTable.id, reportId),
+          submission.effect == null
+            ? isNull(crowdReportsTable.effect)
+            : eq(crowdReportsTable.effect, submission.effect),
+          eq(crowdReportsTable.status, 'accepted'),
+          gte(crowdReportsTable.observed_at, windowStartAt),
+          lte(crowdReportsTable.observed_at, windowEndAt),
+        ),
+      )
+      .orderBy(desc(crowdReportsTable.created_at))
+      .offset(offset)
+      .limit(DUPLICATE_CANDIDATE_PAGE_SIZE);
 
-  for (const candidate of candidates) {
-    if (candidate.status !== 'accepted') {
-      continue;
-    }
-    if (
-      normalizeComparableText(candidate.directionText) !==
-      normalizeComparableText(submission.directionText)
-    ) {
-      continue;
+    const candidateIds = candidates.map((candidate) => candidate.id);
+    if (candidateIds.length === 0) {
+      return undefined;
     }
 
-    const lineIds = candidateLines
-      .filter((line) => line.reportId === candidate.id)
-      .map((line) => line.lineId);
-    const stationIds = candidateStations
-      .filter((station) => station.reportId === candidate.id)
-      .map((station) => station.stationId);
+    const [candidateLines, candidateStations] = await Promise.all([
+      db
+        .select({
+          reportId: crowdReportLinesTable.report_id,
+          lineId: crowdReportLinesTable.line_id,
+        })
+        .from(crowdReportLinesTable)
+        .where(inArray(crowdReportLinesTable.report_id, candidateIds))
+        .limit(DUPLICATE_CANDIDATE_PAGE_SIZE * 8),
+      db
+        .select({
+          reportId: crowdReportStationsTable.report_id,
+          stationId: crowdReportStationsTable.station_id,
+        })
+        .from(crowdReportStationsTable)
+        .where(inArray(crowdReportStationsTable.report_id, candidateIds))
+        .limit(DUPLICATE_CANDIDATE_PAGE_SIZE * 16),
+    ]);
 
-    if (
-      areSameIdSets(lineIds, submission.lineIds) &&
-      areSameIdSets(stationIds, submission.stationIds)
-    ) {
-      return candidate;
+    for (const candidate of candidates) {
+      if (candidate.status !== 'accepted') {
+        continue;
+      }
+      if (
+        normalizeComparableText(candidate.directionText) !==
+        normalizeComparableText(submission.directionText)
+      ) {
+        continue;
+      }
+
+      const lineIds = candidateLines
+        .filter((line) => line.reportId === candidate.id)
+        .map((line) => line.lineId);
+      const stationIds = candidateStations
+        .filter((station) => station.reportId === candidate.id)
+        .map((station) => station.stationId);
+
+      if (
+        areSameIdSets(lineIds, submission.lineIds) &&
+        areSameIdSets(stationIds, submission.stationIds)
+      ) {
+        return candidate;
+      }
     }
+
+    if (candidates.length < DUPLICATE_CANDIDATE_PAGE_SIZE) {
+      return undefined;
+    }
+    offset += DUPLICATE_CANDIDATE_PAGE_SIZE;
   }
-
-  return undefined;
 }
 
 export async function automoderateCrowdReport(
