@@ -386,6 +386,9 @@ Exit criteria:
   public form, searchable station results, station-guided line selection,
   structured direction choices, optional description fallback text, and
   accessible submission errors.
+- 2026-05-24: Continued Phase 2A by adding field-level validation messages,
+  validation focus management, and required reviewer notes for ambiguous
+  `unknown` reports or `Other` direction submissions.
 
 ## Decision Log
 
