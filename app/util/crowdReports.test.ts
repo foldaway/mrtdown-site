@@ -62,6 +62,7 @@ function makeFakeDb(
   const inserts: Array<{ table: unknown; values: unknown }> = [];
   const conflictUpdates: unknown[] = [];
   const updates: Array<{ table: unknown; values: unknown }> = [];
+  const executes: unknown[] = [];
   let transactions = 0;
   const nextSelectResult = () => selectResults.shift() ?? [];
   const selectBuilder = {
@@ -79,6 +80,10 @@ function makeFakeDb(
     },
   };
   const tx = {
+    execute(query: unknown) {
+      executes.push(query);
+      return Promise.resolve();
+    },
     select() {
       return selectBuilder;
     },
@@ -128,6 +133,7 @@ function makeFakeDb(
     inserts,
     conflictUpdates,
     updates,
+    executes,
     get transactions() {
       return transactions;
     },
@@ -150,6 +156,7 @@ function makeFakeAutomoderationDb(
 ) {
   const inserts: Array<{ table: unknown; values: unknown }> = [];
   const updates: Array<{ table: unknown; values: unknown }> = [];
+  const executes: unknown[] = [];
   const nextSelectResult = () => selectResults.shift() ?? [];
   const selectBuilder = {
     from() {
@@ -167,6 +174,10 @@ function makeFakeAutomoderationDb(
   };
 
   const tx = {
+    execute(query: unknown) {
+      executes.push(query);
+      return Promise.resolve();
+    },
     select() {
       return selectBuilder;
     },
@@ -199,6 +210,7 @@ function makeFakeAutomoderationDb(
   return {
     inserts,
     updates,
+    executes,
     db: {
       transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
         return callback(tx);
@@ -548,6 +560,7 @@ describe('persistAutomoderatedCrowdReport', () => {
         duplicate_of_id: null,
       },
     });
+    expect(fake.executes).toHaveLength(1);
   });
 });
 
@@ -586,6 +599,7 @@ describe('automoderateCrowdReport', () => {
         note: 'Report accepted by automated moderation rules',
       },
     });
+    expect(fake.executes).toHaveLength(1);
   });
 
   it('marks a same-context report in the duplicate window as duplicate', async () => {

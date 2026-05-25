@@ -138,6 +138,15 @@ function areSameIdSets(left: string[], right: string[]) {
   );
 }
 
+function buildDuplicateLockKey(submission: CrowdReportSubmission) {
+  return JSON.stringify({
+    effect: submission.effect ?? null,
+    directionText: normalizeComparableText(submission.directionText),
+    lineIds: normalizeIdSet(submission.lineIds),
+    stationIds: normalizeIdSet(submission.stationIds),
+  });
+}
+
 export function validateCrowdReportSubmission(
   input: unknown,
   now = DateTime.now().setZone(SG_TIMEZONE),
@@ -581,6 +590,10 @@ async function automoderateCrowdReportInTransaction(
   duplicateWindowMinutes: number,
   idFactory: () => string,
 ) {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${buildDuplicateLockKey(submission)}, 0::bigint))`,
+  );
+
   const duplicate = await findDuplicateCrowdReport(
     tx,
     reportId,
