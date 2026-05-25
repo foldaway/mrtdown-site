@@ -13,6 +13,7 @@ import {
   CrowdReportRateLimitError,
   getCrowdReportRateLimitBucketStart,
   parseCrowdReportJsonBody,
+  persistAutomoderatedCrowdReport,
   persistCrowdReport,
   validateCrowdReportSubmission,
   verifyTurnstileToken,
@@ -49,10 +50,54 @@ function makeStreamingRequest(body: string) {
   } as RequestInit & { duplex: 'half' });
 }
 
-function makeFakeDb(rateLimitCount: number) {
+function makeFakeDb(
+  rateLimitCount: number,
+  selectResults: unknown[][] = [],
+  updatedReport = {
+    id: 'fixed-id',
+    status: 'accepted',
+    duplicateOfId: null as string | null,
+  },
+) {
   const inserts: Array<{ table: unknown; values: unknown }> = [];
   const conflictUpdates: unknown[] = [];
+  const updates: Array<{ table: unknown; values: unknown }> = [];
+  let transactions = 0;
+  const nextSelectResult = () => selectResults.shift() ?? [];
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    where() {
+      return this;
+    },
+    orderBy() {
+      return this;
+    },
+    limit() {
+      return Promise.resolve(nextSelectResult());
+    },
+  };
   const tx = {
+    select() {
+      return selectBuilder;
+    },
+    update(table: unknown) {
+      return {
+        set(values: unknown) {
+          updates.push({ table, values });
+          return {
+            where() {
+              return {
+                returning() {
+                  return Promise.resolve([updatedReport]);
+                },
+              };
+            },
+          };
+        },
+      };
+    },
     insert(table: unknown) {
       return {
         values(values: unknown) {
@@ -82,8 +127,13 @@ function makeFakeDb(rateLimitCount: number) {
   return {
     inserts,
     conflictUpdates,
+    updates,
+    get transactions() {
+      return transactions;
+    },
     db: {
       transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
+        transactions += 1;
         return callback(tx);
       },
     },
@@ -447,6 +497,55 @@ describe('persistCrowdReport', () => {
       set: {
         client_fingerprint_hash:
           crowdReportRateLimitsTable.client_fingerprint_hash,
+      },
+    });
+  });
+});
+
+describe('persistAutomoderatedCrowdReport', () => {
+  it('persists and automoderates a report in one transaction', async () => {
+    const fake = makeFakeDb(1, [[]], {
+      id: 'fixed-id',
+      status: 'accepted',
+      duplicateOfId: null,
+    });
+
+    await expect(
+      persistAutomoderatedCrowdReport(
+        fake.db as never,
+        VALID_SUBMISSION,
+        {
+          ipHash: 'ip-hash',
+          userAgentHash: 'ua-hash',
+          turnstileOutcome: 'passed',
+        },
+        {
+          now: NOW,
+          idFactory: () => 'fixed-id',
+        },
+      ),
+    ).resolves.toEqual({
+      id: 'fixed-id',
+      status: 'accepted',
+      duplicateOfId: null,
+    });
+
+    expect(fake.transactions).toBe(1);
+    expect(fake.inserts.map((insert) => insert.table)).toEqual([
+      crowdReportRateLimitsTable,
+      crowdReportsTable,
+      crowdReportLinesTable,
+      crowdReportStationsTable,
+      crowdReportAbuseEventsTable,
+      crowdReportModerationEventsTable,
+      crowdReportModerationEventsTable,
+    ]);
+    expect(fake.updates).toHaveLength(1);
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'accepted',
+        duplicate_of_id: null,
       },
     });
   });

@@ -81,12 +81,22 @@ export type CrowdReportJsonBodyResult =
   | { success: false; status: 400 | 413; error: string };
 
 type AppDb = ReturnType<typeof import('~/db').getDb>;
-type CrowdReportReadableDb = Pick<AppDb, 'select'>;
+type CrowdReportTransaction = Parameters<
+  Parameters<AppDb['transaction']>[0]
+>[0];
+type CrowdReportReadableDb = Pick<CrowdReportTransaction, 'select'>;
 
 type PersistCrowdReportOptions = {
   now?: DateTime;
   rateLimitPerHour?: number;
   idFactory?: () => string;
+};
+
+type PersistCrowdReportTransactionContext = {
+  rateLimitPerHour: number;
+  idFactory: () => string;
+  bucketStartAt: string;
+  reportId: string;
 };
 
 type AutomoderateCrowdReportOptions = {
@@ -553,48 +563,153 @@ export async function automoderateCrowdReport(
   const duplicateWindowMinutes =
     options.duplicateWindowMinutes ?? DEFAULT_DUPLICATE_WINDOW_MINUTES;
 
-  return db.transaction(async (tx) => {
-    const duplicate = await findDuplicateCrowdReport(
+  return db.transaction((tx) =>
+    automoderateCrowdReportInTransaction(
       tx,
       reportId,
       submission,
       duplicateWindowMinutes,
-    );
-    const status = duplicate == null ? 'accepted' : 'duplicate';
+      idFactory,
+    ),
+  );
+}
 
-    const [updatedReport] = await tx
-      .update(crowdReportsTable)
-      .set({
-        status,
-        duplicate_of_id: duplicate?.id ?? null,
-        updated_at: sql`now()`,
-      })
-      .where(eq(crowdReportsTable.id, reportId))
-      .returning({
-        id: crowdReportsTable.id,
-        status: crowdReportsTable.status,
-        duplicateOfId: crowdReportsTable.duplicate_of_id,
-      });
+async function automoderateCrowdReportInTransaction(
+  tx: CrowdReportTransaction,
+  reportId: string,
+  submission: CrowdReportSubmission,
+  duplicateWindowMinutes: number,
+  idFactory: () => string,
+) {
+  const duplicate = await findDuplicateCrowdReport(
+    tx,
+    reportId,
+    submission,
+    duplicateWindowMinutes,
+  );
+  const status = duplicate == null ? 'accepted' : 'duplicate';
 
-    await tx.insert(crowdReportModerationEventsTable).values({
-      id: idFactory(),
-      report_id: reportId,
-      actor: 'system',
-      action: duplicate == null ? 'automated_accepted' : 'automated_duplicate',
-      note:
-        duplicate == null
-          ? 'Report accepted by automated moderation rules'
-          : `Report automatically marked as duplicate of ${duplicate.id}`,
+  const [updatedReport] = await tx
+    .update(crowdReportsTable)
+    .set({
+      status,
+      duplicate_of_id: duplicate?.id ?? null,
+      updated_at: sql`now()`,
+    })
+    .where(eq(crowdReportsTable.id, reportId))
+    .returning({
+      id: crowdReportsTable.id,
+      status: crowdReportsTable.status,
+      duplicateOfId: crowdReportsTable.duplicate_of_id,
     });
 
-    return (
-      updatedReport ?? {
-        id: reportId,
-        status,
-        duplicateOfId: duplicate?.id ?? null,
-      }
-    );
+  await tx.insert(crowdReportModerationEventsTable).values({
+    id: idFactory(),
+    report_id: reportId,
+    actor: 'system',
+    action: duplicate == null ? 'automated_accepted' : 'automated_duplicate',
+    note:
+      duplicate == null
+        ? 'Report accepted by automated moderation rules'
+        : `Report automatically marked as duplicate of ${duplicate.id}`,
   });
+
+  return (
+    updatedReport ?? {
+      id: reportId,
+      status,
+      duplicateOfId: duplicate?.id ?? null,
+    }
+  );
+}
+
+async function persistCrowdReportInTransaction(
+  tx: CrowdReportTransaction,
+  submission: CrowdReportSubmission,
+  abuseContext: CrowdReportAbuseContext,
+  context: PersistCrowdReportTransactionContext,
+) {
+  const [rateLimit] = await tx
+    .insert(crowdReportRateLimitsTable)
+    .values({
+      ip_hash: abuseContext.ipHash,
+      bucket_start_at: context.bucketStartAt,
+      submission_count: 1,
+      client_fingerprint_hash: abuseContext.clientFingerprintHash,
+    })
+    .onConflictDoUpdate({
+      target: [
+        crowdReportRateLimitsTable.ip_hash,
+        crowdReportRateLimitsTable.bucket_start_at,
+      ],
+      set: {
+        submission_count: sql`${crowdReportRateLimitsTable.submission_count} + 1`,
+        client_fingerprint_hash:
+          abuseContext.clientFingerprintHash ??
+          crowdReportRateLimitsTable.client_fingerprint_hash,
+        updated_at: sql`now()`,
+      },
+    })
+    .returning({
+      submissionCount: crowdReportRateLimitsTable.submission_count,
+    });
+
+  if ((rateLimit?.submissionCount ?? 0) > context.rateLimitPerHour) {
+    throw new CrowdReportRateLimitError(
+      context.rateLimitPerHour,
+      context.bucketStartAt,
+    );
+  }
+
+  await tx.insert(crowdReportsTable).values({
+    id: context.reportId,
+    observed_at: submission.observedAt,
+    direction_text: submission.directionText,
+    effect: submission.effect,
+    delay_minutes: submission.delayMinutes,
+    still_happening: submission.isStillHappening,
+    text: submission.text,
+    status: 'pending',
+  });
+
+  if (submission.lineIds.length > 0) {
+    await tx.insert(crowdReportLinesTable).values(
+      submission.lineIds.map((lineId) => ({
+        report_id: context.reportId,
+        line_id: lineId,
+      })),
+    );
+  }
+
+  if (submission.stationIds.length > 0) {
+    await tx.insert(crowdReportStationsTable).values(
+      submission.stationIds.map((stationId) => ({
+        report_id: context.reportId,
+        station_id: stationId,
+      })),
+    );
+  }
+
+  await tx.insert(crowdReportAbuseEventsTable).values({
+    id: context.idFactory(),
+    report_id: context.reportId,
+    ip_hash: abuseContext.ipHash,
+    user_agent_hash: abuseContext.userAgentHash,
+    client_fingerprint_hash: abuseContext.clientFingerprintHash,
+    turnstile_token_hash: abuseContext.turnstileTokenHash,
+    turnstile_outcome: abuseContext.turnstileOutcome,
+    rate_limit_bucket_start_at: context.bucketStartAt,
+  });
+
+  await tx.insert(crowdReportModerationEventsTable).values({
+    id: context.idFactory(),
+    report_id: context.reportId,
+    actor: 'system',
+    action: 'submitted',
+    note: 'Report submitted through public API',
+  });
+
+  return { id: context.reportId, status: 'pending' as const };
 }
 
 export async function persistCrowdReport(
@@ -609,84 +724,50 @@ export async function persistCrowdReport(
   const idFactory = options.idFactory ?? (() => crypto.randomUUID());
   const reportId = idFactory();
 
+  return db.transaction((tx) =>
+    persistCrowdReportInTransaction(tx, submission, abuseContext, {
+      rateLimitPerHour: limit,
+      idFactory,
+      bucketStartAt,
+      reportId,
+    }),
+  );
+}
+
+export async function persistAutomoderatedCrowdReport(
+  db: AppDb,
+  submission: CrowdReportSubmission,
+  abuseContext: CrowdReportAbuseContext,
+  options: PersistCrowdReportOptions & AutomoderateCrowdReportOptions = {},
+) {
+  const now = options.now ?? DateTime.now().setZone(SG_TIMEZONE);
+  const bucketStartAt = getCrowdReportRateLimitBucketStart(now);
+  const rateLimitPerHour =
+    options.rateLimitPerHour ?? DEFAULT_RATE_LIMIT_PER_HOUR;
+  const duplicateWindowMinutes =
+    options.duplicateWindowMinutes ?? DEFAULT_DUPLICATE_WINDOW_MINUTES;
+  const idFactory = options.idFactory ?? (() => crypto.randomUUID());
+  const reportId = idFactory();
+
   return db.transaction(async (tx) => {
-    const [rateLimit] = await tx
-      .insert(crowdReportRateLimitsTable)
-      .values({
-        ip_hash: abuseContext.ipHash,
-        bucket_start_at: bucketStartAt,
-        submission_count: 1,
-        client_fingerprint_hash: abuseContext.clientFingerprintHash,
-      })
-      .onConflictDoUpdate({
-        target: [
-          crowdReportRateLimitsTable.ip_hash,
-          crowdReportRateLimitsTable.bucket_start_at,
-        ],
-        set: {
-          submission_count: sql`${crowdReportRateLimitsTable.submission_count} + 1`,
-          client_fingerprint_hash:
-            abuseContext.clientFingerprintHash ??
-            crowdReportRateLimitsTable.client_fingerprint_hash,
-          updated_at: sql`now()`,
-        },
-      })
-      .returning({
-        submissionCount: crowdReportRateLimitsTable.submission_count,
-      });
+    const report = await persistCrowdReportInTransaction(
+      tx,
+      submission,
+      abuseContext,
+      {
+        rateLimitPerHour,
+        idFactory,
+        bucketStartAt,
+        reportId,
+      },
+    );
 
-    if ((rateLimit?.submissionCount ?? 0) > limit) {
-      throw new CrowdReportRateLimitError(limit, bucketStartAt);
-    }
-
-    await tx.insert(crowdReportsTable).values({
-      id: reportId,
-      observed_at: submission.observedAt,
-      direction_text: submission.directionText,
-      effect: submission.effect,
-      delay_minutes: submission.delayMinutes,
-      still_happening: submission.isStillHappening,
-      text: submission.text,
-      status: 'pending',
-    });
-
-    if (submission.lineIds.length > 0) {
-      await tx.insert(crowdReportLinesTable).values(
-        submission.lineIds.map((lineId) => ({
-          report_id: reportId,
-          line_id: lineId,
-        })),
-      );
-    }
-
-    if (submission.stationIds.length > 0) {
-      await tx.insert(crowdReportStationsTable).values(
-        submission.stationIds.map((stationId) => ({
-          report_id: reportId,
-          station_id: stationId,
-        })),
-      );
-    }
-
-    await tx.insert(crowdReportAbuseEventsTable).values({
-      id: idFactory(),
-      report_id: reportId,
-      ip_hash: abuseContext.ipHash,
-      user_agent_hash: abuseContext.userAgentHash,
-      client_fingerprint_hash: abuseContext.clientFingerprintHash,
-      turnstile_token_hash: abuseContext.turnstileTokenHash,
-      turnstile_outcome: abuseContext.turnstileOutcome,
-      rate_limit_bucket_start_at: bucketStartAt,
-    });
-
-    await tx.insert(crowdReportModerationEventsTable).values({
-      id: idFactory(),
-      report_id: reportId,
-      actor: 'system',
-      action: 'submitted',
-      note: 'Report submitted through public API',
-    });
-
-    return { id: reportId, status: 'pending' as const };
+    return automoderateCrowdReportInTransaction(
+      tx,
+      report.id,
+      submission,
+      duplicateWindowMinutes,
+      idFactory,
+    );
   });
 }
