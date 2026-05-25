@@ -472,6 +472,7 @@ async function findDuplicateCrowdReport(
   const candidates = await db
     .select({
       id: crowdReportsTable.id,
+      status: crowdReportsTable.status,
       directionText: crowdReportsTable.direction_text,
     })
     .from(crowdReportsTable)
@@ -481,7 +482,7 @@ async function findDuplicateCrowdReport(
         submission.effect == null
           ? isNull(crowdReportsTable.effect)
           : eq(crowdReportsTable.effect, submission.effect),
-        inArray(crowdReportsTable.status, ['pending', 'accepted']),
+        eq(crowdReportsTable.status, 'accepted'),
         gte(crowdReportsTable.observed_at, windowStartAt),
         lte(crowdReportsTable.observed_at, windowEndAt),
       ),
@@ -514,6 +515,9 @@ async function findDuplicateCrowdReport(
   ]);
 
   for (const candidate of candidates) {
+    if (candidate.status !== 'accepted') {
+      continue;
+    }
     if (
       normalizeComparableText(candidate.directionText) !==
       normalizeComparableText(submission.directionText)

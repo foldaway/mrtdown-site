@@ -492,7 +492,13 @@ describe('automoderateCrowdReport', () => {
   it('marks a same-context report in the duplicate window as duplicate', async () => {
     const fake = makeFakeAutomoderationDb(
       [
-        [{ id: 'existing-report', directionText: 'Towards Choa Chu Kang' }],
+        [
+          {
+            id: 'existing-report',
+            status: 'accepted',
+            directionText: 'Towards Choa Chu Kang',
+          },
+        ],
         [{ reportId: 'existing-report', lineId: 'BPLRT' }],
         [{ reportId: 'existing-report', stationId: 'BP6' }],
       ],
@@ -525,6 +531,44 @@ describe('automoderateCrowdReport', () => {
       values: {
         action: 'automated_duplicate',
         note: 'Report automatically marked as duplicate of existing-report',
+      },
+    });
+  });
+
+  it('ignores same-context pending reports to avoid reciprocal duplicates', async () => {
+    const fake = makeFakeAutomoderationDb(
+      [
+        [
+          {
+            id: 'pending-report',
+            status: 'pending',
+            directionText: 'Towards Choa Chu Kang',
+          },
+        ],
+        [{ reportId: 'pending-report', lineId: 'BPLRT' }],
+        [{ reportId: 'pending-report', stationId: 'BP6' }],
+      ],
+      {
+        id: 'report-1',
+        status: 'accepted',
+        duplicateOfId: null,
+      },
+    );
+
+    await automoderateCrowdReport(
+      fake.db as never,
+      'report-1',
+      VALID_SUBMISSION,
+      {
+        idFactory: () => 'event-1',
+      },
+    );
+
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'accepted',
+        duplicate_of_id: null,
       },
     });
   });
