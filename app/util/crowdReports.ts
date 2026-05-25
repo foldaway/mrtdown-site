@@ -2,7 +2,7 @@ import {
   type IngestContentCrowdReportEffect,
   IngestContentCrowdReportEffectSchema,
 } from '@mrtdown/ingest-contracts';
-import { inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
 import {
@@ -20,6 +20,7 @@ const SG_TIMEZONE = 'Asia/Singapore';
 const DEFAULT_RATE_LIMIT_PER_HOUR = 5;
 const MAX_REPORT_AGE_HOURS = 24;
 const MAX_REPORT_FUTURE_MINUTES = 15;
+const DEFAULT_DUPLICATE_WINDOW_MINUTES = 10;
 export const MAX_CROWD_REPORT_REQUEST_BYTES = 10_000;
 
 export const CrowdReportEffectSchema = IngestContentCrowdReportEffectSchema;
@@ -80,10 +81,16 @@ export type CrowdReportJsonBodyResult =
   | { success: false; status: 400 | 413; error: string };
 
 type AppDb = ReturnType<typeof import('~/db').getDb>;
+type CrowdReportReadableDb = Pick<AppDb, 'select'>;
 
 type PersistCrowdReportOptions = {
   now?: DateTime;
   rateLimitPerHour?: number;
+  idFactory?: () => string;
+};
+
+type AutomoderateCrowdReportOptions = {
+  duplicateWindowMinutes?: number;
   idFactory?: () => string;
 };
 
@@ -103,6 +110,23 @@ export type TurnstileVerificationOptions = {
 export type TurnstileVerificationResult =
   | { success: true; outcome: 'skipped' | 'passed' }
   | { success: false; outcome: 'missing_token' | 'failed'; error: string };
+
+function normalizeComparableText(value: string | null | undefined) {
+  return value?.trim().toLocaleLowerCase() ?? '';
+}
+
+function normalizeIdSet(values: string[]) {
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+}
+
+function areSameIdSets(left: string[], right: string[]) {
+  const normalizedLeft = normalizeIdSet(left);
+  const normalizedRight = normalizeIdSet(right);
+  return (
+    normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((value, index) => value === normalizedRight[index])
+  );
+}
 
 export function validateCrowdReportSubmission(
   input: unknown,
@@ -422,6 +446,151 @@ export async function findMissingCrowdReportReferences(
       (id) => !existingStationIds.has(id),
     ),
   };
+}
+
+async function findDuplicateCrowdReport(
+  db: CrowdReportReadableDb,
+  reportId: string,
+  submission: CrowdReportSubmission,
+  duplicateWindowMinutes: number,
+) {
+  const observedAt = DateTime.fromISO(submission.observedAt, {
+    setZone: true,
+  });
+  const windowStartAt = observedAt
+    .minus({ minutes: duplicateWindowMinutes })
+    .toUTC()
+    .toISO();
+  const windowEndAt = observedAt
+    .plus({ minutes: duplicateWindowMinutes })
+    .toUTC()
+    .toISO();
+  if (windowStartAt == null || windowEndAt == null) {
+    return undefined;
+  }
+
+  const candidates = await db
+    .select({
+      id: crowdReportsTable.id,
+      directionText: crowdReportsTable.direction_text,
+    })
+    .from(crowdReportsTable)
+    .where(
+      and(
+        ne(crowdReportsTable.id, reportId),
+        submission.effect == null
+          ? isNull(crowdReportsTable.effect)
+          : eq(crowdReportsTable.effect, submission.effect),
+        inArray(crowdReportsTable.status, ['pending', 'accepted']),
+        gte(crowdReportsTable.observed_at, windowStartAt),
+        lte(crowdReportsTable.observed_at, windowEndAt),
+      ),
+    )
+    .orderBy(desc(crowdReportsTable.created_at))
+    .limit(20);
+
+  const candidateIds = candidates.map((candidate) => candidate.id);
+  if (candidateIds.length === 0) {
+    return undefined;
+  }
+
+  const [candidateLines, candidateStations] = await Promise.all([
+    db
+      .select({
+        reportId: crowdReportLinesTable.report_id,
+        lineId: crowdReportLinesTable.line_id,
+      })
+      .from(crowdReportLinesTable)
+      .where(inArray(crowdReportLinesTable.report_id, candidateIds))
+      .limit(160),
+    db
+      .select({
+        reportId: crowdReportStationsTable.report_id,
+        stationId: crowdReportStationsTable.station_id,
+      })
+      .from(crowdReportStationsTable)
+      .where(inArray(crowdReportStationsTable.report_id, candidateIds))
+      .limit(320),
+  ]);
+
+  for (const candidate of candidates) {
+    if (
+      normalizeComparableText(candidate.directionText) !==
+      normalizeComparableText(submission.directionText)
+    ) {
+      continue;
+    }
+
+    const lineIds = candidateLines
+      .filter((line) => line.reportId === candidate.id)
+      .map((line) => line.lineId);
+    const stationIds = candidateStations
+      .filter((station) => station.reportId === candidate.id)
+      .map((station) => station.stationId);
+
+    if (
+      areSameIdSets(lineIds, submission.lineIds) &&
+      areSameIdSets(stationIds, submission.stationIds)
+    ) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+export async function automoderateCrowdReport(
+  db: AppDb,
+  reportId: string,
+  submission: CrowdReportSubmission,
+  options: AutomoderateCrowdReportOptions = {},
+) {
+  const idFactory = options.idFactory ?? (() => crypto.randomUUID());
+  const duplicateWindowMinutes =
+    options.duplicateWindowMinutes ?? DEFAULT_DUPLICATE_WINDOW_MINUTES;
+
+  return db.transaction(async (tx) => {
+    const duplicate = await findDuplicateCrowdReport(
+      tx,
+      reportId,
+      submission,
+      duplicateWindowMinutes,
+    );
+    const status = duplicate == null ? 'accepted' : 'duplicate';
+
+    const [updatedReport] = await tx
+      .update(crowdReportsTable)
+      .set({
+        status,
+        duplicate_of_id: duplicate?.id ?? null,
+        updated_at: sql`now()`,
+      })
+      .where(eq(crowdReportsTable.id, reportId))
+      .returning({
+        id: crowdReportsTable.id,
+        status: crowdReportsTable.status,
+        duplicateOfId: crowdReportsTable.duplicate_of_id,
+      });
+
+    await tx.insert(crowdReportModerationEventsTable).values({
+      id: idFactory(),
+      report_id: reportId,
+      actor: 'system',
+      action: duplicate == null ? 'automated_accepted' : 'automated_duplicate',
+      note:
+        duplicate == null
+          ? 'Report accepted by automated moderation rules'
+          : `Report automatically marked as duplicate of ${duplicate.id}`,
+    });
+
+    return (
+      updatedReport ?? {
+        id: reportId,
+        status,
+        duplicateOfId: duplicate?.id ?? null,
+      }
+    );
+  });
 }
 
 export async function persistCrowdReport(

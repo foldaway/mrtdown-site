@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { createFileRoute } from '@tanstack/react-router';
 import { getDb } from '~/db';
 import {
+  automoderateCrowdReport,
   buildCrowdReportAbuseContext,
   CrowdReportRateLimitError,
   findMissingCrowdReportReferences,
@@ -169,11 +170,16 @@ export const Route = createFileRoute('/api/reports')({
               ),
             },
           );
+          const moderatedReport = await automoderateCrowdReport(
+            db,
+            report.id,
+            validation.data,
+          );
 
           return Response.json(
             {
               success: true,
-              data: report,
+              data: moderatedReport,
             },
             { status: 202 },
           );

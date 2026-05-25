@@ -9,6 +9,7 @@ import {
   crowdReportStationsTable,
 } from '~/db/schema';
 import {
+  automoderateCrowdReport,
   CrowdReportRateLimitError,
   getCrowdReportRateLimitBucketStart,
   parseCrowdReportJsonBody,
@@ -81,6 +82,73 @@ function makeFakeDb(rateLimitCount: number) {
   return {
     inserts,
     conflictUpdates,
+    db: {
+      transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
+        return callback(tx);
+      },
+    },
+  };
+}
+
+function makeFakeAutomoderationDb(
+  selectResults: unknown[][],
+  updatedReport: {
+    id: string;
+    status: 'accepted' | 'duplicate';
+    duplicateOfId: string | null;
+  },
+) {
+  const inserts: Array<{ table: unknown; values: unknown }> = [];
+  const updates: Array<{ table: unknown; values: unknown }> = [];
+  const nextSelectResult = () => selectResults.shift() ?? [];
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    where() {
+      return this;
+    },
+    orderBy() {
+      return this;
+    },
+    limit() {
+      return Promise.resolve(nextSelectResult());
+    },
+  };
+
+  const tx = {
+    select() {
+      return selectBuilder;
+    },
+    update(table: unknown) {
+      return {
+        set(values: unknown) {
+          updates.push({ table, values });
+          return {
+            where() {
+              return {
+                returning() {
+                  return Promise.resolve([updatedReport]);
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+    insert(table: unknown) {
+      return {
+        values(values: unknown) {
+          inserts.push({ table, values });
+          return Promise.resolve();
+        },
+      };
+    },
+  };
+
+  return {
+    inserts,
+    updates,
     db: {
       transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
         return callback(tx);
@@ -379,6 +447,84 @@ describe('persistCrowdReport', () => {
       set: {
         client_fingerprint_hash:
           crowdReportRateLimitsTable.client_fingerprint_hash,
+      },
+    });
+  });
+});
+
+describe('automoderateCrowdReport', () => {
+  it('accepts a valid report when no duplicate candidate matches', async () => {
+    const fake = makeFakeAutomoderationDb([[]], {
+      id: 'report-1',
+      status: 'accepted',
+      duplicateOfId: null,
+    });
+
+    await expect(
+      automoderateCrowdReport(fake.db as never, 'report-1', VALID_SUBMISSION, {
+        idFactory: () => 'event-1',
+      }),
+    ).resolves.toEqual({
+      id: 'report-1',
+      status: 'accepted',
+      duplicateOfId: null,
+    });
+
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'accepted',
+        duplicate_of_id: null,
+      },
+    });
+    expect(fake.inserts[0]).toMatchObject({
+      table: crowdReportModerationEventsTable,
+      values: {
+        id: 'event-1',
+        report_id: 'report-1',
+        actor: 'system',
+        action: 'automated_accepted',
+        note: 'Report accepted by automated moderation rules',
+      },
+    });
+  });
+
+  it('marks a same-context report in the duplicate window as duplicate', async () => {
+    const fake = makeFakeAutomoderationDb(
+      [
+        [{ id: 'existing-report', directionText: 'Towards Choa Chu Kang' }],
+        [{ reportId: 'existing-report', lineId: 'BPLRT' }],
+        [{ reportId: 'existing-report', stationId: 'BP6' }],
+      ],
+      {
+        id: 'report-1',
+        status: 'duplicate',
+        duplicateOfId: 'existing-report',
+      },
+    );
+
+    await expect(
+      automoderateCrowdReport(fake.db as never, 'report-1', VALID_SUBMISSION, {
+        idFactory: () => 'event-1',
+      }),
+    ).resolves.toEqual({
+      id: 'report-1',
+      status: 'duplicate',
+      duplicateOfId: 'existing-report',
+    });
+
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'duplicate',
+        duplicate_of_id: 'existing-report',
+      },
+    });
+    expect(fake.inserts[0]).toMatchObject({
+      table: crowdReportModerationEventsTable,
+      values: {
+        action: 'automated_duplicate',
+        note: 'Report automatically marked as duplicate of existing-report',
       },
     });
   });

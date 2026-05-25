@@ -307,18 +307,20 @@ Exit criteria:
   failures.
 - `npm run verify` passes.
 
-### Phase 3: Moderation And Admin Surface
+### Phase 3: Automated Moderation
 
-- Add an internal route or protected API for listing pending reports.
-- Support accept, reject, duplicate, and merge-into-cluster actions.
+- Add deterministic automated moderation immediately after public submission.
+- Auto-accept structurally valid reports that pass validation and abuse gates.
+- Auto-mark same-context reports inside a short observation window as
+  duplicates.
 - Record moderation events for auditability.
-- Keep internal routes behind `internalMiddleware` or a stronger auth boundary.
+- Keep reports out of a long-lived manual pending queue.
 
 Exit criteria:
 
-- Operators can review pending reports without direct database access.
-- Accepted reports are ready for dispatch, but canonical data is still unchanged
-  until dispatch runs.
+- Valid reports become `accepted` or `duplicate` without operator action.
+- Accepted reports are ready for clustering or dispatch, but canonical data is
+  still unchanged until dispatch runs.
 
 ### Phase 4: Clustering And Community Signal
 
@@ -334,7 +336,7 @@ Exit criteria:
 
 - The public UI can show "community reports" without confusing them with
   canonical issues.
-- Single unverified reports remain private to moderation.
+- Single accepted reports remain site-local and are not displayed publicly.
 
 ### Phase 5: Dispatch To Canonical Ingest
 
@@ -353,16 +355,15 @@ Exit criteria:
 
 ### Phase 6: Automation Policy
 
-- Begin with manual review for all reports.
-- Add auto-reject rules for empty, stale, or non-transit reports.
-- Add auto-accept only for high-confidence clusters after manual review metrics
-  are good enough.
+- Expand deterministic auto-reject rules for empty, stale, non-transit, or
+  obviously abusive reports as production traffic reveals patterns.
+- Add auto-accept clustering thresholds for high-confidence clusters.
 - Revisit thresholds using observed false-positive and duplicate rates.
 
 Exit criteria:
 
-- Automation improves moderation load without making unreviewed single reports
-  canonical.
+- Automation keeps low-quality reports out while accepted site-local reports
+  remain non-canonical until dispatch and data-side review complete.
 
 ## Progress Log
 
@@ -389,6 +390,9 @@ Exit criteria:
 - 2026-05-24: Continued Phase 2A by adding field-level validation messages,
   validation focus management, and required reviewer notes for ambiguous
   `unknown` reports or `Other` direction submissions.
+- 2026-05-25: Changed Phase 3 direction from manual review to fully automated
+  moderation. Implemented automatic accept-or-duplicate moderation after public
+  submission, with audit events and same-context duplicate detection.
 
 ## Decision Log
 
@@ -409,6 +413,9 @@ Exit criteria:
   skipped stops and no-service-between-stations as explicit range cases instead.
 - 2026-05-24: Prefer structured direction choices derived from line context,
   with `Not sure` and `Other` fallbacks.
+- 2026-05-25: Use fully automated site-local moderation instead of a manual
+  operator queue. Accepted reports are still non-canonical until the dispatch
+  and `mrtdown-data` review path lands them in published archives.
 
 ## Validation
 
