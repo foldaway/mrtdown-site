@@ -265,6 +265,19 @@ Exit criteria:
 This order gives quick production relief through caching, then reduces the
 underlying compute and payload costs so uncached requests are also fast.
 
+## Progress Notes
+
+- 2026-05-25: Implemented Phase 1 Worker-side public HTML caching for
+  successful public `GET` responses on the planned cacheable route set, plus
+  origin cache headers for matching `GET`/`HEAD` responses. Cacheable pages now
+  emit `Cache-Control: public, max-age=0, s-maxage=60,
+  stale-while-revalidate=300` and `X-MRTDown-Cache: public-html`; cache hits
+  return before SSR with `X-MRTDown-Render: public-html-cache`. API/internal
+  routes, non-candidate pages, non-HTML responses, non-200 responses,
+  `Set-Cookie`, private/no-store opt-outs, and client no-cache requests are
+  excluded. Added focused route-matching and cache-key tests in
+  `app/util/publicHtmlCache.test.ts`.
+
 ## Validation
 
 For each phase:

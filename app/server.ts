@@ -1,15 +1,46 @@
 import * as Sentry from '@sentry/cloudflare';
 import handler from '@tanstack/react-start/server-entry';
+import {
+  applyPublicHtmlCacheHeaders,
+  createPublicHtmlCacheResponse,
+  getPublicHtmlCacheKey,
+  isPublicHtmlCacheLookupRequest,
+  shouldCachePublicHtml,
+} from './util/publicHtmlCache';
 import { handleScheduledWorkflows } from './workflows/scheduled';
 
-async function appFetch(request: Request) {
+const PUBLIC_HTML_CACHE_NAME = 'mrtdown-public-html';
+
+async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
   const startedAt = performance.now();
+  const cachedResponse = await getCachedPublicHtmlResponse(request);
+  if (cachedResponse != null) {
+    const elapsedMs = performance.now() - startedAt;
+    return addResponseInstrumentationHeaders(
+      cachedResponse,
+      elapsedMs,
+      'public-html-cache',
+    );
+  }
+
   const response = await handler.fetch(request);
   const elapsedMs = performance.now() - startedAt;
+  const shouldStorePublicHtml = shouldCachePublicHtml(request, response);
+  const responseWithCacheHeaders = applyPublicHtmlCacheHeaders(
+    request,
+    response,
+  );
+
+  if (shouldStorePublicHtml && isPublicHtmlCacheLookupRequest(request)) {
+    ctx.waitUntil(
+      storePublicHtmlResponse(request, responseWithCacheHeaders.clone()),
+    );
+  }
 
   const responseWithHeaders = addResponseInstrumentationHeaders(
-    response,
+    responseWithCacheHeaders,
     elapsedMs,
+    'worker',
   );
 
   if (import.meta.env.DEV && responseWithHeaders.status !== 101) {
@@ -22,10 +53,11 @@ async function appFetch(request: Request) {
 function addResponseInstrumentationHeaders(
   response: Response,
   elapsedMs: number,
+  render: 'public-html-cache' | 'worker',
 ) {
   const workerTiming = `worker_request;dur=${elapsedMs.toFixed(1)}`;
   try {
-    appendInstrumentationHeaders(response.headers, workerTiming);
+    appendInstrumentationHeaders(response.headers, workerTiming, render);
     return response;
   } catch {
     if (response.status === 101) {
@@ -33,7 +65,7 @@ function addResponseInstrumentationHeaders(
     }
 
     const headers = new Headers(response.headers);
-    appendInstrumentationHeaders(headers, workerTiming);
+    appendInstrumentationHeaders(headers, workerTiming, render);
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -42,7 +74,11 @@ function addResponseInstrumentationHeaders(
   }
 }
 
-function appendInstrumentationHeaders(headers: Headers, workerTiming: string) {
+function appendInstrumentationHeaders(
+  headers: Headers,
+  workerTiming: string,
+  render: 'public-html-cache' | 'worker',
+) {
   const currentServerTiming = headers.get('Server-Timing');
   headers.set(
     'Server-Timing',
@@ -50,7 +86,44 @@ function appendInstrumentationHeaders(headers: Headers, workerTiming: string) {
       ? `${currentServerTiming}, ${workerTiming}`
       : workerTiming,
   );
-  headers.set('X-MRTDown-Render', 'worker');
+  headers.set('X-MRTDown-Render', render);
+}
+
+async function getCachedPublicHtmlResponse(request: Request) {
+  if (!isPublicHtmlCacheLookupRequest(request)) {
+    return null;
+  }
+
+  try {
+    const cache = await caches.open(PUBLIC_HTML_CACHE_NAME);
+    const response = await cache.match(getPublicHtmlCacheKey(request));
+    if (response == null) {
+      return null;
+    }
+
+    const headers = new Headers(response.headers);
+    headers.set('X-MRTDown-Cache', 'hit');
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  } catch (error) {
+    console.warn('Failed to read public HTML cache', error);
+    return null;
+  }
+}
+
+async function storePublicHtmlResponse(request: Request, response: Response) {
+  try {
+    const cache = await caches.open(PUBLIC_HTML_CACHE_NAME);
+    await cache.put(
+      getPublicHtmlCacheKey(request),
+      createPublicHtmlCacheResponse(response),
+    );
+  } catch (error) {
+    console.warn('Failed to store public HTML cache', error);
+  }
 }
 
 async function logResponseByteEstimate(
