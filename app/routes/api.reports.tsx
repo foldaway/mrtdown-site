@@ -7,7 +7,7 @@ import {
   findMissingCrowdReportReferences,
   getClientIp,
   parseCrowdReportJsonBody,
-  persistCrowdReport,
+  persistAutomoderatedCrowdReport,
   validateCrowdReportSubmission,
   verifyTurnstileToken,
 } from '~/util/crowdReports';
@@ -159,7 +159,7 @@ export const Route = createFileRoute('/api/reports')({
         }
 
         try {
-          const report = await persistCrowdReport(
+          const report = await persistAutomoderatedCrowdReport(
             db,
             validation.data,
             abuseContext,

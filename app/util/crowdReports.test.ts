@@ -9,9 +9,11 @@ import {
   crowdReportStationsTable,
 } from '~/db/schema';
 import {
+  automoderateCrowdReport,
   CrowdReportRateLimitError,
   getCrowdReportRateLimitBucketStart,
   parseCrowdReportJsonBody,
+  persistAutomoderatedCrowdReport,
   persistCrowdReport,
   validateCrowdReportSubmission,
   verifyTurnstileToken,
@@ -48,10 +50,62 @@ function makeStreamingRequest(body: string) {
   } as RequestInit & { duplex: 'half' });
 }
 
-function makeFakeDb(rateLimitCount: number) {
+function makeFakeDb(
+  rateLimitCount: number,
+  selectResults: unknown[][] = [],
+  updatedReport = {
+    id: 'fixed-id',
+    status: 'accepted',
+    duplicateOfId: null as string | null,
+  },
+) {
   const inserts: Array<{ table: unknown; values: unknown }> = [];
   const conflictUpdates: unknown[] = [];
+  const updates: Array<{ table: unknown; values: unknown }> = [];
+  const executes: unknown[] = [];
+  let transactions = 0;
+  const nextSelectResult = () => selectResults.shift() ?? [];
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    where() {
+      return this;
+    },
+    orderBy() {
+      return this;
+    },
+    offset() {
+      return this;
+    },
+    limit() {
+      return Promise.resolve(nextSelectResult());
+    },
+  };
   const tx = {
+    execute(query: unknown) {
+      executes.push(query);
+      return Promise.resolve();
+    },
+    select() {
+      return selectBuilder;
+    },
+    update(table: unknown) {
+      return {
+        set(values: unknown) {
+          updates.push({ table, values });
+          return {
+            where() {
+              return {
+                returning() {
+                  return Promise.resolve([updatedReport]);
+                },
+              };
+            },
+          };
+        },
+      };
+    },
     insert(table: unknown) {
       return {
         values(values: unknown) {
@@ -81,6 +135,88 @@ function makeFakeDb(rateLimitCount: number) {
   return {
     inserts,
     conflictUpdates,
+    updates,
+    executes,
+    get transactions() {
+      return transactions;
+    },
+    db: {
+      transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
+        transactions += 1;
+        return callback(tx);
+      },
+    },
+  };
+}
+
+function makeFakeAutomoderationDb(
+  selectResults: unknown[][],
+  updatedReport: {
+    id: string;
+    status: 'accepted' | 'duplicate';
+    duplicateOfId: string | null;
+  },
+) {
+  const inserts: Array<{ table: unknown; values: unknown }> = [];
+  const updates: Array<{ table: unknown; values: unknown }> = [];
+  const executes: unknown[] = [];
+  const nextSelectResult = () => selectResults.shift() ?? [];
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    where() {
+      return this;
+    },
+    orderBy() {
+      return this;
+    },
+    offset() {
+      return this;
+    },
+    limit() {
+      return Promise.resolve(nextSelectResult());
+    },
+  };
+
+  const tx = {
+    execute(query: unknown) {
+      executes.push(query);
+      return Promise.resolve();
+    },
+    select() {
+      return selectBuilder;
+    },
+    update(table: unknown) {
+      return {
+        set(values: unknown) {
+          updates.push({ table, values });
+          return {
+            where() {
+              return {
+                returning() {
+                  return Promise.resolve([updatedReport]);
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+    insert(table: unknown) {
+      return {
+        values(values: unknown) {
+          inserts.push({ table, values });
+          return Promise.resolve();
+        },
+      };
+    },
+  };
+
+  return {
+    inserts,
+    updates,
+    executes,
     db: {
       transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
         return callback(tx);
@@ -379,6 +515,226 @@ describe('persistCrowdReport', () => {
       set: {
         client_fingerprint_hash:
           crowdReportRateLimitsTable.client_fingerprint_hash,
+      },
+    });
+  });
+});
+
+describe('persistAutomoderatedCrowdReport', () => {
+  it('persists and automoderates a report in one transaction', async () => {
+    const fake = makeFakeDb(1, [[]], {
+      id: 'fixed-id',
+      status: 'accepted',
+      duplicateOfId: null,
+    });
+
+    await expect(
+      persistAutomoderatedCrowdReport(
+        fake.db as never,
+        VALID_SUBMISSION,
+        {
+          ipHash: 'ip-hash',
+          userAgentHash: 'ua-hash',
+          turnstileOutcome: 'passed',
+        },
+        {
+          now: NOW,
+          idFactory: () => 'fixed-id',
+        },
+      ),
+    ).resolves.toEqual({
+      id: 'fixed-id',
+      status: 'accepted',
+      duplicateOfId: null,
+    });
+
+    expect(fake.transactions).toBe(1);
+    expect(fake.inserts.map((insert) => insert.table)).toEqual([
+      crowdReportRateLimitsTable,
+      crowdReportsTable,
+      crowdReportLinesTable,
+      crowdReportStationsTable,
+      crowdReportAbuseEventsTable,
+      crowdReportModerationEventsTable,
+      crowdReportModerationEventsTable,
+    ]);
+    expect(fake.updates).toHaveLength(1);
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'accepted',
+        duplicate_of_id: null,
+      },
+    });
+    expect(fake.executes).toHaveLength(1);
+  });
+});
+
+describe('automoderateCrowdReport', () => {
+  it('accepts a valid report when no duplicate candidate matches', async () => {
+    const fake = makeFakeAutomoderationDb([[]], {
+      id: 'report-1',
+      status: 'accepted',
+      duplicateOfId: null,
+    });
+
+    await expect(
+      automoderateCrowdReport(fake.db as never, 'report-1', VALID_SUBMISSION, {
+        idFactory: () => 'event-1',
+      }),
+    ).resolves.toEqual({
+      id: 'report-1',
+      status: 'accepted',
+      duplicateOfId: null,
+    });
+
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'accepted',
+        duplicate_of_id: null,
+      },
+    });
+    expect(fake.inserts[0]).toMatchObject({
+      table: crowdReportModerationEventsTable,
+      values: {
+        id: 'event-1',
+        report_id: 'report-1',
+        actor: 'system',
+        action: 'automated_accepted',
+        note: 'Report accepted by automated moderation rules',
+      },
+    });
+    expect(fake.executes).toHaveLength(1);
+  });
+
+  it('marks a same-context report in the duplicate window as duplicate', async () => {
+    const fake = makeFakeAutomoderationDb(
+      [
+        [
+          {
+            id: 'existing-report',
+            status: 'accepted',
+            directionText: 'Towards Choa Chu Kang',
+          },
+        ],
+        [{ reportId: 'existing-report', lineId: 'BPLRT' }],
+        [{ reportId: 'existing-report', stationId: 'BP6' }],
+      ],
+      {
+        id: 'report-1',
+        status: 'duplicate',
+        duplicateOfId: 'existing-report',
+      },
+    );
+
+    await expect(
+      automoderateCrowdReport(fake.db as never, 'report-1', VALID_SUBMISSION, {
+        idFactory: () => 'event-1',
+      }),
+    ).resolves.toEqual({
+      id: 'report-1',
+      status: 'duplicate',
+      duplicateOfId: 'existing-report',
+    });
+
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'duplicate',
+        duplicate_of_id: 'existing-report',
+      },
+    });
+    expect(fake.inserts[0]).toMatchObject({
+      table: crowdReportModerationEventsTable,
+      values: {
+        action: 'automated_duplicate',
+        note: 'Report automatically marked as duplicate of existing-report',
+      },
+    });
+  });
+
+  it('ignores same-context pending reports to avoid reciprocal duplicates', async () => {
+    const fake = makeFakeAutomoderationDb(
+      [
+        [
+          {
+            id: 'pending-report',
+            status: 'pending',
+            directionText: 'Towards Choa Chu Kang',
+          },
+        ],
+        [{ reportId: 'pending-report', lineId: 'BPLRT' }],
+        [{ reportId: 'pending-report', stationId: 'BP6' }],
+      ],
+      {
+        id: 'report-1',
+        status: 'accepted',
+        duplicateOfId: null,
+      },
+    );
+
+    await automoderateCrowdReport(
+      fake.db as never,
+      'report-1',
+      VALID_SUBMISSION,
+      {
+        idFactory: () => 'event-1',
+      },
+    );
+
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'accepted',
+        duplicate_of_id: null,
+      },
+    });
+  });
+
+  it('searches later duplicate candidate pages before accepting a report', async () => {
+    const firstPage = Array.from({ length: 100 }, (_, index) => ({
+      id: `other-report-${index}`,
+      status: 'accepted',
+      directionText: 'Towards Another Terminal',
+    }));
+    const fake = makeFakeAutomoderationDb(
+      [
+        firstPage,
+        [],
+        [],
+        [
+          {
+            id: 'existing-report',
+            status: 'accepted',
+            directionText: 'Towards Choa Chu Kang',
+          },
+        ],
+        [{ reportId: 'existing-report', lineId: 'BPLRT' }],
+        [{ reportId: 'existing-report', stationId: 'BP6' }],
+      ],
+      {
+        id: 'report-1',
+        status: 'duplicate',
+        duplicateOfId: 'existing-report',
+      },
+    );
+
+    await expect(
+      automoderateCrowdReport(fake.db as never, 'report-1', VALID_SUBMISSION, {
+        idFactory: () => 'event-1',
+      }),
+    ).resolves.toEqual({
+      id: 'report-1',
+      status: 'duplicate',
+      duplicateOfId: 'existing-report',
+    });
+
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'duplicate',
+        duplicate_of_id: 'existing-report',
       },
     });
   });
