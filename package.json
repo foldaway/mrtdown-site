@@ -32,9 +32,9 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
-    "@mrtdown/core": "^2.0.0-alpha.23",
-    "@mrtdown/fs": "^2.0.0-alpha.23",
-    "@mrtdown/ingest-contracts": "^2.0.0-alpha.26",
+    "@mrtdown/core": "^2.0.0-alpha.24",
+    "@mrtdown/fs": "^2.0.0-alpha.24",
+    "@mrtdown/ingest-contracts": "^2.0.0-alpha.27",
     "@posthog/react": "^1.8.3",
     "@sentry/cloudflare": "^10.47.0",
     "@sentry/tanstackstart-react": "^10.47.0",
