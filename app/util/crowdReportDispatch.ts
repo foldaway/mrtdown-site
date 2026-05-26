@@ -1,0 +1,695 @@
+import {
+  IngestContentCrowdReportSource,
+  IngestPayloadSchema,
+  type IngestContentCrowdReport,
+  type IngestPayload,
+} from '@mrtdown/ingest-contracts';
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { DateTime } from 'luxon';
+import {
+  crowdReportClusterLinesTable,
+  crowdReportClustersTable,
+  crowdReportClusterStationsTable,
+  crowdReportLinesTable,
+  crowdReportsTable,
+  crowdReportStationsTable,
+} from '~/db/schema';
+
+const DEFAULT_DISPATCH_OWNER = 'foldaway';
+const DEFAULT_DISPATCH_REPO = 'mrtdown-data';
+const DEFAULT_DISPATCH_EVENT_TYPE = 'ingest';
+const DEFAULT_DISPATCH_LIMIT = 10;
+const DEFAULT_DISPATCH_TIMEOUT_MS = 15_000;
+const MAX_DISPATCH_LIMIT = 50;
+
+type AppDb = ReturnType<typeof import('~/db').getDb>;
+type CrowdReportTransaction = Parameters<
+  Parameters<AppDb['transaction']>[0]
+>[0];
+
+export type CrowdReportDispatchKind = 'cluster' | 'report';
+
+export type CrowdReportDispatchCandidate = {
+  kind: CrowdReportDispatchKind;
+  id: string;
+  reportIds: string[];
+  payload: IngestPayload;
+};
+
+export type CrowdReportDispatchConfig = {
+  token: string;
+  owner?: string;
+  repo?: string;
+  eventType?: string;
+  timeoutMs?: number;
+};
+
+export type CrowdReportDispatchResponse = {
+  status: number;
+  responseText: string;
+};
+
+export type CrowdReportDispatchRunResult = {
+  success: boolean;
+  count: number;
+  dispatched: number;
+  failed: number;
+  results: Array<{
+    kind: CrowdReportDispatchKind;
+    id: string;
+    success: boolean;
+    status?: number;
+    error?: string;
+    skipped?: boolean;
+  }>;
+};
+
+type CrowdReportDispatchOptions = {
+  candidates?: CrowdReportDispatchCandidate[];
+  limit?: number;
+  kind?: CrowdReportDispatchKind | 'any';
+  rootUrl: string;
+};
+
+type ReportContentInput = {
+  id: string;
+  kind: CrowdReportDispatchKind;
+  reportIds: string[];
+  text: string;
+  createdAt: string | Date;
+  observedAt: string | Date;
+  lineIds: string[];
+  stationIds: string[];
+  directionText: string | null;
+  effect: IngestContentCrowdReport['effect'] | null;
+  delayMinutes: number | null;
+  reportCount?: number;
+  isStillHappening?: boolean | null;
+  rootUrl: string;
+};
+
+function clampDispatchLimit(limit: number | undefined) {
+  if (limit == null) {
+    return DEFAULT_DISPATCH_LIMIT;
+  }
+  return Math.max(1, Math.min(MAX_DISPATCH_LIMIT, limit));
+}
+
+function normalizeTimestamp(value: string | Date) {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function hasCrowdReportClusterScope() {
+  return or(
+    sql`exists (select 1 from ${crowdReportClusterLinesTable} where ${crowdReportClusterLinesTable.cluster_id} = ${crowdReportClustersTable.id})`,
+    sql`exists (select 1 from ${crowdReportClusterStationsTable} where ${crowdReportClusterStationsTable.cluster_id} = ${crowdReportClustersTable.id})`,
+  );
+}
+
+export function buildCrowdReportSourceUrl(
+  rootUrl: string,
+  kind: CrowdReportDispatchKind,
+  id: string,
+) {
+  const url = new URL('/report', rootUrl);
+  url.searchParams.set('communitySource', `${kind}:${id}`);
+  return url.toString();
+}
+
+export function buildCrowdReportDispatchText(
+  input: Pick<
+    ReportContentInput,
+    | 'delayMinutes'
+    | 'directionText'
+    | 'effect'
+    | 'isStillHappening'
+    | 'lineIds'
+    | 'reportCount'
+    | 'stationIds'
+    | 'text'
+  >,
+) {
+  const contextParts = [
+    input.lineIds.length > 0 ? `lines ${input.lineIds.join(', ')}` : undefined,
+    input.stationIds.length > 0
+      ? `stations ${input.stationIds.join(', ')}`
+      : undefined,
+  ].filter((part): part is string => part != null);
+
+  const summary: string[] = [];
+  if (input.reportCount && input.reportCount > 1) {
+    summary.push(`${input.reportCount} community reports describe this issue.`);
+  } else {
+    summary.push('A community report describes this issue.');
+  }
+  if (input.effect) {
+    summary.push(`Reported effect: ${input.effect}.`);
+  }
+  if (contextParts.length > 0) {
+    summary.push(`Affected ${contextParts.join('; ')}.`);
+  }
+  if (input.directionText) {
+    summary.push(`Direction: ${input.directionText}.`);
+  }
+  if (input.delayMinutes != null) {
+    summary.push(`Reported delay: ${input.delayMinutes} minutes.`);
+  }
+  if (input.isStillHappening != null) {
+    summary.push(
+      input.isStillHappening
+        ? 'The reporter said this was still happening.'
+        : 'The reporter said this was no longer happening.',
+    );
+  }
+
+  summary.push(`Reporter note: ${input.text}`);
+  return summary.join(' ');
+}
+
+export function buildCrowdReportIngestPayload(
+  input: ReportContentInput,
+): CrowdReportDispatchCandidate {
+  const content: IngestContentCrowdReport = {
+    source: IngestContentCrowdReportSource,
+    reportId: `${input.kind}:${input.id}`,
+    text: buildCrowdReportDispatchText(input),
+    createdAt: normalizeTimestamp(input.createdAt),
+    observedAt: normalizeTimestamp(input.observedAt),
+    lineIds: input.lineIds.length > 0 ? input.lineIds : undefined,
+    stationIds: input.stationIds.length > 0 ? input.stationIds : undefined,
+    directionText: input.directionText ?? undefined,
+    effect: input.effect ?? undefined,
+    delayMinutes: input.delayMinutes ?? undefined,
+    reportCount: input.reportCount,
+    url: buildCrowdReportSourceUrl(input.rootUrl, input.kind, input.id),
+  };
+  const payload = IngestPayloadSchema.parse({ content: [content] });
+  return {
+    kind: input.kind,
+    id: input.id,
+    reportIds: input.reportIds,
+    payload,
+  };
+}
+
+export async function getDispatchableCrowdReportCandidates(
+  db: AppDb,
+  options: CrowdReportDispatchOptions,
+): Promise<CrowdReportDispatchCandidate[]> {
+  const limit = clampDispatchLimit(options.limit);
+  const candidates: CrowdReportDispatchCandidate[] = [];
+
+  if (options.kind !== 'report') {
+    candidates.push(
+      ...(await getDispatchableCrowdReportClusterCandidates(db, {
+        limit,
+        rootUrl: options.rootUrl,
+      })),
+    );
+  }
+
+  if (options.kind !== 'cluster' && candidates.length < limit) {
+    candidates.push(
+      ...(await getDispatchableSingleCrowdReportCandidates(db, {
+        limit: limit - candidates.length,
+        rootUrl: options.rootUrl,
+      })),
+    );
+  }
+
+  return candidates;
+}
+
+async function getDispatchableCrowdReportClusterCandidates(
+  db: AppDb,
+  options: { limit: number; rootUrl: string },
+) {
+  const clusterRows = await db
+    .select({
+      id: crowdReportClustersTable.id,
+      effect: crowdReportClustersTable.effect,
+      reportCount: crowdReportClustersTable.report_count,
+      windowEndAt: crowdReportClustersTable.window_end_at,
+      updatedAt: crowdReportClustersTable.updated_at,
+    })
+    .from(crowdReportClustersTable)
+    .where(
+      and(
+        eq(crowdReportClustersTable.status, 'accepted'),
+        isNull(crowdReportClustersTable.dispatched_at),
+        hasCrowdReportClusterScope(),
+      ),
+    )
+    .orderBy(desc(crowdReportClustersTable.window_end_at))
+    .limit(options.limit);
+
+  const clusterIds = clusterRows.map((cluster) => cluster.id);
+  if (clusterIds.length === 0) {
+    return [];
+  }
+
+  const [lineRows, stationRows, reportRows] = await Promise.all([
+    db
+      .select({
+        clusterId: crowdReportClusterLinesTable.cluster_id,
+        lineId: crowdReportClusterLinesTable.line_id,
+      })
+      .from(crowdReportClusterLinesTable)
+      .where(inArray(crowdReportClusterLinesTable.cluster_id, clusterIds)),
+    db
+      .select({
+        clusterId: crowdReportClusterStationsTable.cluster_id,
+        stationId: crowdReportClusterStationsTable.station_id,
+      })
+      .from(crowdReportClusterStationsTable)
+      .where(inArray(crowdReportClusterStationsTable.cluster_id, clusterIds)),
+    db
+      .select({
+        id: crowdReportsTable.id,
+        clusterId: crowdReportsTable.cluster_id,
+        observedAt: crowdReportsTable.observed_at,
+        text: crowdReportsTable.text,
+        directionText: crowdReportsTable.direction_text,
+        delayMinutes: crowdReportsTable.delay_minutes,
+        stillHappening: crowdReportsTable.still_happening,
+      })
+      .from(crowdReportsTable)
+      .where(
+        and(
+          inArray(crowdReportsTable.cluster_id, clusterIds),
+          inArray(crowdReportsTable.status, ['accepted', 'duplicate']),
+        ),
+      )
+      .orderBy(desc(crowdReportsTable.observed_at)),
+  ]);
+
+  return clusterRows.flatMap((cluster) => {
+    const lineIds = lineRows
+      .filter((row) => row.clusterId === cluster.id)
+      .map((row) => row.lineId)
+      .sort((a, b) => a.localeCompare(b));
+    const stationIds = stationRows
+      .filter((row) => row.clusterId === cluster.id)
+      .map((row) => row.stationId)
+      .sort((a, b) => a.localeCompare(b));
+    const reports = reportRows.filter((row) => row.clusterId === cluster.id);
+    const representative = reports[0];
+    if (
+      representative == null ||
+      (lineIds.length === 0 && stationIds.length === 0)
+    ) {
+      return [];
+    }
+
+    const observedAt = reports.reduce(
+      (earliest, report) =>
+        report.observedAt < earliest ? report.observedAt : earliest,
+      representative.observedAt,
+    );
+
+    return [
+      buildCrowdReportIngestPayload({
+        kind: 'cluster',
+        id: cluster.id,
+        reportIds: reports.map((report) => report.id),
+        text: representative.text,
+        createdAt: cluster.updatedAt,
+        observedAt,
+        lineIds,
+        stationIds,
+        directionText: representative.directionText,
+        effect: cluster.effect,
+        delayMinutes: representative.delayMinutes,
+        reportCount: cluster.reportCount,
+        isStillHappening: representative.stillHappening,
+        rootUrl: options.rootUrl,
+      }),
+    ];
+  });
+}
+
+async function getDispatchableSingleCrowdReportCandidates(
+  db: AppDb,
+  options: { limit: number; rootUrl: string },
+) {
+  if (options.limit <= 0) {
+    return [];
+  }
+
+  const reportRows = await db
+    .select({
+      id: crowdReportsTable.id,
+      observedAt: crowdReportsTable.observed_at,
+      text: crowdReportsTable.text,
+      directionText: crowdReportsTable.direction_text,
+      effect: crowdReportsTable.effect,
+      delayMinutes: crowdReportsTable.delay_minutes,
+      stillHappening: crowdReportsTable.still_happening,
+      updatedAt: crowdReportsTable.updated_at,
+    })
+    .from(crowdReportsTable)
+    .where(
+      and(
+        eq(crowdReportsTable.status, 'accepted'),
+        isNull(crowdReportsTable.dispatched_at),
+        isNull(crowdReportsTable.cluster_id),
+      ),
+    )
+    .orderBy(desc(crowdReportsTable.observed_at))
+    .limit(options.limit);
+
+  const reportIds = reportRows.map((report) => report.id);
+  if (reportIds.length === 0) {
+    return [];
+  }
+
+  const [lineRows, stationRows] = await Promise.all([
+    db
+      .select({
+        reportId: crowdReportLinesTable.report_id,
+        lineId: crowdReportLinesTable.line_id,
+      })
+      .from(crowdReportLinesTable)
+      .where(inArray(crowdReportLinesTable.report_id, reportIds)),
+    db
+      .select({
+        reportId: crowdReportStationsTable.report_id,
+        stationId: crowdReportStationsTable.station_id,
+      })
+      .from(crowdReportStationsTable)
+      .where(inArray(crowdReportStationsTable.report_id, reportIds)),
+  ]);
+
+  return reportRows.flatMap((report) => {
+    const lineIds = lineRows
+      .filter((row) => row.reportId === report.id)
+      .map((row) => row.lineId)
+      .sort((a, b) => a.localeCompare(b));
+    const stationIds = stationRows
+      .filter((row) => row.reportId === report.id)
+      .map((row) => row.stationId)
+      .sort((a, b) => a.localeCompare(b));
+    if (lineIds.length === 0 && stationIds.length === 0) {
+      return [];
+    }
+
+    return [
+      buildCrowdReportIngestPayload({
+        kind: 'report',
+        id: report.id,
+        reportIds: [report.id],
+        text: report.text,
+        createdAt: report.updatedAt,
+        observedAt: report.observedAt,
+        lineIds,
+        stationIds,
+        directionText: report.directionText,
+        effect: report.effect,
+        delayMinutes: report.delayMinutes,
+        reportCount: 1,
+        isStillHappening: report.stillHappening,
+        rootUrl: options.rootUrl,
+      }),
+    ];
+  });
+}
+
+export async function dispatchCrowdReportPayloadToGitHub(
+  payload: IngestPayload,
+  config: CrowdReportDispatchConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<CrowdReportDispatchResponse> {
+  const owner = config.owner?.trim() || DEFAULT_DISPATCH_OWNER;
+  const repo = config.repo?.trim() || DEFAULT_DISPATCH_REPO;
+  const eventType = config.eventType?.trim() || DEFAULT_DISPATCH_EVENT_TYPE;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_DISPATCH_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetchImpl(
+      `https://api.github.com/repos/${owner}/${repo}/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${config.token}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'mrtdown-site-crowd-report-dispatch',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+        body: JSON.stringify({
+          event_type: eventType,
+          client_payload: payload,
+        }),
+        signal: controller.signal,
+      },
+    );
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(
+        `GitHub repository_dispatch timed out after ${timeoutMs}ms`,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      `GitHub repository_dispatch failed with ${response.status}: ${responseText.slice(
+        0,
+        500,
+      )}`,
+    );
+  }
+
+  return { status: response.status, responseText };
+}
+
+export async function markCrowdReportDispatchSuccess(
+  db: AppDb,
+  candidate: CrowdReportDispatchCandidate,
+  dispatchedAt = DateTime.now().toUTC().toISO() ?? new Date().toISOString(),
+) {
+  await db.transaction((tx) =>
+    markCrowdReportDispatchSuccessInTransaction(tx, candidate, dispatchedAt),
+  );
+}
+
+export async function markCrowdReportDispatchFailure(
+  db: AppDb,
+  candidate: CrowdReportDispatchCandidate,
+  error: unknown,
+) {
+  const message = error instanceof Error ? error.message : String(error);
+  await markCrowdReportDispatchFailureInTransaction(db, candidate, message);
+}
+
+async function markCrowdReportDispatchSuccessInTransaction(
+  tx: CrowdReportTransaction,
+  candidate: CrowdReportDispatchCandidate,
+  dispatchedAt: string,
+) {
+  if (candidate.kind === 'cluster') {
+    await tx
+      .update(crowdReportClustersTable)
+      .set({
+        status: 'dispatched',
+        dispatched_at: dispatchedAt,
+        updated_at: sql`now()`,
+      })
+      .where(eq(crowdReportClustersTable.id, candidate.id));
+  }
+
+  await tx
+    .update(crowdReportsTable)
+    .set({
+      status: 'dispatched',
+      dispatched_at: dispatchedAt,
+      dispatch_payload: candidate.payload,
+      dispatch_error: null,
+      updated_at: sql`now()`,
+    })
+    .where(getCrowdReportDispatchReportScope(candidate));
+}
+
+async function markCrowdReportDispatchFailureInTransaction(
+  tx: Pick<CrowdReportTransaction, 'update'>,
+  candidate: CrowdReportDispatchCandidate,
+  message: string,
+) {
+  await tx
+    .update(crowdReportsTable)
+    .set({
+      dispatch_payload: candidate.payload,
+      dispatch_error: message.slice(0, 2000),
+      updated_at: sql`now()`,
+    })
+    .where(getCrowdReportDispatchReportScope(candidate));
+}
+
+function getCrowdReportDispatchReportScope(
+  candidate: CrowdReportDispatchCandidate,
+) {
+  if (candidate.kind === 'cluster') {
+    return and(
+      eq(crowdReportsTable.cluster_id, candidate.id),
+      inArray(crowdReportsTable.status, ['accepted', 'duplicate']),
+    );
+  }
+
+  return inArray(crowdReportsTable.id, candidate.reportIds);
+}
+
+async function tryAcquireCrowdReportDispatchLock(
+  tx: CrowdReportTransaction,
+  candidate: CrowdReportDispatchCandidate,
+) {
+  const result = await tx.execute<{ locked: boolean }>(
+    sql`select pg_try_advisory_xact_lock(hashtextextended(${`crowd-report-dispatch:${candidate.kind}:${candidate.id}`}, 0::bigint)) as "locked"`,
+  );
+  return result.rows[0]?.locked === true;
+}
+
+async function isCrowdReportDispatchCandidateEligible(
+  tx: CrowdReportTransaction,
+  candidate: CrowdReportDispatchCandidate,
+) {
+  if (candidate.kind === 'cluster') {
+    const rows = await tx
+      .select({ id: crowdReportClustersTable.id })
+      .from(crowdReportClustersTable)
+      .where(
+        and(
+          eq(crowdReportClustersTable.id, candidate.id),
+          eq(crowdReportClustersTable.status, 'accepted'),
+          isNull(crowdReportClustersTable.dispatched_at),
+          hasCrowdReportClusterScope(),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  const rows = await tx
+    .select({ id: crowdReportsTable.id })
+    .from(crowdReportsTable)
+    .where(
+      and(
+        eq(crowdReportsTable.id, candidate.id),
+        eq(crowdReportsTable.status, 'accepted'),
+        isNull(crowdReportsTable.dispatched_at),
+        isNull(crowdReportsTable.cluster_id),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
+async function dispatchCrowdReportCandidateWithLock(
+  db: AppDb,
+  candidate: CrowdReportDispatchCandidate,
+  config: CrowdReportDispatchConfig,
+  fetchImpl: typeof fetch,
+) {
+  return db.transaction(async (tx) => {
+    if (!(await tryAcquireCrowdReportDispatchLock(tx, candidate))) {
+      return { skipped: true as const };
+    }
+    if (!(await isCrowdReportDispatchCandidateEligible(tx, candidate))) {
+      return { skipped: true as const };
+    }
+
+    try {
+      const dispatchResponse = await dispatchCrowdReportPayloadToGitHub(
+        candidate.payload,
+        config,
+        fetchImpl,
+      );
+      await markCrowdReportDispatchSuccessInTransaction(
+        tx,
+        candidate,
+        DateTime.now().toUTC().toISO() ?? new Date().toISOString(),
+      );
+      return { skipped: false as const, dispatchResponse };
+    } catch (error) {
+      await markCrowdReportDispatchFailureInTransaction(
+        tx,
+        candidate,
+        error instanceof Error ? error.message : String(error),
+      );
+      return { skipped: false as const, error };
+    }
+  });
+}
+
+export async function dispatchPendingCrowdReports(
+  db: AppDb,
+  options: CrowdReportDispatchOptions & CrowdReportDispatchConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<CrowdReportDispatchRunResult> {
+  const candidates =
+    options.candidates ??
+    (await getDispatchableCrowdReportCandidates(db, options));
+  const results: CrowdReportDispatchRunResult['results'] = [];
+
+  for (const candidate of candidates) {
+    try {
+      const result = await dispatchCrowdReportCandidateWithLock(
+        db,
+        candidate,
+        options,
+        fetchImpl,
+      );
+      if (result.skipped) {
+        results.push({
+          kind: candidate.kind,
+          id: candidate.id,
+          success: true,
+          skipped: true,
+        });
+        continue;
+      }
+      if ('error' in result) {
+        results.push({
+          kind: candidate.kind,
+          id: candidate.id,
+          success: false,
+          error:
+            result.error instanceof Error
+              ? result.error.message
+              : String(result.error),
+        });
+        continue;
+      }
+      results.push({
+        kind: candidate.kind,
+        id: candidate.id,
+        success: true,
+        status: result.dispatchResponse.status,
+      });
+    } catch (error) {
+      results.push({
+        kind: candidate.kind,
+        id: candidate.id,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const failed = results.filter((result) => !result.success).length;
+  return {
+    success: failed === 0,
+    count: candidates.length,
+    dispatched: results.filter((result) => !result.skipped).length - failed,
+    failed,
+    results,
+  };
+}

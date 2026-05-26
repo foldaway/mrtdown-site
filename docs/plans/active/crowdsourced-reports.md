@@ -398,6 +398,13 @@ Exit criteria:
   duplicate reports increment those clusters, clusters become public only after
   at least three reports, and home/line/station pages render accepted community
   signals separately from canonical advisories.
+- 2026-05-27: Started Phase 5 canonical ingest dispatch in `mrtdown-site` with
+  an internal crowd-report dispatch task, local ingest-contract payload
+  validation, GitHub `repository_dispatch` posting, dry-run support, and
+  dispatch result persistence on site-local report rows.
+- 2026-05-27: Added periodic Phase 5 dispatch from the existing hourly
+  Cloudflare scheduled cron when crowd-report GitHub dispatch credentials are
+  configured.
 
 ## Decision Log
 

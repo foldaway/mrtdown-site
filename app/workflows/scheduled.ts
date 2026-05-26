@@ -1,3 +1,6 @@
+import { getDb } from '../db/index.js';
+import { dispatchPendingCrowdReports } from '../util/crowdReportDispatch.js';
+
 const SCHEDULED_PULL_SLOT_MS = 30 * 60 * 1000;
 const SCHEDULED_PULL_LOOKBACK_SLOTS = 48;
 const SCHEDULED_PULL_CRONS = new Set(['*/30 * * * *', '0 * * * *']);
@@ -11,6 +14,14 @@ const ACTIVE_WORKFLOW_STATUSES = new Set([
 ]);
 const COMPLETED_WORKFLOW_STATUSES = new Set(['complete']);
 const RETRYABLE_WORKFLOW_STATUSES = new Set(['errored', 'terminated']);
+
+type CrowdReportDispatchScheduledEnv = Env & {
+  CROWD_REPORT_DISPATCH_GITHUB_TOKEN?: string;
+  CROWD_REPORT_DISPATCH_GITHUB_OWNER?: string;
+  CROWD_REPORT_DISPATCH_GITHUB_REPO?: string;
+  CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE?: string;
+  CROWD_REPORT_DISPATCH_LIMIT?: string;
+};
 
 function scheduledPullWorkflowId(scheduledTime: number) {
   const slot = Math.floor(scheduledTime / SCHEDULED_PULL_SLOT_MS);
@@ -47,6 +58,14 @@ function isMissingWorkflowInstanceError(error: unknown) {
     code === 'not_found' ||
     /not\s*found|unknown instance|does not exist/i.test(message)
   );
+}
+
+function getScheduledCrowdReportDispatchLimit(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 async function hasActiveScheduledPullWorkflow(
@@ -132,6 +151,7 @@ export async function handleScheduledWorkflows(
 ) {
   if (SCHEDULED_PULL_CRONS.has(event.cron)) {
     await handleScheduledPullWorkflow(event, env, ctx);
+    handleScheduledCrowdReportDispatch(event, env, ctx);
     return;
   }
 
@@ -141,6 +161,52 @@ export async function handleScheduledWorkflows(
   }
 
   console.warn(`Ignoring unknown scheduled cron trigger: ${event.cron}`);
+}
+
+function handleScheduledCrowdReportDispatch(
+  event: ScheduledController,
+  env: Env,
+  ctx: ExecutionContext,
+) {
+  const runtimeEnv = env as CrowdReportDispatchScheduledEnv;
+  const token = runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_TOKEN;
+  if (!token) {
+    return;
+  }
+
+  const rootUrl = runtimeEnv.VITE_ROOT_URL;
+  if (!rootUrl) {
+    console.warn(
+      'Skipping scheduled crowd report dispatch; VITE_ROOT_URL is missing',
+    );
+    return;
+  }
+
+  ctx.waitUntil(
+    dispatchPendingCrowdReports(getDb(), {
+      rootUrl,
+      token,
+      limit: getScheduledCrowdReportDispatchLimit(
+        runtimeEnv.CROWD_REPORT_DISPATCH_LIMIT,
+      ),
+      owner: runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_OWNER,
+      repo: runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_REPO,
+      eventType: runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE,
+    })
+      .then((result) => {
+        if (result.count === 0) {
+          return;
+        }
+        console.log('Scheduled crowd report dispatch complete', {
+          dispatched: result.dispatched,
+          failed: result.failed,
+        });
+      })
+      .catch((error) => {
+        console.error('Scheduled crowd report dispatch failed', { error });
+        event.noRetry();
+      }),
+  );
 }
 
 async function handleScheduledPullWorkflow(
