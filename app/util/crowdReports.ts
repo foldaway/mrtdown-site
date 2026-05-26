@@ -120,6 +120,7 @@ type ClusterCrowdReportOptions = {
 type DuplicateCrowdReport = {
   id: string;
   clusterId: string | null;
+  observedAt: string;
 };
 
 export type PublicCrowdReportSignal = {
@@ -541,6 +542,7 @@ async function findDuplicateCrowdReport(
     const candidates = await db
       .select({
         id: crowdReportsTable.id,
+        observedAt: crowdReportsTable.observed_at,
         status: crowdReportsTable.status,
         directionText: crowdReportsTable.direction_text,
         clusterId: crowdReportsTable.cluster_id,
@@ -783,7 +785,7 @@ async function clusterModeratedCrowdReportInTransaction(
     (await createCrowdReportClusterInTransaction(
       tx,
       duplicate.id,
-      submission,
+      { ...submission, observedAt: duplicate.observedAt },
       clusterWindowMinutes,
       idFactory,
     ));
@@ -1005,6 +1007,12 @@ export async function getPublicCrowdReportSignals(
           options.minReportCount ?? DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
         ),
         gte(crowdReportClustersTable.window_end_at, activeSince),
+        options.lineId
+          ? sql`exists (select 1 from ${crowdReportClusterLinesTable} where ${crowdReportClusterLinesTable.cluster_id} = ${crowdReportClustersTable.id} and ${crowdReportClusterLinesTable.line_id} = ${options.lineId})`
+          : undefined,
+        options.stationId
+          ? sql`exists (select 1 from ${crowdReportClusterStationsTable} where ${crowdReportClusterStationsTable.cluster_id} = ${crowdReportClustersTable.id} and ${crowdReportClusterStationsTable.station_id} = ${options.stationId})`
+          : undefined,
       ),
     )
     .orderBy(desc(crowdReportClustersTable.window_end_at))

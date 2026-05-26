@@ -15,6 +15,7 @@ import {
   automoderateCrowdReport,
   CrowdReportRateLimitError,
   getCrowdReportRateLimitBucketStart,
+  getPublicCrowdReportSignals,
   parseCrowdReportJsonBody,
   persistAutomoderatedCrowdReport,
   persistCrowdReport,
@@ -223,6 +224,34 @@ function makeFakeAutomoderationDb(
     db: {
       transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
         return callback(tx);
+      },
+    },
+  };
+}
+
+function makeFakePublicSignalDb() {
+  const whereCalls: unknown[] = [];
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    where(condition: unknown) {
+      whereCalls.push(condition);
+      return this;
+    },
+    orderBy() {
+      return this;
+    },
+    limit() {
+      return Promise.resolve([]);
+    },
+  };
+
+  return {
+    whereCalls,
+    db: {
+      select() {
+        return selectBuilder;
       },
     },
   };
@@ -699,6 +728,48 @@ describe('automoderateCrowdReport', () => {
     });
   });
 
+  it('seeds a legacy duplicate cluster from the original accepted report timestamp', async () => {
+    const fake = makeFakeAutomoderationDb(
+      [
+        [
+          {
+            id: 'existing-report',
+            observedAt: '2026-05-24T12:25:00.000+08:00',
+            status: 'accepted',
+            directionText: 'Towards Choa Chu Kang',
+            clusterId: null,
+          },
+        ],
+        [{ reportId: 'existing-report', lineId: 'BPLRT' }],
+        [{ reportId: 'existing-report', stationId: 'BP6' }],
+      ],
+      {
+        id: 'report-1',
+        status: 'duplicate',
+        duplicateOfId: 'existing-report',
+      },
+    );
+    const ids = ['event-1', 'cluster-1'];
+
+    await automoderateCrowdReport(
+      fake.db as never,
+      'report-1',
+      VALID_SUBMISSION,
+      {
+        idFactory: () => ids.shift() ?? 'unused-id',
+      },
+    );
+
+    expect(fake.inserts[1]).toMatchObject({
+      table: crowdReportClustersTable,
+      values: {
+        id: 'cluster-1',
+        window_start_at: '2026-05-24T04:15:00.000Z',
+        window_end_at: '2026-05-24T04:35:00.000Z',
+      },
+    });
+  });
+
   it('ignores same-context pending reports to avoid reciprocal duplicates', async () => {
     const fake = makeFakeAutomoderationDb(
       [
@@ -783,5 +854,19 @@ describe('automoderateCrowdReport', () => {
         duplicate_of_id: 'existing-report',
       },
     });
+  });
+});
+
+describe('getPublicCrowdReportSignals', () => {
+  it('pushes route scope into the cluster query before applying the result limit', async () => {
+    const fake = makeFakePublicSignalDb();
+
+    await getPublicCrowdReportSignals(fake.db as never, {
+      lineId: 'BPLRT',
+      stationId: 'BP6',
+    });
+
+    expect(fake.whereCalls).toHaveLength(1);
+    expect(fake.whereCalls[0]).toBeDefined();
   });
 });
