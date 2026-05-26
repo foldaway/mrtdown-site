@@ -2,6 +2,9 @@ import { DateTime } from 'luxon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   crowdReportAbuseEventsTable,
+  crowdReportClusterLinesTable,
+  crowdReportClustersTable,
+  crowdReportClusterStationsTable,
   crowdReportLinesTable,
   crowdReportModerationEventsTable,
   crowdReportRateLimitsTable,
@@ -557,13 +560,22 @@ describe('persistAutomoderatedCrowdReport', () => {
       crowdReportAbuseEventsTable,
       crowdReportModerationEventsTable,
       crowdReportModerationEventsTable,
+      crowdReportClustersTable,
+      crowdReportClusterLinesTable,
+      crowdReportClusterStationsTable,
     ]);
-    expect(fake.updates).toHaveLength(1);
+    expect(fake.updates).toHaveLength(2);
     expect(fake.updates[0]).toMatchObject({
       table: crowdReportsTable,
       values: {
         status: 'accepted',
         duplicate_of_id: null,
+      },
+    });
+    expect(fake.updates[1]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        cluster_id: 'fixed-id',
       },
     });
     expect(fake.executes).toHaveLength(1);
@@ -605,6 +617,29 @@ describe('automoderateCrowdReport', () => {
         note: 'Report accepted by automated moderation rules',
       },
     });
+    expect(fake.inserts[1]).toMatchObject({
+      table: crowdReportClustersTable,
+      values: {
+        id: 'event-1',
+        effect: VALID_SUBMISSION.effect,
+        report_count: 1,
+        status: 'pending',
+      },
+    });
+    expect(fake.inserts[2]).toMatchObject({
+      table: crowdReportClusterLinesTable,
+      values: [{ cluster_id: 'event-1', line_id: 'BPLRT' }],
+    });
+    expect(fake.inserts[3]).toMatchObject({
+      table: crowdReportClusterStationsTable,
+      values: [{ cluster_id: 'event-1', station_id: 'BP6' }],
+    });
+    expect(fake.updates[1]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        cluster_id: 'event-1',
+      },
+    });
     expect(fake.executes).toHaveLength(1);
   });
 
@@ -616,6 +651,7 @@ describe('automoderateCrowdReport', () => {
             id: 'existing-report',
             status: 'accepted',
             directionText: 'Towards Choa Chu Kang',
+            clusterId: 'cluster-1',
           },
         ],
         [{ reportId: 'existing-report', lineId: 'BPLRT' }],
@@ -651,6 +687,15 @@ describe('automoderateCrowdReport', () => {
         action: 'automated_duplicate',
         note: 'Report automatically marked as duplicate of existing-report',
       },
+    });
+    expect(fake.updates[1]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        cluster_id: 'cluster-1',
+      },
+    });
+    expect(fake.updates[2]).toMatchObject({
+      table: crowdReportClustersTable,
     });
   });
 
@@ -708,6 +753,7 @@ describe('automoderateCrowdReport', () => {
             id: 'existing-report',
             status: 'accepted',
             directionText: 'Towards Choa Chu Kang',
+            clusterId: 'cluster-1',
           },
         ],
         [{ reportId: 'existing-report', lineId: 'BPLRT' }],

@@ -7,6 +7,9 @@ import { DateTime } from 'luxon';
 import { z } from 'zod';
 import {
   crowdReportAbuseEventsTable,
+  crowdReportClusterLinesTable,
+  crowdReportClustersTable,
+  crowdReportClusterStationsTable,
   crowdReportLinesTable,
   crowdReportModerationEventsTable,
   crowdReportRateLimitsTable,
@@ -21,6 +24,10 @@ const DEFAULT_RATE_LIMIT_PER_HOUR = 5;
 const MAX_REPORT_AGE_HOURS = 24;
 const MAX_REPORT_FUTURE_MINUTES = 15;
 const DEFAULT_DUPLICATE_WINDOW_MINUTES = 10;
+const DEFAULT_CLUSTER_WINDOW_MINUTES = 10;
+const DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS = 3;
+const DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES = 90;
+const DEFAULT_PUBLIC_SIGNAL_LIMIT = 20;
 const DUPLICATE_CANDIDATE_PAGE_SIZE = 100;
 export const MAX_CROWD_REPORT_REQUEST_BYTES = 10_000;
 
@@ -100,9 +107,30 @@ type PersistCrowdReportTransactionContext = {
   reportId: string;
 };
 
-type AutomoderateCrowdReportOptions = {
+type AutomoderateCrowdReportOptions = ClusterCrowdReportOptions & {
   duplicateWindowMinutes?: number;
+};
+
+type ClusterCrowdReportOptions = {
+  clusterWindowMinutes?: number;
+  publicSignalMinReports?: number;
   idFactory?: () => string;
+};
+
+type DuplicateCrowdReport = {
+  id: string;
+  clusterId: string | null;
+};
+
+export type PublicCrowdReportSignal = {
+  id: string;
+  effect: CrowdReportEffect | null;
+  reportCount: number;
+  lineIds: string[];
+  stationIds: string[];
+  windowStartAt: string;
+  windowEndAt: string;
+  updatedAt: string;
 };
 
 export type CrowdReportAbuseContext = {
@@ -146,6 +174,25 @@ function buildDuplicateLockKey(submission: CrowdReportSubmission) {
     lineIds: normalizeIdSet(submission.lineIds),
     stationIds: normalizeIdSet(submission.stationIds),
   });
+}
+
+function getCrowdReportClusterWindow(
+  observedAtIso: string,
+  clusterWindowMinutes: number,
+) {
+  const observedAt = DateTime.fromISO(observedAtIso, {
+    setZone: true,
+  }).toUTC();
+  const windowStartAt = observedAt
+    .minus({ minutes: clusterWindowMinutes })
+    .toISO();
+  const windowEndAt = observedAt
+    .plus({ minutes: clusterWindowMinutes })
+    .toISO();
+  if (windowStartAt == null || windowEndAt == null) {
+    throw new Error('Unable to calculate crowd report cluster window');
+  }
+  return { windowStartAt, windowEndAt };
 }
 
 export function validateCrowdReportSubmission(
@@ -496,6 +543,7 @@ async function findDuplicateCrowdReport(
         id: crowdReportsTable.id,
         status: crowdReportsTable.status,
         directionText: crowdReportsTable.direction_text,
+        clusterId: crowdReportsTable.cluster_id,
       })
       .from(crowdReportsTable)
       .where(
@@ -587,6 +635,8 @@ export async function automoderateCrowdReport(
       submission,
       duplicateWindowMinutes,
       idFactory,
+      options.clusterWindowMinutes,
+      options.publicSignalMinReports,
     ),
   );
 }
@@ -597,6 +647,8 @@ async function automoderateCrowdReportInTransaction(
   submission: CrowdReportSubmission,
   duplicateWindowMinutes: number,
   idFactory: () => string,
+  clusterWindowMinutes = DEFAULT_CLUSTER_WINDOW_MINUTES,
+  publicSignalMinReports = DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
 ) {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${buildDuplicateLockKey(submission)}, 0::bigint))`,
@@ -635,6 +687,16 @@ async function automoderateCrowdReportInTransaction(
         : `Report automatically marked as duplicate of ${duplicate.id}`,
   });
 
+  await clusterModeratedCrowdReportInTransaction(
+    tx,
+    reportId,
+    submission,
+    duplicate,
+    clusterWindowMinutes,
+    publicSignalMinReports,
+    idFactory,
+  );
+
   return (
     updatedReport ?? {
       id: reportId,
@@ -642,6 +704,114 @@ async function automoderateCrowdReportInTransaction(
       duplicateOfId: duplicate?.id ?? null,
     }
   );
+}
+
+async function createCrowdReportClusterInTransaction(
+  tx: CrowdReportTransaction,
+  reportId: string,
+  submission: CrowdReportSubmission,
+  clusterWindowMinutes: number,
+  idFactory: () => string,
+) {
+  const clusterId = idFactory();
+  const { windowStartAt, windowEndAt } = getCrowdReportClusterWindow(
+    submission.observedAt,
+    clusterWindowMinutes,
+  );
+
+  await tx.insert(crowdReportClustersTable).values({
+    id: clusterId,
+    effect: submission.effect,
+    window_start_at: windowStartAt,
+    window_end_at: windowEndAt,
+    report_count: 1,
+    status: 'pending',
+  });
+
+  if (submission.lineIds.length > 0) {
+    await tx.insert(crowdReportClusterLinesTable).values(
+      submission.lineIds.map((lineId) => ({
+        cluster_id: clusterId,
+        line_id: lineId,
+      })),
+    );
+  }
+
+  if (submission.stationIds.length > 0) {
+    await tx.insert(crowdReportClusterStationsTable).values(
+      submission.stationIds.map((stationId) => ({
+        cluster_id: clusterId,
+        station_id: stationId,
+      })),
+    );
+  }
+
+  await tx
+    .update(crowdReportsTable)
+    .set({
+      cluster_id: clusterId,
+      updated_at: sql`now()`,
+    })
+    .where(eq(crowdReportsTable.id, reportId))
+    .returning({ id: crowdReportsTable.id });
+
+  return clusterId;
+}
+
+async function clusterModeratedCrowdReportInTransaction(
+  tx: CrowdReportTransaction,
+  reportId: string,
+  submission: CrowdReportSubmission,
+  duplicate: DuplicateCrowdReport | undefined,
+  clusterWindowMinutes: number,
+  publicSignalMinReports: number,
+  idFactory: () => string,
+) {
+  if (duplicate == null) {
+    await createCrowdReportClusterInTransaction(
+      tx,
+      reportId,
+      submission,
+      clusterWindowMinutes,
+      idFactory,
+    );
+    return;
+  }
+
+  const clusterId =
+    duplicate.clusterId ??
+    (await createCrowdReportClusterInTransaction(
+      tx,
+      duplicate.id,
+      submission,
+      clusterWindowMinutes,
+      idFactory,
+    ));
+  const { windowStartAt, windowEndAt } = getCrowdReportClusterWindow(
+    submission.observedAt,
+    clusterWindowMinutes,
+  );
+
+  await tx
+    .update(crowdReportsTable)
+    .set({
+      cluster_id: clusterId,
+      updated_at: sql`now()`,
+    })
+    .where(eq(crowdReportsTable.id, reportId))
+    .returning({ id: crowdReportsTable.id });
+
+  await tx
+    .update(crowdReportClustersTable)
+    .set({
+      report_count: sql`${crowdReportClustersTable.report_count} + 1`,
+      status: sql`case when ${crowdReportClustersTable.status} = 'pending' and ${crowdReportClustersTable.report_count} + 1 >= ${publicSignalMinReports} then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`,
+      window_start_at: sql`least(${crowdReportClustersTable.window_start_at}, ${windowStartAt}::timestamptz)`,
+      window_end_at: sql`greatest(${crowdReportClustersTable.window_end_at}, ${windowEndAt}::timestamptz)`,
+      updated_at: sql`now()`,
+    })
+    .where(eq(crowdReportClustersTable.id, clusterId))
+    .returning({ id: crowdReportClustersTable.id });
 }
 
 async function persistCrowdReportInTransaction(
@@ -789,6 +959,114 @@ export async function persistAutomoderatedCrowdReport(
       submission,
       duplicateWindowMinutes,
       idFactory,
+      options.clusterWindowMinutes,
+      options.publicSignalMinReports,
     );
   });
+}
+
+export async function getPublicCrowdReportSignals(
+  db: AppDb,
+  options: {
+    lineId?: string;
+    stationId?: string;
+    now?: DateTime;
+    maxAgeMinutes?: number;
+    minReportCount?: number;
+    limit?: number;
+  } = {},
+): Promise<PublicCrowdReportSignal[]> {
+  const now = options.now ?? DateTime.now().setZone(SG_TIMEZONE);
+  const activeSince = now
+    .minus({
+      minutes: options.maxAgeMinutes ?? DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES,
+    })
+    .toUTC()
+    .toISO();
+  if (activeSince == null) {
+    return [];
+  }
+
+  const clusterRows = await db
+    .select({
+      id: crowdReportClustersTable.id,
+      effect: crowdReportClustersTable.effect,
+      reportCount: crowdReportClustersTable.report_count,
+      windowStartAt: crowdReportClustersTable.window_start_at,
+      windowEndAt: crowdReportClustersTable.window_end_at,
+      updatedAt: crowdReportClustersTable.updated_at,
+    })
+    .from(crowdReportClustersTable)
+    .where(
+      and(
+        eq(crowdReportClustersTable.status, 'accepted'),
+        gte(
+          crowdReportClustersTable.report_count,
+          options.minReportCount ?? DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
+        ),
+        gte(crowdReportClustersTable.window_end_at, activeSince),
+      ),
+    )
+    .orderBy(desc(crowdReportClustersTable.window_end_at))
+    .limit(options.limit ?? DEFAULT_PUBLIC_SIGNAL_LIMIT);
+
+  const clusterIds = clusterRows.map((cluster) => cluster.id);
+  if (clusterIds.length === 0) {
+    return [];
+  }
+
+  const [lineRows, stationRows] = await Promise.all([
+    db
+      .select({
+        clusterId: crowdReportClusterLinesTable.cluster_id,
+        lineId: crowdReportClusterLinesTable.line_id,
+      })
+      .from(crowdReportClusterLinesTable)
+      .where(inArray(crowdReportClusterLinesTable.cluster_id, clusterIds)),
+    db
+      .select({
+        clusterId: crowdReportClusterStationsTable.cluster_id,
+        stationId: crowdReportClusterStationsTable.station_id,
+      })
+      .from(crowdReportClusterStationsTable)
+      .where(inArray(crowdReportClusterStationsTable.cluster_id, clusterIds)),
+  ]);
+
+  return clusterRows
+    .map((cluster) => {
+      const lineIds = lineRows
+        .filter((row) => row.clusterId === cluster.id)
+        .map((row) => row.lineId)
+        .sort((a, b) => a.localeCompare(b));
+      const stationIds = stationRows
+        .filter((row) => row.clusterId === cluster.id)
+        .map((row) => row.stationId)
+        .sort((a, b) => a.localeCompare(b));
+
+      return {
+        id: cluster.id,
+        effect: cluster.effect,
+        reportCount: cluster.reportCount,
+        lineIds,
+        stationIds,
+        windowStartAt: cluster.windowStartAt,
+        windowEndAt: cluster.windowEndAt,
+        updatedAt:
+          cluster.updatedAt instanceof Date
+            ? cluster.updatedAt.toISOString()
+            : cluster.updatedAt,
+      };
+    })
+    .filter((signal) => {
+      if (signal.lineIds.length === 0 && signal.stationIds.length === 0) {
+        return false;
+      }
+      if (options.lineId && !signal.lineIds.includes(options.lineId)) {
+        return false;
+      }
+      if (options.stationId && !signal.stationIds.includes(options.stationId)) {
+        return false;
+      }
+      return true;
+    });
 }

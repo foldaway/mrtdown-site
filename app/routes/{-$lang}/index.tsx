@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react';
 import { createIntl, FormattedMessage } from 'react-intl';
 import { z } from 'zod';
 import { LineSummaryBlock } from '~/components/LineSummaryBlock';
+import { CommunitySignalsSection } from '~/components/CommunitySignalsSection';
 import { LANGUAGES } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
@@ -212,6 +213,10 @@ function HomePage() {
           issuesActiveToday={issuesActiveToday}
           lineOperationalCount={lineOperationalCount}
         />
+
+        {crowdReportsEnabled && (
+          <CommunitySignalsSection signals={overview.communitySignals} />
+        )}
 
         {crowdReportsEnabled && (
           <section className="flex flex-col gap-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-sky-900 dark:bg-sky-950/30">

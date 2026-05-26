@@ -393,6 +393,11 @@ Exit criteria:
 - 2026-05-25: Changed Phase 3 direction from manual review to fully automated
   moderation. Implemented automatic accept-or-duplicate moderation after public
   submission, with audit events and same-context duplicate detection.
+- 2026-05-26: Implemented the first Phase 4 community-signal path in
+  `mrtdown-site`: accepted reports now create private clusters, same-context
+  duplicate reports increment those clusters, clusters become public only after
+  at least three reports, and home/line/station pages render accepted community
+  signals separately from canonical advisories.
 
 ## Decision Log
 

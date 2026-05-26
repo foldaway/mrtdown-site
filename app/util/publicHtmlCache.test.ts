@@ -3,6 +3,7 @@ import {
   applyPublicHtmlCacheHeaders,
   createPublicHtmlCacheResponse,
   getPublicHtmlCacheKey,
+  isCommunitySignalPublicPath,
   isPublicHtmlCacheLookupRequest,
   shouldCachePublicHtml,
 } from './publicHtmlCache';
@@ -153,6 +154,20 @@ describe('public HTML cache headers', () => {
       'https://www.mrtdown.org/zh-Hans/statistics?viewport=lg',
     );
   });
+
+  it.each(['/', '/en-SG/', '/lines/BPLRT', '/zh-Hans/stations/BP6'])(
+    'treats %s as community-signal sensitive public HTML',
+    (pathname) => {
+      expect(isCommunitySignalPublicPath(pathname)).toBe(true);
+    },
+  );
+
+  it.each(['/statistics', '/history', '/about', '/operators/SMRT'])(
+    'does not treat %s as community-signal sensitive public HTML',
+    (pathname) => {
+      expect(isCommunitySignalPublicPath(pathname)).toBe(false);
+    },
+  );
 
   it('removes request-specific instrumentation before storing cached HTML', () => {
     const cachedResponse = createPublicHtmlCacheResponse(

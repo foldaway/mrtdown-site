@@ -4,16 +4,27 @@ import {
   applyPublicHtmlCacheHeaders,
   createPublicHtmlCacheResponse,
   getPublicHtmlCacheKey,
+  isCommunitySignalPublicPath,
   isPublicHtmlCacheLookupRequest,
   shouldCachePublicHtml,
 } from './util/publicHtmlCache';
+import {
+  type CrowdReportFeatureEnv,
+  isCrowdReportsFeatureEnabled,
+} from './util/crowdReportFeatureFlag';
 import { handleScheduledWorkflows } from './workflows/scheduled';
 
 const PUBLIC_HTML_CACHE_NAME = 'mrtdown-public-html';
 
 async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
   const startedAt = performance.now();
-  const cachedResponse = await getCachedPublicHtmlResponse(request);
+  const shouldUsePublicHtmlCache = !shouldBypassPublicHtmlCacheForCrowdReports(
+    request,
+    _env,
+  );
+  const cachedResponse = shouldUsePublicHtmlCache
+    ? await getCachedPublicHtmlResponse(request)
+    : null;
   if (cachedResponse != null) {
     const elapsedMs = performance.now() - startedAt;
     return addResponseInstrumentationHeaders(
@@ -25,11 +36,11 @@ async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
 
   const response = await handler.fetch(request);
   const elapsedMs = performance.now() - startedAt;
-  const shouldStorePublicHtml = shouldCachePublicHtml(request, response);
-  const responseWithCacheHeaders = applyPublicHtmlCacheHeaders(
-    request,
-    response,
-  );
+  const shouldStorePublicHtml =
+    shouldUsePublicHtmlCache && shouldCachePublicHtml(request, response);
+  const responseWithCacheHeaders = shouldUsePublicHtmlCache
+    ? applyPublicHtmlCacheHeaders(request, response)
+    : response;
 
   if (shouldStorePublicHtml && isPublicHtmlCacheLookupRequest(request)) {
     ctx.waitUntil(
@@ -48,6 +59,16 @@ async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
   }
 
   return responseWithHeaders;
+}
+
+function shouldBypassPublicHtmlCacheForCrowdReports(
+  request: Request,
+  env: CrowdReportFeatureEnv,
+) {
+  return (
+    isCrowdReportsFeatureEnabled(env, { isLocalDev: import.meta.env.DEV }) &&
+    isCommunitySignalPublicPath(new URL(request.url).pathname)
+  );
 }
 
 function addResponseInstrumentationHeaders(

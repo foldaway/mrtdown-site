@@ -8,6 +8,7 @@ import {
   FormattedMessage,
   useIntl,
 } from 'react-intl';
+import { CommunitySignalsSection } from '~/components/CommunitySignalsSection';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
@@ -317,6 +318,13 @@ function ComponentPage() {
         />
 
         <CurrentStatusCard lineSummary={lineProfile.lineSummary} />
+
+        {crowdReportsEnabled && (
+          <CommunitySignalsSection
+            signals={lineProfile.communitySignals}
+            className="md:col-span-12"
+          />
+        )}
 
         <NextMaintenanceCard
           lineId={lineId}

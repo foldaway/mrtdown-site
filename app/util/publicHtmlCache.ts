@@ -20,6 +20,9 @@ const CACHEABLE_ROUTES = new Set([
 
 const LOCALE_SEGMENTS = new Set(['en-SG', 'zh-Hans', 'ms', 'ta']);
 
+const COMMUNITY_SIGNAL_ROUTE_PREFIXES = ['/lines/', '/stations/'];
+const COMMUNITY_SIGNAL_ROUTES = new Set(['/']);
+
 function hasCacheBypassDirective(request: Request) {
   const cacheControl = request.headers.get('cache-control')?.toLowerCase();
   const pragma = request.headers.get('pragma')?.toLowerCase();
@@ -45,6 +48,16 @@ function isCacheablePublicPath(pathname: string) {
   return (
     CACHEABLE_ROUTES.has(publicPath) ||
     CACHEABLE_ROUTE_PREFIXES.some((prefix) => publicPath.startsWith(prefix))
+  );
+}
+
+export function isCommunitySignalPublicPath(pathname: string) {
+  const publicPath = stripLocaleSegment(pathname);
+  return (
+    COMMUNITY_SIGNAL_ROUTES.has(publicPath) ||
+    COMMUNITY_SIGNAL_ROUTE_PREFIXES.some((prefix) =>
+      publicPath.startsWith(prefix),
+    )
   );
 }
 

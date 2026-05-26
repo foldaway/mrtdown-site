@@ -1,7 +1,12 @@
+import { env } from 'cloudflare:workers';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { ViewportSchema } from '~/hooks/useViewport';
+import {
+  type CrowdReportFeatureEnv,
+  isCrowdReportsFeatureEnabled,
+} from './crowdReportFeatureFlag';
 import { getOverviewData } from './db.queries';
 import { timeServerSpan } from './serverTiming';
 
@@ -16,7 +21,13 @@ export const getOverviewFn = createServerFn({ method: 'GET' })
     const dateCount = getDateCountForViewport(viewport);
     return timeServerSpan(
       'overview_loader',
-      () => getOverviewData(dateCount),
+      () =>
+        getOverviewData(dateCount, {
+          includeCommunitySignals: isCrowdReportsFeatureEnabled(
+            env as CrowdReportFeatureEnv,
+            { isLocalDev: import.meta.env.DEV },
+          ),
+        }),
       `viewport=${viewport}`,
     );
   });

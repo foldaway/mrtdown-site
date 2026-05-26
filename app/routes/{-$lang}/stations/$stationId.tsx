@@ -10,6 +10,7 @@ import {
   type IntlShape,
   useIntl,
 } from 'react-intl';
+import { CommunitySignalsSection } from '~/components/CommunitySignalsSection';
 import type { IncludedEntities, Station } from '~/types';
 import { IssueCard } from '~/components/IssueCard';
 import type { IssueCardContext } from '~/components/IssueCard/types';
@@ -326,6 +327,10 @@ function StationPage() {
             </div>
           </div>
         </div>
+
+        {crowdReportsEnabled && (
+          <CommunitySignalsSection signals={stationProfile.communitySignals} />
+        )}
 
         {/* Station Details Section */}
         <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-lg dark:border-gray-600/60 dark:bg-gray-800">
