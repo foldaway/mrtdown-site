@@ -51,6 +51,7 @@ import {
   issueContributesToLineDowntime,
   issueContributesToLineStatus,
 } from '~/util/issueOperationalEffects';
+import { getPublicCrowdReportSignals } from '~/util/crowdReports';
 import { sortServiceRevisionsByRecency } from '~/util/serviceRevisions';
 import {
   recordServerTiming,
@@ -101,6 +102,10 @@ type BranchWithEntries = DatasetLineBranch & {
     displayCode: string;
     pathIndex: number;
   }>;
+};
+
+type CommunitySignalOptions = {
+  includeCommunitySignals?: boolean;
 };
 
 type BaseDataset = {
@@ -2985,7 +2990,22 @@ export async function getRootData() {
   });
 }
 
-export async function getOverviewData(days: number) {
+async function getPageCommunitySignals(
+  options: CommunitySignalOptions,
+  scope: { lineId?: string; stationId?: string } = {},
+) {
+  if (!options.includeCommunitySignals) {
+    return [];
+  }
+
+  const communitySignalsDb = await getDefaultDb();
+  return getPublicCrowdReportSignals(communitySignalsDb, scope);
+}
+
+export async function getOverviewData(
+  days: number,
+  options: CommunitySignalOptions = {},
+) {
   return timeServerSpan('overview_data', async () => {
     const dataset = await getBaseDataset();
     const issues = Object.values(dataset.allIssues);
@@ -3015,6 +3035,7 @@ export async function getOverviewData(days: number) {
         )
         .map((issue) => issue.id),
       lineSummaries,
+      communitySignals: await getPageCommunitySignals(options),
     };
 
     const overviewIssueIds = [
@@ -3042,7 +3063,11 @@ export async function getOverviewData(days: number) {
   });
 }
 
-export async function getLineProfileData(lineId: string, days: number) {
+export async function getLineProfileData(
+  lineId: string,
+  days: number,
+  options: CommunitySignalOptions = {},
+) {
   const dataset = await getBaseDataset();
   const line = dataset.included.lines[lineId];
   if (line == null) {
@@ -3140,6 +3165,7 @@ export async function getLineProfileData(lineId: string, days: number) {
       buildUptimeGraph(line, lineIssues, dataset.publicHolidaySet, window),
     ),
     stationIdsInterchanges,
+    communitySignals: await getPageCommunitySignals(options, { lineId }),
   };
 
   return {
@@ -3187,7 +3213,10 @@ export async function getIssueData(issueId: string) {
   };
 }
 
-export async function getStationProfileData(stationId: string) {
+export async function getStationProfileData(
+  stationId: string,
+  options: CommunitySignalOptions = {},
+) {
   const dataset = await getBaseDataset();
   const station = dataset.included.stations[stationId];
   if (station == null) {
@@ -3224,6 +3253,7 @@ export async function getStationProfileData(stationId: string) {
       status,
       issueIdsRecent,
       issueCountByType: pickIssueTypes(issues),
+      communitySignals: await getPageCommunitySignals(options, { stationId }),
     },
     included: withIssues(dataset.included, dataset.allIssues, issueIdsRecent),
   };
