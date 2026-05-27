@@ -405,6 +405,10 @@ Exit criteria:
 - 2026-05-27: Added periodic Phase 5 dispatch from the existing hourly
   Cloudflare scheduled cron when crowd-report GitHub dispatch credentials are
   configured.
+- 2026-05-27: Started Phase 6 automation policy in `mrtdown-site` with
+  deterministic auto-rejection for obvious test/filler reports and resolved
+  reports that are already several hours stale, while keeping accepted reports
+  non-canonical until clustering, dispatch, and data-side review.
 
 ## Decision Log
 
