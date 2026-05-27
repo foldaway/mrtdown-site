@@ -47,5 +47,4 @@ Use checked-in plans for multi-phase work that needs durable context across agen
 Current active plans:
 
 - `docs/plans/active/crowdsourced-reports.md`
-- `docs/plans/active/overhaul-read-model.md`
 - `docs/plans/active/production-performance.md`
