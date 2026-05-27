@@ -1675,25 +1675,22 @@ async function getBaseDataset() {
 
 async function getIncludedForIssueIds(issueIds: readonly string[]) {
   const dataset = await buildDataset(nowSg(), undefined, issueIds);
-  return withIssues(dataset.included, dataset.allIssues, issueIds);
-}
-
-function withIssues(
-  baseIncluded: BaseIncludedEntities,
-  allIssues: Record<string, IssueWithOperationalEffects>,
-  issueIds?: readonly string[],
-): IncludedEntities {
-  return {
-    ...baseIncluded,
-    issues: stripOperationalEffects(selectIssues(allIssues, issueIds)),
-  };
+  return selectIncludedEntities(dataset.included, dataset.allIssues, {
+    issueIds,
+    includeStationMembershipLines: true,
+  });
 }
 
 type IncludedEntitySelection = {
   issueIds?: readonly string[];
   lineIds?: readonly string[];
+  operatorIds?: readonly string[];
   stationIds?: readonly string[];
+  townIds?: readonly string[];
+  landmarkIds?: readonly string[];
   includeIssueEntities?: boolean;
+  includeLineOperators?: boolean;
+  includeStationDetailEntities?: boolean;
   includeStationMembershipLines?: boolean;
 };
 
@@ -1732,7 +1729,10 @@ export function selectIncludedEntities(
 ): IncludedEntities {
   const selectedIssuesWithEffects = selectIssues(allIssues, selection.issueIds);
   const lineIds = new Set(selection.lineIds ?? []);
+  const operatorIds = new Set(selection.operatorIds ?? []);
   const stationIds = new Set(selection.stationIds ?? []);
+  const townIds = new Set(selection.townIds ?? []);
+  const landmarkIds = new Set(selection.landmarkIds ?? []);
 
   if (selection.includeIssueEntities !== false) {
     for (const issue of Object.values(selectedIssuesWithEffects)) {
@@ -1757,6 +1757,28 @@ export function selectIncludedEntities(
     }
   }
 
+  if (selection.includeLineOperators === true) {
+    for (const lineId of lineIds) {
+      const line = baseIncluded.lines[lineId];
+      for (const operator of line?.operators ?? []) {
+        operatorIds.add(operator.operatorId);
+      }
+    }
+  }
+
+  if (selection.includeStationDetailEntities === true) {
+    for (const stationId of stationIds) {
+      const station = baseIncluded.stations[stationId];
+      if (station == null) {
+        continue;
+      }
+      townIds.add(station.townId);
+      for (const landmarkId of station.landmarkIds) {
+        landmarkIds.add(landmarkId);
+      }
+    }
+  }
+
   return {
     lines: Object.fromEntries(
       [...lineIds]
@@ -1769,9 +1791,21 @@ export function selectIncludedEntities(
         .map((stationId) => [stationId, baseIncluded.stations[stationId]]),
     ),
     issues: stripOperationalEffects(selectedIssuesWithEffects),
-    landmarks: {},
-    towns: {},
-    operators: {},
+    landmarks: Object.fromEntries(
+      [...landmarkIds]
+        .filter((landmarkId) => baseIncluded.landmarks[landmarkId] != null)
+        .map((landmarkId) => [landmarkId, baseIncluded.landmarks[landmarkId]]),
+    ),
+    towns: Object.fromEntries(
+      [...townIds]
+        .filter((townId) => baseIncluded.towns[townId] != null)
+        .map((townId) => [townId, baseIncluded.towns[townId]]),
+    ),
+    operators: Object.fromEntries(
+      [...operatorIds]
+        .filter((operatorId) => baseIncluded.operators[operatorId] != null)
+        .map((operatorId) => [operatorId, baseIncluded.operators[operatorId]]),
+    ),
   };
 }
 
@@ -3239,16 +3273,23 @@ export async function getLineProfileData(
     stationIdsInterchanges,
     communitySignals: await getPageCommunitySignals(options, { lineId }),
   };
+  const profileIssueIds = [
+    ...new Set(
+      [...issueIdsRecent, profile.issueIdNextMaintenance].filter(
+        (value): value is string => value != null,
+      ),
+    ),
+  ];
 
   return {
     data: profile,
-    included: withIssues(dataset.included, dataset.allIssues, [
-      ...new Set(
-        [...issueIdsRecent, profile.issueIdNextMaintenance].filter(
-          (value): value is string => value != null,
-        ),
-      ),
-    ]),
+    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+      issueIds: profileIssueIds,
+      lineIds: [lineId],
+      stationIds: Object.keys(dataset.included.stations),
+      operatorIds: line.operators.map((operator) => operator.operatorId),
+      includeStationMembershipLines: true,
+    }),
   };
 }
 
@@ -3281,7 +3322,10 @@ export async function getIssueData(issueId: string) {
         createdAt: evidence.ts,
       })),
     },
-    included: withIssues(dataset.included, dataset.allIssues, [issueId]),
+    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+      issueIds: [issueId],
+      includeStationMembershipLines: true,
+    }),
   };
 }
 
@@ -3318,6 +3362,9 @@ export async function getStationProfileData(
     issues.map((issue) => issue.id),
     dataset.allIssues,
   ).slice(0, 15);
+  const communitySignals = await getPageCommunitySignals(options, {
+    stationId,
+  });
 
   return {
     data: {
@@ -3325,9 +3372,20 @@ export async function getStationProfileData(
       status,
       issueIdsRecent,
       issueCountByType: pickIssueTypes(issues),
-      communitySignals: await getPageCommunitySignals(options, { stationId }),
+      communitySignals,
     },
-    included: withIssues(dataset.included, dataset.allIssues, issueIdsRecent),
+    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+      issueIds: issueIdsRecent,
+      lineIds: [
+        ...new Set(communitySignals.flatMap((signal) => signal.lineIds)),
+      ],
+      stationIds: [
+        stationId,
+        ...new Set(communitySignals.flatMap((signal) => signal.stationIds)),
+      ],
+      includeStationDetailEntities: true,
+      includeStationMembershipLines: true,
+    }),
   };
 }
 
@@ -3459,11 +3517,12 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
 
   return {
     data: profile,
-    included: withIssues(
-      dataset.included,
-      dataset.allIssues,
-      profile.issueIdsRecent,
-    ),
+    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+      issueIds: profile.issueIdsRecent,
+      lineIds: profile.lineIds,
+      operatorIds: [operatorId],
+      includeStationMembershipLines: true,
+    }),
   };
 }
 
@@ -3519,11 +3578,10 @@ export async function getHistoryYearSummaryData(year: number) {
         endAt: isoDate(yearEnd.minus({ day: 1 })),
         summaryByMonth,
       },
-      included: withIssues(
-        dataset.included,
-        dataset.allIssues,
-        issues.map((issue) => issue.id),
-      ),
+      included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+        issueIds: issues.map((issue) => issue.id),
+        includeStationMembershipLines: true,
+      }),
     };
   }
   const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
@@ -3627,11 +3685,10 @@ export async function getHistoryYearMonthData(year: number, month: number) {
             issueIds,
           })),
       },
-      included: withIssues(
-        dataset.included,
-        dataset.allIssues,
-        issues.map((issue) => issue.id),
-      ),
+      included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+        issueIds: issues.map((issue) => issue.id),
+        includeStationMembershipLines: true,
+      }),
     };
   }
   const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
@@ -3693,7 +3750,10 @@ export async function getHistoryDayData(
         endAt: isoDate(date),
         issueIds,
       },
-      included: withIssues(dataset.included, dataset.allIssues, issueIds),
+      included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+        issueIds,
+        includeStationMembershipLines: true,
+      }),
     };
   }
   const issueIds = [...new Set(factRows.map((row) => row.issue_id))].sort(

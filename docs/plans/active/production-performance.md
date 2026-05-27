@@ -291,6 +291,11 @@ underlying compute and payload costs so uncached requests are also fast.
   mobile-sized 30-day window, then fetches the existing viewport-sized 60/90-day
   windows client-side for larger screens without navigating to a `viewport`
   search parameter.
+- 2026-05-27: Extended Phase 2 payload reduction beyond home/statistics. Line,
+  station, operator, issue, and history loaders now use the explicit
+  included-entity selector instead of spreading the full base included graph
+  into each response. The selector can now opt into route-local operators,
+  station towns, and station landmarks for pages that actually render them.
 
 ## Validation
 
