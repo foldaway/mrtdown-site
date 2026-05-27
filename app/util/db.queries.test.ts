@@ -322,6 +322,10 @@ describe('selectIncludedEntities', () => {
   });
 
   it('keeps explicitly requested stations and their membership lines', () => {
+    const station = {
+      ...TEST_STATION,
+      landmarkIds: ['hillion'],
+    };
     const included = selectIncludedEntities(
       {
         lines: {
@@ -329,24 +333,92 @@ describe('selectIncludedEntities', () => {
           [TEST_FEEDER_LINE.id]: TEST_FEEDER_LINE,
         },
         stations: {
-          [TEST_STATION.id]: TEST_STATION,
+          [station.id]: station,
         },
         operators: {},
+        towns: {
+          'bukit-panjang': {
+            id: 'bukit-panjang',
+            name: {
+              'en-SG': 'Bukit Panjang',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
+          },
+        },
+        landmarks: {
+          hillion: {
+            id: 'hillion',
+            name: {
+              'en-SG': 'Hillion Mall',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
+          },
+        },
+      },
+      {},
+      {
+        issueIds: [],
+        stationIds: [station.id],
+        includeStationDetailEntities: true,
+        includeStationMembershipLines: true,
+      },
+    );
+
+    expect(Object.keys(included.stations)).toEqual([station.id]);
+    expect(Object.keys(included.lines).sort()).toEqual(
+      [TEST_FEEDER_LINE.id, TEST_LINE.id].sort(),
+    );
+    expect(Object.keys(included.towns)).toEqual(['bukit-panjang']);
+    expect(Object.keys(included.landmarks)).toEqual(['hillion']);
+    expect(included.issues).toEqual({});
+  });
+
+  it('keeps operators for requested lines when requested', () => {
+    const line = {
+      ...TEST_LINE,
+      operators: [
+        {
+          operatorId: 'SMRT',
+          startedAt: '1999-11-06',
+          endedAt: null,
+        },
+      ],
+    };
+    const included = selectIncludedEntities(
+      {
+        lines: {
+          [line.id]: line,
+        },
+        stations: {},
+        operators: {
+          SMRT: {
+            id: 'SMRT',
+            name: {
+              'en-SG': 'SMRT',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
+            foundedAt: '1987-08-06',
+            url: null,
+          },
+        },
         towns: {},
         landmarks: {},
       },
       {},
       {
         issueIds: [],
-        stationIds: [TEST_STATION.id],
-        includeStationMembershipLines: true,
+        lineIds: [line.id],
+        includeLineOperators: true,
       },
     );
 
-    expect(Object.keys(included.stations)).toEqual([TEST_STATION.id]);
-    expect(Object.keys(included.lines).sort()).toEqual(
-      [TEST_FEEDER_LINE.id, TEST_LINE.id].sort(),
-    );
-    expect(included.issues).toEqual({});
+    expect(Object.keys(included.lines)).toEqual([line.id]);
+    expect(Object.keys(included.operators)).toEqual(['SMRT']);
   });
 });
