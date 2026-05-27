@@ -425,6 +425,9 @@ Exit criteria:
   keeping public-signal and dispatch source diversity anchored to IP hashes
   instead of trusting caller-provided client fingerprints as independent
   sources.
+- 2026-05-27: Continued Phase 6 canonical-ingest hardening by auto-rejecting
+  obvious prompt-injection report text before it can be forwarded into the
+  LLM-assisted `mrtdown-data` triage path.
 
 ## Decision Log
 
