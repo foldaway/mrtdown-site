@@ -473,6 +473,38 @@ describe('assessCrowdReportAutomationPolicy', () => {
     });
   });
 
+  it('rejects stale reports that do not confirm whether the issue is ongoing', () => {
+    expect(
+      assessCrowdReportAutomationPolicy(
+        {
+          ...VALID_SUBMISSION,
+          observedAt: '2026-05-23T23:30:00.000+08:00',
+          isStillHappening: undefined,
+        },
+        NOW,
+      ),
+    ).toEqual({
+      action: 'reject',
+      reason:
+        'Report rejected by automated moderation: unconfirmed report is more than 12h old',
+    });
+  });
+
+  it('keeps old reports eligible when they explicitly say the issue is ongoing', () => {
+    expect(
+      assessCrowdReportAutomationPolicy(
+        {
+          ...VALID_SUBMISSION,
+          observedAt: '2026-05-24T00:30:00.000+08:00',
+          isStillHappening: true,
+        },
+        NOW,
+      ),
+    ).toEqual({
+      action: 'accept',
+    });
+  });
+
   it('keeps structured current reports eligible for acceptance', () => {
     expect(assessCrowdReportAutomationPolicy(VALID_SUBMISSION, NOW)).toEqual({
       action: 'accept',
