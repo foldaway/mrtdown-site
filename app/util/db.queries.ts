@@ -3117,12 +3117,18 @@ export async function getOverviewData(
         ),
       ]),
     ];
+    const overviewCommunitySignalStationIds = [
+      ...new Set(
+        overview.communitySignals.flatMap((signal) => signal.stationIds),
+      ),
+    ];
 
     return {
       data: overview,
       included: selectIncludedEntities(dataset.included, dataset.allIssues, {
         issueIds: overviewIssueIds,
         lineIds: overview.lineSummaries.map((summary) => summary.lineId),
+        stationIds: overviewCommunitySignalStationIds,
         includeStationMembershipLines: true,
       }),
     };

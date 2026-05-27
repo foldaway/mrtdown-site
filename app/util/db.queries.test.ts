@@ -320,4 +320,33 @@ describe('selectIncludedEntities', () => {
     expect(included.issues).toEqual({});
     expect(included.stations).toEqual({});
   });
+
+  it('keeps explicitly requested stations and their membership lines', () => {
+    const included = selectIncludedEntities(
+      {
+        lines: {
+          [TEST_LINE.id]: TEST_LINE,
+          [TEST_FEEDER_LINE.id]: TEST_FEEDER_LINE,
+        },
+        stations: {
+          [TEST_STATION.id]: TEST_STATION,
+        },
+        operators: {},
+        towns: {},
+        landmarks: {},
+      },
+      {},
+      {
+        issueIds: [],
+        stationIds: [TEST_STATION.id],
+        includeStationMembershipLines: true,
+      },
+    );
+
+    expect(Object.keys(included.stations)).toEqual([TEST_STATION.id]);
+    expect(Object.keys(included.lines).sort()).toEqual(
+      [TEST_FEEDER_LINE.id, TEST_LINE.id].sort(),
+    );
+    expect(included.issues).toEqual({});
+  });
 });
