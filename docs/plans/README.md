@@ -22,10 +22,13 @@ Use plans for:
   report collection, moderation, clustering, and canonical ingest dispatch.
 - [Dynamic system map](active/dynamic-system-map.md): canonical schematic map
   data and data-driven site rendering.
-- [Overhaul read model](active/overhaul-read-model.md): local Postgres-backed
-  read model migration.
 - [Production performance](active/production-performance.md): public route
   latency and payload reduction plan.
+
+## Completed
+
+- [Overhaul read model](completed/overhaul-read-model.md): local
+  Postgres-backed read model migration.
 
 ## Template
 
