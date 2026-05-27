@@ -9,6 +9,7 @@ import type { LineSummaryStatus } from './types';
 
 export const LANGUAGES_NON_DEFAULT = ['zh-Hans', 'ms', 'ta'];
 export const LANGUAGES = ['en-SG', ...LANGUAGES_NON_DEFAULT];
+export const HOME_OVERVIEW_INITIAL_DATE_COUNT = 30;
 
 export const LineSummaryStatusLabels: Record<
   LineSummaryStatus,

@@ -294,4 +294,30 @@ describe('selectIncludedEntities', () => {
     expect(included.issues[issue.id]).not.toHaveProperty('serviceEffectKinds');
     expect(included.issues[issue.id]).not.toHaveProperty('facilityEffectKinds');
   });
+
+  it('keeps explicitly requested lines when no selected issue references them', () => {
+    const included = selectIncludedEntities(
+      {
+        lines: {
+          [TEST_LINE.id]: TEST_LINE,
+          [TEST_FEEDER_LINE.id]: TEST_FEEDER_LINE,
+        },
+        stations: {
+          [TEST_STATION.id]: TEST_STATION,
+        },
+        operators: {},
+        towns: {},
+        landmarks: {},
+      },
+      {},
+      {
+        issueIds: [],
+        lineIds: [TEST_LINE.id],
+      },
+    );
+
+    expect(Object.keys(included.lines)).toEqual([TEST_LINE.id]);
+    expect(included.issues).toEqual({});
+    expect(included.stations).toEqual({});
+  });
 });
