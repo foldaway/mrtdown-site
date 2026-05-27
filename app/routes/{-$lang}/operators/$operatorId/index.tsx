@@ -1,20 +1,19 @@
 import type { IssueType } from '@mrtdown/core';
+import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect } from 'react';
 import {
   createIntl,
   FormattedDate,
   FormattedMessage,
   useIntl,
 } from 'react-intl';
-import { z } from 'zod';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { useHydrated } from '~/hooks/useHydrated';
-import { useViewport, ViewportSchema } from '~/hooks/useViewport';
+import { useViewport } from '~/hooks/useViewport';
 import { getOperatorProfileFn } from '~/util/operator.functions';
 import { assert } from '../../../../util/assert';
 import { CountTrendCards } from '../../lines/$lineId/components/CountTrendCards';
@@ -25,19 +24,15 @@ import { OperatorLinePerformanceCard } from './components/OperatorLinePerformanc
 import { OperatorQuickFactsCard } from './components/OperatorQuickFactsCard';
 import { OperatorUptimeCard } from './components/OperatorUptimeCard';
 
-const SearchParamsSchema = z.object({
-  viewport: ViewportSchema.optional(),
-});
+const OPERATOR_PROFILE_INITIAL_DATE_COUNT = 30;
 
 export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
   component: OperatorPage,
-  validateSearch: SearchParamsSchema,
-  loaderDeps: ({ search }) => ({ viewport: search.viewport ?? 'xs' }),
-  loader: ({ params, deps }) =>
+  loader: ({ params }) =>
     getOperatorProfileFn({
       data: {
         operatorId: params.operatorId,
-        days: getDateCountForViewport(deps.viewport),
+        days: OPERATOR_PROFILE_INITIAL_DATE_COUNT,
       },
     }),
   async head(ctx) {
@@ -184,28 +179,36 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
 
 function OperatorPage() {
   const loaderData = Route.useLoaderData();
-  const { data: operatorProfile, included, dateCount } = loaderData;
+  const measuredViewport = useViewport();
+  const desiredDateCount = getDateCountForViewport(measuredViewport);
+  const expandedProfileQuery = useQuery({
+    queryKey: [
+      'operator-profile',
+      loaderData.data.operatorId,
+      desiredDateCount,
+    ],
+    queryFn: () =>
+      getOperatorProfileFn({
+        data: {
+          operatorId: loaderData.data.operatorId,
+          days: desiredDateCount,
+        },
+      }),
+    enabled: desiredDateCount > loaderData.dateCount,
+    staleTime: 60_000,
+  });
+  const activeData =
+    desiredDateCount > loaderData.dateCount && expandedProfileQuery.data != null
+      ? expandedProfileQuery.data
+      : loaderData;
+
+  const { data: operatorProfile, included, dateCount } = activeData;
   const operator = included.operators[operatorProfile.operatorId];
   const intl = useIntl();
   const operatorName = getLocalizedTranslation(operator.name, intl.locale);
   const operatorDefaultName = getLocalizedTranslation(operator.name, 'en-SG');
 
   const isHydrated = useHydrated();
-  const navigate = Route.useNavigate();
-  const { viewport } = Route.useSearch();
-  const measuredViewport = useViewport();
-
-  useEffect(() => {
-    if (viewport === measuredViewport) {
-      return;
-    }
-    navigate({
-      search: {
-        viewport: measuredViewport,
-      },
-      replace: true,
-    });
-  }, [viewport, measuredViewport, navigate]);
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
