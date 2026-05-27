@@ -22,6 +22,9 @@ Generated files are excluded from normal Biome checks. If a generated file chang
 
 ## Current Gaps
 
-The overhaul still needs broader tests around DB query behavior, pull workflow staging and promotion, operational facts, i18n route handling, and smoke coverage for the main public pages.
+The overhaul has guardrail tests for pull staging row mapping and pull
+promotion step ordering.
 
-The known cleanup work is to broaden coverage around the overhaul paths and decide which generated/config files Biome should own.
+The remaining known cleanup work is to broaden coverage around DB query
+behavior, operational facts, i18n route handling, smoke coverage for the main
+public pages, and to decide which generated/config files Biome should own.
