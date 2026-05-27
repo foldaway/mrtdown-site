@@ -776,6 +776,34 @@ describe('automoderateCrowdReport', () => {
     expect(fake.executes).toHaveLength(1);
   });
 
+  it('only accepts a first-report cluster when configured source thresholds are met', async () => {
+    const fake = makeFakeAutomoderationDb([[]], {
+      id: 'report-1',
+      status: 'accepted',
+      duplicateOfId: null,
+    });
+
+    await automoderateCrowdReport(
+      fake.db as never,
+      'report-1',
+      VALID_SUBMISSION,
+      {
+        idFactory: () => 'event-1',
+        publicSignalMinReports: 1,
+        publicSignalMinDistinctIpHashes: 1,
+      },
+    );
+
+    expect(fake.inserts[1]).toMatchObject({
+      table: crowdReportClustersTable,
+      values: {
+        id: 'event-1',
+        report_count: 1,
+        status: 'accepted',
+      },
+    });
+  });
+
   it('rejects low-quality reports before duplicate detection and clustering', async () => {
     const fake = makeFakeAutomoderationDb([], {
       id: 'report-1',
