@@ -304,6 +304,18 @@ function isObviousNonTransitChatterText(value: string) {
   );
 }
 
+function isObviousPromptInjectionText(value: string) {
+  return (
+    /\b(?:ignore|disregard|forget)\s+(?:(?:all|the|your)\s+)?(?:(?:previous|prior|above)\s+(?:(?:system|developer)\s+)?(?:instructions?|prompts?|messages?|rules?)|(?:system|developer)\s+(?:instructions?|prompts?|messages?|rules?)|(?:prompts?|rules?))\b/u.test(
+      value,
+    ) ||
+    /\b(?:reveal|print|show)\s+(?:(?:the|your)\s+)?(?:system|developer)\s+(?:prompt|message|instructions?)\b/u.test(
+      value,
+    ) ||
+    /\b(?:jailbreak|prompt injection)\b/u.test(value)
+  );
+}
+
 export function assessCrowdReportAutomationPolicy(
   submission: CrowdReportSubmission,
   now = DateTime.now().setZone(SG_TIMEZONE),
@@ -333,6 +345,20 @@ export function assessCrowdReportAutomationPolicy(
       action: 'reject',
       reason:
         'Report rejected by automated moderation: obvious non-transit text',
+    };
+  }
+
+  const normalizedDirectionText = normalizePolicyText(
+    submission.directionText ?? '',
+  );
+  if (
+    [normalizedText, normalizedDirectionText].some((value) =>
+      isObviousPromptInjectionText(value),
+    )
+  ) {
+    return {
+      action: 'reject',
+      reason: 'Report rejected by automated moderation: prompt-injection text',
     };
   }
 
