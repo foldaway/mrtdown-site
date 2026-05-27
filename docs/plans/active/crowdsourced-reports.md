@@ -421,9 +421,10 @@ Exit criteria:
   site-local reporter IP hashes, reducing the chance that one source can create
   a public signal or canonical ingest dispatch alone.
 - 2026-05-27: Continued Phase 6 stale-report hardening by auto-rejecting old
-  reports that do not explicitly confirm the issue is still happening, and by
-  counting reporter source diversity from client fingerprint hashes when
-  present with an IP-hash fallback.
+  reports that do not explicitly confirm the issue is still happening, while
+  keeping public-signal and dispatch source diversity anchored to IP hashes
+  instead of trusting caller-provided client fingerprints as independent
+  sources.
 
 ## Decision Log
 

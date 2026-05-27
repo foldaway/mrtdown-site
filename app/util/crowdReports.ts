@@ -209,10 +209,7 @@ function getCrowdReportClusterDistinctIpHashCountSql(
   clusterId: string | typeof crowdReportClustersTable.id,
 ) {
   return sql<number>`(
-    select count(distinct coalesce(
-      ${crowdReportAbuseEventsTable.client_fingerprint_hash},
-      ${crowdReportAbuseEventsTable.ip_hash}
-    ))
+    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})
     from ${crowdReportAbuseEventsTable}
     inner join ${crowdReportsTable}
       on ${crowdReportsTable.id} = ${crowdReportAbuseEventsTable.report_id}
