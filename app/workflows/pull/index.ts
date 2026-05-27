@@ -6,7 +6,10 @@ import {
 import { MRTDownRepository } from '@mrtdown/fs';
 import * as Sentry from '@sentry/cloudflare';
 import { ZipStore } from '~/helpers/ZipStore.js';
-import { rebuildOperationalFactsRange } from '~/util/db.queries.js';
+import {
+  rebuildOperationalFactsRange,
+  rebuildStatisticsSnapshot,
+} from '~/util/db.queries.js';
 import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
@@ -295,6 +298,19 @@ class PullWorkflowBase extends WorkflowEntrypoint<Env, Params> {
     );
 
     console.log(`[PULL] Rebuilt operational facts for ${facts.length} days`);
+
+    const statistics = await step.do(
+      'rebuild-statistics-snapshot',
+      factsStepConfig,
+      async () => {
+        console.log('[PULL] Rebuilding statistics snapshot...');
+        return rebuildStatisticsSnapshot();
+      },
+    );
+
+    console.log(
+      `[PULL] Rebuilt statistics snapshot ${statistics.asOf} with ${statistics.issueIdsDisruptionLongest.length} longest disruptions`,
+    );
     console.log('[PULL] Pull complete', counts);
   }
 }

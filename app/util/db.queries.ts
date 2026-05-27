@@ -45,6 +45,7 @@ import {
   stationCodesTable,
   stationLandmarksTable,
   stationsTable,
+  statisticsSnapshotsTable,
   townsTable,
 } from '~/db/schema';
 import {
@@ -138,6 +139,24 @@ type IssueIntervalBounds = {
 };
 
 type TimeScale = TimeScaleChart['dataTimeScale'];
+
+export type SystemAnalytics = {
+  timeScaleChartsIssueCount: TimeScaleChart[];
+  timeScaleChartsIssueDuration: TimeScaleChart[];
+  chartTotalIssueCountByLine: {
+    title: string;
+    data: ChartEntry[];
+  };
+  chartTotalIssueCountByStation: {
+    title: string;
+    data: ChartEntry[];
+  };
+  chartRollingYearHeatmap: {
+    title: string;
+    data: ChartEntry[];
+  };
+  issueIdsDisruptionLongest: string[];
+};
 
 type StatisticsTimeWindow = {
   title: string;
@@ -2622,11 +2641,15 @@ function isUndefinedTableError(error: unknown) {
   );
 }
 
-async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
-  const db = await getDefaultDb();
+async function getIssueDayFactsInRange(
+  start: DateTime,
+  end: DateTime,
+  db?: AppDb,
+) {
+  const database = db ?? (await getDefaultDb());
   try {
     return await timeServerSpan('fact_issue_day_query', () =>
-      db
+      database
         .select({
           date: issueDayFactsTable.date,
           issue_id: issueDayFactsTable.issue_id,
@@ -2653,11 +2676,12 @@ async function getIssueDayFactsInRange(start: DateTime, end: DateTime) {
 async function getOperationalFactCoverageDatesInRange(
   start: DateTime,
   end: DateTime,
+  db?: AppDb,
 ) {
-  const db = await getDefaultDb();
+  const database = db ?? (await getDefaultDb());
   try {
     return await timeServerSpan('fact_coverage_query', () =>
-      db
+      database
         .select({
           date: lineDayFactsTable.date,
         })
@@ -3771,9 +3795,73 @@ export async function getHistoryDayData(
   };
 }
 
-export async function getStatisticsData() {
-  return timeServerSpan('statistics_data', async () => {
-    const dataset = await getBaseDataset();
+const STATISTICS_SNAPSHOT_ID = 'latest';
+
+function isSystemAnalytics(value: unknown): value is SystemAnalytics {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    Array.isArray(
+      (value as Partial<SystemAnalytics>).timeScaleChartsIssueCount,
+    ) &&
+    Array.isArray(
+      (value as Partial<SystemAnalytics>).timeScaleChartsIssueDuration,
+    ) &&
+    Array.isArray(
+      (value as Partial<SystemAnalytics>).chartTotalIssueCountByLine?.data,
+    ) &&
+    Array.isArray(
+      (value as Partial<SystemAnalytics>).chartTotalIssueCountByStation?.data,
+    ) &&
+    Array.isArray(
+      (value as Partial<SystemAnalytics>).chartRollingYearHeatmap?.data,
+    ) &&
+    Array.isArray((value as Partial<SystemAnalytics>).issueIdsDisruptionLongest)
+  );
+}
+
+async function getLatestStatisticsSnapshot(db?: AppDb) {
+  const database = db ?? (await getDefaultDb());
+  try {
+    const [snapshot] = await timeServerSpan('statistics_snapshot_query', () =>
+      database
+        .select({
+          data: statisticsSnapshotsTable.data,
+        })
+        .from(statisticsSnapshotsTable)
+        .where(eq(statisticsSnapshotsTable.id, STATISTICS_SNAPSHOT_ID))
+        .limit(1),
+    );
+    return isSystemAnalytics(snapshot?.data) ? snapshot.data : null;
+  } catch (error) {
+    if (isUndefinedTableError(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function getStatisticsIncluded(
+  dataset: BaseDataset,
+  statistics: SystemAnalytics,
+) {
+  return selectIncludedEntities(dataset.included, dataset.allIssues, {
+    issueIds: statistics.issueIdsDisruptionLongest,
+    lineIds: statistics.chartTotalIssueCountByLine.data.map(
+      (entry) => entry.name,
+    ),
+    stationIds: statistics.chartTotalIssueCountByStation.data.map(
+      (entry) => entry.name,
+    ),
+    includeStationMembershipLines: true,
+  });
+}
+
+async function buildStatisticsDataFromDataset(
+  dataset: BaseDataset,
+  db?: AppDb,
+) {
+  return timeServerSpan('statistics_build', async () => {
     const issues = Object.values(dataset.allIssues);
     const rollingYearEnd = nowSg().startOf('day');
     const rollingYearStart = rollingYearEnd.minus({ days: 364 });
@@ -3781,16 +3869,19 @@ export async function getStatisticsData() {
     const issueFactRows = await getIssueDayFactsInRange(
       statisticsFactStart,
       rollingYearEnd,
+      db,
     );
     const rollingYearFactCoverageRows =
       await getOperationalFactCoverageDatesInRange(
         rollingYearStart,
         rollingYearEnd,
+        db,
       );
     const statisticsFactCoverageRows =
       await getOperationalFactCoverageDatesInRange(
         statisticsFactStart,
         rollingYearEnd,
+        db,
       );
     const hasRollingYearIssueFactCoverage = hasFullDateCoverage(
       rollingYearFactCoverageRows,
@@ -3926,7 +4017,7 @@ export async function getStatisticsData() {
       }),
     );
 
-    const statistics = {
+    return {
       timeScaleChartsIssueCount: timeSyncServerSpan(
         'statistics_count_charts',
         () =>
@@ -3945,17 +4036,61 @@ export async function getStatisticsData() {
       chartTotalIssueCountByStation,
       chartRollingYearHeatmap,
       issueIdsDisruptionLongest: longestDisruptions,
-    };
+    } satisfies SystemAnalytics;
+  });
+}
 
+export async function rebuildStatisticsSnapshot(db?: AppDb) {
+  return timeServerSpan('statistics_snapshot_rebuild', async () => {
+    const database = db ?? (await getDefaultDb());
+    const asOf = isoDateTime(nowSg());
+    const dataset = await buildDataset(nowSg(), database);
+    const data = await buildStatisticsDataFromDataset(dataset, database);
+    await timeServerSpan('statistics_snapshot_upsert', () =>
+      database
+        .insert(statisticsSnapshotsTable)
+        .values({
+          id: STATISTICS_SNAPSHOT_ID,
+          as_of: asOf,
+          data,
+        })
+        .onConflictDoUpdate({
+          target: [statisticsSnapshotsTable.id],
+          set: {
+            as_of: asOf,
+            data,
+            updated_at: sql`now()`,
+          },
+        }),
+    );
+    return {
+      asOf,
+      issueIdsDisruptionLongest: data.issueIdsDisruptionLongest,
+    };
+  });
+}
+
+export async function getStatisticsData() {
+  return timeServerSpan('statistics_data', async () => {
+    const snapshot = await getLatestStatisticsSnapshot();
+    if (snapshot != null) {
+      const dataset = await timeServerSpan('statistics_included_dataset', () =>
+        buildDataset(nowSg(), undefined, snapshot.issueIdsDisruptionLongest),
+      );
+      return {
+        data: snapshot,
+        included: timeSyncServerSpan('statistics_included', () =>
+          getStatisticsIncluded(dataset, snapshot),
+        ),
+      };
+    }
+
+    const dataset = await getBaseDataset();
+    const statistics = await buildStatisticsDataFromDataset(dataset);
     return {
       data: statistics,
       included: timeSyncServerSpan('statistics_included', () =>
-        selectIncludedEntities(dataset.included, dataset.allIssues, {
-          issueIds: longestDisruptions,
-          lineIds: chartTotalIssueCountByLine.data.map((entry) => entry.name),
-          stationIds: topStationIssueCounts.map((entry) => entry.name),
-          includeStationMembershipLines: true,
-        }),
+        getStatisticsIncluded(dataset, statistics),
       ),
     };
   });
@@ -3990,8 +4125,4 @@ export type LineBranch = Awaited<
 
 export type OperatorProfile = Awaited<
   ReturnType<typeof getOperatorProfileData>
->['data'];
-
-export type SystemAnalytics = Awaited<
-  ReturnType<typeof getStatisticsData>
 >['data'];

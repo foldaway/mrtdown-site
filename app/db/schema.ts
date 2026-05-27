@@ -878,6 +878,29 @@ export const lineDayFactsTable = pgTable(
   },
 );
 
+// Precomputed public statistics payload. This keeps chart assembly off the SSR
+// request path while preserving a rebuildable fallback.
+export const statisticsSnapshotsTable = pgTable(
+  'statistics_snapshots',
+  {
+    id: text('id').primaryKey(),
+    as_of: timestamp('as_of', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    data: jsonb('data').$type<unknown>().notNull(),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      index('statistics_snapshots_as_of_idx').using(
+        'btree',
+        table.as_of.desc(),
+      ),
+    ];
+  },
+);
+
 export const impactEventServiceScopeTypeEnum = pgEnum(
   'impact_event_service_scope_type',
   enumToPgEnum(ServiceScopeTypeSchema.enum),
