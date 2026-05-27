@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
-import type { Issue, Line } from '~/types';
-import { buildLineSummary } from './db.queries';
+import type { Issue, Line, Station } from '~/types';
+import { buildLineSummary, selectIncludedEntities } from './db.queries';
 
 const REFERENCE_NOW = DateTime.fromISO('2026-02-23T23:59:00', {
   zone: 'Asia/Singapore',
@@ -23,6 +23,58 @@ const TEST_LINE: Line = {
     weekends: { start: '05:30', end: '23:30' },
   },
   operators: [],
+};
+
+const TEST_FEEDER_LINE: Line = {
+  id: 'DTL',
+  name: {
+    'en-SG': 'Downtown Line',
+    'zh-Hans': null,
+    ms: null,
+    ta: null,
+  },
+  type: 'mrt.high',
+  color: '#005ec4',
+  startedAt: '2015-12-27',
+  operatingHours: {
+    weekdays: { start: '05:30', end: '23:30' },
+    weekends: { start: '05:30', end: '23:30' },
+  },
+  operators: [],
+};
+
+const TEST_STATION: Station = {
+  id: 'BP6',
+  name: {
+    'en-SG': 'Bukit Panjang',
+    'zh-Hans': null,
+    ms: null,
+    ta: null,
+  },
+  geo: {
+    latitude: 1.379,
+    longitude: 103.761,
+  },
+  townId: 'bukit-panjang',
+  landmarkIds: [],
+  memberships: [
+    {
+      branchId: TEST_LINE.id,
+      code: 'BP6',
+      lineId: TEST_LINE.id,
+      sequenceOrder: 6,
+      startedAt: '1999-11-06',
+      structureType: 'elevated',
+    },
+    {
+      branchId: TEST_FEEDER_LINE.id,
+      code: 'DT1',
+      lineId: TEST_FEEDER_LINE.id,
+      sequenceOrder: 1,
+      startedAt: '2015-12-27',
+      structureType: 'underground',
+    },
+  ],
 };
 
 function buildIssue(
@@ -169,5 +221,77 @@ describe('buildLineSummary', () => {
     );
 
     expect(summary.status).toBe('closed_for_day');
+  });
+});
+
+describe('selectIncludedEntities', () => {
+  it('keeps only explicitly needed entities plus issue branch dependencies', () => {
+    const issue = buildIssue('disruption-1', 'disruption', [
+      {
+        startAt: '2026-02-23T05:30:00+08:00',
+        endAt: '2026-02-23T06:30:00+08:00',
+        status: 'ended',
+      },
+    ]);
+    issue.branchesAffected = [
+      {
+        lineId: TEST_LINE.id,
+        branchId: TEST_LINE.id,
+        stationIds: [TEST_STATION.id],
+      },
+    ];
+
+    const included = selectIncludedEntities(
+      {
+        lines: {
+          [TEST_LINE.id]: TEST_LINE,
+          [TEST_FEEDER_LINE.id]: TEST_FEEDER_LINE,
+        },
+        stations: {
+          [TEST_STATION.id]: TEST_STATION,
+        },
+        operators: {
+          SMRT: {
+            id: 'SMRT',
+            name: {
+              'en-SG': 'SMRT',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
+            foundedAt: '1987-08-06',
+            url: null,
+          },
+        },
+        towns: {
+          'bukit-panjang': {
+            id: 'bukit-panjang',
+            name: {
+              'en-SG': 'Bukit Panjang',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
+          },
+        },
+        landmarks: {},
+      },
+      { [issue.id]: issue },
+      {
+        issueIds: [issue.id],
+        includeStationMembershipLines: true,
+      },
+    );
+
+    expect(Object.keys(included.issues)).toEqual([issue.id]);
+    expect(Object.keys(included.stations)).toEqual([TEST_STATION.id]);
+    expect(Object.keys(included.lines).sort()).toEqual(
+      [TEST_FEEDER_LINE.id, TEST_LINE.id].sort(),
+    );
+    expect(included.operators).toEqual({});
+    expect(included.towns).toEqual({});
+    expect(included.landmarks).toEqual({});
+    expect(included.issues[issue.id]).not.toHaveProperty('serviceEffectKinds');
+    expect(included.issues[issue.id]).not.toHaveProperty('facilityEffectKinds');
   });
 });
