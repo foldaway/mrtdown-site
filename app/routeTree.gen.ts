@@ -31,6 +31,7 @@ import { Route as Char123LangChar125HistoryYearMonthRouteImport } from './routes
 import { Route as InternalApiTasksPullRouteImport } from './routes/internal.api.tasks.pull'
 import { Route as InternalApiTasksPublicHolidaysRouteImport } from './routes/internal.api.tasks.public-holidays'
 import { Route as InternalApiTasksFactsRouteImport } from './routes/internal.api.tasks.facts'
+import { Route as InternalApiTasksCrowdReportDispatchRouteImport } from './routes/internal.api.tasks.crowd-report-dispatch'
 
 const Char123LangChar125Route = Char123LangChar125RouteImport.update({
   id: '/{-$lang}',
@@ -156,6 +157,12 @@ const InternalApiTasksFactsRoute = InternalApiTasksFactsRouteImport.update({
   path: '/internal/api/tasks/facts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InternalApiTasksCrowdReportDispatchRoute =
+  InternalApiTasksCrowdReportDispatchRouteImport.update({
+    id: '/internal/api/tasks/crowd-report-dispatch',
+    path: '/internal/api/tasks/crowd-report-dispatch',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
@@ -171,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
+  '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
@@ -194,6 +202,7 @@ export interface FileRoutesByTo {
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdRoute
   '/{-$lang}/history': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/statistics': typeof Char123LangChar125StatisticsIndexRoute
+  '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
@@ -219,6 +228,7 @@ export interface FileRoutesById {
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
+  '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
@@ -245,6 +255,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/status/$lineId'
     | '/{-$lang}/history/'
     | '/{-$lang}/statistics/'
+    | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
@@ -268,6 +279,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/status/$lineId'
     | '/{-$lang}/history'
     | '/{-$lang}/statistics'
+    | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
@@ -292,6 +304,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/status/$lineId'
     | '/{-$lang}/history/'
     | '/{-$lang}/statistics/'
+    | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
@@ -308,6 +321,7 @@ export interface RootRouteChildren {
   ApiIssuesDayRoute: typeof ApiIssuesDayRoute
   ApiReportsRoute: typeof ApiReportsRoute
   ApiPhSplatRoute: typeof ApiPhSplatRoute
+  InternalApiTasksCrowdReportDispatchRoute: typeof InternalApiTasksCrowdReportDispatchRoute
   InternalApiTasksFactsRoute: typeof InternalApiTasksFactsRoute
   InternalApiTasksPublicHolidaysRoute: typeof InternalApiTasksPublicHolidaysRoute
   InternalApiTasksPullRoute: typeof InternalApiTasksPullRoute
@@ -469,6 +483,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InternalApiTasksFactsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/internal/api/tasks/crowd-report-dispatch': {
+      id: '/internal/api/tasks/crowd-report-dispatch'
+      path: '/internal/api/tasks/crowd-report-dispatch'
+      fullPath: '/internal/api/tasks/crowd-report-dispatch'
+      preLoaderRoute: typeof InternalApiTasksCrowdReportDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -524,6 +545,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiIssuesDayRoute: ApiIssuesDayRoute,
   ApiReportsRoute: ApiReportsRoute,
   ApiPhSplatRoute: ApiPhSplatRoute,
+  InternalApiTasksCrowdReportDispatchRoute:
+    InternalApiTasksCrowdReportDispatchRoute,
   InternalApiTasksFactsRoute: InternalApiTasksFactsRoute,
   InternalApiTasksPublicHolidaysRoute: InternalApiTasksPublicHolidaysRoute,
   InternalApiTasksPullRoute: InternalApiTasksPullRoute,

@@ -19,6 +19,7 @@
     "verify:strict": "npm run typecheck && npm run lint && npm run format:check && npm run db:generate:check && npm run test:run",
     "dev:pull": "curl -i -X POST http://localhost:3000/internal/api/tasks/pull",
     "dev:public-holidays": "curl -i -X POST http://localhost:3000/internal/api/tasks/public-holidays",
+    "dev:crowd-report-dispatch": "curl -i -X POST http://localhost:3000/internal/api/tasks/crowd-report-dispatch",
     "db:reset": "tsx app/scripts/resetDatabase.ts",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
