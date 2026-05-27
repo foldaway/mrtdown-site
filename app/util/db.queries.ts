@@ -1677,6 +1677,7 @@ async function getIncludedForIssueIds(issueIds: readonly string[]) {
   const dataset = await buildDataset(nowSg(), undefined, issueIds);
   return selectIncludedEntities(dataset.included, dataset.allIssues, {
     issueIds,
+    includeStationMembershipLines: true,
   });
 }
 
@@ -3323,6 +3324,7 @@ export async function getIssueData(issueId: string) {
     },
     included: selectIncludedEntities(dataset.included, dataset.allIssues, {
       issueIds: [issueId],
+      includeStationMembershipLines: true,
     }),
   };
 }
@@ -3374,6 +3376,9 @@ export async function getStationProfileData(
     },
     included: selectIncludedEntities(dataset.included, dataset.allIssues, {
       issueIds: issueIdsRecent,
+      lineIds: [
+        ...new Set(communitySignals.flatMap((signal) => signal.lineIds)),
+      ],
       stationIds: [
         stationId,
         ...new Set(communitySignals.flatMap((signal) => signal.stationIds)),
@@ -3516,6 +3521,7 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
       issueIds: profile.issueIdsRecent,
       lineIds: profile.lineIds,
       operatorIds: [operatorId],
+      includeStationMembershipLines: true,
     }),
   };
 }
@@ -3574,6 +3580,7 @@ export async function getHistoryYearSummaryData(year: number) {
       },
       included: selectIncludedEntities(dataset.included, dataset.allIssues, {
         issueIds: issues.map((issue) => issue.id),
+        includeStationMembershipLines: true,
       }),
     };
   }
@@ -3680,6 +3687,7 @@ export async function getHistoryYearMonthData(year: number, month: number) {
       },
       included: selectIncludedEntities(dataset.included, dataset.allIssues, {
         issueIds: issues.map((issue) => issue.id),
+        includeStationMembershipLines: true,
       }),
     };
   }
@@ -3744,6 +3752,7 @@ export async function getHistoryDayData(
       },
       included: selectIncludedEntities(dataset.included, dataset.allIssues, {
         issueIds,
+        includeStationMembershipLines: true,
       }),
     };
   }
