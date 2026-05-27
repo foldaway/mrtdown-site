@@ -39,7 +39,7 @@ overrides are `CROWD_REPORT_DISPATCH_GITHUB_OWNER`,
 built from `VITE_ROOT_URL`. Send `{ "dryRun": true }` to the endpoint to inspect
 pending payloads without calling GitHub or mutating report state.
 
-The existing hourly scheduled cron also invokes the same dispatch path when
+The existing six-hourly scheduled cron also invokes the same dispatch path when
 `CROWD_REPORT_DISPATCH_GITHUB_TOKEN` is configured. Use
 `CROWD_REPORT_DISPATCH_LIMIT` to tune the maximum number of dispatch candidates
 processed per scheduled run.

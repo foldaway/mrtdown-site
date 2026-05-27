@@ -100,7 +100,7 @@
         "TIER": "staging"
       },
       "triggers": {
-        "crons": ["0 * * * *", "0 18 * * SUN"]
+        "crons": ["0 0,6,12,18 * * *", "0 18 * * SUN"]
       },
       "workflows": [
         {
@@ -147,7 +147,7 @@
         "TIER": "production"
       },
       "triggers": {
-        "crons": ["0 * * * *", "0 18 * * SUN"]
+        "crons": ["0 0,6,12,18 * * *", "0 18 * * SUN"]
       },
       "observability": {
         "enabled": true,

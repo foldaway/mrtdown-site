@@ -3,7 +3,7 @@ import { dispatchPendingCrowdReports } from '../util/crowdReportDispatch.js';
 
 const SCHEDULED_PULL_SLOT_MS = 30 * 60 * 1000;
 const SCHEDULED_PULL_LOOKBACK_SLOTS = 48;
-const SCHEDULED_PULL_CRONS = new Set(['*/30 * * * *', '0 * * * *']);
+const SCHEDULED_PULL_CRONS = new Set(['0 0,6,12,18 * * *']);
 const SCHEDULED_PUBLIC_HOLIDAYS_CRON = '0 18 * * SUN';
 const ACTIVE_WORKFLOW_STATUSES = new Set([
   'queued',

@@ -21,7 +21,7 @@ import { handleScheduledWorkflows } from './scheduled';
 
 type WorkflowStatus = Awaited<ReturnType<WorkflowInstance['status']>>['status'];
 
-const PULL_CRON = '*/30 * * * *';
+const PULL_CRON = '0 0,6,12,18 * * *';
 const PUBLIC_HOLIDAYS_CRON = '0 18 * * SUN';
 
 function scheduledPublicHolidaysWorkflowId(scheduledTime: number) {
