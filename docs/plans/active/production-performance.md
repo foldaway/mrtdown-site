@@ -296,6 +296,10 @@ underlying compute and payload costs so uncached requests are also fast.
   included-entity selector instead of spreading the full base included graph
   into each response. The selector can now opt into route-local operators,
   station towns, and station landmarks for pages that actually render them.
+- 2026-05-27: Extended the Phase 3 viewport-reload cleanup to operator profile
+  pages. Operator routes now SSR-load a 30-day baseline and fetch the wider
+  60/90-day viewport windows client-side without navigating to a `viewport`
+  search parameter, matching the home page pattern.
 
 ## Validation
 
