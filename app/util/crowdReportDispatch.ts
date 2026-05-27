@@ -7,6 +7,7 @@ import {
 import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import {
+  crowdReportAbuseEventsTable,
   crowdReportClusterLinesTable,
   crowdReportClustersTable,
   crowdReportClusterStationsTable,
@@ -20,6 +21,7 @@ const DEFAULT_DISPATCH_REPO = 'mrtdown-data';
 const DEFAULT_DISPATCH_EVENT_TYPE = 'ingest';
 const DEFAULT_DISPATCH_LIMIT = 10;
 const DEFAULT_DISPATCH_TIMEOUT_MS = 15_000;
+const DEFAULT_DISPATCH_MIN_DISTINCT_IP_HASHES = 2;
 const MAX_DISPATCH_LIMIT = 50;
 
 type AppDb = ReturnType<typeof import('~/db').getDb>;
@@ -104,6 +106,16 @@ function hasCrowdReportClusterScope() {
     sql`exists (select 1 from ${crowdReportClusterLinesTable} where ${crowdReportClusterLinesTable.cluster_id} = ${crowdReportClustersTable.id})`,
     sql`exists (select 1 from ${crowdReportClusterStationsTable} where ${crowdReportClusterStationsTable.cluster_id} = ${crowdReportClustersTable.id})`,
   );
+}
+
+function hasCrowdReportClusterSourceDiversity() {
+  return sql`(
+    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})
+    from ${crowdReportAbuseEventsTable}
+    inner join ${crowdReportsTable}
+      on ${crowdReportsTable.id} = ${crowdReportAbuseEventsTable.report_id}
+    where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
+  ) >= ${DEFAULT_DISPATCH_MIN_DISTINCT_IP_HASHES}`;
 }
 
 export function buildCrowdReportSourceUrl(
@@ -238,6 +250,7 @@ async function getDispatchableCrowdReportClusterCandidates(
         eq(crowdReportClustersTable.status, 'accepted'),
         isNull(crowdReportClustersTable.dispatched_at),
         hasCrowdReportClusterScope(),
+        hasCrowdReportClusterSourceDiversity(),
       ),
     )
     .orderBy(desc(crowdReportClustersTable.window_end_at))
@@ -571,6 +584,7 @@ async function isCrowdReportDispatchCandidateEligible(
           eq(crowdReportClustersTable.status, 'accepted'),
           isNull(crowdReportClustersTable.dispatched_at),
           hasCrowdReportClusterScope(),
+          hasCrowdReportClusterSourceDiversity(),
         ),
       )
       .limit(1);

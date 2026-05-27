@@ -26,6 +26,7 @@ const MAX_REPORT_FUTURE_MINUTES = 15;
 const DEFAULT_DUPLICATE_WINDOW_MINUTES = 10;
 const DEFAULT_CLUSTER_WINDOW_MINUTES = 10;
 const DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS = 3;
+const DEFAULT_PUBLIC_SIGNAL_MIN_DISTINCT_IP_HASHES = 2;
 const DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES = 90;
 const DEFAULT_PUBLIC_SIGNAL_LIMIT = 20;
 const AUTO_REJECT_RESOLVED_STALE_HOURS = 6;
@@ -116,6 +117,7 @@ type AutomoderateCrowdReportOptions = ClusterCrowdReportOptions & {
 type ClusterCrowdReportOptions = {
   clusterWindowMinutes?: number;
   publicSignalMinReports?: number;
+  publicSignalMinDistinctIpHashes?: number;
   idFactory?: () => string;
 };
 
@@ -200,6 +202,24 @@ function getCrowdReportClusterWindow(
     throw new Error('Unable to calculate crowd report cluster window');
   }
   return { windowStartAt, windowEndAt };
+}
+
+function getCrowdReportClusterDistinctIpHashCountSql(
+  clusterId: string | typeof crowdReportClustersTable.id,
+) {
+  return sql<number>`(
+    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})
+    from ${crowdReportAbuseEventsTable}
+    inner join ${crowdReportsTable}
+      on ${crowdReportsTable.id} = ${crowdReportAbuseEventsTable.report_id}
+    where ${crowdReportsTable.cluster_id} = ${clusterId}
+  )`;
+}
+
+function hasCrowdReportClusterSourceDiversitySql(minDistinctIpHashes: number) {
+  return sql`${getCrowdReportClusterDistinctIpHashCountSql(
+    crowdReportClustersTable.id,
+  )} >= ${minDistinctIpHashes}`;
 }
 
 function normalizePolicyText(value: string) {
@@ -778,6 +798,7 @@ export async function automoderateCrowdReport(
       now,
       options.clusterWindowMinutes,
       options.publicSignalMinReports,
+      options.publicSignalMinDistinctIpHashes,
     ),
   );
 }
@@ -791,6 +812,7 @@ async function automoderateCrowdReportInTransaction(
   now: DateTime,
   clusterWindowMinutes = DEFAULT_CLUSTER_WINDOW_MINUTES,
   publicSignalMinReports = DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
+  publicSignalMinDistinctIpHashes = DEFAULT_PUBLIC_SIGNAL_MIN_DISTINCT_IP_HASHES,
 ) {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${buildDuplicateLockKey(submission)}, 0::bigint))`,
@@ -869,6 +891,7 @@ async function automoderateCrowdReportInTransaction(
     duplicate,
     clusterWindowMinutes,
     publicSignalMinReports,
+    publicSignalMinDistinctIpHashes,
     idFactory,
   );
 
@@ -887,6 +910,8 @@ async function createCrowdReportClusterInTransaction(
   submission: CrowdReportSubmission,
   clusterWindowMinutes: number,
   idFactory: () => string,
+  publicSignalMinReports: number,
+  publicSignalMinDistinctIpHashes: number,
 ) {
   const clusterId = idFactory();
   const { windowStartAt, windowEndAt } = getCrowdReportClusterWindow(
@@ -900,7 +925,10 @@ async function createCrowdReportClusterInTransaction(
     window_start_at: windowStartAt,
     window_end_at: windowEndAt,
     report_count: 1,
-    status: 'pending',
+    status:
+      publicSignalMinReports <= 1 && publicSignalMinDistinctIpHashes <= 1
+        ? 'accepted'
+        : 'pending',
   });
 
   if (submission.lineIds.length > 0) {
@@ -940,6 +968,7 @@ async function clusterModeratedCrowdReportInTransaction(
   duplicate: DuplicateCrowdReport | undefined,
   clusterWindowMinutes: number,
   publicSignalMinReports: number,
+  publicSignalMinDistinctIpHashes: number,
   idFactory: () => string,
 ) {
   if (duplicate == null) {
@@ -949,6 +978,8 @@ async function clusterModeratedCrowdReportInTransaction(
       submission,
       clusterWindowMinutes,
       idFactory,
+      publicSignalMinReports,
+      publicSignalMinDistinctIpHashes,
     );
     return;
   }
@@ -961,6 +992,8 @@ async function clusterModeratedCrowdReportInTransaction(
       { ...submission, observedAt: duplicate.observedAt },
       clusterWindowMinutes,
       idFactory,
+      publicSignalMinReports,
+      publicSignalMinDistinctIpHashes,
     ));
   const { windowStartAt, windowEndAt } = getCrowdReportClusterWindow(
     submission.observedAt,
@@ -980,7 +1013,7 @@ async function clusterModeratedCrowdReportInTransaction(
     .update(crowdReportClustersTable)
     .set({
       report_count: sql`${crowdReportClustersTable.report_count} + 1`,
-      status: sql`case when ${crowdReportClustersTable.status} = 'pending' and ${crowdReportClustersTable.report_count} + 1 >= ${publicSignalMinReports} then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`,
+      status: sql`case when ${crowdReportClustersTable.status} = 'pending' and ${crowdReportClustersTable.report_count} + 1 >= ${publicSignalMinReports} and ${getCrowdReportClusterDistinctIpHashCountSql(clusterId)} >= ${publicSignalMinDistinctIpHashes} then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`,
       window_start_at: sql`least(${crowdReportClustersTable.window_start_at}, ${windowStartAt}::timestamptz)`,
       window_end_at: sql`greatest(${crowdReportClustersTable.window_end_at}, ${windowEndAt}::timestamptz)`,
       updated_at: sql`now()`,
@@ -1137,6 +1170,7 @@ export async function persistAutomoderatedCrowdReport(
       now,
       options.clusterWindowMinutes,
       options.publicSignalMinReports,
+      options.publicSignalMinDistinctIpHashes,
     );
   });
 }
@@ -1149,6 +1183,7 @@ export async function getPublicCrowdReportSignals(
     now?: DateTime;
     maxAgeMinutes?: number;
     minReportCount?: number;
+    minDistinctIpHashes?: number;
     limit?: number;
   } = {},
 ): Promise<PublicCrowdReportSignal[]> {
@@ -1179,6 +1214,10 @@ export async function getPublicCrowdReportSignals(
         gte(
           crowdReportClustersTable.report_count,
           options.minReportCount ?? DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
+        ),
+        hasCrowdReportClusterSourceDiversitySql(
+          options.minDistinctIpHashes ??
+            DEFAULT_PUBLIC_SIGNAL_MIN_DISTINCT_IP_HASHES,
         ),
         gte(crowdReportClustersTable.window_end_at, activeSince),
         options.lineId

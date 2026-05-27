@@ -416,6 +416,10 @@ Exit criteria:
   free-text details by default; standard structured reports now submit
   generated summary text, while ambiguous `unknown` or `Other` direction
   reports still require a short note.
+- 2026-05-27: Hardened Phase 6 high-confidence cluster automation by requiring
+  public and dispatchable community-report clusters to include multiple
+  site-local reporter IP hashes, reducing the chance that one source can create
+  a public signal or canonical ingest dispatch alone.
 
 ## Decision Log
 
