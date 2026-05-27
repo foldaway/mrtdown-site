@@ -402,6 +402,58 @@ describe('assessCrowdReportAutomationPolicy', () => {
         NOW,
       ),
     ).toMatchObject({ action: 'reject' });
+
+    expect(
+      assessCrowdReportAutomationPolicy(
+        {
+          ...VALID_SUBMISSION,
+          text: '!!!!!!!!',
+        },
+        NOW,
+      ),
+    ).toMatchObject({ action: 'reject' });
+  });
+
+  it('rejects obvious spam or solicitation reports', () => {
+    expect(
+      assessCrowdReportAutomationPolicy(
+        {
+          ...VALID_SUBMISSION,
+          text: 'Buy now at https://spam.example for free money.',
+        },
+        NOW,
+      ),
+    ).toEqual({
+      action: 'reject',
+      reason:
+        'Report rejected by automated moderation: spam or solicitation text',
+    });
+
+    expect(
+      assessCrowdReportAutomationPolicy(
+        {
+          ...VALID_SUBMISSION,
+          text: 'Whatsapp 9000 1234 for casino promo code.',
+        },
+        NOW,
+      ),
+    ).toMatchObject({ action: 'reject' });
+  });
+
+  it('rejects obvious non-transit chatter reports', () => {
+    expect(
+      assessCrowdReportAutomationPolicy(
+        {
+          ...VALID_SUBMISSION,
+          text: 'Good morning',
+        },
+        NOW,
+      ),
+    ).toEqual({
+      action: 'reject',
+      reason:
+        'Report rejected by automated moderation: obvious non-transit text',
+    });
   });
 
   it('rejects stale resolved reports', () => {

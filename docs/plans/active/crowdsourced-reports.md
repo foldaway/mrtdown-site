@@ -409,6 +409,13 @@ Exit criteria:
   deterministic auto-rejection for obvious test/filler reports and resolved
   reports that are already several hours stale, while keeping accepted reports
   non-canonical until clustering, dispatch, and data-side review.
+- 2026-05-27: Continued Phase 6 automation policy with deterministic rejection
+  for punctuation-only, numeric-only, contact-solicitation, spam-link, and
+  obvious non-transit chatter submissions.
+- 2026-05-27: Reduced spam incentive in the public report form by hiding
+  free-text details by default; standard structured reports now submit
+  generated summary text, while ambiguous `unknown` or `Other` direction
+  reports still require a short note.
 
 ## Decision Log
 

@@ -208,6 +208,10 @@ function normalizePolicyText(value: string) {
 
 function isRepeatedFillerText(value: string) {
   const compact = value.replace(/[\s\p{P}\p{S}]/gu, '');
+  if (!/[\p{L}\p{N}]/u.test(value) || /^\p{N}+$/u.test(compact)) {
+    return true;
+  }
+
   if (compact.length >= 8 && new Set([...compact]).size <= 2) {
     return true;
   }
@@ -235,6 +239,50 @@ function isObviousTestReportText(value: string) {
   );
 }
 
+function isObviousSpamOrSolicitationText(value: string) {
+  if (
+    /(?:https?:\/\/|www\.)\S+/u.test(value) ||
+    /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/u.test(value)
+  ) {
+    return true;
+  }
+
+  if (
+    /\b(?:buy now|casino|crypto|forex|free money|loan|promo code|seo|work from home)\b/u.test(
+      value,
+    )
+  ) {
+    return true;
+  }
+
+  return (
+    /\b(?:call|sms|telegram|text|whatsapp)\b/u.test(value) &&
+    /(?:\+?\d[\s-]?){8,}/u.test(value)
+  );
+}
+
+function isObviousNonTransitChatterText(value: string) {
+  if (
+    [
+      'good afternoon',
+      'good evening',
+      'good morning',
+      'good night',
+      'how are you',
+      'i am bored',
+      'weather today',
+      'what is the weather',
+      'where to eat',
+    ].includes(value)
+  ) {
+    return true;
+  }
+
+  return /\b(?:food delivery|homework help|movie tickets|taxi booking)\b/u.test(
+    value,
+  );
+}
+
 export function assessCrowdReportAutomationPolicy(
   submission: CrowdReportSubmission,
   now = DateTime.now().setZone(SG_TIMEZONE),
@@ -248,6 +296,22 @@ export function assessCrowdReportAutomationPolicy(
       action: 'reject',
       reason:
         'Report rejected by automated moderation: obvious test or filler text',
+    };
+  }
+
+  if (isObviousSpamOrSolicitationText(normalizedText)) {
+    return {
+      action: 'reject',
+      reason:
+        'Report rejected by automated moderation: spam or solicitation text',
+    };
+  }
+
+  if (isObviousNonTransitChatterText(normalizedText)) {
+    return {
+      action: 'reject',
+      reason:
+        'Report rejected by automated moderation: obvious non-transit text',
     };
   }
 

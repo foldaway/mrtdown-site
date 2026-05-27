@@ -367,6 +367,9 @@ function ReportPage() {
     selectedLineIds.length === 1
       ? (lineDirections[selectedLineIds[0]] ?? [])
       : [];
+  const requiresDescription =
+    effect === 'unknown' ||
+    (selectedLineIds.length > 0 && directionChoice === 'other');
   const stationSearchResults = useMemo(() => {
     const query = stationSearch.trim().toLocaleLowerCase();
     if (!query) {
@@ -428,6 +431,19 @@ function ReportPage() {
     selectedLineDirectionOptions,
     selectedLineIds.length,
   ]);
+
+  useEffect(() => {
+    if (requiresDescription || fieldErrors.description == null) {
+      return;
+    }
+
+    setClientError(null);
+    setFieldErrors((current) => {
+      const next = { ...current };
+      delete next.description;
+      return next;
+    });
+  }, [fieldErrors.description, requiresDescription]);
 
   const clearFieldError = (field: FieldErrorKey) => {
     setClientError(null);
@@ -657,12 +673,8 @@ function ReportPage() {
     }
 
     const directionText = getDirectionText();
-    const trimmedText = text.trim();
-    if (
-      (effect === 'unknown' ||
-        (selectedLineIds.length > 0 && directionChoice === 'other')) &&
-      trimmedText.length < 8
-    ) {
+    const trimmedText = requiresDescription ? text.trim() : '';
+    if (requiresDescription && trimmedText.length < 8) {
       const message = intl.formatMessage({
         id: 'report.error.description_required_for_ambiguous_report',
         defaultMessage:
@@ -673,14 +685,6 @@ function ReportPage() {
         message,
         'description_required_for_ambiguous_report',
       );
-      return;
-    }
-    if (trimmedText.length > 0 && trimmedText.length < 8) {
-      const message = intl.formatMessage({
-        id: 'report.error.description_too_short',
-        defaultMessage: 'Add a little more detail, or leave the note blank.',
-      });
-      showFieldError('description', message, 'description_too_short');
       return;
     }
     const reportText = trimmedText || buildFallbackText();
@@ -1292,48 +1296,44 @@ function ReportPage() {
           </section>
         )}
 
-        <label className="flex flex-col gap-2">
-          <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-            <FormattedMessage
-              id="report.description"
-              defaultMessage="Anything else?"
-            />
-            <span className="ms-2 font-normal text-gray-500 text-xs dark:text-gray-400">
+        {requiresDescription && (
+          <label className="flex flex-col gap-2">
+            <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
               <FormattedMessage
-                id="report.optional"
-                defaultMessage="Optional"
+                id="report.description"
+                defaultMessage="Anything else?"
               />
             </span>
-          </span>
-          <textarea
-            ref={descriptionRef}
-            value={text}
-            onChange={(event) => {
-              clearFieldError('description');
-              setText(event.target.value);
-            }}
-            maxLength={1000}
-            rows={5}
-            aria-invalid={fieldErrors.description != null}
-            aria-describedby={
-              fieldErrors.description ? 'report-description-error' : undefined
-            }
-            placeholder={intl.formatMessage({
-              id: 'report.description_placeholder',
-              defaultMessage:
-                'Add details that the choices above do not capture.',
-            })}
-            className="resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-          />
-          {fieldErrors.description != null && (
-            <p
-              className="text-red-700 text-sm dark:text-red-300"
-              id="report-description-error"
-            >
-              {fieldErrors.description}
-            </p>
-          )}
-        </label>
+            <textarea
+              ref={descriptionRef}
+              value={text}
+              onChange={(event) => {
+                clearFieldError('description');
+                setText(event.target.value);
+              }}
+              maxLength={1000}
+              rows={4}
+              aria-invalid={fieldErrors.description != null}
+              aria-describedby={
+                fieldErrors.description ? 'report-description-error' : undefined
+              }
+              placeholder={intl.formatMessage({
+                id: 'report.description_placeholder',
+                defaultMessage:
+                  'Add details that the choices above do not capture.',
+              })}
+              className="resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            />
+            {fieldErrors.description != null && (
+              <p
+                className="text-red-700 text-sm dark:text-red-300"
+                id="report-description-error"
+              >
+                {fieldErrors.description}
+              </p>
+            )}
+          </label>
+        )}
 
         <details className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
           <summary className="cursor-pointer font-medium text-gray-700 text-sm dark:text-gray-200">

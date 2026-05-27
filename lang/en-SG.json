@@ -212,7 +212,6 @@
   "report.effect.skipped_stop": "Train skipped stop",
   "report.effect.unknown": "Not sure",
   "report.error.description_required_for_ambiguous_report": "Add a short note so reviewers can understand the report.",
-  "report.error.description_too_short": "Add a little more detail, or leave the note blank.",
   "report.error.direction_other_required": "Add the direction or destination.",
   "report.error.effect_required": "Choose what is happening.",
   "report.error.line_required": "Select the affected line.",
