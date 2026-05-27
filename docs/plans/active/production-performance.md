@@ -300,6 +300,11 @@ underlying compute and payload costs so uncached requests are also fast.
   pages. Operator routes now SSR-load a 30-day baseline and fetch the wider
   60/90-day viewport windows client-side without navigating to a `viewport`
   search parameter, matching the home page pattern.
+- 2026-05-27: Started Phase 4 precomputed statistics. Added a rebuildable
+  `statistics_snapshots` read-model table, refresh it after pull workflow
+  operational facts and manual facts rebuilds, and make the statistics route use
+  the snapshot when available. The existing request-time statistics builder
+  remains as a fallback for development and un-migrated environments.
 
 ## Validation
 

@@ -17,6 +17,7 @@ describe('pull workflow promotion order', () => {
       'delete-operators-towns-landmarks-orphans',
       'finalize',
       'rebuild-operational-facts',
+      'rebuild-statistics-snapshot',
     ];
 
     let previousIndex = -1;
