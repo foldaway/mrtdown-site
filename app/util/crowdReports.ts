@@ -28,6 +28,7 @@ const DEFAULT_CLUSTER_WINDOW_MINUTES = 10;
 const DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS = 3;
 const DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES = 90;
 const DEFAULT_PUBLIC_SIGNAL_LIMIT = 20;
+const AUTO_REJECT_RESOLVED_STALE_HOURS = 6;
 const DUPLICATE_CANDIDATE_PAGE_SIZE = 100;
 export const MAX_CROWD_REPORT_REQUEST_BYTES = 10_000;
 
@@ -109,6 +110,7 @@ type PersistCrowdReportTransactionContext = {
 
 type AutomoderateCrowdReportOptions = ClusterCrowdReportOptions & {
   duplicateWindowMinutes?: number;
+  now?: DateTime;
 };
 
 type ClusterCrowdReportOptions = {
@@ -122,6 +124,10 @@ type DuplicateCrowdReport = {
   clusterId: string | null;
   observedAt: string;
 };
+
+type CrowdReportAutomationPolicyResult =
+  | { action: 'accept' }
+  | { action: 'reject'; reason: string };
 
 export type PublicCrowdReportSignal = {
   id: string;
@@ -194,6 +200,73 @@ function getCrowdReportClusterWindow(
     throw new Error('Unable to calculate crowd report cluster window');
   }
   return { windowStartAt, windowEndAt };
+}
+
+function normalizePolicyText(value: string) {
+  return value.trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+}
+
+function isRepeatedFillerText(value: string) {
+  const compact = value.replace(/[\s\p{P}\p{S}]/gu, '');
+  if (compact.length >= 8 && new Set([...compact]).size <= 2) {
+    return true;
+  }
+
+  const tokens = value.split(' ').filter(Boolean);
+  return tokens.length >= 3 && new Set(tokens).size === 1;
+}
+
+function isObviousTestReportText(value: string) {
+  return (
+    [
+      'asdf',
+      'hello',
+      'hi',
+      'lorem ipsum',
+      'n/a',
+      'na',
+      'none',
+      'nothing',
+      'qwerty',
+      'test',
+      'test report',
+      'testing',
+    ].includes(value) || /^test(?:ing)?(?:\s+\d+)?$/.test(value)
+  );
+}
+
+export function assessCrowdReportAutomationPolicy(
+  submission: CrowdReportSubmission,
+  now = DateTime.now().setZone(SG_TIMEZONE),
+): CrowdReportAutomationPolicyResult {
+  const normalizedText = normalizePolicyText(submission.text);
+  if (
+    isObviousTestReportText(normalizedText) ||
+    isRepeatedFillerText(normalizedText)
+  ) {
+    return {
+      action: 'reject',
+      reason:
+        'Report rejected by automated moderation: obvious test or filler text',
+    };
+  }
+
+  const observedAt = DateTime.fromISO(submission.observedAt, {
+    setZone: true,
+  });
+  if (
+    submission.isStillHappening === false &&
+    observedAt.isValid &&
+    observedAt.setZone(SG_TIMEZONE) <
+      now.minus({ hours: AUTO_REJECT_RESOLVED_STALE_HOURS })
+  ) {
+    return {
+      action: 'reject',
+      reason: `Report rejected by automated moderation: resolved report is more than ${AUTO_REJECT_RESOLVED_STALE_HOURS}h old`,
+    };
+  }
+
+  return { action: 'accept' };
 }
 
 export function validateCrowdReportSubmission(
@@ -629,6 +702,7 @@ export async function automoderateCrowdReport(
   const idFactory = options.idFactory ?? (() => crypto.randomUUID());
   const duplicateWindowMinutes =
     options.duplicateWindowMinutes ?? DEFAULT_DUPLICATE_WINDOW_MINUTES;
+  const now = options.now ?? DateTime.now().setZone(SG_TIMEZONE);
 
   return db.transaction((tx) =>
     automoderateCrowdReportInTransaction(
@@ -637,6 +711,7 @@ export async function automoderateCrowdReport(
       submission,
       duplicateWindowMinutes,
       idFactory,
+      now,
       options.clusterWindowMinutes,
       options.publicSignalMinReports,
     ),
@@ -649,12 +724,46 @@ async function automoderateCrowdReportInTransaction(
   submission: CrowdReportSubmission,
   duplicateWindowMinutes: number,
   idFactory: () => string,
+  now: DateTime,
   clusterWindowMinutes = DEFAULT_CLUSTER_WINDOW_MINUTES,
   publicSignalMinReports = DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
 ) {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${buildDuplicateLockKey(submission)}, 0::bigint))`,
   );
+
+  const policy = assessCrowdReportAutomationPolicy(submission, now);
+  if (policy.action === 'reject') {
+    const [updatedReport] = await tx
+      .update(crowdReportsTable)
+      .set({
+        status: 'rejected',
+        duplicate_of_id: null,
+        updated_at: sql`now()`,
+      })
+      .where(eq(crowdReportsTable.id, reportId))
+      .returning({
+        id: crowdReportsTable.id,
+        status: crowdReportsTable.status,
+        duplicateOfId: crowdReportsTable.duplicate_of_id,
+      });
+
+    await tx.insert(crowdReportModerationEventsTable).values({
+      id: idFactory(),
+      report_id: reportId,
+      actor: 'system',
+      action: 'automated_rejected',
+      note: policy.reason,
+    });
+
+    return (
+      updatedReport ?? {
+        id: reportId,
+        status: 'rejected' as const,
+        duplicateOfId: null,
+      }
+    );
+  }
 
   const duplicate = await findDuplicateCrowdReport(
     tx,
@@ -961,6 +1070,7 @@ export async function persistAutomoderatedCrowdReport(
       submission,
       duplicateWindowMinutes,
       idFactory,
+      now,
       options.clusterWindowMinutes,
       options.publicSignalMinReports,
     );

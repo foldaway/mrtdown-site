@@ -12,6 +12,7 @@ import {
   crowdReportStationsTable,
 } from '~/db/schema';
 import {
+  assessCrowdReportAutomationPolicy,
   automoderateCrowdReport,
   CrowdReportRateLimitError,
   getCrowdReportRateLimitBucketStart,
@@ -157,7 +158,7 @@ function makeFakeAutomoderationDb(
   selectResults: unknown[][],
   updatedReport: {
     id: string;
-    status: 'accepted' | 'duplicate';
+    status: 'accepted' | 'duplicate' | 'rejected';
     duplicateOfId: string | null;
   },
 ) {
@@ -373,6 +374,57 @@ describe('validateCrowdReportSubmission', () => {
     if (!result.success) {
       expect(result.issues).toContain('observedAt cannot be more than 24h old');
     }
+  });
+});
+
+describe('assessCrowdReportAutomationPolicy', () => {
+  it('rejects obvious test or filler reports', () => {
+    expect(
+      assessCrowdReportAutomationPolicy(
+        {
+          ...VALID_SUBMISSION,
+          text: 'test 123',
+        },
+        NOW,
+      ),
+    ).toEqual({
+      action: 'reject',
+      reason:
+        'Report rejected by automated moderation: obvious test or filler text',
+    });
+
+    expect(
+      assessCrowdReportAutomationPolicy(
+        {
+          ...VALID_SUBMISSION,
+          text: 'aaaa aaaa aaaa',
+        },
+        NOW,
+      ),
+    ).toMatchObject({ action: 'reject' });
+  });
+
+  it('rejects stale resolved reports', () => {
+    expect(
+      assessCrowdReportAutomationPolicy(
+        {
+          ...VALID_SUBMISSION,
+          observedAt: '2026-05-24T05:30:00.000+08:00',
+          isStillHappening: false,
+        },
+        NOW,
+      ),
+    ).toEqual({
+      action: 'reject',
+      reason:
+        'Report rejected by automated moderation: resolved report is more than 6h old',
+    });
+  });
+
+  it('keeps structured current reports eligible for acceptance', () => {
+    expect(assessCrowdReportAutomationPolicy(VALID_SUBMISSION, NOW)).toEqual({
+      action: 'accept',
+    });
   });
 });
 
@@ -669,6 +721,54 @@ describe('automoderateCrowdReport', () => {
         cluster_id: 'event-1',
       },
     });
+    expect(fake.executes).toHaveLength(1);
+  });
+
+  it('rejects low-quality reports before duplicate detection and clustering', async () => {
+    const fake = makeFakeAutomoderationDb([], {
+      id: 'report-1',
+      status: 'rejected',
+      duplicateOfId: null,
+    });
+
+    await expect(
+      automoderateCrowdReport(
+        fake.db as never,
+        'report-1',
+        {
+          ...VALID_SUBMISSION,
+          text: 'testing',
+        },
+        {
+          idFactory: () => 'event-1',
+          now: NOW,
+        },
+      ),
+    ).resolves.toEqual({
+      id: 'report-1',
+      status: 'rejected',
+      duplicateOfId: null,
+    });
+
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'rejected',
+        duplicate_of_id: null,
+      },
+    });
+    expect(fake.inserts).toEqual([
+      {
+        table: crowdReportModerationEventsTable,
+        values: {
+          id: 'event-1',
+          report_id: 'report-1',
+          actor: 'system',
+          action: 'automated_rejected',
+          note: 'Report rejected by automated moderation: obvious test or filler text',
+        },
+      },
+    ]);
     expect(fake.executes).toHaveLength(1);
   });
 
