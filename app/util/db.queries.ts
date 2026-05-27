@@ -1683,17 +1683,38 @@ function withIssues(
   allIssues: Record<string, IssueWithOperationalEffects>,
   issueIds?: readonly string[],
 ): IncludedEntities {
-  const selectedIssuesWithEffects =
-    issueIds == null
-      ? allIssues
-      : Object.fromEntries(
-          issueIds
-            .filter((issueId) => allIssues[issueId] != null)
-            .map((issueId) => [issueId, allIssues[issueId]]),
-        );
+  return {
+    ...baseIncluded,
+    issues: stripOperationalEffects(selectIssues(allIssues, issueIds)),
+  };
+}
 
-  const selectedIssues = Object.fromEntries(
-    Object.entries(selectedIssuesWithEffects).map(([issueId, issue]) => {
+type IncludedEntitySelection = {
+  issueIds?: readonly string[];
+  lineIds?: readonly string[];
+  stationIds?: readonly string[];
+  includeIssueEntities?: boolean;
+  includeStationMembershipLines?: boolean;
+};
+
+function selectIssues(
+  allIssues: Record<string, IssueWithOperationalEffects>,
+  issueIds?: readonly string[],
+) {
+  return issueIds == null
+    ? allIssues
+    : Object.fromEntries(
+        issueIds
+          .filter((issueId) => allIssues[issueId] != null)
+          .map((issueId) => [issueId, allIssues[issueId]]),
+      );
+}
+
+function stripOperationalEffects(
+  issues: Record<string, IssueWithOperationalEffects>,
+): Record<string, Issue> {
+  return Object.fromEntries(
+    Object.entries(issues).map(([issueId, issue]) => {
       const {
         serviceEffectKinds: _serviceEffectKinds,
         facilityEffectKinds: _facilityEffectKinds,
@@ -1702,10 +1723,55 @@ function withIssues(
       return [issueId, publicIssue];
     }),
   ) as Record<string, Issue>;
+}
+
+export function selectIncludedEntities(
+  baseIncluded: BaseIncludedEntities,
+  allIssues: Record<string, IssueWithOperationalEffects>,
+  selection: IncludedEntitySelection,
+): IncludedEntities {
+  const selectedIssuesWithEffects = selectIssues(allIssues, selection.issueIds);
+  const lineIds = new Set(selection.lineIds ?? []);
+  const stationIds = new Set(selection.stationIds ?? []);
+
+  if (selection.includeIssueEntities !== false) {
+    for (const issue of Object.values(selectedIssuesWithEffects)) {
+      for (const lineId of issue.lineIds) {
+        lineIds.add(lineId);
+      }
+      for (const branch of issue.branchesAffected) {
+        lineIds.add(branch.lineId);
+        for (const stationId of branch.stationIds) {
+          stationIds.add(stationId);
+        }
+      }
+    }
+  }
+
+  if (selection.includeStationMembershipLines === true) {
+    for (const stationId of stationIds) {
+      const station = baseIncluded.stations[stationId];
+      for (const membership of station?.memberships ?? []) {
+        lineIds.add(membership.lineId);
+      }
+    }
+  }
 
   return {
-    ...baseIncluded,
-    issues: selectedIssues,
+    lines: Object.fromEntries(
+      [...lineIds]
+        .filter((lineId) => baseIncluded.lines[lineId] != null)
+        .map((lineId) => [lineId, baseIncluded.lines[lineId]]),
+    ),
+    stations: Object.fromEntries(
+      [...stationIds]
+        .filter((stationId) => baseIncluded.stations[stationId] != null)
+        .map((stationId) => [stationId, baseIncluded.stations[stationId]]),
+    ),
+    issues: stripOperationalEffects(selectedIssuesWithEffects),
+    landmarks: {},
+    towns: {},
+    operators: {},
   };
 }
 
@@ -3758,17 +3824,23 @@ export async function getStatisticsData() {
             ),
     );
 
-    const chartTotalIssueCountByStation = timeSyncServerSpan(
-      'statistics_station_chart',
-      () => ({
-        title: 'Issue Count by Station',
-        data: stationIssueCounts
+    const topStationIssueCounts = timeSyncServerSpan(
+      'statistics_top_station_counts',
+      () =>
+        stationIssueCounts
           .sort(
             (a, b) =>
               (b.payload.totalIssues as number) -
               (a.payload.totalIssues as number),
           )
           .slice(0, 15),
+    );
+
+    const chartTotalIssueCountByStation = timeSyncServerSpan(
+      'statistics_station_chart',
+      () => ({
+        title: 'Issue Count by Station',
+        data: topStationIssueCounts,
       }),
     );
 
@@ -3811,10 +3883,13 @@ export async function getStatisticsData() {
 
     return {
       data: statistics,
-      included: withIssues(
-        dataset.included,
-        dataset.allIssues,
-        longestDisruptions,
+      included: timeSyncServerSpan('statistics_included', () =>
+        selectIncludedEntities(dataset.included, dataset.allIssues, {
+          issueIds: longestDisruptions,
+          lineIds: chartTotalIssueCountByLine.data.map((entry) => entry.name),
+          stationIds: topStationIssueCounts.map((entry) => entry.name),
+          includeStationMembershipLines: true,
+        }),
       ),
     };
   });

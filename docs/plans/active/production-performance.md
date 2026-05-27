@@ -277,6 +277,13 @@ underlying compute and payload costs so uncached requests are also fast.
   `Set-Cookie`, private/no-store opt-outs, and client no-cache requests are
   excluded. Added focused route-matching and cache-key tests in
   `app/util/publicHtmlCache.test.ts`.
+- 2026-05-27: Started Phase 2 payload reduction for `/statistics`. The
+  statistics loader now returns an explicit included-entity subset: all lines
+  needed by the line chart, the top station-chart stations, the longest
+  disruption issues, and the line/station dependencies those issue cards need.
+  It no longer serializes the full operators, towns, landmarks, or station
+  dictionaries for the statistics route. Added focused selector coverage in
+  `app/util/db.queries.test.ts`.
 
 ## Validation
 
