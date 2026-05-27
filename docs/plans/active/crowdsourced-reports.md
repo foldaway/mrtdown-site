@@ -420,6 +420,10 @@ Exit criteria:
   public and dispatchable community-report clusters to include multiple
   site-local reporter IP hashes, reducing the chance that one source can create
   a public signal or canonical ingest dispatch alone.
+- 2026-05-27: Continued Phase 6 stale-report hardening by auto-rejecting old
+  reports that do not explicitly confirm the issue is still happening, and by
+  counting reporter source diversity from client fingerprint hashes when
+  present with an IP-hash fallback.
 
 ## Decision Log
 

@@ -30,6 +30,7 @@ const DEFAULT_PUBLIC_SIGNAL_MIN_DISTINCT_IP_HASHES = 2;
 const DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES = 90;
 const DEFAULT_PUBLIC_SIGNAL_LIMIT = 20;
 const AUTO_REJECT_RESOLVED_STALE_HOURS = 6;
+const AUTO_REJECT_UNCONFIRMED_STALE_HOURS = 12;
 const DUPLICATE_CANDIDATE_PAGE_SIZE = 100;
 export const MAX_CROWD_REPORT_REQUEST_BYTES = 10_000;
 
@@ -208,7 +209,10 @@ function getCrowdReportClusterDistinctIpHashCountSql(
   clusterId: string | typeof crowdReportClustersTable.id,
 ) {
   return sql<number>`(
-    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})
+    select count(distinct coalesce(
+      ${crowdReportAbuseEventsTable.client_fingerprint_hash},
+      ${crowdReportAbuseEventsTable.ip_hash}
+    ))
     from ${crowdReportAbuseEventsTable}
     inner join ${crowdReportsTable}
       on ${crowdReportsTable.id} = ${crowdReportAbuseEventsTable.report_id}
@@ -347,6 +351,18 @@ export function assessCrowdReportAutomationPolicy(
     return {
       action: 'reject',
       reason: `Report rejected by automated moderation: resolved report is more than ${AUTO_REJECT_RESOLVED_STALE_HOURS}h old`,
+    };
+  }
+
+  if (
+    submission.isStillHappening == null &&
+    observedAt.isValid &&
+    observedAt.setZone(SG_TIMEZONE) <
+      now.minus({ hours: AUTO_REJECT_UNCONFIRMED_STALE_HOURS })
+  ) {
+    return {
+      action: 'reject',
+      reason: `Report rejected by automated moderation: unconfirmed report is more than ${AUTO_REJECT_UNCONFIRMED_STALE_HOURS}h old`,
     };
   }
 
