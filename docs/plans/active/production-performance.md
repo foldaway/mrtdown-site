@@ -284,6 +284,13 @@ underlying compute and payload costs so uncached requests are also fast.
   It no longer serializes the full operators, towns, landmarks, or station
   dictionaries for the statistics route. Added focused selector coverage in
   `app/util/db.queries.test.ts`.
+- 2026-05-27: Advanced Phase 2 for `/` and started Phase 3. The home loader now
+  returns an explicit included-entity subset instead of the full base included
+  graph: rendered line summaries, selected advisory/date-card issues, and the
+  line/station dependencies those issue cards need. The route now SSR-loads the
+  mobile-sized 30-day window, then fetches the existing viewport-sized 60/90-day
+  windows client-side for larger screens without navigating to a `viewport`
+  search parameter.
 
 ## Validation
 

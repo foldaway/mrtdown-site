@@ -1,15 +1,15 @@
+import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { createIntl, FormattedMessage } from 'react-intl';
-import { z } from 'zod';
 import { LineSummaryBlock } from '~/components/LineSummaryBlock';
 import { CommunitySignalsSection } from '~/components/CommunitySignalsSection';
-import { LANGUAGES } from '~/constants';
+import { HOME_OVERVIEW_INITIAL_DATE_COUNT, LANGUAGES } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
-import { useViewport, ViewportSchema } from '~/hooks/useViewport';
+import { useViewport } from '~/hooks/useViewport';
 import { getOverviewFn } from '~/util/overview.functions';
 import { CurrentAdvisoriesSection } from '../../components/CurrentAdvisoriesSection';
 import { countOperationalLineSummaries } from '../../components/CurrentAdvisoriesSection/helpers';
@@ -17,34 +17,26 @@ import { assert } from '../../util/assert';
 import { HomeLineSummariesSkeleton } from './components/HomeLineSummariesSkeleton';
 import { sortLineSummariesWithFutureServiceLast } from './helpers/sortLineSummaries';
 
-const SearchParamsSchema = z.object({
-  viewport: ViewportSchema.optional(),
-});
-
 export const Route = createFileRoute('/{-$lang}/')({
   component: HomePage,
   pendingComponent: HomePagePending,
   pendingMs: 0,
   pendingMinMs: 0,
 
-  validateSearch: SearchParamsSchema,
-  loaderDeps({ search }) {
-    return { viewport: search.viewport ?? 'xs' };
-  },
-  async loader({ deps, params }) {
+  async loader({ params }) {
     const lang = params.lang ?? 'en-SG';
     if (!LANGUAGES.includes(lang)) {
       throw notFound();
     }
 
-    const viewport = deps.viewport ?? 'xs';
-    const dateCount = getDateCountForViewport(viewport);
     const { data, included } = await getOverviewFn({
-      data: {
-        viewport,
-      },
+      data: { days: HOME_OVERVIEW_INITIAL_DATE_COUNT },
     });
-    return { overview: data, included, dateCount };
+    return {
+      overview: data,
+      included,
+      dateCount: HOME_OVERVIEW_INITIAL_DATE_COUNT,
+    };
   },
   async head(ctx) {
     const lang = ctx.params.lang ?? 'en-SG';
@@ -123,43 +115,26 @@ export const Route = createFileRoute('/{-$lang}/')({
 
 function HomePage() {
   const loaderData = Route.useLoaderData();
-  const { viewport } = Route.useSearch();
-  const { overview, included, dateCount } = loaderData;
+  const measuredViewport = useViewport();
+  const desiredDateCount = getDateCountForViewport(measuredViewport);
+  const expandedOverviewQuery = useQuery({
+    queryKey: ['home-overview', desiredDateCount],
+    queryFn: () => getOverviewFn({ data: { days: desiredDateCount } }),
+    enabled: desiredDateCount > loaderData.dateCount,
+    staleTime: 60_000,
+  });
+  const activeData =
+    desiredDateCount > loaderData.dateCount &&
+    expandedOverviewQuery.data != null
+      ? {
+          overview: expandedOverviewQuery.data.data,
+          included: expandedOverviewQuery.data.included,
+          dateCount: desiredDateCount,
+        }
+      : loaderData;
+  const { overview, included, dateCount } = activeData;
   const { issues } = included;
   const crowdReportsEnabled = useCrowdReportsFeatureEnabled();
-
-  const navigate = Route.useNavigate();
-
-  const measuredViewport = useViewport();
-  const measuredDateCount = useMemo(
-    () => getDateCountForViewport(measuredViewport),
-    [measuredViewport],
-  );
-  const measuredDateKeys = useMemo(() => {
-    const dateRangeEnd = DateTime.now()
-      .startOf('hour')
-      .setZone('Asia/Singapore');
-    return Array.from({ length: measuredDateCount }, (_, daysAgo) => {
-      return (
-        dateRangeEnd
-          .minus({ days: measuredDateCount - daysAgo - 1 })
-          .toISODate() ?? `date-${daysAgo}`
-      );
-    });
-  }, [measuredDateCount]);
-  const isLineSummaryViewportPending = dateCount !== measuredDateCount;
-
-  useEffect(() => {
-    if (viewport === measuredViewport) {
-      return;
-    }
-    navigate({
-      search: {
-        viewport: measuredViewport,
-      },
-      replace: true,
-    });
-  }, [viewport, measuredViewport, navigate]);
 
   const dateTimes = useMemo(() => {
     const dateRangeEnd = DateTime.now()
@@ -246,26 +221,17 @@ function HomePage() {
           </section>
         )}
 
-        {isLineSummaryViewportPending ? (
-          <HomeLineSummariesSkeleton
-            dateKeys={measuredDateKeys}
-            lineIds={sortedLineSummaries.map((lineSummary) => {
-              return lineSummary.lineId;
-            })}
-          />
-        ) : (
-          <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            <div className="flex flex-col gap-y-4 px-2 py-2 sm:gap-y-6 sm:px-3 sm:py-4">
-              {sortedLineSummaries.map((lineSummary) => (
-                <LineSummaryBlock
-                  key={lineSummary.lineId}
-                  data={lineSummary}
-                  dateTimes={dateTimes}
-                />
-              ))}
-            </div>
+        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex flex-col gap-y-4 px-2 py-2 sm:gap-y-6 sm:px-3 sm:py-4">
+            {sortedLineSummaries.map((lineSummary) => (
+              <LineSummaryBlock
+                key={lineSummary.lineId}
+                data={lineSummary}
+                dateTimes={dateTimes}
+              />
+            ))}
           </div>
-        )}
+        </div>
 
         <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800/50">
           <h3 className="mb-4 text-center font-semibold text-gray-700 text-sm dark:text-gray-300">

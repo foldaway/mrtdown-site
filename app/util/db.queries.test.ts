@@ -294,4 +294,59 @@ describe('selectIncludedEntities', () => {
     expect(included.issues[issue.id]).not.toHaveProperty('serviceEffectKinds');
     expect(included.issues[issue.id]).not.toHaveProperty('facilityEffectKinds');
   });
+
+  it('keeps explicitly requested lines when no selected issue references them', () => {
+    const included = selectIncludedEntities(
+      {
+        lines: {
+          [TEST_LINE.id]: TEST_LINE,
+          [TEST_FEEDER_LINE.id]: TEST_FEEDER_LINE,
+        },
+        stations: {
+          [TEST_STATION.id]: TEST_STATION,
+        },
+        operators: {},
+        towns: {},
+        landmarks: {},
+      },
+      {},
+      {
+        issueIds: [],
+        lineIds: [TEST_LINE.id],
+      },
+    );
+
+    expect(Object.keys(included.lines)).toEqual([TEST_LINE.id]);
+    expect(included.issues).toEqual({});
+    expect(included.stations).toEqual({});
+  });
+
+  it('keeps explicitly requested stations and their membership lines', () => {
+    const included = selectIncludedEntities(
+      {
+        lines: {
+          [TEST_LINE.id]: TEST_LINE,
+          [TEST_FEEDER_LINE.id]: TEST_FEEDER_LINE,
+        },
+        stations: {
+          [TEST_STATION.id]: TEST_STATION,
+        },
+        operators: {},
+        towns: {},
+        landmarks: {},
+      },
+      {},
+      {
+        issueIds: [],
+        stationIds: [TEST_STATION.id],
+        includeStationMembershipLines: true,
+      },
+    );
+
+    expect(Object.keys(included.stations)).toEqual([TEST_STATION.id]);
+    expect(Object.keys(included.lines).sort()).toEqual(
+      [TEST_FEEDER_LINE.id, TEST_LINE.id].sort(),
+    );
+    expect(included.issues).toEqual({});
+  });
 });
