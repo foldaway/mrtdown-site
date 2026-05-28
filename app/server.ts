@@ -2,24 +2,22 @@ import * as Sentry from '@sentry/cloudflare';
 import handler from '@tanstack/react-start/server-entry';
 import {
   applyPublicHtmlCacheHeaders,
-  createPublicHtmlCacheResponse,
-  getPublicHtmlCacheKey,
+  getCachedPublicHtmlResponse,
   isCommunitySignalPublicPath,
   isPublicHtmlCacheLookupRequest,
   shouldCachePublicHtml,
+  storePublicHtmlResponse,
 } from './util/publicHtmlCache';
 import {
   type CrowdReportFeatureEnv,
   isCrowdReportsFeatureEnabled,
 } from './util/crowdReportFeatureFlag';
 import {
-  createSentryAnonymousUserCookie,
+  addSentryAnonymousUserCookie,
   getSentryAnonymousUser,
-  type SentryAnonymousUser,
+  stripSentryUserIpAddress,
 } from './util/sentryAnonymousUser';
 import { handleScheduledWorkflows } from './workflows/scheduled';
-
-const PUBLIC_HTML_CACHE_NAME = 'mrtdown-public-html';
 
 async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
   const startedAt = performance.now();
@@ -123,81 +121,6 @@ function appendInstrumentationHeaders(
   headers.set('X-MRTDown-Render', render);
 }
 
-function addSentryAnonymousUserCookie(
-  response: Response,
-  sentryAnonymousUser: SentryAnonymousUser,
-) {
-  if (!sentryAnonymousUser.shouldSetCookie || response.status === 101) {
-    return response;
-  }
-
-  const cookie = createSentryAnonymousUserCookie(
-    sentryAnonymousUser.cookieValue,
-  );
-
-  try {
-    response.headers.append('Set-Cookie', cookie);
-    preventSharedCachingOfCookieResponse(response.headers);
-    return response;
-  } catch {
-    const headers = new Headers(response.headers);
-    headers.append('Set-Cookie', cookie);
-    preventSharedCachingOfCookieResponse(headers);
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
-  }
-}
-
-function preventSharedCachingOfCookieResponse(headers: Headers) {
-  const cacheControl = headers.get('Cache-Control')?.toLowerCase();
-  if (
-    cacheControl == null ||
-    (!cacheControl.includes('private') && !cacheControl.includes('no-store'))
-  ) {
-    headers.set('Cache-Control', 'private, max-age=0');
-  }
-}
-
-async function getCachedPublicHtmlResponse(request: Request) {
-  if (!isPublicHtmlCacheLookupRequest(request)) {
-    return null;
-  }
-
-  try {
-    const cache = await caches.open(PUBLIC_HTML_CACHE_NAME);
-    const response = await cache.match(getPublicHtmlCacheKey(request));
-    if (response == null) {
-      return null;
-    }
-
-    const headers = new Headers(response.headers);
-    headers.set('X-MRTDown-Cache', 'hit');
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
-  } catch (error) {
-    console.warn('Failed to read public HTML cache', error);
-    return null;
-  }
-}
-
-async function storePublicHtmlResponse(request: Request, response: Response) {
-  try {
-    const cache = await caches.open(PUBLIC_HTML_CACHE_NAME);
-    await cache.put(
-      getPublicHtmlCacheKey(request),
-      createPublicHtmlCacheResponse(response),
-    );
-  } catch (error) {
-    console.warn('Failed to store public HTML cache', error);
-  }
-}
-
 async function logResponseByteEstimate(
   request: Request,
   response: Response,
@@ -233,15 +156,7 @@ export default Sentry.withSentry(
     return {
       dsn: env.SENTRY_DSN ?? '',
       environment: env.TIER ?? 'development',
-      beforeSend(event) {
-        if (event.user != null) {
-          const user = { ...event.user };
-          delete user.ip_address;
-          event.user = Object.keys(user).length > 0 ? user : undefined;
-        }
-
-        return event;
-      },
+      beforeSend: stripSentryUserIpAddress,
     };
   },
   {

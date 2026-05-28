@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addSentryAnonymousUserCookie,
   createSentryAnonymousUserCookie,
   getSentryAnonymousUser,
+  stripSentryUserIpAddress,
 } from './sentryAnonymousUser';
 
 const EXISTING_ID = 'c4bc6391-2d15-40e8-a01f-8a1e44928abc';
@@ -61,5 +63,56 @@ describe('Sentry anonymous user IDs', () => {
         'HttpOnly',
       ].join('; '),
     );
+  });
+
+  it('adds the anonymous user cookie and prevents shared response caching', () => {
+    const response = addSentryAnonymousUserCookie(
+      new Response('ok', {
+        headers: {
+          'cache-control': 'public, s-maxage=60',
+        },
+      }),
+      {
+        cookieValue: NEW_ID,
+        sentryUserId: `anon:${NEW_ID}`,
+        shouldSetCookie: true,
+      },
+    );
+
+    expect(response.headers.get('set-cookie')).toBe(
+      createSentryAnonymousUserCookie(NEW_ID),
+    );
+    expect(response.headers.get('cache-control')).toBe('private, max-age=0');
+  });
+
+  it('does not add the anonymous user cookie when it is already present', () => {
+    const response = addSentryAnonymousUserCookie(new Response('ok'), {
+      cookieValue: EXISTING_ID,
+      sentryUserId: `anon:${EXISTING_ID}`,
+      shouldSetCookie: false,
+    });
+
+    expect(response.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('strips Sentry user IP addresses without removing stable IDs', () => {
+    expect(
+      stripSentryUserIpAddress({
+        user: {
+          id: `anon:${EXISTING_ID}`,
+          ip_address: '172.70.42.77',
+        },
+      }),
+    ).toEqual({
+      user: {
+        id: `anon:${EXISTING_ID}`,
+      },
+    });
+
+    expect(
+      stripSentryUserIpAddress({ user: { ip_address: '172.70.42.77' } }),
+    ).toEqual({
+      user: undefined,
+    });
   });
 });

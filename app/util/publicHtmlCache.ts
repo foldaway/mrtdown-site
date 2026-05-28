@@ -1,5 +1,6 @@
 const PUBLIC_HTML_CACHE_CONTROL =
   'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
+const PUBLIC_HTML_CACHE_NAME = 'mrtdown-public-html';
 
 const HTML_CONTENT_TYPES = ['text/html', 'application/xhtml+xml'];
 
@@ -143,4 +144,44 @@ export function createPublicHtmlCacheResponse(response: Response) {
     statusText: response.statusText,
     headers,
   });
+}
+
+export async function getCachedPublicHtmlResponse(request: Request) {
+  if (!isPublicHtmlCacheLookupRequest(request)) {
+    return null;
+  }
+
+  try {
+    const cache = await caches.open(PUBLIC_HTML_CACHE_NAME);
+    const response = await cache.match(getPublicHtmlCacheKey(request));
+    if (response == null) {
+      return null;
+    }
+
+    const headers = new Headers(response.headers);
+    headers.set('X-MRTDown-Cache', 'hit');
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  } catch (error) {
+    console.warn('Failed to read public HTML cache', error);
+    return null;
+  }
+}
+
+export async function storePublicHtmlResponse(
+  request: Request,
+  response: Response,
+) {
+  try {
+    const cache = await caches.open(PUBLIC_HTML_CACHE_NAME);
+    await cache.put(
+      getPublicHtmlCacheKey(request),
+      createPublicHtmlCacheResponse(response),
+    );
+  } catch (error) {
+    console.warn('Failed to store public HTML cache', error);
+  }
 }
