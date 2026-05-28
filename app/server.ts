@@ -12,12 +12,22 @@ import {
   type CrowdReportFeatureEnv,
   isCrowdReportsFeatureEnabled,
 } from './util/crowdReportFeatureFlag';
+import {
+  createSentryAnonymousUserCookie,
+  getSentryAnonymousUser,
+  type SentryAnonymousUser,
+} from './util/sentryAnonymousUser';
 import { handleScheduledWorkflows } from './workflows/scheduled';
 
 const PUBLIC_HTML_CACHE_NAME = 'mrtdown-public-html';
 
 async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
   const startedAt = performance.now();
+  const sentryAnonymousUser = getSentryAnonymousUser(request);
+  Sentry.setUser({
+    id: sentryAnonymousUser.sentryUserId,
+    ip_address: null,
+  });
   const shouldUsePublicHtmlCache = !shouldBypassPublicHtmlCacheForCrowdReports(
     request,
     _env,
@@ -27,10 +37,13 @@ async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
     : null;
   if (cachedResponse != null) {
     const elapsedMs = performance.now() - startedAt;
-    return addResponseInstrumentationHeaders(
-      cachedResponse,
-      elapsedMs,
-      'public-html-cache',
+    return addSentryAnonymousUserCookie(
+      addResponseInstrumentationHeaders(
+        cachedResponse,
+        elapsedMs,
+        'public-html-cache',
+      ),
+      sentryAnonymousUser,
     );
   }
 
@@ -58,7 +71,7 @@ async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
     logResponseByteEstimate(request, responseWithHeaders.clone(), elapsedMs);
   }
 
-  return responseWithHeaders;
+  return addSentryAnonymousUserCookie(responseWithHeaders, sentryAnonymousUser);
 }
 
 function shouldBypassPublicHtmlCacheForCrowdReports(
@@ -108,6 +121,44 @@ function appendInstrumentationHeaders(
       : workerTiming,
   );
   headers.set('X-MRTDown-Render', render);
+}
+
+function addSentryAnonymousUserCookie(
+  response: Response,
+  sentryAnonymousUser: SentryAnonymousUser,
+) {
+  if (!sentryAnonymousUser.shouldSetCookie || response.status === 101) {
+    return response;
+  }
+
+  const cookie = createSentryAnonymousUserCookie(
+    sentryAnonymousUser.cookieValue,
+  );
+
+  try {
+    response.headers.append('Set-Cookie', cookie);
+    preventSharedCachingOfCookieResponse(response.headers);
+    return response;
+  } catch {
+    const headers = new Headers(response.headers);
+    headers.append('Set-Cookie', cookie);
+    preventSharedCachingOfCookieResponse(headers);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+}
+
+function preventSharedCachingOfCookieResponse(headers: Headers) {
+  const cacheControl = headers.get('Cache-Control')?.toLowerCase();
+  if (
+    cacheControl == null ||
+    (!cacheControl.includes('private') && !cacheControl.includes('no-store'))
+  ) {
+    headers.set('Cache-Control', 'private, max-age=0');
+  }
 }
 
 async function getCachedPublicHtmlResponse(request: Request) {
@@ -182,6 +233,15 @@ export default Sentry.withSentry(
     return {
       dsn: env.SENTRY_DSN ?? '',
       environment: env.TIER ?? 'development',
+      beforeSend(event) {
+        if (event.user != null) {
+          const user = { ...event.user };
+          delete user.ip_address;
+          event.user = Object.keys(user).length > 0 ? user : undefined;
+        }
+
+        return event;
+      },
     };
   },
   {
