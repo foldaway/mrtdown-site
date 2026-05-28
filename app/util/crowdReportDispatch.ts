@@ -21,6 +21,7 @@ const DEFAULT_DISPATCH_REPO = 'mrtdown-data';
 const DEFAULT_DISPATCH_EVENT_TYPE = 'ingest';
 const DEFAULT_DISPATCH_LIMIT = 10;
 const DEFAULT_DISPATCH_TIMEOUT_MS = 15_000;
+const DEFAULT_DISPATCH_MIN_ONGOING_REPORTS = 3;
 const DEFAULT_DISPATCH_MIN_DISTINCT_IP_HASHES = 2;
 const MAX_DISPATCH_LIMIT = 50;
 
@@ -108,13 +109,21 @@ function hasCrowdReportClusterScope() {
   );
 }
 
-function hasCrowdReportClusterSourceDiversity() {
+function hasCrowdReportClusterCurrentConfidence() {
   return sql`(
+    select count(*)
+    from ${crowdReportsTable}
+    where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
+      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+      and ${crowdReportsTable.still_happening} is true
+  ) >= ${DEFAULT_DISPATCH_MIN_ONGOING_REPORTS} and (
     select count(distinct ${crowdReportAbuseEventsTable.ip_hash})
     from ${crowdReportAbuseEventsTable}
     inner join ${crowdReportsTable}
       on ${crowdReportsTable.id} = ${crowdReportAbuseEventsTable.report_id}
     where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
+      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+      and ${crowdReportsTable.still_happening} is true
   ) >= ${DEFAULT_DISPATCH_MIN_DISTINCT_IP_HASHES}`;
 }
 
@@ -250,7 +259,7 @@ async function getDispatchableCrowdReportClusterCandidates(
         eq(crowdReportClustersTable.status, 'accepted'),
         isNull(crowdReportClustersTable.dispatched_at),
         hasCrowdReportClusterScope(),
-        hasCrowdReportClusterSourceDiversity(),
+        hasCrowdReportClusterCurrentConfidence(),
       ),
     )
     .orderBy(desc(crowdReportClustersTable.window_end_at))
@@ -584,7 +593,7 @@ async function isCrowdReportDispatchCandidateEligible(
           eq(crowdReportClustersTable.status, 'accepted'),
           isNull(crowdReportClustersTable.dispatched_at),
           hasCrowdReportClusterScope(),
-          hasCrowdReportClusterSourceDiversity(),
+          hasCrowdReportClusterCurrentConfidence(),
         ),
       )
       .limit(1);

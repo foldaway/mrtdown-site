@@ -205,7 +205,19 @@ function getCrowdReportClusterWindow(
   return { windowStartAt, windowEndAt };
 }
 
-function getCrowdReportClusterDistinctIpHashCountSql(
+function getCrowdReportClusterOngoingReportCountSql(
+  clusterId: string | typeof crowdReportClustersTable.id,
+) {
+  return sql<number>`(
+    select count(*)
+    from ${crowdReportsTable}
+    where ${crowdReportsTable.cluster_id} = ${clusterId}
+      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+      and ${crowdReportsTable.still_happening} is true
+  )`;
+}
+
+function getCrowdReportClusterOngoingDistinctIpHashCountSql(
   clusterId: string | typeof crowdReportClustersTable.id,
 ) {
   return sql<number>`(
@@ -214,11 +226,18 @@ function getCrowdReportClusterDistinctIpHashCountSql(
     inner join ${crowdReportsTable}
       on ${crowdReportsTable.id} = ${crowdReportAbuseEventsTable.report_id}
     where ${crowdReportsTable.cluster_id} = ${clusterId}
+      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+      and ${crowdReportsTable.still_happening} is true
   )`;
 }
 
-function hasCrowdReportClusterSourceDiversitySql(minDistinctIpHashes: number) {
-  return sql`${getCrowdReportClusterDistinctIpHashCountSql(
+function hasCrowdReportClusterCurrentConfidenceSql(
+  minReportCount: number,
+  minDistinctIpHashes: number,
+) {
+  return sql`${getCrowdReportClusterOngoingReportCountSql(
+    crowdReportClustersTable.id,
+  )} >= ${minReportCount} and ${getCrowdReportClusterOngoingDistinctIpHashCountSql(
     crowdReportClustersTable.id,
   )} >= ${minDistinctIpHashes}`;
 }
@@ -965,7 +984,9 @@ async function createCrowdReportClusterInTransaction(
     window_end_at: windowEndAt,
     report_count: 1,
     status:
-      publicSignalMinReports <= 1 && publicSignalMinDistinctIpHashes <= 1
+      submission.isStillHappening === true &&
+      publicSignalMinReports <= 1 &&
+      publicSignalMinDistinctIpHashes <= 1
         ? 'accepted'
         : 'pending',
   });
@@ -1052,7 +1073,7 @@ async function clusterModeratedCrowdReportInTransaction(
     .update(crowdReportClustersTable)
     .set({
       report_count: sql`${crowdReportClustersTable.report_count} + 1`,
-      status: sql`case when ${crowdReportClustersTable.status} = 'pending' and ${crowdReportClustersTable.report_count} + 1 >= ${publicSignalMinReports} and ${getCrowdReportClusterDistinctIpHashCountSql(clusterId)} >= ${publicSignalMinDistinctIpHashes} then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`,
+      status: sql`case when ${crowdReportClustersTable.status} = 'pending' and ${getCrowdReportClusterOngoingReportCountSql(clusterId)} >= ${publicSignalMinReports} and ${getCrowdReportClusterOngoingDistinctIpHashCountSql(clusterId)} >= ${publicSignalMinDistinctIpHashes} then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`,
       window_start_at: sql`least(${crowdReportClustersTable.window_start_at}, ${windowStartAt}::timestamptz)`,
       window_end_at: sql`greatest(${crowdReportClustersTable.window_end_at}, ${windowEndAt}::timestamptz)`,
       updated_at: sql`now()`,
@@ -1250,11 +1271,8 @@ export async function getPublicCrowdReportSignals(
     .where(
       and(
         eq(crowdReportClustersTable.status, 'accepted'),
-        gte(
-          crowdReportClustersTable.report_count,
+        hasCrowdReportClusterCurrentConfidenceSql(
           options.minReportCount ?? DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
-        ),
-        hasCrowdReportClusterSourceDiversitySql(
           options.minDistinctIpHashes ??
             DEFAULT_PUBLIC_SIGNAL_MIN_DISTINCT_IP_HASHES,
         ),

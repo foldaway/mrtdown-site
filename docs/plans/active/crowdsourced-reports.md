@@ -428,6 +428,10 @@ Exit criteria:
 - 2026-05-27: Continued Phase 6 canonical-ingest hardening by auto-rejecting
   obvious prompt-injection report text before it can be forwarded into the
   LLM-assisted `mrtdown-data` triage path.
+- 2026-05-28: Continued Phase 6 community-signal hardening by requiring
+  high-confidence public and dispatchable clusters to satisfy report-count and
+  source-diversity thresholds using reports that explicitly say the issue is
+  still happening.
 
 ## Decision Log
 
