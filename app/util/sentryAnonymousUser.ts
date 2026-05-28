@@ -1,8 +1,9 @@
+import z from 'zod';
+
 const SENTRY_ANONYMOUS_USER_COOKIE_NAME = 'mrtdown_anon_id';
 const SENTRY_ANONYMOUS_USER_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SentryAnonymousUserCookieSchema = z.uuid();
 
 export type SentryAnonymousUser = {
   cookieValue: string;
@@ -73,7 +74,7 @@ function getCookieValue(cookieHeader: string | null, cookieName: string) {
 }
 
 function isValidSentryAnonymousUserCookieValue(value: string) {
-  return UUID_PATTERN.test(value);
+  return SentryAnonymousUserCookieSchema.safeParse(value).success;
 }
 
 function toSentryUserId(cookieValue: string) {
