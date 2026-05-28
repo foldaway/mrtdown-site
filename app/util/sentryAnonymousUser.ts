@@ -58,6 +58,48 @@ export function createSentryAnonymousUserCookie(cookieValue: string) {
   ].join('; ');
 }
 
+export function addSentryAnonymousUserCookie(
+  response: Response,
+  sentryAnonymousUser: SentryAnonymousUser,
+) {
+  if (!sentryAnonymousUser.shouldSetCookie || response.status === 101) {
+    return response;
+  }
+
+  const cookie = createSentryAnonymousUserCookie(
+    sentryAnonymousUser.cookieValue,
+  );
+
+  try {
+    response.headers.append('Set-Cookie', cookie);
+    preventSharedCachingOfCookieResponse(response.headers);
+    return response;
+  } catch {
+    const headers = new Headers(response.headers);
+    headers.append('Set-Cookie', cookie);
+    preventSharedCachingOfCookieResponse(headers);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+}
+
+export function stripSentryUserIpAddress<
+  TEvent extends { user?: Record<string, unknown> | null },
+>(event: TEvent) {
+  if (event.user == null) {
+    return event;
+  }
+
+  const user = { ...event.user };
+  delete user.ip_address;
+  event.user = Object.keys(user).length > 0 ? user : undefined;
+
+  return event;
+}
+
 function getCookieValue(cookieHeader: string | null, cookieName: string) {
   if (cookieHeader == null || cookieHeader === '') {
     return null;
@@ -75,6 +117,16 @@ function getCookieValue(cookieHeader: string | null, cookieName: string) {
 
 function isValidSentryAnonymousUserCookieValue(value: string) {
   return SentryAnonymousUserCookieSchema.safeParse(value).success;
+}
+
+function preventSharedCachingOfCookieResponse(headers: Headers) {
+  const cacheControl = headers.get('Cache-Control')?.toLowerCase();
+  if (
+    cacheControl == null ||
+    (!cacheControl.includes('private') && !cacheControl.includes('no-store'))
+  ) {
+    headers.set('Cache-Control', 'private, max-age=0');
+  }
 }
 
 function toSentryUserId(cookieValue: string) {
