@@ -4,7 +4,7 @@ import {
   ChevronRightIcon,
 } from '@heroicons/react/16/solid';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { DropdownMenu } from 'radix-ui';
 import { useMemo } from 'react';
@@ -18,15 +18,30 @@ import { IssueCard } from '~/components/IssueCard';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
-import { getIssuesHistoryYearMonthFn } from '~/util/history.functions';
+import {
+  getIssuesHistoryYearMonthFn,
+  parseHistoryYearMonthParams,
+} from '~/util/history.functions';
 
 export const Route = createFileRoute('/{-$lang}/history/$year/$month')({
   component: HistoryMonthPage,
-  loader: ({ params }) =>
-    getIssuesHistoryYearMonthFn({
-      data: { year: params.year, month: params.month },
-    }),
+  loader: ({ params }) => {
+    const parsedParams = parseHistoryYearMonthParams(params.year, params.month);
+    if (parsedParams == null) {
+      throw notFound();
+    }
+
+    return getIssuesHistoryYearMonthFn({
+      data: parsedParams,
+    });
+  },
   async head(ctx) {
+    if (ctx.loaderData == null) {
+      return {
+        meta: [],
+      };
+    }
+
     const { lang = 'en-SG', year, month } = ctx.params;
     const { default: messages } = await import(
       `../../../../../lang/${lang}.json`

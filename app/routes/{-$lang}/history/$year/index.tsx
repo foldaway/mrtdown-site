@@ -5,7 +5,7 @@ import {
 } from '@heroicons/react/16/solid';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { ExclamationCircleIcon } from '@heroicons/react/24/solid';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { DropdownMenu } from 'radix-ui';
 import { useMemo } from 'react';
@@ -18,12 +18,21 @@ import {
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { useHydrated } from '~/hooks/useHydrated';
-import { getIssuesHistoryYearFn } from '~/util/history.functions';
+import {
+  getIssuesHistoryYearFn,
+  parseHistoryYearParam,
+} from '~/util/history.functions';
 
 export const Route = createFileRoute('/{-$lang}/history/$year/')({
   component: HistoryYearPage,
-  loader: ({ params }) =>
-    getIssuesHistoryYearFn({ data: { year: params.year } }),
+  loader: ({ params }) => {
+    const year = parseHistoryYearParam(params.year);
+    if (year == null) {
+      throw notFound();
+    }
+
+    return getIssuesHistoryYearFn({ data: { year } });
+  },
   async head(ctx) {
     if (ctx.loaderData == null) {
       return {
