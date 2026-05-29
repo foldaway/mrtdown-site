@@ -22,12 +22,12 @@ const lineSummary = (
 };
 
 describe('sortLineSummariesWithFutureServiceLast', () => {
-  it('moves future service entries to the end', () => {
+  it('orders lines by id with future service entries at the end', () => {
     const input: LineSummary[] = [
       lineSummary('A', 'future_service'),
-      lineSummary('B', 'normal'),
       lineSummary('C', 'ongoing_maintenance'),
       lineSummary('D', 'future_service'),
+      lineSummary('B', 'normal'),
       lineSummary('E', 'ongoing_disruption'),
     ];
 
