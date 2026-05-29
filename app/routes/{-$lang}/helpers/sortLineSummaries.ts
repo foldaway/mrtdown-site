@@ -4,15 +4,16 @@ export function sortLineSummariesWithFutureServiceLast(
   lineSummaries: LineSummary[],
 ): LineSummary[] {
   return [...lineSummaries].sort((first, second) => {
-    if (first.status === second.status) {
-      return 0;
-    }
-    if (first.status === 'future_service') {
+    const firstIsFuture = first.status === 'future_service';
+    const secondIsFuture = second.status === 'future_service';
+
+    if (firstIsFuture && !secondIsFuture) {
       return 1;
     }
-    if (second.status === 'future_service') {
+    if (!firstIsFuture && secondIsFuture) {
       return -1;
     }
-    return 0;
+
+    return first.lineId.localeCompare(second.lineId);
   });
 }
