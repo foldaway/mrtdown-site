@@ -6,9 +6,6 @@ import {
   getHistoryYearSummaryData,
 } from './db.queries';
 
-const YearSchema = z.coerce.number().int();
-const MonthSchema = z.coerce.number().int();
-
 function isHistoryYearInRange(year: number) {
   const minYear = 1980;
   const maxYear = DateTime.now().year + 10;
@@ -19,8 +16,15 @@ function isHistoryMonthInRange(month: number) {
   return month >= 1 && month <= 12;
 }
 
+const YearSchema = z.coerce.number().int();
+const HistoryYearSchema = YearSchema.refine(isHistoryYearInRange, {
+  message: 'Year is out of range',
+});
+const MonthSchema = z.coerce.number().int();
+const HistoryMonthSchema = MonthSchema.min(1).max(12);
+
 const YearInputSchema = z.object({
-  year: YearSchema,
+  year: HistoryYearSchema,
 });
 
 export function parseHistoryYearParam(year: unknown) {
@@ -37,12 +41,16 @@ export const getIssuesHistoryYearFn = createServerFn({ method: 'GET' })
   .handler((val) => getHistoryYearSummaryData(val.data.year));
 
 const YearMonthInputSchema = z.object({
+  year: HistoryYearSchema,
+  month: HistoryMonthSchema,
+});
+const YearMonthParamSchema = z.object({
   year: YearSchema,
   month: MonthSchema,
 });
 
 export function parseHistoryYearMonthParams(year: unknown, month: unknown) {
-  const result = YearMonthInputSchema.safeParse({ year, month });
+  const result = YearMonthParamSchema.safeParse({ year, month });
   if (
     !result.success ||
     !isHistoryYearInRange(result.data.year) ||
