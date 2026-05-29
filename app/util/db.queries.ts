@@ -1138,6 +1138,23 @@ async function buildDataset(
     return acc;
   }, {});
 
+  const revisionForReferenceDateByServiceId = Object.fromEntries(
+    Object.entries(revisionsByServiceId)
+      .map(([serviceId, revisions]) => {
+        const revision = selectServiceRevisionForReferenceDate(
+          revisions,
+          referenceDate,
+        );
+        return revision == null ? null : ([serviceId, revision] as const);
+      })
+      .filter(
+        (
+          entry,
+        ): entry is readonly [string, (typeof serviceRevisionRows)[number]] =>
+          entry != null,
+      ),
+  );
+
   const allRevisionIds = [
     ...new Set(serviceRevisionRows.map((revision) => revision.id)),
   ];
@@ -1277,6 +1294,15 @@ async function buildDataset(
         }
         if (serviceRevisionHasEnded(latestRevision, referenceDate)) {
           return latestRevision.end_at;
+        }
+
+        const overallRevision = revisionForReferenceDateByServiceId[service.id];
+        if (
+          overallRevision != null &&
+          overallRevision.id !== latestRevision.id &&
+          serviceRevisionHasEnded(overallRevision, referenceDate)
+        ) {
+          return overallRevision.end_at;
         }
 
         return null;

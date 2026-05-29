@@ -127,4 +127,25 @@ describe('selectServiceRevisionForReferenceDate', () => {
       selectServiceRevisionForReferenceDate(revisions, '2026-05-29')?.id,
     ).toBe('ccl-extra-future');
   });
+
+  it('returns the newest ended revision after a pathless retirement marker ends', () => {
+    const revisions = [
+      {
+        id: 'service-with-path',
+        start_at: '2009-05-28',
+        end_at: '2026-07-01',
+        updated_at: updatedAt,
+      },
+      {
+        id: 'service-retired-pathless',
+        start_at: '2026-07-02',
+        end_at: '2026-07-02',
+        updated_at: new Date('2026-07-02T00:00:00.000Z'),
+      },
+    ];
+
+    expect(
+      selectServiceRevisionForReferenceDate(revisions, '2026-07-03')?.id,
+    ).toBe('service-retired-pathless');
+  });
 });
