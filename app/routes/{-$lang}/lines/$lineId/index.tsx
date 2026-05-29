@@ -65,6 +65,9 @@ function countLineStations(
       if (branchMembership == null) {
         continue;
       }
+      if (!includePlanned && branchMembership.endedAt != null) {
+        continue;
+      }
       stationIds.add(stationId);
     }
   }
