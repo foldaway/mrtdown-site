@@ -81,6 +81,10 @@ function serviceRevisionEndAt(revision: ServiceRevision): string | null {
   return revision.endAt;
 }
 
+function serviceRevisionStartAt(revision: ServiceRevision): string {
+  return revision.startAt;
+}
+
 function assertUnreachable(value: never, message: string): never {
   throw new Error(`${message}: ${String(value)}`);
 }
@@ -887,7 +891,10 @@ export async function syncServices(db: Db): Promise<void> {
       .leftJoin(servicesTable, eq(servicesNextTable.id, servicesTable.id));
 
     const serviceIds = rows.map((row) => row.id);
-    const liveRevisionEndAtByKey = new Map<string, string | null>();
+    const liveRevisionDatesByKey = new Map<
+      string,
+      { startAt: string | null; endAt: string | null }
+    >();
     const liveRevisionIdsByServiceId = new Map<string, Set<string>>();
     for (const serviceIdChunk of chunk(serviceIds, BATCH)) {
       if (serviceIdChunk.length === 0) continue;
@@ -895,14 +902,18 @@ export async function syncServices(db: Db): Promise<void> {
         .select({
           id: serviceRevisionsTable.id,
           service_id: serviceRevisionsTable.service_id,
+          start_at: serviceRevisionsTable.start_at,
           end_at: serviceRevisionsTable.end_at,
         })
         .from(serviceRevisionsTable)
         .where(inArray(serviceRevisionsTable.service_id, serviceIdChunk));
       for (const revisionRow of revisionRows) {
-        liveRevisionEndAtByKey.set(
+        liveRevisionDatesByKey.set(
           `${revisionRow.service_id}::${revisionRow.id}`,
-          revisionRow.end_at,
+          {
+            startAt: revisionRow.start_at,
+            endAt: revisionRow.end_at,
+          },
         );
         const liveRevisionIds =
           liveRevisionIdsByServiceId.get(revisionRow.service_id) ?? new Set();
@@ -928,10 +939,12 @@ export async function syncServices(db: Db): Promise<void> {
 
         return row.revisions.some((revision) => {
           const key = `${row.id}::${revision.id}`;
+          const liveDates = liveRevisionDatesByKey.get(key);
           return (
             !liveRevisionIds.has(revision.id) ||
-            !liveRevisionEndAtByKey.has(key) ||
-            liveRevisionEndAtByKey.get(key) !== serviceRevisionEndAt(revision)
+            liveDates == null ||
+            liveDates.startAt !== serviceRevisionStartAt(revision) ||
+            liveDates.endAt !== serviceRevisionEndAt(revision)
           );
         });
       })
@@ -984,6 +997,7 @@ export async function syncServices(db: Db): Promise<void> {
             .values({
               id: revisionData.id,
               service_id: row.id,
+              start_at: serviceRevisionStartAt(revisionData),
               end_at: serviceRevisionEndAt(revisionData),
               operating_hours: revisionData.operatingHours,
             } satisfies InferInsertModel<typeof serviceRevisionsTable>)
@@ -993,6 +1007,7 @@ export async function syncServices(db: Db): Promise<void> {
                 serviceRevisionsTable.service_id,
               ],
               set: {
+                start_at: serviceRevisionStartAt(revisionData),
                 end_at: serviceRevisionEndAt(revisionData),
                 operating_hours: revisionData.operatingHours,
                 updated_at: new Date(),

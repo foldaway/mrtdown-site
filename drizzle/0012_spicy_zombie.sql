@@ -1,0 +1,1 @@
+ALTER TABLE "service_revisions" ADD COLUMN "start_at" date;

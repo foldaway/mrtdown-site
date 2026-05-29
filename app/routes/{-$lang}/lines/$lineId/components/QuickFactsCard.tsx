@@ -33,7 +33,7 @@ export const QuickFactsCard: React.FC<Props> = (props) => {
   const stationsCount = useMemo(() => {
     const stationIds = new Set<string>();
     for (const branch of branches) {
-      if (branch.endedAt != null) {
+      if (branch.startedAt == null || branch.endedAt != null) {
         continue;
       }
       for (const stationId of branch.stationIds) {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { sortServiceRevisionsByRecency } from './serviceRevisions';
+import {
+  selectServiceRevisionForReferenceDate,
+  serviceRevisionIsActiveOn,
+  sortServiceRevisionsByRecency,
+} from './serviceRevisions';
 
 const updatedAt = new Date('2026-05-22T00:00:00.000Z');
 
@@ -51,5 +55,76 @@ describe('sortServiceRevisionsByRecency', () => {
     expect(
       sortServiceRevisionsByRecency(revisions).map((row) => row.id),
     ).toEqual(['r_b', 'r_a']);
+  });
+});
+
+describe('selectServiceRevisionForReferenceDate', () => {
+  it('keeps the current revision active before a future revision starts', () => {
+    const revisions = [
+      {
+        id: 'ccl-current',
+        start_at: '2009-05-28',
+        end_at: '2026-07-01',
+        updated_at: updatedAt,
+      },
+      {
+        id: 'ccl-loop',
+        start_at: '2026-07-02',
+        end_at: null,
+        updated_at: new Date('2026-05-29T00:00:00.000Z'),
+      },
+    ];
+
+    expect(
+      selectServiceRevisionForReferenceDate(revisions, '2026-05-29')?.id,
+    ).toBe('ccl-current');
+  });
+
+  it('switches to the future revision on its start date', () => {
+    const revisions = [
+      {
+        id: 'ccl-current',
+        start_at: '2009-05-28',
+        end_at: '2026-07-01',
+        updated_at: updatedAt,
+      },
+      {
+        id: 'ccl-loop',
+        start_at: '2026-07-02',
+        end_at: null,
+        updated_at: new Date('2026-05-29T00:00:00.000Z'),
+      },
+    ];
+
+    expect(
+      selectServiceRevisionForReferenceDate(revisions, '2026-07-02')?.id,
+    ).toBe('ccl-loop');
+  });
+
+  it('treats a future end date as still active', () => {
+    expect(
+      serviceRevisionIsActiveOn(
+        {
+          start_at: '2009-05-28',
+          end_at: '2026-07-01',
+        },
+        '2026-05-29',
+      ),
+    ).toBe(true);
+  });
+
+  it('returns the nearest future revision when no service is active yet', () => {
+    const revisions = [
+      {
+        id: 'ccl-extra-future',
+        start_at: '2026-07-02',
+        end_at: null,
+        updated_at: updatedAt,
+      },
+    ];
+
+    expect(
+      selectServiceRevisionForReferenceDate(revisions, '2026-05-29')?.id,
+    ).toBe('ccl-extra-future');
   });
 });

@@ -76,10 +76,7 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
           continue;
         }
 
-        if (
-          branchMembership.startedAt == null ||
-          branchMembership.endedAt != null
-        ) {
+        if (branch.startedAt == null || branch.endedAt != null) {
           continue;
         }
         stationIds.add(stationId);
@@ -207,10 +204,7 @@ function ComponentPage() {
           continue;
         }
 
-        if (
-          branchMembership.startedAt == null ||
-          branchMembership.endedAt != null
-        ) {
+        if (branch.startedAt == null || branch.endedAt != null) {
           continue;
         }
         stationIds.add(stationId);
