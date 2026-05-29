@@ -542,6 +542,7 @@ export const serviceRevisionsTable = pgTable(
     service_id: text('service_id')
       .references(() => servicesTable.id)
       .notNull(),
+    start_at: date('start_at', { mode: 'string' }),
     end_at: date('end_at', { mode: 'string' }),
     operating_hours: jsonb('operating_hours').$type<OperatingHours>().notNull(),
     ...timestampColumns,

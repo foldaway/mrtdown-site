@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { createServerFn } from '@tanstack/react-start';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
+import { DateTime } from 'luxon';
 import { getDb } from '~/db';
 import {
   linesTable,
@@ -14,6 +15,7 @@ import {
   type CrowdReportFeatureEnv,
   isCrowdReportsFeatureEnabled,
 } from './crowdReportFeatureFlag';
+import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
 export const getCrowdReportFormOptionsFn = createServerFn({
   method: 'GET',
@@ -30,12 +32,15 @@ export const getCrowdReportFormOptionsFn = createServerFn({
   }
 
   const db = getDb();
+  const referenceDate =
+    DateTime.now().setZone('Asia/Singapore').toISODate() ??
+    new Date().toISOString().slice(0, 10);
   const [
     lines,
     stations,
     stationCodes,
     services,
-    latestServiceRevisionsWithPathData,
+    serviceRevisionsWithPathRows,
   ] = await Promise.all([
     db
       .select({
@@ -68,9 +73,12 @@ export const getCrowdReportFormOptionsFn = createServerFn({
       .from(servicesTable)
       .orderBy(asc(servicesTable.id)),
     db
-      .selectDistinctOn([serviceRevisionsTable.service_id], {
+      .select({
         id: serviceRevisionsTable.id,
         serviceId: serviceRevisionsTable.service_id,
+        start_at: serviceRevisionsTable.start_at,
+        end_at: serviceRevisionsTable.end_at,
+        updated_at: serviceRevisionsTable.updated_at,
       })
       .from(serviceRevisionsTable)
       .innerJoin(
@@ -86,23 +94,43 @@ export const getCrowdReportFormOptionsFn = createServerFn({
           ),
         ),
       )
-      .orderBy(
-        serviceRevisionsTable.service_id,
-        sql`${serviceRevisionsTable.end_at} is not null`,
-        desc(serviceRevisionsTable.end_at),
-        desc(serviceRevisionsTable.updated_at),
-        desc(serviceRevisionsTable.id),
-      ),
+      .orderBy(serviceRevisionsTable.service_id, serviceRevisionsTable.id),
   ]);
 
   const stationById = Object.fromEntries(
     stations.map((station) => [station.id, station]),
   );
+  const serviceRevisionByKey = new Map<
+    string,
+    (typeof serviceRevisionsWithPathRows)[number]
+  >();
+  for (const revision of serviceRevisionsWithPathRows) {
+    serviceRevisionByKey.set(`${revision.serviceId}::${revision.id}`, revision);
+  }
+  const revisionsByServiceId = Array.from(serviceRevisionByKey.values()).reduce<
+    Record<string, (typeof serviceRevisionsWithPathRows)[number][]>
+  >((acc, revision) => {
+    acc[revision.serviceId] ??= [];
+    acc[revision.serviceId].push(revision);
+    return acc;
+  }, {});
   const latestRevisionByServiceId = Object.fromEntries(
-    latestServiceRevisionsWithPathData.map((revision) => [
-      revision.serviceId,
-      revision,
-    ]),
+    Object.entries(revisionsByServiceId)
+      .map(([serviceId, revisions]) => {
+        const revision = selectServiceRevisionForReferenceDate(
+          revisions,
+          referenceDate,
+        );
+        return revision == null ? null : ([serviceId, revision] as const);
+      })
+      .filter(
+        (
+          entry,
+        ): entry is readonly [
+          string,
+          (typeof serviceRevisionsWithPathRows)[number],
+        ] => entry != null,
+      ),
   );
 
   const latestRevisionIds = [

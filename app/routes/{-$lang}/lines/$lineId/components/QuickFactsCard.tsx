@@ -32,8 +32,17 @@ export const QuickFactsCard: React.FC<Props> = (props) => {
 
   const stationsCount = useMemo(() => {
     const stationIds = new Set<string>();
+    const includePlanned =
+      line.startedAt == null ||
+      DateTime.fromISO(line.startedAt).diffNow().as('days') >= 0;
     for (const branch of branches) {
-      if (branch.endedAt != null) {
+      if (
+        !includePlanned &&
+        (branch.startedAt == null || branch.endedAt != null)
+      ) {
+        continue;
+      }
+      if (includePlanned && branch.endedAt != null) {
         continue;
       }
       for (const stationId of branch.stationIds) {
@@ -41,7 +50,7 @@ export const QuickFactsCard: React.FC<Props> = (props) => {
       }
     }
     return stationIds.size;
-  }, [branches]);
+  }, [branches, line.startedAt]);
 
   const currentOperators = useMemo(() => {
     return line.operators

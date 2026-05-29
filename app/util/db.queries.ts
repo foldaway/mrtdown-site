@@ -53,7 +53,10 @@ import {
   issueContributesToLineStatus,
 } from '~/util/issueOperationalEffects';
 import { getPublicCrowdReportSignals } from '~/util/crowdReports';
-import { sortServiceRevisionsByRecency } from '~/util/serviceRevisions';
+import {
+  selectServiceRevisionForReferenceDate,
+  serviceRevisionHasEnded,
+} from '~/util/serviceRevisions';
 import {
   recordServerTiming,
   timeServerSpan,
@@ -1054,6 +1057,7 @@ async function buildDataset(
     metadataRows.map((row) => [row.key, row.value]),
   );
   const publicHolidaySet = new Set(publicHolidayRows.map((row) => row.date));
+  const referenceDate = isoDate(referenceNow);
 
   const operatorsById = Object.fromEntries(
     operatorsRows.map((row) => {
@@ -1134,21 +1138,14 @@ async function buildDataset(
     return acc;
   }, {});
 
-  const revisionsSortedByServiceId = Object.fromEntries(
-    Object.entries(revisionsByServiceId).map(([serviceId, revisions]) => [
-      serviceId,
-      sortServiceRevisionsByRecency(revisions),
-    ]),
-  ) as Record<string, typeof serviceRevisionRows>;
-
-  const latestOverallRevisionByServiceId = Object.fromEntries(
-    Object.entries(revisionsSortedByServiceId)
+  const revisionForReferenceDateByServiceId = Object.fromEntries(
+    Object.entries(revisionsByServiceId)
       .map(([serviceId, revisions]) => {
-        const latestRevision = revisions[0];
-        if (latestRevision == null) {
-          return null;
-        }
-        return [serviceId, latestRevision] as const;
+        const revision = selectServiceRevisionForReferenceDate(
+          revisions,
+          referenceDate,
+        );
+        return revision == null ? null : ([serviceId, revision] as const);
       })
       .filter(
         (
@@ -1192,17 +1189,21 @@ async function buildDataset(
   const latestRevisionByServiceId = Object.fromEntries(
     serviceRows
       .map((service) => {
-        const revisions = revisionsSortedByServiceId[service.id] ?? [];
-        const latestRevisionWithPath = revisions.find((revision) => {
+        const revisions = revisionsByServiceId[service.id] ?? [];
+        const revisionsWithPath = revisions.filter((revision) => {
           const revisionKey = `${revision.id}::${service.id}`;
           const entries = pathEntriesByRevisionKey[revisionKey] ?? [];
           return entries.length > 0;
         });
-        if (latestRevisionWithPath == null) {
+        const revisionForReferenceDate = selectServiceRevisionForReferenceDate(
+          revisionsWithPath,
+          referenceDate,
+        );
+        if (revisionForReferenceDate == null) {
           return null;
         }
 
-        return [service.id, latestRevisionWithPath] as const;
+        return [service.id, revisionForReferenceDate] as const;
       })
       .filter(
         (
@@ -1263,16 +1264,21 @@ async function buildDataset(
       .map((value) => parseDateTime(value));
 
     const name = parseTranslations(service.name);
+    const revisionStartDate =
+      latestRevision.start_at != null
+        ? parseDateTime(latestRevision.start_at)
+        : null;
     const minStart = startedDates.sort(
       (a, b) => a.toMillis() - b.toMillis(),
     )[0];
-    const allStartsInFuture =
-      minStart != null && startedDates.every((date) => date > referenceNow);
+    const effectiveStart = revisionStartDate ?? minStart ?? null;
     const branch: BranchWithEntries = {
       id: service.id,
       name,
       startedAt:
-        minStart != null && !allStartsInFuture ? minStart.toISODate() : null,
+        effectiveStart != null && effectiveStart <= referenceNow
+          ? effectiveStart.toISODate()
+          : null,
       endedAt: (() => {
         const endedAtByStationCode =
           endedDates.length === entries.length
@@ -1280,23 +1286,26 @@ async function buildDataset(
                 .sort((a, b) => b.toMillis() - a.toMillis())[0]
                 ?.toISODate() ?? null)
             : null;
-        if (endedAtByStationCode != null) {
+        if (
+          endedAtByStationCode != null &&
+          endedAtByStationCode < referenceDate
+        ) {
           return endedAtByStationCode;
         }
-        if (latestRevision.end_at != null) {
+        if (serviceRevisionHasEnded(latestRevision, referenceDate)) {
           return latestRevision.end_at;
         }
 
-        const latestOverallRevision =
-          latestOverallRevisionByServiceId[service.id];
-        const hasNewerRevisionWithoutPath =
-          latestOverallRevision != null &&
-          latestOverallRevision.id !== latestRevision.id;
-        if (!hasNewerRevisionWithoutPath) {
-          return null;
+        const overallRevision = revisionForReferenceDateByServiceId[service.id];
+        if (
+          overallRevision != null &&
+          overallRevision.id !== latestRevision.id &&
+          serviceRevisionHasEnded(overallRevision, referenceDate)
+        ) {
+          return overallRevision.end_at;
         }
 
-        return latestOverallRevision.end_at;
+        return null;
       })(),
       stationIds: [...new Set(entries.map((entry) => entry.station_id))],
       entries: entries.map((entry) => ({
@@ -1334,7 +1343,10 @@ async function buildDataset(
             codeInfo?.started_at ??
             linesById[lineId]?.startedAt ??
             '1970-01-01',
-          endedAt: codeInfo?.ended_at ?? undefined,
+          endedAt:
+            codeInfo?.ended_at != null && codeInfo.ended_at < referenceDate
+              ? codeInfo.ended_at
+              : undefined,
           structureType: codeInfo?.structure_type ?? 'underground',
           sequenceOrder: index,
         };
@@ -1370,7 +1382,10 @@ async function buildDataset(
       branchId: `${code.line_id}:${code.code}`,
       code: code.code,
       startedAt: code.started_at,
-      endedAt: code.ended_at ?? undefined,
+      endedAt:
+        code.ended_at != null && code.ended_at < referenceDate
+          ? code.ended_at
+          : undefined,
       structureType: code.structure_type,
       sequenceOrder: 0,
     });

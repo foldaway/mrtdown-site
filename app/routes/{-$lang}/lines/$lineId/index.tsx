@@ -14,7 +14,9 @@ import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import type { Station } from '~/types';
 import { assert } from '~/util/assert';
+import type { LineBranch } from '~/util/db.queries';
 import { getLineProfileFn } from '~/util/lines.functions';
 import { CountTrendCards } from './components/CountTrendCards';
 import { CurrentStatusCard } from './components/CurrentStatusCard';
@@ -28,6 +30,49 @@ import { UptimeCard } from './components/UptimeCard';
 import { UptimeRatioTrendCards } from './components/UptimeRatioTrendCards';
 
 const DATE_COUNT = 90;
+
+function lineHasStarted<T extends { startedAt: string | null }>(
+  line: T,
+): line is T & { startedAt: string } {
+  return (
+    line.startedAt != null &&
+    DateTime.fromISO(line.startedAt).diffNow().as('days') < 0
+  );
+}
+
+function countLineStations(
+  branches: LineBranch[],
+  included: { stations: Record<string, Station> },
+  includePlanned: boolean,
+) {
+  const stationIds = new Set<string>();
+  for (const branch of branches) {
+    if (
+      !includePlanned &&
+      (branch.startedAt == null || branch.endedAt != null)
+    ) {
+      continue;
+    }
+    if (includePlanned && branch.endedAt != null) {
+      continue;
+    }
+
+    for (const stationId of branch.stationIds) {
+      const station = included.stations[stationId];
+      const branchMembership = station?.memberships.find(
+        (membership) => membership.branchId === branch.id,
+      );
+      if (branchMembership == null) {
+        continue;
+      }
+      if (!includePlanned && branchMembership.endedAt != null) {
+        continue;
+      }
+      stationIds.add(stationId);
+    }
+  }
+  return stationIds.size;
+}
 
 export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
   component: ComponentPage,
@@ -65,59 +110,36 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
       intl,
     );
 
-    const stationIds = new Set<string>();
-    for (const branch of branches) {
-      for (const stationId of branch.stationIds) {
-        const station = included.stations[stationId];
-        const branchMembership = station.memberships.find(
-          (membership) => membership.branchId === branch.id,
+    const description = lineHasStarted(line)
+      ? intl.formatMessage(
+          {
+            id: 'general.component_description',
+            defaultMessage:
+              'The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}, with {issueTypeCountString} reported to date.',
+          },
+          {
+            stationCount: countLineStations(branches, included, false),
+            componentName,
+            startDate: intl.formatDate(line.startedAt, {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            }),
+            issueTypeCountString,
+          },
+        )
+      : intl.formatMessage(
+          {
+            id: 'general.component_description_future',
+            defaultMessage:
+              'The {componentName} will begin operations in the future. It has {stationCount, plural, one {# station} other {# stations}} planned, with {issueTypeCountString} reported to date.',
+          },
+          {
+            stationCount: countLineStations(branches, included, true),
+            componentName,
+            issueTypeCountString,
+          },
         );
-        if (branchMembership == null) {
-          continue;
-        }
-
-        if (
-          branchMembership.startedAt == null ||
-          branchMembership.endedAt != null
-        ) {
-          continue;
-        }
-        stationIds.add(stationId);
-      }
-    }
-
-    const description =
-      line.startedAt != null &&
-      DateTime.fromISO(line.startedAt).diffNow().as('days') < 0
-        ? intl.formatMessage(
-            {
-              id: 'general.component_description',
-              defaultMessage:
-                'The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}, with {issueTypeCountString} reported to date.',
-            },
-            {
-              stationCount: stationIds.size,
-              componentName,
-              startDate: intl.formatDate(line.startedAt, {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              }),
-              issueTypeCountString,
-            },
-          )
-        : intl.formatMessage(
-            {
-              id: 'general.component_description_future',
-              defaultMessage:
-                'The {componentName} will begin operations in the future. It has {stationCount, plural, one {# station} other {# stations}} planned, with {issueTypeCountString} reported to date.',
-            },
-            {
-              stationCount: stationIds.size,
-              componentName,
-              issueTypeCountString,
-            },
-          );
 
     return {
       meta: [
@@ -196,28 +218,8 @@ function ComponentPage() {
   const componentName = getLocalizedTranslation(line.name, intl.locale);
 
   const stationCount = useMemo(() => {
-    const stationIds = new Set<string>();
-    for (const branch of branches) {
-      for (const stationId of branch.stationIds) {
-        const station = included.stations[stationId];
-        const branchMembership = station.memberships.find(
-          (membership) => membership.branchId === branch.id,
-        );
-        if (branchMembership == null) {
-          continue;
-        }
-
-        if (
-          branchMembership.startedAt == null ||
-          branchMembership.endedAt != null
-        ) {
-          continue;
-        }
-        stationIds.add(stationId);
-      }
-    }
-    return stationIds.size;
-  }, [branches, included.stations]);
+    return countLineStations(branches, included, !lineHasStarted(line));
+  }, [branches, included, line]);
 
   const issueTypeCountString = useMemo(() => {
     return buildIssueTypeCountString(

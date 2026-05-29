@@ -85,6 +85,13 @@
       "when": 1779896170223,
       "tag": "0011_serious_kid_colt",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1780057469953,
+      "tag": "0012_spicy_zombie",
+      "breakpoints": true
     }
   ]
 }
