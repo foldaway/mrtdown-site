@@ -54,6 +54,10 @@ import {
 } from '~/util/issueOperationalEffects';
 import { getPublicCrowdReportSignals } from '~/util/crowdReports';
 import {
+  deriveLineStartedAtFromBranches,
+  sortLineBranchesForCurrentView,
+} from '~/util/lineBranches';
+import {
   selectServiceRevisionForReferenceDate,
   serviceRevisionHasEnded,
 } from '~/util/serviceRevisions';
@@ -1325,7 +1329,17 @@ async function buildDataset(
   const membershipByStationId: Record<string, Station['memberships']> = {};
 
   for (const [lineId, branches] of Object.entries(branchesByLineId)) {
-    for (const branch of branches) {
+    const sortedBranches = sortLineBranchesForCurrentView(branches);
+    branchesByLineId[lineId] = sortedBranches;
+    const line = linesById[lineId];
+    if (line != null) {
+      line.startedAt = deriveLineStartedAtFromBranches(
+        line.startedAt,
+        sortedBranches,
+      );
+    }
+
+    for (const branch of sortedBranches) {
       branch.entries.forEach((entry, index) => {
         if (membershipByStationId[entry.stationId] == null) {
           membershipByStationId[entry.stationId] = [];
