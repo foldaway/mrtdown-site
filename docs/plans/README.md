@@ -22,6 +22,8 @@ Use plans for:
   report collection, moderation, clustering, and canonical ingest dispatch.
 - [Dynamic system map](active/dynamic-system-map.md): canonical schematic map
   data and data-driven site rendering.
+- [Markdown for agents](active/markdown-for-agents.md): `llms.txt` and
+  app-owned Markdown alternatives for agents and scrapers.
 - [Production performance](active/production-performance.md): public route
   latency and payload reduction plan.
 
