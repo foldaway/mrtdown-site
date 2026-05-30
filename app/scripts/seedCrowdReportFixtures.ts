@@ -69,22 +69,44 @@ function chooseSeedContext(
   }
 
   const stationIdsByLineId = groupStationsByLine(stationCodes);
-  const lineId =
-    lineIds.find((candidateLineId) => {
-      const lineStationIds = stationIdsByLineId.get(candidateLineId) ?? [];
-      return lineStationIds.length > 0;
-    }) ?? lineIds[0];
-  const stationId = stationIdsByLineId.get(lineId)?.[0] ?? stationIds[0];
-  const rangeLineId =
-    lineIds.find((candidateLineId) => {
-      const lineStationIds = stationIdsByLineId.get(candidateLineId) ?? [];
-      return lineStationIds.length >= 2;
-    }) ?? lineId;
-  const rangeLineStationIds = stationIdsByLineId.get(rangeLineId) ?? stationIds;
-  const rangeStationIds = [
-    rangeLineStationIds[0] ?? stationId,
-    rangeLineStationIds[1] ?? rangeLineStationIds[0] ?? stationId,
-  ] as [string, string];
+  const lineId = lineIds.find((candidateLineId) => {
+    const lineStationIds = stationIdsByLineId.get(candidateLineId) ?? [];
+    return lineStationIds.length > 0;
+  });
+  if (lineId == null) {
+    throw new Error(
+      'Crowd report fixtures require station codes for at least one line. Run db:seed:fixtures first.',
+    );
+  }
+
+  const lineStationIds = stationIdsByLineId.get(lineId);
+  const stationId = lineStationIds?.[0];
+  if (stationId == null) {
+    throw new Error(
+      `Crowd report fixtures require station codes for line ${lineId}. Run db:seed:fixtures first.`,
+    );
+  }
+
+  const rangeLineId = lineIds.find((candidateLineId) => {
+    const candidateStationIds = stationIdsByLineId.get(candidateLineId) ?? [];
+    return candidateStationIds.length >= 2;
+  });
+  if (rangeLineId == null) {
+    throw new Error(
+      'Crowd report fixtures require one line with at least two mapped stations. Run db:seed:fixtures first.',
+    );
+  }
+
+  const rangeLineStationIds = stationIdsByLineId.get(rangeLineId);
+  if (rangeLineStationIds == null || rangeLineStationIds.length < 2) {
+    throw new Error(
+      `Crowd report fixtures require at least two mapped stations for line ${rangeLineId}. Run db:seed:fixtures first.`,
+    );
+  }
+  const rangeStationIds = [rangeLineStationIds[0], rangeLineStationIds[1]] as [
+    string,
+    string,
+  ];
 
   return {
     lineId,

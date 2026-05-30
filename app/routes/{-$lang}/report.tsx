@@ -54,6 +54,7 @@ type FieldErrorKey =
   | 'station'
   | 'line'
   | 'effect'
+  | 'affectedStops'
   | 'direction'
   | 'description'
   | 'observedAt';
@@ -253,7 +254,8 @@ function datetimeLocalToSgIso(value: string) {
 }
 
 function ReportPage() {
-  const { lineDirections, lines, stations } = Route.useLoaderData();
+  const { lineDirections, lineStationPaths, lines, stations } =
+    Route.useLoaderData();
   const search = Route.useSearch() as ReportSearch;
   const intl = useIntl();
   const posthog = usePostHog();
@@ -262,6 +264,7 @@ function ReportPage() {
   const stationSearchRef = useRef<HTMLInputElement>(null);
   const lineRef = useRef<HTMLDivElement>(null);
   const effectRef = useRef<HTMLDivElement>(null);
+  const affectedStopsRef = useRef<HTMLDivElement>(null);
   const directionSelectRef = useRef<HTMLSelectElement>(null);
   const directionOtherRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -382,33 +385,85 @@ function ReportPage() {
     (selectedLineIds.length > 0 && directionChoice === 'other');
   const supportsAffectedStopRange =
     effect === 'skipped-stop' || effect === 'no-service';
-  const submittedStationIds = useMemo(
-    () => [
-      ...new Set([
-        ...selectedStationIds,
-        ...(supportsAffectedStopRange && rangeStartStationId
-          ? [rangeStartStationId]
-          : []),
-        ...(supportsAffectedStopRange && rangeEndStationId
-          ? [rangeEndStationId]
-          : []),
-      ]),
-    ],
-    [
-      rangeEndStationId,
-      rangeStartStationId,
-      selectedStationIds,
-      supportsAffectedStopRange,
-    ],
-  );
-  const getStationSearchResults = (searchValue: string) => {
-    const query = searchValue.trim().toLocaleLowerCase();
-    if (!query) {
-      return stations.slice(0, 8);
+  const affectedStopSearchLineIds =
+    selectedLineIds.length > 0 ? selectedLineIds : undefined;
+  const expandedAffectedStopStationIds = useMemo(() => {
+    if (
+      !supportsAffectedStopRange ||
+      rangeStartStationId.length === 0 ||
+      rangeEndStationId.length === 0 ||
+      rangeStartStationId === rangeEndStationId
+    ) {
+      return [];
     }
 
+    const candidateLineIds = selectedLineIds.filter(
+      (lineId) =>
+        rangeStartStation?.lineIds.includes(lineId) &&
+        rangeEndStation?.lineIds.includes(lineId),
+    );
+    for (const lineId of candidateLineIds) {
+      for (const path of lineStationPaths[lineId] ?? []) {
+        const startIndex = path.indexOf(rangeStartStationId);
+        const endIndex = path.indexOf(rangeEndStationId);
+        if (startIndex === -1 || endIndex === -1) {
+          continue;
+        }
+        const [fromIndex, toIndex] =
+          startIndex < endIndex
+            ? [startIndex, endIndex]
+            : [endIndex, startIndex];
+        return path.slice(fromIndex, toIndex + 1);
+      }
+    }
+
+    return [];
+  }, [
+    lineStationPaths,
+    rangeEndStation,
+    rangeEndStationId,
+    rangeStartStation,
+    rangeStartStationId,
+    selectedLineIds,
+    supportsAffectedStopRange,
+  ]);
+  const affectedStopStationIds = useMemo(() => {
+    if (!supportsAffectedStopRange) {
+      return [];
+    }
+    if (rangeStartStationId.length > 0 && rangeEndStationId.length > 0) {
+      return expandedAffectedStopStationIds;
+    }
+    return [rangeStartStationId, rangeEndStationId].filter(
+      (stationId) => stationId.length > 0,
+    );
+  }, [
+    expandedAffectedStopStationIds,
+    rangeEndStationId,
+    rangeStartStationId,
+    supportsAffectedStopRange,
+  ]);
+  const submittedStationIds = useMemo(
+    () => [...new Set([...selectedStationIds, ...affectedStopStationIds])],
+    [affectedStopStationIds, selectedStationIds],
+  );
+  const getStationSearchResults = (
+    searchValue: string,
+    filterLineIds?: string[],
+  ) => {
+    const query = searchValue.trim().toLocaleLowerCase();
     return stations
       .filter((station) => {
+        if (
+          filterLineIds != null &&
+          filterLineIds.length > 0 &&
+          !station.lineIds.some((lineId) => filterLineIds.includes(lineId))
+        ) {
+          return false;
+        }
+        if (!query) {
+          return true;
+        }
         const stationName = getLocalizedTranslation(
           station.name,
           intl.locale,
@@ -477,6 +532,29 @@ function ReportPage() {
     });
   }, [fieldErrors.description, requiresDescription]);
 
+  useEffect(() => {
+    if (selectedLineIds.length === 0) {
+      return;
+    }
+
+    if (
+      rangeStartStation != null &&
+      !rangeStartStation.lineIds.some((lineId) =>
+        selectedLineIds.includes(lineId),
+      )
+    ) {
+      setRangeStartStationId('');
+    }
+    if (
+      rangeEndStation != null &&
+      !rangeEndStation.lineIds.some((lineId) =>
+        selectedLineIds.includes(lineId),
+      )
+    ) {
+      setRangeEndStationId('');
+    }
+  }, [rangeEndStation, rangeStartStation, selectedLineIds]);
+
   const clearFieldError = (field: FieldErrorKey) => {
     setClientError(null);
     setFieldErrors((current) => {
@@ -519,6 +597,10 @@ function ReportPage() {
       }
       if (field === 'effect') {
         effectRef.current?.focus();
+        return;
+      }
+      if (field === 'affectedStops') {
+        affectedStopsRef.current?.focus();
         return;
       }
       if (field === 'direction') {
@@ -679,6 +761,45 @@ function ReportPage() {
       });
       showFieldError('effect', message, 'effect_required');
       return;
+    }
+
+    if (
+      supportsAffectedStopRange &&
+      rangeStartStationId.length > 0 &&
+      rangeEndStationId.length > 0
+    ) {
+      if (selectedLineIds.length === 0) {
+        const message = intl.formatMessage({
+          id: 'report.error.affected_stops_line_required',
+          defaultMessage:
+            'Select the affected line before choosing a stop range.',
+        });
+        showFieldError('line', message, 'affected_stops_line_required');
+        return;
+      }
+
+      if (rangeStartStationId === rangeEndStationId) {
+        const message = intl.formatMessage({
+          id: 'report.error.affected_stops_same_station',
+          defaultMessage: 'Choose two different affected stops.',
+        });
+        showFieldError('affectedStops', message, 'affected_stops_same_station');
+        return;
+      }
+
+      if (expandedAffectedStopStationIds.length === 0) {
+        const message = intl.formatMessage({
+          id: 'report.error.affected_stops_not_on_selected_line',
+          defaultMessage:
+            'Choose affected stops that are served by the selected line.',
+        });
+        showFieldError(
+          'affectedStops',
+          message,
+          'affected_stops_not_on_selected_line',
+        );
+        return;
+      }
     }
 
     if (
@@ -862,6 +983,7 @@ function ReportPage() {
     label,
     selectedStation,
     searchValue,
+    filterLineIds,
     onSearchChange,
     onSelect,
     onClear,
@@ -870,6 +992,7 @@ function ReportPage() {
     label: string;
     selectedStation: (typeof stations)[number] | undefined;
     searchValue: string;
+    filterLineIds?: string[];
     onSearchChange: (value: string) => void;
     onSelect: (stationId: string) => void;
     onClear: () => void;
@@ -906,16 +1029,18 @@ function ReportPage() {
       </label>
       {(searchValue || selectedStation == null) && (
         <div className="grid gap-2">
-          {getStationSearchResults(searchValue).map((station) => (
-            <button
-              key={`${id}:${station.id}`}
-              type="button"
-              onClick={() => onSelect(station.id)}
-              className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
-            >
-              {renderStationIdentity(station)}
-            </button>
-          ))}
+          {getStationSearchResults(searchValue, filterLineIds).map(
+            (station) => (
+              <button
+                key={`${id}:${station.id}`}
+                type="button"
+                onClick={() => onSelect(station.id)}
+                className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
+              >
+                {renderStationIdentity(station)}
+              </button>
+            ),
+          )}
         </div>
       )}
     </div>
@@ -1295,7 +1420,16 @@ function ReportPage() {
         </section>
 
         {supportsAffectedStopRange && (
-          <section className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
+          <section
+            className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900"
+            ref={affectedStopsRef}
+            tabIndex={-1}
+            aria-describedby={
+              fieldErrors.affectedStops
+                ? 'report-affected-stops-error'
+                : undefined
+            }
+          >
             <div>
               <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
                 <FormattedMessage
@@ -1325,12 +1459,17 @@ function ReportPage() {
                 }),
                 selectedStation: rangeStartStation,
                 searchValue: rangeStartStationSearch,
+                filterLineIds: affectedStopSearchLineIds,
                 onSearchChange: setRangeStartStationSearch,
                 onSelect: (stationId) => {
+                  clearFieldError('affectedStops');
                   setRangeStartStationId(stationId);
                   setRangeStartStationSearch('');
                 },
-                onClear: () => setRangeStartStationId(''),
+                onClear: () => {
+                  clearFieldError('affectedStops');
+                  setRangeStartStationId('');
+                },
               })}
               {renderAffectedStopPicker({
                 id: 'range-end',
@@ -1340,14 +1479,27 @@ function ReportPage() {
                 }),
                 selectedStation: rangeEndStation,
                 searchValue: rangeEndStationSearch,
+                filterLineIds: affectedStopSearchLineIds,
                 onSearchChange: setRangeEndStationSearch,
                 onSelect: (stationId) => {
+                  clearFieldError('affectedStops');
                   setRangeEndStationId(stationId);
                   setRangeEndStationSearch('');
                 },
-                onClear: () => setRangeEndStationId(''),
+                onClear: () => {
+                  clearFieldError('affectedStops');
+                  setRangeEndStationId('');
+                },
               })}
             </div>
+            {fieldErrors.affectedStops != null && (
+              <p
+                className="text-red-700 text-sm dark:text-red-300"
+                id="report-affected-stops-error"
+              >
+                {fieldErrors.affectedStops}
+              </p>
+            )}
           </section>
         )}
 
