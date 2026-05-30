@@ -436,6 +436,10 @@ Exit criteria:
   from/to affected-stop controls for skipped-stop and no-service reports,
   submitting those station IDs through the existing multi-station report model
   while keeping the default flow single-station or line-first.
+- 2026-05-30: Added an explicit synthetic crowd-report fixture seeder for local
+  or preview databases. It samples existing line and station data, creates
+  recent automoderated reports including a public-signal cluster and from/to
+  affected-stop examples, and stays separate from canonical fixture seeding.
 
 ## Decision Log
 

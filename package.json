@@ -27,6 +27,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:debug": "tsx app/scripts/migrateDatabase.ts",
     "db:seed:fixtures": "tsx app/scripts/seedFixtures.ts",
+    "db:seed:crowd-report-fixtures": "tsx app/scripts/seedCrowdReportFixtures.ts",
     "db:preview:prepare": "npm run db:reset && npm run db:migrate:debug",
     "db:studio": "drizzle-kit studio",
     "cf-typegen": "wrangler types"
