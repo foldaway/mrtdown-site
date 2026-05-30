@@ -165,6 +165,12 @@ export type SystemAnalytics = {
   issueIdsDisruptionLongest: string[];
 };
 
+type StatisticsSnapshotPayload = {
+  kind: 'statistics_snapshot.v1';
+  data: SystemAnalytics;
+  included: IncludedEntities;
+};
+
 type StatisticsTimeWindow = {
   title: string;
   dataTimeScale: TimeScale;
@@ -3826,10 +3832,13 @@ export async function getHistoryDayData(
 
 const STATISTICS_SNAPSHOT_ID = 'latest';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function isSystemAnalytics(value: unknown): value is SystemAnalytics {
   return (
-    value != null &&
-    typeof value === 'object' &&
+    isRecord(value) &&
     Array.isArray(
       (value as Partial<SystemAnalytics>).timeScaleChartsIssueCount,
     ) &&
@@ -3849,6 +3858,53 @@ function isSystemAnalytics(value: unknown): value is SystemAnalytics {
   );
 }
 
+function isIncludedEntities(value: unknown): value is IncludedEntities {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    isRecord(value.issues) &&
+    isRecord(value.lines) &&
+    isRecord(value.stations) &&
+    isRecord(value.operators) &&
+    isRecord(value.towns) &&
+    isRecord(value.landmarks)
+  );
+}
+
+function isStatisticsSnapshotPayload(
+  value: unknown,
+): value is StatisticsSnapshotPayload {
+  return (
+    isRecord(value) &&
+    value.kind === 'statistics_snapshot.v1' &&
+    isSystemAnalytics(value.data) &&
+    isIncludedEntities(value.included)
+  );
+}
+
+export function parseStatisticsSnapshotPayload(value: unknown): {
+  data: SystemAnalytics;
+  included: IncludedEntities | null;
+} | null {
+  if (isStatisticsSnapshotPayload(value)) {
+    return {
+      data: value.data,
+      included: value.included,
+    };
+  }
+
+  if (isSystemAnalytics(value)) {
+    return {
+      data: value,
+      included: null,
+    };
+  }
+
+  return null;
+}
+
 async function getLatestStatisticsSnapshot(db?: AppDb) {
   const database = db ?? (await getDefaultDb());
   try {
@@ -3861,7 +3917,7 @@ async function getLatestStatisticsSnapshot(db?: AppDb) {
         .where(eq(statisticsSnapshotsTable.id, STATISTICS_SNAPSHOT_ID))
         .limit(1),
     );
-    return isSystemAnalytics(snapshot?.data) ? snapshot.data : null;
+    return parseStatisticsSnapshotPayload(snapshot?.data);
   } catch (error) {
     if (isUndefinedTableError(error)) {
       return null;
@@ -4075,19 +4131,27 @@ export async function rebuildStatisticsSnapshot(db?: AppDb) {
     const asOf = isoDateTime(nowSg());
     const dataset = await buildDataset(nowSg(), database);
     const data = await buildStatisticsDataFromDataset(dataset, database);
+    const included = timeSyncServerSpan('statistics_snapshot_included', () =>
+      getStatisticsIncluded(dataset, data),
+    );
+    const snapshotPayload = {
+      kind: 'statistics_snapshot.v1',
+      data,
+      included,
+    } satisfies StatisticsSnapshotPayload;
     await timeServerSpan('statistics_snapshot_upsert', () =>
       database
         .insert(statisticsSnapshotsTable)
         .values({
           id: STATISTICS_SNAPSHOT_ID,
           as_of: asOf,
-          data,
+          data: snapshotPayload,
         })
         .onConflictDoUpdate({
           target: [statisticsSnapshotsTable.id],
           set: {
             as_of: asOf,
-            data,
+            data: snapshotPayload,
             updated_at: sql`now()`,
           },
         }),
@@ -4103,13 +4167,25 @@ export async function getStatisticsData() {
   return timeServerSpan('statistics_data', async () => {
     const snapshot = await getLatestStatisticsSnapshot();
     if (snapshot != null) {
+      if (snapshot.included != null) {
+        recordServerTiming('statistics_included', 0, 'source=snapshot');
+        return {
+          data: snapshot.data,
+          included: snapshot.included,
+        };
+      }
+
       const dataset = await timeServerSpan('statistics_included_dataset', () =>
-        buildDataset(nowSg(), undefined, snapshot.issueIdsDisruptionLongest),
+        buildDataset(
+          nowSg(),
+          undefined,
+          snapshot.data.issueIdsDisruptionLongest,
+        ),
       );
       return {
-        data: snapshot,
+        data: snapshot.data,
         included: timeSyncServerSpan('statistics_included', () =>
-          getStatisticsIncluded(dataset, snapshot),
+          getStatisticsIncluded(dataset, snapshot.data),
         ),
       };
     }

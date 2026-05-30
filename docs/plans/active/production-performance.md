@@ -305,6 +305,12 @@ underlying compute and payload costs so uncached requests are also fast.
   operational facts and manual facts rebuilds, and make the statistics route use
   the snapshot when available. The existing request-time statistics builder
   remains as a fallback for development and un-migrated environments.
+- 2026-05-30: Continued Phase 4 by storing the statistics route's pruned
+  included-entity payload inside new statistics snapshot rows. The request path
+  now returns precomputed snapshot data and included entities without rebuilding
+  a dataset when the v1 snapshot shape is available, while legacy
+  statistics-only snapshot rows still fall back to the previous included-entity
+  assembly path.
 
 ## Validation
 

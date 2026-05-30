@@ -1,7 +1,12 @@
 import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
 import type { Issue, Line, Station } from '~/types';
-import { buildLineSummary, selectIncludedEntities } from './db.queries';
+import {
+  buildLineSummary,
+  parseStatisticsSnapshotPayload,
+  selectIncludedEntities,
+  type SystemAnalytics,
+} from './db.queries';
 
 const REFERENCE_NOW = DateTime.fromISO('2026-02-23T23:59:00', {
   zone: 'Asia/Singapore',
@@ -99,6 +104,26 @@ function buildIssue(
     serviceEffectKinds: [],
     facilityEffectKinds: [],
   } as Parameters<typeof buildLineSummary>[1][number];
+}
+
+function buildStatistics(): SystemAnalytics {
+  return {
+    timeScaleChartsIssueCount: [],
+    timeScaleChartsIssueDuration: [],
+    chartTotalIssueCountByLine: {
+      title: 'Issue Count by Line',
+      data: [],
+    },
+    chartTotalIssueCountByStation: {
+      title: 'Issue Count by Station',
+      data: [],
+    },
+    chartRollingYearHeatmap: {
+      title: 'Rolling Year Heatmap',
+      data: [],
+    },
+    issueIdsDisruptionLongest: ['disruption-1'],
+  };
 }
 
 describe('buildLineSummary', () => {
@@ -221,6 +246,50 @@ describe('buildLineSummary', () => {
     );
 
     expect(summary.status).toBe('closed_for_day');
+  });
+});
+
+describe('parseStatisticsSnapshotPayload', () => {
+  it('reads precomputed statistics snapshots with included entities', () => {
+    const statistics = buildStatistics();
+    const included = {
+      issues: {},
+      lines: {},
+      stations: {},
+      operators: {},
+      towns: {},
+      landmarks: {},
+    };
+
+    expect(
+      parseStatisticsSnapshotPayload({
+        kind: 'statistics_snapshot.v1',
+        data: statistics,
+        included,
+      }),
+    ).toEqual({
+      data: statistics,
+      included,
+    });
+  });
+
+  it('keeps legacy statistics-only snapshots as a fallback', () => {
+    const statistics = buildStatistics();
+
+    expect(parseStatisticsSnapshotPayload(statistics)).toEqual({
+      data: statistics,
+      included: null,
+    });
+  });
+
+  it('rejects malformed statistics snapshot payloads', () => {
+    expect(
+      parseStatisticsSnapshotPayload({
+        kind: 'statistics_snapshot.v1',
+        data: buildStatistics(),
+      }),
+    ).toBeNull();
+    expect(parseStatisticsSnapshotPayload({})).toBeNull();
   });
 });
 
