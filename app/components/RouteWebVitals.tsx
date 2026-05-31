@@ -84,17 +84,23 @@ export function RouteWebVitals() {
     const observers: PerformanceObserver[] = [];
     let clsSessionWindow = createClsSessionWindow();
     let hasClsSupport = false;
+    let hasPendingRouteMetrics = false;
     let largestContentfulPaint: MetricValue | null = null;
     let maxInteractionDuration: MetricValue | null = null;
     let reportedFinalMetrics = false;
 
     const resetRouteMetrics = () => {
       clsSessionWindow = createClsSessionWindow();
+      hasPendingRouteMetrics = false;
       largestContentfulPaint = null;
       maxInteractionDuration = null;
     };
 
     const reportCurrentRouteMetrics = () => {
+      if (!hasPendingRouteMetrics) {
+        return;
+      }
+
       if (largestContentfulPaint != null) {
         captureMetric(
           'LCP',
@@ -103,7 +109,7 @@ export function RouteWebVitals() {
         );
       }
 
-      if (hasClsSupport) {
+      if (hasClsSupport && clsSessionWindow.maxValue > 0) {
         captureMetric('CLS', clsSessionWindow.maxValue, routeRef.current);
       }
 
@@ -139,6 +145,7 @@ export function RouteWebVitals() {
             route: routeRef.current,
             value: entry.startTime,
           };
+          hasPendingRouteMetrics = true;
         }
       });
       lcpObserver.observe({
@@ -176,6 +183,7 @@ export function RouteWebVitals() {
             clsSessionWindow.maxValue,
             clsSessionWindow.currentValue,
           );
+          hasPendingRouteMetrics = true;
         }
       });
       clsObserver.observe({ type: 'layout-shift', buffered: true });
@@ -195,6 +203,7 @@ export function RouteWebVitals() {
                 route: routeRef.current,
                 value,
               };
+              hasPendingRouteMetrics = true;
             }
           }
         }
@@ -219,7 +228,7 @@ export function RouteWebVitals() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        reportFinalMetrics();
+        reportCurrentRouteMetrics();
       }
     };
 

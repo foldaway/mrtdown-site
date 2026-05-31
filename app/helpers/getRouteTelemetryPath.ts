@@ -40,6 +40,6 @@ export function getRouteTelemetryPath(pathname: string) {
     case 'status':
       return '/status/:lineId';
     default:
-      return `/${routeSegments.join('/')}`;
+      return '/404';
   }
 }

@@ -24,4 +24,9 @@ describe('getRouteTelemetryPath', () => {
     );
     expect(getRouteTelemetryPath('/status/CCL')).toBe('/status/:lineId');
   });
+
+  it('buckets unknown routes to a fixed not-found path', () => {
+    expect(getRouteTelemetryPath('/en-SG/2026-05-31-random')).toBe('/404');
+    expect(getRouteTelemetryPath('/unexpected/deep/path')).toBe('/404');
+  });
 });
