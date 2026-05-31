@@ -1,3 +1,5 @@
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { DateTime } from 'luxon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -1220,6 +1222,18 @@ describe('automoderateCrowdReport', () => {
 });
 
 describe('getPublicCrowdReportSignals', () => {
+  it('requires cluster affected-area scope before applying the result limit', async () => {
+    const fake = makeFakePublicSignalDb();
+
+    await getPublicCrowdReportSignals(fake.db as never);
+
+    const dialect = new PgDialect();
+    const whereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
+
+    expect(whereSql).toContain('crowd_report_cluster_lines');
+    expect(whereSql).toContain('crowd_report_cluster_stations');
+  });
+
   it('pushes route scope into the cluster query before applying the result limit', async () => {
     const fake = makeFakePublicSignalDb();
 

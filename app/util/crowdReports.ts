@@ -242,6 +242,21 @@ function hasCrowdReportClusterCurrentConfidenceSql(
   )} >= ${minDistinctIpHashes}`;
 }
 
+function hasCrowdReportClusterScopeSql() {
+  return sql`(
+    exists (
+      select 1
+      from ${crowdReportClusterLinesTable}
+      where ${crowdReportClusterLinesTable.cluster_id} = ${crowdReportClustersTable.id}
+    )
+    or exists (
+      select 1
+      from ${crowdReportClusterStationsTable}
+      where ${crowdReportClusterStationsTable.cluster_id} = ${crowdReportClustersTable.id}
+    )
+  )`;
+}
+
 function normalizePolicyText(value: string) {
   return value.trim().toLocaleLowerCase().replace(/\s+/g, ' ');
 }
@@ -1271,6 +1286,7 @@ export async function getPublicCrowdReportSignals(
     .where(
       and(
         eq(crowdReportClustersTable.status, 'accepted'),
+        hasCrowdReportClusterScopeSql(),
         hasCrowdReportClusterCurrentConfidenceSql(
           options.minReportCount ?? DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
           options.minDistinctIpHashes ??
