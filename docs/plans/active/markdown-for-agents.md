@@ -136,6 +136,9 @@ Exit criteria:
 - 2026-05-29: Feasibility investigation completed and refined into a preferred
   app-owned Markdown route approach.
 - 2026-05-29: Created this active plan.
+- 2026-05-31: Added the shared Phase 1 Markdown surface with mdast-backed
+  serialization helpers, GFM table support, date and duration formatting, and a
+  cacheable `text/markdown` response helper.
 
 ## Decision Log
 
@@ -150,6 +153,10 @@ Exit criteria:
   route includes them, so Markdown does not expose a different status product.
 - 2026-05-29: Defer `Content-Signal` headers because AI training/search policy
   should be a separate product/legal decision.
+- 2026-05-31: Use the mdast ecosystem for serialization
+  (`mdast-util-to-markdown` plus `mdast-util-gfm`) instead of hand-assembling
+  Markdown strings, so escaping and GFM tables follow maintained Markdown
+  rules.
 
 ## Validation
 
