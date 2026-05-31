@@ -282,12 +282,21 @@ export function RouteWebVitals() {
       reportFinalMetrics();
     };
 
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        reportedFinalMetrics = false;
+        reportRouteMetricsRef.current = flushCurrentRouteMetrics;
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageShow);
       reportRouteMetricsRef.current = null;
       for (const observer of observers) {
         observer.disconnect();
