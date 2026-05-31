@@ -82,6 +82,7 @@ export function RouteWebVitals() {
     };
 
     const observers: PerformanceObserver[] = [];
+    const pendingRecordDrainers: Array<() => void> = [];
     let clsSessionWindow = createClsSessionWindow();
     let hasClsSupport = false;
     let hasPendingRouteMetrics = false;
@@ -109,7 +110,7 @@ export function RouteWebVitals() {
         );
       }
 
-      if (hasClsSupport && clsSessionWindow.maxValue > 0) {
+      if (hasClsSupport) {
         captureMetric('CLS', clsSessionWindow.maxValue, routeRef.current);
       }
 
@@ -124,95 +125,135 @@ export function RouteWebVitals() {
       resetRouteMetrics();
     };
 
-    reportRouteMetricsRef.current = reportCurrentRouteMetrics;
+    const drainPendingRecords = () => {
+      for (const drainPendingRecords of pendingRecordDrainers) {
+        drainPendingRecords();
+      }
+    };
+
+    const flushCurrentRouteMetrics = () => {
+      drainPendingRecords();
+      reportCurrentRouteMetrics();
+    };
+
+    reportRouteMetricsRef.current = flushCurrentRouteMetrics;
+
+    const processPaintEntries = (entries: PerformanceEntry[]) => {
+      for (const entry of entries) {
+        if (entry.name === 'first-contentful-paint') {
+          captureMetric('FCP', entry.startTime, routeRef.current);
+          hasPendingRouteMetrics = true;
+        }
+      }
+    };
+
+    const processLcpEntries = (entries: PerformanceEntry[]) => {
+      for (const entry of entries) {
+        largestContentfulPaint = {
+          route: routeRef.current,
+          value: entry.startTime,
+        };
+        hasPendingRouteMetrics = true;
+      }
+    };
+
+    const processClsEntries = (entries: LayoutShiftEntry[]) => {
+      for (const entry of entries) {
+        if (entry.hadRecentInput) {
+          continue;
+        }
+
+        const currentStartTime = clsSessionWindow.currentStartTime;
+        const currentLastEntryTime = clsSessionWindow.currentLastEntryTime;
+        const startsNewSession =
+          currentStartTime == null ||
+          currentLastEntryTime == null ||
+          entry.startTime - currentLastEntryTime > MAX_CLS_SESSION_GAP_MS ||
+          entry.startTime - currentStartTime > MAX_CLS_SESSION_DURATION_MS;
+
+        if (startsNewSession) {
+          clsSessionWindow.currentStartTime = entry.startTime;
+          clsSessionWindow.currentValue = entry.value;
+        } else {
+          clsSessionWindow.currentValue += entry.value;
+        }
+
+        clsSessionWindow.currentLastEntryTime = entry.startTime;
+        clsSessionWindow.maxValue = Math.max(
+          clsSessionWindow.maxValue,
+          clsSessionWindow.currentValue,
+        );
+        hasPendingRouteMetrics = true;
+      }
+    };
+
+    const processEventEntries = (entries: EventTimingEntry[]) => {
+      for (const entry of entries) {
+        if (entry.interactionId != null && entry.interactionId > 0) {
+          const value = entry.duration;
+          if (
+            maxInteractionDuration == null ||
+            value > maxInteractionDuration.value
+          ) {
+            maxInteractionDuration = {
+              route: routeRef.current,
+              value,
+            };
+            hasPendingRouteMetrics = true;
+          }
+        }
+      }
+    };
 
     if (supportsEntryType('paint')) {
       const paintObserver = new PerformanceObserver((entryList) => {
-        for (const entry of entryList.getEntries()) {
-          if (entry.name === 'first-contentful-paint') {
-            captureMetric('FCP', entry.startTime, routeRef.current);
-          }
-        }
+        processPaintEntries(entryList.getEntries());
       });
       paintObserver.observe({ type: 'paint', buffered: true });
+      pendingRecordDrainers.push(() =>
+        processPaintEntries(paintObserver.takeRecords()),
+      );
       observers.push(paintObserver);
     }
 
     if (supportsEntryType('largest-contentful-paint')) {
       const lcpObserver = new PerformanceObserver((entryList) => {
-        for (const entry of entryList.getEntries()) {
-          largestContentfulPaint = {
-            route: routeRef.current,
-            value: entry.startTime,
-          };
-          hasPendingRouteMetrics = true;
-        }
+        processLcpEntries(entryList.getEntries());
       });
       lcpObserver.observe({
         type: 'largest-contentful-paint',
         buffered: true,
       });
+      pendingRecordDrainers.push(() =>
+        processLcpEntries(lcpObserver.takeRecords()),
+      );
       observers.push(lcpObserver);
     }
 
     if (supportsEntryType('layout-shift')) {
       hasClsSupport = true;
       const clsObserver = new PerformanceObserver((entryList) => {
-        for (const entry of entryList.getEntries() as LayoutShiftEntry[]) {
-          if (entry.hadRecentInput) {
-            continue;
-          }
-
-          const currentStartTime = clsSessionWindow.currentStartTime;
-          const currentLastEntryTime = clsSessionWindow.currentLastEntryTime;
-          const startsNewSession =
-            currentStartTime == null ||
-            currentLastEntryTime == null ||
-            entry.startTime - currentLastEntryTime > MAX_CLS_SESSION_GAP_MS ||
-            entry.startTime - currentStartTime > MAX_CLS_SESSION_DURATION_MS;
-
-          if (startsNewSession) {
-            clsSessionWindow.currentStartTime = entry.startTime;
-            clsSessionWindow.currentValue = entry.value;
-          } else {
-            clsSessionWindow.currentValue += entry.value;
-          }
-
-          clsSessionWindow.currentLastEntryTime = entry.startTime;
-          clsSessionWindow.maxValue = Math.max(
-            clsSessionWindow.maxValue,
-            clsSessionWindow.currentValue,
-          );
-          hasPendingRouteMetrics = true;
-        }
+        processClsEntries(entryList.getEntries() as LayoutShiftEntry[]);
       });
       clsObserver.observe({ type: 'layout-shift', buffered: true });
+      pendingRecordDrainers.push(() =>
+        processClsEntries(clsObserver.takeRecords() as LayoutShiftEntry[]),
+      );
       observers.push(clsObserver);
     }
 
     if (supportsEntryType('event')) {
       const inpObserver = new PerformanceObserver((entryList) => {
-        for (const entry of entryList.getEntries() as EventTimingEntry[]) {
-          if (entry.interactionId != null && entry.interactionId > 0) {
-            const value = entry.duration;
-            if (
-              maxInteractionDuration == null ||
-              value > maxInteractionDuration.value
-            ) {
-              maxInteractionDuration = {
-                route: routeRef.current,
-                value,
-              };
-              hasPendingRouteMetrics = true;
-            }
-          }
-        }
+        processEventEntries(entryList.getEntries() as EventTimingEntry[]);
       });
       inpObserver.observe({
         type: 'event',
         buffered: true,
         durationThreshold: 40,
       } as PerformanceObserverInit);
+      pendingRecordDrainers.push(() =>
+        processEventEntries(inpObserver.takeRecords() as EventTimingEntry[]),
+      );
       observers.push(inpObserver);
     }
 
@@ -222,22 +263,31 @@ export function RouteWebVitals() {
       }
 
       reportedFinalMetrics = true;
-      reportCurrentRouteMetrics();
+      flushCurrentRouteMetrics();
       reportRouteMetricsRef.current = null;
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        reportCurrentRouteMetrics();
+        flushCurrentRouteMetrics();
       }
     };
 
+    const handlePageHide = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        flushCurrentRouteMetrics();
+        return;
+      }
+
+      reportFinalMetrics();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', reportFinalMetrics);
+    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pagehide', reportFinalMetrics);
+      window.removeEventListener('pagehide', handlePageHide);
       reportRouteMetricsRef.current = null;
       for (const observer of observers) {
         observer.disconnect();
