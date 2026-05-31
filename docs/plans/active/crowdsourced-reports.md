@@ -440,6 +440,9 @@ Exit criteria:
   or preview databases. It samples existing line and station data, creates
   recent automoderated reports including a public-signal cluster and from/to
   affected-stop examples, and stays separate from canonical fixture seeding.
+- 2026-05-31: Tightened public community-signal querying so clusters without
+  persisted line or station scope are excluded before result limits are applied,
+  matching the affected-area requirement for displayable crowd-report clusters.
 
 ## Decision Log
 
