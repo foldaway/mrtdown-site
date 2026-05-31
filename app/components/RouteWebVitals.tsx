@@ -264,7 +264,6 @@ export function RouteWebVitals() {
 
       reportedFinalMetrics = true;
       flushCurrentRouteMetrics();
-      reportRouteMetricsRef.current = null;
     };
 
     const handleVisibilityChange = () => {
@@ -280,6 +279,7 @@ export function RouteWebVitals() {
       }
 
       reportFinalMetrics();
+      reportRouteMetricsRef.current = null;
     };
 
     const handlePageShow = (event: PageTransitionEvent) => {
