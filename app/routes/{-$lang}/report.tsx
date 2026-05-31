@@ -54,6 +54,7 @@ type FieldErrorKey =
   | 'station'
   | 'line'
   | 'effect'
+  | 'affectedStops'
   | 'direction'
   | 'description'
   | 'observedAt';
@@ -157,6 +158,7 @@ const REPORT_SCOPE_LABELS = {
 >;
 
 const REPORT_SCOPES = Object.keys(REPORT_SCOPE_LABELS) as ReportScope[];
+const MAX_REPORT_STATION_IDS = 16;
 
 let turnstileScriptPromise: Promise<TurnstileApi> | null = null;
 const turnstileSiteKey = import.meta.env.VITE_CROWD_REPORT_TURNSTILE_SITE_KEY;
@@ -253,7 +255,8 @@ function datetimeLocalToSgIso(value: string) {
 }
 
 function ReportPage() {
-  const { lineDirections, lines, stations } = Route.useLoaderData();
+  const { lineDirections, lineStationPaths, lines, stations } =
+    Route.useLoaderData();
   const search = Route.useSearch() as ReportSearch;
   const intl = useIntl();
   const posthog = usePostHog();
@@ -262,6 +265,7 @@ function ReportPage() {
   const stationSearchRef = useRef<HTMLInputElement>(null);
   const lineRef = useRef<HTMLDivElement>(null);
   const effectRef = useRef<HTMLDivElement>(null);
+  const affectedStopsRef = useRef<HTMLDivElement>(null);
   const directionSelectRef = useRef<HTMLSelectElement>(null);
   const directionOtherRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -297,6 +301,10 @@ function ReportPage() {
   );
   const [text, setText] = useState('');
   const [stationSearch, setStationSearch] = useState('');
+  const [rangeStartStationId, setRangeStartStationId] = useState('');
+  const [rangeEndStationId, setRangeEndStationId] = useState('');
+  const [rangeStartStationSearch, setRangeStartStationSearch] = useState('');
+  const [rangeEndStationSearch, setRangeEndStationSearch] = useState('');
   const [directionChoice, setDirectionChoice] = useState('');
   const [directionOtherText, setDirectionOtherText] = useState('');
   const [effect, setEffect] = useState('');
@@ -359,6 +367,12 @@ function ReportPage() {
   const selectedStation = selectedStationIds[0]
     ? stationById[selectedStationIds[0]]
     : undefined;
+  const rangeStartStation = rangeStartStationId
+    ? stationById[rangeStartStationId]
+    : undefined;
+  const rangeEndStation = rangeEndStationId
+    ? stationById[rangeEndStationId]
+    : undefined;
   const selectedLineSet = useMemo(
     () => new Set(selectedLineIds),
     [selectedLineIds],
@@ -370,14 +384,87 @@ function ReportPage() {
   const requiresDescription =
     effect === 'unknown' ||
     (selectedLineIds.length > 0 && directionChoice === 'other');
-  const stationSearchResults = useMemo(() => {
-    const query = stationSearch.trim().toLocaleLowerCase();
-    if (!query) {
-      return stations.slice(0, 8);
+  const supportsAffectedStopRange =
+    effect === 'skipped-stop' || effect === 'no-service';
+  const affectedStopSearchLineIds =
+    selectedLineIds.length > 0 ? selectedLineIds : undefined;
+  const expandedAffectedStopStationIds = useMemo(() => {
+    if (
+      !supportsAffectedStopRange ||
+      rangeStartStationId.length === 0 ||
+      rangeEndStationId.length === 0 ||
+      rangeStartStationId === rangeEndStationId
+    ) {
+      return [];
     }
 
+    const candidateLineIds = selectedLineIds.filter(
+      (lineId) =>
+        rangeStartStation?.lineIds.includes(lineId) &&
+        rangeEndStation?.lineIds.includes(lineId),
+    );
+    for (const lineId of candidateLineIds) {
+      for (const path of lineStationPaths[lineId] ?? []) {
+        const startIndex = path.indexOf(rangeStartStationId);
+        const endIndex = path.indexOf(rangeEndStationId);
+        if (startIndex === -1 || endIndex === -1) {
+          continue;
+        }
+        const [fromIndex, toIndex] =
+          startIndex < endIndex
+            ? [startIndex, endIndex]
+            : [endIndex, startIndex];
+        return path.slice(fromIndex, toIndex + 1);
+      }
+    }
+
+    return [];
+  }, [
+    lineStationPaths,
+    rangeEndStation,
+    rangeEndStationId,
+    rangeStartStation,
+    rangeStartStationId,
+    selectedLineIds,
+    supportsAffectedStopRange,
+  ]);
+  const affectedStopStationIds = useMemo(() => {
+    if (!supportsAffectedStopRange) {
+      return [];
+    }
+    if (rangeStartStationId.length > 0 && rangeEndStationId.length > 0) {
+      return expandedAffectedStopStationIds;
+    }
+    return [rangeStartStationId, rangeEndStationId].filter(
+      (stationId) => stationId.length > 0,
+    );
+  }, [
+    expandedAffectedStopStationIds,
+    rangeEndStationId,
+    rangeStartStationId,
+    supportsAffectedStopRange,
+  ]);
+  const submittedStationIds = useMemo(
+    () => [...new Set([...selectedStationIds, ...affectedStopStationIds])],
+    [affectedStopStationIds, selectedStationIds],
+  );
+  const getStationSearchResults = (
+    searchValue: string,
+    filterLineIds?: string[],
+  ) => {
+    const query = searchValue.trim().toLocaleLowerCase();
     return stations
       .filter((station) => {
+        if (
+          filterLineIds != null &&
+          filterLineIds.length > 0 &&
+          !station.lineIds.some((lineId) => filterLineIds.includes(lineId))
+        ) {
+          return false;
+        }
+        if (!query) {
+          return true;
+        }
         const stationName = getLocalizedTranslation(
           station.name,
           intl.locale,
@@ -389,7 +476,8 @@ function ReportPage() {
         );
       })
       .slice(0, 8);
-  }, [intl.locale, stationSearch, stations]);
+  };
+  const stationSearchResults = getStationSearchResults(stationSearch);
 
   useEffect(() => {
     if (
@@ -445,6 +533,29 @@ function ReportPage() {
     });
   }, [fieldErrors.description, requiresDescription]);
 
+  useEffect(() => {
+    if (selectedLineIds.length === 0) {
+      return;
+    }
+
+    if (
+      rangeStartStation != null &&
+      !rangeStartStation.lineIds.some((lineId) =>
+        selectedLineIds.includes(lineId),
+      )
+    ) {
+      setRangeStartStationId('');
+    }
+    if (
+      rangeEndStation != null &&
+      !rangeEndStation.lineIds.some((lineId) =>
+        selectedLineIds.includes(lineId),
+      )
+    ) {
+      setRangeEndStationId('');
+    }
+  }, [rangeEndStation, rangeStartStation, selectedLineIds]);
+
   const clearFieldError = (field: FieldErrorKey) => {
     setClientError(null);
     setFieldErrors((current) => {
@@ -487,6 +598,10 @@ function ReportPage() {
       }
       if (field === 'effect') {
         effectRef.current?.focus();
+        return;
+      }
+      if (field === 'affectedStops') {
+        affectedStopsRef.current?.focus();
         return;
       }
       if (field === 'direction') {
@@ -650,6 +765,94 @@ function ReportPage() {
     }
 
     if (
+      supportsAffectedStopRange &&
+      (rangeStartStationId.length > 0 || rangeEndStationId.length > 0)
+    ) {
+      if (selectedLineIds.length === 0) {
+        const message = intl.formatMessage({
+          id: 'report.error.affected_stops_line_required',
+          defaultMessage:
+            'Select the affected line before choosing affected stops.',
+        });
+        showFieldError('line', message, 'affected_stops_line_required');
+        return;
+      }
+
+      const affectedStopEndpointStations = [
+        rangeStartStation,
+        rangeEndStation,
+      ].filter((station): station is (typeof stations)[number] => {
+        return station != null;
+      });
+      if (
+        affectedStopEndpointStations.some(
+          (station) =>
+            !station.lineIds.some((lineId) => selectedLineIds.includes(lineId)),
+        )
+      ) {
+        const message = intl.formatMessage({
+          id: 'report.error.affected_stops_not_on_selected_line',
+          defaultMessage:
+            'Choose affected stops that are served by the selected line.',
+        });
+        showFieldError(
+          'affectedStops',
+          message,
+          'affected_stops_not_on_selected_line',
+        );
+        return;
+      }
+
+      if (
+        rangeStartStationId.length > 0 &&
+        rangeEndStationId.length > 0 &&
+        rangeStartStationId === rangeEndStationId
+      ) {
+        const message = intl.formatMessage({
+          id: 'report.error.affected_stops_same_station',
+          defaultMessage: 'Choose two different affected stops.',
+        });
+        showFieldError('affectedStops', message, 'affected_stops_same_station');
+        return;
+      }
+
+      if (
+        rangeStartStationId.length > 0 &&
+        rangeEndStationId.length > 0 &&
+        expandedAffectedStopStationIds.length === 0
+      ) {
+        const message = intl.formatMessage({
+          id: 'report.error.affected_stops_not_on_selected_line',
+          defaultMessage:
+            'Choose affected stops that are served by the selected line.',
+        });
+        showFieldError(
+          'affectedStops',
+          message,
+          'affected_stops_not_on_selected_line',
+        );
+        return;
+      }
+
+      if (submittedStationIds.length > MAX_REPORT_STATION_IDS) {
+        const message = intl.formatMessage(
+          {
+            id: 'report.error.affected_stops_too_many_stations',
+            defaultMessage:
+              'Choose a shorter affected stop range. Reports can include up to {maxStationCount} stations.',
+          },
+          { maxStationCount: MAX_REPORT_STATION_IDS },
+        );
+        showFieldError(
+          'affectedStops',
+          message,
+          'affected_stops_too_many_stations',
+        );
+        return;
+      }
+    }
+
+    if (
       selectedLineIds.length > 0 &&
       directionChoice === 'other' &&
       directionOtherText.trim().length === 0
@@ -701,7 +904,7 @@ function ReportPage() {
         body: JSON.stringify({
           observedAt: observedAtIso,
           lineIds: selectedLineIds,
-          stationIds: selectedStationIds,
+          stationIds: submittedStationIds,
           text: reportText,
           directionText,
           effect: effect || undefined,
@@ -729,7 +932,7 @@ function ReportPage() {
     if (response.ok) {
       posthog.capture('crowd_report_submit_success', {
         line_count: selectedLineIds.length,
-        station_count: selectedStationIds.length,
+        station_count: submittedStationIds.length,
         has_effect: effect.length > 0,
       });
       setSubmitState('success');
@@ -823,6 +1026,74 @@ function ReportPage() {
       </span>
       {station.codePills.length > 0 && renderStationCodePills(station)}
     </span>
+  );
+
+  const renderAffectedStopPicker = ({
+    id,
+    label,
+    selectedStation,
+    searchValue,
+    filterLineIds,
+    onSearchChange,
+    onSelect,
+    onClear,
+  }: {
+    id: string;
+    label: string;
+    selectedStation: (typeof stations)[number] | undefined;
+    searchValue: string;
+    filterLineIds?: string[];
+    onSearchChange: (value: string) => void;
+    onSelect: (stationId: string) => void;
+    onClear: () => void;
+  }) => (
+    <div className="flex flex-col gap-2">
+      <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+        {label}
+      </span>
+      {selectedStation != null && (
+        <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
+          {renderStationIdentity(selectedStation)}
+          <button
+            type="button"
+            onClick={onClear}
+            className="ms-auto shrink-0 rounded-md px-2 py-1 font-medium text-accent-light text-xs hover:bg-white dark:hover:bg-gray-800"
+          >
+            <FormattedMessage id="report.change" defaultMessage="Change" />
+          </button>
+        </div>
+      )}
+      <label className="relative">
+        <span className="sr-only">{label}</span>
+        <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-gray-400" />
+        <input
+          type="search"
+          value={searchValue}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder={intl.formatMessage({
+            id: 'report.affected_stop_search_placeholder',
+            defaultMessage: 'Search by station name or code',
+          })}
+          className="w-full rounded-lg border border-gray-300 bg-white py-2 pr-3 pl-9 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+        />
+      </label>
+      {(searchValue || selectedStation == null) && (
+        <div className="grid gap-2">
+          {getStationSearchResults(searchValue, filterLineIds).map(
+            (station) => (
+              <button
+                key={`${id}:${station.id}`}
+                type="button"
+                onClick={() => onSelect(station.id)}
+                className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
+              >
+                {renderStationIdentity(station)}
+              </button>
+            ),
+          )}
+        </div>
+      )}
+    </div>
   );
 
   const renderEffectButton = (effectValue: IngestContentCrowdReportEffect) => {
@@ -1197,6 +1468,90 @@ function ReportPage() {
             </span>
           </label>
         </section>
+
+        {supportsAffectedStopRange && (
+          <section
+            className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900"
+            ref={affectedStopsRef}
+            tabIndex={-1}
+            aria-describedby={
+              fieldErrors.affectedStops
+                ? 'report-affected-stops-error'
+                : undefined
+            }
+          >
+            <div>
+              <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+                <FormattedMessage
+                  id="report.affected_stops"
+                  defaultMessage="Affected stops"
+                />
+              </span>
+              <span className="ms-2 text-gray-500 text-xs dark:text-gray-400">
+                <FormattedMessage
+                  id="report.optional"
+                  defaultMessage="Optional"
+                />
+              </span>
+              <p className="mt-1 text-gray-500 text-xs leading-5 dark:text-gray-400">
+                <FormattedMessage
+                  id="report.affected_stops_hint"
+                  defaultMessage="Add a stop or range only if this is about skipped stops or no service between stations."
+                />
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {renderAffectedStopPicker({
+                id: 'range-start',
+                label: intl.formatMessage({
+                  id: 'report.affected_stop_from',
+                  defaultMessage: 'From station',
+                }),
+                selectedStation: rangeStartStation,
+                searchValue: rangeStartStationSearch,
+                filterLineIds: affectedStopSearchLineIds,
+                onSearchChange: setRangeStartStationSearch,
+                onSelect: (stationId) => {
+                  clearFieldError('affectedStops');
+                  setRangeStartStationId(stationId);
+                  setRangeStartStationSearch('');
+                },
+                onClear: () => {
+                  clearFieldError('affectedStops');
+                  setRangeStartStationId('');
+                },
+              })}
+              {renderAffectedStopPicker({
+                id: 'range-end',
+                label: intl.formatMessage({
+                  id: 'report.affected_stop_to',
+                  defaultMessage: 'To station',
+                }),
+                selectedStation: rangeEndStation,
+                searchValue: rangeEndStationSearch,
+                filterLineIds: affectedStopSearchLineIds,
+                onSearchChange: setRangeEndStationSearch,
+                onSelect: (stationId) => {
+                  clearFieldError('affectedStops');
+                  setRangeEndStationId(stationId);
+                  setRangeEndStationSearch('');
+                },
+                onClear: () => {
+                  clearFieldError('affectedStops');
+                  setRangeEndStationId('');
+                },
+              })}
+            </div>
+            {fieldErrors.affectedStops != null && (
+              <p
+                className="text-red-700 text-sm dark:text-red-300"
+                id="report-affected-stops-error"
+              >
+                {fieldErrors.affectedStops}
+              </p>
+            )}
+          </section>
+        )}
 
         {selectedLineIds.length > 0 && (
           <section className="grid gap-4 sm:grid-cols-2">

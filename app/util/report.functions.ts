@@ -171,6 +171,8 @@ export const getCrowdReportFormOptionsFn = createServerFn({
     Array<{ stationId: string; name: (typeof stations)[number]['name'] }>
   > = {};
   const directionKeysByLineId: Record<string, Set<string>> = {};
+  const stationPathsByLineId: Record<string, string[][]> = {};
+  const stationPathKeysByLineId: Record<string, Set<string>> = {};
 
   for (const service of services) {
     const latestRevision = latestRevisionByServiceId[service.id];
@@ -183,6 +185,16 @@ export const getCrowdReportFormOptionsFn = createServerFn({
         `${latestRevision.id}::${service.id}`
       ] ?? []),
     ].sort((a, b) => a.pathIndex - b.pathIndex);
+    const pathStationIds = entries.map((entry) => entry.stationId);
+    if (pathStationIds.length > 0) {
+      stationPathsByLineId[service.lineId] ??= [];
+      stationPathKeysByLineId[service.lineId] ??= new Set();
+      const pathKey = pathStationIds.join('>');
+      if (!stationPathKeysByLineId[service.lineId].has(pathKey)) {
+        stationPathKeysByLineId[service.lineId].add(pathKey);
+        stationPathsByLineId[service.lineId].push(pathStationIds);
+      }
+    }
     const terminalStationIds = [
       entries[0]?.stationId,
       entries[entries.length - 1]?.stationId,
@@ -255,6 +267,7 @@ export const getCrowdReportFormOptionsFn = createServerFn({
   return {
     lines,
     lineDirections: directionsByLineId,
+    lineStationPaths: stationPathsByLineId,
     stations: stations.map((station) => ({
       ...station,
       codes: stationCodesByStationId[station.id] ?? [],
