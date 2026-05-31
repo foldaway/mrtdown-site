@@ -432,6 +432,9 @@ Exit criteria:
   high-confidence public and dispatchable clusters to satisfy report-count and
   source-diversity thresholds using reports that explicitly say the issue is
   still happening.
+- 2026-05-31: Tightened single-report canonical dispatch candidate selection so
+  accepted reports without persisted line or station scope are excluded before
+  dispatch batch limits are applied and rechecked under the dispatch lock.
 
 ## Decision Log
 

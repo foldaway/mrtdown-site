@@ -109,6 +109,13 @@ function hasCrowdReportClusterScope() {
   );
 }
 
+function hasCrowdReportScope() {
+  return or(
+    sql`exists (select 1 from ${crowdReportLinesTable} where ${crowdReportLinesTable.report_id} = ${crowdReportsTable.id})`,
+    sql`exists (select 1 from ${crowdReportStationsTable} where ${crowdReportStationsTable.report_id} = ${crowdReportsTable.id})`,
+  );
+}
+
 function hasCrowdReportClusterCurrentConfidence() {
   return sql`(
     select count(*)
@@ -375,6 +382,7 @@ async function getDispatchableSingleCrowdReportCandidates(
         eq(crowdReportsTable.status, 'accepted'),
         isNull(crowdReportsTable.dispatched_at),
         isNull(crowdReportsTable.cluster_id),
+        hasCrowdReportScope(),
       ),
     )
     .orderBy(desc(crowdReportsTable.observed_at))
@@ -609,6 +617,7 @@ async function isCrowdReportDispatchCandidateEligible(
         eq(crowdReportsTable.status, 'accepted'),
         isNull(crowdReportsTable.dispatched_at),
         isNull(crowdReportsTable.cluster_id),
+        hasCrowdReportScope(),
       ),
     )
     .limit(1);
