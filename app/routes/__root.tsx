@@ -7,6 +7,7 @@ import {
   useRouterState,
 } from '@tanstack/react-router';
 import { LANGUAGES } from '~/constants';
+import { RouteWebVitals } from '~/components/RouteWebVitals';
 import { getPosthogOptions } from '~/helpers/getPosthogOptions';
 import stylesheet from '../index.css?url';
 
@@ -66,6 +67,7 @@ function RootComponent() {
         apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
         options={posthogOptions}
       >
+        <RouteWebVitals />
         <Outlet />
       </PostHogProvider>
     </RootDocument>

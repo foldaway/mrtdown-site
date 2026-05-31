@@ -311,6 +311,10 @@ underlying compute and payload costs so uncached requests are also fast.
   a dataset when the v1 snapshot shape is available, while legacy
   statistics-only snapshot rows still fall back to the previous included-entity
   assembly path.
+- 2026-05-31: Started Phase 5 production Web Vitals telemetry. The root route
+  now captures browser FCP, LCP, CLS, and approximate INP metrics through the
+  existing PostHog provider in production, tagged with normalized route paths so
+  entity IDs do not create high-cardinality analytics dimensions.
 
 ## Validation
 
