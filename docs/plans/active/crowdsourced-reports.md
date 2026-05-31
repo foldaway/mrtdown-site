@@ -443,6 +443,9 @@ Exit criteria:
 - 2026-05-31: Tightened public community-signal querying so clusters without
   persisted line or station scope are excluded before result limits are applied,
   matching the affected-area requirement for displayable crowd-report clusters.
+- 2026-05-31: Tightened single-report canonical dispatch candidate selection so
+  accepted reports without persisted line or station scope are excluded before
+  dispatch batch limits are applied and rechecked under the dispatch lock.
 
 ## Decision Log
 

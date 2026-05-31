@@ -1,10 +1,41 @@
 import { IngestPayloadSchema } from '@mrtdown/ingest-contracts';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildCrowdReportIngestPayload,
   buildCrowdReportSourceUrl,
   dispatchCrowdReportPayloadToGitHub,
+  getDispatchableCrowdReportCandidates,
 } from './crowdReportDispatch';
+
+function makeFakeCandidateDb() {
+  const whereCalls: unknown[] = [];
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    where(condition: unknown) {
+      whereCalls.push(condition);
+      return this;
+    },
+    orderBy() {
+      return this;
+    },
+    limit() {
+      return Promise.resolve([]);
+    },
+  };
+
+  return {
+    whereCalls,
+    db: {
+      select() {
+        return selectBuilder;
+      },
+    },
+  };
+}
 
 describe('buildCrowdReportIngestPayload', () => {
   it('builds a valid crowd-report ingest payload without site-local metadata', () => {
@@ -69,6 +100,24 @@ describe('buildCrowdReportSourceUrl', () => {
     expect(
       buildCrowdReportSourceUrl('https://mrtdown.example', 'report', 'r1'),
     ).toBe('https://mrtdown.example/report?communitySource=report%3Ar1');
+  });
+});
+
+describe('getDispatchableCrowdReportCandidates', () => {
+  it('requires single-report affected-area scope before applying the result limit', async () => {
+    const fake = makeFakeCandidateDb();
+
+    await getDispatchableCrowdReportCandidates(fake.db as never, {
+      kind: 'report',
+      limit: 1,
+      rootUrl: 'https://mrtdown.example',
+    });
+
+    const dialect = new PgDialect();
+    const whereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
+
+    expect(whereSql).toContain('crowd_report_lines');
+    expect(whereSql).toContain('crowd_report_stations');
   });
 });
 
