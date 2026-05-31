@@ -158,6 +158,7 @@ const REPORT_SCOPE_LABELS = {
 >;
 
 const REPORT_SCOPES = Object.keys(REPORT_SCOPE_LABELS) as ReportScope[];
+const MAX_REPORT_STATION_IDS = 16;
 
 let turnstileScriptPromise: Promise<TurnstileApi> | null = null;
 const turnstileSiteKey = import.meta.env.VITE_CROWD_REPORT_TURNSTILE_SITE_KEY;
@@ -765,29 +766,30 @@ function ReportPage() {
 
     if (
       supportsAffectedStopRange &&
-      rangeStartStationId.length > 0 &&
-      rangeEndStationId.length > 0
+      (rangeStartStationId.length > 0 || rangeEndStationId.length > 0)
     ) {
       if (selectedLineIds.length === 0) {
         const message = intl.formatMessage({
           id: 'report.error.affected_stops_line_required',
           defaultMessage:
-            'Select the affected line before choosing a stop range.',
+            'Select the affected line before choosing affected stops.',
         });
         showFieldError('line', message, 'affected_stops_line_required');
         return;
       }
 
-      if (rangeStartStationId === rangeEndStationId) {
-        const message = intl.formatMessage({
-          id: 'report.error.affected_stops_same_station',
-          defaultMessage: 'Choose two different affected stops.',
-        });
-        showFieldError('affectedStops', message, 'affected_stops_same_station');
-        return;
-      }
-
-      if (expandedAffectedStopStationIds.length === 0) {
+      const affectedStopEndpointStations = [
+        rangeStartStation,
+        rangeEndStation,
+      ].filter((station): station is (typeof stations)[number] => {
+        return station != null;
+      });
+      if (
+        affectedStopEndpointStations.some(
+          (station) =>
+            !station.lineIds.some((lineId) => selectedLineIds.includes(lineId)),
+        )
+      ) {
         const message = intl.formatMessage({
           id: 'report.error.affected_stops_not_on_selected_line',
           defaultMessage:
@@ -797,6 +799,54 @@ function ReportPage() {
           'affectedStops',
           message,
           'affected_stops_not_on_selected_line',
+        );
+        return;
+      }
+
+      if (
+        rangeStartStationId.length > 0 &&
+        rangeEndStationId.length > 0 &&
+        rangeStartStationId === rangeEndStationId
+      ) {
+        const message = intl.formatMessage({
+          id: 'report.error.affected_stops_same_station',
+          defaultMessage: 'Choose two different affected stops.',
+        });
+        showFieldError('affectedStops', message, 'affected_stops_same_station');
+        return;
+      }
+
+      if (
+        rangeStartStationId.length > 0 &&
+        rangeEndStationId.length > 0 &&
+        expandedAffectedStopStationIds.length === 0
+      ) {
+        const message = intl.formatMessage({
+          id: 'report.error.affected_stops_not_on_selected_line',
+          defaultMessage:
+            'Choose affected stops that are served by the selected line.',
+        });
+        showFieldError(
+          'affectedStops',
+          message,
+          'affected_stops_not_on_selected_line',
+        );
+        return;
+      }
+
+      if (submittedStationIds.length > MAX_REPORT_STATION_IDS) {
+        const message = intl.formatMessage(
+          {
+            id: 'report.error.affected_stops_too_many_stations',
+            defaultMessage:
+              'Choose a shorter affected stop range. Reports can include up to {maxStationCount} stations.',
+          },
+          { maxStationCount: MAX_REPORT_STATION_IDS },
+        );
+        showFieldError(
+          'affectedStops',
+          message,
+          'affected_stops_too_many_stations',
         );
         return;
       }
