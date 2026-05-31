@@ -211,6 +211,15 @@ function buildFixtureSubmissions(
 async function clearExistingSyntheticCrowdReports(db: Db) {
   await db.transaction(async (tx) => {
     await tx
+      .update(crowdReportsTable)
+      .set({
+        cluster_id: null,
+        updated_at: sql`now()`,
+      })
+      .where(
+        sql`${crowdReportsTable.id} not like ${`${FIXTURE_ID_PREFIX}-%`} and ${crowdReportsTable.cluster_id} like ${`${FIXTURE_ID_PREFIX}-%`}`,
+      );
+    await tx
       .delete(crowdReportsTable)
       .where(sql`${crowdReportsTable.id} like ${`${FIXTURE_ID_PREFIX}-%`}`);
     await tx
