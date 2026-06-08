@@ -27,7 +27,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           ref: ${{ inputs.environment == 'production' && 'production' || 'main' }}
 
