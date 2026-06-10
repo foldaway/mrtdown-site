@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as Char123LangChar125RouteImport } from './routes/{-$lang}'
+import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as Char123LangChar125IndexRouteImport } from './routes/{-$lang}/index'
 import { Route as Char123LangChar125SystemMapRouteImport } from './routes/{-$lang}/system-map'
 import { Route as Char123LangChar125SitemapDotxmlRouteImport } from './routes/{-$lang}/sitemap[.]xml'
@@ -36,6 +37,11 @@ import { Route as InternalApiTasksCrowdReportDispatchRouteImport } from './route
 const Char123LangChar125Route = Char123LangChar125RouteImport.update({
   id: '/{-$lang}',
   path: '/{-$lang}',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
+  id: '/llms.txt',
+  path: '/llms.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char123LangChar125IndexRoute = Char123LangChar125IndexRouteImport.update({
@@ -165,6 +171,7 @@ const InternalApiTasksCrowdReportDispatchRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/llms.txt': typeof LlmsDottxtRoute
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/operators/$operatorId/': typeof Char123LangChar125OperatorsOperatorIdIndexRoute
 }
 export interface FileRoutesByTo {
+  '/llms.txt': typeof LlmsDottxtRoute
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutRoute
@@ -215,6 +223,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/llms.txt': typeof LlmsDottxtRoute
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
@@ -242,6 +251,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/llms.txt'
     | '/{-$lang}'
     | '/api/issues-day'
     | '/api/reports'
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/operators/$operatorId/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/llms.txt'
     | '/api/issues-day'
     | '/api/reports'
     | '/{-$lang}/about'
@@ -291,6 +302,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/operators/$operatorId'
   id:
     | '__root__'
+    | '/llms.txt'
     | '/{-$lang}'
     | '/api/issues-day'
     | '/api/reports'
@@ -317,6 +329,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  LlmsDottxtRoute: typeof LlmsDottxtRoute
   Char123LangChar125Route: typeof Char123LangChar125RouteWithChildren
   ApiIssuesDayRoute: typeof ApiIssuesDayRoute
   ApiReportsRoute: typeof ApiReportsRoute
@@ -334,6 +347,13 @@ declare module '@tanstack/react-router' {
       path: '/{-$lang}'
       fullPath: '/{-$lang}'
       preLoaderRoute: typeof Char123LangChar125RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/llms.txt': {
+      id: '/llms.txt'
+      path: '/llms.txt'
+      fullPath: '/llms.txt'
+      preLoaderRoute: typeof LlmsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/{-$lang}/': {
@@ -541,6 +561,7 @@ const Char123LangChar125RouteWithChildren =
   Char123LangChar125Route._addFileChildren(Char123LangChar125RouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  LlmsDottxtRoute: LlmsDottxtRoute,
   Char123LangChar125Route: Char123LangChar125RouteWithChildren,
   ApiIssuesDayRoute: ApiIssuesDayRoute,
   ApiReportsRoute: ApiReportsRoute,
