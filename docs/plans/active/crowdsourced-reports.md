@@ -446,6 +446,9 @@ Exit criteria:
 - 2026-05-31: Tightened single-report canonical dispatch candidate selection so
   accepted reports without persisted line or station scope are excluded before
   dispatch batch limits are applied and rechecked under the dispatch lock.
+- 2026-06-10: Added explicit regression coverage for Phase 5 cluster dispatch
+  candidate selection so accepted clusters must retain persisted line or station
+  scope before dispatch limits are applied.
 
 ## Decision Log
 

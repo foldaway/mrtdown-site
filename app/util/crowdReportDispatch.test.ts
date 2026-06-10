@@ -104,6 +104,22 @@ describe('buildCrowdReportSourceUrl', () => {
 });
 
 describe('getDispatchableCrowdReportCandidates', () => {
+  it('requires cluster affected-area scope before applying the result limit', async () => {
+    const fake = makeFakeCandidateDb();
+
+    await getDispatchableCrowdReportCandidates(fake.db as never, {
+      kind: 'cluster',
+      limit: 1,
+      rootUrl: 'https://mrtdown.example',
+    });
+
+    const dialect = new PgDialect();
+    const whereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
+
+    expect(whereSql).toContain('crowd_report_cluster_lines');
+    expect(whereSql).toContain('crowd_report_cluster_stations');
+  });
+
   it('requires single-report affected-area scope before applying the result limit', async () => {
     const fake = makeFakeCandidateDb();
 
