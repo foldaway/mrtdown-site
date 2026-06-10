@@ -328,6 +328,12 @@ underlying compute and payload costs so uncached requests are also fast.
   production build keeps the line route entry chunk from preloading the
   generated `StationMap` asset and shared Recharts charting chunk up front; they
   remain nested lazy dependencies of the line component chunk.
+- 2026-06-11: Continued Phase 5 operator profile hydration cleanup. The
+  operator route now lazy-loads the shared line chart cards behind stable
+  skeleton placeholders and an `IntersectionObserver` viewport gate. A
+  production build emits separate client chunks for `CountTrendCards`,
+  `UptimeRatioTrendCards`, and the shared Recharts charting chunk instead of
+  importing the chart implementation directly in the operator route entry.
 
 ## Validation
 

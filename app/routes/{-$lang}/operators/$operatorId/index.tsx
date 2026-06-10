@@ -1,6 +1,8 @@
 import type { IssueType } from '@mrtdown/core';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import type React from 'react';
 import {
   createIntl,
   FormattedDate,
@@ -16,15 +18,26 @@ import { useHydrated } from '~/hooks/useHydrated';
 import { useViewport } from '~/hooks/useViewport';
 import { getOperatorProfileFn } from '~/util/operator.functions';
 import { assert } from '../../../../util/assert';
-import { CountTrendCards } from '../../lines/$lineId/components/CountTrendCards';
 import { RecentIssuesSection } from '../../lines/$lineId/components/RecentIssuesSection';
-import { UptimeRatioTrendCards } from '../../lines/$lineId/components/UptimeRatioTrendCards';
 import { OperatorCurrentStatusCard } from './components/OperatorCurrentStatusCard';
 import { OperatorLinePerformanceCard } from './components/OperatorLinePerformanceCard';
 import { OperatorQuickFactsCard } from './components/OperatorQuickFactsCard';
 import { OperatorUptimeCard } from './components/OperatorUptimeCard';
 
 const OPERATOR_PROFILE_INITIAL_DATE_COUNT = 30;
+
+const CountTrendCards = lazy(() =>
+  import('../../lines/$lineId/components/CountTrendCards').then((module) => ({
+    default: module.CountTrendCards,
+  })),
+);
+const UptimeRatioTrendCards = lazy(() =>
+  import('../../lines/$lineId/components/UptimeRatioTrendCards').then(
+    (module) => ({
+      default: module.UptimeRatioTrendCards,
+    }),
+  ),
+);
 
 export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
   component: OperatorPage,
@@ -301,15 +314,84 @@ function OperatorPage() {
         />
 
         {operatorProfile.aggregateUptimeRatio != null && (
-          <UptimeRatioTrendCards
-            graphs={operatorProfile.timeScaleGraphsUptimeRatios}
-          />
+          <DeferredOperatorWidget
+            className="md:col-span-12 lg:col-span-8"
+            fallback={<TrendCardSkeleton />}
+          >
+            <UptimeRatioTrendCards
+              graphs={operatorProfile.timeScaleGraphsUptimeRatios}
+            />
+          </DeferredOperatorWidget>
         )}
 
         <RecentIssuesSection issueIds={operatorProfile.issueIdsRecent} />
 
-        <CountTrendCards graphs={operatorProfile.timeScaleGraphsIssueCount} />
+        <DeferredOperatorWidget
+          className="md:col-span-12 lg:col-span-8"
+          fallback={<TrendCardSkeleton />}
+        >
+          <CountTrendCards graphs={operatorProfile.timeScaleGraphsIssueCount} />
+        </DeferredOperatorWidget>
       </div>
     </IncludedEntitiesContext.Provider>
+  );
+}
+
+interface DeferredOperatorWidgetProps {
+  children: React.ReactNode;
+  className: string;
+  fallback: React.ReactNode;
+}
+
+function DeferredOperatorWidget(props: DeferredOperatorWidgetProps) {
+  const { children, className, fallback } = props;
+  const [shouldRender, setShouldRender] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (shouldRender) {
+      return;
+    }
+
+    const container = containerRef.current;
+    if (container == null || !('IntersectionObserver' in window)) {
+      setShouldRender(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldRender(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '600px 0px' },
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [shouldRender]);
+
+  return (
+    <div className={className} ref={containerRef}>
+      {shouldRender ? (
+        <Suspense fallback={fallback}>{children}</Suspense>
+      ) : (
+        fallback
+      )}
+    </div>
+  );
+}
+
+function TrendCardSkeleton() {
+  return (
+    <div className="flex min-h-96 flex-col rounded-lg border border-gray-300 p-6 shadow-lg dark:border-gray-700">
+      <div className="h-6 w-56 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+      <div className="mt-3 h-10 w-40 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+      <div className="mt-3 h-5 w-32 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+      <div className="mt-4 h-48 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+      <div className="mt-4 h-10 w-60 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+    </div>
   );
 }
