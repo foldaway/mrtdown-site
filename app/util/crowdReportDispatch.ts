@@ -4,7 +4,16 @@ import {
   type IngestContentCrowdReport,
   type IngestPayload,
 } from '@mrtdown/ingest-contracts';
-import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import {
   crowdReportAbuseEventsTable,
@@ -117,21 +126,29 @@ function hasCrowdReportScope() {
 }
 
 function hasCrowdReportClusterCurrentConfidence() {
-  return sql`(
-    select count(*)
+  return sql`${getCrowdReportClusterOngoingReportCountSql()} >= ${DEFAULT_DISPATCH_MIN_ONGOING_REPORTS} and ${getCrowdReportClusterOngoingDistinctIpHashCountSql()} >= ${DEFAULT_DISPATCH_MIN_DISTINCT_IP_HASHES}`;
+}
+
+function getCrowdReportClusterOngoingReportCountSql() {
+  return sql<number>`(
+    select count(*)::int
     from ${crowdReportsTable}
     where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
       and ${crowdReportsTable.still_happening} is true
-  ) >= ${DEFAULT_DISPATCH_MIN_ONGOING_REPORTS} and (
-    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})
+  )`;
+}
+
+function getCrowdReportClusterOngoingDistinctIpHashCountSql() {
+  return sql<number>`(
+    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})::int
     from ${crowdReportAbuseEventsTable}
     inner join ${crowdReportsTable}
       on ${crowdReportsTable.id} = ${crowdReportAbuseEventsTable.report_id}
     where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
       and ${crowdReportsTable.still_happening} is true
-  ) >= ${DEFAULT_DISPATCH_MIN_DISTINCT_IP_HASHES}`;
+  )`;
 }
 
 export function buildCrowdReportSourceUrl(
@@ -256,7 +273,7 @@ async function getDispatchableCrowdReportClusterCandidates(
     .select({
       id: crowdReportClustersTable.id,
       effect: crowdReportClustersTable.effect,
-      reportCount: crowdReportClustersTable.report_count,
+      reportCount: getCrowdReportClusterOngoingReportCountSql(),
       windowEndAt: crowdReportClustersTable.window_end_at,
       updatedAt: crowdReportClustersTable.updated_at,
     })
@@ -307,6 +324,7 @@ async function getDispatchableCrowdReportClusterCandidates(
         and(
           inArray(crowdReportsTable.cluster_id, clusterIds),
           inArray(crowdReportsTable.status, ['accepted', 'duplicate']),
+          eq(crowdReportsTable.still_happening, true),
         ),
       )
       .orderBy(desc(crowdReportsTable.observed_at)),
@@ -534,7 +552,12 @@ async function markCrowdReportDispatchSuccessInTransaction(
         dispatched_at: dispatchedAt,
         updated_at: sql`now()`,
       })
-      .where(eq(crowdReportClustersTable.id, candidate.id));
+      .where(
+        and(
+          eq(crowdReportClustersTable.id, candidate.id),
+          hasNoOngoingClusterReportsOutsideDispatchPayload(candidate),
+        ),
+      );
   }
 
   await tx
@@ -567,14 +590,20 @@ async function markCrowdReportDispatchFailureInTransaction(
 function getCrowdReportDispatchReportScope(
   candidate: CrowdReportDispatchCandidate,
 ) {
-  if (candidate.kind === 'cluster') {
-    return and(
-      eq(crowdReportsTable.cluster_id, candidate.id),
-      inArray(crowdReportsTable.status, ['accepted', 'duplicate']),
-    );
-  }
-
   return inArray(crowdReportsTable.id, candidate.reportIds);
+}
+
+function hasNoOngoingClusterReportsOutsideDispatchPayload(
+  candidate: CrowdReportDispatchCandidate,
+) {
+  return sql`not exists (
+    select 1
+    from ${crowdReportsTable}
+    where ${crowdReportsTable.cluster_id} = ${candidate.id}
+      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+      and ${crowdReportsTable.still_happening} is true
+      and ${notInArray(crowdReportsTable.id, candidate.reportIds)}
+  )`;
 }
 
 async function tryAcquireCrowdReportDispatchLock(

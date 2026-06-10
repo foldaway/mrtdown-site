@@ -209,7 +209,7 @@ function getCrowdReportClusterOngoingReportCountSql(
   clusterId: string | typeof crowdReportClustersTable.id,
 ) {
   return sql<number>`(
-    select count(*)
+    select count(*)::int
     from ${crowdReportsTable}
     where ${crowdReportsTable.cluster_id} = ${clusterId}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
@@ -221,10 +221,34 @@ function getCrowdReportClusterOngoingDistinctIpHashCountSql(
   clusterId: string | typeof crowdReportClustersTable.id,
 ) {
   return sql<number>`(
-    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})
+    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})::int
     from ${crowdReportAbuseEventsTable}
     inner join ${crowdReportsTable}
       on ${crowdReportsTable.id} = ${crowdReportAbuseEventsTable.report_id}
+    where ${crowdReportsTable.cluster_id} = ${clusterId}
+      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+      and ${crowdReportsTable.still_happening} is true
+  )`;
+}
+
+function getCrowdReportClusterOngoingWindowStartAtSql(
+  clusterId: string | typeof crowdReportClustersTable.id,
+) {
+  return sql<string>`(
+    select min(${crowdReportsTable.observed_at})
+    from ${crowdReportsTable}
+    where ${crowdReportsTable.cluster_id} = ${clusterId}
+      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+      and ${crowdReportsTable.still_happening} is true
+  )`;
+}
+
+function getCrowdReportClusterOngoingWindowEndAtSql(
+  clusterId: string | typeof crowdReportClustersTable.id,
+) {
+  return sql<string>`(
+    select max(${crowdReportsTable.observed_at})
+    from ${crowdReportsTable}
     where ${crowdReportsTable.cluster_id} = ${clusterId}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
       and ${crowdReportsTable.still_happening} is true
@@ -1277,9 +1301,15 @@ export async function getPublicCrowdReportSignals(
     .select({
       id: crowdReportClustersTable.id,
       effect: crowdReportClustersTable.effect,
-      reportCount: crowdReportClustersTable.report_count,
-      windowStartAt: crowdReportClustersTable.window_start_at,
-      windowEndAt: crowdReportClustersTable.window_end_at,
+      reportCount: getCrowdReportClusterOngoingReportCountSql(
+        crowdReportClustersTable.id,
+      ),
+      windowStartAt: getCrowdReportClusterOngoingWindowStartAtSql(
+        crowdReportClustersTable.id,
+      ),
+      windowEndAt: getCrowdReportClusterOngoingWindowEndAtSql(
+        crowdReportClustersTable.id,
+      ),
       updatedAt: crowdReportClustersTable.updated_at,
     })
     .from(crowdReportClustersTable)
@@ -1292,7 +1322,12 @@ export async function getPublicCrowdReportSignals(
           options.minDistinctIpHashes ??
             DEFAULT_PUBLIC_SIGNAL_MIN_DISTINCT_IP_HASHES,
         ),
-        gte(crowdReportClustersTable.window_end_at, activeSince),
+        gte(
+          getCrowdReportClusterOngoingWindowEndAtSql(
+            crowdReportClustersTable.id,
+          ),
+          activeSince,
+        ),
         options.lineId
           ? sql`exists (select 1 from ${crowdReportClusterLinesTable} where ${crowdReportClusterLinesTable.cluster_id} = ${crowdReportClustersTable.id} and ${crowdReportClusterLinesTable.line_id} = ${options.lineId})`
           : undefined,
@@ -1301,7 +1336,11 @@ export async function getPublicCrowdReportSignals(
           : undefined,
       ),
     )
-    .orderBy(desc(crowdReportClustersTable.window_end_at))
+    .orderBy(
+      desc(
+        getCrowdReportClusterOngoingWindowEndAtSql(crowdReportClustersTable.id),
+      ),
+    )
     .limit(options.limit ?? DEFAULT_PUBLIC_SIGNAL_LIMIT);
 
   const clusterIds = clusterRows.map((cluster) => cluster.id);
