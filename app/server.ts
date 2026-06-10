@@ -69,6 +69,10 @@ async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
     logResponseByteEstimate(request, responseWithHeaders.clone(), elapsedMs);
   }
 
+  if (shouldPreservePublicMarkdownCache(responseWithHeaders)) {
+    return responseWithHeaders;
+  }
+
   return addSentryAnonymousUserCookie(responseWithHeaders, sentryAnonymousUser);
 }
 
@@ -119,6 +123,10 @@ function appendInstrumentationHeaders(
       : workerTiming,
   );
   headers.set('X-MRTDown-Render', render);
+}
+
+function shouldPreservePublicMarkdownCache(response: Response) {
+  return response.headers.get('X-MRTDown-Cache') === 'public-markdown';
 }
 
 async function logResponseByteEstimate(

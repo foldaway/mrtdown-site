@@ -139,6 +139,9 @@ Exit criteria:
 - 2026-05-31: Added the shared Phase 1 Markdown surface with mdast-backed
   serialization helpers, GFM table support, date and duration formatting, and a
   cacheable `text/markdown` response helper.
+- 2026-06-11: Added the Phase 2 `/llms.txt` discovery route with a curated
+  agent entry point, links to current public resources, and documented canonical
+  Markdown URL patterns for Phase 3 entity routes.
 
 ## Decision Log
 
