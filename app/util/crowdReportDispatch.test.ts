@@ -6,6 +6,7 @@ import {
   buildCrowdReportIngestPayload,
   buildCrowdReportSourceUrl,
   dispatchCrowdReportPayloadToGitHub,
+  dispatchPendingCrowdReports,
   getDispatchableCrowdReportCandidates,
   markCrowdReportDispatchSuccess,
 } from './crowdReportDispatch';
@@ -122,6 +123,48 @@ function makeFakeDispatchUpdateDb() {
         return callback({
           update() {
             return updateBuilder;
+          },
+        });
+      },
+    },
+  };
+}
+
+function makeFakeDispatchEligibilityDb() {
+  const executeCalls: unknown[] = [];
+  const whereCalls: unknown[] = [];
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    where(condition: unknown) {
+      whereCalls.push(condition);
+      return this;
+    },
+    limit() {
+      return Promise.resolve([]);
+    },
+  };
+
+  return {
+    executeCalls,
+    whereCalls,
+    db: {
+      transaction<T>(
+        callback: (transaction: {
+          execute: (
+            query: unknown,
+          ) => Promise<{ rows: Array<{ locked: boolean }> }>;
+          select: () => typeof selectBuilder;
+        }) => Promise<T>,
+      ) {
+        return callback({
+          execute(query: unknown) {
+            executeCalls.push(query);
+            return Promise.resolve({ rows: [{ locked: true }] });
+          },
+          select() {
+            return selectBuilder;
           },
         });
       },
@@ -289,6 +332,53 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(reportUpdateWhereSql).not.toContain(
       '"crowd_reports"."cluster_id" =',
     );
+  });
+
+  it('rechecks cluster payload freshness under the dispatch lock', async () => {
+    const fake = makeFakeDispatchEligibilityDb();
+    const fetchImpl = vi.fn();
+
+    await dispatchPendingCrowdReports(
+      fake.db as never,
+      {
+        rootUrl: 'https://mrtdown.example',
+        token: 'github-token',
+        candidates: [
+          {
+            kind: 'cluster',
+            id: 'cluster-1',
+            reportIds: ['ongoing-report-1', 'ongoing-report-2'],
+            payload: IngestPayloadSchema.parse({
+              content: [
+                {
+                  source: 'crowd-report',
+                  reportId: 'cluster:cluster-1',
+                  text: 'Two community reports describe this issue.',
+                  createdAt: '2026-05-24T04:40:00.000Z',
+                  observedAt: '2026-05-24T12:30:00.000+08:00',
+                  lineIds: ['BPLRT'],
+                  reportCount: 2,
+                  url: 'https://mrtdown.example/report?communitySource=cluster%3Acluster-1',
+                },
+              ],
+            }),
+          },
+        ],
+      },
+      fetchImpl,
+    );
+
+    const dialect = new PgDialect();
+    const lockSql = dialect.sqlToQuery(fake.executeCalls[0] as SQL);
+    const eligibilityWhereSql = dialect.sqlToQuery(
+      fake.whereCalls[0] as SQL,
+    ).sql;
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(lockSql.params).toContain('crowd-report-dispatch:cluster:cluster-1');
+    expect(eligibilityWhereSql).toContain('not exists');
+    expect(eligibilityWhereSql).toContain('"still_happening" is true');
+    expect(eligibilityWhereSql).toContain('"crowd_reports"."id" not in');
   });
 });
 

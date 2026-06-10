@@ -18,6 +18,7 @@ import {
   stationsTable,
   crowdReportStationsTable,
 } from '~/db/schema';
+import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 const DEFAULT_RATE_LIMIT_PER_HOUR = 5;
@@ -184,6 +185,34 @@ function buildDuplicateLockKey(submission: CrowdReportSubmission) {
     lineIds: normalizeIdSet(submission.lineIds),
     stationIds: normalizeIdSet(submission.stationIds),
   });
+}
+
+async function lockCrowdReportClusterDispatchInTransaction(
+  tx: Pick<CrowdReportTransaction, 'execute'>,
+  clusterId: string,
+) {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${buildCrowdReportDispatchLockKey('cluster', clusterId)}, 0::bigint))`,
+  );
+}
+
+async function isCrowdReportClusterAvailableForDuplicateInTransaction(
+  tx: Pick<CrowdReportTransaction, 'select'>,
+  clusterId: string,
+) {
+  const rows = await tx
+    .select({ id: crowdReportClustersTable.id })
+    .from(crowdReportClustersTable)
+    .where(
+      and(
+        eq(crowdReportClustersTable.id, clusterId),
+        inArray(crowdReportClustersTable.status, ['pending', 'accepted']),
+        isNull(crowdReportClustersTable.dispatched_at),
+      ),
+    )
+    .limit(1);
+
+  return rows.length > 0;
 }
 
 function getCrowdReportClusterWindow(
@@ -948,12 +977,23 @@ async function automoderateCrowdReportInTransaction(
     );
   }
 
-  const duplicate = await findDuplicateCrowdReport(
+  let duplicate = await findDuplicateCrowdReport(
     tx,
     reportId,
     submission,
     duplicateWindowMinutes,
   );
+  if (duplicate?.clusterId != null) {
+    await lockCrowdReportClusterDispatchInTransaction(tx, duplicate.clusterId);
+    if (
+      !(await isCrowdReportClusterAvailableForDuplicateInTransaction(
+        tx,
+        duplicate.clusterId,
+      ))
+    ) {
+      duplicate = undefined;
+    }
+  }
   const status = duplicate == null ? 'accepted' : 'duplicate';
 
   const [updatedReport] = await tx
