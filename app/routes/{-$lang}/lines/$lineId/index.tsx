@@ -1,7 +1,8 @@
 import type { IssueType } from '@mrtdown/core';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { useMemo } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import type React from 'react';
 import {
   createIntl,
   FormattedDate,
@@ -18,16 +19,29 @@ import type { Station } from '~/types';
 import { assert } from '~/util/assert';
 import type { LineBranch } from '~/util/db.queries';
 import { getLineProfileFn } from '~/util/lines.functions';
-import { CountTrendCards } from './components/CountTrendCards';
 import { CurrentStatusCard } from './components/CurrentStatusCard';
 import { LineSchematicCard } from './components/LineSchematicCard';
-import { LineSystemMapCard } from './components/LineSystemMapCard';
 import { NextMaintenanceCard } from './components/NextMaintenanceCard';
 import { QuickFactsCard } from './components/QuickFactsCard';
 import { RecentIssuesSection } from './components/RecentIssuesSection';
 import { StationInterchangesCard } from './components/StationInterchangesCard';
 import { UptimeCard } from './components/UptimeCard';
-import { UptimeRatioTrendCards } from './components/UptimeRatioTrendCards';
+
+const CountTrendCards = lazy(() =>
+  import('./components/CountTrendCards').then((module) => ({
+    default: module.CountTrendCards,
+  })),
+);
+const LineSystemMapCard = lazy(() =>
+  import('./components/LineSystemMapCard').then((module) => ({
+    default: module.LineSystemMapCard,
+  })),
+);
+const UptimeRatioTrendCards = lazy(() =>
+  import('./components/UptimeRatioTrendCards').then((module) => ({
+    default: module.UptimeRatioTrendCards,
+  })),
+);
 
 const DATE_COUNT = 90;
 
@@ -337,17 +351,32 @@ function ComponentPage() {
 
         <QuickFactsCard line={line} branches={branches} />
 
-        <LineSystemMapCard line={line} branches={branches} />
+        <DeferredLineWidget
+          className="md:col-span-4"
+          fallback={<LineSystemMapCardSkeleton />}
+        >
+          <LineSystemMapCard line={line} branches={branches} />
+        </DeferredLineWidget>
 
         {lineProfile.lineSummary.status !== 'future_service' && (
-          <UptimeRatioTrendCards
-            graphs={lineProfile.timeScaleGraphsUptimeRatios}
-          />
+          <DeferredLineWidget
+            className="md:col-span-12 lg:col-span-8"
+            fallback={<TrendCardSkeleton />}
+          >
+            <UptimeRatioTrendCards
+              graphs={lineProfile.timeScaleGraphsUptimeRatios}
+            />
+          </DeferredLineWidget>
         )}
 
         <RecentIssuesSection issueIds={lineProfile.issueIdsRecent} />
 
-        <CountTrendCards graphs={lineProfile.timeScaleGraphsIssueCount} />
+        <DeferredLineWidget
+          className="md:col-span-12 lg:col-span-8"
+          fallback={<TrendCardSkeleton />}
+        >
+          <CountTrendCards graphs={lineProfile.timeScaleGraphsIssueCount} />
+        </DeferredLineWidget>
 
         <StationInterchangesCard
           lineId={lineId}
@@ -355,5 +384,75 @@ function ComponentPage() {
         />
       </div>
     </IncludedEntitiesContext.Provider>
+  );
+}
+
+interface DeferredLineWidgetProps {
+  children: React.ReactNode;
+  className: string;
+  fallback: React.ReactNode;
+}
+
+function DeferredLineWidget(props: DeferredLineWidgetProps) {
+  const { children, className, fallback } = props;
+  const [shouldRender, setShouldRender] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (shouldRender) {
+      return;
+    }
+
+    const container = containerRef.current;
+    if (container == null || !('IntersectionObserver' in window)) {
+      setShouldRender(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldRender(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '600px 0px' },
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [shouldRender]);
+
+  return (
+    <div className={className} ref={containerRef}>
+      {shouldRender ? (
+        <Suspense fallback={fallback}>{children}</Suspense>
+      ) : (
+        fallback
+      )}
+    </div>
+  );
+}
+
+function TrendCardSkeleton() {
+  return (
+    <div className="flex min-h-96 flex-col rounded-lg border border-gray-300 p-6 shadow-lg dark:border-gray-700">
+      <div className="h-6 w-56 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+      <div className="mt-3 h-10 w-40 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+      <div className="mt-3 h-5 w-32 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+      <div className="mt-4 h-48 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+      <div className="mt-4 h-10 w-60 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+    </div>
+  );
+}
+
+function LineSystemMapCardSkeleton() {
+  return (
+    <div className="flex min-h-96 flex-col rounded-lg border border-gray-300 p-6 shadow-lg dark:border-gray-700">
+      <div className="mb-2 h-6 w-28 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+      <div className="min-h-0 flex-1 bg-gray-100 p-3 dark:bg-gray-800">
+        <div className="h-full min-h-80 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
+      </div>
+    </div>
   );
 }
