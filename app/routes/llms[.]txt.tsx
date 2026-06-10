@@ -8,7 +8,7 @@ export const Route = createFileRoute('/llms.txt')({
       GET() {
         return createPublicMarkdownResponse(
           getLlmsTxt({
-            rootUrl: process.env.ROOT_URL ?? 'https://www.mrtdown.org',
+            rootUrl: import.meta.env.VITE_ROOT_URL,
           }),
         );
       },
