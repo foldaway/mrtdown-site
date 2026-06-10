@@ -322,6 +322,12 @@ underlying compute and payload costs so uncached requests are also fast.
   production build emits separate client chunks for `CountTrendCards`,
   `DurationTrendCards`, `LinesIssueCountCard`, `StationsIssueCountCard`, and
   `DisruptionsHeatmap`.
+- 2026-06-11: Continued Phase 5 line profile hydration cleanup. The line route
+  now lazy-loads the focused system map and line chart cards behind stable
+  skeleton placeholders and an `IntersectionObserver` viewport gate. A
+  production build keeps the line route entry chunk from preloading the
+  generated `StationMap` asset and shared Recharts charting chunk up front; they
+  remain nested lazy dependencies of the line component chunk.
 
 ## Validation
 
