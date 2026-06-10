@@ -449,6 +449,17 @@ Exit criteria:
 - 2026-06-10: Added explicit regression coverage for Phase 5 cluster dispatch
   candidate selection so accepted clusters must retain persisted line or station
   scope before dispatch limits are applied.
+- 2026-06-10: Continued Phase 6 dispatch hardening so public community-signal
+  counts and canonical cluster dispatch payloads use ongoing accepted or
+  duplicate reports only, with regression coverage for ongoing-source
+  confidence predicates.
+- 2026-06-10: Addressed review feedback on Phase 6 hardening by scoping
+  dispatch success and failure report updates to the exact ongoing reports in
+  the payload, and by deriving public community-signal recency from ongoing
+  report timestamps instead of cluster-wide windows.
+- 2026-06-11: Addressed follow-up review feedback by preventing cluster dispatch
+  from closing a cluster when new ongoing accepted or duplicate reports exist
+  outside the dispatched payload's report ID set.
 
 ## Decision Log
 

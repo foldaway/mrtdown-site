@@ -7,6 +7,7 @@ import {
   buildCrowdReportSourceUrl,
   dispatchCrowdReportPayloadToGitHub,
   getDispatchableCrowdReportCandidates,
+  markCrowdReportDispatchSuccess,
 } from './crowdReportDispatch';
 
 function makeFakeCandidateDb() {
@@ -32,6 +33,97 @@ function makeFakeCandidateDb() {
     db: {
       select() {
         return selectBuilder;
+      },
+    },
+  };
+}
+
+function makeFakeClusterCandidateDb() {
+  const whereCalls: unknown[] = [];
+  const selectResults = [
+    [
+      {
+        id: 'cluster-1',
+        effect: 'delay',
+        reportCount: 1,
+        windowEndAt: '2026-05-24T04:40:00.000Z',
+        updatedAt: '2026-05-24T04:45:00.000Z',
+      },
+    ],
+    [{ clusterId: 'cluster-1', lineId: 'BPLRT' }],
+    [{ clusterId: 'cluster-1', stationId: 'BP6' }],
+    [
+      {
+        id: 'report-1',
+        clusterId: 'cluster-1',
+        observedAt: '2026-05-24T04:30:00.000Z',
+        text: 'Train stalled near the platform for several minutes.',
+        directionText: 'Towards Choa Chu Kang',
+        delayMinutes: 10,
+        stillHappening: true,
+      },
+    ],
+  ];
+  let selectCount = 0;
+
+  return {
+    whereCalls,
+    db: {
+      select() {
+        const selectIndex = selectCount;
+        selectCount += 1;
+        return {
+          from() {
+            return this;
+          },
+          where(condition: unknown) {
+            whereCalls.push(condition);
+            if (selectIndex === 1 || selectIndex === 2) {
+              return Promise.resolve(selectResults[selectIndex]);
+            }
+            return this;
+          },
+          orderBy() {
+            if (selectIndex === 3) {
+              return Promise.resolve(selectResults[selectIndex]);
+            }
+            return this;
+          },
+          limit() {
+            return Promise.resolve(selectResults[selectIndex]);
+          },
+        };
+      },
+    },
+  };
+}
+
+function makeFakeDispatchUpdateDb() {
+  const whereCalls: unknown[] = [];
+  const updateBuilder = {
+    set() {
+      return {
+        where(condition: unknown) {
+          whereCalls.push(condition);
+          return Promise.resolve();
+        },
+      };
+    },
+  };
+
+  return {
+    whereCalls,
+    db: {
+      transaction<T>(
+        callback: (transaction: {
+          update: () => typeof updateBuilder;
+        }) => Promise<T>,
+      ) {
+        return callback({
+          update() {
+            return updateBuilder;
+          },
+        });
       },
     },
   };
@@ -118,6 +210,8 @@ describe('getDispatchableCrowdReportCandidates', () => {
 
     expect(whereSql).toContain('crowd_report_cluster_lines');
     expect(whereSql).toContain('crowd_report_cluster_stations');
+    expect(whereSql).toContain('still_happening');
+    expect(whereSql).toContain('count(distinct');
   });
 
   it('requires single-report affected-area scope before applying the result limit', async () => {
@@ -134,6 +228,67 @@ describe('getDispatchableCrowdReportCandidates', () => {
 
     expect(whereSql).toContain('crowd_report_lines');
     expect(whereSql).toContain('crowd_report_stations');
+  });
+
+  it('builds cluster dispatch payloads from ongoing reports only', async () => {
+    const fake = makeFakeClusterCandidateDb();
+
+    await getDispatchableCrowdReportCandidates(fake.db as never, {
+      kind: 'cluster',
+      limit: 1,
+      rootUrl: 'https://mrtdown.example',
+    });
+
+    const dialect = new PgDialect();
+    const reportRowsWhereSql = dialect.sqlToQuery(
+      fake.whereCalls[3] as SQL,
+    ).sql;
+
+    expect(reportRowsWhereSql).toContain('"still_happening" =');
+  });
+
+  it('marks only the report IDs included in a cluster dispatch payload', async () => {
+    const fake = makeFakeDispatchUpdateDb();
+
+    await markCrowdReportDispatchSuccess(
+      fake.db as never,
+      {
+        kind: 'cluster',
+        id: 'cluster-1',
+        reportIds: ['ongoing-report-1', 'ongoing-report-2'],
+        payload: IngestPayloadSchema.parse({
+          content: [
+            {
+              source: 'crowd-report',
+              reportId: 'cluster:cluster-1',
+              text: 'Two community reports describe this issue.',
+              createdAt: '2026-05-24T04:40:00.000Z',
+              observedAt: '2026-05-24T12:30:00.000+08:00',
+              lineIds: ['BPLRT'],
+              reportCount: 2,
+              url: 'https://mrtdown.example/report?communitySource=cluster%3Acluster-1',
+            },
+          ],
+        }),
+      },
+      '2026-05-24T04:45:00.000Z',
+    );
+
+    const dialect = new PgDialect();
+    const clusterUpdateWhereSql = dialect.sqlToQuery(
+      fake.whereCalls[0] as SQL,
+    ).sql;
+    const reportUpdateWhereSql = dialect.sqlToQuery(
+      fake.whereCalls[1] as SQL,
+    ).sql;
+
+    expect(clusterUpdateWhereSql).toContain('not exists');
+    expect(clusterUpdateWhereSql).toContain('"still_happening" is true');
+    expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" not in');
+    expect(reportUpdateWhereSql).toContain('"crowd_reports"."id" in');
+    expect(reportUpdateWhereSql).not.toContain(
+      '"crowd_reports"."cluster_id" =',
+    );
   });
 });
 

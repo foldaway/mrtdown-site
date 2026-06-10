@@ -1232,6 +1232,12 @@ describe('getPublicCrowdReportSignals', () => {
 
     expect(whereSql).toContain('crowd_report_cluster_lines');
     expect(whereSql).toContain('crowd_report_cluster_stations');
+    expect(whereSql).toContain('still_happening');
+    expect(whereSql).toContain('count(distinct');
+    expect(whereSql).toContain('max("crowd_reports"."observed_at")');
+    expect(whereSql).not.toContain(
+      '"crowd_report_clusters"."window_end_at" >=',
+    );
   });
 
   it('pushes route scope into the cluster query before applying the result limit', async () => {
