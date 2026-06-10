@@ -315,6 +315,13 @@ underlying compute and payload costs so uncached requests are also fast.
   now captures browser FCP, LCP, CLS, and approximate INP metrics through the
   existing PostHog provider in production, tagged with normalized route paths so
   entity IDs do not create high-cardinality analytics dimensions.
+- 2026-06-10: Continued Phase 5 statistics hydration cleanup. The statistics
+  grid now lazy-loads chart-heavy cards behind stable skeleton placeholders and
+  an `IntersectionObserver` viewport gate, keeping Recharts and chart card code
+  out of the initial statistics route render until the cards are near view. A
+  production build emits separate client chunks for `CountTrendCards`,
+  `DurationTrendCards`, `LinesIssueCountCard`, `StationsIssueCountCard`, and
+  `DisruptionsHeatmap`.
 
 ## Validation
 

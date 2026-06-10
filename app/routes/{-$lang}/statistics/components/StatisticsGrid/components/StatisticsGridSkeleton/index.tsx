@@ -27,7 +27,7 @@ function CardSkeleton(props: React.PropsWithChildren) {
   );
 }
 
-function TrendCardSkeleton() {
+export function TrendCardSkeleton() {
   return (
     <CardSkeleton>
       <div className="mb-2 h-5 w-56 rounded-md bg-gray-200 dark:bg-gray-700" />
@@ -67,7 +67,7 @@ function TrendCardSkeleton() {
   );
 }
 
-function HeatmapCardSkeleton() {
+export function HeatmapCardSkeleton() {
   return (
     <CardSkeleton>
       <div className="mb-1 h-5 w-48 rounded-md bg-gray-200 dark:bg-gray-700" />
@@ -119,7 +119,7 @@ interface BarChartCardSkeletonProps {
   heightClassName: string;
 }
 
-function BarChartCardSkeleton(props: BarChartCardSkeletonProps) {
+export function BarChartCardSkeleton(props: BarChartCardSkeletonProps) {
   const { barCount, heightClassName } = props;
   const barIds = barCount === 15 ? STATION_BAR_IDS : LINE_BAR_IDS;
 
@@ -148,7 +148,7 @@ function BarChartCardSkeleton(props: BarChartCardSkeletonProps) {
   );
 }
 
-function LongestDisruptionsCardSkeleton() {
+export function LongestDisruptionsCardSkeleton() {
   return (
     <CardSkeleton>
       <div className="mb-4 h-5 w-44 rounded-md bg-gray-200 dark:bg-gray-700" />
