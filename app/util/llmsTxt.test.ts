@@ -9,24 +9,23 @@ describe('getLlmsTxt', () => {
     expect(getLlmsTxt({ rootUrl: 'https://example.com/base/' })).toContain(
       '[Sitemap](https://example.com/sitemap.xml)',
     );
+    expect(getLlmsTxt({ rootUrl: 'https://example.com/base/' })).toContain(
+      '[llms.txt](https://example.com/llms.txt)',
+    );
   });
 
-  it('documents the canonical Markdown route patterns', () => {
+  it('only advertises Markdown routes that exist in this phase', () => {
     const markdown = getLlmsTxt();
 
     expect(markdown).toContain('# mrtdown');
-    expect(markdown).toContain('| Current system status | /index.md');
+    expect(markdown).toContain('## Available Markdown');
     expect(markdown).toContain(
-      '| Line profile          | /lines/{lineId}/index.md',
+      'Additional entity Markdown routes will be linked here after those routes are implemented.',
     );
-    expect(markdown).toContain(
-      '| Station profile       | /stations/{stationId}/index.md',
-    );
-    expect(markdown).toContain(
-      '| Operator profile      | /operators/{operatorId}/index.md',
-    );
-    expect(markdown).toContain(
-      '| Issue profile         | /issues/{issueId}/index.md',
-    );
+    expect(markdown).not.toContain('/index.md');
+    expect(markdown).not.toContain('/lines/{lineId}/index.md');
+    expect(markdown).not.toContain('/stations/{stationId}/index.md');
+    expect(markdown).not.toContain('/operators/{operatorId}/index.md');
+    expect(markdown).not.toContain('/issues/{issueId}/index.md');
   });
 });

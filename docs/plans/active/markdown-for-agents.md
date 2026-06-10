@@ -140,8 +140,9 @@ Exit criteria:
   serialization helpers, GFM table support, date and duration formatting, and a
   cacheable `text/markdown` response helper.
 - 2026-06-11: Added the Phase 2 `/llms.txt` discovery route with a curated
-  agent entry point, links to current public resources, and documented canonical
-  Markdown URL patterns for Phase 3 entity routes.
+  agent entry point and links to current public resources. Deferred linking
+  Phase 3 entity Markdown URLs until those routes exist, so agents do not
+  follow advertised 404s.
 
 ## Decision Log
 

@@ -5,7 +5,7 @@ import type {
   PhrasingContent,
   RootContent,
 } from 'mdast';
-import { markdownTable, serializeAgentMarkdown } from './agentMarkdown';
+import { serializeAgentMarkdown } from './agentMarkdown';
 
 const DEFAULT_ROOT_URL = 'https://www.mrtdown.org';
 
@@ -15,25 +15,6 @@ interface LlmsTxtOptions {
 
 export function getLlmsTxt(options?: LlmsTxtOptions) {
   const rootUrl = options?.rootUrl ?? DEFAULT_ROOT_URL;
-  const routeTable = markdownTable({
-    headers: ['Content', 'Markdown URL', 'Human URL'],
-    rows: [
-      ['Current system status', '/index.md', '/'],
-      ['Line profile', '/lines/{lineId}/index.md', '/lines/{lineId}'],
-      [
-        'Station profile',
-        '/stations/{stationId}/index.md',
-        '/stations/{stationId}',
-      ],
-      [
-        'Operator profile',
-        '/operators/{operatorId}/index.md',
-        '/operators/{operatorId}',
-      ],
-      ['Issue profile', '/issues/{issueId}/index.md', '/issues/{issueId}'],
-    ],
-  });
-
   const content: RootContent[] = [
     {
       type: 'heading',
@@ -91,20 +72,31 @@ export function getLlmsTxt(options?: LlmsTxtOptions) {
     {
       type: 'heading',
       depth: 2,
-      children: [{ type: 'text', value: 'Markdown Routes' }],
+      children: [{ type: 'text', value: 'Available Markdown' }],
+    },
+    {
+      type: 'list',
+      ordered: false,
+      spread: false,
+      children: [
+        listItem([
+          link('llms.txt', '/llms.txt', rootUrl),
+          {
+            type: 'text',
+            value:
+              ': curated agent entry point for currently available public resources.',
+          },
+        ]),
+      ],
     },
     paragraph([
       {
         type: 'text',
         value:
-          'The first Markdown pass is en-SG only. Replace placeholders with identifiers from the sitemap or human pages.',
+          'Additional entity Markdown routes will be linked here after those routes are implemented.',
       },
     ]),
   ];
-
-  if (routeTable != null) {
-    content.push(routeTable);
-  }
 
   content.push(
     {
