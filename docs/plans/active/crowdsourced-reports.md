@@ -460,6 +460,16 @@ Exit criteria:
 - 2026-06-11: Addressed follow-up review feedback by preventing cluster dispatch
   from closing a cluster when new ongoing accepted or duplicate reports exist
   outside the dispatched payload's report ID set.
+- 2026-06-11: Continued Phase 6 dispatch hardening by rechecking cluster
+  payload freshness under the dispatch lock, so stale candidates are skipped
+  instead of posting partial cluster payloads when newer ongoing reports arrive.
+- 2026-06-11: Addressed review feedback on the dispatch freshness hardening by
+  making duplicate-report clustering observe the same cluster dispatch advisory
+  lock before attaching a report to an existing cluster.
+- 2026-06-11: Addressed follow-up review feedback by rechecking duplicate
+  cluster availability after waiting on the cluster dispatch lock. Reports that
+  race with a completed dispatch now start fresh accepted clusters instead of
+  attaching to already-dispatched clusters.
 
 ## Decision Log
 

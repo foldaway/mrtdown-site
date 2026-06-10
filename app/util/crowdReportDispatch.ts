@@ -24,6 +24,7 @@ import {
   crowdReportsTable,
   crowdReportStationsTable,
 } from '~/db/schema';
+import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
 
 const DEFAULT_DISPATCH_OWNER = 'foldaway';
 const DEFAULT_DISPATCH_REPO = 'mrtdown-data';
@@ -611,7 +612,7 @@ async function tryAcquireCrowdReportDispatchLock(
   candidate: CrowdReportDispatchCandidate,
 ) {
   const result = await tx.execute<{ locked: boolean }>(
-    sql`select pg_try_advisory_xact_lock(hashtextextended(${`crowd-report-dispatch:${candidate.kind}:${candidate.id}`}, 0::bigint)) as "locked"`,
+    sql`select pg_try_advisory_xact_lock(hashtextextended(${buildCrowdReportDispatchLockKey(candidate.kind, candidate.id)}, 0::bigint)) as "locked"`,
   );
   return result.rows[0]?.locked === true;
 }
@@ -631,6 +632,7 @@ async function isCrowdReportDispatchCandidateEligible(
           isNull(crowdReportClustersTable.dispatched_at),
           hasCrowdReportClusterScope(),
           hasCrowdReportClusterCurrentConfidence(),
+          hasNoOngoingClusterReportsOutsideDispatchPayload(candidate),
         ),
       )
       .limit(1);

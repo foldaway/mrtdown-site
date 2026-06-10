@@ -1049,6 +1049,7 @@ describe('automoderateCrowdReport', () => {
         ],
         [{ reportId: 'existing-report', lineId: 'BPLRT' }],
         [{ reportId: 'existing-report', stationId: 'BP6' }],
+        [{ id: 'cluster-1' }],
       ],
       {
         id: 'report-1',
@@ -1090,6 +1091,73 @@ describe('automoderateCrowdReport', () => {
     expect(fake.updates[2]).toMatchObject({
       table: crowdReportClustersTable,
     });
+
+    const dialect = new PgDialect();
+    const clusterLockSql = dialect.sqlToQuery(fake.executes[1] as SQL);
+    expect(clusterLockSql.sql).toContain('pg_advisory_xact_lock');
+    expect(clusterLockSql.params).toContain(
+      'crowd-report-dispatch:cluster:cluster-1',
+    );
+  });
+
+  it('starts a fresh cluster when a duplicate cluster was dispatched before the lock', async () => {
+    const fake = makeFakeAutomoderationDb(
+      [
+        [
+          {
+            id: 'existing-report',
+            status: 'accepted',
+            directionText: 'Towards Choa Chu Kang',
+            clusterId: 'cluster-1',
+          },
+        ],
+        [{ reportId: 'existing-report', lineId: 'BPLRT' }],
+        [{ reportId: 'existing-report', stationId: 'BP6' }],
+        [],
+      ],
+      {
+        id: 'report-1',
+        status: 'accepted',
+        duplicateOfId: null,
+      },
+    );
+    const ids = ['event-1', 'cluster-2'];
+
+    await expect(
+      automoderateCrowdReport(fake.db as never, 'report-1', VALID_SUBMISSION, {
+        idFactory: () => ids.shift() ?? 'unused-id',
+      }),
+    ).resolves.toEqual({
+      id: 'report-1',
+      status: 'accepted',
+      duplicateOfId: null,
+    });
+
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'accepted',
+        duplicate_of_id: null,
+      },
+    });
+    expect(fake.inserts[1]).toMatchObject({
+      table: crowdReportClustersTable,
+      values: {
+        id: 'cluster-2',
+      },
+    });
+    expect(fake.updates[1]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        cluster_id: 'cluster-2',
+      },
+    });
+
+    const dialect = new PgDialect();
+    const clusterLockSql = dialect.sqlToQuery(fake.executes[1] as SQL);
+    expect(clusterLockSql.params).toContain(
+      'crowd-report-dispatch:cluster:cluster-1',
+    );
   });
 
   it('seeds a legacy duplicate cluster from the original accepted report timestamp', async () => {
@@ -1193,6 +1261,7 @@ describe('automoderateCrowdReport', () => {
         ],
         [{ reportId: 'existing-report', lineId: 'BPLRT' }],
         [{ reportId: 'existing-report', stationId: 'BP6' }],
+        [{ id: 'cluster-1' }],
       ],
       {
         id: 'report-1',
