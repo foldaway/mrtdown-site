@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import type { SystemAnalytics } from '~/util/db.queries';
-import { LongestDisruptionsCard } from './components/LongestDisruptionsCard';
 import {
   BarChartCardSkeleton,
   HeatmapCardSkeleton,
+  LongestDisruptionsCardSkeleton,
   TrendCardSkeleton,
 } from './components/StatisticsGridSkeleton';
 
@@ -26,6 +26,11 @@ const DurationTrendCards = lazy(() =>
 const LinesIssueCountCard = lazy(() =>
   import('./components/LinesIssueCountCard').then((module) => ({
     default: module.LinesIssueCountCard,
+  })),
+);
+const LongestDisruptionsCard = lazy(() =>
+  import('./components/LongestDisruptionsCard').then((module) => ({
+    default: module.LongestDisruptionsCard,
   })),
 );
 const StationsIssueCountCard = lazy(() =>
@@ -54,7 +59,11 @@ export const StatisticsGrid: React.FC<Props> = (props) => {
       >
         <LinesIssueCountCard chart={statistics.chartTotalIssueCountByLine} />
       </DeferredStatisticsCard>
-      <LongestDisruptionsCard issueIds={statistics.issueIdsDisruptionLongest} />
+      <DeferredStatisticsCard fallback={<LongestDisruptionsCardSkeleton />}>
+        <LongestDisruptionsCard
+          issueIds={statistics.issueIdsDisruptionLongest}
+        />
+      </DeferredStatisticsCard>
       <DeferredStatisticsCard
         fallback={<BarChartCardSkeleton barCount={15} heightClassName="h-72" />}
       >
