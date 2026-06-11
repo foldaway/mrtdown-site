@@ -478,6 +478,9 @@ Exit criteria:
   payload's report IDs to still be the exact current ongoing accepted or
   duplicate reports attached to the cluster before dispatch or success marking
   can proceed.
+- 2026-06-11: Addressed review feedback on cluster dispatch success marking by
+  making the report-row success update conditional on the guarded cluster-row
+  update actually succeeding.
 
 ## Decision Log
 

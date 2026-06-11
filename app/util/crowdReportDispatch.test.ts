@@ -99,13 +99,25 @@ function makeFakeClusterCandidateDb() {
   };
 }
 
-function makeFakeDispatchUpdateDb() {
+function makeFakeDispatchUpdateDb(
+  clusterUpdateRows: Array<{ id: string }> = [{ id: 'cluster-1' }],
+) {
   const whereCalls: unknown[] = [];
+  let updateCount = 0;
   const updateBuilder = {
     set() {
+      const updateIndex = updateCount;
+      updateCount += 1;
       return {
         where(condition: unknown) {
           whereCalls.push(condition);
+          if (updateIndex === 0) {
+            return {
+              returning() {
+                return Promise.resolve(clusterUpdateRows);
+              },
+            };
+          }
           return Promise.resolve();
         },
       };
@@ -334,6 +346,38 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(reportUpdateWhereSql).not.toContain(
       '"crowd_reports"."cluster_id" =',
     );
+  });
+
+  it('does not mark cluster payload reports when the cluster freshness update misses', async () => {
+    const fake = makeFakeDispatchUpdateDb([]);
+
+    await expect(
+      markCrowdReportDispatchSuccess(
+        fake.db as never,
+        {
+          kind: 'cluster',
+          id: 'cluster-1',
+          reportIds: ['stale-report-1'],
+          payload: IngestPayloadSchema.parse({
+            content: [
+              {
+                source: 'crowd-report',
+                reportId: 'cluster:cluster-1',
+                text: 'A community report describes this issue.',
+                createdAt: '2026-05-24T04:40:00.000Z',
+                observedAt: '2026-05-24T12:30:00.000+08:00',
+                lineIds: ['BPLRT'],
+                reportCount: 1,
+                url: 'https://mrtdown.example/report?communitySource=cluster%3Acluster-1',
+              },
+            ],
+          }),
+        },
+        '2026-05-24T04:45:00.000Z',
+      ),
+    ).resolves.toBe(false);
+
+    expect(fake.whereCalls).toHaveLength(1);
   });
 
   it('rechecks cluster payload freshness under the dispatch lock', async () => {

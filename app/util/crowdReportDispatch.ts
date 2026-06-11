@@ -526,7 +526,7 @@ export async function markCrowdReportDispatchSuccess(
   candidate: CrowdReportDispatchCandidate,
   dispatchedAt = DateTime.now().toUTC().toISO() ?? new Date().toISOString(),
 ) {
-  await db.transaction((tx) =>
+  return db.transaction((tx) =>
     markCrowdReportDispatchSuccessInTransaction(tx, candidate, dispatchedAt),
   );
 }
@@ -546,7 +546,7 @@ async function markCrowdReportDispatchSuccessInTransaction(
   dispatchedAt: string,
 ) {
   if (candidate.kind === 'cluster') {
-    await tx
+    const updatedClusters = await tx
       .update(crowdReportClustersTable)
       .set({
         status: 'dispatched',
@@ -559,7 +559,12 @@ async function markCrowdReportDispatchSuccessInTransaction(
           hasNoOngoingClusterReportsOutsideDispatchPayload(candidate),
           hasAllClusterDispatchPayloadReportsCurrent(candidate),
         ),
-      );
+      )
+      .returning({ id: crowdReportClustersTable.id });
+
+    if (updatedClusters.length === 0) {
+      return false;
+    }
   }
 
   await tx
@@ -572,6 +577,7 @@ async function markCrowdReportDispatchSuccessInTransaction(
       updated_at: sql`now()`,
     })
     .where(getCrowdReportDispatchReportScope(candidate));
+  return true;
 }
 
 async function markCrowdReportDispatchFailureInTransaction(
@@ -694,11 +700,14 @@ async function dispatchCrowdReportCandidateWithLock(
         config,
         fetchImpl,
       );
-      await markCrowdReportDispatchSuccessInTransaction(
+      const marked = await markCrowdReportDispatchSuccessInTransaction(
         tx,
         candidate,
         DateTime.now().toUTC().toISO() ?? new Date().toISOString(),
       );
+      if (!marked) {
+        return { skipped: true as const };
+      }
       return { skipped: false as const, dispatchResponse };
     } catch (error) {
       await markCrowdReportDispatchFailureInTransaction(
