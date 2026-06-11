@@ -87,15 +87,55 @@ export function getLlmsTxt(options?: LlmsTxtOptions) {
               ': curated agent entry point for currently available public resources.',
           },
         ]),
+        listItem([
+          link('Overview Markdown', '/index.md', rootUrl),
+          {
+            type: 'text',
+            value:
+              ': current system status, active advisories, line status, and public community report signals.',
+          },
+        ]),
+        listItem([
+          link('Line Markdown pattern', '/lines/{lineId}/index.md', rootUrl),
+          {
+            type: 'text',
+            value:
+              ': line profile, current status, recent issues, branches, interchanges, and public community report signals.',
+          },
+        ]),
+        listItem([
+          link(
+            'Station Markdown pattern',
+            '/stations/{stationId}/index.md',
+            rootUrl,
+          ),
+          {
+            type: 'text',
+            value:
+              ': station profile, served lines, current status, recent issues, and public community report signals.',
+          },
+        ]),
+        listItem([
+          link(
+            'Operator Markdown pattern',
+            '/operators/{operatorId}/index.md',
+            rootUrl,
+          ),
+          {
+            type: 'text',
+            value:
+              ': operator profile, current status, line performance, and recent issues.',
+          },
+        ]),
+        listItem([
+          link('Issue Markdown pattern', '/issues/{issueId}/index.md', rootUrl),
+          {
+            type: 'text',
+            value: ': issue summary, affected network, intervals, and updates.',
+          },
+        ]),
       ],
     },
-    paragraph([
-      {
-        type: 'text',
-        value:
-          'Additional entity Markdown routes will be linked here after those routes are implemented.',
-      },
-    ]),
   ];
 
   content.push(

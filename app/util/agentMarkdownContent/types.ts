@@ -1,0 +1,23 @@
+import type {
+  getIssueData,
+  getLineProfileData,
+  getOperatorProfileData,
+  getOverviewData,
+  getStationProfileData,
+} from '../db.queries';
+
+export const DEFAULT_ROOT_URL = 'https://www.mrtdown.org';
+
+export interface AgentMarkdownOptions {
+  rootUrl?: string;
+}
+
+export type OverviewPayload = Awaited<ReturnType<typeof getOverviewData>>;
+export type LineProfilePayload = Awaited<ReturnType<typeof getLineProfileData>>;
+export type StationProfilePayload = Awaited<
+  ReturnType<typeof getStationProfileData>
+>;
+export type OperatorProfilePayload = Awaited<
+  ReturnType<typeof getOperatorProfileData>
+>;
+export type IssuePayload = Awaited<ReturnType<typeof getIssueData>>;
