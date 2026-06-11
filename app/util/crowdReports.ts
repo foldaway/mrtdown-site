@@ -196,6 +196,15 @@ async function lockCrowdReportClusterDispatchInTransaction(
   );
 }
 
+async function lockCrowdReportDispatchInTransaction(
+  tx: Pick<CrowdReportTransaction, 'execute'>,
+  reportId: string,
+) {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${buildCrowdReportDispatchLockKey('report', reportId)}, 0::bigint))`,
+  );
+}
+
 async function isCrowdReportClusterAvailableForDuplicateInTransaction(
   tx: Pick<CrowdReportTransaction, 'select'>,
   clusterId: string,
@@ -208,6 +217,26 @@ async function isCrowdReportClusterAvailableForDuplicateInTransaction(
         eq(crowdReportClustersTable.id, clusterId),
         inArray(crowdReportClustersTable.status, ['pending', 'accepted']),
         isNull(crowdReportClustersTable.dispatched_at),
+      ),
+    )
+    .limit(1);
+
+  return rows.length > 0;
+}
+
+async function isLegacyCrowdReportAvailableForDuplicateInTransaction(
+  tx: Pick<CrowdReportTransaction, 'select'>,
+  reportId: string,
+) {
+  const rows = await tx
+    .select({ id: crowdReportsTable.id })
+    .from(crowdReportsTable)
+    .where(
+      and(
+        eq(crowdReportsTable.id, reportId),
+        eq(crowdReportsTable.status, 'accepted'),
+        isNull(crowdReportsTable.cluster_id),
+        isNull(crowdReportsTable.dispatched_at),
       ),
     )
     .limit(1);
@@ -989,6 +1018,16 @@ async function automoderateCrowdReportInTransaction(
       !(await isCrowdReportClusterAvailableForDuplicateInTransaction(
         tx,
         duplicate.clusterId,
+      ))
+    ) {
+      duplicate = undefined;
+    }
+  } else if (duplicate != null) {
+    await lockCrowdReportDispatchInTransaction(tx, duplicate.id);
+    if (
+      !(await isLegacyCrowdReportAvailableForDuplicateInTransaction(
+        tx,
+        duplicate.id,
       ))
     ) {
       duplicate = undefined;

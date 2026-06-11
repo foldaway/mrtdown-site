@@ -470,6 +470,10 @@ Exit criteria:
   cluster availability after waiting on the cluster dispatch lock. Reports that
   race with a completed dispatch now start fresh accepted clusters instead of
   attaching to already-dispatched clusters.
+- 2026-06-11: Continued dispatch race hardening for legacy accepted reports
+  without clusters. Duplicate automation now takes the report dispatch advisory
+  lock and rechecks that the original report remains accepted, unclustered, and
+  undispatched before using it to seed a duplicate cluster.
 
 ## Decision Log
 
