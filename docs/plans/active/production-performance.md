@@ -334,6 +334,12 @@ underlying compute and payload costs so uncached requests are also fast.
   production build emits separate client chunks for `CountTrendCards`,
   `UptimeRatioTrendCards`, and the shared Recharts charting chunk instead of
   importing the chart implementation directly in the operator route entry.
+- 2026-06-11: Continued Phase 5 generated map bundle cleanup. `StationMap` now
+  keeps the current April 2025 snapshot in the base map chunk and lazy-loads
+  historical and future generated snapshots only when their timeline tabs are
+  opened. A production build emits separate client chunks for the inactive
+  `MapJan2012`, `MapNov2017`, `MapDec2019`, `MapNov2024`, `MapDec2027`,
+  `MapDec2029`, `MapDec2030`, and `MapDec2032` snapshots.
 
 ## Validation
 
