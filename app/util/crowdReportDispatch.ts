@@ -526,7 +526,7 @@ export async function markCrowdReportDispatchSuccess(
   candidate: CrowdReportDispatchCandidate,
   dispatchedAt = DateTime.now().toUTC().toISO() ?? new Date().toISOString(),
 ) {
-  await db.transaction((tx) =>
+  return db.transaction((tx) =>
     markCrowdReportDispatchSuccessInTransaction(tx, candidate, dispatchedAt),
   );
 }
@@ -546,7 +546,7 @@ async function markCrowdReportDispatchSuccessInTransaction(
   dispatchedAt: string,
 ) {
   if (candidate.kind === 'cluster') {
-    await tx
+    const updatedClusters = await tx
       .update(crowdReportClustersTable)
       .set({
         status: 'dispatched',
@@ -557,8 +557,14 @@ async function markCrowdReportDispatchSuccessInTransaction(
         and(
           eq(crowdReportClustersTable.id, candidate.id),
           hasNoOngoingClusterReportsOutsideDispatchPayload(candidate),
+          hasAllClusterDispatchPayloadReportsCurrent(candidate),
         ),
-      );
+      )
+      .returning({ id: crowdReportClustersTable.id });
+
+    if (updatedClusters.length === 0) {
+      return false;
+    }
   }
 
   await tx
@@ -571,6 +577,7 @@ async function markCrowdReportDispatchSuccessInTransaction(
       updated_at: sql`now()`,
     })
     .where(getCrowdReportDispatchReportScope(candidate));
+  return true;
 }
 
 async function markCrowdReportDispatchFailureInTransaction(
@@ -607,6 +614,23 @@ function hasNoOngoingClusterReportsOutsideDispatchPayload(
   )`;
 }
 
+function hasAllClusterDispatchPayloadReportsCurrent(
+  candidate: CrowdReportDispatchCandidate,
+) {
+  if (candidate.reportIds.length === 0) {
+    return sql`false`;
+  }
+
+  return sql`(
+    select count(*)::int
+    from ${crowdReportsTable}
+    where ${crowdReportsTable.cluster_id} = ${candidate.id}
+      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+      and ${crowdReportsTable.still_happening} is true
+      and ${inArray(crowdReportsTable.id, candidate.reportIds)}
+  ) = ${candidate.reportIds.length}`;
+}
+
 async function tryAcquireCrowdReportDispatchLock(
   tx: CrowdReportTransaction,
   candidate: CrowdReportDispatchCandidate,
@@ -633,6 +657,7 @@ async function isCrowdReportDispatchCandidateEligible(
           hasCrowdReportClusterScope(),
           hasCrowdReportClusterCurrentConfidence(),
           hasNoOngoingClusterReportsOutsideDispatchPayload(candidate),
+          hasAllClusterDispatchPayloadReportsCurrent(candidate),
         ),
       )
       .limit(1);
@@ -675,11 +700,18 @@ async function dispatchCrowdReportCandidateWithLock(
         config,
         fetchImpl,
       );
-      await markCrowdReportDispatchSuccessInTransaction(
+      const dispatchedAt =
+        DateTime.now().toUTC().toISO() ?? new Date().toISOString();
+      const marked = await markCrowdReportDispatchSuccessInTransaction(
         tx,
         candidate,
-        DateTime.now().toUTC().toISO() ?? new Date().toISOString(),
+        dispatchedAt,
       );
+      if (!marked) {
+        throw new Error(
+          'Crowd report dispatch was sent, but local success marking became stale',
+        );
+      }
       return { skipped: false as const, dispatchResponse };
     } catch (error) {
       await markCrowdReportDispatchFailureInTransaction(

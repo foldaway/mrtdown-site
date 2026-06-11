@@ -99,13 +99,25 @@ function makeFakeClusterCandidateDb() {
   };
 }
 
-function makeFakeDispatchUpdateDb() {
+function makeFakeDispatchUpdateDb(
+  clusterUpdateRows: Array<{ id: string }> = [{ id: 'cluster-1' }],
+) {
   const whereCalls: unknown[] = [];
+  let updateCount = 0;
   const updateBuilder = {
     set() {
+      const updateIndex = updateCount;
+      updateCount += 1;
       return {
         where(condition: unknown) {
           whereCalls.push(condition);
+          if (updateIndex === 0) {
+            return {
+              returning() {
+                return Promise.resolve(clusterUpdateRows);
+              },
+            };
+          }
           return Promise.resolve();
         },
       };
@@ -165,6 +177,75 @@ function makeFakeDispatchEligibilityDb() {
           },
           select() {
             return selectBuilder;
+          },
+        });
+      },
+    },
+  };
+}
+
+function makeFakePostSendMarkMissDb() {
+  const executeCalls: unknown[] = [];
+  const updateSets: unknown[] = [];
+  const whereCalls: unknown[] = [];
+  let updateCount = 0;
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    where(condition: unknown) {
+      whereCalls.push(condition);
+      return this;
+    },
+    limit() {
+      return Promise.resolve([{ id: 'cluster-1' }]);
+    },
+  };
+  const updateBuilder = {
+    set(values: unknown) {
+      const updateIndex = updateCount;
+      updateCount += 1;
+      updateSets.push(values);
+      return {
+        where(condition: unknown) {
+          whereCalls.push(condition);
+          if (updateIndex === 0) {
+            return {
+              returning() {
+                return Promise.resolve([]);
+              },
+            };
+          }
+          return Promise.resolve();
+        },
+      };
+    },
+  };
+
+  return {
+    executeCalls,
+    updateSets,
+    whereCalls,
+    db: {
+      transaction<T>(
+        callback: (transaction: {
+          execute: (
+            query: unknown,
+          ) => Promise<{ rows: Array<{ locked: boolean }> }>;
+          select: () => typeof selectBuilder;
+          update: () => typeof updateBuilder;
+        }) => Promise<T>,
+      ) {
+        return callback({
+          execute(query: unknown) {
+            executeCalls.push(query);
+            return Promise.resolve({ rows: [{ locked: true }] });
+          },
+          select() {
+            return selectBuilder;
+          },
+          update() {
+            return updateBuilder;
           },
         });
       },
@@ -328,10 +409,44 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(clusterUpdateWhereSql).toContain('not exists');
     expect(clusterUpdateWhereSql).toContain('"still_happening" is true');
     expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" not in');
+    expect(clusterUpdateWhereSql).toContain('count(*)::int');
+    expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).not.toContain(
       '"crowd_reports"."cluster_id" =',
     );
+  });
+
+  it('does not mark cluster payload reports when the cluster freshness update misses', async () => {
+    const fake = makeFakeDispatchUpdateDb([]);
+
+    await expect(
+      markCrowdReportDispatchSuccess(
+        fake.db as never,
+        {
+          kind: 'cluster',
+          id: 'cluster-1',
+          reportIds: ['stale-report-1'],
+          payload: IngestPayloadSchema.parse({
+            content: [
+              {
+                source: 'crowd-report',
+                reportId: 'cluster:cluster-1',
+                text: 'A community report describes this issue.',
+                createdAt: '2026-05-24T04:40:00.000Z',
+                observedAt: '2026-05-24T12:30:00.000+08:00',
+                lineIds: ['BPLRT'],
+                reportCount: 1,
+                url: 'https://mrtdown.example/report?communitySource=cluster%3Acluster-1',
+              },
+            ],
+          }),
+        },
+        '2026-05-24T04:45:00.000Z',
+      ),
+    ).resolves.toBe(false);
+
+    expect(fake.whereCalls).toHaveLength(1);
   });
 
   it('rechecks cluster payload freshness under the dispatch lock', async () => {
@@ -379,6 +494,70 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(eligibilityWhereSql).toContain('not exists');
     expect(eligibilityWhereSql).toContain('"still_happening" is true');
     expect(eligibilityWhereSql).toContain('"crowd_reports"."id" not in');
+    expect(eligibilityWhereSql).toContain('count(*)::int');
+    expect(eligibilityWhereSql).toContain('"crowd_reports"."id" in');
+  });
+
+  it('reports a post-send stale local success mark as failed without closing the cluster', async () => {
+    const fake = makeFakePostSendMarkMissDb();
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 204,
+      }),
+    );
+
+    await expect(
+      dispatchPendingCrowdReports(
+        fake.db as never,
+        {
+          rootUrl: 'https://mrtdown.example',
+          token: 'github-token',
+          candidates: [
+            {
+              kind: 'cluster',
+              id: 'cluster-1',
+              reportIds: ['stale-report-1'],
+              payload: IngestPayloadSchema.parse({
+                content: [
+                  {
+                    source: 'crowd-report',
+                    reportId: 'cluster:cluster-1',
+                    text: 'A community report describes this issue.',
+                    createdAt: '2026-05-24T04:40:00.000Z',
+                    observedAt: '2026-05-24T12:30:00.000+08:00',
+                    lineIds: ['BPLRT'],
+                    reportCount: 1,
+                    url: 'https://mrtdown.example/report?communitySource=cluster%3Acluster-1',
+                  },
+                ],
+              }),
+            },
+          ],
+        },
+        fetchImpl,
+      ),
+    ).resolves.toMatchObject({
+      success: false,
+      count: 1,
+      dispatched: 0,
+      failed: 1,
+      results: [
+        {
+          kind: 'cluster',
+          id: 'cluster-1',
+          success: false,
+          error:
+            'Crowd report dispatch was sent, but local success marking became stale',
+        },
+      ],
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fake.updateSets).toHaveLength(2);
+    expect(fake.updateSets[1]).toMatchObject({
+      dispatch_error:
+        'Crowd report dispatch was sent, but local success marking became stale',
+    });
   });
 });
 
