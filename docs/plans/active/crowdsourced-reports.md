@@ -474,6 +474,10 @@ Exit criteria:
   without clusters. Duplicate automation now takes the report dispatch advisory
   lock and rechecks that the original report remains accepted, unclustered, and
   undispatched before using it to seed a duplicate cluster.
+- 2026-06-11: Continued cluster dispatch freshness hardening by requiring the
+  payload's report IDs to still be the exact current ongoing accepted or
+  duplicate reports attached to the cluster before dispatch or success marking
+  can proceed.
 
 ## Decision Log
 

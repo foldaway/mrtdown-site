@@ -557,6 +557,7 @@ async function markCrowdReportDispatchSuccessInTransaction(
         and(
           eq(crowdReportClustersTable.id, candidate.id),
           hasNoOngoingClusterReportsOutsideDispatchPayload(candidate),
+          hasAllClusterDispatchPayloadReportsCurrent(candidate),
         ),
       );
   }
@@ -607,6 +608,23 @@ function hasNoOngoingClusterReportsOutsideDispatchPayload(
   )`;
 }
 
+function hasAllClusterDispatchPayloadReportsCurrent(
+  candidate: CrowdReportDispatchCandidate,
+) {
+  if (candidate.reportIds.length === 0) {
+    return sql`false`;
+  }
+
+  return sql`(
+    select count(*)::int
+    from ${crowdReportsTable}
+    where ${crowdReportsTable.cluster_id} = ${candidate.id}
+      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+      and ${crowdReportsTable.still_happening} is true
+      and ${inArray(crowdReportsTable.id, candidate.reportIds)}
+  ) = ${candidate.reportIds.length}`;
+}
+
 async function tryAcquireCrowdReportDispatchLock(
   tx: CrowdReportTransaction,
   candidate: CrowdReportDispatchCandidate,
@@ -633,6 +651,7 @@ async function isCrowdReportDispatchCandidateEligible(
           hasCrowdReportClusterScope(),
           hasCrowdReportClusterCurrentConfidence(),
           hasNoOngoingClusterReportsOutsideDispatchPayload(candidate),
+          hasAllClusterDispatchPayloadReportsCurrent(candidate),
         ),
       )
       .limit(1);

@@ -328,6 +328,8 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(clusterUpdateWhereSql).toContain('not exists');
     expect(clusterUpdateWhereSql).toContain('"still_happening" is true');
     expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" not in');
+    expect(clusterUpdateWhereSql).toContain('count(*)::int');
+    expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).not.toContain(
       '"crowd_reports"."cluster_id" =',
@@ -379,6 +381,8 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(eligibilityWhereSql).toContain('not exists');
     expect(eligibilityWhereSql).toContain('"still_happening" is true');
     expect(eligibilityWhereSql).toContain('"crowd_reports"."id" not in');
+    expect(eligibilityWhereSql).toContain('count(*)::int');
+    expect(eligibilityWhereSql).toContain('"crowd_reports"."id" in');
   });
 });
 
