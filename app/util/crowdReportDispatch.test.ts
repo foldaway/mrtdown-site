@@ -184,6 +184,75 @@ function makeFakeDispatchEligibilityDb() {
   };
 }
 
+function makeFakePostSendMarkMissDb() {
+  const executeCalls: unknown[] = [];
+  const updateSets: unknown[] = [];
+  const whereCalls: unknown[] = [];
+  let updateCount = 0;
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    where(condition: unknown) {
+      whereCalls.push(condition);
+      return this;
+    },
+    limit() {
+      return Promise.resolve([{ id: 'cluster-1' }]);
+    },
+  };
+  const updateBuilder = {
+    set(values: unknown) {
+      const updateIndex = updateCount;
+      updateCount += 1;
+      updateSets.push(values);
+      return {
+        where(condition: unknown) {
+          whereCalls.push(condition);
+          if (updateIndex === 0) {
+            return {
+              returning() {
+                return Promise.resolve([]);
+              },
+            };
+          }
+          return Promise.resolve();
+        },
+      };
+    },
+  };
+
+  return {
+    executeCalls,
+    updateSets,
+    whereCalls,
+    db: {
+      transaction<T>(
+        callback: (transaction: {
+          execute: (
+            query: unknown,
+          ) => Promise<{ rows: Array<{ locked: boolean }> }>;
+          select: () => typeof selectBuilder;
+          update: () => typeof updateBuilder;
+        }) => Promise<T>,
+      ) {
+        return callback({
+          execute(query: unknown) {
+            executeCalls.push(query);
+            return Promise.resolve({ rows: [{ locked: true }] });
+          },
+          select() {
+            return selectBuilder;
+          },
+          update() {
+            return updateBuilder;
+          },
+        });
+      },
+    },
+  };
+}
+
 describe('buildCrowdReportIngestPayload', () => {
   it('builds a valid crowd-report ingest payload without site-local metadata', () => {
     const candidate = buildCrowdReportIngestPayload({
@@ -427,6 +496,71 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(eligibilityWhereSql).toContain('"crowd_reports"."id" not in');
     expect(eligibilityWhereSql).toContain('count(*)::int');
     expect(eligibilityWhereSql).toContain('"crowd_reports"."id" in');
+  });
+
+  it('reports a post-send stale local success mark as failed instead of skipped', async () => {
+    const fake = makeFakePostSendMarkMissDb();
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 204,
+      }),
+    );
+
+    await expect(
+      dispatchPendingCrowdReports(
+        fake.db as never,
+        {
+          rootUrl: 'https://mrtdown.example',
+          token: 'github-token',
+          candidates: [
+            {
+              kind: 'cluster',
+              id: 'cluster-1',
+              reportIds: ['stale-report-1'],
+              payload: IngestPayloadSchema.parse({
+                content: [
+                  {
+                    source: 'crowd-report',
+                    reportId: 'cluster:cluster-1',
+                    text: 'A community report describes this issue.',
+                    createdAt: '2026-05-24T04:40:00.000Z',
+                    observedAt: '2026-05-24T12:30:00.000+08:00',
+                    lineIds: ['BPLRT'],
+                    reportCount: 1,
+                    url: 'https://mrtdown.example/report?communitySource=cluster%3Acluster-1',
+                  },
+                ],
+              }),
+            },
+          ],
+        },
+        fetchImpl,
+      ),
+    ).resolves.toMatchObject({
+      success: false,
+      count: 1,
+      dispatched: 0,
+      failed: 1,
+      results: [
+        {
+          kind: 'cluster',
+          id: 'cluster-1',
+          success: false,
+          error:
+            'Crowd report dispatch was sent, but local success marking became stale',
+        },
+      ],
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fake.updateSets).toHaveLength(3);
+    expect(fake.updateSets[1]).toMatchObject({
+      status: 'dispatched',
+    });
+    expect(fake.updateSets[2]).toMatchObject({
+      dispatch_error:
+        'Crowd report dispatch was sent, but local success marking became stale',
+    });
   });
 });
 

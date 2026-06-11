@@ -595,6 +595,31 @@ async function markCrowdReportDispatchFailureInTransaction(
     .where(getCrowdReportDispatchReportScope(candidate));
 }
 
+async function markCrowdReportClusterSentAfterStaleSuccessInTransaction(
+  tx: Pick<CrowdReportTransaction, 'update'>,
+  candidate: CrowdReportDispatchCandidate,
+  dispatchedAt: string,
+) {
+  if (candidate.kind !== 'cluster') {
+    return;
+  }
+
+  await tx
+    .update(crowdReportClustersTable)
+    .set({
+      status: 'dispatched',
+      dispatched_at: dispatchedAt,
+      updated_at: sql`now()`,
+    })
+    .where(
+      and(
+        eq(crowdReportClustersTable.id, candidate.id),
+        eq(crowdReportClustersTable.status, 'accepted'),
+        isNull(crowdReportClustersTable.dispatched_at),
+      ),
+    );
+}
+
 function getCrowdReportDispatchReportScope(
   candidate: CrowdReportDispatchCandidate,
 ) {
@@ -700,13 +725,22 @@ async function dispatchCrowdReportCandidateWithLock(
         config,
         fetchImpl,
       );
+      const dispatchedAt =
+        DateTime.now().toUTC().toISO() ?? new Date().toISOString();
       const marked = await markCrowdReportDispatchSuccessInTransaction(
         tx,
         candidate,
-        DateTime.now().toUTC().toISO() ?? new Date().toISOString(),
+        dispatchedAt,
       );
       if (!marked) {
-        return { skipped: true as const };
+        await markCrowdReportClusterSentAfterStaleSuccessInTransaction(
+          tx,
+          candidate,
+          dispatchedAt,
+        );
+        throw new Error(
+          'Crowd report dispatch was sent, but local success marking became stale',
+        );
       }
       return { skipped: false as const, dispatchResponse };
     } catch (error) {

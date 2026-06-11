@@ -481,6 +481,9 @@ Exit criteria:
 - 2026-06-11: Addressed review feedback on cluster dispatch success marking by
   making the report-row success update conditional on the guarded cluster-row
   update actually succeeding.
+- 2026-06-11: Addressed follow-up review feedback by treating post-send local
+  success-marking races as dispatch failures instead of skipped candidates, and
+  closing still-accepted clusters that already had a repository dispatch sent.
 
 ## Decision Log
 
