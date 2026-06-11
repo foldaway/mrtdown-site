@@ -498,7 +498,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(eligibilityWhereSql).toContain('"crowd_reports"."id" in');
   });
 
-  it('reports a post-send stale local success mark as failed instead of skipped', async () => {
+  it('reports a post-send stale local success mark as failed without closing the cluster', async () => {
     const fake = makeFakePostSendMarkMissDb();
     const fetchImpl = vi.fn().mockResolvedValue(
       new Response(null, {
@@ -553,11 +553,8 @@ describe('getDispatchableCrowdReportCandidates', () => {
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(fake.updateSets).toHaveLength(3);
+    expect(fake.updateSets).toHaveLength(2);
     expect(fake.updateSets[1]).toMatchObject({
-      status: 'dispatched',
-    });
-    expect(fake.updateSets[2]).toMatchObject({
       dispatch_error:
         'Crowd report dispatch was sent, but local success marking became stale',
     });

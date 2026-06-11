@@ -482,8 +482,9 @@ Exit criteria:
   making the report-row success update conditional on the guarded cluster-row
   update actually succeeding.
 - 2026-06-11: Addressed follow-up review feedback by treating post-send local
-  success-marking races as dispatch failures instead of skipped candidates, and
-  closing still-accepted clusters that already had a repository dispatch sent.
+  success-marking races as dispatch failures instead of skipped candidates,
+  without closing clusters that may have newer ongoing reports outside the sent
+  payload.
 
 ## Decision Log
 

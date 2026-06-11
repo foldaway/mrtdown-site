@@ -595,31 +595,6 @@ async function markCrowdReportDispatchFailureInTransaction(
     .where(getCrowdReportDispatchReportScope(candidate));
 }
 
-async function markCrowdReportClusterSentAfterStaleSuccessInTransaction(
-  tx: Pick<CrowdReportTransaction, 'update'>,
-  candidate: CrowdReportDispatchCandidate,
-  dispatchedAt: string,
-) {
-  if (candidate.kind !== 'cluster') {
-    return;
-  }
-
-  await tx
-    .update(crowdReportClustersTable)
-    .set({
-      status: 'dispatched',
-      dispatched_at: dispatchedAt,
-      updated_at: sql`now()`,
-    })
-    .where(
-      and(
-        eq(crowdReportClustersTable.id, candidate.id),
-        eq(crowdReportClustersTable.status, 'accepted'),
-        isNull(crowdReportClustersTable.dispatched_at),
-      ),
-    );
-}
-
 function getCrowdReportDispatchReportScope(
   candidate: CrowdReportDispatchCandidate,
 ) {
@@ -733,11 +708,6 @@ async function dispatchCrowdReportCandidateWithLock(
         dispatchedAt,
       );
       if (!marked) {
-        await markCrowdReportClusterSentAfterStaleSuccessInTransaction(
-          tx,
-          candidate,
-          dispatchedAt,
-        );
         throw new Error(
           'Crowd report dispatch was sent, but local success marking became stale',
         );
