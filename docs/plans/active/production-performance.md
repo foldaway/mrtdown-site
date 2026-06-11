@@ -340,6 +340,13 @@ underlying compute and payload costs so uncached requests are also fast.
   opened. A production build emits separate client chunks for the inactive
   `MapJan2012`, `MapNov2017`, `MapDec2019`, `MapNov2024`, `MapDec2027`,
   `MapDec2029`, `MapDec2030`, and `MapDec2032` snapshots.
+- 2026-06-11: Continued Phase 5 statistics hydration cleanup by lazy-loading
+  the longest-disruptions card behind the existing statistics viewport gate and
+  skeleton. The statistics route preload set no longer includes `IssueCard`,
+  Radix Collapsible, or chevron icon chunks up front; those dependencies now
+  sit behind the separate `LongestDisruptionsCard` chunk. Tightened the
+  TanStack route-file ignore pattern so support `helpers`, `components`,
+  `hooks`, and test files are not scanned as route files during builds.
 
 ## Validation
 

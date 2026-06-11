@@ -50,8 +50,8 @@ export default defineConfig(() => {
       tanstackStart({
         srcDirectory: 'app',
         router: {
-          // Ignores files/folders containing 'components', 'hooks', or ending in '.test.tsx'
-          routeFileIgnorePattern: '((components|hooks)|.test.tsx)',
+          // Ignores route support folders and files ending in '.test.ts' / '.test.tsx'
+          routeFileIgnorePattern: '((components|hooks|helpers)|\\.test\\.tsx?)',
         },
       }),
       tailwindcss(),
