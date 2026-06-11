@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as Char123LangChar125RouteImport } from './routes/{-$lang}'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
+import { Route as IndexDotmdRouteImport } from './routes/index[.]md'
 import { Route as Char123LangChar125IndexRouteImport } from './routes/{-$lang}/index'
 import { Route as Char123LangChar125SystemMapRouteImport } from './routes/{-$lang}/system-map'
 import { Route as Char123LangChar125SitemapDotxmlRouteImport } from './routes/{-$lang}/sitemap[.]xml'
@@ -22,6 +23,10 @@ import { Route as Char123LangChar125StatisticsIndexRouteImport } from './routes/
 import { Route as Char123LangChar125HistoryIndexRouteImport } from './routes/{-$lang}/history/index'
 import { Route as Char123LangChar125StatusLineIdRouteImport } from './routes/{-$lang}/status.$lineId'
 import { Route as Char123LangChar125StationsStationIdRouteImport } from './routes/{-$lang}/stations/$stationId'
+import { Route as StationsStationIdIndexDotmdRouteImport } from './routes/stations/$stationId/index[.]md'
+import { Route as OperatorsOperatorIdIndexDotmdRouteImport } from './routes/operators/$operatorId/index[.]md'
+import { Route as LinesLineIdIndexDotmdRouteImport } from './routes/lines/$lineId/index[.]md'
+import { Route as IssuesIssueIdIndexDotmdRouteImport } from './routes/issues/$issueId/index[.]md'
 import { Route as ApiPhSplatRouteImport } from './routes/api.ph.$'
 import { Route as Char123LangChar125OperatorsOperatorIdIndexRouteImport } from './routes/{-$lang}/operators/$operatorId/index'
 import { Route as Char123LangChar125LinesLineIdIndexRouteImport } from './routes/{-$lang}/lines/$lineId/index'
@@ -42,6 +47,11 @@ const Char123LangChar125Route = Char123LangChar125RouteImport.update({
 const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
   id: '/llms.txt',
   path: '/llms.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexDotmdRoute = IndexDotmdRouteImport.update({
+  id: '/index.md',
+  path: '/index.md',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char123LangChar125IndexRoute = Char123LangChar125IndexRouteImport.update({
@@ -106,6 +116,28 @@ const Char123LangChar125StationsStationIdRoute =
     path: '/stations/$stationId',
     getParentRoute: () => Char123LangChar125Route,
   } as any)
+const StationsStationIdIndexDotmdRoute =
+  StationsStationIdIndexDotmdRouteImport.update({
+    id: '/stations/$stationId/index.md',
+    path: '/stations/$stationId/index.md',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const OperatorsOperatorIdIndexDotmdRoute =
+  OperatorsOperatorIdIndexDotmdRouteImport.update({
+    id: '/operators/$operatorId/index.md',
+    path: '/operators/$operatorId/index.md',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LinesLineIdIndexDotmdRoute = LinesLineIdIndexDotmdRouteImport.update({
+  id: '/lines/$lineId/index.md',
+  path: '/lines/$lineId/index.md',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IssuesIssueIdIndexDotmdRoute = IssuesIssueIdIndexDotmdRouteImport.update({
+  id: '/issues/$issueId/index.md',
+  path: '/issues/$issueId/index.md',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPhSplatRoute = ApiPhSplatRouteImport.update({
   id: '/api/ph/$',
   path: '/api/ph/$',
@@ -171,6 +203,7 @@ const InternalApiTasksCrowdReportDispatchRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/index.md': typeof IndexDotmdRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
   '/api/issues-day': typeof ApiIssuesDayRoute
@@ -181,6 +214,10 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapRoute
   '/{-$lang}/': typeof Char123LangChar125IndexRoute
   '/api/ph/$': typeof ApiPhSplatRoute
+  '/issues/$issueId/index.md': typeof IssuesIssueIdIndexDotmdRoute
+  '/lines/$lineId/index.md': typeof LinesLineIdIndexDotmdRoute
+  '/operators/$operatorId/index.md': typeof OperatorsOperatorIdIndexDotmdRoute
+  '/stations/$stationId/index.md': typeof StationsStationIdIndexDotmdRoute
   '/{-$lang}/stations/$stationId': typeof Char123LangChar125StationsStationIdRoute
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
@@ -197,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/operators/$operatorId/': typeof Char123LangChar125OperatorsOperatorIdIndexRoute
 }
 export interface FileRoutesByTo {
+  '/index.md': typeof IndexDotmdRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
@@ -206,6 +244,10 @@ export interface FileRoutesByTo {
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapRoute
   '/{-$lang}': typeof Char123LangChar125IndexRoute
   '/api/ph/$': typeof ApiPhSplatRoute
+  '/issues/$issueId/index.md': typeof IssuesIssueIdIndexDotmdRoute
+  '/lines/$lineId/index.md': typeof LinesLineIdIndexDotmdRoute
+  '/operators/$operatorId/index.md': typeof OperatorsOperatorIdIndexDotmdRoute
+  '/stations/$stationId/index.md': typeof StationsStationIdIndexDotmdRoute
   '/{-$lang}/stations/$stationId': typeof Char123LangChar125StationsStationIdRoute
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdRoute
   '/{-$lang}/history': typeof Char123LangChar125HistoryIndexRoute
@@ -223,6 +265,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/index.md': typeof IndexDotmdRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
   '/api/issues-day': typeof ApiIssuesDayRoute
@@ -233,6 +276,10 @@ export interface FileRoutesById {
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapRoute
   '/{-$lang}/': typeof Char123LangChar125IndexRoute
   '/api/ph/$': typeof ApiPhSplatRoute
+  '/issues/$issueId/index.md': typeof IssuesIssueIdIndexDotmdRoute
+  '/lines/$lineId/index.md': typeof LinesLineIdIndexDotmdRoute
+  '/operators/$operatorId/index.md': typeof OperatorsOperatorIdIndexDotmdRoute
+  '/stations/$stationId/index.md': typeof StationsStationIdIndexDotmdRoute
   '/{-$lang}/stations/$stationId': typeof Char123LangChar125StationsStationIdRoute
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
@@ -251,6 +298,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/index.md'
     | '/llms.txt'
     | '/{-$lang}'
     | '/api/issues-day'
@@ -261,6 +309,10 @@ export interface FileRouteTypes {
     | '/{-$lang}/system-map'
     | '/{-$lang}/'
     | '/api/ph/$'
+    | '/issues/$issueId/index.md'
+    | '/lines/$lineId/index.md'
+    | '/operators/$operatorId/index.md'
+    | '/stations/$stationId/index.md'
     | '/{-$lang}/stations/$stationId'
     | '/{-$lang}/status/$lineId'
     | '/{-$lang}/history/'
@@ -277,6 +329,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/operators/$operatorId/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/index.md'
     | '/llms.txt'
     | '/api/issues-day'
     | '/api/reports'
@@ -286,6 +339,10 @@ export interface FileRouteTypes {
     | '/{-$lang}/system-map'
     | '/{-$lang}'
     | '/api/ph/$'
+    | '/issues/$issueId/index.md'
+    | '/lines/$lineId/index.md'
+    | '/operators/$operatorId/index.md'
+    | '/stations/$stationId/index.md'
     | '/{-$lang}/stations/$stationId'
     | '/{-$lang}/status/$lineId'
     | '/{-$lang}/history'
@@ -302,6 +359,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/operators/$operatorId'
   id:
     | '__root__'
+    | '/index.md'
     | '/llms.txt'
     | '/{-$lang}'
     | '/api/issues-day'
@@ -312,6 +370,10 @@ export interface FileRouteTypes {
     | '/{-$lang}/system-map'
     | '/{-$lang}/'
     | '/api/ph/$'
+    | '/issues/$issueId/index.md'
+    | '/lines/$lineId/index.md'
+    | '/operators/$operatorId/index.md'
+    | '/stations/$stationId/index.md'
     | '/{-$lang}/stations/$stationId'
     | '/{-$lang}/status/$lineId'
     | '/{-$lang}/history/'
@@ -329,11 +391,16 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexDotmdRoute: typeof IndexDotmdRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
   Char123LangChar125Route: typeof Char123LangChar125RouteWithChildren
   ApiIssuesDayRoute: typeof ApiIssuesDayRoute
   ApiReportsRoute: typeof ApiReportsRoute
   ApiPhSplatRoute: typeof ApiPhSplatRoute
+  IssuesIssueIdIndexDotmdRoute: typeof IssuesIssueIdIndexDotmdRoute
+  LinesLineIdIndexDotmdRoute: typeof LinesLineIdIndexDotmdRoute
+  OperatorsOperatorIdIndexDotmdRoute: typeof OperatorsOperatorIdIndexDotmdRoute
+  StationsStationIdIndexDotmdRoute: typeof StationsStationIdIndexDotmdRoute
   InternalApiTasksCrowdReportDispatchRoute: typeof InternalApiTasksCrowdReportDispatchRoute
   InternalApiTasksFactsRoute: typeof InternalApiTasksFactsRoute
   InternalApiTasksPublicHolidaysRoute: typeof InternalApiTasksPublicHolidaysRoute
@@ -354,6 +421,13 @@ declare module '@tanstack/react-router' {
       path: '/llms.txt'
       fullPath: '/llms.txt'
       preLoaderRoute: typeof LlmsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/index.md': {
+      id: '/index.md'
+      path: '/index.md'
+      fullPath: '/index.md'
+      preLoaderRoute: typeof IndexDotmdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/{-$lang}/': {
@@ -432,6 +506,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/{-$lang}/stations/$stationId'
       preLoaderRoute: typeof Char123LangChar125StationsStationIdRouteImport
       parentRoute: typeof Char123LangChar125Route
+    }
+    '/stations/$stationId/index.md': {
+      id: '/stations/$stationId/index.md'
+      path: '/stations/$stationId/index.md'
+      fullPath: '/stations/$stationId/index.md'
+      preLoaderRoute: typeof StationsStationIdIndexDotmdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/operators/$operatorId/index.md': {
+      id: '/operators/$operatorId/index.md'
+      path: '/operators/$operatorId/index.md'
+      fullPath: '/operators/$operatorId/index.md'
+      preLoaderRoute: typeof OperatorsOperatorIdIndexDotmdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lines/$lineId/index.md': {
+      id: '/lines/$lineId/index.md'
+      path: '/lines/$lineId/index.md'
+      fullPath: '/lines/$lineId/index.md'
+      preLoaderRoute: typeof LinesLineIdIndexDotmdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/issues/$issueId/index.md': {
+      id: '/issues/$issueId/index.md'
+      path: '/issues/$issueId/index.md'
+      fullPath: '/issues/$issueId/index.md'
+      preLoaderRoute: typeof IssuesIssueIdIndexDotmdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/ph/$': {
       id: '/api/ph/$'
@@ -561,11 +663,16 @@ const Char123LangChar125RouteWithChildren =
   Char123LangChar125Route._addFileChildren(Char123LangChar125RouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexDotmdRoute: IndexDotmdRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
   Char123LangChar125Route: Char123LangChar125RouteWithChildren,
   ApiIssuesDayRoute: ApiIssuesDayRoute,
   ApiReportsRoute: ApiReportsRoute,
   ApiPhSplatRoute: ApiPhSplatRoute,
+  IssuesIssueIdIndexDotmdRoute: IssuesIssueIdIndexDotmdRoute,
+  LinesLineIdIndexDotmdRoute: LinesLineIdIndexDotmdRoute,
+  OperatorsOperatorIdIndexDotmdRoute: OperatorsOperatorIdIndexDotmdRoute,
+  StationsStationIdIndexDotmdRoute: StationsStationIdIndexDotmdRoute,
   InternalApiTasksCrowdReportDispatchRoute:
     InternalApiTasksCrowdReportDispatchRoute,
   InternalApiTasksFactsRoute: InternalApiTasksFactsRoute,

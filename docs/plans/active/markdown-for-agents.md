@@ -143,6 +143,10 @@ Exit criteria:
   agent entry point and links to current public resources. Deferred linking
   Phase 3 entity Markdown URLs until those routes exist, so agents do not
   follow advertised 404s.
+- 2026-06-11: Added the Phase 3 `/index.md`, `/lines/$lineId/index.md`,
+  `/stations/$stationId/index.md`, `/operators/$operatorId/index.md`, and
+  `/issues/$issueId/index.md` routes backed by read-model server functions.
+  Updated `/llms.txt` to advertise the new Markdown surface.
 
 ## Decision Log
 

@@ -14,18 +14,15 @@ describe('getLlmsTxt', () => {
     );
   });
 
-  it('only advertises Markdown routes that exist in this phase', () => {
+  it('advertises canonical Markdown routes and entity route patterns', () => {
     const markdown = getLlmsTxt();
 
     expect(markdown).toContain('# mrtdown');
     expect(markdown).toContain('## Available Markdown');
-    expect(markdown).toContain(
-      'Additional entity Markdown routes will be linked here after those routes are implemented.',
-    );
-    expect(markdown).not.toContain('/index.md');
-    expect(markdown).not.toContain('/lines/{lineId}/index.md');
-    expect(markdown).not.toContain('/stations/{stationId}/index.md');
-    expect(markdown).not.toContain('/operators/{operatorId}/index.md');
-    expect(markdown).not.toContain('/issues/{issueId}/index.md');
+    expect(markdown).toContain('/index.md');
+    expect(markdown).toContain('/lines/%7BlineId%7D/index.md');
+    expect(markdown).toContain('/stations/%7BstationId%7D/index.md');
+    expect(markdown).toContain('/operators/%7BoperatorId%7D/index.md');
+    expect(markdown).toContain('/issues/%7BissueId%7D/index.md');
   });
 });
