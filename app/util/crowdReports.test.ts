@@ -1174,6 +1174,7 @@ describe('automoderateCrowdReport', () => {
         ],
         [{ reportId: 'existing-report', lineId: 'BPLRT' }],
         [{ reportId: 'existing-report', stationId: 'BP6' }],
+        [{ id: 'existing-report' }],
       ],
       {
         id: 'report-1',
@@ -1200,6 +1201,69 @@ describe('automoderateCrowdReport', () => {
         window_end_at: '2026-05-24T04:35:00.000Z',
       },
     });
+
+    const dialect = new PgDialect();
+    const reportLockSql = dialect.sqlToQuery(fake.executes[1] as SQL);
+    expect(reportLockSql.params).toContain(
+      'crowd-report-dispatch:report:existing-report',
+    );
+  });
+
+  it('starts a fresh cluster when a legacy duplicate report was dispatched before the lock', async () => {
+    const fake = makeFakeAutomoderationDb(
+      [
+        [
+          {
+            id: 'existing-report',
+            observedAt: '2026-05-24T12:25:00.000+08:00',
+            status: 'accepted',
+            directionText: 'Towards Choa Chu Kang',
+            clusterId: null,
+          },
+        ],
+        [{ reportId: 'existing-report', lineId: 'BPLRT' }],
+        [{ reportId: 'existing-report', stationId: 'BP6' }],
+        [],
+      ],
+      {
+        id: 'report-1',
+        status: 'accepted',
+        duplicateOfId: null,
+      },
+    );
+    const ids = ['event-1', 'cluster-1'];
+
+    await expect(
+      automoderateCrowdReport(fake.db as never, 'report-1', VALID_SUBMISSION, {
+        idFactory: () => ids.shift() ?? 'unused-id',
+      }),
+    ).resolves.toEqual({
+      id: 'report-1',
+      status: 'accepted',
+      duplicateOfId: null,
+    });
+
+    expect(fake.updates[0]).toMatchObject({
+      table: crowdReportsTable,
+      values: {
+        status: 'accepted',
+        duplicate_of_id: null,
+      },
+    });
+    expect(fake.inserts[1]).toMatchObject({
+      table: crowdReportClustersTable,
+      values: {
+        id: 'cluster-1',
+        window_start_at: '2026-05-24T04:20:00.000Z',
+        window_end_at: '2026-05-24T04:40:00.000Z',
+      },
+    });
+
+    const dialect = new PgDialect();
+    const reportLockSql = dialect.sqlToQuery(fake.executes[1] as SQL);
+    expect(reportLockSql.params).toContain(
+      'crowd-report-dispatch:report:existing-report',
+    );
   });
 
   it('ignores same-context pending reports to avoid reciprocal duplicates', async () => {
