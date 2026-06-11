@@ -2,7 +2,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { Tabs } from 'radix-ui';
 import type React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { FormattedList, FormattedMessage, useIntl } from 'react-intl';
 import type { IssueAffectedBranch } from '~/types';
 import { ZoomControls } from '~/components/ZoomControls';
@@ -11,16 +11,49 @@ import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { assert } from '~/util/assert';
 import { MapApr2025 } from './components/MapApr2025';
-import { MapDec2019 } from './components/MapDec2019';
-import { MapDec2027 } from './components/MapDec2027';
-import { MapDec2029 } from './components/MapDec2029';
-import { MapDec2030 } from './components/MapDec2030';
-import { MapDec2032 } from './components/MapDec2032';
-import { MapJan2012 } from './components/MapJan2012';
-import { MapNov2017 } from './components/MapNov2017';
-import { MapNov2024 } from './components/MapNov2024';
 import { Timeline } from './components/Timeline';
 import { segmentText } from './helpers/segmentText';
+
+const MapDec2032 = lazy(() =>
+  import('./components/MapDec2032').then((module) => ({
+    default: module.MapDec2032,
+  })),
+);
+const MapDec2030 = lazy(() =>
+  import('./components/MapDec2030').then((module) => ({
+    default: module.MapDec2030,
+  })),
+);
+const MapDec2029 = lazy(() =>
+  import('./components/MapDec2029').then((module) => ({
+    default: module.MapDec2029,
+  })),
+);
+const MapDec2027 = lazy(() =>
+  import('./components/MapDec2027').then((module) => ({
+    default: module.MapDec2027,
+  })),
+);
+const MapNov2024 = lazy(() =>
+  import('./components/MapNov2024').then((module) => ({
+    default: module.MapNov2024,
+  })),
+);
+const MapDec2019 = lazy(() =>
+  import('./components/MapDec2019').then((module) => ({
+    default: module.MapDec2019,
+  })),
+);
+const MapNov2017 = lazy(() =>
+  import('./components/MapNov2017').then((module) => ({
+    default: module.MapNov2017,
+  })),
+);
+const MapJan2012 = lazy(() =>
+  import('./components/MapJan2012').then((module) => ({
+    default: module.MapJan2012,
+  })),
+);
 
 type FocusedLineBranch = {
   id: string;
@@ -428,31 +461,47 @@ export const StationMap: React.FC<Props> = (props) => {
         <div className="relative overflow-hidden">
           <div className="overflow-auto">
             <Tabs.Content value="2032-12">
-              <MapDec2032 ref={setRef} />
+              <Suspense fallback={<StationMapSnapshotFallback />}>
+                <MapDec2032 ref={setRef} />
+              </Suspense>
             </Tabs.Content>
             <Tabs.Content value="2030-12">
-              <MapDec2030 ref={setRef} />
+              <Suspense fallback={<StationMapSnapshotFallback />}>
+                <MapDec2030 ref={setRef} />
+              </Suspense>
             </Tabs.Content>
             <Tabs.Content value="2029-12">
-              <MapDec2029 ref={setRef} />
+              <Suspense fallback={<StationMapSnapshotFallback />}>
+                <MapDec2029 ref={setRef} />
+              </Suspense>
             </Tabs.Content>
             <Tabs.Content value="2027-12">
-              <MapDec2027 ref={setRef} />
+              <Suspense fallback={<StationMapSnapshotFallback />}>
+                <MapDec2027 ref={setRef} />
+              </Suspense>
             </Tabs.Content>
             <Tabs.Content value="2025-04">
               <MapApr2025 ref={setRef} />
             </Tabs.Content>
             <Tabs.Content value="2024-11">
-              <MapNov2024 ref={setRef} />
+              <Suspense fallback={<StationMapSnapshotFallback />}>
+                <MapNov2024 ref={setRef} />
+              </Suspense>
             </Tabs.Content>
             <Tabs.Content value="2019-12">
-              <MapDec2019 ref={setRef} />
+              <Suspense fallback={<StationMapSnapshotFallback />}>
+                <MapDec2019 ref={setRef} />
+              </Suspense>
             </Tabs.Content>
             <Tabs.Content value="2017-11">
-              <MapNov2017 ref={setRef} />
+              <Suspense fallback={<StationMapSnapshotFallback />}>
+                <MapNov2017 ref={setRef} />
+              </Suspense>
             </Tabs.Content>
             <Tabs.Content value="2012-01">
-              <MapJan2012 ref={setRef} />
+              <Suspense fallback={<StationMapSnapshotFallback />}>
+                <MapJan2012 ref={setRef} />
+              </Suspense>
             </Tabs.Content>
           </div>
           <ZoomControls svgRef={ref} initialZoom={1} />
@@ -493,3 +542,11 @@ export const StationMap: React.FC<Props> = (props) => {
     </div>
   );
 };
+
+function StationMapSnapshotFallback() {
+  return (
+    <div className="flex min-h-[28rem] items-center justify-center bg-gray-100 dark:bg-gray-800">
+      <div className="h-64 w-full max-w-5xl animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
+    </div>
+  );
+}
