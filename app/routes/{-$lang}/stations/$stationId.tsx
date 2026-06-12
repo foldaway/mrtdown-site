@@ -2,7 +2,7 @@ import { InformationCircleIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import type { IssueType } from '@mrtdown/core';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { useMemo } from 'react';
+import { lazy, useMemo } from 'react';
 import {
   createIntl,
   FormattedDate,
@@ -10,10 +10,11 @@ import {
   type IntlShape,
   useIntl,
 } from 'react-intl';
-import { CommunitySignalsSection } from '~/components/CommunitySignalsSection';
+import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
 import type { IncludedEntities, Station } from '~/types';
 import { IssueCard } from '~/components/IssueCard';
 import type { IssueCardContext } from '~/components/IssueCard/types';
+import { CommunitySignalsSectionSkeleton } from '~/components/ProfileWidgetSkeletons';
 import { StationBar } from '~/components/StationBar';
 import { LineTypeLabels, StationStructureTypeLabels } from '~/constants';
 import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
@@ -24,6 +25,12 @@ import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { useHydrated } from '~/hooks/useHydrated';
 import { getStationProfileFn } from '~/util/station.functions';
 import { assert } from '../../../util/assert';
+
+const CommunitySignalsSection = lazy(() =>
+  import('~/components/CommunitySignalsSection').then((module) => ({
+    default: module.CommunitySignalsSection,
+  })),
+);
 
 function computeStationStrings(
   intl: IntlShape,
@@ -328,8 +335,15 @@ function StationPage() {
           </div>
         </div>
 
-        {crowdReportsEnabled && (
-          <CommunitySignalsSection signals={stationProfile.communitySignals} />
+        {crowdReportsEnabled && stationProfile.communitySignals.length > 0 && (
+          <DeferredViewportWidget
+            className="block"
+            fallback={<CommunitySignalsSectionSkeleton />}
+          >
+            <CommunitySignalsSection
+              signals={stationProfile.communitySignals}
+            />
+          </DeferredViewportWidget>
         )}
 
         {/* Station Details Section */}

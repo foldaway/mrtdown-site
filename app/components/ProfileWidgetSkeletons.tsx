@@ -20,3 +20,21 @@ export function ProfileSystemMapCardSkeleton() {
     </div>
   );
 }
+
+export function CommunitySignalsSectionSkeleton() {
+  return (
+    <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/70 dark:bg-amber-950/30">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 size-9 shrink-0 animate-pulse rounded-lg bg-amber-100 dark:bg-amber-900/70" />
+        <div className="min-w-0 flex-1">
+          <div className="h-5 w-40 animate-pulse rounded-md bg-amber-100 dark:bg-amber-900/70" />
+          <div className="mt-2 h-4 w-full max-w-md animate-pulse rounded-md bg-amber-100 dark:bg-amber-900/70" />
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="h-28 animate-pulse rounded-lg border border-amber-200 bg-white dark:border-amber-900 dark:bg-gray-900/70" />
+        <div className="hidden h-28 animate-pulse rounded-lg border border-amber-200 bg-white md:block dark:border-amber-900 dark:bg-gray-900/70" />
+      </div>
+    </section>
+  );
+}

@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { useMemo } from 'react';
+import { lazy, useMemo } from 'react';
 import { createIntl, FormattedMessage } from 'react-intl';
+import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
 import { LineSummaryBlock } from '~/components/LineSummaryBlock';
-import { CommunitySignalsSection } from '~/components/CommunitySignalsSection';
+import { CommunitySignalsSectionSkeleton } from '~/components/ProfileWidgetSkeletons';
 import { HOME_OVERVIEW_INITIAL_DATE_COUNT, LANGUAGES } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
@@ -16,6 +17,12 @@ import { countOperationalLineSummaries } from '../../components/CurrentAdvisorie
 import { assert } from '../../util/assert';
 import { HomeLineSummariesSkeleton } from './components/HomeLineSummariesSkeleton';
 import { sortLineSummariesWithFutureServiceLast } from './helpers/sortLineSummaries';
+
+const CommunitySignalsSection = lazy(() =>
+  import('~/components/CommunitySignalsSection').then((module) => ({
+    default: module.CommunitySignalsSection,
+  })),
+);
 
 export const Route = createFileRoute('/{-$lang}/')({
   component: HomePage,
@@ -189,8 +196,13 @@ function HomePage() {
           lineOperationalCount={lineOperationalCount}
         />
 
-        {crowdReportsEnabled && (
-          <CommunitySignalsSection signals={overview.communitySignals} />
+        {crowdReportsEnabled && overview.communitySignals.length > 0 && (
+          <DeferredViewportWidget
+            className="block"
+            fallback={<CommunitySignalsSectionSkeleton />}
+          >
+            <CommunitySignalsSection signals={overview.communitySignals} />
+          </DeferredViewportWidget>
         )}
 
         {crowdReportsEnabled && (
