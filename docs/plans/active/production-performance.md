@@ -360,6 +360,12 @@ underlying compute and payload costs so uncached requests are also fast.
   `CommunitySignalsSection` client/server chunk, and the home, line, and
   station route component entries list it only as a dynamic import instead of
   an eager route dependency.
+- 2026-06-13: Continued Phase 5 profile route hydration cleanup by
+  lazy-loading recent-issues sections behind `DeferredViewportWidget` on line,
+  operator, and station profile routes. A production build now emits separate
+  recent-issues chunks, keeping `IssueCard` out of the initial profile route
+  render and keeping the shared line/operator recent-issues Radix Collapsible
+  dependency behind the viewport gate.
 
 ## Validation
 
