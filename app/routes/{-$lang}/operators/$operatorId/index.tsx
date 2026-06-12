@@ -1,15 +1,16 @@
 import type { IssueType } from '@mrtdown/core';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import type React from 'react';
+import { lazy } from 'react';
 import {
   createIntl,
   FormattedDate,
   FormattedMessage,
   useIntl,
 } from 'react-intl';
+import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
+import { ProfileTrendCardSkeleton } from '~/components/ProfileWidgetSkeletons';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
@@ -314,84 +315,25 @@ function OperatorPage() {
         />
 
         {operatorProfile.aggregateUptimeRatio != null && (
-          <DeferredOperatorWidget
+          <DeferredViewportWidget
             className="md:col-span-12 lg:col-span-8"
-            fallback={<TrendCardSkeleton />}
+            fallback={<ProfileTrendCardSkeleton />}
           >
             <UptimeRatioTrendCards
               graphs={operatorProfile.timeScaleGraphsUptimeRatios}
             />
-          </DeferredOperatorWidget>
+          </DeferredViewportWidget>
         )}
 
         <RecentIssuesSection issueIds={operatorProfile.issueIdsRecent} />
 
-        <DeferredOperatorWidget
+        <DeferredViewportWidget
           className="md:col-span-12 lg:col-span-8"
-          fallback={<TrendCardSkeleton />}
+          fallback={<ProfileTrendCardSkeleton />}
         >
           <CountTrendCards graphs={operatorProfile.timeScaleGraphsIssueCount} />
-        </DeferredOperatorWidget>
+        </DeferredViewportWidget>
       </div>
     </IncludedEntitiesContext.Provider>
-  );
-}
-
-interface DeferredOperatorWidgetProps {
-  children: React.ReactNode;
-  className: string;
-  fallback: React.ReactNode;
-}
-
-function DeferredOperatorWidget(props: DeferredOperatorWidgetProps) {
-  const { children, className, fallback } = props;
-  const [shouldRender, setShouldRender] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (shouldRender) {
-      return;
-    }
-
-    const container = containerRef.current;
-    if (container == null || !('IntersectionObserver' in window)) {
-      setShouldRender(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setShouldRender(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '600px 0px' },
-    );
-
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [shouldRender]);
-
-  return (
-    <div className={className} ref={containerRef}>
-      {shouldRender ? (
-        <Suspense fallback={fallback}>{children}</Suspense>
-      ) : (
-        fallback
-      )}
-    </div>
-  );
-}
-
-function TrendCardSkeleton() {
-  return (
-    <div className="flex min-h-96 flex-col rounded-lg border border-gray-300 p-6 shadow-lg dark:border-gray-700">
-      <div className="h-6 w-56 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
-      <div className="mt-3 h-10 w-40 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
-      <div className="mt-3 h-5 w-32 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
-      <div className="mt-4 h-48 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
-      <div className="mt-4 h-10 w-60 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
-    </div>
   );
 }

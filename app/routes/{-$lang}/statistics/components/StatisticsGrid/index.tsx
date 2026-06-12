@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import type React from 'react';
+import { lazy } from 'react';
+import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
 import type { SystemAnalytics } from '~/util/db.queries';
 import {
   BarChartCardSkeleton,
@@ -48,78 +48,46 @@ export const StatisticsGrid: React.FC<Props> = (props) => {
 
   return (
     <div className="grid grid-cols-1 gap-4 text-gray-800 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 dark:text-gray-200">
-      <DeferredStatisticsCard fallback={<TrendCardSkeleton />}>
+      <DeferredViewportWidget
+        className="col-span-6"
+        fallback={<TrendCardSkeleton />}
+      >
         <CountTrendCards graphs={statistics.timeScaleChartsIssueCount} />
-      </DeferredStatisticsCard>
-      <DeferredStatisticsCard fallback={<HeatmapCardSkeleton />}>
+      </DeferredViewportWidget>
+      <DeferredViewportWidget
+        className="col-span-6"
+        fallback={<HeatmapCardSkeleton />}
+      >
         <DisruptionsHeatmap chart={statistics.chartRollingYearHeatmap} />
-      </DeferredStatisticsCard>
-      <DeferredStatisticsCard
+      </DeferredViewportWidget>
+      <DeferredViewportWidget
+        className="col-span-6"
         fallback={<BarChartCardSkeleton barCount={8} heightClassName="h-64" />}
       >
         <LinesIssueCountCard chart={statistics.chartTotalIssueCountByLine} />
-      </DeferredStatisticsCard>
-      <DeferredStatisticsCard fallback={<LongestDisruptionsCardSkeleton />}>
+      </DeferredViewportWidget>
+      <DeferredViewportWidget
+        className="col-span-6"
+        fallback={<LongestDisruptionsCardSkeleton />}
+      >
         <LongestDisruptionsCard
           issueIds={statistics.issueIdsDisruptionLongest}
         />
-      </DeferredStatisticsCard>
-      <DeferredStatisticsCard
+      </DeferredViewportWidget>
+      <DeferredViewportWidget
+        className="col-span-6"
         fallback={<BarChartCardSkeleton barCount={15} heightClassName="h-72" />}
       >
         <StationsIssueCountCard
           chart={statistics.chartTotalIssueCountByStation}
         />
-      </DeferredStatisticsCard>
-      <DeferredStatisticsCard fallback={<TrendCardSkeleton />}>
+      </DeferredViewportWidget>
+      <DeferredViewportWidget
+        className="col-span-6"
+        fallback={<TrendCardSkeleton />}
+      >
         <DurationTrendCards graphs={statistics.timeScaleChartsIssueDuration} />
-      </DeferredStatisticsCard>
+      </DeferredViewportWidget>
     </div>
   );
 };
-
-interface DeferredStatisticsCardProps {
-  children: React.ReactNode;
-  fallback: React.ReactNode;
-}
-
-function DeferredStatisticsCard(props: DeferredStatisticsCardProps) {
-  const { children, fallback } = props;
-  const [shouldRender, setShouldRender] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (shouldRender) {
-      return;
-    }
-
-    const container = containerRef.current;
-    if (container == null || !('IntersectionObserver' in window)) {
-      setShouldRender(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setShouldRender(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '600px 0px' },
-    );
-
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [shouldRender]);
-
-  return (
-    <div className="col-span-6" ref={containerRef}>
-      {shouldRender ? (
-        <Suspense fallback={fallback}>{children}</Suspense>
-      ) : (
-        fallback
-      )}
-    </div>
-  );
-}
