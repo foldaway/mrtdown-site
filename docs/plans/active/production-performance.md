@@ -125,6 +125,12 @@ Tasks:
   - `/?viewport=lg`
   - `/statistics`
   - `/about`
+- Add post-launch Markdown surface traffic checks for:
+  - `/llms.txt`
+  - `/index.md`
+  - representative entity `index.md` routes
+  - `.md` alias attempts
+  - `Accept: text/markdown` requests
 - Capture whether each response was Worker-rendered or edge-cached.
 
 Exit criteria:
@@ -132,6 +138,8 @@ Exit criteria:
 - A production response for `/statistics` shows timing breakdowns.
 - We know whether the 7s-11s latency is dominated by DB, CPU, SSR rendering, or
   serialization.
+- Markdown route traffic can inform whether XML sitemap inclusion or `.md`
+  aliases are worth adding later.
 
 ### Phase 1: Cache Public HTML Safely
 

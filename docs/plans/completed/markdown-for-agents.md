@@ -74,6 +74,10 @@ Exit criteria:
   routes.
 - A route can return cacheable `text/markdown` without duplicating header logic.
 
+Status: complete. `app/util/agentMarkdown.ts` provides mdast-backed
+serialization, date and duration helpers, GFM table support, and a cacheable
+Markdown response helper with focused tests.
+
 ### Phase 2: Discovery Entry Point
 
 Add `/llms.txt` as the stable agent entry point.
@@ -90,6 +94,9 @@ Exit criteria:
 - `/llms.txt` returns valid Markdown-like text with `text/markdown`.
 - The response gives agents enough context to find status, lines, stations,
   operators, and issues Markdown.
+
+Status: complete. `/llms.txt` is served from a root route and advertises the
+curated Markdown surface plus human-facing resources.
 
 ### Phase 3: Core Entity Routes
 
@@ -112,6 +119,11 @@ Exit criteria:
 - Route tests or integration checks cover success and not-found cases.
 - No Markdown route serializes React-rendered HTML.
 
+Status: complete. `/index.md`, line, station, operator, and issue Markdown
+routes use existing read-model server functions and content builders. Tests cover
+successful route delegation, cacheable Markdown responses, and preservation of
+read-model 404 responses.
+
 ### Phase 4: Discovery and Observability
 
 Expose and measure the new surface after the core routes are stable.
@@ -122,15 +134,22 @@ Tasks:
   unsupported `robots.txt` directives.
 - Decide whether to include Markdown URLs in the dynamic sitemap or keep them
   discoverable only through `/llms.txt`.
-- Inspect Cloudflare analytics or logs for `/llms.txt`, `index.md`, `.md`, and
-  `Accept: text/markdown` traffic.
+- Carry Cloudflare analytics or log inspection for `/llms.txt`, `index.md`,
+  `.md`, and `Accept: text/markdown` traffic into the production performance
+  observability plan.
 - Revisit `.md` aliases only if logs show meaningful demand.
 
 Exit criteria:
 
 - Agents can discover `/llms.txt` at the conventional root URL.
-- There is an explicit follow-up decision on sitemap inclusion and alias support
-  based on observed traffic or product need.
+- Sitemap inclusion and alias support have an explicit follow-up path based on
+  observed traffic or product need.
+
+Status: complete for launch. `/llms.txt` remains available at the conventional
+root URL, Markdown routes stay out of the XML sitemap, unsupported `robots.txt`
+directives are avoided, and `.md` aliases remain deferred. Production traffic
+inspection moved to `docs/plans/active/production-performance.md` as a
+post-launch observability follow-up.
 
 ## Progress Log
 
@@ -161,7 +180,8 @@ Exit criteria:
   responses for missing entities.
 - 2026-06-13: Added discovery tests that assert Markdown routes stay out of the
   XML sitemap. Production traffic inspection for `/llms.txt`, `index.md`,
-  `.md`, and `Accept: text/markdown` remains the open Phase 4 follow-up.
+  `.md`, and `Accept: text/markdown` was left for a post-launch observability
+  follow-up.
 - 2026-06-13: Removed the unsupported `LLMS:` robots directive after Chrome
   Lighthouse flagged it as invalid. `/llms.txt` remains available at the
   conventional root URL, and robots discovery is limited to the standard XML
@@ -170,6 +190,10 @@ Exit criteria:
   PostgreSQL-style timestamp strings such as `2026-06-10 01:00:00+00`.
   Updated the shared Markdown date parser to accept SQL timestamp strings and
   added regression coverage.
+- 2026-06-13: Closed the plan as completed. The app-owned Markdown surface is
+  implemented and covered by tests; production traffic inspection was carried
+  into the production performance plan so sitemap inclusion and `.md` aliases
+  can be revisited with post-launch data.
 
 ## Decision Log
 
@@ -194,6 +218,9 @@ Exit criteria:
 - 2026-06-13: Do not advertise `/llms.txt` with non-standard `robots.txt`
   directives; Lighthouse treats `LLMS:` as invalid, and the root `/llms.txt`
   convention is sufficient for the current agent entry point.
+- 2026-06-13: Treat XML sitemap inclusion and `.md` aliases as observability-led
+  follow-ups instead of launch blockers. Keep discovery curated through
+  `/llms.txt` until production traffic shows meaningful demand.
 
 ## Validation
 

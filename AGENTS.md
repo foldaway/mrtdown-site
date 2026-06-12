@@ -48,5 +48,4 @@ Current active plans:
 
 - `docs/plans/active/crowdsourced-reports.md`
 - `docs/plans/active/dynamic-system-map.md`
-- `docs/plans/active/markdown-for-agents.md`
 - `docs/plans/active/production-performance.md`
