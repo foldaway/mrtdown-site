@@ -366,6 +366,10 @@ underlying compute and payload costs so uncached requests are also fast.
   recent-issues chunks, keeping `IssueCard` out of the initial profile route
   render and keeping the shared line/operator recent-issues Radix Collapsible
   dependency behind the viewport gate.
+- 2026-06-13: Continued Phase 5 route preload cleanup by removing the unused
+  runtime `ViewportSchema` from `useViewport`. The home and operator route
+  entries still use the viewport hook, but the production build no longer pulls
+  the `zod` chunk through that hook.
 
 ## Validation
 
