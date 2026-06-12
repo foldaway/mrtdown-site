@@ -13,13 +13,21 @@ vi.mock('./db.queries', () => ({
 }));
 
 describe('agent Markdown discovery', () => {
-  it('advertises llms.txt through robots.txt', () => {
+  it('keeps robots.txt limited to standard discovery directives', () => {
     const robotsTxt = readFileSync(
       new URL('../../public/robots.txt', import.meta.url),
       'utf8',
     );
 
-    expect(robotsTxt).toContain('LLMS: https://www.mrtdown.org/llms.txt');
+    const directives = robotsTxt
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line !== '' && !line.startsWith('#'))
+      .map((line) => line.split(':', 1)[0]?.toLowerCase());
+
+    expect(directives).toEqual(['user-agent', 'disallow', 'sitemap']);
+    expect(robotsTxt).toContain('Sitemap: https://www.mrtdown.org/sitemap.xml');
+    expect(robotsTxt).not.toMatch(/^LLMS:/im);
   });
 
   it('keeps Markdown routes discoverable through llms.txt instead of the XML sitemap', () => {

@@ -118,7 +118,8 @@ Expose and measure the new surface after the core routes are stable.
 
 Tasks:
 
-- Add `/llms.txt` to `public/robots.txt`.
+- Keep `/llms.txt` available at the conventional root URL without adding
+  unsupported `robots.txt` directives.
 - Decide whether to include Markdown URLs in the dynamic sitemap or keep them
   discoverable only through `/llms.txt`.
 - Inspect Cloudflare analytics or logs for `/llms.txt`, `index.md`, `.md`, and
@@ -127,7 +128,7 @@ Tasks:
 
 Exit criteria:
 
-- Crawlers can discover `/llms.txt`.
+- Agents can discover `/llms.txt` at the conventional root URL.
 - There is an explicit follow-up decision on sitemap inclusion and alias support
   based on observed traffic or product need.
 
@@ -147,9 +148,9 @@ Exit criteria:
   `/stations/$stationId/index.md`, `/operators/$operatorId/index.md`, and
   `/issues/$issueId/index.md` routes backed by read-model server functions.
   Updated `/llms.txt` to advertise the new Markdown surface.
-- 2026-06-11: Started Phase 4 discovery by adding `/llms.txt` to
-  `public/robots.txt`. Kept Markdown URLs out of the XML sitemap for now so the
-  curated agent entry point remains the expansion surface.
+- 2026-06-11: Started Phase 4 discovery by exposing `/llms.txt` at the
+  conventional root URL. Kept Markdown URLs out of the XML sitemap for now so
+  the curated agent entry point remains the expansion surface.
 - 2026-06-12: Expanded Markdown content tests for line, station, and operator
   builders so the Phase 3 entity formats are covered alongside overview and
   issue Markdown. Missing-entity behavior remains delegated to the shared
@@ -158,10 +159,13 @@ Exit criteria:
   Phase 3 entity Markdown routes. The tests cover read-model delegation,
   cacheable `text/markdown` responses, and preservation of read-model 404
   responses for missing entities.
-- 2026-06-13: Added discovery tests that assert `/llms.txt` is advertised from
-  `public/robots.txt` and that Markdown routes stay out of the XML sitemap.
-  Production traffic inspection for `/llms.txt`, `index.md`, `.md`, and
-  `Accept: text/markdown` remains the open Phase 4 follow-up.
+- 2026-06-13: Added discovery tests that assert Markdown routes stay out of the
+  XML sitemap. Production traffic inspection for `/llms.txt`, `index.md`,
+  `.md`, and `Accept: text/markdown` remains the open Phase 4 follow-up.
+- 2026-06-13: Removed the unsupported `LLMS:` robots directive after Chrome
+  Lighthouse flagged it as invalid. `/llms.txt` remains available at the
+  conventional root URL, and robots discovery is limited to the standard XML
+  sitemap directive.
 
 ## Decision Log
 
@@ -183,6 +187,9 @@ Exit criteria:
 - 2026-06-11: Keep Markdown routes discoverable through `/llms.txt` instead of
   the dynamic XML sitemap until there is observed crawler demand for sitemap
   inclusion.
+- 2026-06-13: Do not advertise `/llms.txt` with non-standard `robots.txt`
+  directives; Lighthouse treats `LLMS:` as invalid, and the root `/llms.txt`
+  convention is sufficient for the current agent entry point.
 
 ## Validation
 
