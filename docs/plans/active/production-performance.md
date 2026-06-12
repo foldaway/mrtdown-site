@@ -347,6 +347,13 @@ underlying compute and payload costs so uncached requests are also fast.
   sit behind the separate `LongestDisruptionsCard` chunk. Tightened the
   TanStack route-file ignore pattern so support `helpers`, `components`,
   `hooks`, and test files are not scanned as route files during builds.
+- 2026-06-12: Continued Phase 5 hydration cleanup by extracting the repeated
+  viewport-gated `Suspense` wrapper used by statistics, line, and operator
+  routes into `DeferredViewportWidget`, and by sharing the profile chart/map
+  skeletons. A production build keeps statistics chart cards, line trend cards,
+  `LineSystemMapCard`, and generated `StationMap` assets as dynamic imports
+  rather than route preloads; route preloads now include only the small shared
+  deferred wrapper.
 
 ## Validation
 
