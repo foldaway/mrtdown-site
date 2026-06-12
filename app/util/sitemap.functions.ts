@@ -6,6 +6,15 @@ import { LANGUAGES_NON_DEFAULT } from '~/constants';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getSitemapData } from './db.queries';
 
+interface SitemapPathData {
+  lineIds: string[];
+  stationIds: string[];
+  operatorIds: string[];
+  issueIds: string[];
+  monthEarliest: string;
+  monthLatest: string;
+}
+
 function buildEntries(path: string, rootUrl: string): Element {
   return {
     type: 'element',
@@ -54,55 +63,7 @@ function buildEntries(path: string, rootUrl: string): Element {
 
 export const getSitemapFn = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const {
-      lineIds,
-      stationIds,
-      operatorIds,
-      issueIds,
-      monthEarliest,
-      monthLatest,
-    } = await getSitemapData();
-    const paths: string[] = [
-      '/',
-      '/history',
-      '/statistics',
-      '/system-map',
-      '/about',
-    ];
-
-    for (const lineId of lineIds) {
-      paths.push(`/lines/${lineId}`);
-    }
-    for (const stationId of stationIds) {
-      paths.push(`/stations/${stationId}`);
-    }
-    for (const operatorId of operatorIds) {
-      paths.push(`/operators/${operatorId}`);
-    }
-    for (const issueId of issueIds) {
-      paths.push(`/issues/${issueId}`);
-    }
-
-    const monthEarliestDateTime = DateTime.fromISO(monthEarliest);
-    const monthLatestDateTime = DateTime.fromISO(monthLatest);
-    const interval = Interval.fromDateTimes(
-      monthEarliestDateTime,
-      monthLatestDateTime.plus({ month: 1 }),
-    );
-    for (const monthInterval of interval.splitBy({ month: 1 })) {
-      const monthDateTime = monthInterval.start;
-      if (monthDateTime == null) {
-        continue;
-      }
-
-      if (!paths.includes(`/history/${monthDateTime.toFormat('yyyy')}`)) {
-        paths.push(`/history/${monthDateTime.toFormat('yyyy')}`);
-      }
-
-      paths.push(
-        `/history/${monthDateTime.toFormat('yyyy')}/${monthDateTime.toFormat('MM')}`,
-      );
-    }
+    const paths = buildSitemapPaths(await getSitemapData());
 
     const elementUrlSet: Element = {
       type: 'element',
@@ -114,7 +75,7 @@ export const getSitemapFn = createServerFn({ method: 'GET' }).handler(
       children: paths.map((path) => {
         return buildEntries(
           path,
-          process.env.ROOT_URL ?? 'http://localhost:3000',
+          import.meta.env.VITE_ROOT_URL ?? 'http://localhost:3000',
         );
       }),
     };
@@ -127,3 +88,56 @@ export const getSitemapFn = createServerFn({ method: 'GET' }).handler(
     return toXml(root);
   },
 );
+
+export function buildSitemapPaths({
+  lineIds,
+  stationIds,
+  operatorIds,
+  issueIds,
+  monthEarliest,
+  monthLatest,
+}: SitemapPathData) {
+  const paths: string[] = [
+    '/',
+    '/history',
+    '/statistics',
+    '/system-map',
+    '/about',
+  ];
+
+  for (const lineId of lineIds) {
+    paths.push(`/lines/${lineId}`);
+  }
+  for (const stationId of stationIds) {
+    paths.push(`/stations/${stationId}`);
+  }
+  for (const operatorId of operatorIds) {
+    paths.push(`/operators/${operatorId}`);
+  }
+  for (const issueId of issueIds) {
+    paths.push(`/issues/${issueId}`);
+  }
+
+  const monthEarliestDateTime = DateTime.fromISO(monthEarliest);
+  const monthLatestDateTime = DateTime.fromISO(monthLatest);
+  const interval = Interval.fromDateTimes(
+    monthEarliestDateTime,
+    monthLatestDateTime.plus({ month: 1 }),
+  );
+  for (const monthInterval of interval.splitBy({ month: 1 })) {
+    const monthDateTime = monthInterval.start;
+    if (monthDateTime == null) {
+      continue;
+    }
+
+    if (!paths.includes(`/history/${monthDateTime.toFormat('yyyy')}`)) {
+      paths.push(`/history/${monthDateTime.toFormat('yyyy')}`);
+    }
+
+    paths.push(
+      `/history/${monthDateTime.toFormat('yyyy')}/${monthDateTime.toFormat('MM')}`,
+    );
+  }
+
+  return paths;
+}
