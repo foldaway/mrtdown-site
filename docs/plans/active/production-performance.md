@@ -354,6 +354,12 @@ underlying compute and payload costs so uncached requests are also fast.
   `LineSystemMapCard`, and generated `StationMap` assets as dynamic imports
   rather than route preloads; route preloads now include only the small shared
   deferred wrapper.
+- 2026-06-13: Continued Phase 5 profile route hydration cleanup by lazy-loading
+  the optional `CommunitySignalsSection` behind `DeferredViewportWidget` on
+  home, line, and station routes. A production build now emits a separate
+  `CommunitySignalsSection` client/server chunk, and the home, line, and
+  station route component entries list it only as a dynamic import instead of
+  an eager route dependency.
 
 ## Validation
 

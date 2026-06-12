@@ -8,10 +8,10 @@ import {
   FormattedMessage,
   useIntl,
 } from 'react-intl';
-import { CommunitySignalsSection } from '~/components/CommunitySignalsSection';
 import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import {
+  CommunitySignalsSectionSkeleton,
   ProfileSystemMapCardSkeleton,
   ProfileTrendCardSkeleton,
 } from '~/components/ProfileWidgetSkeletons';
@@ -44,6 +44,11 @@ const LineSystemMapCard = lazy(() =>
 const UptimeRatioTrendCards = lazy(() =>
   import('./components/UptimeRatioTrendCards').then((module) => ({
     default: module.UptimeRatioTrendCards,
+  })),
+);
+const CommunitySignalsSection = lazy(() =>
+  import('~/components/CommunitySignalsSection').then((module) => ({
+    default: module.CommunitySignalsSection,
   })),
 );
 
@@ -339,11 +344,13 @@ function ComponentPage() {
 
         <CurrentStatusCard lineSummary={lineProfile.lineSummary} />
 
-        {crowdReportsEnabled && (
-          <CommunitySignalsSection
-            signals={lineProfile.communitySignals}
+        {crowdReportsEnabled && lineProfile.communitySignals.length > 0 && (
+          <DeferredViewportWidget
             className="md:col-span-12"
-          />
+            fallback={<CommunitySignalsSectionSkeleton />}
+          >
+            <CommunitySignalsSection signals={lineProfile.communitySignals} />
+          </DeferredViewportWidget>
         )}
 
         <NextMaintenanceCard
