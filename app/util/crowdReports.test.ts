@@ -620,6 +620,18 @@ describe('assessCrowdReportAutomationPolicy', () => {
     ).toEqual({ action: 'accept' });
   });
 
+  it('allows transit reports that mention new instructions from staff', () => {
+    expect(
+      assessCrowdReportAutomationPolicy(
+        {
+          ...VALID_SUBMISSION,
+          text: 'Station staff gave new instructions for boarding at Platform B.',
+        },
+        NOW,
+      ),
+    ).toEqual({ action: 'accept' });
+  });
+
   it('rejects stale resolved reports', () => {
     expect(
       assessCrowdReportAutomationPolicy(
