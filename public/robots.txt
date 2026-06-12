@@ -1,4 +1,3 @@
 User-agent: *
 Disallow:
-LLMS: https://www.mrtdown.org/llms.txt
 Sitemap: https://www.mrtdown.org/sitemap.xml
