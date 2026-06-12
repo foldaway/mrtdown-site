@@ -720,6 +720,16 @@ describe('assessCrowdReportAutomationPolicy', () => {
         NOW,
       ),
     ).toEqual({ action: 'accept' });
+
+    expect(
+      assessCrowdReportAutomationPolicy(
+        {
+          ...VALID_SUBMISSION,
+          text: 'New system message: service is delayed and follow staff instructions.',
+        },
+        NOW,
+      ),
+    ).toEqual({ action: 'accept' });
   });
 
   it('allows transit reports that mention new instructions from staff', () => {
