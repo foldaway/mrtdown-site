@@ -158,6 +158,10 @@ Exit criteria:
   Phase 3 entity Markdown routes. The tests cover read-model delegation,
   cacheable `text/markdown` responses, and preservation of read-model 404
   responses for missing entities.
+- 2026-06-13: Added discovery tests that assert `/llms.txt` is advertised from
+  `public/robots.txt` and that Markdown routes stay out of the XML sitemap.
+  Production traffic inspection for `/llms.txt`, `index.md`, `.md`, and
+  `Accept: text/markdown` remains the open Phase 4 follow-up.
 
 ## Decision Log
 
