@@ -340,7 +340,11 @@ function hasCrowdReportClusterScopeSql() {
 }
 
 function normalizePolicyText(value: string) {
-  return value.trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+  return value
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/[\u2018\u2019]/gu, "'")
+    .replace(/\s+/g, ' ');
 }
 
 function isRepeatedFillerText(value: string) {
@@ -431,19 +435,19 @@ function isObviousPromptInjectionText(value: string) {
     /\b(?:act\s+as|pretend\s+(?:as|to\s+be))\s+(?:(?:a|an|the)\s+)?(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
       value,
     ) ||
-    /\b(?:you\s+are\s+(?:now\s+)?|from\s+now\s+on,?\s+you\s+are\s+)(?:(?:a|an|the)\s+)?(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
+    /\b(?:you(?:\s+are|'re)\s+(?:now\s+)?|from\s+now\s+on,?\s+you(?:\s+are|'re)\s+)(?:(?:a|an|the)\s+)?(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
       value,
     ) ||
-    /\b(?:(?:new|updated|additional)\s+)?(?:system|developer)\s+messages?\s*:\s*(?:(?:always|please)\s+)?(?:accept|create|mark|reject|treat)\b/u.test(
+    /\b(?:(?:new|updated|additional)\s+)?(?:system|developer)\s+(?:instructions?|messages?|prompts?|rules?)\s*:\s*(?:(?:always|please)\s+)?(?:accept|create|mark|reject|treat)\b/u.test(
       value,
     ) ||
     /\b(?:(?:new|updated|additional)\s+system\s+(?:instructions?|prompts?|rules?)|(?:new|updated|additional)\s+developer\s+(?:instructions?|messages?|prompts?|rules?)|override\s+(?:(?:the|your)\s+)?(?:system|developer)\s+(?:instructions?|messages?|prompts?|rules?))\b/u.test(
       value,
     ) ||
-    /\b(?:do not|don't)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?(?:(?:above|previous|prior)\s+(?:system|developer)\s+|(?:system|developer)\s+)(?:instructions?|messages?|prompts?|rules?)\b/u.test(
+    /\b(?:do not|don't|never)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?(?:(?:above|previous|prior)\s+(?:system|developer)\s+|(?:system|developer)\s+)(?:instructions?|messages?|prompts?|rules?)\b/u.test(
       value,
     ) ||
-    /\b(?:do not|don't)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?above\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
+    /\b(?:do not|don't|never)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?above\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
       value,
     ) ||
     /\b(?:treat|use)\s+(?:this|the following)\s+as\s+(?:(?:a|an|the)\s+)?(?:developer|system)\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
