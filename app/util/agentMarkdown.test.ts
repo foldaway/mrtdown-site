@@ -105,6 +105,9 @@ describe('agent Markdown serialization', () => {
 
   it('formats dates, datetimes, and durations consistently for agent routes', () => {
     expect(formatMarkdownDate('2026-05-31T23:30:00+08:00')).toBe('2026-05-31');
+    expect(formatMarkdownDateTime('2026-06-10 01:00:00+00')).toBe(
+      '2026-06-10T09:00:00+08:00',
+    );
     expect(
       formatMarkdownDateTime(
         DateTime.fromISO('2026-05-31T23:30:00+08:00', { setZone: true }),

@@ -166,6 +166,10 @@ Exit criteria:
   Lighthouse flagged it as invalid. `/llms.txt` remains available at the
   conventional root URL, and robots discovery is limited to the standard XML
   sitemap directive.
+- 2026-06-13: Local route validation found issue Markdown could crash on
+  PostgreSQL-style timestamp strings such as `2026-06-10 01:00:00+00`.
+  Updated the shared Markdown date parser to accept SQL timestamp strings and
+  added regression coverage.
 
 ## Decision Log
 

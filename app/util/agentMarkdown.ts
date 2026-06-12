@@ -155,6 +155,10 @@ function parseMarkdownDate(
     dateTime = DateTime.fromJSDate(value);
   } else {
     dateTime = DateTime.fromISO(value, { setZone: true });
+
+    if (!dateTime.isValid) {
+      dateTime = DateTime.fromSQL(value, { setZone: true });
+    }
   }
 
   if (!dateTime.isValid) {
