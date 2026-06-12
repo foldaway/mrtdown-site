@@ -428,6 +428,21 @@ function isObviousPromptInjectionText(value: string) {
     /\b(?:reveal|print|show)\s+(?:(?:the|your)\s+)?(?:system|developer)\s+(?:prompt|message|instructions?)\b/u.test(
       value,
     ) ||
+    /\b(?:act|pretend)\s+as\s+(?:(?:a|an|the)\s+)?(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
+      value,
+    ) ||
+    /\b(?:you are now|from now on)\s+(?:(?:a|an|the)\s+)?(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
+      value,
+    ) ||
+    /\b(?:new|updated|additional|override)\s+(?:(?:system|developer)\s+)?(?:instructions?|prompts?|rules?)\b/u.test(
+      value,
+    ) ||
+    /\b(?:do not|don't)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?(?:above|developer|previous|prior|system)\s+(?:instructions?|prompts?|rules?)\b/u.test(
+      value,
+    ) ||
+    /\b(?:treat|use)\s+(?:this|the following)\s+as\s+(?:(?:a|an|the)\s+)?(?:developer|system)\s+(?:instructions?|message|prompt)\b/u.test(
+      value,
+    ) ||
     /\b(?:jailbreak|prompt injection)\b/u.test(value)
   );
 }

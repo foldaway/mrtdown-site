@@ -485,6 +485,9 @@ Exit criteria:
   success-marking races as dispatch failures instead of skipped candidates,
   without closing clusters that may have newer ongoing reports outside the sent
   payload.
+- 2026-06-12: Continued Phase 6 prompt-injection hardening by rejecting
+  role-assignment and new-instruction wording in report text or direction
+  fields before accepted reports can reach canonical ingest triage.
 
 ## Decision Log
 
