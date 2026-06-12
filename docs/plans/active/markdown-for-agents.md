@@ -150,6 +150,10 @@ Exit criteria:
 - 2026-06-11: Started Phase 4 discovery by adding `/llms.txt` to
   `public/robots.txt`. Kept Markdown URLs out of the XML sitemap for now so the
   curated agent entry point remains the expansion surface.
+- 2026-06-12: Expanded Markdown content tests for line, station, and operator
+  builders so the Phase 3 entity formats are covered alongside overview and
+  issue Markdown. Missing-entity behavior remains delegated to the shared
+  read-model server functions used by the HTML routes.
 
 ## Decision Log
 
