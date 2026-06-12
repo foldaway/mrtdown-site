@@ -11,10 +11,10 @@ import {
   useIntl,
 } from 'react-intl';
 import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
-import type { IncludedEntities, Station } from '~/types';
-import { IssueCard } from '~/components/IssueCard';
-import type { IssueCardContext } from '~/components/IssueCard/types';
-import { CommunitySignalsSectionSkeleton } from '~/components/ProfileWidgetSkeletons';
+import {
+  CommunitySignalsSectionSkeleton,
+  ProfileRecentIssuesSectionSkeleton,
+} from '~/components/ProfileWidgetSkeletons';
 import { StationBar } from '~/components/StationBar';
 import { LineTypeLabels, StationStructureTypeLabels } from '~/constants';
 import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
@@ -23,12 +23,18 @@ import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { useHydrated } from '~/hooks/useHydrated';
+import type { IncludedEntities, Station } from '~/types';
 import { getStationProfileFn } from '~/util/station.functions';
 import { assert } from '../../../util/assert';
 
 const CommunitySignalsSection = lazy(() =>
   import('~/components/CommunitySignalsSection').then((module) => ({
     default: module.CommunitySignalsSection,
+  })),
+);
+const RecentIssuesSection = lazy(() =>
+  import('./$stationId/components/RecentIssuesSection').then((module) => ({
+    default: module.RecentIssuesSection,
   })),
 );
 
@@ -239,14 +245,6 @@ function StationPage() {
       return true;
     });
   }, [station.memberships]);
-
-  const issueCardContext = useMemo<IssueCardContext>(() => {
-    return {
-      type: 'history.days',
-      date: DateTime.now().startOf('day').minus({ days: 30 }).toISODate(),
-      days: 30,
-    };
-  }, []);
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
@@ -497,44 +495,12 @@ function StationPage() {
           </div>
         </div>
 
-        {/* Recent Issues Section */}
-        <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-lg dark:border-gray-600/60 dark:bg-gray-800">
-          <div className="p-4 sm:p-6">
-            <h2 className="font-semibold text-base text-gray-900 dark:text-gray-100">
-              <FormattedMessage
-                id="station.recent_issues"
-                defaultMessage="Recent Issues"
-              />
-            </h2>
-
-            <div className="mt-4 space-y-3">
-              {stationProfile.issueIdsRecent.length > 0 ? (
-                stationProfile.issueIdsRecent.map((issueId) => {
-                  const issue = included.issues[issueId];
-
-                  return (
-                    <IssueCard
-                      key={issue.id}
-                      issue={issue}
-                      className="!w-auto"
-                      context={issueCardContext}
-                    />
-                  );
-                })
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <InformationCircleIcon className="h-12 w-12 text-gray-400 dark:text-gray-500" />
-                  <p className="mt-3 text-gray-600 dark:text-gray-400">
-                    <FormattedMessage
-                      id="station.no_recent_issues"
-                      defaultMessage="No recent issues reported for this station"
-                    />
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <DeferredViewportWidget
+          className="block"
+          fallback={<ProfileRecentIssuesSectionSkeleton />}
+        >
+          <RecentIssuesSection issueIds={stationProfile.issueIdsRecent} />
+        </DeferredViewportWidget>
       </div>
     </IncludedEntitiesContext.Provider>
   );

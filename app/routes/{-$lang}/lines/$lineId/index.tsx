@@ -12,6 +12,7 @@ import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import {
   CommunitySignalsSectionSkeleton,
+  ProfileRecentIssuesSectionSkeleton,
   ProfileSystemMapCardSkeleton,
   ProfileTrendCardSkeleton,
 } from '~/components/ProfileWidgetSkeletons';
@@ -27,7 +28,6 @@ import { CurrentStatusCard } from './components/CurrentStatusCard';
 import { LineSchematicCard } from './components/LineSchematicCard';
 import { NextMaintenanceCard } from './components/NextMaintenanceCard';
 import { QuickFactsCard } from './components/QuickFactsCard';
-import { RecentIssuesSection } from './components/RecentIssuesSection';
 import { StationInterchangesCard } from './components/StationInterchangesCard';
 import { UptimeCard } from './components/UptimeCard';
 
@@ -49,6 +49,11 @@ const UptimeRatioTrendCards = lazy(() =>
 const CommunitySignalsSection = lazy(() =>
   import('~/components/CommunitySignalsSection').then((module) => ({
     default: module.CommunitySignalsSection,
+  })),
+);
+const RecentIssuesSection = lazy(() =>
+  import('./components/RecentIssuesSection').then((module) => ({
+    default: module.RecentIssuesSection,
   })),
 );
 
@@ -380,7 +385,12 @@ function ComponentPage() {
           </DeferredViewportWidget>
         )}
 
-        <RecentIssuesSection issueIds={lineProfile.issueIdsRecent} />
+        <DeferredViewportWidget
+          className="md:col-span-12"
+          fallback={<ProfileRecentIssuesSectionSkeleton />}
+        >
+          <RecentIssuesSection issueIds={lineProfile.issueIdsRecent} />
+        </DeferredViewportWidget>
 
         <DeferredViewportWidget
           className="md:col-span-12 lg:col-span-8"

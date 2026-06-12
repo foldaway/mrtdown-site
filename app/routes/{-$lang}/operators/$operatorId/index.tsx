@@ -10,7 +10,10 @@ import {
 } from 'react-intl';
 import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
-import { ProfileTrendCardSkeleton } from '~/components/ProfileWidgetSkeletons';
+import {
+  ProfileRecentIssuesSectionSkeleton,
+  ProfileTrendCardSkeleton,
+} from '~/components/ProfileWidgetSkeletons';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
@@ -19,7 +22,6 @@ import { useHydrated } from '~/hooks/useHydrated';
 import { useViewport } from '~/hooks/useViewport';
 import { getOperatorProfileFn } from '~/util/operator.functions';
 import { assert } from '../../../../util/assert';
-import { RecentIssuesSection } from '../../lines/$lineId/components/RecentIssuesSection';
 import { OperatorCurrentStatusCard } from './components/OperatorCurrentStatusCard';
 import { OperatorLinePerformanceCard } from './components/OperatorLinePerformanceCard';
 import { OperatorQuickFactsCard } from './components/OperatorQuickFactsCard';
@@ -36,6 +38,13 @@ const UptimeRatioTrendCards = lazy(() =>
   import('../../lines/$lineId/components/UptimeRatioTrendCards').then(
     (module) => ({
       default: module.UptimeRatioTrendCards,
+    }),
+  ),
+);
+const RecentIssuesSection = lazy(() =>
+  import('../../lines/$lineId/components/RecentIssuesSection').then(
+    (module) => ({
+      default: module.RecentIssuesSection,
     }),
   ),
 );
@@ -325,7 +334,12 @@ function OperatorPage() {
           </DeferredViewportWidget>
         )}
 
-        <RecentIssuesSection issueIds={operatorProfile.issueIdsRecent} />
+        <DeferredViewportWidget
+          className="md:col-span-12"
+          fallback={<ProfileRecentIssuesSectionSkeleton />}
+        >
+          <RecentIssuesSection issueIds={operatorProfile.issueIdsRecent} />
+        </DeferredViewportWidget>
 
         <DeferredViewportWidget
           className="md:col-span-12 lg:col-span-8"

@@ -38,3 +38,15 @@ export function CommunitySignalsSectionSkeleton() {
     </section>
   );
 }
+
+export function ProfileRecentIssuesSectionSkeleton() {
+  return (
+    <section className="rounded-lg border border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800/50">
+      <div className="h-6 w-36 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
+      <div className="mt-4 space-y-3">
+        <div className="h-24 animate-pulse rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800" />
+        <div className="h-24 animate-pulse rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800" />
+      </div>
+    </section>
+  );
+}
