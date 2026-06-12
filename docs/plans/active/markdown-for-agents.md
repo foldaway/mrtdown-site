@@ -147,6 +147,9 @@ Exit criteria:
   `/stations/$stationId/index.md`, `/operators/$operatorId/index.md`, and
   `/issues/$issueId/index.md` routes backed by read-model server functions.
   Updated `/llms.txt` to advertise the new Markdown surface.
+- 2026-06-11: Started Phase 4 discovery by adding `/llms.txt` to
+  `public/robots.txt`. Kept Markdown URLs out of the XML sitemap for now so the
+  curated agent entry point remains the expansion surface.
 
 ## Decision Log
 
@@ -165,6 +168,9 @@ Exit criteria:
   (`mdast-util-to-markdown` plus `mdast-util-gfm`) instead of hand-assembling
   Markdown strings, so escaping and GFM tables follow maintained Markdown
   rules.
+- 2026-06-11: Keep Markdown routes discoverable through `/llms.txt` instead of
+  the dynamic XML sitemap until there is observed crawler demand for sitemap
+  inclusion.
 
 ## Validation
 
