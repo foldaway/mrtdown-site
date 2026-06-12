@@ -154,6 +154,10 @@ Exit criteria:
   builders so the Phase 3 entity formats are covered alongside overview and
   issue Markdown. Missing-entity behavior remains delegated to the shared
   read-model server functions used by the HTML routes.
+- 2026-06-13: Added route-level tests for `/llms.txt`, `/index.md`, and the
+  Phase 3 entity Markdown routes. The tests cover read-model delegation,
+  cacheable `text/markdown` responses, and preservation of read-model 404
+  responses for missing entities.
 
 ## Decision Log
 
