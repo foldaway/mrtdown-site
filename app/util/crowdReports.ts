@@ -437,7 +437,7 @@ function isObviousPromptInjectionText(value: string) {
     /\b(?:new|updated|additional|override)\s+(?:system|developer)\s+(?:instructions?|prompts?|rules?)\b/u.test(
       value,
     ) ||
-    /\b(?:do not|don't)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?(?:above|developer|previous|prior|system)\s+(?:instructions?|prompts?|rules?)\b/u.test(
+    /\b(?:do not|don't)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?(?:(?:above|previous|prior)\s+(?:system|developer)\s+|(?:system|developer)\s+)(?:instructions?|prompts?|rules?)\b/u.test(
       value,
     ) ||
     /\b(?:treat|use)\s+(?:this|the following)\s+as\s+(?:(?:a|an|the)\s+)?(?:developer|system)\s+(?:instructions?|message|prompt)\b/u.test(
