@@ -434,13 +434,16 @@ function isObviousPromptInjectionText(value: string) {
     /\b(?:you\s+are\s+(?:now\s+)?|from\s+now\s+on,?\s+you\s+are\s+)(?:(?:a|an|the)\s+)?(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
       value,
     ) ||
-    /\b(?:new|updated|additional)\s+system\s+messages?\s*:\s*(?:accept|create|mark|reject|treat|use)\b/u.test(
+    /\b(?:(?:new|updated|additional)\s+)?system\s+messages?\s*:\s*(?:(?:always|please)\s+)?(?:accept|create|mark|reject|treat|use)\b/u.test(
       value,
     ) ||
     /\b(?:(?:new|updated|additional)\s+system\s+(?:instructions?|prompts?|rules?)|(?:new|updated|additional)\s+developer\s+(?:instructions?|messages?|prompts?|rules?)|override\s+(?:(?:the|your)\s+)?(?:system|developer)\s+(?:instructions?|messages?|prompts?|rules?))\b/u.test(
       value,
     ) ||
     /\b(?:do not|don't)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?(?:(?:above|previous|prior)\s+(?:system|developer)\s+|(?:system|developer)\s+)(?:instructions?|messages?|prompts?|rules?)\b/u.test(
+      value,
+    ) ||
+    /\b(?:do not|don't)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?above\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
       value,
     ) ||
     /\b(?:treat|use)\s+(?:this|the following)\s+as\s+(?:(?:a|an|the)\s+)?(?:developer|system)\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
