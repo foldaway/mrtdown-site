@@ -461,13 +461,16 @@ function isObviousPromptInjectionText(value: string) {
     /\b(?:enable|enter|switch(?:\s+to)?|activate|turn\s+on)\s+(?:(?:the|your)\s+)?(?:admin|developer|debug|system)\s+mode\b/u.test(
       value,
     ) ||
-    /\b(?:admin|developer|debug|system)\s+mode\s*:\s*(?:accept|create|ignore|mark|override|reject|treat)\b/u.test(
+    /\b(?:admin|developer|debug|system)\s+mode\s*:\s*(?:(?:always|please)\s+)?(?:accept|create|ignore|mark|override|reject|treat)\b/u.test(
       value,
     ) ||
-    /\b(?:system|developer)\s+override\s*:\s*(?:accept|create|ignore|mark|reject|treat)\b/u.test(
+    /\b(?:system|developer)\s+override\s*:\s*(?:(?:always|please)\s+)?(?:accept|create|ignore|mark|reject|treat)\b/u.test(
       value,
     ) ||
-    /\b(?:bypass|override)\s+(?:(?:the|your)\s+)?(?:filters?|guardrails?|moderation|(?:ai|llm|model)\s+safety|triage|validation)\b/u.test(
+    /\b(?:bypass|override)\s+(?:(?:the|your|all|automated|content|ai|llm|model)\s+)*(?:filters?|moderation|(?:ai|llm|model)\s+safety|triage)\b/u.test(
+      value,
+    ) ||
+    /\b(?:bypass|override)\s+(?:(?:all|automated|input|report|submission)\s+)+validation\b/u.test(
       value,
     ) ||
     /\b(?:jailbreak|prompt injection)\b/u.test(value)
