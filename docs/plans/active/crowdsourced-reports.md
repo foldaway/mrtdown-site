@@ -488,6 +488,10 @@ Exit criteria:
 - 2026-06-12: Continued Phase 6 prompt-injection hardening by rejecting
   role-assignment and new-instruction wording in report text or direction
   fields before accepted reports can reach canonical ingest triage.
+- 2026-06-13: Continued Phase 6 prompt-injection hardening by normalizing
+  compatibility characters and removing invisible format characters before
+  automation policy checks, with regression coverage for zero-width obfuscated
+  report text and direction fields.
 
 ## Decision Log
 
