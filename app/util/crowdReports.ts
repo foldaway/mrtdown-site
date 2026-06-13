@@ -467,7 +467,7 @@ function isObviousPromptInjectionText(value: string) {
     /\b(?:system|developer)\s+override\s*:\s*(?:accept|create|ignore|mark|reject|treat)\b/u.test(
       value,
     ) ||
-    /\b(?:bypass|override)\s+(?:(?:the|your)\s+)?(?:filters?|guardrails?|moderation|safety|triage|validation)\b/u.test(
+    /\b(?:bypass|override)\s+(?:(?:the|your)\s+)?(?:filters?|guardrails?|moderation|(?:ai|llm|model)\s+safety|triage|validation)\b/u.test(
       value,
     ) ||
     /\b(?:jailbreak|prompt injection)\b/u.test(value)
