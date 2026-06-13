@@ -378,6 +378,12 @@ underlying compute and payload costs so uncached requests are also fast.
   runtime `ViewportSchema` from `useViewport`. The home and operator route
   entries still use the viewport hook, but the production build no longer pulls
   the `zod` chunk through that hook.
+- 2026-06-13: Continued Phase 5 home hydration cleanup by splitting the
+  collapsed current-advisory issue details into a lazy `Details` chunk and
+  replacing the eager Radix Collapsible dependency with local button state. A
+  production build emits separate client assets for `Details` and `IssueCard`,
+  keeping advisory detail cards out of the initial home route bundle until the
+  user opens the section.
 
 ## Validation
 

@@ -8,18 +8,16 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
-import { DateTime } from 'luxon';
-import { Collapsible } from 'radix-ui';
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { defineMessage, FormattedMessage } from 'react-intl';
 import type { Issue } from '~/types';
-import { IssueCard } from '~/components/IssueCard';
 import { LineBar } from '~/components/LineBar';
-import type { IssueCardContext } from './IssueCard/types';
 
-const ISSUE_CARD_CONTEXT_NOW: IssueCardContext = {
-  type: 'now',
-};
+const CurrentAdvisoriesDetails = lazy(() =>
+  import('./CurrentAdvisoriesSection/Details').then((module) => ({
+    default: module.CurrentAdvisoriesDetails,
+  })),
+);
 
 const ISSUE_TYPES = [
   {
@@ -59,6 +57,7 @@ interface Props {
 
 export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
   const { issuesActiveNow, issuesActiveToday, lineOperationalCount } = props;
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const { issueCountsByType, issueLineIdsByType } = useMemo(() => {
     const countsByType: Partial<Record<IssueType, number>> = {};
@@ -84,18 +83,10 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
     };
   }, [issuesActiveNow, issuesActiveToday]);
 
-  const issueCardContextToday = useMemo<IssueCardContext>(() => {
-    return {
-      type: 'history.days',
-      date: DateTime.now().toISODate(),
-      days: 1,
-    };
-  }, []);
-
   const activeIssueCount = issuesActiveNow.length + issuesActiveToday.length;
 
   return (
-    <Collapsible.Root>
+    <>
       <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4 dark:border-gray-700 dark:bg-gray-800">
         <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex-1 shrink space-y-3">
@@ -172,60 +163,82 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
 
           {activeIssueCount > 0 && (
             <div className="flex w-full shrink-0 justify-center gap-2 sm:w-auto lg:justify-start">
-              <Collapsible.Trigger className="group w-36 shrink-0 rounded-lg bg-accent-light px-3 py-2 font-medium text-sm text-white transition-all duration-200 hover:bg-accent-light/80 hover:shadow-md sm:rounded-xl sm:px-4 sm:py-2.5 dark:bg-accent-dark dark:hover:bg-accent-dark/80">
-                <div className="flex items-center justify-center gap-x-2 group-data-[state=open]:hidden sm:justify-between">
-                  <FormattedMessage
-                    id="general.show_details"
-                    defaultMessage="Show details"
-                  />
-                  <ChevronDownIcon className="size-4" />
+              <button
+                type="button"
+                aria-expanded={detailsOpen}
+                aria-controls="current-advisories-details"
+                className="w-36 shrink-0 rounded-lg bg-accent-light px-3 py-2 font-medium text-sm text-white transition-all duration-200 hover:bg-accent-light/80 hover:shadow-md sm:rounded-xl sm:px-4 sm:py-2.5 dark:bg-accent-dark dark:hover:bg-accent-dark/80"
+                onClick={() => setDetailsOpen((isOpen) => !isOpen)}
+              >
+                <div className="flex items-center justify-center gap-x-2 sm:justify-between">
+                  {detailsOpen ? (
+                    <>
+                      <FormattedMessage
+                        id="general.hide_details"
+                        defaultMessage="Hide details"
+                      />
+                      <ChevronUpIcon className="size-4" />
+                    </>
+                  ) : (
+                    <>
+                      <FormattedMessage
+                        id="general.show_details"
+                        defaultMessage="Show details"
+                      />
+                      <ChevronDownIcon className="size-4" />
+                    </>
+                  )}
                 </div>
-                <div className="flex items-center justify-center gap-x-2 group-data-[state=closed]:hidden sm:justify-between">
-                  <FormattedMessage
-                    id="general.hide_details"
-                    defaultMessage="Hide details"
-                  />
-                  <ChevronUpIcon className="size-4" />
-                </div>
-              </Collapsible.Trigger>
+              </button>
             </div>
           )}
         </div>
       </div>
-      {activeIssueCount > 0 && (
-        <Collapsible.Content asChild>
-          <div className="mt-4 flex flex-col space-y-3">
-            {issuesActiveNow.map((issue) => (
-              <IssueCard
-                key={issue.id}
-                issue={issue}
-                className="!w-auto"
-                context={ISSUE_CARD_CONTEXT_NOW}
-              />
-            ))}
-            {issuesActiveToday.map((issue) => (
-              <IssueCard
-                key={issue.id}
-                issue={issue}
-                className="!w-auto"
-                context={issueCardContextToday}
-              />
-            ))}
-            <Collapsible.Trigger asChild>
-              <button
-                type="button"
-                className="inline-flex items-center gap-x-2 self-center rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:focus:ring-accent-dark dark:hover:bg-gray-700"
-              >
-                <FormattedMessage
-                  id="general.hide_details"
-                  defaultMessage="Hide details"
-                />
-                <ChevronUpIcon className="size-4" />
-              </button>
-            </Collapsible.Trigger>
-          </div>
-        </Collapsible.Content>
+      {activeIssueCount > 0 && detailsOpen && (
+        <Suspense
+          fallback={
+            <CurrentAdvisoriesDetailsSkeleton
+              issuesActiveNow={issuesActiveNow}
+              issuesActiveToday={issuesActiveToday}
+            />
+          }
+        >
+          <CurrentAdvisoriesDetails
+            issuesActiveNow={issuesActiveNow}
+            issuesActiveToday={issuesActiveToday}
+            onClose={() => setDetailsOpen(false)}
+          />
+        </Suspense>
       )}
-    </Collapsible.Root>
+    </>
   );
 };
+
+function CurrentAdvisoriesDetailsSkeleton(props: {
+  issuesActiveNow: Issue[];
+  issuesActiveToday: Issue[];
+}) {
+  return (
+    <div
+      id="current-advisories-details"
+      className="mt-4 flex flex-col space-y-3"
+    >
+      {props.issuesActiveNow.map((issue) => (
+        <CurrentAdvisoriesDetailsSkeletonCard key={`now-${issue.id}`} />
+      ))}
+      {props.issuesActiveToday.map((issue) => (
+        <CurrentAdvisoriesDetailsSkeletonCard key={`today-${issue.id}`} />
+      ))}
+    </div>
+  );
+}
+
+function CurrentAdvisoriesDetailsSkeletonCard() {
+  return (
+    <div className="flex flex-col rounded-xl border border-gray-300 bg-white px-4 py-3 shadow-sm sm:px-6 sm:py-4 dark:border-gray-600 dark:bg-gray-800">
+      <div className="h-5 w-44 rounded bg-gray-200 dark:bg-gray-700" />
+      <div className="mt-3 h-4 w-full max-w-xl rounded bg-gray-200 dark:bg-gray-700" />
+      <div className="mt-2 h-4 w-2/3 rounded bg-gray-200 dark:bg-gray-700" />
+    </div>
+  );
+}
