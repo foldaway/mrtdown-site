@@ -458,6 +458,18 @@ function isObviousPromptInjectionText(value: string) {
     /\b(?:treat|use)\s+(?:this|the following)\s+as\s+(?:(?:a|an|the)\s+)?(?:developer|system)\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
       value,
     ) ||
+    /\b(?:enable|enter|switch(?:\s+to)?|activate|turn\s+on)\s+(?:(?:the|your)\s+)?(?:admin|developer|debug|system)\s+mode\b/u.test(
+      value,
+    ) ||
+    /\b(?:admin|developer|debug|system)\s+mode\s*:\s*(?:accept|create|ignore|mark|override|reject|treat)\b/u.test(
+      value,
+    ) ||
+    /\b(?:system|developer)\s+override\s*:\s*(?:accept|create|ignore|mark|reject|treat)\b/u.test(
+      value,
+    ) ||
+    /\b(?:bypass|override)\s+(?:(?:the|your)\s+)?(?:filters?|guardrails?|moderation|safety|triage|validation)\b/u.test(
+      value,
+    ) ||
     /\b(?:jailbreak|prompt injection)\b/u.test(value)
   );
 }
