@@ -432,10 +432,10 @@ function isObviousPromptInjectionText(value: string) {
     /\b(?:reveal|print|show)\s+(?:(?:the|your)\s+)?(?:system|developer)\s+(?:prompt|message|instructions?)\b/u.test(
       value,
     ) ||
-    /\b(?:act\s+as|pretend\s+(?:as|to\s+be))\s+(?:(?:a|an|the)\s+)?(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
+    /\b(?:act\s+as|pretend\s+(?:as|to\s+be))\s+(?:(?:a|an|the)\s+)?(?:[a-z]+\s+){0,2}(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
       value,
     ) ||
-    /\b(?:you(?:\s+are|'re)\s+(?:now\s+)?|from\s+now\s+on,?\s+you(?:\s+are|'re)\s+)(?:(?:a|an|the)\s+)?(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
+    /\b(?:you(?:\s+are|'re)\s+(?:now\s+)?|from\s+now\s+on,?\s+you(?:\s+are|'re)\s+)(?:(?:a|an|the)\s+)?(?:[a-z]+\s+){0,2}(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
       value,
     ) ||
     /\b(?:(?:new|updated|additional)\s+)?(?:system|developer)\s+(?:instructions?|messages?|prompts?|rules?)\s*:\s*(?:(?:always|please)\s+)?(?:accept|create|mark|reject|treat)\b/u.test(
@@ -448,6 +448,9 @@ function isObviousPromptInjectionText(value: string) {
       value,
     ) ||
     /\b(?:do not|don't|never)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?above\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
+      value,
+    ) ||
+    /\b(?:do not|don't|never)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?(?:previous|prior)\s+(?:instructions?|messages?|prompts?|rules?)\s+(?:and\s+)?(?:accept|create|mark|reject|treat)\b/u.test(
       value,
     ) ||
     /\b(?:treat|use)\s+(?:this|the following)\s+as\s+(?:(?:a|an|the)\s+)?(?:developer|system)\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
