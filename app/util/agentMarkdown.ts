@@ -9,6 +9,15 @@ export const PUBLIC_MARKDOWN_CACHE_CONTROL =
 export const MARKDOWN_CONTENT_TYPE = 'text/markdown; charset=utf-8';
 
 const DEFAULT_MARKDOWN_TIMEZONE = 'Asia/Singapore';
+const HTML_CONTENT_TYPES = ['text/html', 'application/xhtml+xml'];
+const CANONICAL_MARKDOWN_PATH_PATTERNS = [
+  /^\/index\.md$/,
+  /^\/llms\.txt$/,
+  /^\/issues\/[^/]+\/index\.md$/,
+  /^\/lines\/[^/]+\/index\.md$/,
+  /^\/operators\/[^/]+\/index\.md$/,
+  /^\/stations\/[^/]+\/index\.md$/,
+];
 
 type MarkdownDateInput = Date | DateTime | string;
 
@@ -124,6 +133,33 @@ export function createPublicMarkdownResponse(
   });
 }
 
+export function getUnsupportedAgentMarkdownResponse(request: Request) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return null;
+  }
+
+  const pathname = new URL(request.url).pathname;
+  if (isCanonicalAgentMarkdownPath(pathname)) {
+    return null;
+  }
+
+  if (pathname.endsWith('.md')) {
+    return new Response('Markdown route not found', {
+      status: 404,
+      headers: { 'content-type': 'text/plain; charset=utf-8' },
+    });
+  }
+
+  if (prefersMarkdown(request.headers.get('accept'))) {
+    return new Response('Markdown is not available for this route', {
+      status: 406,
+      headers: { 'content-type': 'text/plain; charset=utf-8' },
+    });
+  }
+
+  return null;
+}
+
 function tableRow(cells: string[]): TableRow {
   return {
     type: 'tableRow',
@@ -166,4 +202,59 @@ function parseMarkdownDate(
   }
 
   return dateTime.setZone(zone);
+}
+
+function isCanonicalAgentMarkdownPath(pathname: string) {
+  return CANONICAL_MARKDOWN_PATH_PATTERNS.some((pattern) =>
+    pattern.test(pathname),
+  );
+}
+
+function prefersMarkdown(acceptHeader: string | null) {
+  if (acceptHeader == null || acceptHeader === '') {
+    return false;
+  }
+
+  const markdownQuality = getAcceptedQuality(acceptHeader, 'text/markdown');
+  if (markdownQuality <= 0) {
+    return false;
+  }
+
+  const htmlQuality = Math.max(
+    ...HTML_CONTENT_TYPES.map((contentType) =>
+      getAcceptedQuality(acceptHeader, contentType),
+    ),
+  );
+  return markdownQuality > htmlQuality;
+}
+
+function getAcceptedQuality(acceptHeader: string, contentType: string) {
+  const [targetType, targetSubtype] = contentType.toLowerCase().split('/');
+  let quality = 0;
+
+  for (const rawEntry of acceptHeader.split(',')) {
+    const [rawMediaRange = '', ...rawParameters] = rawEntry
+      .trim()
+      .toLowerCase()
+      .split(';');
+    const [rangeType, rangeSubtype] = rawMediaRange.trim().split('/');
+    if (
+      (rangeType !== targetType && rangeType !== '*') ||
+      (rangeSubtype !== targetSubtype && rangeSubtype !== '*')
+    ) {
+      continue;
+    }
+
+    const qParameter = rawParameters
+      .map((parameter) => parameter.trim())
+      .find((parameter) => parameter.startsWith('q='));
+    const parsedQuality =
+      qParameter == null ? 1 : Number.parseFloat(qParameter.slice('q='.length));
+    quality = Math.max(
+      quality,
+      Number.isFinite(parsedQuality) ? parsedQuality : 0,
+    );
+  }
+
+  return quality;
 }

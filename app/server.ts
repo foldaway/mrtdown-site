@@ -12,6 +12,7 @@ import {
   type CrowdReportFeatureEnv,
   isCrowdReportsFeatureEnabled,
 } from './util/crowdReportFeatureFlag';
+import { getUnsupportedAgentMarkdownResponse } from './util/agentMarkdown';
 import {
   addSentryAnonymousUserCookie,
   getSentryAnonymousUser,
@@ -26,6 +27,20 @@ async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
     id: sentryAnonymousUser.sentryUserId,
     ip_address: null,
   });
+  const unsupportedMarkdownResponse =
+    getUnsupportedAgentMarkdownResponse(request);
+  if (unsupportedMarkdownResponse != null) {
+    const elapsedMs = performance.now() - startedAt;
+    return addSentryAnonymousUserCookie(
+      addResponseInstrumentationHeaders(
+        unsupportedMarkdownResponse,
+        elapsedMs,
+        'worker',
+      ),
+      sentryAnonymousUser,
+    );
+  }
+
   const shouldUsePublicHtmlCache = !shouldBypassPublicHtmlCacheForCrowdReports(
     request,
     _env,

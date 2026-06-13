@@ -6,6 +6,7 @@ import {
   formatMarkdownDate,
   formatMarkdownDateTime,
   formatMarkdownDurationSeconds,
+  getUnsupportedAgentMarkdownResponse,
   markdownTable,
   serializeAgentMarkdown,
 } from './agentMarkdown';
@@ -150,3 +151,77 @@ describe('createPublicMarkdownResponse', () => {
     expect(response.headers.get('x-mrtdown-cache')).toBeNull();
   });
 });
+
+describe('agent Markdown request negotiation', () => {
+  it.each([
+    '/index.md',
+    '/llms.txt',
+    '/lines/BPLRT/index.md',
+    '/stations/BKP/index.md',
+    '/operators/SMRT_TRAINS/index.md',
+    '/issues/issue-1/index.md',
+  ])('lets canonical Markdown route %s pass through', (pathname) => {
+    expect(
+      getUnsupportedAgentMarkdownResponse(
+        request(pathname, { headers: { accept: 'text/markdown' } }),
+      ),
+    ).toBeNull();
+  });
+
+  it.each(['/lines/BPLRT.md', '/stations/BKP.md'])(
+    'returns 404 for unsupported Markdown alias %s',
+    async (pathname) => {
+      const response = getUnsupportedAgentMarkdownResponse(
+        request(pathname, { headers: { accept: 'text/markdown' } }),
+      );
+
+      expect(response?.status).toBe(404);
+      expect(response?.headers.get('content-type')).toBe(
+        'text/plain; charset=utf-8',
+      );
+      await expect(response?.text()).resolves.toBe('Markdown route not found');
+    },
+  );
+
+  it('returns 406 when Markdown is explicitly preferred for an HTML route', async () => {
+    const response = getUnsupportedAgentMarkdownResponse(
+      request('/lines/BPLRT', { headers: { accept: 'text/markdown' } }),
+    );
+
+    expect(response?.status).toBe(406);
+    expect(response?.headers.get('content-type')).toBe(
+      'text/plain; charset=utf-8',
+    );
+    await expect(response?.text()).resolves.toBe(
+      'Markdown is not available for this route',
+    );
+  });
+
+  it('does not affect normal HTML requests', () => {
+    expect(
+      getUnsupportedAgentMarkdownResponse(
+        request('/lines/BPLRT', {
+          headers: {
+            accept:
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          },
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('does not affect non-GET and non-HEAD requests', () => {
+    expect(
+      getUnsupportedAgentMarkdownResponse(
+        request('/lines/BPLRT.md', {
+          method: 'POST',
+          headers: { accept: 'text/markdown' },
+        }),
+      ),
+    ).toBeNull();
+  });
+});
+
+function request(pathname: string, init?: RequestInit) {
+  return new Request(`https://www.mrtdown.org${pathname}`, init);
+}

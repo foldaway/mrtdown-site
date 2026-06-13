@@ -401,6 +401,11 @@ underlying compute and payload costs so uncached requests are also fast.
   `Accept: text/markdown` currently return 500 JSON responses in production,
   so a follow-up should decide whether those should normalize to 404/406 before
   adding alias support.
+- 2026-06-13: Normalized unsupported Markdown request surfaces before they
+  reach the TanStack router. Non-canonical `.md` alias attempts now return 404
+  plain text, while explicit `Accept: text/markdown` requests for non-Markdown
+  routes return 406 plain text. Canonical Markdown routes still pass through
+  their route handlers and keep public Markdown cache headers.
 
 ## Validation
 
