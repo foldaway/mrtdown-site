@@ -2,6 +2,7 @@ import { DateTime } from 'luxon';
 import { gfmToMarkdown } from 'mdast-util-gfm';
 import { toMarkdown } from 'mdast-util-to-markdown';
 import type { Root, RootContent, Table, TableCell, TableRow } from 'mdast';
+import { isCacheablePublicHtmlPath } from './publicHtmlCache';
 
 export const PUBLIC_MARKDOWN_CACHE_CONTROL =
   'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
@@ -9,7 +10,7 @@ export const PUBLIC_MARKDOWN_CACHE_CONTROL =
 export const MARKDOWN_CONTENT_TYPE = 'text/markdown; charset=utf-8';
 
 const DEFAULT_MARKDOWN_TIMEZONE = 'Asia/Singapore';
-const HTML_CONTENT_TYPES = ['text/html', 'application/xhtml+xml'];
+const PUBLIC_HTML_CONTENT_TYPE = 'text/html';
 const CANONICAL_MARKDOWN_PATH_PATTERNS = [
   /^\/index\.md$/,
   /^\/llms\.txt$/,
@@ -150,7 +151,10 @@ export function getUnsupportedAgentMarkdownResponse(request: Request) {
     });
   }
 
-  if (prefersMarkdown(request.headers.get('accept'))) {
+  if (
+    isCacheablePublicHtmlPath(pathname) &&
+    prefersMarkdown(request.headers.get('accept'))
+  ) {
     return new Response('Markdown is not available for this route', {
       status: 406,
       headers: { 'content-type': 'text/plain; charset=utf-8' },
@@ -220,16 +224,16 @@ function prefersMarkdown(acceptHeader: string | null) {
     return false;
   }
 
-  const htmlQuality = Math.max(
-    ...HTML_CONTENT_TYPES.map((contentType) =>
-      getAcceptedQuality(acceptHeader, contentType),
-    ),
+  const htmlQuality = getAcceptedQuality(
+    acceptHeader,
+    PUBLIC_HTML_CONTENT_TYPE,
   );
   return markdownQuality > htmlQuality;
 }
 
 function getAcceptedQuality(acceptHeader: string, contentType: string) {
   const [targetType, targetSubtype] = contentType.toLowerCase().split('/');
+  let specificity = -1;
   let quality = 0;
 
   for (const rawEntry of acceptHeader.split(',')) {
@@ -250,10 +254,26 @@ function getAcceptedQuality(acceptHeader: string, contentType: string) {
       .find((parameter) => parameter.startsWith('q='));
     const parsedQuality =
       qParameter == null ? 1 : Number.parseFloat(qParameter.slice('q='.length));
-    quality = Math.max(
-      quality,
-      Number.isFinite(parsedQuality) ? parsedQuality : 0,
-    );
+    const rangeSpecificity =
+      rangeType === targetType && rangeSubtype === targetSubtype
+        ? 2
+        : rangeType === targetType
+          ? 1
+          : 0;
+    if (rangeSpecificity < specificity) {
+      continue;
+    }
+
+    const normalizedQuality = Number.isFinite(parsedQuality)
+      ? parsedQuality
+      : 0;
+    if (rangeSpecificity > specificity) {
+      specificity = rangeSpecificity;
+      quality = normalizedQuality;
+      continue;
+    }
+
+    quality = Math.max(quality, normalizedQuality);
   }
 
   return quality;

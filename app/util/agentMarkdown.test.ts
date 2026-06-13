@@ -197,6 +197,31 @@ describe('agent Markdown request negotiation', () => {
     );
   });
 
+  it('respects specific Accept ranges before wildcard fallbacks', async () => {
+    const response = getUnsupportedAgentMarkdownResponse(
+      request('/lines/BPLRT', {
+        headers: {
+          accept: 'text/markdown;q=0.8, text/html;q=0, */*;q=1',
+        },
+      }),
+    );
+
+    expect(response?.status).toBe(406);
+    await expect(response?.text()).resolves.toBe(
+      'Markdown is not available for this route',
+    );
+  });
+
+  it('does not reject API routes that can satisfy another accepted content type', () => {
+    expect(
+      getUnsupportedAgentMarkdownResponse(
+        request('/api/issues-day', {
+          headers: { accept: 'application/json, text/markdown' },
+        }),
+      ),
+    ).toBeNull();
+  });
+
   it('does not affect normal HTML requests', () => {
     expect(
       getUnsupportedAgentMarkdownResponse(
