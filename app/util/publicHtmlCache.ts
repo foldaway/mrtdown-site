@@ -44,7 +44,7 @@ function stripLocaleSegment(pathname: string) {
   return rest.length > 0 ? `/${rest.join('/')}` : '/';
 }
 
-function isCacheablePublicPath(pathname: string) {
+export function isCacheablePublicHtmlPath(pathname: string) {
   const publicPath = stripLocaleSegment(pathname);
   return (
     CACHEABLE_ROUTES.has(publicPath) ||
@@ -66,7 +66,7 @@ export function isPublicHtmlCacheLookupRequest(request: Request) {
   return (
     request.method === 'GET' &&
     !hasCacheBypassDirective(request) &&
-    isCacheablePublicPath(new URL(request.url).pathname)
+    isCacheablePublicHtmlPath(new URL(request.url).pathname)
   );
 }
 
@@ -104,7 +104,7 @@ export function shouldCachePublicHtml(request: Request, response: Response) {
     return false;
   }
 
-  return isCacheablePublicPath(new URL(request.url).pathname);
+  return isCacheablePublicHtmlPath(new URL(request.url).pathname);
 }
 
 export function applyPublicHtmlCacheHeaders(
