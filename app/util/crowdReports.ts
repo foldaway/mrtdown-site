@@ -470,7 +470,7 @@ function isObviousPromptInjectionText(value: string) {
     /\b(?:bypass|override)\s+(?:(?:the|your|all|automated|content|ai|llm|model)\s+)*(?:filters?|moderation|(?:ai|llm|model)\s+safety|triage)\b/u.test(
       value,
     ) ||
-    /\b(?:bypass|override)\s+(?:(?:all|automated|input|report|submission)\s+)+validation\b/u.test(
+    /\b(?:bypass|override)\s+(?:(?:the|your|all|automated)\s+)*(?:(?:ai|llm|model|moderation|input|report|submission)\s+validation)\b/u.test(
       value,
     ) ||
     /\b(?:jailbreak|prompt injection)\b/u.test(value)
