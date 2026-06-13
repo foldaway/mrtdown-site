@@ -384,6 +384,22 @@ underlying compute and payload costs so uncached requests are also fast.
   production build emits separate client assets for `Details` and `IssueCard`,
   keeping advisory detail cards out of the initial home route bundle until the
   user opens the section.
+- 2026-06-13: Continued Phase 0 repeatable production checks by extending
+  `npm run perf:routes` beyond public HTML routes. The script now samples
+  `/llms.txt`, `/index.md`, representative line/station/operator `index.md`
+  routes, `.md` alias attempts, and a regular HTML route with
+  `Accept: text/markdown`; results include sample number, TTFB, total time,
+  response bytes, content type, Cloudflare cache status, app cache marker,
+  render source, cache-control, and server-timing headers. Use
+  `PROBES=html`, `PROBES=markdown`, or `PROBES=all` to scope a run.
+- 2026-06-13: Ran `SAMPLES=1 PROBES=markdown npm run perf:routes --`
+  against production after the script update. `/llms.txt`, `/index.md`, and
+  representative line/station/operator `index.md` routes returned 200
+  `text/markdown` responses with `X-MRTDown-Cache: public-markdown`.
+  Unsupported `.md` alias attempts and `/lines/BPLRT` with
+  `Accept: text/markdown` currently return 500 JSON responses in production,
+  so a follow-up should decide whether those should normalize to 404/406 before
+  adding alias support.
 
 ## Validation
 
@@ -408,6 +424,8 @@ curl --compressed -L -s -D /tmp/mrtdown-statistics.headers \
   https://www.mrtdown.org/statistics
 
 wc -c /tmp/mrtdown-statistics.html /tmp/mrtdown-statistics.headers
+
+SAMPLES=2 PROBES=all npm run perf:routes -- https://www.mrtdown.org
 ```
 
 ## Open Questions
