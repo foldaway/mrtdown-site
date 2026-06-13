@@ -341,8 +341,10 @@ function hasCrowdReportClusterScopeSql() {
 
 function normalizePolicyText(value: string) {
   return value
+    .normalize('NFKC')
     .trim()
     .toLocaleLowerCase()
+    .replace(/\p{Cf}/gu, '')
     .replace(/[\u2018\u2019]/gu, "'")
     .replace(/\s+/g, ' ');
 }
