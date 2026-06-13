@@ -198,7 +198,8 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
         <Suspense
           fallback={
             <CurrentAdvisoriesDetailsSkeleton
-              issues={[...issuesActiveNow, ...issuesActiveToday]}
+              issuesActiveNow={issuesActiveNow}
+              issuesActiveToday={issuesActiveToday}
             />
           }
         >
@@ -213,22 +214,31 @@ export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
   );
 };
 
-function CurrentAdvisoriesDetailsSkeleton(props: { issues: Issue[] }) {
+function CurrentAdvisoriesDetailsSkeleton(props: {
+  issuesActiveNow: Issue[];
+  issuesActiveToday: Issue[];
+}) {
   return (
     <div
       id="current-advisories-details"
       className="mt-4 flex flex-col space-y-3"
     >
-      {props.issues.map((issue) => (
-        <div
-          key={issue.id}
-          className="flex flex-col rounded-xl border border-gray-300 bg-white px-4 py-3 shadow-sm sm:px-6 sm:py-4 dark:border-gray-600 dark:bg-gray-800"
-        >
-          <div className="h-5 w-44 rounded bg-gray-200 dark:bg-gray-700" />
-          <div className="mt-3 h-4 w-full max-w-xl rounded bg-gray-200 dark:bg-gray-700" />
-          <div className="mt-2 h-4 w-2/3 rounded bg-gray-200 dark:bg-gray-700" />
-        </div>
+      {props.issuesActiveNow.map((issue) => (
+        <CurrentAdvisoriesDetailsSkeletonCard key={`now-${issue.id}`} />
       ))}
+      {props.issuesActiveToday.map((issue) => (
+        <CurrentAdvisoriesDetailsSkeletonCard key={`today-${issue.id}`} />
+      ))}
+    </div>
+  );
+}
+
+function CurrentAdvisoriesDetailsSkeletonCard() {
+  return (
+    <div className="flex flex-col rounded-xl border border-gray-300 bg-white px-4 py-3 shadow-sm sm:px-6 sm:py-4 dark:border-gray-600 dark:bg-gray-800">
+      <div className="h-5 w-44 rounded bg-gray-200 dark:bg-gray-700" />
+      <div className="mt-3 h-4 w-full max-w-xl rounded bg-gray-200 dark:bg-gray-700" />
+      <div className="mt-2 h-4 w-2/3 rounded bg-gray-200 dark:bg-gray-700" />
     </div>
   );
 }

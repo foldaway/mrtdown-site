@@ -34,7 +34,7 @@ export function CurrentAdvisoriesDetails(props: Props) {
     >
       {issuesActiveNow.map((issue) => (
         <IssueCard
-          key={issue.id}
+          key={`now-${issue.id}`}
           issue={issue}
           className="!w-auto"
           context={ISSUE_CARD_CONTEXT_NOW}
@@ -42,7 +42,7 @@ export function CurrentAdvisoriesDetails(props: Props) {
       ))}
       {issuesActiveToday.map((issue) => (
         <IssueCard
-          key={issue.id}
+          key={`today-${issue.id}`}
           issue={issue}
           className="!w-auto"
           context={issueCardContextToday}
