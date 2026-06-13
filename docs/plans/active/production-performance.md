@@ -211,10 +211,11 @@ Options:
 
 Preferred approach:
 
-- Return a single 60-day window for the home page.
-- Use CSS container behavior to show the useful subset on small screens.
-- Remove `viewport` from home route loader dependencies unless profiling shows
-  the 60-day payload is too large after Phase 2.
+- Keep the multi-viewport expansion flow, but make the SSR and client expansion
+  payloads cheap enough through Phase 2 included-entity pruning.
+- Preserve the 30-day SSR baseline for small screens.
+- Use measured viewport only for client-side expansion requests, not route
+  search params or blocking SSR dependencies.
 
 Exit criteria:
 
