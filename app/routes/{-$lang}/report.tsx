@@ -56,7 +56,6 @@ type FieldErrorKey =
   | 'effect'
   | 'affectedStops'
   | 'direction'
-  | 'description'
   | 'observedAt';
 
 type TurnstileApi = {
@@ -267,8 +266,6 @@ function ReportPage() {
   const effectRef = useRef<HTMLDivElement>(null);
   const affectedStopsRef = useRef<HTMLDivElement>(null);
   const directionSelectRef = useRef<HTMLSelectElement>(null);
-  const directionOtherRef = useRef<HTMLInputElement>(null);
-  const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const observedAtRef = useRef<HTMLInputElement>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetIdRef = useRef<string | undefined>(undefined);
@@ -299,14 +296,12 @@ function ReportPage() {
   const [observedAt, setObservedAt] = useState(() =>
     toSgDatetimeLocal(DateTime.now()),
   );
-  const [text, setText] = useState('');
   const [stationSearch, setStationSearch] = useState('');
   const [rangeStartStationId, setRangeStartStationId] = useState('');
   const [rangeEndStationId, setRangeEndStationId] = useState('');
   const [rangeStartStationSearch, setRangeStartStationSearch] = useState('');
   const [rangeEndStationSearch, setRangeEndStationSearch] = useState('');
   const [directionChoice, setDirectionChoice] = useState('');
-  const [directionOtherText, setDirectionOtherText] = useState('');
   const [effect, setEffect] = useState('');
   const [delayMinutes, setDelayMinutes] = useState('');
   const [isStillHappening, setIsStillHappening] = useState(true);
@@ -381,9 +376,6 @@ function ReportPage() {
     selectedLineIds.length === 1
       ? (lineDirections[selectedLineIds[0]] ?? [])
       : [];
-  const requiresDescription =
-    effect === 'unknown' ||
-    (selectedLineIds.length > 0 && directionChoice === 'other');
   const supportsAffectedStopRange =
     effect === 'skipped-stop' || effect === 'no-service';
   const affectedStopSearchLineIds =
@@ -496,15 +488,11 @@ function ReportPage() {
       if (directionChoice !== '') {
         setDirectionChoice('');
       }
-      if (directionOtherText !== '') {
-        setDirectionOtherText('');
-      }
       return;
     }
 
     if (
       directionChoice === 'not-sure' ||
-      directionChoice === 'other' ||
       directionChoice === '' ||
       selectedLineDirectionOptions.some(
         (option) => option.stationId === directionChoice,
@@ -513,25 +501,7 @@ function ReportPage() {
       return;
     }
     setDirectionChoice('');
-  }, [
-    directionChoice,
-    directionOtherText,
-    selectedLineDirectionOptions,
-    selectedLineIds.length,
-  ]);
-
-  useEffect(() => {
-    if (requiresDescription || fieldErrors.description == null) {
-      return;
-    }
-
-    setClientError(null);
-    setFieldErrors((current) => {
-      const next = { ...current };
-      delete next.description;
-      return next;
-    });
-  }, [fieldErrors.description, requiresDescription]);
+  }, [directionChoice, selectedLineDirectionOptions, selectedLineIds.length]);
 
   useEffect(() => {
     if (selectedLineIds.length === 0) {
@@ -605,11 +575,7 @@ function ReportPage() {
         return;
       }
       if (field === 'direction') {
-        (directionOtherRef.current ?? directionSelectRef.current)?.focus();
-        return;
-      }
-      if (field === 'description') {
-        descriptionRef.current?.focus();
+        directionSelectRef.current?.focus();
         return;
       }
       observedAtRef.current?.focus();
@@ -656,9 +622,6 @@ function ReportPage() {
   };
 
   const getDirectionText = () => {
-    if (directionChoice === 'other') {
-      return directionOtherText.trim() || undefined;
-    }
     if (directionChoice === 'not-sure' || directionChoice === '') {
       return undefined;
     }
@@ -680,34 +643,6 @@ function ReportPage() {
         ),
       },
     );
-  };
-
-  const buildFallbackText = () => {
-    const effectLabel =
-      effect && effect in EFFECT_LABELS
-        ? intl.formatMessage(
-            EFFECT_LABELS[effect as IngestContentCrowdReportEffect],
-          )
-        : intl.formatMessage({
-            id: 'report.fallback_text.issue',
-            defaultMessage: 'train issue',
-          });
-    const directionText = getDirectionText();
-    return directionText
-      ? intl.formatMessage(
-          {
-            id: 'report.fallback_text_with_direction',
-            defaultMessage: 'Community report: {effect}. {direction}.',
-          },
-          { direction: directionText, effect: effectLabel },
-        )
-      : intl.formatMessage(
-          {
-            id: 'report.fallback_text',
-            defaultMessage: 'Community report: {effect}.',
-          },
-          { effect: effectLabel },
-        );
   };
 
   const submitReport = async (event: FormEvent<HTMLFormElement>) => {
@@ -852,19 +787,6 @@ function ReportPage() {
       }
     }
 
-    if (
-      selectedLineIds.length > 0 &&
-      directionChoice === 'other' &&
-      directionOtherText.trim().length === 0
-    ) {
-      const message = intl.formatMessage({
-        id: 'report.error.direction_other_required',
-        defaultMessage: 'Add the direction or destination.',
-      });
-      showFieldError('direction', message, 'direction_other_required');
-      return;
-    }
-
     const observedAtIso = datetimeLocalToSgIso(observedAt);
     if (observedAtIso == null) {
       const message = intl.formatMessage({
@@ -876,21 +798,6 @@ function ReportPage() {
     }
 
     const directionText = getDirectionText();
-    const trimmedText = requiresDescription ? text.trim() : '';
-    if (requiresDescription && trimmedText.length < 8) {
-      const message = intl.formatMessage({
-        id: 'report.error.description_required_for_ambiguous_report',
-        defaultMessage:
-          'Add a short note so reviewers can understand the report.',
-      });
-      showFieldError(
-        'description',
-        message,
-        'description_required_for_ambiguous_report',
-      );
-      return;
-    }
-    const reportText = trimmedText || buildFallbackText();
 
     setSubmitState('submitting');
 
@@ -905,7 +812,6 @@ function ReportPage() {
           observedAt: observedAtIso,
           lineIds: selectedLineIds,
           stationIds: submittedStationIds,
-          text: reportText,
           directionText,
           effect: effect || undefined,
           delayMinutes: delayMinutes ? Number(delayMinutes) : undefined,
@@ -1603,43 +1509,8 @@ function ReportPage() {
                     defaultMessage: 'Not sure',
                   })}
                 </option>
-                <option value="other">
-                  {intl.formatMessage({
-                    id: 'report.direction_other',
-                    defaultMessage: 'Other',
-                  })}
-                </option>
               </select>
             </label>
-            {directionChoice === 'other' && (
-              <label className="flex flex-col gap-2">
-                <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                  <FormattedMessage
-                    id="report.direction_other_label"
-                    defaultMessage="Other direction"
-                  />
-                </span>
-                <input
-                  ref={directionOtherRef}
-                  type="text"
-                  value={directionOtherText}
-                  onChange={(event) => {
-                    clearFieldError('direction');
-                    setDirectionOtherText(event.target.value);
-                  }}
-                  maxLength={120}
-                  aria-invalid={fieldErrors.direction != null}
-                  aria-describedby={
-                    fieldErrors.direction ? 'report-direction-error' : undefined
-                  }
-                  placeholder={intl.formatMessage({
-                    id: 'report.direction_other_placeholder',
-                    defaultMessage: 'Example: towards Jurong East',
-                  })}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                />
-              </label>
-            )}
             {fieldErrors.direction != null && (
               <p
                 className="text-red-700 text-sm sm:col-span-2 dark:text-red-300"
@@ -1649,45 +1520,6 @@ function ReportPage() {
               </p>
             )}
           </section>
-        )}
-
-        {requiresDescription && (
-          <label className="flex flex-col gap-2">
-            <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-              <FormattedMessage
-                id="report.description"
-                defaultMessage="Anything else?"
-              />
-            </span>
-            <textarea
-              ref={descriptionRef}
-              value={text}
-              onChange={(event) => {
-                clearFieldError('description');
-                setText(event.target.value);
-              }}
-              maxLength={1000}
-              rows={4}
-              aria-invalid={fieldErrors.description != null}
-              aria-describedby={
-                fieldErrors.description ? 'report-description-error' : undefined
-              }
-              placeholder={intl.formatMessage({
-                id: 'report.description_placeholder',
-                defaultMessage:
-                  'Add details that the choices above do not capture.',
-              })}
-              className="resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            />
-            {fieldErrors.description != null && (
-              <p
-                className="text-red-700 text-sm dark:text-red-300"
-                id="report-description-error"
-              >
-                {fieldErrors.description}
-              </p>
-            )}
-          </label>
         )}
 
         <details className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">

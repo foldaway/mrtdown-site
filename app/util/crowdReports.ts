@@ -50,7 +50,6 @@ const RawCrowdReportSubmissionSchema = z
     observedAt: optionalTrimmedString(64),
     lineIds: z.array(z.string().trim().min(1).max(64)).max(8).default([]),
     stationIds: z.array(z.string().trim().min(1).max(64)).max(16).default([]),
-    text: z.string().trim().min(8).max(1000),
     directionText: optionalTrimmedString(120),
     effect: CrowdReportEffectSchema.optional(),
     delayMinutes: z.number().int().min(0).max(180).optional(),
@@ -66,7 +65,6 @@ export type CrowdReportSubmission = {
   observedAt: string;
   lineIds: string[];
   stationIds: string[];
-  text: string;
   directionText?: string;
   effect?: CrowdReportEffect;
   delayMinutes?: number;
@@ -339,175 +337,10 @@ function hasCrowdReportClusterScopeSql() {
   )`;
 }
 
-function normalizePolicyText(value: string) {
-  return value
-    .normalize('NFKC')
-    .trim()
-    .toLocaleLowerCase()
-    .replace(/\p{Cf}/gu, '')
-    .replace(/[\u2018\u2019]/gu, "'")
-    .replace(/\s+/g, ' ');
-}
-
-function isRepeatedFillerText(value: string) {
-  const compact = value.replace(/[\s\p{P}\p{S}]/gu, '');
-  if (!/[\p{L}\p{N}]/u.test(value) || /^\p{N}+$/u.test(compact)) {
-    return true;
-  }
-
-  if (compact.length >= 8 && new Set([...compact]).size <= 2) {
-    return true;
-  }
-
-  const tokens = value.split(' ').filter(Boolean);
-  return tokens.length >= 3 && new Set(tokens).size === 1;
-}
-
-function isObviousTestReportText(value: string) {
-  return (
-    [
-      'asdf',
-      'hello',
-      'hi',
-      'lorem ipsum',
-      'n/a',
-      'na',
-      'none',
-      'nothing',
-      'qwerty',
-      'test',
-      'test report',
-      'testing',
-    ].includes(value) || /^test(?:ing)?(?:\s+\d+)?$/.test(value)
-  );
-}
-
-function isObviousSpamOrSolicitationText(value: string) {
-  if (
-    /(?:https?:\/\/|www\.)\S+/u.test(value) ||
-    /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/u.test(value)
-  ) {
-    return true;
-  }
-
-  if (
-    /\b(?:buy now|casino|crypto|forex|free money|loan|promo code|seo|work from home)\b/u.test(
-      value,
-    )
-  ) {
-    return true;
-  }
-
-  return (
-    /\b(?:call|sms|telegram|text|whatsapp)\b/u.test(value) &&
-    /(?:\+?\d[\s-]?){8,}/u.test(value)
-  );
-}
-
-function isObviousNonTransitChatterText(value: string) {
-  if (
-    [
-      'good afternoon',
-      'good evening',
-      'good morning',
-      'good night',
-      'how are you',
-      'i am bored',
-      'weather today',
-      'what is the weather',
-      'where to eat',
-    ].includes(value)
-  ) {
-    return true;
-  }
-
-  return /\b(?:food delivery|homework help|movie tickets|taxi booking)\b/u.test(
-    value,
-  );
-}
-
-function isObviousPromptInjectionText(value: string) {
-  return (
-    /\b(?:ignore|disregard|forget)\s+(?:(?:all|the|your)\s+)?(?:(?:previous|prior|above)\s+(?:(?:system|developer)\s+)?(?:instructions?|prompts?|messages?|rules?)|(?:system|developer)\s+(?:instructions?|prompts?|messages?|rules?)|(?:prompts?|rules?))\b/u.test(
-      value,
-    ) ||
-    /\b(?:reveal|print|show)\s+(?:(?:the|your)\s+)?(?:system|developer)\s+(?:prompt|message|instructions?)\b/u.test(
-      value,
-    ) ||
-    /\b(?:act\s+as|pretend\s+(?:as|to\s+be))\s+(?:(?:a|an|the)\s+)?(?:[a-z]+\s+){0,2}(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
-      value,
-    ) ||
-    /\b(?:you(?:\s+are|'re)\s+(?:now\s+)?|from\s+now\s+on,?\s+you(?:\s+are|'re)\s+)(?:(?:a|an|the)\s+)?(?:[a-z]+\s+){0,2}(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
-      value,
-    ) ||
-    /\b(?:(?:new|updated|additional)\s+)?(?:system|developer)\s+(?:instructions?|messages?|prompts?|rules?)\s*:\s*(?:(?:always|please)\s+)?(?:accept|create|mark|reject|treat)\b/u.test(
-      value,
-    ) ||
-    /\b(?:(?:new|updated|additional)\s+system\s+(?:instructions?|prompts?|rules?)|(?:new|updated|additional)\s+developer\s+(?:instructions?|messages?|prompts?|rules?)|override\s+(?:(?:the|your)\s+)?(?:system|developer)\s+(?:instructions?|messages?|prompts?|rules?))\b/u.test(
-      value,
-    ) ||
-    /\b(?:do not|don't|never)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?(?:(?:above|previous|prior)\s+(?:system|developer)\s+|(?:system|developer)\s+)(?:instructions?|messages?|prompts?|rules?)\b/u.test(
-      value,
-    ) ||
-    /\b(?:do not|don't|never)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?above\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
-      value,
-    ) ||
-    /\b(?:do not|don't|never)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?(?:previous|prior)\s+(?:instructions?|messages?|prompts?|rules?)(?:(?:\s+(?:and\s+)?)|[.;:]\s*)(?:accept|create|mark|reject|treat)\b/u.test(
-      value,
-    ) ||
-    /\b(?:treat|use)\s+(?:this|the following)\s+as\s+(?:(?:a|an|the)\s+)?(?:developer|system)\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
-      value,
-    ) ||
-    /\b(?:jailbreak|prompt injection)\b/u.test(value)
-  );
-}
-
 export function assessCrowdReportAutomationPolicy(
   submission: CrowdReportSubmission,
   now = DateTime.now().setZone(SG_TIMEZONE),
 ): CrowdReportAutomationPolicyResult {
-  const normalizedText = normalizePolicyText(submission.text);
-  if (
-    isObviousTestReportText(normalizedText) ||
-    isRepeatedFillerText(normalizedText)
-  ) {
-    return {
-      action: 'reject',
-      reason:
-        'Report rejected by automated moderation: obvious test or filler text',
-    };
-  }
-
-  if (isObviousSpamOrSolicitationText(normalizedText)) {
-    return {
-      action: 'reject',
-      reason:
-        'Report rejected by automated moderation: spam or solicitation text',
-    };
-  }
-
-  if (isObviousNonTransitChatterText(normalizedText)) {
-    return {
-      action: 'reject',
-      reason:
-        'Report rejected by automated moderation: obvious non-transit text',
-    };
-  }
-
-  const normalizedDirectionText = normalizePolicyText(
-    submission.directionText ?? '',
-  );
-  if (
-    [normalizedText, normalizedDirectionText].some((value) =>
-      isObviousPromptInjectionText(value),
-    )
-  ) {
-    return {
-      action: 'reject',
-      reason: 'Report rejected by automated moderation: prompt-injection text',
-    };
-  }
-
   const observedAt = DateTime.fromISO(submission.observedAt, {
     setZone: true,
   });
@@ -592,7 +425,6 @@ export function validateCrowdReportSubmission(
       observedAt: observedAtIso,
       lineIds,
       stationIds,
-      text: parsed.data.text,
       directionText: parsed.data.directionText,
       effect: parsed.data.effect,
       delayMinutes: parsed.data.delayMinutes,
@@ -621,6 +453,43 @@ export function getClientIp(request: Request) {
     forwardedFor?.split(',')[0]?.trim() ??
     'unknown'
   );
+}
+
+export function buildCrowdReportStorageText(
+  submission: Pick<
+    CrowdReportSubmission,
+    | 'delayMinutes'
+    | 'directionText'
+    | 'effect'
+    | 'isStillHappening'
+    | 'lineIds'
+    | 'stationIds'
+  >,
+) {
+  const summary = ['Structured community report.'];
+  if (submission.effect != null) {
+    summary.push(`Effect: ${submission.effect}.`);
+  }
+  if (submission.lineIds.length > 0) {
+    summary.push(`Lines: ${submission.lineIds.join(', ')}.`);
+  }
+  if (submission.stationIds.length > 0) {
+    summary.push(`Stations: ${submission.stationIds.join(', ')}.`);
+  }
+  if (submission.directionText != null) {
+    summary.push(`Direction: ${submission.directionText}.`);
+  }
+  if (submission.delayMinutes != null) {
+    summary.push(`Delay: ${submission.delayMinutes} minutes.`);
+  }
+  if (submission.isStillHappening != null) {
+    summary.push(
+      submission.isStillHappening
+        ? 'Still happening: yes.'
+        : 'Still happening: no.',
+    );
+  }
+  return summary.join(' ');
 }
 
 export async function parseCrowdReportJsonBody(
@@ -1275,7 +1144,7 @@ async function persistCrowdReportInTransaction(
     effect: submission.effect,
     delay_minutes: submission.delayMinutes,
     still_happening: submission.isStillHappening,
-    text: submission.text,
+    text: buildCrowdReportStorageText(submission),
     status: 'pending',
   });
 

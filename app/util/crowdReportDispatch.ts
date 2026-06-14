@@ -88,7 +88,6 @@ type ReportContentInput = {
   id: string;
   kind: CrowdReportDispatchKind;
   reportIds: string[];
-  text: string;
   createdAt: string | Date;
   observedAt: string | Date;
   lineIds: string[];
@@ -166,6 +165,7 @@ export function buildCrowdReportDispatchText(
   input: Pick<
     ReportContentInput,
     | 'delayMinutes'
+    | 'directionText'
     | 'effect'
     | 'isStillHappening'
     | 'lineIds'
@@ -192,6 +192,9 @@ export function buildCrowdReportDispatchText(
   if (contextParts.length > 0) {
     summary.push(`Affected ${contextParts.join('; ')}.`);
   }
+  if (input.directionText) {
+    summary.push(`Direction: ${input.directionText}.`);
+  }
   if (input.delayMinutes != null) {
     summary.push(`Reported delay: ${input.delayMinutes} minutes.`);
   }
@@ -203,7 +206,7 @@ export function buildCrowdReportDispatchText(
     );
   }
 
-  summary.push('Reporter notes are retained site-local.');
+  summary.push('Reporter notes are not collected.');
   return summary.join(' ');
 }
 
@@ -218,6 +221,7 @@ export function buildCrowdReportIngestPayload(
     observedAt: normalizeTimestamp(input.observedAt),
     lineIds: input.lineIds.length > 0 ? input.lineIds : undefined,
     stationIds: input.stationIds.length > 0 ? input.stationIds : undefined,
+    directionText: input.directionText ?? undefined,
     effect: input.effect ?? undefined,
     delayMinutes: input.delayMinutes ?? undefined,
     reportCount: input.reportCount,
@@ -309,7 +313,6 @@ async function getDispatchableCrowdReportClusterCandidates(
         id: crowdReportsTable.id,
         clusterId: crowdReportsTable.cluster_id,
         observedAt: crowdReportsTable.observed_at,
-        text: crowdReportsTable.text,
         directionText: crowdReportsTable.direction_text,
         delayMinutes: crowdReportsTable.delay_minutes,
         stillHappening: crowdReportsTable.still_happening,
@@ -354,7 +357,6 @@ async function getDispatchableCrowdReportClusterCandidates(
         kind: 'cluster',
         id: cluster.id,
         reportIds: reports.map((report) => report.id),
-        text: representative.text,
         createdAt: cluster.updatedAt,
         observedAt,
         lineIds,
@@ -382,7 +384,6 @@ async function getDispatchableSingleCrowdReportCandidates(
     .select({
       id: crowdReportsTable.id,
       observedAt: crowdReportsTable.observed_at,
-      text: crowdReportsTable.text,
       directionText: crowdReportsTable.direction_text,
       effect: crowdReportsTable.effect,
       delayMinutes: crowdReportsTable.delay_minutes,
@@ -441,7 +442,6 @@ async function getDispatchableSingleCrowdReportCandidates(
         kind: 'report',
         id: report.id,
         reportIds: [report.id],
-        text: report.text,
         createdAt: report.updatedAt,
         observedAt: report.observedAt,
         lineIds,
