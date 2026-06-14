@@ -1,15 +1,20 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { createIntl, FormattedMessage, useIntl } from 'react-intl';
 import type { IssueAffectedBranch } from '~/types';
 import { CurrentAdvisoriesSection } from '~/components/CurrentAdvisoriesSection';
 import { countOperationalLineSummaries } from '~/components/CurrentAdvisoriesSection/helpers';
-import { StationMap } from '~/components/StationMap';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { getSystemMapFn } from '~/util/system-map.functions';
+
+const StationMap = lazy(() =>
+  import('~/components/StationMap').then((module) => ({
+    default: module.StationMap,
+  })),
+);
 
 export const Route = createFileRoute('/{-$lang}/system-map')({
   component: SystemMapPage,
@@ -130,13 +135,15 @@ function SystemMapPage() {
         />
 
         <div className="flex flex-col bg-gray-100 p-4 dark:bg-gray-800">
-          <StationMap
-            currentDate={DateTime.now().toISODate()}
-            mode={{
-              type: 'network',
-              branchesAffected,
-            }}
-          />
+          <Suspense fallback={<SystemMapSkeleton />}>
+            <StationMap
+              currentDate={DateTime.now().toISODate()}
+              mode={{
+                type: 'network',
+                branchesAffected,
+              }}
+            />
+          </Suspense>
 
           <div className="mt-2 flex bg-gray-50 px-4 py-2.5 dark:bg-gray-900">
             <div className="grid grow grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -168,5 +175,11 @@ function SystemMapPage() {
         </div>
       </div>
     </IncludedEntitiesContext.Provider>
+  );
+}
+
+function SystemMapSkeleton() {
+  return (
+    <div className="h-[60vh] min-h-96 animate-pulse bg-gray-200 dark:bg-gray-700" />
   );
 }

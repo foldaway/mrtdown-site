@@ -406,6 +406,11 @@ underlying compute and payload costs so uncached requests are also fast.
   plain text, while explicit `Accept: text/markdown` requests for non-Markdown
   routes return 406 plain text. Canonical Markdown routes still pass through
   their route handlers and keep public Markdown cache headers.
+- 2026-06-14: Continued Phase 5 route preload cleanup for `/system-map`. The
+  system-map route now lazy-loads the shared `StationMap` component behind a
+  stable map-sized skeleton. A production build keeps `StationMap` and its
+  generated snapshot dependencies in the route's dynamic import set instead of
+  the eager system-map component imports.
 
 ## Validation
 
