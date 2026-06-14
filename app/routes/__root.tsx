@@ -1,4 +1,3 @@
-import { PostHogProvider } from '@posthog/react';
 import {
   createRootRoute,
   HeadContent,
@@ -9,6 +8,7 @@ import {
 import { LANGUAGES } from '~/constants';
 import { RouteWebVitals } from '~/components/RouteWebVitals';
 import { getPosthogOptions } from '~/helpers/getPosthogOptions';
+import { OptionalPostHogProvider } from '~/helpers/OptionalPostHogProvider';
 import stylesheet from '../index.css?url';
 
 export const Route = createRootRoute({
@@ -63,13 +63,13 @@ const posthogOptions = getPosthogOptions();
 function RootComponent() {
   return (
     <RootDocument>
-      <PostHogProvider
+      <OptionalPostHogProvider
         apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
         options={posthogOptions}
       >
         <RouteWebVitals />
         <Outlet />
-      </PostHogProvider>
+      </OptionalPostHogProvider>
     </RootDocument>
   );
 }
