@@ -15,10 +15,14 @@ import {
   crowdReportRateLimitsTable,
   crowdReportsTable,
   linesTable,
+  serviceRevisionPathStationEntriesTable,
+  serviceRevisionsTable,
+  servicesTable,
   stationsTable,
   crowdReportStationsTable,
 } from '~/db/schema';
 import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
+import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 const DEFAULT_RATE_LIMIT_PER_HOUR = 5;
@@ -711,20 +715,23 @@ export async function findMissingCrowdReportReferences(
     ...submission.stationIds,
     ...(submission.directionStationId ? [submission.directionStationId] : []),
   ];
-  const [lineRows, stationRows] = await Promise.all([
-    submission.lineIds.length > 0
-      ? db
-          .select({ id: linesTable.id })
-          .from(linesTable)
-          .where(inArray(linesTable.id, submission.lineIds))
-      : Promise.resolve([]),
-    referencedStationIds.length > 0
-      ? db
-          .select({ id: stationsTable.id })
-          .from(stationsTable)
-          .where(inArray(stationsTable.id, referencedStationIds))
-      : Promise.resolve([]),
-  ]);
+  const [lineRows, stationRows, invalidDirectionStationIds] = await Promise.all(
+    [
+      submission.lineIds.length > 0
+        ? db
+            .select({ id: linesTable.id })
+            .from(linesTable)
+            .where(inArray(linesTable.id, submission.lineIds))
+        : Promise.resolve([]),
+      referencedStationIds.length > 0
+        ? db
+            .select({ id: stationsTable.id })
+            .from(stationsTable)
+            .where(inArray(stationsTable.id, referencedStationIds))
+        : Promise.resolve([]),
+      findInvalidDirectionStationIds(db, submission),
+    ],
+  );
 
   const existingLineIds = new Set(lineRows.map((row) => row.id));
   const existingStationIds = new Set(stationRows.map((row) => row.id));
@@ -734,7 +741,149 @@ export async function findMissingCrowdReportReferences(
     stationIds: referencedStationIds.filter(
       (id) => !existingStationIds.has(id),
     ),
+    directionStationIds: invalidDirectionStationIds,
   };
+}
+
+async function findInvalidDirectionStationIds(
+  db: AppDb,
+  submission: Pick<
+    CrowdReportSubmission,
+    'directionStationId' | 'lineIds' | 'stationIds'
+  >,
+) {
+  if (submission.directionStationId == null) {
+    return [];
+  }
+  if (submission.lineIds.length === 0) {
+    return [submission.directionStationId];
+  }
+
+  const referenceDate =
+    DateTime.now().setZone(SG_TIMEZONE).toISODate() ??
+    new Date().toISOString().slice(0, 10);
+  const serviceRevisionRows = await db
+    .select({
+      id: serviceRevisionsTable.id,
+      serviceId: serviceRevisionsTable.service_id,
+      lineId: servicesTable.line_id,
+      start_at: serviceRevisionsTable.start_at,
+      end_at: serviceRevisionsTable.end_at,
+      updated_at: serviceRevisionsTable.updated_at,
+    })
+    .from(serviceRevisionsTable)
+    .innerJoin(
+      servicesTable,
+      eq(servicesTable.id, serviceRevisionsTable.service_id),
+    )
+    .innerJoin(
+      serviceRevisionPathStationEntriesTable,
+      and(
+        eq(
+          serviceRevisionPathStationEntriesTable.service_revision_id,
+          serviceRevisionsTable.id,
+        ),
+        eq(
+          serviceRevisionPathStationEntriesTable.service_id,
+          serviceRevisionsTable.service_id,
+        ),
+      ),
+    )
+    .where(inArray(servicesTable.line_id, submission.lineIds));
+
+  const revisionsByKey = new Map<
+    string,
+    (typeof serviceRevisionRows)[number]
+  >();
+  for (const revision of serviceRevisionRows) {
+    revisionsByKey.set(`${revision.serviceId}::${revision.id}`, revision);
+  }
+
+  const revisionsByServiceId = Array.from(revisionsByKey.values()).reduce<
+    Record<string, Array<(typeof serviceRevisionRows)[number]>>
+  >((acc, revision) => {
+    acc[revision.serviceId] ??= [];
+    acc[revision.serviceId].push(revision);
+    return acc;
+  }, {});
+  const selectedRevisionKeys = new Set(
+    Object.entries(revisionsByServiceId)
+      .map(([serviceId, revisions]) => {
+        const revision = selectServiceRevisionForReferenceDate(
+          revisions,
+          referenceDate,
+        );
+        return revision == null ? undefined : `${serviceId}::${revision.id}`;
+      })
+      .filter((key): key is string => key != null),
+  );
+  if (selectedRevisionKeys.size === 0) {
+    return [submission.directionStationId];
+  }
+
+  const selectedRevisionIds = [
+    ...new Set(
+      [...selectedRevisionKeys]
+        .map((key) => key.split('::')[1])
+        .filter((id): id is string => id != null),
+    ),
+  ];
+  const selectedServiceIds = [
+    ...new Set(
+      [...selectedRevisionKeys]
+        .map((key) => key.split('::')[0])
+        .filter((id): id is string => id != null),
+    ),
+  ];
+  const pathRows = await db
+    .select({
+      serviceRevisionId:
+        serviceRevisionPathStationEntriesTable.service_revision_id,
+      serviceId: serviceRevisionPathStationEntriesTable.service_id,
+      stationId: serviceRevisionPathStationEntriesTable.station_id,
+      pathIndex: serviceRevisionPathStationEntriesTable.path_index,
+    })
+    .from(serviceRevisionPathStationEntriesTable)
+    .where(
+      and(
+        inArray(
+          serviceRevisionPathStationEntriesTable.service_revision_id,
+          selectedRevisionIds,
+        ),
+        inArray(
+          serviceRevisionPathStationEntriesTable.service_id,
+          selectedServiceIds,
+        ),
+      ),
+    );
+
+  const terminalStationIds = new Set<string>();
+  const pathRowsByRevisionKey = pathRows.reduce<
+    Record<string, typeof pathRows>
+  >((acc, row) => {
+    const key = `${row.serviceId}::${row.serviceRevisionId}`;
+    if (!selectedRevisionKeys.has(key)) {
+      return acc;
+    }
+    acc[key] ??= [];
+    acc[key].push(row);
+    return acc;
+  }, {});
+  for (const entries of Object.values(pathRowsByRevisionKey)) {
+    entries.sort((a, b) => a.pathIndex - b.pathIndex);
+    const firstStationId = entries[0]?.stationId;
+    const lastStationId = entries[entries.length - 1]?.stationId;
+    if (firstStationId != null) {
+      terminalStationIds.add(firstStationId);
+    }
+    if (lastStationId != null) {
+      terminalStationIds.add(lastStationId);
+    }
+  }
+
+  return terminalStationIds.has(submission.directionStationId)
+    ? []
+    : [submission.directionStationId];
 }
 
 async function findDuplicateCrowdReport(

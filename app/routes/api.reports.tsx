@@ -146,7 +146,8 @@ export const Route = createFileRoute('/api/reports')({
         );
         if (
           missingReferences.lineIds.length > 0 ||
-          missingReferences.stationIds.length > 0
+          missingReferences.stationIds.length > 0 ||
+          missingReferences.directionStationIds.length > 0
         ) {
           return Response.json(
             {

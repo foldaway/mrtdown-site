@@ -17,6 +17,7 @@ import {
   assessCrowdReportAutomationPolicy,
   automoderateCrowdReport,
   CrowdReportRateLimitError,
+  findMissingCrowdReportReferences,
   getCrowdReportRateLimitBucketStart,
   getPublicCrowdReportSignals,
   parseCrowdReportJsonBody,
@@ -252,6 +253,29 @@ function makeFakePublicSignalDb() {
 
   return {
     whereCalls,
+    db: {
+      select() {
+        return selectBuilder;
+      },
+    },
+  };
+}
+
+function makeFakeReferenceDb(selectResults: unknown[][]) {
+  const nextSelectResult = () => selectResults.shift() ?? [];
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    innerJoin() {
+      return this;
+    },
+    where() {
+      return Promise.resolve(nextSelectResult());
+    },
+  };
+
+  return {
     db: {
       select() {
         return selectBuilder;
@@ -557,6 +581,94 @@ describe('verifyTurnstileToken', () => {
       success: false,
       outcome: 'failed',
       error: 'Turnstile verification action mismatch',
+    });
+  });
+});
+
+describe('findMissingCrowdReportReferences', () => {
+  it('accepts a direction station that is a selected line terminal', async () => {
+    const fake = makeFakeReferenceDb([
+      [{ id: 'BPLRT' }],
+      [{ id: 'BP6' }],
+      [
+        {
+          id: 'rev-current',
+          serviceId: 'svc-bplrt',
+          lineId: 'BPLRT',
+          start_at: '2020-01-01',
+          end_at: null,
+          updated_at: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      [
+        {
+          serviceRevisionId: 'rev-current',
+          serviceId: 'svc-bplrt',
+          stationId: 'BP1',
+          pathIndex: 0,
+        },
+        {
+          serviceRevisionId: 'rev-current',
+          serviceId: 'svc-bplrt',
+          stationId: 'BP6',
+          pathIndex: 5,
+        },
+      ],
+    ]);
+
+    await expect(
+      findMissingCrowdReportReferences(fake.db as never, {
+        lineIds: ['BPLRT'],
+        stationIds: [],
+        directionStationId: 'BP6',
+      }),
+    ).resolves.toEqual({
+      lineIds: [],
+      stationIds: [],
+      directionStationIds: [],
+    });
+  });
+
+  it('rejects a direction station that is not offered for the selected line', async () => {
+    const fake = makeFakeReferenceDb([
+      [{ id: 'BPLRT' }],
+      [{ id: 'BP6' }],
+      [
+        {
+          id: 'rev-current',
+          serviceId: 'svc-bplrt',
+          lineId: 'BPLRT',
+          start_at: '2020-01-01',
+          end_at: null,
+          updated_at: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      [
+        {
+          serviceRevisionId: 'rev-current',
+          serviceId: 'svc-bplrt',
+          stationId: 'BP1',
+          pathIndex: 0,
+        },
+        {
+          serviceRevisionId: 'rev-current',
+          serviceId: 'svc-bplrt',
+          stationId: 'BP14',
+          pathIndex: 5,
+        },
+      ],
+    ]);
+
+    await expect(
+      findMissingCrowdReportReferences(fake.db as never, {
+        lineIds: ['BPLRT'],
+        stationIds: [],
+        directionStationId: 'BP6',
+      }),
+    ).resolves.toEqual({
+      lineIds: [],
+      stationIds: [],
+      directionStationIds: ['BP6'],
     });
   });
 });
