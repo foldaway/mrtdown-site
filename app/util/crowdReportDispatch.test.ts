@@ -59,7 +59,7 @@ function makeFakeClusterCandidateDb() {
         clusterId: 'cluster-1',
         observedAt: '2026-05-24T04:30:00.000Z',
         text: 'Train stalled near the platform for several minutes.',
-        directionText: 'Towards Choa Chu Kang',
+        directionText: 'towards:BP6',
         delayMinutes: 10,
         stillHappening: true,
       },
@@ -263,7 +263,7 @@ describe('buildCrowdReportIngestPayload', () => {
       observedAt: '2026-05-24T12:30:00.000+08:00',
       lineIds: ['BPLRT'],
       stationIds: ['BP6'],
-      directionText: 'Towards Choa Chu Kang',
+      directionText: 'towards:BP6',
       effect: 'delay',
       delayMinutes: 10,
       reportCount: 3,
@@ -288,13 +288,13 @@ describe('buildCrowdReportIngestPayload', () => {
     );
     expect(candidate.payload.content[0]).toHaveProperty(
       'directionText',
-      'Towards Choa Chu Kang',
+      'towards:BP6',
     );
     const content = candidate.payload.content[0];
     if (content.source !== 'crowd-report') {
       throw new Error(`Expected crowd-report content, got ${content.source}`);
     }
-    expect(content.text).toContain('Direction: Towards Choa Chu Kang.');
+    expect(content.text).toContain('Direction: towards:BP6.');
     expect(content.text).toContain('Reporter notes are not collected.');
   });
 
@@ -307,7 +307,7 @@ describe('buildCrowdReportIngestPayload', () => {
       observedAt: '2026-05-24T12:30:00.000+08:00',
       lineIds: ['BPLRT'],
       stationIds: [],
-      directionText: 'Towards Choa Chu Kang',
+      directionText: 'towards:BP6',
       effect: 'delay',
       delayMinutes: null,
       reportCount: 1,
@@ -317,13 +317,13 @@ describe('buildCrowdReportIngestPayload', () => {
 
     expect(candidate.payload.content[0]).toHaveProperty(
       'directionText',
-      'Towards Choa Chu Kang',
+      'towards:BP6',
     );
     const content = candidate.payload.content[0];
     if (content.source !== 'crowd-report') {
       throw new Error(`Expected crowd-report content, got ${content.source}`);
     }
-    expect(content.text).toContain('Direction: Towards Choa Chu Kang.');
+    expect(content.text).toContain('Direction: towards:BP6.');
     expect(content.text).toContain('A community report describes this issue.');
   });
 

@@ -496,6 +496,9 @@ Exit criteria:
   from the automated reporting flow, with submitted reports storing generated
   structured summaries instead of reporter prose and superseding the
   prompt-injection phrase-filter expansion.
+- 2026-06-14: Tightened the public API boundary so reports require a structured
+  effect and direction is submitted as a direction station ID, then derived into
+  a fixed `towards:{stationId}` token for duplicate detection and dispatch.
 
 ## Decision Log
 
@@ -515,7 +518,8 @@ Exit criteria:
 - 2026-05-24: Keep multiple-station reporting out of the default path. Model
   skipped stops and no-service-between-stations as explicit range cases instead.
 - 2026-05-24: Prefer structured direction choices derived from line context,
-  with `Not sure` and `Other` fallbacks.
+  with a `Not sure` fallback and no public free-text direction path while
+  moderation is automated.
 - 2026-05-25: Use fully automated site-local moderation instead of a manual
   operator queue. Accepted reports are still non-canonical until the dispatch
   and `mrtdown-data` review path lands them in published archives.

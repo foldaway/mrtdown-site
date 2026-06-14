@@ -50,8 +50,8 @@ const RawCrowdReportSubmissionSchema = z
     observedAt: optionalTrimmedString(64),
     lineIds: z.array(z.string().trim().min(1).max(64)).max(8).default([]),
     stationIds: z.array(z.string().trim().min(1).max(64)).max(16).default([]),
-    directionText: optionalTrimmedString(120),
-    effect: CrowdReportEffectSchema.optional(),
+    directionStationId: optionalTrimmedString(64),
+    effect: CrowdReportEffectSchema,
     delayMinutes: z.number().int().min(0).max(180).optional(),
     isStillHappening: z.boolean().optional(),
     turnstileToken: optionalTrimmedString(4096),
@@ -65,8 +65,9 @@ export type CrowdReportSubmission = {
   observedAt: string;
   lineIds: string[];
   stationIds: string[];
+  directionStationId?: string;
   directionText?: string;
-  effect?: CrowdReportEffect;
+  effect: CrowdReportEffect;
   delayMinutes?: number;
   isStillHappening?: boolean;
   turnstileToken?: string;
@@ -418,14 +419,16 @@ export function validateCrowdReportSubmission(
   if (observedAtIso == null) {
     return { success: false, issues: ['observedAt must be valid'] };
   }
-
   return {
     success: true,
     data: {
       observedAt: observedAtIso,
       lineIds,
       stationIds,
-      directionText: parsed.data.directionText,
+      directionStationId: parsed.data.directionStationId,
+      directionText: parsed.data.directionStationId
+        ? `towards:${parsed.data.directionStationId}`
+        : undefined,
       effect: parsed.data.effect,
       delayMinutes: parsed.data.delayMinutes,
       isStillHappening: parsed.data.isStillHappening,
@@ -459,7 +462,7 @@ export function buildCrowdReportStorageText(
   submission: Pick<
     CrowdReportSubmission,
     | 'delayMinutes'
-    | 'directionText'
+    | 'directionStationId'
     | 'effect'
     | 'isStillHappening'
     | 'lineIds'
@@ -476,8 +479,8 @@ export function buildCrowdReportStorageText(
   if (submission.stationIds.length > 0) {
     summary.push(`Stations: ${submission.stationIds.join(', ')}.`);
   }
-  if (submission.directionText != null) {
-    summary.push(`Direction: ${submission.directionText}.`);
+  if (submission.directionStationId != null) {
+    summary.push(`Direction station: ${submission.directionStationId}.`);
   }
   if (submission.delayMinutes != null) {
     summary.push(`Delay: ${submission.delayMinutes} minutes.`);
@@ -699,8 +702,15 @@ export async function verifyTurnstileToken(
 
 export async function findMissingCrowdReportReferences(
   db: AppDb,
-  submission: Pick<CrowdReportSubmission, 'lineIds' | 'stationIds'>,
+  submission: Pick<
+    CrowdReportSubmission,
+    'directionStationId' | 'lineIds' | 'stationIds'
+  >,
 ) {
+  const referencedStationIds = [
+    ...submission.stationIds,
+    ...(submission.directionStationId ? [submission.directionStationId] : []),
+  ];
   const [lineRows, stationRows] = await Promise.all([
     submission.lineIds.length > 0
       ? db
@@ -708,11 +718,11 @@ export async function findMissingCrowdReportReferences(
           .from(linesTable)
           .where(inArray(linesTable.id, submission.lineIds))
       : Promise.resolve([]),
-    submission.stationIds.length > 0
+    referencedStationIds.length > 0
       ? db
           .select({ id: stationsTable.id })
           .from(stationsTable)
-          .where(inArray(stationsTable.id, submission.stationIds))
+          .where(inArray(stationsTable.id, referencedStationIds))
       : Promise.resolve([]),
   ]);
 
@@ -721,7 +731,7 @@ export async function findMissingCrowdReportReferences(
 
   return {
     lineIds: submission.lineIds.filter((id) => !existingLineIds.has(id)),
-    stationIds: submission.stationIds.filter(
+    stationIds: referencedStationIds.filter(
       (id) => !existingStationIds.has(id),
     ),
   };

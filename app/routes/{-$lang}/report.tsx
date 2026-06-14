@@ -621,28 +621,14 @@ function ReportPage() {
     window.turnstile?.reset(turnstileWidgetIdRef.current);
   };
 
-  const getDirectionText = () => {
+  const getDirectionStationId = () => {
     if (directionChoice === 'not-sure' || directionChoice === '') {
       return undefined;
     }
-    const directionStation = selectedLineDirectionOptions.find(
+    const directionOption = selectedLineDirectionOptions.find(
       (option) => option.stationId === directionChoice,
     );
-    if (directionStation == null) {
-      return undefined;
-    }
-    return intl.formatMessage(
-      {
-        id: 'report.direction_towards_value',
-        defaultMessage: 'Towards {stationName}',
-      },
-      {
-        stationName: getLocalizedTranslation(
-          directionStation.name,
-          intl.locale,
-        ),
-      },
-    );
+    return directionOption?.stationId;
   };
 
   const submitReport = async (event: FormEvent<HTMLFormElement>) => {
@@ -797,7 +783,7 @@ function ReportPage() {
       return;
     }
 
-    const directionText = getDirectionText();
+    const directionStationId = getDirectionStationId();
 
     setSubmitState('submitting');
 
@@ -812,7 +798,7 @@ function ReportPage() {
           observedAt: observedAtIso,
           lineIds: selectedLineIds,
           stationIds: submittedStationIds,
-          directionText,
+          directionStationId,
           effect: effect || undefined,
           delayMinutes: delayMinutes ? Number(delayMinutes) : undefined,
           isStillHappening,
