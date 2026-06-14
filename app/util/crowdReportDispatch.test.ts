@@ -59,7 +59,7 @@ function makeFakeClusterCandidateDb() {
         clusterId: 'cluster-1',
         observedAt: '2026-05-24T04:30:00.000Z',
         text: 'Train stalled near the platform for several minutes.',
-        directionText: 'Towards Choa Chu Kang',
+        directionText: 'towards:BP6',
         delayMinutes: 10,
         stillHappening: true,
       },
@@ -254,17 +254,16 @@ function makeFakePostSendMarkMissDb() {
 }
 
 describe('buildCrowdReportIngestPayload', () => {
-  it('builds a valid crowd-report ingest payload without site-local metadata', () => {
+  it('builds a valid crowd-report ingest payload without reporter text', () => {
     const candidate = buildCrowdReportIngestPayload({
       kind: 'cluster',
       id: 'cluster-1',
       reportIds: ['report-1', 'report-2', 'report-3'],
-      text: 'The train has been stopped for a while.',
       createdAt: '2026-05-24T04:40:00.000Z',
       observedAt: '2026-05-24T12:30:00.000+08:00',
       lineIds: ['BPLRT'],
       stationIds: ['BP6'],
-      directionText: 'Towards Choa Chu Kang',
+      directionText: 'towards:BP6',
       effect: 'delay',
       delayMinutes: 10,
       reportCount: 3,
@@ -287,6 +286,45 @@ describe('buildCrowdReportIngestPayload', () => {
     expect(candidate.payload.content[0]).not.toHaveProperty(
       'turnstileTokenHash',
     );
+    expect(candidate.payload.content[0]).toHaveProperty(
+      'directionText',
+      'towards:BP6',
+    );
+    const content = candidate.payload.content[0];
+    if (content.source !== 'crowd-report') {
+      throw new Error(`Expected crowd-report content, got ${content.source}`);
+    }
+    expect(content.text).toContain('Direction: towards:BP6.');
+    expect(content.text).toContain('Reporter notes are not collected.');
+  });
+
+  it('preserves structured direction text in the canonical ingest payload', () => {
+    const candidate = buildCrowdReportIngestPayload({
+      kind: 'report',
+      id: 'report-1',
+      reportIds: ['report-1'],
+      createdAt: '2026-05-24T04:40:00.000Z',
+      observedAt: '2026-05-24T12:30:00.000+08:00',
+      lineIds: ['BPLRT'],
+      stationIds: [],
+      directionText: 'towards:BP6',
+      effect: 'delay',
+      delayMinutes: null,
+      reportCount: 1,
+      isStillHappening: true,
+      rootUrl: 'https://mrtdown.example',
+    });
+
+    expect(candidate.payload.content[0]).toHaveProperty(
+      'directionText',
+      'towards:BP6',
+    );
+    const content = candidate.payload.content[0];
+    if (content.source !== 'crowd-report') {
+      throw new Error(`Expected crowd-report content, got ${content.source}`);
+    }
+    expect(content.text).toContain('Direction: towards:BP6.');
+    expect(content.text).toContain('A community report describes this issue.');
   });
 
   it('requires at least one affected line or station through the ingest contract', () => {
@@ -295,7 +333,6 @@ describe('buildCrowdReportIngestPayload', () => {
         kind: 'report',
         id: 'report-1',
         reportIds: ['report-1'],
-        text: 'The train has been stopped for a while.',
         createdAt: '2026-05-24T04:40:00.000Z',
         observedAt: '2026-05-24T12:30:00.000+08:00',
         lineIds: [],

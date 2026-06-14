@@ -151,9 +151,9 @@ or a branch affected by a line disruption.
 
 Direction should be structured when enough context is known. After line and
 station or line and journey scope are selected, offer terminal or branch
-direction choices derived from service revision data. Always include `Not sure`
-and `Other` fallbacks with free text so uncommon routing and commuter uncertainty
-do not block submission.
+direction choices derived from service revision data. Include `Not sure` for
+commuter uncertainty, but do not collect free-text direction or report notes in
+the public automated flow.
 
 The UI should describe the submission as a community report, not an official
 alert. It should avoid promising publication or immediate service-status
@@ -172,7 +172,7 @@ Add site-local tables through Drizzle migrations:
 - `direction_text`
 - `effect`
 - `delay_minutes`
-- `text`
+- `text` (generated structured summary for legacy/non-null storage only)
 - `status`
 - `cluster_id`
 - `duplicate_of_id`
@@ -288,11 +288,12 @@ Exit criteria:
 - Keep multiple-station input out of the default path. Add explicit range or
   from/to controls only for skipped-stop and no-service-between-stations cases.
 - Replace free-text direction with structured terminal, branch, or destination
-  choices when line context is known. Keep `Not sure` and `Other` fallbacks.
+  choices when line context is known. Keep `Not sure` but do not collect
+  public free-text direction notes.
 - Reduce visible workload by defaulting observed time to now and moving it to a
   secondary details area.
-- Make the description optional when structured fields are sufficient, but
-  require it for ambiguous `unknown` reports or `Other` direction/effect values.
+- Avoid public description fields while reports are primarily automated; use
+  constrained structured fields instead.
 - Add field-level validation messages and focus management for failed
   submissions.
 - Add `role="alert"` or `aria-live` to validation and submission errors.
@@ -385,11 +386,9 @@ Exit criteria:
   guided line selection, structured direction, and accessible validation.
 - 2026-05-24: Began Phase 2A implementation in `mrtdown-site`: scope-first
   public form, searchable station results, station-guided line selection,
-  structured direction choices, optional description fallback text, and
-  accessible submission errors.
-- 2026-05-24: Continued Phase 2A by adding field-level validation messages,
-  validation focus management, and required reviewer notes for ambiguous
-  `unknown` reports or `Other` direction submissions.
+  structured direction choices, and accessible submission errors.
+- 2026-05-24: Continued Phase 2A by adding field-level validation messages and
+  validation focus management.
 - 2026-05-25: Changed Phase 3 direction from manual review to fully automated
   moderation. Implemented automatic accept-or-duplicate moderation after public
   submission, with audit events and same-context duplicate detection.
@@ -413,9 +412,8 @@ Exit criteria:
   for punctuation-only, numeric-only, contact-solicitation, spam-link, and
   obvious non-transit chatter submissions.
 - 2026-05-27: Reduced spam incentive in the public report form by hiding
-  free-text details by default; standard structured reports now submit
-  generated summary text, while ambiguous `unknown` or `Other` direction
-  reports still require a short note.
+  free-text details by default; standard structured reports submit generated
+  summary text.
 - 2026-05-27: Hardened Phase 6 high-confidence cluster automation by requiring
   public and dispatchable community-report clusters to include multiple
   site-local reporter IP hashes, reducing the chance that one source can create
@@ -492,6 +490,15 @@ Exit criteria:
   compatibility characters and removing invisible format characters before
   automation policy checks, with regression coverage for zero-width obfuscated
   report text and direction fields.
+- 2026-06-14: Reframed Phase 6 canonical-ingest hardening so canonical dispatch
+  receives only a structured community-report summary.
+- 2026-06-14: Removed public free-text report notes and `Other` direction text
+  from the automated reporting flow, with submitted reports storing generated
+  structured summaries instead of reporter prose and superseding the
+  prompt-injection phrase-filter expansion.
+- 2026-06-14: Tightened the public API boundary so reports require a structured
+  effect and direction is submitted as a direction station ID, then derived into
+  a fixed `towards:{stationId}` token for duplicate detection and dispatch.
 
 ## Decision Log
 
@@ -511,7 +518,8 @@ Exit criteria:
 - 2026-05-24: Keep multiple-station reporting out of the default path. Model
   skipped stops and no-service-between-stations as explicit range cases instead.
 - 2026-05-24: Prefer structured direction choices derived from line context,
-  with `Not sure` and `Other` fallbacks.
+  with a `Not sure` fallback and no public free-text direction path while
+  moderation is automated.
 - 2026-05-25: Use fully automated site-local moderation instead of a manual
   operator queue. Accepted reports are still non-canonical until the dispatch
   and `mrtdown-data` review path lands them in published archives.

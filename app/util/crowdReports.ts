@@ -15,10 +15,14 @@ import {
   crowdReportRateLimitsTable,
   crowdReportsTable,
   linesTable,
+  serviceRevisionPathStationEntriesTable,
+  serviceRevisionsTable,
+  servicesTable,
   stationsTable,
   crowdReportStationsTable,
 } from '~/db/schema';
 import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
+import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 const DEFAULT_RATE_LIMIT_PER_HOUR = 5;
@@ -50,9 +54,8 @@ const RawCrowdReportSubmissionSchema = z
     observedAt: optionalTrimmedString(64),
     lineIds: z.array(z.string().trim().min(1).max(64)).max(8).default([]),
     stationIds: z.array(z.string().trim().min(1).max(64)).max(16).default([]),
-    text: z.string().trim().min(8).max(1000),
-    directionText: optionalTrimmedString(120),
-    effect: CrowdReportEffectSchema.optional(),
+    directionStationId: optionalTrimmedString(64),
+    effect: CrowdReportEffectSchema,
     delayMinutes: z.number().int().min(0).max(180).optional(),
     isStillHappening: z.boolean().optional(),
     turnstileToken: optionalTrimmedString(4096),
@@ -66,9 +69,9 @@ export type CrowdReportSubmission = {
   observedAt: string;
   lineIds: string[];
   stationIds: string[];
-  text: string;
+  directionStationId?: string;
   directionText?: string;
-  effect?: CrowdReportEffect;
+  effect: CrowdReportEffect;
   delayMinutes?: number;
   isStillHappening?: boolean;
   turnstileToken?: string;
@@ -339,175 +342,10 @@ function hasCrowdReportClusterScopeSql() {
   )`;
 }
 
-function normalizePolicyText(value: string) {
-  return value
-    .normalize('NFKC')
-    .trim()
-    .toLocaleLowerCase()
-    .replace(/\p{Cf}/gu, '')
-    .replace(/[\u2018\u2019]/gu, "'")
-    .replace(/\s+/g, ' ');
-}
-
-function isRepeatedFillerText(value: string) {
-  const compact = value.replace(/[\s\p{P}\p{S}]/gu, '');
-  if (!/[\p{L}\p{N}]/u.test(value) || /^\p{N}+$/u.test(compact)) {
-    return true;
-  }
-
-  if (compact.length >= 8 && new Set([...compact]).size <= 2) {
-    return true;
-  }
-
-  const tokens = value.split(' ').filter(Boolean);
-  return tokens.length >= 3 && new Set(tokens).size === 1;
-}
-
-function isObviousTestReportText(value: string) {
-  return (
-    [
-      'asdf',
-      'hello',
-      'hi',
-      'lorem ipsum',
-      'n/a',
-      'na',
-      'none',
-      'nothing',
-      'qwerty',
-      'test',
-      'test report',
-      'testing',
-    ].includes(value) || /^test(?:ing)?(?:\s+\d+)?$/.test(value)
-  );
-}
-
-function isObviousSpamOrSolicitationText(value: string) {
-  if (
-    /(?:https?:\/\/|www\.)\S+/u.test(value) ||
-    /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/u.test(value)
-  ) {
-    return true;
-  }
-
-  if (
-    /\b(?:buy now|casino|crypto|forex|free money|loan|promo code|seo|work from home)\b/u.test(
-      value,
-    )
-  ) {
-    return true;
-  }
-
-  return (
-    /\b(?:call|sms|telegram|text|whatsapp)\b/u.test(value) &&
-    /(?:\+?\d[\s-]?){8,}/u.test(value)
-  );
-}
-
-function isObviousNonTransitChatterText(value: string) {
-  if (
-    [
-      'good afternoon',
-      'good evening',
-      'good morning',
-      'good night',
-      'how are you',
-      'i am bored',
-      'weather today',
-      'what is the weather',
-      'where to eat',
-    ].includes(value)
-  ) {
-    return true;
-  }
-
-  return /\b(?:food delivery|homework help|movie tickets|taxi booking)\b/u.test(
-    value,
-  );
-}
-
-function isObviousPromptInjectionText(value: string) {
-  return (
-    /\b(?:ignore|disregard|forget)\s+(?:(?:all|the|your)\s+)?(?:(?:previous|prior|above)\s+(?:(?:system|developer)\s+)?(?:instructions?|prompts?|messages?|rules?)|(?:system|developer)\s+(?:instructions?|prompts?|messages?|rules?)|(?:prompts?|rules?))\b/u.test(
-      value,
-    ) ||
-    /\b(?:reveal|print|show)\s+(?:(?:the|your)\s+)?(?:system|developer)\s+(?:prompt|message|instructions?)\b/u.test(
-      value,
-    ) ||
-    /\b(?:act\s+as|pretend\s+(?:as|to\s+be))\s+(?:(?:a|an|the)\s+)?(?:[a-z]+\s+){0,2}(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
-      value,
-    ) ||
-    /\b(?:you(?:\s+are|'re)\s+(?:now\s+)?|from\s+now\s+on,?\s+you(?:\s+are|'re)\s+)(?:(?:a|an|the)\s+)?(?:[a-z]+\s+){0,2}(?:admin|assistant|developer|moderator|operator|(?:data\s+)?reviewer|system|triage)\b/u.test(
-      value,
-    ) ||
-    /\b(?:(?:new|updated|additional)\s+)?(?:system|developer)\s+(?:instructions?|messages?|prompts?|rules?)\s*:\s*(?:(?:always|please)\s+)?(?:accept|create|mark|reject|treat)\b/u.test(
-      value,
-    ) ||
-    /\b(?:(?:new|updated|additional)\s+system\s+(?:instructions?|prompts?|rules?)|(?:new|updated|additional)\s+developer\s+(?:instructions?|messages?|prompts?|rules?)|override\s+(?:(?:the|your)\s+)?(?:system|developer)\s+(?:instructions?|messages?|prompts?|rules?))\b/u.test(
-      value,
-    ) ||
-    /\b(?:do not|don't|never)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?(?:(?:above|previous|prior)\s+(?:system|developer)\s+|(?:system|developer)\s+)(?:instructions?|messages?|prompts?|rules?)\b/u.test(
-      value,
-    ) ||
-    /\b(?:do not|don't|never)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?above\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
-      value,
-    ) ||
-    /\b(?:do not|don't|never)\s+(?:follow|obey)\s+(?:(?:the|your)\s+)?(?:previous|prior)\s+(?:instructions?|messages?|prompts?|rules?)(?:(?:\s+(?:and\s+)?)|[.;:]\s*)(?:accept|create|mark|reject|treat)\b/u.test(
-      value,
-    ) ||
-    /\b(?:treat|use)\s+(?:this|the following)\s+as\s+(?:(?:a|an|the)\s+)?(?:developer|system)\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
-      value,
-    ) ||
-    /\b(?:jailbreak|prompt injection)\b/u.test(value)
-  );
-}
-
 export function assessCrowdReportAutomationPolicy(
   submission: CrowdReportSubmission,
   now = DateTime.now().setZone(SG_TIMEZONE),
 ): CrowdReportAutomationPolicyResult {
-  const normalizedText = normalizePolicyText(submission.text);
-  if (
-    isObviousTestReportText(normalizedText) ||
-    isRepeatedFillerText(normalizedText)
-  ) {
-    return {
-      action: 'reject',
-      reason:
-        'Report rejected by automated moderation: obvious test or filler text',
-    };
-  }
-
-  if (isObviousSpamOrSolicitationText(normalizedText)) {
-    return {
-      action: 'reject',
-      reason:
-        'Report rejected by automated moderation: spam or solicitation text',
-    };
-  }
-
-  if (isObviousNonTransitChatterText(normalizedText)) {
-    return {
-      action: 'reject',
-      reason:
-        'Report rejected by automated moderation: obvious non-transit text',
-    };
-  }
-
-  const normalizedDirectionText = normalizePolicyText(
-    submission.directionText ?? '',
-  );
-  if (
-    [normalizedText, normalizedDirectionText].some((value) =>
-      isObviousPromptInjectionText(value),
-    )
-  ) {
-    return {
-      action: 'reject',
-      reason: 'Report rejected by automated moderation: prompt-injection text',
-    };
-  }
-
   const observedAt = DateTime.fromISO(submission.observedAt, {
     setZone: true,
   });
@@ -585,15 +423,16 @@ export function validateCrowdReportSubmission(
   if (observedAtIso == null) {
     return { success: false, issues: ['observedAt must be valid'] };
   }
-
   return {
     success: true,
     data: {
       observedAt: observedAtIso,
       lineIds,
       stationIds,
-      text: parsed.data.text,
-      directionText: parsed.data.directionText,
+      directionStationId: parsed.data.directionStationId,
+      directionText: parsed.data.directionStationId
+        ? `towards:${parsed.data.directionStationId}`
+        : undefined,
       effect: parsed.data.effect,
       delayMinutes: parsed.data.delayMinutes,
       isStillHappening: parsed.data.isStillHappening,
@@ -621,6 +460,43 @@ export function getClientIp(request: Request) {
     forwardedFor?.split(',')[0]?.trim() ??
     'unknown'
   );
+}
+
+export function buildCrowdReportStorageText(
+  submission: Pick<
+    CrowdReportSubmission,
+    | 'delayMinutes'
+    | 'directionStationId'
+    | 'effect'
+    | 'isStillHappening'
+    | 'lineIds'
+    | 'stationIds'
+  >,
+) {
+  const summary = ['Structured community report.'];
+  if (submission.effect != null) {
+    summary.push(`Effect: ${submission.effect}.`);
+  }
+  if (submission.lineIds.length > 0) {
+    summary.push(`Lines: ${submission.lineIds.join(', ')}.`);
+  }
+  if (submission.stationIds.length > 0) {
+    summary.push(`Stations: ${submission.stationIds.join(', ')}.`);
+  }
+  if (submission.directionStationId != null) {
+    summary.push(`Direction station: ${submission.directionStationId}.`);
+  }
+  if (submission.delayMinutes != null) {
+    summary.push(`Delay: ${submission.delayMinutes} minutes.`);
+  }
+  if (submission.isStillHappening != null) {
+    summary.push(
+      submission.isStillHappening
+        ? 'Still happening: yes.'
+        : 'Still happening: no.',
+    );
+  }
+  return summary.join(' ');
 }
 
 export async function parseCrowdReportJsonBody(
@@ -830,32 +706,184 @@ export async function verifyTurnstileToken(
 
 export async function findMissingCrowdReportReferences(
   db: AppDb,
-  submission: Pick<CrowdReportSubmission, 'lineIds' | 'stationIds'>,
+  submission: Pick<
+    CrowdReportSubmission,
+    'directionStationId' | 'lineIds' | 'stationIds'
+  >,
 ) {
-  const [lineRows, stationRows] = await Promise.all([
-    submission.lineIds.length > 0
-      ? db
-          .select({ id: linesTable.id })
-          .from(linesTable)
-          .where(inArray(linesTable.id, submission.lineIds))
-      : Promise.resolve([]),
-    submission.stationIds.length > 0
-      ? db
-          .select({ id: stationsTable.id })
-          .from(stationsTable)
-          .where(inArray(stationsTable.id, submission.stationIds))
-      : Promise.resolve([]),
-  ]);
+  const referencedStationIds = [
+    ...submission.stationIds,
+    ...(submission.directionStationId ? [submission.directionStationId] : []),
+  ];
+  const [lineRows, stationRows, invalidDirectionStationIds] = await Promise.all(
+    [
+      submission.lineIds.length > 0
+        ? db
+            .select({ id: linesTable.id })
+            .from(linesTable)
+            .where(inArray(linesTable.id, submission.lineIds))
+        : Promise.resolve([]),
+      referencedStationIds.length > 0
+        ? db
+            .select({ id: stationsTable.id })
+            .from(stationsTable)
+            .where(inArray(stationsTable.id, referencedStationIds))
+        : Promise.resolve([]),
+      findInvalidDirectionStationIds(db, submission),
+    ],
+  );
 
   const existingLineIds = new Set(lineRows.map((row) => row.id));
   const existingStationIds = new Set(stationRows.map((row) => row.id));
 
   return {
     lineIds: submission.lineIds.filter((id) => !existingLineIds.has(id)),
-    stationIds: submission.stationIds.filter(
+    stationIds: referencedStationIds.filter(
       (id) => !existingStationIds.has(id),
     ),
+    directionStationIds: invalidDirectionStationIds,
   };
+}
+
+async function findInvalidDirectionStationIds(
+  db: AppDb,
+  submission: Pick<
+    CrowdReportSubmission,
+    'directionStationId' | 'lineIds' | 'stationIds'
+  >,
+) {
+  if (submission.directionStationId == null) {
+    return [];
+  }
+  if (submission.lineIds.length === 0) {
+    return [submission.directionStationId];
+  }
+
+  const referenceDate =
+    DateTime.now().setZone(SG_TIMEZONE).toISODate() ??
+    new Date().toISOString().slice(0, 10);
+  const serviceRevisionRows = await db
+    .select({
+      id: serviceRevisionsTable.id,
+      serviceId: serviceRevisionsTable.service_id,
+      lineId: servicesTable.line_id,
+      start_at: serviceRevisionsTable.start_at,
+      end_at: serviceRevisionsTable.end_at,
+      updated_at: serviceRevisionsTable.updated_at,
+    })
+    .from(serviceRevisionsTable)
+    .innerJoin(
+      servicesTable,
+      eq(servicesTable.id, serviceRevisionsTable.service_id),
+    )
+    .innerJoin(
+      serviceRevisionPathStationEntriesTable,
+      and(
+        eq(
+          serviceRevisionPathStationEntriesTable.service_revision_id,
+          serviceRevisionsTable.id,
+        ),
+        eq(
+          serviceRevisionPathStationEntriesTable.service_id,
+          serviceRevisionsTable.service_id,
+        ),
+      ),
+    )
+    .where(inArray(servicesTable.line_id, submission.lineIds));
+
+  const revisionsByKey = new Map<
+    string,
+    (typeof serviceRevisionRows)[number]
+  >();
+  for (const revision of serviceRevisionRows) {
+    revisionsByKey.set(`${revision.serviceId}::${revision.id}`, revision);
+  }
+
+  const revisionsByServiceId = Array.from(revisionsByKey.values()).reduce<
+    Record<string, Array<(typeof serviceRevisionRows)[number]>>
+  >((acc, revision) => {
+    acc[revision.serviceId] ??= [];
+    acc[revision.serviceId].push(revision);
+    return acc;
+  }, {});
+  const selectedRevisionKeys = new Set(
+    Object.entries(revisionsByServiceId)
+      .map(([serviceId, revisions]) => {
+        const revision = selectServiceRevisionForReferenceDate(
+          revisions,
+          referenceDate,
+        );
+        return revision == null ? undefined : `${serviceId}::${revision.id}`;
+      })
+      .filter((key): key is string => key != null),
+  );
+  if (selectedRevisionKeys.size === 0) {
+    return [submission.directionStationId];
+  }
+
+  const selectedRevisionIds = [
+    ...new Set(
+      [...selectedRevisionKeys]
+        .map((key) => key.split('::')[1])
+        .filter((id): id is string => id != null),
+    ),
+  ];
+  const selectedServiceIds = [
+    ...new Set(
+      [...selectedRevisionKeys]
+        .map((key) => key.split('::')[0])
+        .filter((id): id is string => id != null),
+    ),
+  ];
+  const pathRows = await db
+    .select({
+      serviceRevisionId:
+        serviceRevisionPathStationEntriesTable.service_revision_id,
+      serviceId: serviceRevisionPathStationEntriesTable.service_id,
+      stationId: serviceRevisionPathStationEntriesTable.station_id,
+      pathIndex: serviceRevisionPathStationEntriesTable.path_index,
+    })
+    .from(serviceRevisionPathStationEntriesTable)
+    .where(
+      and(
+        inArray(
+          serviceRevisionPathStationEntriesTable.service_revision_id,
+          selectedRevisionIds,
+        ),
+        inArray(
+          serviceRevisionPathStationEntriesTable.service_id,
+          selectedServiceIds,
+        ),
+      ),
+    );
+
+  const terminalStationIds = new Set<string>();
+  const pathRowsByRevisionKey = pathRows.reduce<
+    Record<string, typeof pathRows>
+  >((acc, row) => {
+    const key = `${row.serviceId}::${row.serviceRevisionId}`;
+    if (!selectedRevisionKeys.has(key)) {
+      return acc;
+    }
+    acc[key] ??= [];
+    acc[key].push(row);
+    return acc;
+  }, {});
+  for (const entries of Object.values(pathRowsByRevisionKey)) {
+    entries.sort((a, b) => a.pathIndex - b.pathIndex);
+    const firstStationId = entries[0]?.stationId;
+    const lastStationId = entries[entries.length - 1]?.stationId;
+    if (firstStationId != null) {
+      terminalStationIds.add(firstStationId);
+    }
+    if (lastStationId != null) {
+      terminalStationIds.add(lastStationId);
+    }
+  }
+
+  return terminalStationIds.has(submission.directionStationId)
+    ? []
+    : [submission.directionStationId];
 }
 
 async function findDuplicateCrowdReport(
@@ -1275,7 +1303,7 @@ async function persistCrowdReportInTransaction(
     effect: submission.effect,
     delay_minutes: submission.delayMinutes,
     still_happening: submission.isStillHappening,
-    text: submission.text,
+    text: buildCrowdReportStorageText(submission),
     status: 'pending',
   });
 

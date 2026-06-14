@@ -88,7 +88,6 @@ type ReportContentInput = {
   id: string;
   kind: CrowdReportDispatchKind;
   reportIds: string[];
-  text: string;
   createdAt: string | Date;
   observedAt: string | Date;
   lineIds: string[];
@@ -172,7 +171,6 @@ export function buildCrowdReportDispatchText(
     | 'lineIds'
     | 'reportCount'
     | 'stationIds'
-    | 'text'
   >,
 ) {
   const contextParts = [
@@ -208,7 +206,7 @@ export function buildCrowdReportDispatchText(
     );
   }
 
-  summary.push(`Reporter note: ${input.text}`);
+  summary.push('Reporter notes are not collected.');
   return summary.join(' ');
 }
 
@@ -315,7 +313,6 @@ async function getDispatchableCrowdReportClusterCandidates(
         id: crowdReportsTable.id,
         clusterId: crowdReportsTable.cluster_id,
         observedAt: crowdReportsTable.observed_at,
-        text: crowdReportsTable.text,
         directionText: crowdReportsTable.direction_text,
         delayMinutes: crowdReportsTable.delay_minutes,
         stillHappening: crowdReportsTable.still_happening,
@@ -360,7 +357,6 @@ async function getDispatchableCrowdReportClusterCandidates(
         kind: 'cluster',
         id: cluster.id,
         reportIds: reports.map((report) => report.id),
-        text: representative.text,
         createdAt: cluster.updatedAt,
         observedAt,
         lineIds,
@@ -388,7 +384,6 @@ async function getDispatchableSingleCrowdReportCandidates(
     .select({
       id: crowdReportsTable.id,
       observedAt: crowdReportsTable.observed_at,
-      text: crowdReportsTable.text,
       directionText: crowdReportsTable.direction_text,
       effect: crowdReportsTable.effect,
       delayMinutes: crowdReportsTable.delay_minutes,
@@ -447,7 +442,6 @@ async function getDispatchableSingleCrowdReportCandidates(
         kind: 'report',
         id: report.id,
         reportIds: [report.id],
-        text: report.text,
         createdAt: report.updatedAt,
         observedAt: report.observedAt,
         lineIds,
