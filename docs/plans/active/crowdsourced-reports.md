@@ -499,6 +499,9 @@ Exit criteria:
 - 2026-06-14: Tightened the public API boundary so reports require a structured
   effect and direction is submitted as a direction station ID, then derived into
   a fixed `towards:{stationId}` token for duplicate detection and dispatch.
+- 2026-06-14: Continued structured direction hardening by rejecting
+  direction-station submissions unless exactly one affected line is selected,
+  matching the public form's single-line direction picker.
 
 ## Decision Log
 

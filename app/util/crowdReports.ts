@@ -394,6 +394,9 @@ export function validateCrowdReportSubmission(
   if (lineIds.length === 0 && stationIds.length === 0) {
     issues.push('At least one affected line or station is required');
   }
+  if (parsed.data.directionStationId != null && lineIds.length !== 1) {
+    issues.push('directionStationId requires exactly one affected line');
+  }
 
   const observedAt = parsed.data.observedAt
     ? DateTime.fromISO(parsed.data.observedAt, { setZone: true })
@@ -755,7 +758,7 @@ async function findInvalidDirectionStationIds(
   if (submission.directionStationId == null) {
     return [];
   }
-  if (submission.lineIds.length === 0) {
+  if (submission.lineIds.length !== 1) {
     return [submission.directionStationId];
   }
 
