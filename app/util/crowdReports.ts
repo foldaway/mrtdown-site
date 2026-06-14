@@ -458,16 +458,16 @@ function isObviousPromptInjectionText(value: string) {
     /\b(?:treat|use)\s+(?:this|the following)\s+as\s+(?:(?:a|an|the)\s+)?(?:developer|system)\s+(?:instructions?|messages?|prompts?|rules?)\b/u.test(
       value,
     ) ||
-    /\b(?:enable|enter|switch(?:\s+to)?|activate|turn\s+on)\s+(?:(?:the|your)\s+)?(?:admin|developer|debug|system)\s+mode\b/u.test(
+    /\b(?:enable|(?:enter|switch)(?:\s+(?:to|into))?|activate|turn\s+on)\s+(?:(?:the|your)\s+)?(?:admin|developer|debug|system)\s+mode\b/u.test(
       value,
     ) ||
     /\b(?:admin|developer|debug|system)\s+mode\s*:\s*(?:(?:always|please)\s+)?(?:accept|create|ignore|mark|override|reject|treat)\b/u.test(
       value,
     ) ||
-    /\b(?:system|developer)\s+override\s*:\s*(?:(?:always|please)\s+)?(?:accept|create|ignore|mark|reject|treat)\b/u.test(
+    /\b(?:admin|debug|developer|system)\s+override\s*:\s*(?:(?:always|please)\s+)?(?:accept|create|ignore|mark|reject|treat)\b/u.test(
       value,
     ) ||
-    /\b(?:bypass|override)\s+(?:(?:the|your|all|automated|content|ai|llm|model)\s+)*(?:filters?|moderation|(?:ai|llm|model)\s+safety|triage)\b/u.test(
+    /\b(?:bypass|override)\s+(?:(?:the|your|all|automated|content|ai|llm|model)\s+)*(?:filters?|moderation|(?:ai|llm|model)\s+safety|(?:ai|llm|model|moderation)\s+guardrails?|triage)\b/u.test(
       value,
     ) ||
     /\b(?:bypass|override)\s+(?:(?:the|your|all|automated)\s+)*(?:(?:ai|llm|model|moderation|input|report|submission)\s+validation)\b/u.test(
