@@ -442,6 +442,24 @@ describe('validateCrowdReportSubmission', () => {
       expect(result.issues).toContain('Unrecognized key: "directionText"');
     }
   });
+
+  it('requires exactly one affected line when a direction station is submitted', () => {
+    const result = validateCrowdReportSubmission(
+      {
+        lineIds: ['BPLRT', 'CCL'],
+        directionStationId: 'BP6',
+        effect: 'delay',
+      },
+      NOW,
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues).toContain(
+        'directionStationId requires exactly one affected line',
+      );
+    }
+  });
 });
 
 describe('assessCrowdReportAutomationPolicy', () => {
@@ -662,6 +680,25 @@ describe('findMissingCrowdReportReferences', () => {
     await expect(
       findMissingCrowdReportReferences(fake.db as never, {
         lineIds: ['BPLRT'],
+        stationIds: [],
+        directionStationId: 'BP6',
+      }),
+    ).resolves.toEqual({
+      lineIds: [],
+      stationIds: [],
+      directionStationIds: ['BP6'],
+    });
+  });
+
+  it('rejects a direction station when multiple affected lines are selected', async () => {
+    const fake = makeFakeReferenceDb([
+      [{ id: 'BPLRT' }, { id: 'CCL' }],
+      [{ id: 'BP6' }],
+    ]);
+
+    await expect(
+      findMissingCrowdReportReferences(fake.db as never, {
+        lineIds: ['BPLRT', 'CCL'],
         stationIds: [],
         directionStationId: 'BP6',
       }),
