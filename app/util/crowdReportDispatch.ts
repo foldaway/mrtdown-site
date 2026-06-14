@@ -166,13 +166,11 @@ export function buildCrowdReportDispatchText(
   input: Pick<
     ReportContentInput,
     | 'delayMinutes'
-    | 'directionText'
     | 'effect'
     | 'isStillHappening'
     | 'lineIds'
     | 'reportCount'
     | 'stationIds'
-    | 'text'
   >,
 ) {
   const contextParts = [
@@ -194,9 +192,6 @@ export function buildCrowdReportDispatchText(
   if (contextParts.length > 0) {
     summary.push(`Affected ${contextParts.join('; ')}.`);
   }
-  if (input.directionText) {
-    summary.push(`Direction: ${input.directionText}.`);
-  }
   if (input.delayMinutes != null) {
     summary.push(`Reported delay: ${input.delayMinutes} minutes.`);
   }
@@ -208,7 +203,7 @@ export function buildCrowdReportDispatchText(
     );
   }
 
-  summary.push(`Reporter note: ${input.text}`);
+  summary.push('Reporter notes are retained site-local.');
   return summary.join(' ');
 }
 
@@ -223,7 +218,6 @@ export function buildCrowdReportIngestPayload(
     observedAt: normalizeTimestamp(input.observedAt),
     lineIds: input.lineIds.length > 0 ? input.lineIds : undefined,
     stationIds: input.stationIds.length > 0 ? input.stationIds : undefined,
-    directionText: input.directionText ?? undefined,
     effect: input.effect ?? undefined,
     delayMinutes: input.delayMinutes ?? undefined,
     reportCount: input.reportCount,

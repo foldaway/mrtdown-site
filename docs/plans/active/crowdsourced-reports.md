@@ -492,9 +492,9 @@ Exit criteria:
   compatibility characters and removing invisible format characters before
   automation policy checks, with regression coverage for zero-width obfuscated
   report text and direction fields.
-- 2026-06-14: Continued Phase 6 prompt-injection hardening by rejecting
-  developer/system mode-switch, override, and moderation-bypass wording before
-  accepted reports can reach canonical ingest triage.
+- 2026-06-14: Reframed Phase 6 canonical-ingest hardening so reporter notes
+  and free-form direction text stay site-local for moderation while canonical
+  dispatch receives only a structured community-report summary.
 
 ## Decision Log
 
