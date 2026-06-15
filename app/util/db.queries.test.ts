@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Issue, Line, Station } from '~/types';
 import {
   buildLineSummary,
+  deriveServiceScopeStationIds,
   parseStatisticsSnapshotPayload,
   selectIncludedEntities,
   type SystemAnalytics,
@@ -125,6 +126,87 @@ function buildStatistics(): SystemAnalytics {
     issueIdsDisruptionLongest: ['disruption-1'],
   };
 }
+
+describe('deriveServiceScopeStationIds', () => {
+  const BRANCH_STATION_IDS = ['NS1', 'NS2', 'NS3', 'NS4', 'NS5'];
+
+  it('returns the whole branch when no service scope is present', () => {
+    expect(deriveServiceScopeStationIds(BRANCH_STATION_IDS, [])).toEqual(
+      BRANCH_STATION_IDS,
+    );
+  });
+
+  it('returns the whole branch for whole-service scopes', () => {
+    expect(
+      deriveServiceScopeStationIds(BRANCH_STATION_IDS, [
+        {
+          type: 'service.whole',
+          station_id: null,
+          from_station_id: null,
+          to_station_id: null,
+        },
+      ]),
+    ).toEqual(BRANCH_STATION_IDS);
+  });
+
+  it('returns the inclusive station range for segment scopes', () => {
+    expect(
+      deriveServiceScopeStationIds(BRANCH_STATION_IDS, [
+        {
+          type: 'service.segment',
+          station_id: null,
+          from_station_id: 'NS2',
+          to_station_id: 'NS4',
+        },
+      ]),
+    ).toEqual(['NS2', 'NS3', 'NS4']);
+  });
+
+  it('preserves branch order for reversed segment endpoints', () => {
+    expect(
+      deriveServiceScopeStationIds(BRANCH_STATION_IDS, [
+        {
+          type: 'service.segment',
+          station_id: null,
+          from_station_id: 'NS4',
+          to_station_id: 'NS2',
+        },
+      ]),
+    ).toEqual(['NS2', 'NS3', 'NS4']);
+  });
+
+  it('combines point and segment scopes in branch order', () => {
+    expect(
+      deriveServiceScopeStationIds(BRANCH_STATION_IDS, [
+        {
+          type: 'service.point',
+          station_id: 'NS5',
+          from_station_id: null,
+          to_station_id: null,
+        },
+        {
+          type: 'service.segment',
+          station_id: null,
+          from_station_id: 'NS2',
+          to_station_id: 'NS3',
+        },
+      ]),
+    ).toEqual(['NS2', 'NS3', 'NS5']);
+  });
+
+  it('falls back to the whole branch when scoped stations cannot be resolved', () => {
+    expect(
+      deriveServiceScopeStationIds(BRANCH_STATION_IDS, [
+        {
+          type: 'service.segment',
+          station_id: null,
+          from_station_id: 'EW1',
+          to_station_id: 'EW2',
+        },
+      ]),
+    ).toEqual(BRANCH_STATION_IDS);
+  });
+});
 
 describe('buildLineSummary', () => {
   it('merges overlapping same-type issue durations in daily breakdowns', () => {

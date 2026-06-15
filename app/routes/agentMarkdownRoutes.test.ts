@@ -21,6 +21,8 @@ const mocks = vi.hoisted(() => ({
   getStationProfileFn: vi.fn(),
 }));
 
+const EXPECTED_ROOT_URL = import.meta.env.VITE_ROOT_URL;
+
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: (path: string) => (options: unknown) => ({
     options,
@@ -82,7 +84,9 @@ describe('agent Markdown routes', () => {
 
     const response = await getHandler(LlmsTxtRoute)();
 
-    expect(mocks.getLlmsTxt).toHaveBeenCalledWith({ rootUrl: undefined });
+    expect(mocks.getLlmsTxt).toHaveBeenCalledWith({
+      rootUrl: EXPECTED_ROOT_URL,
+    });
     await expect(response.text()).resolves.toBe('# llms');
     expectMarkdownResponse(response);
   });
@@ -98,7 +102,7 @@ describe('agent Markdown routes', () => {
       data: { days: HOME_OVERVIEW_INITIAL_DATE_COUNT },
     });
     expect(mocks.getOverviewMarkdown).toHaveBeenCalledWith(overviewPayload, {
-      rootUrl: undefined,
+      rootUrl: EXPECTED_ROOT_URL,
     });
     await expect(response.text()).resolves.toBe('# overview');
     expectMarkdownResponse(response);
@@ -117,7 +121,7 @@ describe('agent Markdown routes', () => {
       data: { days: 90, lineId: 'EWL' },
     });
     expect(mocks.getLineMarkdown).toHaveBeenCalledWith(linePayload, {
-      rootUrl: undefined,
+      rootUrl: EXPECTED_ROOT_URL,
     });
     await expect(response.text()).resolves.toBe('# line');
     expectMarkdownResponse(response);
@@ -136,7 +140,7 @@ describe('agent Markdown routes', () => {
       data: { stationId: 'EW1' },
     });
     expect(mocks.getStationMarkdown).toHaveBeenCalledWith(stationPayload, {
-      rootUrl: undefined,
+      rootUrl: EXPECTED_ROOT_URL,
     });
     await expect(response.text()).resolves.toBe('# station');
     expectMarkdownResponse(response);
@@ -155,7 +159,7 @@ describe('agent Markdown routes', () => {
       data: { days: 90, operatorId: 'SMRT' },
     });
     expect(mocks.getOperatorMarkdown).toHaveBeenCalledWith(operatorPayload, {
-      rootUrl: undefined,
+      rootUrl: EXPECTED_ROOT_URL,
     });
     await expect(response.text()).resolves.toBe('# operator');
     expectMarkdownResponse(response);
@@ -174,7 +178,7 @@ describe('agent Markdown routes', () => {
       data: { issueId: 'issue-1' },
     });
     expect(mocks.getIssueMarkdown).toHaveBeenCalledWith(issuePayload, {
-      rootUrl: undefined,
+      rootUrl: EXPECTED_ROOT_URL,
     });
     await expect(response.text()).resolves.toBe('# issue');
     expectMarkdownResponse(response);

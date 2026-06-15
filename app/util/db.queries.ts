@@ -28,6 +28,7 @@ import {
   impactEventEntityServicesTable,
   impactEventFacilityEffectsTable,
   impactEventPeriodsTable,
+  impactEventServiceScopesTable,
   impactEventServiceEffectsTable,
   impactEventsTable,
   issueDayFactsTable,
@@ -111,6 +112,66 @@ type BranchWithEntries = DatasetLineBranch & {
     pathIndex: number;
   }>;
 };
+
+type ImpactEventServiceScopeRow = Pick<
+  typeof impactEventServiceScopesTable.$inferSelect,
+  'type' | 'station_id' | 'from_station_id' | 'to_station_id'
+>;
+
+export function deriveServiceScopeStationIds(
+  branchStationIds: readonly string[],
+  scopeRows: readonly ImpactEventServiceScopeRow[],
+) {
+  if (scopeRows.length === 0) {
+    return [...branchStationIds];
+  }
+
+  if (scopeRows.some((scope) => scope.type === 'service.whole')) {
+    return [...branchStationIds];
+  }
+
+  const stationIds = new Set<string>();
+
+  for (const scope of scopeRows) {
+    switch (scope.type) {
+      case 'service.point': {
+        if (
+          scope.station_id != null &&
+          branchStationIds.includes(scope.station_id)
+        ) {
+          stationIds.add(scope.station_id);
+        }
+        break;
+      }
+      case 'service.segment': {
+        if (scope.from_station_id == null || scope.to_station_id == null) {
+          break;
+        }
+
+        const fromIndex = branchStationIds.indexOf(scope.from_station_id);
+        const toIndex = branchStationIds.indexOf(scope.to_station_id);
+        if (fromIndex === -1 || toIndex === -1) {
+          break;
+        }
+
+        const startIndex = Math.min(fromIndex, toIndex);
+        const endIndex = Math.max(fromIndex, toIndex);
+        for (let index = startIndex; index <= endIndex; index++) {
+          const stationId = branchStationIds[index];
+          if (stationId != null) {
+            stationIds.add(stationId);
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  const scopedStationIds = branchStationIds.filter((stationId) =>
+    stationIds.has(stationId),
+  );
+  return scopedStationIds.length > 0 ? scopedStationIds : [...branchStationIds];
+}
 
 type CommunitySignalOptions = {
   includeCommunitySignals?: boolean;
@@ -978,6 +1039,7 @@ async function buildDataset(
     impactEventServiceRows,
     impactEventFacilityRows,
     impactEventCauseRows,
+    impactEventServiceScopeRows,
     impactEventServiceEffectRows,
     impactEventFacilityEffectRows,
   ] = await timeServerSpan('dataset_issue_detail_queries', () =>
@@ -1034,6 +1096,19 @@ async function buildDataset(
               ),
           )
         : ([] as (typeof impactEventCausesTable.$inferSelect)[]),
+      selectedStateEventIds.length > 0
+        ? timeDbQuery('dataset_q_impact_event_service_scopes', () =>
+            database
+              .select()
+              .from(impactEventServiceScopesTable)
+              .where(
+                inArray(
+                  impactEventServiceScopesTable.impact_event_id,
+                  selectedStateEventIds,
+                ),
+              ),
+          )
+        : ([] as (typeof impactEventServiceScopesTable.$inferSelect)[]),
       selectedStateEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_service_effects', () =>
             database
@@ -1484,6 +1559,16 @@ async function buildDataset(
     return acc;
   }, {});
 
+  const serviceScopesByImpactEventId = impactEventServiceScopeRows.reduce<
+    Record<string, typeof impactEventServiceScopeRows>
+  >((acc, row) => {
+    if (acc[row.impact_event_id] == null) {
+      acc[row.impact_event_id] = [];
+    }
+    acc[row.impact_event_id].push(row);
+    return acc;
+  }, {});
+
   const serviceEffectsByImpactEventId = impactEventServiceEffectRows.reduce<
     Record<string, typeof impactEventServiceEffectRows>
   >((acc, row) => {
@@ -1527,6 +1612,10 @@ async function buildDataset(
     const serviceBranches = new Map<string, IssueAffectedBranch>();
     const facilityBranches = new Map<string, IssueAffectedBranch>();
     const causeSet = new Set<Issue['subtypes'][number]>();
+    const serviceScopeRowsByServiceId = new Map<
+      string,
+      typeof impactEventServiceScopeRows
+    >();
 
     const periodEvents =
       latestEventByType['periods.set'] != null
@@ -1535,6 +1624,17 @@ async function buildDataset(
     const canonicalPeriods = periodEvents.flatMap((event) => {
       return periodsByImpactEventId[event.id] ?? [];
     });
+
+    const serviceScopeEvent = latestEventByType['service_scopes.set'];
+    if (serviceScopeEvent != null) {
+      const scopeRows =
+        serviceScopesByImpactEventId[serviceScopeEvent.id] ?? [];
+      for (const serviceRef of serviceRowsByImpactEventId[
+        serviceScopeEvent.id
+      ] ?? []) {
+        serviceScopeRowsByServiceId.set(serviceRef.service_id, scopeRows);
+      }
+    }
 
     for (const event of selectedStateEvents) {
       for (const cause of causesByImpactEventId[event.id] ?? []) {
@@ -1550,7 +1650,10 @@ async function buildDataset(
         serviceBranches.set(branch.id, {
           lineId: service.line_id,
           branchId: branch.id,
-          stationIds: branch.stationIds,
+          stationIds: deriveServiceScopeStationIds(
+            branch.stationIds,
+            serviceScopeRowsByServiceId.get(serviceRef.service_id) ?? [],
+          ),
         });
       }
 
