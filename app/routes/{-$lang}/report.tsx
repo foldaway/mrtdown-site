@@ -537,9 +537,13 @@ function ReportPage() {
 
   const toggleLine = (lineId: string) => {
     clearFieldError('line');
+    clearFieldError('direction');
     setSelectedLineIds((current) => {
       if (current.includes(lineId)) {
         return current.filter((id) => id !== lineId);
+      }
+      if (reportScope === 'train') {
+        return [lineId];
       }
       return [...current, lineId];
     });
@@ -673,6 +677,24 @@ function ReportPage() {
         defaultMessage: 'Select the line you are travelling on.',
       });
       showFieldError('line', message, 'train_line_required');
+      return;
+    }
+
+    if (reportScope === 'train' && selectedLineIds.length > 1) {
+      const message = intl.formatMessage({
+        id: 'report.error.train_single_line_required',
+        defaultMessage: 'Select one line you are travelling on.',
+      });
+      showFieldError('line', message, 'train_single_line_required');
+      return;
+    }
+
+    if (reportScope === 'train' && directionChoice === '') {
+      const message = intl.formatMessage({
+        id: 'report.error.train_direction_required',
+        defaultMessage: 'Choose a direction, destination, or Not sure.',
+      });
+      showFieldError('direction', message, 'train_direction_required');
       return;
     }
 
