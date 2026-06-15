@@ -142,6 +142,7 @@ function buildFixtureSubmissions(
     {
       sourceId: 'a',
       submission: {
+        reportScope: 'station',
         observedAt: observedAt(12),
         lineIds: [context.lineId],
         stationIds: [context.stationId],
@@ -155,6 +156,7 @@ function buildFixtureSubmissions(
     {
       sourceId: 'b',
       submission: {
+        reportScope: 'station',
         observedAt: observedAt(10),
         lineIds: [context.lineId],
         stationIds: [context.stationId],
@@ -168,6 +170,7 @@ function buildFixtureSubmissions(
     {
       sourceId: 'c',
       submission: {
+        reportScope: 'station',
         observedAt: observedAt(8),
         lineIds: [context.lineId],
         stationIds: [context.stationId],
@@ -181,6 +184,7 @@ function buildFixtureSubmissions(
     {
       sourceId: 'd',
       submission: {
+        reportScope: 'line',
         observedAt: observedAt(6),
         lineIds: [context.rangeLineId],
         stationIds: context.rangeStationIds,
@@ -191,6 +195,7 @@ function buildFixtureSubmissions(
     {
       sourceId: 'e',
       submission: {
+        reportScope: 'line',
         observedAt: observedAt(4),
         lineIds: [context.rangeLineId],
         stationIds: context.rangeStationIds,

@@ -52,7 +52,7 @@ const optionalTrimmedString = (maxLength: number) =>
 
 const RawCrowdReportSubmissionSchema = z
   .object({
-    reportScope: CrowdReportScopeSchema.optional(),
+    reportScope: CrowdReportScopeSchema,
     observedAt: optionalTrimmedString(64),
     lineIds: z.array(z.string().trim().min(1).max(64)).max(8).default([]),
     stationIds: z.array(z.string().trim().min(1).max(64)).max(16).default([]),
@@ -69,7 +69,7 @@ const RawCrowdReportSubmissionSchema = z
 export type CrowdReportEffect = IngestContentCrowdReportEffect;
 
 export type CrowdReportSubmission = {
-  reportScope?: z.infer<typeof CrowdReportScopeSchema>;
+  reportScope: z.infer<typeof CrowdReportScopeSchema>;
   observedAt: string;
   lineIds: string[];
   stationIds: string[];
@@ -458,9 +458,7 @@ export function validateCrowdReportSubmission(
   return {
     success: true,
     data: {
-      ...(parsed.data.reportScope != null
-        ? { reportScope: parsed.data.reportScope }
-        : {}),
+      reportScope: parsed.data.reportScope,
       observedAt: observedAtIso,
       lineIds,
       stationIds,
