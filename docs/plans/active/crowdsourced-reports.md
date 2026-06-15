@@ -505,6 +505,11 @@ Exit criteria:
 - 2026-06-15: Tightened the on-train public reporting flow so train reports use
   a single selected line and require an explicit direction, destination, or
   `Not sure` choice before submission.
+- 2026-06-15: Hardened the public report API contract so submitted report scope
+  is validated server-side, on-train reports require exactly one selected line
+  plus a structured direction or explicit unknown-direction marker, and
+  structured storage summaries record scope and unknown direction without
+  reporter prose.
 
 ## Decision Log
 

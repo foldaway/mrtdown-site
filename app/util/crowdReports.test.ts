@@ -16,6 +16,7 @@ import {
 import {
   assessCrowdReportAutomationPolicy,
   automoderateCrowdReport,
+  buildCrowdReportStorageText,
   CrowdReportRateLimitError,
   findMissingCrowdReportReferences,
   getCrowdReportRateLimitBucketStart,
@@ -459,6 +460,121 @@ describe('validateCrowdReportSubmission', () => {
         'directionStationId requires exactly one affected line',
       );
     }
+  });
+
+  it('normalizes an on-train report with explicit unknown direction', () => {
+    const result = validateCrowdReportSubmission(
+      {
+        reportScope: 'train',
+        lineIds: ['BPLRT'],
+        directionUnknown: true,
+        effect: 'delay',
+        isStillHappening: true,
+      },
+      NOW,
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toMatchObject({
+        reportScope: 'train',
+        lineIds: ['BPLRT'],
+        directionUnknown: true,
+        directionText: 'not-sure',
+      });
+    }
+  });
+
+  it('requires explicit direction context for on-train reports', () => {
+    const result = validateCrowdReportSubmission(
+      {
+        reportScope: 'train',
+        lineIds: ['BPLRT'],
+        effect: 'delay',
+      },
+      NOW,
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues).toContain(
+        'Train reports require a direction station or explicit unknown direction',
+      );
+    }
+  });
+
+  it('requires exactly one affected line for on-train reports', () => {
+    const result = validateCrowdReportSubmission(
+      {
+        reportScope: 'train',
+        lineIds: ['BPLRT', 'CCL'],
+        directionUnknown: true,
+        effect: 'delay',
+      },
+      NOW,
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues).toContain(
+        'Train reports require exactly one affected line',
+      );
+    }
+  });
+
+  it('rejects contradictory known and unknown direction context', () => {
+    const result = validateCrowdReportSubmission(
+      {
+        reportScope: 'train',
+        lineIds: ['BPLRT'],
+        directionStationId: 'BP6',
+        directionUnknown: true,
+        effect: 'delay',
+      },
+      NOW,
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues).toContain(
+        'directionUnknown cannot be combined with directionStationId',
+      );
+    }
+  });
+
+  it('requires station context for station-scoped reports', () => {
+    const result = validateCrowdReportSubmission(
+      {
+        reportScope: 'station',
+        lineIds: ['BPLRT'],
+        effect: 'delay',
+      },
+      NOW,
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues).toContain(
+        'Station reports require at least one affected station',
+      );
+    }
+  });
+});
+
+describe('buildCrowdReportStorageText', () => {
+  it('stores structured scope and unknown direction without reporter prose', () => {
+    expect(
+      buildCrowdReportStorageText({
+        reportScope: 'train',
+        lineIds: ['BPLRT'],
+        stationIds: [],
+        directionUnknown: true,
+        effect: 'delay',
+        isStillHappening: true,
+      }),
+    ).toBe(
+      'Structured community report. Scope: train. Effect: delay. Lines: BPLRT. Direction: not sure. Still happening: yes.',
+    );
   });
 });
 
