@@ -173,6 +173,23 @@ export function deriveServiceScopeStationIds(
   return scopedStationIds.length > 0 ? scopedStationIds : [...branchStationIds];
 }
 
+type ImpactEventStateRow = Pick<
+  typeof impactEventsTable.$inferSelect,
+  'id' | 'type'
+>;
+
+export function selectServiceBranchSourceEvents<T extends ImpactEventStateRow>(
+  selectedStateEvents: readonly T[],
+) {
+  const serviceScopeEvents = selectedStateEvents.filter(
+    (event) => event.type === 'service_scopes.set',
+  );
+
+  return serviceScopeEvents.length > 0
+    ? serviceScopeEvents
+    : selectedStateEvents;
+}
+
 type CommunitySignalOptions = {
   includeCommunitySignals?: boolean;
 };
@@ -1641,22 +1658,6 @@ async function buildDataset(
         causeSet.add(cause.type as Issue['subtypes'][number]);
       }
 
-      for (const serviceRef of serviceRowsByImpactEventId[event.id] ?? []) {
-        const branch = branchByServiceId[serviceRef.service_id];
-        const service = serviceById[serviceRef.service_id];
-        if (branch == null || service == null) {
-          continue;
-        }
-        serviceBranches.set(branch.id, {
-          lineId: service.line_id,
-          branchId: branch.id,
-          stationIds: deriveServiceScopeStationIds(
-            branch.stationIds,
-            serviceScopeRowsByServiceId.get(serviceRef.service_id) ?? [],
-          ),
-        });
-      }
-
       for (const facilityRef of facilityRowsByImpactEventId[event.id] ?? []) {
         const station = stationsById[facilityRef.station_id];
         if (station == null) {
@@ -1695,6 +1696,24 @@ async function buildDataset(
             });
           }
         }
+      }
+    }
+
+    for (const event of selectServiceBranchSourceEvents(selectedStateEvents)) {
+      for (const serviceRef of serviceRowsByImpactEventId[event.id] ?? []) {
+        const branch = branchByServiceId[serviceRef.service_id];
+        const service = serviceById[serviceRef.service_id];
+        if (branch == null || service == null) {
+          continue;
+        }
+        serviceBranches.set(branch.id, {
+          lineId: service.line_id,
+          branchId: branch.id,
+          stationIds: deriveServiceScopeStationIds(
+            branch.stationIds,
+            serviceScopeRowsByServiceId.get(serviceRef.service_id) ?? [],
+          ),
+        });
       }
     }
 

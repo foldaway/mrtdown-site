@@ -6,6 +6,7 @@ import {
   deriveServiceScopeStationIds,
   parseStatisticsSnapshotPayload,
   selectIncludedEntities,
+  selectServiceBranchSourceEvents,
   type SystemAnalytics,
 } from './db.queries';
 
@@ -205,6 +206,30 @@ describe('deriveServiceScopeStationIds', () => {
         },
       ]),
     ).toEqual(BRANCH_STATION_IDS);
+  });
+});
+
+describe('selectServiceBranchSourceEvents', () => {
+  it('uses service scope events as the source of affected branch pills', () => {
+    const events = [
+      { id: 'periods', type: 'periods.set' },
+      { id: 'causes', type: 'causes.set' },
+      { id: 'scopes', type: 'service_scopes.set' },
+      { id: 'effects', type: 'service_effects.set' },
+    ] as const;
+
+    expect(selectServiceBranchSourceEvents(events)).toEqual([
+      { id: 'scopes', type: 'service_scopes.set' },
+    ]);
+  });
+
+  it('falls back to all state events for legacy issues without service scopes', () => {
+    const events = [
+      { id: 'periods', type: 'periods.set' },
+      { id: 'effects', type: 'service_effects.set' },
+    ] as const;
+
+    expect(selectServiceBranchSourceEvents(events)).toEqual(events);
   });
 });
 
