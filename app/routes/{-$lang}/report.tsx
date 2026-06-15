@@ -817,10 +817,15 @@ function ReportPage() {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
+          reportScope,
           observedAt: observedAtIso,
           lineIds: selectedLineIds,
           stationIds: submittedStationIds,
           directionStationId,
+          directionUnknown:
+            reportScope === 'train' && directionChoice === 'not-sure'
+              ? true
+              : undefined,
           effect: effect || undefined,
           delayMinutes: delayMinutes ? Number(delayMinutes) : undefined,
           isStillHappening,

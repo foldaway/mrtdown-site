@@ -40,6 +40,7 @@ const DUPLICATE_CANDIDATE_PAGE_SIZE = 100;
 export const MAX_CROWD_REPORT_REQUEST_BYTES = 10_000;
 
 export const CrowdReportEffectSchema = IngestContentCrowdReportEffectSchema;
+export const CrowdReportScopeSchema = z.enum(['line', 'station', 'train']);
 
 const optionalTrimmedString = (maxLength: number) =>
   z
@@ -51,10 +52,12 @@ const optionalTrimmedString = (maxLength: number) =>
 
 const RawCrowdReportSubmissionSchema = z
   .object({
+    reportScope: CrowdReportScopeSchema,
     observedAt: optionalTrimmedString(64),
     lineIds: z.array(z.string().trim().min(1).max(64)).max(8).default([]),
     stationIds: z.array(z.string().trim().min(1).max(64)).max(16).default([]),
     directionStationId: optionalTrimmedString(64),
+    directionUnknown: z.boolean().optional(),
     effect: CrowdReportEffectSchema,
     delayMinutes: z.number().int().min(0).max(180).optional(),
     isStillHappening: z.boolean().optional(),
@@ -66,10 +69,12 @@ const RawCrowdReportSubmissionSchema = z
 export type CrowdReportEffect = IngestContentCrowdReportEffect;
 
 export type CrowdReportSubmission = {
+  reportScope: z.infer<typeof CrowdReportScopeSchema>;
   observedAt: string;
   lineIds: string[];
   stationIds: string[];
   directionStationId?: string;
+  directionUnknown?: boolean;
   directionText?: string;
   effect: CrowdReportEffect;
   delayMinutes?: number;
@@ -394,8 +399,32 @@ export function validateCrowdReportSubmission(
   if (lineIds.length === 0 && stationIds.length === 0) {
     issues.push('At least one affected line or station is required');
   }
+  if (parsed.data.reportScope === 'line' && lineIds.length === 0) {
+    issues.push('Line reports require at least one affected line');
+  }
+  if (parsed.data.reportScope === 'station' && stationIds.length === 0) {
+    issues.push('Station reports require at least one affected station');
+  }
+  if (parsed.data.reportScope === 'train' && lineIds.length !== 1) {
+    issues.push('Train reports require exactly one affected line');
+  }
+  if (
+    parsed.data.reportScope === 'train' &&
+    parsed.data.directionStationId == null &&
+    parsed.data.directionUnknown !== true
+  ) {
+    issues.push(
+      'Train reports require a direction station or explicit unknown direction',
+    );
+  }
   if (parsed.data.directionStationId != null && lineIds.length !== 1) {
     issues.push('directionStationId requires exactly one affected line');
+  }
+  if (
+    parsed.data.directionStationId != null &&
+    parsed.data.directionUnknown === true
+  ) {
+    issues.push('directionUnknown cannot be combined with directionStationId');
   }
 
   const observedAt = parsed.data.observedAt
@@ -429,13 +458,21 @@ export function validateCrowdReportSubmission(
   return {
     success: true,
     data: {
+      reportScope: parsed.data.reportScope,
       observedAt: observedAtIso,
       lineIds,
       stationIds,
-      directionStationId: parsed.data.directionStationId,
+      ...(parsed.data.directionStationId != null
+        ? { directionStationId: parsed.data.directionStationId }
+        : {}),
+      ...(parsed.data.directionUnknown != null
+        ? { directionUnknown: parsed.data.directionUnknown }
+        : {}),
       directionText: parsed.data.directionStationId
         ? `towards:${parsed.data.directionStationId}`
-        : undefined,
+        : parsed.data.directionUnknown === true
+          ? 'not-sure'
+          : undefined,
       effect: parsed.data.effect,
       delayMinutes: parsed.data.delayMinutes,
       isStillHappening: parsed.data.isStillHappening,
@@ -469,14 +506,19 @@ export function buildCrowdReportStorageText(
   submission: Pick<
     CrowdReportSubmission,
     | 'delayMinutes'
+    | 'directionUnknown'
     | 'directionStationId'
     | 'effect'
     | 'isStillHappening'
     | 'lineIds'
+    | 'reportScope'
     | 'stationIds'
   >,
 ) {
   const summary = ['Structured community report.'];
+  if (submission.reportScope != null) {
+    summary.push(`Scope: ${submission.reportScope}.`);
+  }
   if (submission.effect != null) {
     summary.push(`Effect: ${submission.effect}.`);
   }
@@ -488,6 +530,8 @@ export function buildCrowdReportStorageText(
   }
   if (submission.directionStationId != null) {
     summary.push(`Direction station: ${submission.directionStationId}.`);
+  } else if (submission.directionUnknown === true) {
+    summary.push('Direction: not sure.');
   }
   if (submission.delayMinutes != null) {
     summary.push(`Delay: ${submission.delayMinutes} minutes.`);
