@@ -502,6 +502,9 @@ Exit criteria:
 - 2026-06-14: Continued structured direction hardening by rejecting
   direction-station submissions unless exactly one affected line is selected,
   matching the public form's single-line direction picker.
+- 2026-06-15: Tightened the on-train public reporting flow so train reports use
+  a single selected line and require an explicit direction, destination, or
+  `Not sure` choice before submission.
 
 ## Decision Log
 
