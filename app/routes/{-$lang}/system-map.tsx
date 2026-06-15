@@ -5,11 +5,35 @@ import { createIntl, FormattedMessage, useIntl } from 'react-intl';
 import type { IssueAffectedBranch } from '~/types';
 import { CurrentAdvisoriesSection } from '~/components/CurrentAdvisoriesSection';
 import { countOperationalLineSummaries } from '~/components/CurrentAdvisoriesSection/helpers';
-import { StationMap } from '~/components/StationMap';
+import {
+  StationMap,
+  type StationMapSnapshotComponents,
+} from '~/components/StationMap';
+import { MapApr2025 } from '~/components/StationMap/components/MapApr2025';
+import { MapDec2019 } from '~/components/StationMap/components/MapDec2019';
+import { MapDec2027 } from '~/components/StationMap/components/MapDec2027';
+import { MapDec2029 } from '~/components/StationMap/components/MapDec2029';
+import { MapDec2030 } from '~/components/StationMap/components/MapDec2030';
+import { MapDec2032 } from '~/components/StationMap/components/MapDec2032';
+import { MapJan2012 } from '~/components/StationMap/components/MapJan2012';
+import { MapNov2017 } from '~/components/StationMap/components/MapNov2017';
+import { MapNov2024 } from '~/components/StationMap/components/MapNov2024';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { getSystemMapFn } from '~/util/system-map.functions';
+
+const SYSTEM_MAP_SNAPSHOTS = {
+  '2012-01': MapJan2012,
+  '2017-11': MapNov2017,
+  '2019-12': MapDec2019,
+  '2024-11': MapNov2024,
+  '2025-04': MapApr2025,
+  '2027-12': MapDec2027,
+  '2029-12': MapDec2029,
+  '2030-12': MapDec2030,
+  '2032-12': MapDec2032,
+} satisfies StationMapSnapshotComponents;
 
 export const Route = createFileRoute('/{-$lang}/system-map')({
   component: SystemMapPage,
@@ -132,6 +156,7 @@ function SystemMapPage() {
         <div className="flex flex-col bg-gray-100 p-4 dark:bg-gray-800">
           <StationMap
             currentDate={DateTime.now().toISODate()}
+            snapshotComponents={SYSTEM_MAP_SNAPSHOTS}
             mode={{
               type: 'network',
               branchesAffected,

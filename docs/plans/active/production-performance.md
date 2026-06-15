@@ -406,6 +406,11 @@ underlying compute and payload costs so uncached requests are also fast.
   plain text, while explicit `Accept: text/markdown` requests for non-Markdown
   routes return 406 plain text. Canonical Markdown routes still pass through
   their route handlers and keep public Markdown cache headers.
+- 2026-06-15: Clarified the Phase 5 map-bundle strategy for SEO. The public
+  `/system-map` route now passes eager generated snapshot components into
+  `StationMap` so timeline map content does not depend on React Suspense
+  fallbacks, while supporting profile widgets can continue using the default
+  deferred snapshot imports behind their viewport gate.
 
 ## Validation
 

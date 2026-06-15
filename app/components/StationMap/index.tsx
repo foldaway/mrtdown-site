@@ -14,6 +14,25 @@ import { MapApr2025 } from './components/MapApr2025';
 import { Timeline } from './components/Timeline';
 import { segmentText } from './helpers/segmentText';
 
+type MapSnapshotId =
+  | '2012-01'
+  | '2017-11'
+  | '2019-12'
+  | '2024-11'
+  | '2025-04'
+  | '2027-12'
+  | '2029-12'
+  | '2030-12'
+  | '2032-12';
+
+export type StationMapSnapshotComponent = React.ElementType<{
+  ref?: React.Ref<SVGSVGElement>;
+}>;
+
+export type StationMapSnapshotComponents = Partial<
+  Record<MapSnapshotId, StationMapSnapshotComponent>
+>;
+
 const MapDec2032 = lazy(() =>
   import('./components/MapDec2032').then((module) => ({
     default: module.MapDec2032,
@@ -77,10 +96,11 @@ export type StationMapMode =
 interface Props {
   currentDate?: string;
   mode: StationMapMode;
+  snapshotComponents?: StationMapSnapshotComponents;
 }
 
 export const StationMap: React.FC<Props> = (props) => {
-  const { currentDate, mode } = props;
+  const { currentDate, mode, snapshotComponents } = props;
 
   const intl = useIntl();
   const navigate = useNavigate();
@@ -451,6 +471,27 @@ export const StationMap: React.FC<Props> = (props) => {
   const showAffectedStationsSummary =
     mode.type === 'network' && mode.showAffectedStationsSummary !== false;
 
+  const renderSnapshot = (
+    snapshotId: MapSnapshotId,
+    DefaultComponent: StationMapSnapshotComponent,
+  ) => {
+    const SnapshotComponent = snapshotComponents?.[snapshotId];
+
+    if (SnapshotComponent != null) {
+      return <SnapshotComponent ref={setRef} />;
+    }
+
+    if (snapshotId === '2025-04') {
+      return <DefaultComponent ref={setRef} />;
+    }
+
+    return (
+      <Suspense fallback={<StationMapSnapshotFallback />}>
+        <DefaultComponent ref={setRef} />
+      </Suspense>
+    );
+  };
+
   return (
     <div className="flex flex-col fill-gray-800 dark:fill-gray-50">
       {/* Tailwind Class trappers */}
@@ -461,47 +502,31 @@ export const StationMap: React.FC<Props> = (props) => {
         <div className="relative overflow-hidden">
           <div className="overflow-auto">
             <Tabs.Content value="2032-12">
-              <Suspense fallback={<StationMapSnapshotFallback />}>
-                <MapDec2032 ref={setRef} />
-              </Suspense>
+              {renderSnapshot('2032-12', MapDec2032)}
             </Tabs.Content>
             <Tabs.Content value="2030-12">
-              <Suspense fallback={<StationMapSnapshotFallback />}>
-                <MapDec2030 ref={setRef} />
-              </Suspense>
+              {renderSnapshot('2030-12', MapDec2030)}
             </Tabs.Content>
             <Tabs.Content value="2029-12">
-              <Suspense fallback={<StationMapSnapshotFallback />}>
-                <MapDec2029 ref={setRef} />
-              </Suspense>
+              {renderSnapshot('2029-12', MapDec2029)}
             </Tabs.Content>
             <Tabs.Content value="2027-12">
-              <Suspense fallback={<StationMapSnapshotFallback />}>
-                <MapDec2027 ref={setRef} />
-              </Suspense>
+              {renderSnapshot('2027-12', MapDec2027)}
             </Tabs.Content>
             <Tabs.Content value="2025-04">
-              <MapApr2025 ref={setRef} />
+              {renderSnapshot('2025-04', MapApr2025)}
             </Tabs.Content>
             <Tabs.Content value="2024-11">
-              <Suspense fallback={<StationMapSnapshotFallback />}>
-                <MapNov2024 ref={setRef} />
-              </Suspense>
+              {renderSnapshot('2024-11', MapNov2024)}
             </Tabs.Content>
             <Tabs.Content value="2019-12">
-              <Suspense fallback={<StationMapSnapshotFallback />}>
-                <MapDec2019 ref={setRef} />
-              </Suspense>
+              {renderSnapshot('2019-12', MapDec2019)}
             </Tabs.Content>
             <Tabs.Content value="2017-11">
-              <Suspense fallback={<StationMapSnapshotFallback />}>
-                <MapNov2017 ref={setRef} />
-              </Suspense>
+              {renderSnapshot('2017-11', MapNov2017)}
             </Tabs.Content>
             <Tabs.Content value="2012-01">
-              <Suspense fallback={<StationMapSnapshotFallback />}>
-                <MapJan2012 ref={setRef} />
-              </Suspense>
+              {renderSnapshot('2012-01', MapJan2012)}
             </Tabs.Content>
           </div>
           <ZoomControls svgRef={ref} initialZoom={1} />
