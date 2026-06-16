@@ -434,7 +434,7 @@ export function validateCrowdReportSubmission(
   }
   if (
     parsed.data.reportScope !== 'train' &&
-    parsed.data.directionUnknown === true
+    parsed.data.directionUnknown != null
   ) {
     issues.push('directionUnknown is only allowed for train reports');
   }
@@ -477,8 +477,8 @@ export function validateCrowdReportSubmission(
       ...(parsed.data.directionStationId != null
         ? { directionStationId: parsed.data.directionStationId }
         : {}),
-      ...(parsed.data.directionUnknown != null
-        ? { directionUnknown: parsed.data.directionUnknown }
+      ...(parsed.data.directionUnknown === true
+        ? { directionUnknown: true }
         : {}),
       directionText: parsed.data.directionStationId
         ? `towards:${parsed.data.directionStationId}`

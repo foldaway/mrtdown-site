@@ -536,6 +536,25 @@ describe('validateCrowdReportSubmission', () => {
     }
   });
 
+  it('omits false unknown-direction markers from normalized on-train reports', () => {
+    const result = validateCrowdReportSubmission(
+      {
+        reportScope: 'train',
+        lineIds: ['BPLRT'],
+        directionStationId: 'BP6',
+        directionUnknown: false,
+        effect: 'delay',
+      },
+      NOW,
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.directionUnknown).toBeUndefined();
+      expect(result.data.directionText).toBe('towards:BP6');
+    }
+  });
+
   it('requires explicit direction context for on-train reports', () => {
     const result = validateCrowdReportSubmission(
       {
@@ -599,6 +618,25 @@ describe('validateCrowdReportSubmission', () => {
         reportScope: 'line',
         lineIds: ['BPLRT'],
         directionUnknown: true,
+        effect: 'delay',
+      },
+      NOW,
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues).toContain(
+        'directionUnknown is only allowed for train reports',
+      );
+    }
+  });
+
+  it('rejects false unknown-direction fields outside on-train reports', () => {
+    const result = validateCrowdReportSubmission(
+      {
+        reportScope: 'line',
+        lineIds: ['BPLRT'],
+        directionUnknown: false,
         effect: 'delay',
       },
       NOW,
