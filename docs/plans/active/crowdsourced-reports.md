@@ -510,6 +510,9 @@ Exit criteria:
   plus a structured direction or explicit unknown-direction marker, and
   structured storage summaries record scope and unknown direction without
   reporter prose.
+- 2026-06-16: Continued public report API contract hardening by rejecting
+  explicit unknown-direction markers outside on-train reports, keeping line and
+  station reports aligned with the public form's implicit no-direction path.
 
 ## Decision Log
 

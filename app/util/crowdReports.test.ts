@@ -573,6 +573,25 @@ describe('validateCrowdReportSubmission', () => {
     }
   });
 
+  it('rejects explicit unknown direction markers outside on-train reports', () => {
+    const result = validateCrowdReportSubmission(
+      {
+        reportScope: 'line',
+        lineIds: ['BPLRT'],
+        directionUnknown: true,
+        effect: 'delay',
+      },
+      NOW,
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues).toContain(
+        'directionUnknown is only allowed for train reports',
+      );
+    }
+  });
+
   it('requires station context for station-scoped reports', () => {
     const result = validateCrowdReportSubmission(
       {
