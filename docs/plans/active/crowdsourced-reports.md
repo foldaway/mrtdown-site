@@ -519,6 +519,9 @@ Exit criteria:
 - 2026-06-17: Continued train-direction contract hardening by rejecting any
   submitted `directionUnknown` field outside on-train reports and normalizing
   only true unknown-direction markers into persisted report data.
+- 2026-06-17: Cleaned the extracted report message catalog after removing
+  public free-text notes and `Other` direction inputs, so localized report
+  strings match the structured automated flow.
 
 ## Decision Log
 
