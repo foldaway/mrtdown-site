@@ -426,6 +426,12 @@ export function validateCrowdReportSubmission(
   ) {
     issues.push('directionUnknown cannot be combined with directionStationId');
   }
+  if (
+    parsed.data.reportScope !== 'train' &&
+    parsed.data.directionUnknown === true
+  ) {
+    issues.push('directionUnknown is only allowed for train reports');
+  }
 
   const observedAt = parsed.data.observedAt
     ? DateTime.fromISO(parsed.data.observedAt, { setZone: true })
