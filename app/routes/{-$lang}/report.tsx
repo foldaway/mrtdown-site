@@ -484,6 +484,13 @@ function ReportPage() {
   }, [reportScope, selectedLineIds.length, selectedStation]);
 
   useEffect(() => {
+    if (reportScope !== 'train') {
+      if (directionChoice !== '') {
+        setDirectionChoice('');
+      }
+      return;
+    }
+
     if (selectedLineIds.length === 0) {
       if (directionChoice !== '') {
         setDirectionChoice('');
@@ -501,7 +508,12 @@ function ReportPage() {
       return;
     }
     setDirectionChoice('');
-  }, [directionChoice, selectedLineDirectionOptions, selectedLineIds.length]);
+  }, [
+    directionChoice,
+    reportScope,
+    selectedLineDirectionOptions,
+    selectedLineIds.length,
+  ]);
 
   useEffect(() => {
     if (selectedLineIds.length === 0) {
@@ -626,6 +638,9 @@ function ReportPage() {
   };
 
   const getDirectionStationId = () => {
+    if (reportScope !== 'train') {
+      return undefined;
+    }
     if (directionChoice === 'not-sure' || directionChoice === '') {
       return undefined;
     }
@@ -1472,7 +1487,7 @@ function ReportPage() {
           </section>
         )}
 
-        {selectedLineIds.length > 0 && (
+        {reportScope === 'train' && selectedLineIds.length > 0 && (
           <section className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-2">
               <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">

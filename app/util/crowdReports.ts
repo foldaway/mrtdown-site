@@ -421,6 +421,12 @@ export function validateCrowdReportSubmission(
     issues.push('directionStationId requires exactly one affected line');
   }
   if (
+    parsed.data.reportScope !== 'train' &&
+    parsed.data.directionStationId != null
+  ) {
+    issues.push('directionStationId is only allowed for train reports');
+  }
+  if (
     parsed.data.directionStationId != null &&
     parsed.data.directionUnknown === true
   ) {
