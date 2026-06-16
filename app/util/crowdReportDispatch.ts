@@ -95,7 +95,7 @@ type ReportContentInput = {
   directionText: string | null;
   effect: IngestContentCrowdReport['effect'] | null;
   delayMinutes: number | null;
-  reportCount?: number;
+  reportCount: number;
   isStillHappening?: boolean | null;
   rootUrl: string;
 };
