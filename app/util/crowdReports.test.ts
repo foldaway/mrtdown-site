@@ -34,7 +34,7 @@ const NOW = DateTime.fromISO('2026-05-24T12:34:00+08:00', {
 });
 
 const VALID_SUBMISSION: CrowdReportSubmission = {
-  reportScope: 'station',
+  reportScope: 'train',
   observedAt: '2026-05-24T12:30:00.000+08:00',
   lineIds: ['BPLRT'],
   stationIds: ['BP6'],
@@ -325,7 +325,7 @@ describe('validateCrowdReportSubmission', () => {
   it('normalizes a valid report submission', () => {
     const result = validateCrowdReportSubmission(
       {
-        reportScope: 'station',
+        reportScope: 'train',
         observedAt: '2026-05-24T12:30:00+08:00',
         lineIds: ['BPLRT', 'BPLRT'],
         stationIds: ['BP6'],
@@ -489,6 +489,26 @@ describe('validateCrowdReportSubmission', () => {
     if (!result.success) {
       expect(result.issues).toContain(
         'directionStationId requires exactly one affected line',
+      );
+    }
+  });
+
+  it('rejects direction stations outside on-train reports', () => {
+    const result = validateCrowdReportSubmission(
+      {
+        reportScope: 'station',
+        lineIds: ['BPLRT'],
+        stationIds: ['BP6'],
+        directionStationId: 'BP6',
+        effect: 'delay',
+      },
+      NOW,
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues).toContain(
+        'directionStationId is only allowed for train reports',
       );
     }
   });
@@ -910,7 +930,7 @@ describe('persistCrowdReport', () => {
       observed_at: VALID_SUBMISSION.observedAt,
       status: 'pending',
       still_happening: true,
-      text: 'Structured community report. Scope: station. Effect: delay. Lines: BPLRT. Stations: BP6. Direction station: BP6. Delay: 10 minutes. Still happening: yes.',
+      text: 'Structured community report. Scope: train. Effect: delay. Lines: BPLRT. Stations: BP6. Direction station: BP6. Delay: 10 minutes. Still happening: yes.',
     });
     expect(fake.inserts[1]?.values).not.toMatchObject({
       text: expect.stringContaining('towards:BP6'),

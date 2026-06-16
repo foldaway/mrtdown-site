@@ -513,6 +513,9 @@ Exit criteria:
 - 2026-06-16: Continued public report API contract hardening by rejecting
   explicit unknown-direction markers outside on-train reports, keeping line and
   station reports aligned with the public form's implicit no-direction path.
+- 2026-06-17: Continued public report API contract hardening by rejecting
+  structured direction-station submissions outside on-train reports, matching
+  the public form's train-only direction picker.
 
 ## Decision Log
 
