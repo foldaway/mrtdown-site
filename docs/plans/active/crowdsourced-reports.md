@@ -522,6 +522,10 @@ Exit criteria:
 - 2026-06-17: Cleaned the extracted report message catalog after removing
   public free-text notes and `Other` direction inputs, so localized report
   strings match the structured automated flow.
+- 2026-06-17: Added regression coverage for the public report form option
+  assembly by extracting the service-revision direction, station-code, and
+  affected-stop path derivation into a pure helper while keeping the server
+  function behavior unchanged.
 
 ## Decision Log
 

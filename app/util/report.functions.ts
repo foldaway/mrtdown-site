@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import type { Translations } from '@mrtdown/core';
 import { createServerFn } from '@tanstack/react-start';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { DateTime } from 'luxon';
@@ -17,98 +18,67 @@ import {
 } from './crowdReportFeatureFlag';
 import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
-export const getCrowdReportFormOptionsFn = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  if (
-    !isCrowdReportsFeatureEnabled(env as CrowdReportFeatureEnv, {
-      isLocalDev: import.meta.env.DEV,
-    })
-  ) {
-    throw new Response('Not Found', {
-      status: 404,
-      statusText: 'Not Found',
-    });
-  }
+type CrowdReportFormLineRow = {
+  id: string;
+  name: Translations;
+  color: string;
+};
 
-  const db = getDb();
-  const referenceDate =
-    DateTime.now().setZone('Asia/Singapore').toISODate() ??
-    new Date().toISOString().slice(0, 10);
-  const [
-    lines,
-    stations,
-    stationCodes,
-    services,
-    serviceRevisionsWithPathRows,
-  ] = await Promise.all([
-    db
-      .select({
-        id: linesTable.id,
-        name: linesTable.name,
-        color: linesTable.color,
-      })
-      .from(linesTable)
-      .orderBy(asc(linesTable.id)),
-    db
-      .select({
-        id: stationsTable.id,
-        name: stationsTable.name,
-      })
-      .from(stationsTable)
-      .orderBy(asc(stationsTable.id)),
-    db
-      .select({
-        lineId: stationCodesTable.line_id,
-        stationId: stationCodesTable.station_id,
-        code: stationCodesTable.code,
-      })
-      .from(stationCodesTable)
-      .orderBy(asc(stationCodesTable.code)),
-    db
-      .select({
-        id: servicesTable.id,
-        lineId: servicesTable.line_id,
-      })
-      .from(servicesTable)
-      .orderBy(asc(servicesTable.id)),
-    db
-      .select({
-        id: serviceRevisionsTable.id,
-        serviceId: serviceRevisionsTable.service_id,
-        start_at: serviceRevisionsTable.start_at,
-        end_at: serviceRevisionsTable.end_at,
-        updated_at: serviceRevisionsTable.updated_at,
-      })
-      .from(serviceRevisionsTable)
-      .innerJoin(
-        serviceRevisionPathStationEntriesTable,
-        and(
-          eq(
-            serviceRevisionPathStationEntriesTable.service_revision_id,
-            serviceRevisionsTable.id,
-          ),
-          eq(
-            serviceRevisionPathStationEntriesTable.service_id,
-            serviceRevisionsTable.service_id,
-          ),
-        ),
-      )
-      .orderBy(serviceRevisionsTable.service_id, serviceRevisionsTable.id),
-  ]);
+type CrowdReportFormStationRow = {
+  id: string;
+  name: Translations;
+};
 
+type CrowdReportFormStationCodeRow = {
+  lineId: string;
+  stationId: string;
+  code: string;
+};
+
+type CrowdReportFormServiceRow = {
+  id: string;
+  lineId: string;
+};
+
+type CrowdReportFormServiceRevisionRow = {
+  id: string;
+  serviceId: string;
+  start_at: string | null;
+  end_at: string | null;
+  updated_at: Date | string;
+};
+
+type CrowdReportFormPathEntryRow = {
+  serviceRevisionId: string;
+  serviceId: string;
+  stationId: string;
+  pathIndex: number;
+};
+
+type BuildCrowdReportFormOptionsInput = {
+  referenceDate: string;
+  lines: CrowdReportFormLineRow[];
+  stations: CrowdReportFormStationRow[];
+  stationCodes: CrowdReportFormStationCodeRow[];
+  services: CrowdReportFormServiceRow[];
+  serviceRevisions: CrowdReportFormServiceRevisionRow[];
+  servicePathEntries: CrowdReportFormPathEntryRow[];
+};
+
+export function buildCrowdReportFormOptions({
+  referenceDate,
+  lines,
+  stations,
+  stationCodes,
+  services,
+  serviceRevisions,
+  servicePathEntries,
+}: BuildCrowdReportFormOptionsInput) {
   const stationById = Object.fromEntries(
     stations.map((station) => [station.id, station]),
   );
-  const serviceRevisionByKey = new Map<
-    string,
-    (typeof serviceRevisionsWithPathRows)[number]
-  >();
-  for (const revision of serviceRevisionsWithPathRows) {
-    serviceRevisionByKey.set(`${revision.serviceId}::${revision.id}`, revision);
-  }
-  const revisionsByServiceId = Array.from(serviceRevisionByKey.values()).reduce<
-    Record<string, (typeof serviceRevisionsWithPathRows)[number][]>
+  const revisionsByServiceId = serviceRevisions.reduce<
+    Record<string, CrowdReportFormServiceRevisionRow[]>
   >((acc, revision) => {
     acc[revision.serviceId] ??= [];
     acc[revision.serviceId].push(revision);
@@ -126,39 +96,13 @@ export const getCrowdReportFormOptionsFn = createServerFn({
       .filter(
         (
           entry,
-        ): entry is readonly [
-          string,
-          (typeof serviceRevisionsWithPathRows)[number],
-        ] => entry != null,
+        ): entry is readonly [string, CrowdReportFormServiceRevisionRow] =>
+          entry != null,
       ),
   );
 
-  const latestRevisionIds = [
-    ...new Set(
-      Object.values(latestRevisionByServiceId).map((revision) => revision.id),
-    ),
-  ];
-  const servicePathEntries =
-    latestRevisionIds.length > 0
-      ? await db
-          .select({
-            serviceRevisionId:
-              serviceRevisionPathStationEntriesTable.service_revision_id,
-            serviceId: serviceRevisionPathStationEntriesTable.service_id,
-            stationId: serviceRevisionPathStationEntriesTable.station_id,
-            pathIndex: serviceRevisionPathStationEntriesTable.path_index,
-          })
-          .from(serviceRevisionPathStationEntriesTable)
-          .where(
-            inArray(
-              serviceRevisionPathStationEntriesTable.service_revision_id,
-              latestRevisionIds,
-            ),
-          )
-      : [];
-
   const servicePathEntriesByRevisionKey = servicePathEntries.reduce<
-    Record<string, typeof servicePathEntries>
+    Record<string, CrowdReportFormPathEntryRow[]>
   >((acc, entry) => {
     const key = `${entry.serviceRevisionId}::${entry.serviceId}`;
     acc[key] ??= [];
@@ -168,7 +112,7 @@ export const getCrowdReportFormOptionsFn = createServerFn({
 
   const directionsByLineId: Record<
     string,
-    Array<{ stationId: string; name: (typeof stations)[number]['name'] }>
+    Array<{ stationId: string; name: CrowdReportFormStationRow['name'] }>
   > = {};
   const directionKeysByLineId: Record<string, Set<string>> = {};
   const stationPathsByLineId: Record<string, string[][]> = {};
@@ -275,4 +219,140 @@ export const getCrowdReportFormOptionsFn = createServerFn({
       lineIds: stationLineIdsByStationId[station.id] ?? [],
     })),
   };
+}
+
+export const getCrowdReportFormOptionsFn = createServerFn({
+  method: 'GET',
+}).handler(async () => {
+  if (
+    !isCrowdReportsFeatureEnabled(env as CrowdReportFeatureEnv, {
+      isLocalDev: import.meta.env.DEV,
+    })
+  ) {
+    throw new Response('Not Found', {
+      status: 404,
+      statusText: 'Not Found',
+    });
+  }
+
+  const db = getDb();
+  const referenceDate =
+    DateTime.now().setZone('Asia/Singapore').toISODate() ??
+    new Date().toISOString().slice(0, 10);
+  const [
+    lines,
+    stations,
+    stationCodes,
+    services,
+    serviceRevisionsWithPathRows,
+  ] = await Promise.all([
+    db
+      .select({
+        id: linesTable.id,
+        name: linesTable.name,
+        color: linesTable.color,
+      })
+      .from(linesTable)
+      .orderBy(asc(linesTable.id)),
+    db
+      .select({
+        id: stationsTable.id,
+        name: stationsTable.name,
+      })
+      .from(stationsTable)
+      .orderBy(asc(stationsTable.id)),
+    db
+      .select({
+        lineId: stationCodesTable.line_id,
+        stationId: stationCodesTable.station_id,
+        code: stationCodesTable.code,
+      })
+      .from(stationCodesTable)
+      .orderBy(asc(stationCodesTable.code)),
+    db
+      .select({
+        id: servicesTable.id,
+        lineId: servicesTable.line_id,
+      })
+      .from(servicesTable)
+      .orderBy(asc(servicesTable.id)),
+    db
+      .select({
+        id: serviceRevisionsTable.id,
+        serviceId: serviceRevisionsTable.service_id,
+        start_at: serviceRevisionsTable.start_at,
+        end_at: serviceRevisionsTable.end_at,
+        updated_at: serviceRevisionsTable.updated_at,
+      })
+      .from(serviceRevisionsTable)
+      .innerJoin(
+        serviceRevisionPathStationEntriesTable,
+        and(
+          eq(
+            serviceRevisionPathStationEntriesTable.service_revision_id,
+            serviceRevisionsTable.id,
+          ),
+          eq(
+            serviceRevisionPathStationEntriesTable.service_id,
+            serviceRevisionsTable.service_id,
+          ),
+        ),
+      )
+      .orderBy(serviceRevisionsTable.service_id, serviceRevisionsTable.id),
+  ]);
+
+  const serviceRevisionByKey = new Map<
+    string,
+    (typeof serviceRevisionsWithPathRows)[number]
+  >();
+  for (const revision of serviceRevisionsWithPathRows) {
+    serviceRevisionByKey.set(`${revision.serviceId}::${revision.id}`, revision);
+  }
+  const serviceRevisions = Array.from(serviceRevisionByKey.values());
+  const revisionsByServiceId = serviceRevisions.reduce<
+    Record<string, typeof serviceRevisions>
+  >((acc, revision) => {
+    acc[revision.serviceId] ??= [];
+    acc[revision.serviceId].push(revision);
+    return acc;
+  }, {});
+  const selectedServiceRevisions = Object.values(revisionsByServiceId)
+    .map((revisions) =>
+      selectServiceRevisionForReferenceDate(revisions, referenceDate),
+    )
+    .filter((revision): revision is (typeof serviceRevisions)[number] => {
+      return revision != null;
+    });
+
+  const latestRevisionIds = [
+    ...new Set(selectedServiceRevisions.map((revision) => revision.id)),
+  ];
+  const servicePathEntries =
+    latestRevisionIds.length > 0
+      ? await db
+          .select({
+            serviceRevisionId:
+              serviceRevisionPathStationEntriesTable.service_revision_id,
+            serviceId: serviceRevisionPathStationEntriesTable.service_id,
+            stationId: serviceRevisionPathStationEntriesTable.station_id,
+            pathIndex: serviceRevisionPathStationEntriesTable.path_index,
+          })
+          .from(serviceRevisionPathStationEntriesTable)
+          .where(
+            inArray(
+              serviceRevisionPathStationEntriesTable.service_revision_id,
+              latestRevisionIds,
+            ),
+          )
+      : [];
+
+  return buildCrowdReportFormOptions({
+    referenceDate,
+    lines,
+    stations,
+    stationCodes,
+    services,
+    serviceRevisions,
+    servicePathEntries,
+  });
 });
