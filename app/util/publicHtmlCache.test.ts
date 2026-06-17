@@ -30,6 +30,8 @@ describe('public HTML cache headers', () => {
     '/zh-Hans/statistics',
     '/history',
     '/history/2025',
+    '/community-reports/cluster/cluster-1',
+    '/zh-Hans/community-reports/report/report-1',
     '/lines/EWL',
     '/operators/SMRT',
     '/stations/NS1',
