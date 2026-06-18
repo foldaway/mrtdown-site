@@ -13,6 +13,7 @@ import {
   createIntl,
   defineMessages,
   FormattedDate,
+  FormattedList,
   FormattedMessage,
   type MessageDescriptor,
   useIntl,
@@ -72,7 +73,9 @@ export const Route = createFileRoute(
     const { kind, sourceId, lang = 'en-SG' } = ctx.params;
     assert(ctx.loaderData != null);
     const source = ctx.loaderData;
-    const { default: messages } = await import(`../../../../lang/${lang}.json`);
+    const { default: messages } = await import(
+      `../../../../../lang/${lang}.json`
+    );
     const intl = createIntl({ locale: lang, messages });
     const rootUrl = import.meta.env.VITE_ROOT_URL;
     assert(rootUrl != null, 'VITE_ROOT_URL is not set');
@@ -265,6 +268,7 @@ function CommunityReportSourcePage() {
                 end: (
                   <FormattedDate
                     value={source.observedEndAt}
+                    dateStyle="medium"
                     timeStyle="short"
                   />
                 ),
@@ -341,11 +345,12 @@ function CommunityReportSourcePage() {
           </div>
           {source.stations.length > 0 ? (
             <p className="mt-3 text-gray-800 text-sm leading-6 dark:text-gray-200">
-              {source.stations
-                .map((station) =>
+              <FormattedList
+                type="unit"
+                value={source.stations.map((station) =>
                   getLocalizedTranslation(station.name, intl.locale),
-                )
-                .join(', ')}
+                )}
+              />
             </p>
           ) : (
             <p className="mt-3 text-gray-500 text-sm dark:text-gray-400">

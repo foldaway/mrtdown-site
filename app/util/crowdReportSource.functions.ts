@@ -87,7 +87,6 @@ async function getClusterSource(
     .select({
       id: crowdReportClustersTable.id,
       effect: crowdReportClustersTable.effect,
-      reportCount: crowdReportClustersTable.report_count,
       status: crowdReportClustersTable.status,
       windowStartAt: crowdReportClustersTable.window_start_at,
       windowEndAt: crowdReportClustersTable.window_end_at,
@@ -150,10 +149,15 @@ async function getClusterSource(
             'duplicate',
             'dispatched',
           ]),
+          eq(crowdReportsTable.still_happening, true),
         ),
       )
       .orderBy(desc(crowdReportsTable.observed_at)),
   ]);
+
+  if (reports.length === 0) {
+    return null;
+  }
 
   const representative = reports[0];
   const observedValues = reports.map((report) => report.observedAt);
@@ -163,7 +167,7 @@ async function getClusterSource(
     id: cluster.id,
     status: cluster.status as CrowdReportSourceStatus,
     effect: cluster.effect,
-    reportCount: Math.max(cluster.reportCount, reports.length),
+    reportCount: reports.length,
     observedStartAt:
       observedValues.length > 0
         ? observedValues.reduce((earliest, value) =>
