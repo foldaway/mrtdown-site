@@ -36,8 +36,9 @@ Configure `CROWD_REPORT_DISPATCH_GITHUB_TOKEN` as a deployed secret. Optional
 overrides are `CROWD_REPORT_DISPATCH_GITHUB_OWNER`,
 `CROWD_REPORT_DISPATCH_GITHUB_REPO`, and
 `CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE`. The canonical evidence source URL is
-built from `VITE_ROOT_URL`. Send `{ "dryRun": true }` to the endpoint to inspect
-pending payloads without calling GitHub or mutating report state.
+built from `VITE_ROOT_URL` as a stable `/community-reports/{kind}/{id}`
+permalink. Send `{ "dryRun": true }` to the endpoint to inspect pending payloads
+without calling GitHub or mutating report state.
 
 The existing six-hourly scheduled cron also invokes the same dispatch path when
 `CROWD_REPORT_DISPATCH_GITHUB_TOKEN` is configured. Use

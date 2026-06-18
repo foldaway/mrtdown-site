@@ -526,6 +526,10 @@ Exit criteria:
   assembly by extracting the service-revision direction, station-code, and
   affected-stop path derivation into a pure helper while keeping the server
   function behavior unchanged.
+- 2026-06-18: Added stable `/community-reports/{kind}/{id}` evidence
+  permalinks for accepted or dispatched crowd report sources, and changed
+  canonical ingest dispatch payload URLs to point at those read-only public
+  source pages instead of the public report submission form.
 
 ## Decision Log
 

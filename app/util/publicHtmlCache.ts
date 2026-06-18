@@ -5,6 +5,7 @@ const PUBLIC_HTML_CACHE_NAME = 'mrtdown-public-html';
 const HTML_CONTENT_TYPES = ['text/html', 'application/xhtml+xml'];
 
 const CACHEABLE_ROUTE_PREFIXES = [
+  '/community-reports/',
   '/history/',
   '/lines/',
   '/operators/',

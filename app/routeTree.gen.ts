@@ -34,6 +34,7 @@ import { Route as Char123LangChar125IssuesIssueIdIndexRouteImport } from './rout
 import { Route as Char123LangChar125HistoryYearIndexRouteImport } from './routes/{-$lang}/history/$year/index'
 import { Route as Char123LangChar125HistoryPagePageNumRouteImport } from './routes/{-$lang}/history/page.$pageNum'
 import { Route as Char123LangChar125HistoryYearMonthRouteImport } from './routes/{-$lang}/history/$year/$month'
+import { Route as Char123LangChar125CommunityReportsKindSourceIdRouteImport } from './routes/{-$lang}/community-reports/$kind/$sourceId'
 import { Route as InternalApiTasksPullRouteImport } from './routes/internal.api.tasks.pull'
 import { Route as InternalApiTasksPublicHolidaysRouteImport } from './routes/internal.api.tasks.public-holidays'
 import { Route as InternalApiTasksFactsRouteImport } from './routes/internal.api.tasks.facts'
@@ -179,6 +180,12 @@ const Char123LangChar125HistoryYearMonthRoute =
     path: '/history/$year/$month',
     getParentRoute: () => Char123LangChar125Route,
   } as any)
+const Char123LangChar125CommunityReportsKindSourceIdRoute =
+  Char123LangChar125CommunityReportsKindSourceIdRouteImport.update({
+    id: '/community-reports/$kind/$sourceId',
+    path: '/community-reports/$kind/$sourceId',
+    getParentRoute: () => Char123LangChar125Route,
+  } as any)
 const InternalApiTasksPullRoute = InternalApiTasksPullRouteImport.update({
   id: '/internal/api/tasks/pull',
   path: '/internal/api/tasks/pull',
@@ -226,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
+  '/{-$lang}/community-reports/$kind/$sourceId': typeof Char123LangChar125CommunityReportsKindSourceIdRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
   '/{-$lang}/history/$year/': typeof Char123LangChar125HistoryYearIndexRoute
@@ -256,6 +264,7 @@ export interface FileRoutesByTo {
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
+  '/{-$lang}/community-reports/$kind/$sourceId': typeof Char123LangChar125CommunityReportsKindSourceIdRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
   '/{-$lang}/history/$year': typeof Char123LangChar125HistoryYearIndexRoute
@@ -288,6 +297,7 @@ export interface FileRoutesById {
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
+  '/{-$lang}/community-reports/$kind/$sourceId': typeof Char123LangChar125CommunityReportsKindSourceIdRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
   '/{-$lang}/history/$year/': typeof Char123LangChar125HistoryYearIndexRoute
@@ -321,6 +331,7 @@ export interface FileRouteTypes {
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
+    | '/{-$lang}/community-reports/$kind/$sourceId'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
     | '/{-$lang}/history/$year/'
@@ -351,6 +362,7 @@ export interface FileRouteTypes {
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
+    | '/{-$lang}/community-reports/$kind/$sourceId'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
     | '/{-$lang}/history/$year'
@@ -382,6 +394,7 @@ export interface FileRouteTypes {
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
+    | '/{-$lang}/community-reports/$kind/$sourceId'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
     | '/{-$lang}/history/$year/'
@@ -584,6 +597,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char123LangChar125HistoryYearMonthRouteImport
       parentRoute: typeof Char123LangChar125Route
     }
+    '/{-$lang}/community-reports/$kind/$sourceId': {
+      id: '/{-$lang}/community-reports/$kind/$sourceId'
+      path: '/community-reports/$kind/$sourceId'
+      fullPath: '/{-$lang}/community-reports/$kind/$sourceId'
+      preLoaderRoute: typeof Char123LangChar125CommunityReportsKindSourceIdRouteImport
+      parentRoute: typeof Char123LangChar125Route
+    }
     '/internal/api/tasks/pull': {
       id: '/internal/api/tasks/pull'
       path: '/internal/api/tasks/pull'
@@ -625,6 +645,7 @@ interface Char123LangChar125RouteChildren {
   Char123LangChar125StatusLineIdRoute: typeof Char123LangChar125StatusLineIdRoute
   Char123LangChar125HistoryIndexRoute: typeof Char123LangChar125HistoryIndexRoute
   Char123LangChar125StatisticsIndexRoute: typeof Char123LangChar125StatisticsIndexRoute
+  Char123LangChar125CommunityReportsKindSourceIdRoute: typeof Char123LangChar125CommunityReportsKindSourceIdRoute
   Char123LangChar125HistoryYearMonthRoute: typeof Char123LangChar125HistoryYearMonthRoute
   Char123LangChar125HistoryPagePageNumRoute: typeof Char123LangChar125HistoryPagePageNumRoute
   Char123LangChar125HistoryYearIndexRoute: typeof Char123LangChar125HistoryYearIndexRoute
@@ -645,6 +666,8 @@ const Char123LangChar125RouteChildren: Char123LangChar125RouteChildren = {
   Char123LangChar125HistoryIndexRoute: Char123LangChar125HistoryIndexRoute,
   Char123LangChar125StatisticsIndexRoute:
     Char123LangChar125StatisticsIndexRoute,
+  Char123LangChar125CommunityReportsKindSourceIdRoute:
+    Char123LangChar125CommunityReportsKindSourceIdRoute,
   Char123LangChar125HistoryYearMonthRoute:
     Char123LangChar125HistoryYearMonthRoute,
   Char123LangChar125HistoryPagePageNumRoute:

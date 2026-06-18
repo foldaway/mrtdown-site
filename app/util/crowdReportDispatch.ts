@@ -156,8 +156,10 @@ export function buildCrowdReportSourceUrl(
   kind: CrowdReportDispatchKind,
   id: string,
 ) {
-  const url = new URL('/report', rootUrl);
-  url.searchParams.set('communitySource', `${kind}:${id}`);
+  const url = new URL(
+    `/community-reports/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`,
+    rootUrl,
+  );
   return url.toString();
 }
 

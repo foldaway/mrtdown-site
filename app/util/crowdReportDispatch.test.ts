@@ -280,7 +280,7 @@ describe('buildCrowdReportIngestPayload', () => {
       effect: 'delay',
       delayMinutes: 10,
       reportCount: 3,
-      url: 'https://mrtdown.example/report?communitySource=cluster%3Acluster-1',
+      url: 'https://mrtdown.example/community-reports/cluster/cluster-1',
     });
     expect(candidate.payload.content[0]).not.toHaveProperty('ipHash');
     expect(candidate.payload.content[0]).not.toHaveProperty(
@@ -352,7 +352,7 @@ describe('buildCrowdReportSourceUrl', () => {
   it('uses a stable public report URL with a non-PII community source id', () => {
     expect(
       buildCrowdReportSourceUrl('https://mrtdown.example', 'report', 'r1'),
-    ).toBe('https://mrtdown.example/report?communitySource=report%3Ar1');
+    ).toBe('https://mrtdown.example/community-reports/report/r1');
   });
 });
 
@@ -427,7 +427,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
               observedAt: '2026-05-24T12:30:00.000+08:00',
               lineIds: ['BPLRT'],
               reportCount: 2,
-              url: 'https://mrtdown.example/report?communitySource=cluster%3Acluster-1',
+              url: 'https://mrtdown.example/community-reports/cluster/cluster-1',
             },
           ],
         }),
@@ -474,7 +474,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
                 observedAt: '2026-05-24T12:30:00.000+08:00',
                 lineIds: ['BPLRT'],
                 reportCount: 1,
-                url: 'https://mrtdown.example/report?communitySource=cluster%3Acluster-1',
+                url: 'https://mrtdown.example/community-reports/cluster/cluster-1',
               },
             ],
           }),
@@ -510,7 +510,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
                   observedAt: '2026-05-24T12:30:00.000+08:00',
                   lineIds: ['BPLRT'],
                   reportCount: 2,
-                  url: 'https://mrtdown.example/report?communitySource=cluster%3Acluster-1',
+                  url: 'https://mrtdown.example/community-reports/cluster/cluster-1',
                 },
               ],
             }),
@@ -564,7 +564,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
                     observedAt: '2026-05-24T12:30:00.000+08:00',
                     lineIds: ['BPLRT'],
                     reportCount: 1,
-                    url: 'https://mrtdown.example/report?communitySource=cluster%3Acluster-1',
+                    url: 'https://mrtdown.example/community-reports/cluster/cluster-1',
                   },
                 ],
               }),
@@ -610,7 +610,7 @@ describe('dispatchCrowdReportPayloadToGitHub', () => {
           observedAt: '2026-05-24T12:30:00.000+08:00',
           lineIds: ['BPLRT'],
           reportCount: 1,
-          url: 'https://mrtdown.example/report?communitySource=report%3Areport-1',
+          url: 'https://mrtdown.example/community-reports/report/report-1',
         },
       ],
     });
@@ -660,7 +660,7 @@ describe('dispatchCrowdReportPayloadToGitHub', () => {
           observedAt: '2026-05-24T12:30:00.000+08:00',
           lineIds: ['BPLRT'],
           reportCount: 1,
-          url: 'https://mrtdown.example/report?communitySource=report%3Areport-1',
+          url: 'https://mrtdown.example/community-reports/report/report-1',
         },
       ],
     });
@@ -691,7 +691,7 @@ describe('dispatchCrowdReportPayloadToGitHub', () => {
           observedAt: '2026-05-24T12:30:00.000+08:00',
           lineIds: ['BPLRT'],
           reportCount: 1,
-          url: 'https://mrtdown.example/report?communitySource=report%3Areport-1',
+          url: 'https://mrtdown.example/community-reports/report/report-1',
         },
       ],
     });
