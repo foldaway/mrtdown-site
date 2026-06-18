@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import type React from 'react';
+import { useHydrated } from '~/hooks/useHydrated';
 
 interface DeferredViewportWidgetProps {
   children: React.ReactNode;
@@ -10,7 +11,9 @@ interface DeferredViewportWidgetProps {
 
 export function DeferredViewportWidget(props: DeferredViewportWidgetProps) {
   const { children, className, fallback, rootMargin = '600px 0px' } = props;
-  const [shouldRender, setShouldRender] = useState(false);
+  const isHydrated = useHydrated();
+  // SSR and the matching hydration pass should emit real content for crawlers.
+  const [shouldRender, setShouldRender] = useState(() => !isHydrated);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
