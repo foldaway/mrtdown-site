@@ -530,6 +530,9 @@ Exit criteria:
   permalinks for accepted or dispatched crowd report sources, and changed
   canonical ingest dispatch payload URLs to point at those read-only public
   source pages instead of the public report submission form.
+- 2026-06-19: Added regression coverage for community-report evidence
+  permalinks so single-report sources must remain unclustered and tied to a
+  persisted line or station scope before they are publicly linkable.
 
 ## Decision Log
 
