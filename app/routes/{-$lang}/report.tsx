@@ -652,6 +652,23 @@ function ReportPage() {
     if (scope === 'line') {
       setSelectedStationIds([]);
       setStationSearch('');
+      return;
+    }
+
+    if (scope === 'station') {
+      setSelectedLineIds((current) => {
+        if (selectedStation == null) {
+          return [];
+        }
+        return current.filter((lineId) =>
+          selectedStation.lineIds.includes(lineId),
+        );
+      });
+      return;
+    }
+
+    if (scope === 'train') {
+      setSelectedLineIds((current) => (current.length === 1 ? current : []));
     }
   };
 
