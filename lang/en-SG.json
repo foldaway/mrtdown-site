@@ -189,7 +189,7 @@
   "operator.website": "Visit website",
   "operator.years_of_operation": "Years of Operation",
   "operator.years_of_operation_display": "{years, plural, one {# year} other {# years}} of operation",
-  "report.additional_lines": "Additional lines",
+  "report.additional_lines": "Use a different line",
   "report.affected_stop_from": "From station",
   "report.affected_stop_search_placeholder": "Search by station name or code",
   "report.affected_stop_search_hint": "Search when you want to add a specific stop or range.",

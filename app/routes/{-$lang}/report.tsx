@@ -1381,7 +1381,7 @@ function ReportPage() {
                   <summary className="cursor-pointer font-medium text-gray-700 text-sm dark:text-gray-200">
                     <FormattedMessage
                       id="report.additional_lines"
-                      defaultMessage="Additional lines"
+                      defaultMessage="Use a different line"
                     />
                   </summary>
                   <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
