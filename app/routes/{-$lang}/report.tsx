@@ -645,6 +645,16 @@ function ReportPage() {
     setSelectedStationIds([]);
   };
 
+  const chooseReportScope = (scope: ReportScope) => {
+    clearFieldError('scope');
+    setReportScope(scope);
+
+    if (scope === 'line') {
+      setSelectedStationIds([]);
+      setStationSearch('');
+    }
+  };
+
   const resetTurnstile = () => {
     setTurnstileToken('');
     window.turnstile?.reset(turnstileWidgetIdRef.current);
@@ -1173,10 +1183,7 @@ function ReportPage() {
                 <button
                   key={scope}
                   type="button"
-                  onClick={() => {
-                    clearFieldError('scope');
-                    setReportScope(scope);
-                  }}
+                  onClick={() => chooseReportScope(scope)}
                   className={classNames(
                     'min-h-24 rounded-lg border p-3 text-start transition-colors focus:outline-none focus:ring-2 focus:ring-accent-light/30',
                     selected
