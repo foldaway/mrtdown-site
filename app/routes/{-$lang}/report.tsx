@@ -1253,10 +1253,17 @@ function ReportPage() {
           <section className="flex flex-col gap-3">
             <div>
               <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                <FormattedMessage
-                  id="report.station"
-                  defaultMessage="Affected station"
-                />
+                {reportScope === 'train' ? (
+                  <FormattedMessage
+                    id="report.train_station"
+                    defaultMessage="Next station or destination"
+                  />
+                ) : (
+                  <FormattedMessage
+                    id="report.station"
+                    defaultMessage="Affected station"
+                  />
+                )}
               </span>
               {reportScope === 'train' && (
                 <span className="ms-2 text-gray-500 text-xs dark:text-gray-400">
@@ -1284,10 +1291,17 @@ function ReportPage() {
             )}
             <label className="relative">
               <span className="sr-only">
-                <FormattedMessage
-                  id="report.station_search"
-                  defaultMessage="Search station"
-                />
+                {reportScope === 'train' ? (
+                  <FormattedMessage
+                    id="report.train_station_search"
+                    defaultMessage="Search next station or destination"
+                  />
+                ) : (
+                  <FormattedMessage
+                    id="report.station_search"
+                    defaultMessage="Search station"
+                  />
+                )}
               </span>
               <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-gray-400" />
               <input
@@ -1299,8 +1313,14 @@ function ReportPage() {
                   setStationSearch(event.target.value);
                 }}
                 placeholder={intl.formatMessage({
-                  id: 'report.station_search_placeholder',
-                  defaultMessage: 'Search by station name or code',
+                  id:
+                    reportScope === 'train'
+                      ? 'report.train_station_search_placeholder'
+                      : 'report.station_search_placeholder',
+                  defaultMessage:
+                    reportScope === 'train'
+                      ? 'Search by next station, destination, or code'
+                      : 'Search by station name or code',
                 })}
                 aria-invalid={fieldErrors.station != null}
                 aria-describedby={
@@ -1334,8 +1354,16 @@ function ReportPage() {
             {stationSearchQuery.length === 0 && selectedStation == null && (
               <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
                 <FormattedMessage
-                  id="report.station_search_hint"
-                  defaultMessage="Start typing a station name or station code."
+                  id={
+                    reportScope === 'train'
+                      ? 'report.train_station_search_hint'
+                      : 'report.station_search_hint'
+                  }
+                  defaultMessage={
+                    reportScope === 'train'
+                      ? 'Add this only if it helps describe where you are headed.'
+                      : 'Start typing a station name or station code.'
+                  }
                 />
               </p>
             )}
