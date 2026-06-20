@@ -5,6 +5,7 @@ import {
   ClockIcon,
   ExclamationTriangleIcon,
   ForwardIcon,
+  InformationCircleIcon,
   MagnifyingGlassIcon,
   MapIcon,
   MapPinIcon,
@@ -362,6 +363,8 @@ function ReportPage() {
   const selectedStation = selectedStationIds[0]
     ? stationById[selectedStationIds[0]]
     : undefined;
+  const selectedStationLineIds =
+    selectedStation?.lineIds.filter((lineId) => lineById[lineId] != null) ?? [];
   const rangeStartStation = rangeStartStationId
     ? stationById[rangeStartStationId]
     : undefined;
@@ -440,6 +443,16 @@ function ReportPage() {
     () => [...new Set([...selectedStationIds, ...affectedStopStationIds])],
     [affectedStopStationIds, selectedStationIds],
   );
+  const stationSearchQuery = stationSearch.trim();
+  const primaryContextComplete =
+    reportScope === 'line'
+      ? selectedLineIds.length > 0
+      : reportScope === 'station'
+        ? selectedStationIds.length > 0 &&
+          (selectedStationLineIds.length <= 1 || selectedLineIds.length > 0)
+        : reportScope === 'train'
+          ? selectedLineIds.length > 0 && directionChoice.length > 0
+          : false;
   const getStationSearchResults = (
     searchValue: string,
     filterLineIds?: string[],
@@ -686,6 +699,19 @@ function ReportPage() {
       return;
     }
 
+    if (
+      reportScope === 'station' &&
+      selectedStationLineIds.length > 1 &&
+      selectedLineIds.length === 0
+    ) {
+      const message = intl.formatMessage({
+        id: 'report.error.station_line_required',
+        defaultMessage: 'Select the affected line at this interchange.',
+      });
+      showFieldError('line', message, 'station_line_required');
+      return;
+    }
+
     if (reportScope === 'train' && selectedLineIds.length === 0) {
       const message = intl.formatMessage({
         id: 'report.error.train_line_required',
@@ -893,8 +919,6 @@ function ReportPage() {
     setSubmitState('idle');
   };
 
-  const selectedStationLineIds =
-    selectedStation?.lineIds.filter((lineId) => lineById[lineId] != null) ?? [];
   const allLineIds = lines.map((line) => line.id);
   const primaryLineIds =
     selectedStationLineIds.length > 0 ? selectedStationLineIds : allLineIds;
@@ -1011,7 +1035,7 @@ function ReportPage() {
           className="w-full rounded-lg border border-gray-300 bg-white py-2 pr-3 pl-9 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
         />
       </label>
-      {(searchValue || selectedStation == null) && (
+      {searchValue.trim().length > 0 && (
         <div className="grid gap-2">
           {getStationSearchResults(searchValue, filterLineIds).map(
             (station) => (
@@ -1026,6 +1050,14 @@ function ReportPage() {
             ),
           )}
         </div>
+      )}
+      {searchValue.trim().length === 0 && selectedStation == null && (
+        <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+          <FormattedMessage
+            id="report.affected_stop_search_hint"
+            defaultMessage="Search when you want to add a specific stop or range."
+          />
+        </p>
       )}
     </div>
   );
@@ -1285,7 +1317,7 @@ function ReportPage() {
                 {fieldErrors.station}
               </p>
             )}
-            {(stationSearch || selectedStation == null) && (
+            {stationSearchQuery.length > 0 && (
               <div className="grid gap-2 sm:grid-cols-2">
                 {stationSearchResults.map((station) => (
                   <button
@@ -1298,6 +1330,14 @@ function ReportPage() {
                   </button>
                 ))}
               </div>
+            )}
+            {stationSearchQuery.length === 0 && selectedStation == null && (
+              <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+                <FormattedMessage
+                  id="report.station_search_hint"
+                  defaultMessage="Start typing a station name or station code."
+                />
+              </p>
             )}
           </section>
         )}
@@ -1360,48 +1400,62 @@ function ReportPage() {
             </section>
           )}
 
-        <section className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
-          <div
-            className="flex flex-col gap-2"
-            ref={effectRef}
-            tabIndex={-1}
-            aria-describedby={
-              fieldErrors.effect ? 'report-effect-error' : undefined
-            }
-          >
-            <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+        {reportScope && !primaryContextComplete && (
+          <section className="flex gap-3 rounded-lg border border-gray-300 border-dashed bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-900">
+            <InformationCircleIcon className="mt-0.5 size-5 shrink-0 text-gray-400" />
+            <p className="text-gray-600 leading-5 dark:text-gray-300">
               <FormattedMessage
-                id="report.effect"
-                defaultMessage="What is happening?"
+                id="report.primary_context_hint"
+                defaultMessage="Add the affected line, station, or train direction before choosing what is happening."
               />
-            </span>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {IngestContentCrowdReportEffects.map(renderEffectButton)}
+            </p>
+          </section>
+        )}
+
+        {primaryContextComplete && (
+          <section className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
+            <div
+              className="flex flex-col gap-2"
+              ref={effectRef}
+              tabIndex={-1}
+              aria-describedby={
+                fieldErrors.effect ? 'report-effect-error' : undefined
+              }
+            >
+              <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+                <FormattedMessage
+                  id="report.effect"
+                  defaultMessage="What is happening?"
+                />
+              </span>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {IngestContentCrowdReportEffects.map(renderEffectButton)}
+              </div>
+              {fieldErrors.effect != null && (
+                <p
+                  className="text-red-700 text-sm dark:text-red-300"
+                  id="report-effect-error"
+                >
+                  {fieldErrors.effect}
+                </p>
+              )}
             </div>
-            {fieldErrors.effect != null && (
-              <p
-                className="text-red-700 text-sm dark:text-red-300"
-                id="report-effect-error"
-              >
-                {fieldErrors.effect}
-              </p>
-            )}
-          </div>
-          <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-900">
-            <input
-              type="checkbox"
-              checked={isStillHappening}
-              onChange={(event) => setIsStillHappening(event.target.checked)}
-              className="mt-1 size-4"
-            />
-            <span className="text-gray-700 dark:text-gray-200">
-              <FormattedMessage
-                id="report.still_happening"
-                defaultMessage="This is still happening now"
+            <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-900">
+              <input
+                type="checkbox"
+                checked={isStillHappening}
+                onChange={(event) => setIsStillHappening(event.target.checked)}
+                className="mt-1 size-4"
               />
-            </span>
-          </label>
-        </section>
+              <span className="text-gray-700 dark:text-gray-200">
+                <FormattedMessage
+                  id="report.still_happening"
+                  defaultMessage="This is still happening now"
+                />
+              </span>
+            </label>
+          </section>
+        )}
 
         {supportsAffectedStopRange && (
           <section
@@ -1550,71 +1604,73 @@ function ReportPage() {
           </section>
         )}
 
-        <details className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
-          <summary className="cursor-pointer font-medium text-gray-700 text-sm dark:text-gray-200">
-            <FormattedMessage
-              id="report.more_details"
-              defaultMessage="More details"
-            />
-          </summary>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2">
-              <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                <FormattedMessage
-                  id="report.delay_minutes"
-                  defaultMessage="Estimated delay"
-                />
-              </span>
-              <input
-                type="number"
-                min={0}
-                max={180}
-                inputMode="numeric"
-                value={delayMinutes}
-                onChange={(event) => setDelayMinutes(event.target.value)}
-                placeholder={intl.formatMessage({
-                  id: 'report.delay_placeholder',
-                  defaultMessage: 'Minutes, if known',
-                })}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+        {primaryContextComplete && (
+          <details className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
+            <summary className="cursor-pointer font-medium text-gray-700 text-sm dark:text-gray-200">
+              <FormattedMessage
+                id="report.more_details"
+                defaultMessage="More details"
               />
-            </label>
-            <label className="flex flex-col gap-2">
-              <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                <FormattedMessage
-                  id="report.observed_at"
-                  defaultMessage="Observed time"
+            </summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+                  <FormattedMessage
+                    id="report.delay_minutes"
+                    defaultMessage="Estimated delay"
+                  />
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  max={180}
+                  inputMode="numeric"
+                  value={delayMinutes}
+                  onChange={(event) => setDelayMinutes(event.target.value)}
+                  placeholder={intl.formatMessage({
+                    id: 'report.delay_placeholder',
+                    defaultMessage: 'Minutes, if known',
+                  })}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
                 />
-              </span>
-              <input
-                ref={observedAtRef}
-                type="datetime-local"
-                value={observedAt}
-                max={toSgDatetimeLocal(DateTime.now().plus({ minutes: 15 }))}
-                onChange={(event) => {
-                  clearFieldError('observedAt');
-                  setObservedAt(event.target.value);
-                }}
-                aria-invalid={fieldErrors.observedAt != null}
-                aria-describedby={
-                  fieldErrors.observedAt
-                    ? 'report-observed-at-error'
-                    : undefined
-                }
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
-                required
-              />
-              {fieldErrors.observedAt != null && (
-                <p
-                  className="text-red-700 text-sm dark:text-red-300"
-                  id="report-observed-at-error"
-                >
-                  {fieldErrors.observedAt}
-                </p>
-              )}
-            </label>
-          </div>
-        </details>
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+                  <FormattedMessage
+                    id="report.observed_at"
+                    defaultMessage="Observed time"
+                  />
+                </span>
+                <input
+                  ref={observedAtRef}
+                  type="datetime-local"
+                  value={observedAt}
+                  max={toSgDatetimeLocal(DateTime.now().plus({ minutes: 15 }))}
+                  onChange={(event) => {
+                    clearFieldError('observedAt');
+                    setObservedAt(event.target.value);
+                  }}
+                  aria-invalid={fieldErrors.observedAt != null}
+                  aria-describedby={
+                    fieldErrors.observedAt
+                      ? 'report-observed-at-error'
+                      : undefined
+                  }
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+                  required
+                />
+                {fieldErrors.observedAt != null && (
+                  <p
+                    className="text-red-700 text-sm dark:text-red-300"
+                    id="report-observed-at-error"
+                  >
+                    {fieldErrors.observedAt}
+                  </p>
+                )}
+              </label>
+            </div>
+          </details>
+        )}
 
         {turnstileSiteKey && (
           <div
