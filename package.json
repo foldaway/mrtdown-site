@@ -67,7 +67,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.0.0",
-    "@cloudflare/vite-plugin": "^1.31.1",
+    "@cloudflare/vite-plugin": "^1.42.1",
     "@formatjs/cli": "^6.6.3",
     "@tailwindcss/vite": "^4.2.2",
     "@types/luxon": "^3.4.2",
@@ -84,6 +84,6 @@
     "vite": "^8.0.16",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.1.9",
-    "wrangler": "^4.81.0"
+    "wrangler": "^4.103.0"
   }
 }
