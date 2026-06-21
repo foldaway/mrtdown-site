@@ -19,8 +19,8 @@ import {
 } from '~/components/ProfileWidgetSkeletons';
 import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { buildSeoMetadata } from '~/helpers/seo';
 import type { Station } from '~/types';
 import { assert } from '~/util/assert';
 import type { LineBranch } from '~/util/db.queries';
@@ -117,11 +117,11 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
-    const ogUrl = new URL(
-      buildLocaleAwareLink(`/lines/${lineId}`, lang),
+    const seo = buildSeoMetadata({
+      path: `/lines/${lineId}`,
+      lang,
       rootUrl,
-    ).toString();
-    const ogImage = new URL('/og_image.png', rootUrl).toString();
+    });
 
     const { default: messages } = await import(
       `../../../../../lang/${lang}.json`
@@ -171,6 +171,7 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
         );
 
     return {
+      links: seo.links,
       meta: [
         {
           title,
@@ -193,11 +194,11 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
         },
         {
           property: 'og:url',
-          content: ogUrl,
+          content: seo.ogUrl,
         },
         {
           property: 'og:image',
-          content: ogImage,
+          content: seo.ogImage,
         },
         {
           'script:ld+json': {
@@ -228,7 +229,7 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
                 });
               }),
             },
-            url: ogUrl,
+            url: seo.ogUrl,
           },
         },
       ],

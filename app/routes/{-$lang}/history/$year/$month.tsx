@@ -16,7 +16,7 @@ import {
 } from 'react-intl';
 import { IssueCard } from '~/components/IssueCard';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { buildSeoMetadata } from '~/helpers/seo';
 import { useHydrated } from '~/hooks/useHydrated';
 import {
   getIssuesHistoryYearMonthFn,
@@ -77,13 +77,14 @@ export const Route = createFileRoute('/{-$lang}/history/$year/$month')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
-    const ogUrl = new URL(
-      buildLocaleAwareLink(`/history/${year}/${month}`, lang),
+    const seo = buildSeoMetadata({
+      path: `/history/${year}/${month}`,
+      lang,
       rootUrl,
-    ).toString();
-    const ogImage = new URL('/og_image.png', rootUrl).toString();
+    });
 
     return {
+      links: seo.links,
       meta: [
         {
           title,
@@ -106,11 +107,11 @@ export const Route = createFileRoute('/{-$lang}/history/$year/$month')({
         },
         {
           property: 'og:url',
-          content: ogUrl,
+          content: seo.ogUrl,
         },
         {
           property: 'og:image',
-          content: ogImage,
+          content: seo.ogImage,
         },
       ],
     };

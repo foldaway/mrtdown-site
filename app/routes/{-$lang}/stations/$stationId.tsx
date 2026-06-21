@@ -21,8 +21,8 @@ import { LineTypeLabels, StationStructureTypeLabels } from '~/constants';
 import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { buildSeoMetadata } from '~/helpers/seo';
 import { useHydrated } from '~/hooks/useHydrated';
 import type { IncludedEntities, Station } from '~/types';
 import { getStationProfileFn } from '~/util/station.functions';
@@ -154,13 +154,14 @@ export const Route = createFileRoute('/{-$lang}/stations/$stationId')({
         );
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
-    const ogUrl = new URL(
-      buildLocaleAwareLink(`/stations/${stationId}`, lang),
+    const seo = buildSeoMetadata({
+      path: `/stations/${stationId}`,
+      lang,
       rootUrl,
-    ).toString();
-    const ogImage = new URL('/og_image.png', rootUrl).toString();
+    });
 
     return {
+      links: seo.links,
       meta: [
         {
           title,
@@ -183,11 +184,11 @@ export const Route = createFileRoute('/{-$lang}/stations/$stationId')({
         },
         {
           property: 'og:url',
-          content: ogUrl,
+          content: seo.ogUrl,
         },
         {
           property: 'og:image',
-          content: ogImage,
+          content: seo.ogImage,
         },
         {
           'script:ld+json': {
@@ -200,8 +201,8 @@ export const Route = createFileRoute('/{-$lang}/stations/$stationId')({
               alternateName: Array.from(stationCodes).join(' / '),
               description,
             },
-            url: ogUrl,
-            image: ogImage,
+            url: seo.ogUrl,
+            image: seo.ogImage,
           },
         },
       ],

@@ -16,7 +16,7 @@ import {
   FormattedNumber,
 } from 'react-intl';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { buildSeoMetadata } from '~/helpers/seo';
 import { useHydrated } from '~/hooks/useHydrated';
 import {
   getIssuesHistoryYearFn,
@@ -47,11 +47,11 @@ export const Route = createFileRoute('/{-$lang}/history/$year/')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
-    const ogUrl = new URL(
-      buildLocaleAwareLink(`/history/${ctx.params.year}`, lang),
+    const seo = buildSeoMetadata({
+      path: `/history/${ctx.params.year}`,
+      lang,
       rootUrl,
-    ).toString();
-    const ogImage = new URL('/og_image.png', rootUrl).toString();
+    });
 
     const intl = createIntl({
       locale: lang,
@@ -83,6 +83,7 @@ export const Route = createFileRoute('/{-$lang}/history/$year/')({
     );
 
     return {
+      links: seo.links,
       meta: [
         {
           title,
@@ -105,11 +106,11 @@ export const Route = createFileRoute('/{-$lang}/history/$year/')({
         },
         {
           property: 'og:url',
-          content: ogUrl,
+          content: seo.ogUrl,
         },
         {
           property: 'og:image',
-          content: ogImage,
+          content: seo.ogImage,
         },
       ],
     };

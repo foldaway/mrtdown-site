@@ -40,8 +40,8 @@ import {
 } from 'react-intl';
 import { z } from 'zod';
 import { BetaBadge } from '~/components/BetaBadge';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { buildSeoMetadata } from '~/helpers/seo';
 import { assert } from '~/util/assert';
 import { getCrowdReportFormOptionsFn } from '~/util/report.functions';
 
@@ -254,20 +254,16 @@ export const Route = createFileRoute('/{-$lang}/report')({
       defaultMessage:
         'Share a concise community report about MRT or LRT delays, crowding, skipped stops, or service issues.',
     });
+    const seo = buildSeoMetadata({ path: '/report', lang, rootUrl });
 
     return {
+      links: seo.links,
       meta: [
         { title },
         { name: 'description', content: description },
         { property: 'og:title', content: title },
         { property: 'og:description', content: description },
-        {
-          property: 'og:url',
-          content: new URL(
-            buildLocaleAwareLink('/report', lang),
-            rootUrl,
-          ).toString(),
-        },
+        { property: 'og:url', content: seo.ogUrl },
       ],
     };
   },

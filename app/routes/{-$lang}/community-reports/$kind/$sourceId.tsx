@@ -18,8 +18,8 @@ import {
   type MessageDescriptor,
   useIntl,
 } from 'react-intl';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { buildSeoMetadata } from '~/helpers/seo';
 import { assert } from '~/util/assert';
 import {
   getCrowdReportSourceFn,
@@ -92,24 +92,23 @@ export const Route = createFileRoute(
       },
       { count: source.reportCount },
     );
-    const ogUrl = new URL(
-      buildLocaleAwareLink(
-        `/community-reports/${encodeURIComponent(kind)}/${encodeURIComponent(
-          sourceId,
-        )}`,
-        lang,
-      ),
+    const seo = buildSeoMetadata({
+      path: `/community-reports/${encodeURIComponent(kind)}/${encodeURIComponent(
+        sourceId,
+      )}`,
+      lang,
       rootUrl,
-    ).toString();
+    });
 
     return {
+      links: seo.links,
       meta: [
         { title },
         { name: 'description', content: description },
         { property: 'og:title', content: title },
         { property: 'og:description', content: description },
         { property: 'og:type', content: 'website' },
-        { property: 'og:url', content: ogUrl },
+        { property: 'og:url', content: seo.ogUrl },
       ],
     };
   },

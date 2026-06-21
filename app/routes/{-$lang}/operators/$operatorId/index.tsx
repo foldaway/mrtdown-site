@@ -15,9 +15,9 @@ import {
   ProfileTrendCardSkeleton,
 } from '~/components/ProfileWidgetSkeletons';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { buildSeoMetadata } from '~/helpers/seo';
 import { useHydrated } from '~/hooks/useHydrated';
 import { useViewport } from '~/hooks/useViewport';
 import { getOperatorProfileFn } from '~/util/operator.functions';
@@ -105,11 +105,11 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
-    const ogUrl = new URL(
-      buildLocaleAwareLink(`/operators/${ctx.params.operatorId}`, lang),
+    const seo = buildSeoMetadata({
+      path: `/operators/${ctx.params.operatorId}`,
+      lang,
       rootUrl,
-    ).toString();
-    const ogImage = new URL('/og_image.png', rootUrl).toString();
+    });
 
     // Build enhanced Organization structured data
     const organizationData: Record<string, unknown> = {
@@ -127,6 +127,7 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
     }
 
     return {
+      links: seo.links,
       meta: [
         {
           title,
@@ -149,11 +150,11 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
         },
         {
           property: 'og:url',
-          content: ogUrl,
+          content: seo.ogUrl,
         },
         {
           property: 'og:image',
-          content: ogImage,
+          content: seo.ogImage,
         },
         {
           property: 'og:image:alt',
@@ -181,7 +182,7 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
         },
         {
           name: 'twitter:image',
-          content: ogImage,
+          content: seo.ogImage,
         },
         {
           'script:ld+json': {
@@ -190,8 +191,8 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
             name: title,
             description,
             mainEntity: organizationData,
-            url: ogUrl,
-            image: ogImage,
+            url: seo.ogUrl,
+            image: seo.ogImage,
             inLanguage: lang,
           },
         },
