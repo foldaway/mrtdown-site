@@ -82,6 +82,10 @@ export const relations = defineRelations(schema, (r) => ({
   },
   crowdReports: {
     crowdReportAbuseEvents: r.many.crowdReportAbuseEvents(),
+    cluster: r.one.crowdReportClusters({
+      from: r.crowdReports.cluster_id,
+      to: r.crowdReportClusters.id,
+    }),
     lines: r.many.lines({
       from: r.crowdReports.id.through(r.crowdReportLines.report_id),
       to: r.lines.id.through(r.crowdReportLines.line_id),
@@ -91,7 +95,6 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.crowdReports.id.through(r.crowdReportStations.report_id),
       to: r.stations.id.through(r.crowdReportStations.station_id),
     }),
-    crowdReportClusters: r.many.crowdReportClusters(),
   },
   crowdReportClusters: {
     lines: r.many.lines({
