@@ -139,8 +139,8 @@ Exit criteria:
 
 ### Phase 4: Add SEO Smoke Checks
 
-- Add a local script, for example `npm run seo:check`, that fetches the local
-  sitemap and validates each `<loc>`.
+- Add a local script, `npm run seo:check`, that fetches the local sitemap and
+  validates each `<loc>`.
 - Validate that representative HTML pages include:
   - `<title>`
   - meta description
@@ -179,6 +179,11 @@ Exit criteria:
   history, entity, report, and community report pages now emit canonical links
   and full `hreflang` alternates from the same route path policy. XML sitemap
   alternates now use the same helper and include `en-SG` plus `x-default`.
+- 2026-06-21: Started Phase 4 by adding `npm run seo:check`. The check expects
+  a running app, fetches `/sitemap.xml`, verifies each sitemap `<loc>` returns
+  `200` without redirects, and validates representative HTML pages for title,
+  meta description, canonical link, `hreflang` alternates, `og:url`, and the
+  known `WIP` description placeholder.
 
 ## Decision Log
 
@@ -197,7 +202,10 @@ Exit criteria:
 Before handing back implementation work for this plan:
 
 - Run `npm run verify`.
-- Run the SEO smoke-check command once it exists.
+- Run `npm run seo:check` against a running local or deployed app. Pass the base
+  URL as the first argument or set `VITE_ROOT_URL`; otherwise the script checks
+  `http://localhost:3000`. Set `SEO_CHECK_TIMEOUT_MS` to override the default
+  25-second per-request timeout.
 - Manually or programmatically crawl `http://localhost:3000/sitemap.xml` and
   confirm every `<loc>` returns `200` without redirects.
 - Sample at least these rendered pages for title, description, canonical,
