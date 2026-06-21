@@ -1,26 +1,12 @@
 import {
+  type Service as CoreService,
+  type FacilityEffectKind,
   type IssueType,
   resolvePeriods,
-  type FacilityEffectKind,
-  type Service as CoreService,
   type ServiceEffectKind,
 } from '@mrtdown/core';
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
-import type {
-  ChartEntry,
-  Granularity,
-  IncludedEntities,
-  Issue,
-  IssueAffectedBranch,
-  IssueInterval,
-  Line,
-  LineSummary,
-  LineSummaryDayType,
-  LineSummaryStatus,
-  Station,
-  TimeScaleChart,
-} from '~/types';
 import {
   evidencesTable,
   impactEventCausesTable,
@@ -28,8 +14,8 @@ import {
   impactEventEntityServicesTable,
   impactEventFacilityEffectsTable,
   impactEventPeriodsTable,
-  impactEventServiceScopesTable,
   impactEventServiceEffectsTable,
+  impactEventServiceScopesTable,
   impactEventsTable,
   issueDayFactsTable,
   issuesTable,
@@ -49,24 +35,38 @@ import {
   statisticsSnapshotsTable,
   townsTable,
 } from '~/db/schema';
+import type {
+  ChartEntry,
+  Granularity,
+  IncludedEntities,
+  Issue,
+  IssueAffectedBranch,
+  IssueInterval,
+  Line,
+  LineSummary,
+  LineSummaryDayType,
+  LineSummaryStatus,
+  Station,
+  TimeScaleChart,
+} from '~/types';
+import { getPublicCrowdReportSignals } from '~/util/crowdReports';
 import {
   issueContributesToLineDowntime,
   issueContributesToLineStatus,
 } from '~/util/issueOperationalEffects';
-import { getPublicCrowdReportSignals } from '~/util/crowdReports';
 import {
   deriveLineStartedAtFromBranches,
   sortLineBranchesForCurrentView,
 } from '~/util/lineBranches';
 import {
-  selectServiceRevisionForReferenceDate,
-  serviceRevisionHasEnded,
-} from '~/util/serviceRevisions';
-import {
   recordServerTiming,
   timeServerSpan,
   timeSyncServerSpan,
 } from '~/util/serverTiming';
+import {
+  selectServiceRevisionForReferenceDate,
+  serviceRevisionHasEnded,
+} from '~/util/serviceRevisions';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 const ISSUE_TYPES = [
