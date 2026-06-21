@@ -5,6 +5,7 @@ import {
   ClockIcon,
   ExclamationTriangleIcon,
   ForwardIcon,
+  InformationCircleIcon,
   MagnifyingGlassIcon,
   MapIcon,
   MapPinIcon,
@@ -24,6 +25,7 @@ import {
   type ComponentType,
   type FormEvent,
   type SVGProps,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -48,6 +50,33 @@ type ReportSearch = {
 };
 
 type ReportScope = 'line' | 'station' | 'train';
+type ReportContextBase = {
+  observedAt: string;
+  effect: IngestContentCrowdReportEffect | '';
+  delayMinutes: string;
+  isStillHappening: boolean;
+};
+type EmptyReportContext = ReportContextBase & { scope: '' };
+type LineReportContext = ReportContextBase & {
+  scope: 'line';
+  lineIds: string[];
+};
+type StationReportContext = ReportContextBase & {
+  scope: 'station';
+  stationId: string | null;
+  lineIds: string[];
+};
+type TrainReportContext = ReportContextBase & {
+  scope: 'train';
+  lineId: string | null;
+  directionChoice: string;
+  stationId: string | null;
+};
+type ReportContext =
+  | EmptyReportContext
+  | LineReportContext
+  | StationReportContext
+  | TrainReportContext;
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 type FieldErrorKey =
   | 'scope'
@@ -253,6 +282,23 @@ function datetimeLocalToSgIso(value: string) {
   }).toISO();
 }
 
+function getReportContextLineIds(context: ReportContext) {
+  if (context.scope === 'line' || context.scope === 'station') {
+    return context.lineIds;
+  }
+  if (context.scope === 'train' && context.lineId != null) {
+    return [context.lineId];
+  }
+  return [];
+}
+
+function getReportContextStationId(context: ReportContext) {
+  if (context.scope === 'station' || context.scope === 'train') {
+    return context.stationId;
+  }
+  return null;
+}
+
 function ReportPage() {
   const { lineDirections, lineStationPaths, lines, stations } =
     Route.useLoaderData();
@@ -278,33 +324,40 @@ function ReportPage() {
     stations.some((station) => station.id === search.stationId)
       ? search.stationId
       : undefined;
-  const [reportScope, setReportScope] = useState<ReportScope | ''>(() => {
+  const [reportContext, setReportContext] = useState<ReportContext>(() => {
+    const base: ReportContextBase = {
+      observedAt: toSgDatetimeLocal(DateTime.now()),
+      effect: '',
+      delayMinutes: '',
+      isStillHappening: true,
+    };
     if (prefilledStationId != null) {
-      return 'station';
+      const prefilledStation = stations.find(
+        (station) => station.id === prefilledStationId,
+      );
+      const lineIds =
+        prefilledLineId != null
+          ? [prefilledLineId]
+          : prefilledStation?.lineIds.length === 1
+            ? [prefilledStation.lineIds[0]]
+            : [];
+      return {
+        ...base,
+        scope: 'station',
+        stationId: prefilledStationId,
+        lineIds,
+      };
     }
     if (prefilledLineId != null) {
-      return 'line';
+      return { ...base, scope: 'line', lineIds: [prefilledLineId] };
     }
-    return '';
+    return { ...base, scope: '' };
   });
-  const [selectedLineIds, setSelectedLineIds] = useState<string[]>(
-    prefilledLineId != null ? [prefilledLineId] : [],
-  );
-  const [selectedStationIds, setSelectedStationIds] = useState<string[]>(
-    prefilledStationId != null ? [prefilledStationId] : [],
-  );
-  const [observedAt, setObservedAt] = useState(() =>
-    toSgDatetimeLocal(DateTime.now()),
-  );
   const [stationSearch, setStationSearch] = useState('');
   const [rangeStartStationId, setRangeStartStationId] = useState('');
   const [rangeEndStationId, setRangeEndStationId] = useState('');
   const [rangeStartStationSearch, setRangeStartStationSearch] = useState('');
   const [rangeEndStationSearch, setRangeEndStationSearch] = useState('');
-  const [directionChoice, setDirectionChoice] = useState('');
-  const [effect, setEffect] = useState('');
-  const [delayMinutes, setDelayMinutes] = useState('');
-  const [isStillHappening, setIsStillHappening] = useState(true);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [clientError, setClientError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<
@@ -359,9 +412,70 @@ function ReportPage() {
     () => Object.fromEntries(stations.map((station) => [station.id, station])),
     [stations],
   );
-  const selectedStation = selectedStationIds[0]
-    ? stationById[selectedStationIds[0]]
+  const reportScope = reportContext.scope;
+  const selectedLineIds = getReportContextLineIds(reportContext);
+  const selectedStationId = getReportContextStationId(reportContext);
+  const selectedStation = selectedStationId
+    ? stationById[selectedStationId]
     : undefined;
+  const selectedStationIds = selectedStationId ? [selectedStationId] : [];
+  const observedAt = reportContext.observedAt;
+  const effect = reportContext.effect;
+  const delayMinutes = reportContext.delayMinutes;
+  const isStillHappening = reportContext.isStillHappening;
+  const directionChoice =
+    reportContext.scope === 'train' ? reportContext.directionChoice : '';
+  const setObservedAt = (observedAtValue: string) => {
+    setReportContext((current) => ({
+      ...current,
+      observedAt: observedAtValue,
+    }));
+  };
+  const setEffect = (effectValue: IngestContentCrowdReportEffect) => {
+    setReportContext((current) => ({
+      ...current,
+      effect: effectValue,
+    }));
+  };
+  const setDelayMinutes = (delayMinutesValue: string) => {
+    setReportContext((current) => ({
+      ...current,
+      delayMinutes: delayMinutesValue,
+    }));
+  };
+  const setIsStillHappening = (isStillHappeningValue: boolean) => {
+    setReportContext((current) => ({
+      ...current,
+      isStillHappening: isStillHappeningValue,
+    }));
+  };
+  const setDirectionChoice = useCallback((directionChoiceValue: string) => {
+    setReportContext((current) =>
+      current.scope === 'train'
+        ? { ...current, directionChoice: directionChoiceValue }
+        : current,
+    );
+  }, []);
+  const setSelectedLineIds = useCallback(
+    (value: string[] | ((current: string[]) => string[])) => {
+      setReportContext((current) => {
+        const nextLineIds =
+          typeof value === 'function'
+            ? value(getReportContextLineIds(current))
+            : value;
+        if (current.scope === 'line' || current.scope === 'station') {
+          return { ...current, lineIds: nextLineIds };
+        }
+        if (current.scope === 'train') {
+          return { ...current, lineId: nextLineIds[0] ?? null };
+        }
+        return current;
+      });
+    },
+    [],
+  );
+  const selectedStationLineIds =
+    selectedStation?.lineIds.filter((lineId) => lineById[lineId] != null) ?? [];
   const rangeStartStation = rangeStartStationId
     ? stationById[rangeStartStationId]
     : undefined;
@@ -440,6 +554,16 @@ function ReportPage() {
     () => [...new Set([...selectedStationIds, ...affectedStopStationIds])],
     [affectedStopStationIds, selectedStationIds],
   );
+  const stationSearchQuery = stationSearch.trim();
+  const primaryContextComplete =
+    reportScope === 'line'
+      ? selectedLineIds.length > 0
+      : reportScope === 'station'
+        ? selectedStationIds.length > 0 &&
+          (selectedStationLineIds.length <= 1 || selectedLineIds.length > 0)
+        : reportScope === 'train'
+          ? selectedLineIds.length > 0 && directionChoice.length > 0
+          : false;
   const getStationSearchResults = (
     searchValue: string,
     filterLineIds?: string[],
@@ -469,7 +593,41 @@ function ReportPage() {
       })
       .slice(0, 8);
   };
+  const getLineStationSuggestions = (filterLineIds?: string[]) => {
+    if (filterLineIds == null || filterLineIds.length === 0) {
+      return [];
+    }
+
+    const stationIds: string[] = [];
+    for (const lineId of filterLineIds) {
+      for (const path of lineStationPaths[lineId] ?? []) {
+        for (const stationId of path) {
+          if (!stationIds.includes(stationId)) {
+            stationIds.push(stationId);
+          }
+        }
+      }
+    }
+
+    const orderedStations = stationIds
+      .map((stationId) => stationById[stationId])
+      .filter((station): station is (typeof stations)[number] => {
+        return station != null;
+      });
+    if (orderedStations.length > 0) {
+      return orderedStations.slice(0, 12);
+    }
+
+    return getStationSearchResults('', filterLineIds).slice(0, 12);
+  };
   const stationSearchResults = getStationSearchResults(stationSearch);
+  const mainStationSuggestionLineIds =
+    reportScope === 'train' && selectedLineIds.length > 0
+      ? selectedLineIds
+      : undefined;
+  const mainStationSuggestions = getLineStationSuggestions(
+    mainStationSuggestionLineIds,
+  );
 
   useEffect(() => {
     if (
@@ -481,7 +639,12 @@ function ReportPage() {
       return;
     }
     setSelectedLineIds([selectedStation.lineIds[0]]);
-  }, [reportScope, selectedLineIds.length, selectedStation]);
+  }, [
+    reportScope,
+    selectedLineIds.length,
+    selectedStation,
+    setSelectedLineIds,
+  ]);
 
   useEffect(() => {
     if (reportScope !== 'train') {
@@ -513,6 +676,7 @@ function ReportPage() {
     reportScope,
     selectedLineDirectionOptions,
     selectedLineIds.length,
+    setDirectionChoice,
   ]);
 
   useEffect(() => {
@@ -612,24 +776,74 @@ function ReportPage() {
   const selectStation = (stationId: string) => {
     const station = stationById[stationId];
     clearFieldError('station');
-    setSelectedStationIds([stationId]);
     setStationSearch('');
-    if (reportScope === '') {
-      setReportScope('station');
-    }
-    if (reportScope === 'station' && station != null) {
-      if (station.lineIds.length === 1) {
-        setSelectedLineIds([station.lineIds[0]]);
-        return;
+    setReportContext((current) => {
+      if (current.scope === 'train') {
+        return { ...current, stationId };
       }
-      setSelectedLineIds((current) =>
-        current.filter((lineId) => station.lineIds.includes(lineId)),
-      );
-    }
+
+      const selectedStationLineIds = station?.lineIds ?? [];
+      const lineIds =
+        selectedStationLineIds.length === 1
+          ? [selectedStationLineIds[0]]
+          : getReportContextLineIds(current).filter((lineId) =>
+              selectedStationLineIds.includes(lineId),
+            );
+      return {
+        ...current,
+        scope: 'station',
+        stationId,
+        lineIds,
+      };
+    });
   };
 
   const clearStation = () => {
-    setSelectedStationIds([]);
+    setReportContext((current) => {
+      if (current.scope === 'station') {
+        return { ...current, stationId: null, lineIds: [] };
+      }
+      if (current.scope === 'train') {
+        return { ...current, stationId: null };
+      }
+      return current;
+    });
+  };
+
+  const chooseReportScope = (scope: ReportScope) => {
+    clearFieldError('scope');
+    setStationSearch('');
+    setReportContext((current) => {
+      if (scope === 'line') {
+        return {
+          ...current,
+          scope: 'line',
+          lineIds: getReportContextLineIds(current),
+        };
+      }
+
+      if (scope === 'station') {
+        const stationId = getReportContextStationId(current);
+        if (stationId == null) {
+          return { ...current, scope: 'station', stationId: null, lineIds: [] };
+        }
+        const station = stationById[stationId];
+        const lineIds = getReportContextLineIds(current).filter((lineId) =>
+          station?.lineIds.includes(lineId),
+        );
+        return { ...current, scope: 'station', stationId, lineIds };
+      }
+
+      const lineIds = getReportContextLineIds(current);
+      return {
+        ...current,
+        scope: 'train',
+        lineId: lineIds.length === 1 ? lineIds[0] : null,
+        directionChoice:
+          current.scope === 'train' ? current.directionChoice : '',
+        stationId: null,
+      };
+    });
   };
 
   const resetTurnstile = () => {
@@ -683,6 +897,19 @@ function ReportPage() {
         defaultMessage: 'Select the affected station.',
       });
       showFieldError('station', message, 'station_required');
+      return;
+    }
+
+    if (
+      reportScope === 'station' &&
+      selectedStationLineIds.length > 1 &&
+      selectedLineIds.length === 0
+    ) {
+      const message = intl.formatMessage({
+        id: 'report.error.station_line_required',
+        defaultMessage: 'Select the affected line at this interchange.',
+      });
+      showFieldError('line', message, 'station_line_required');
       return;
     }
 
@@ -893,8 +1120,6 @@ function ReportPage() {
     setSubmitState('idle');
   };
 
-  const selectedStationLineIds =
-    selectedStation?.lineIds.filter((lineId) => lineById[lineId] != null) ?? [];
   const allLineIds = lines.map((line) => line.id);
   const primaryLineIds =
     selectedStationLineIds.length > 0 ? selectedStationLineIds : allLineIds;
@@ -980,55 +1205,91 @@ function ReportPage() {
     onSearchChange: (value: string) => void;
     onSelect: (stationId: string) => void;
     onClear: () => void;
-  }) => (
-    <div className="flex flex-col gap-2">
-      <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-        {label}
-      </span>
-      {selectedStation != null && (
-        <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
-          {renderStationIdentity(selectedStation)}
-          <button
-            type="button"
-            onClick={onClear}
-            className="ms-auto shrink-0 rounded-md px-2 py-1 font-medium text-accent-light text-xs hover:bg-white dark:hover:bg-gray-800"
-          >
-            <FormattedMessage id="report.change" defaultMessage="Change" />
-          </button>
-        </div>
-      )}
-      <label className="relative">
-        <span className="sr-only">{label}</span>
-        <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-gray-400" />
-        <input
-          type="search"
-          value={searchValue}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder={intl.formatMessage({
-            id: 'report.affected_stop_search_placeholder',
-            defaultMessage: 'Search by station name or code',
-          })}
-          className="w-full rounded-lg border border-gray-300 bg-white py-2 pr-3 pl-9 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-        />
-      </label>
-      {(searchValue || selectedStation == null) && (
-        <div className="grid gap-2">
-          {getStationSearchResults(searchValue, filterLineIds).map(
-            (station) => (
-              <button
-                key={`${id}:${station.id}`}
-                type="button"
-                onClick={() => onSelect(station.id)}
-                className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
-              >
-                {renderStationIdentity(station)}
-              </button>
-            ),
+  }) => {
+    const stationSuggestions = getLineStationSuggestions(filterLineIds);
+
+    return (
+      <div className="flex flex-col gap-2">
+        <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+          {label}
+        </span>
+        {selectedStation != null && (
+          <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
+            {renderStationIdentity(selectedStation)}
+            <button
+              type="button"
+              onClick={onClear}
+              className="ms-auto shrink-0 rounded-md px-2 py-1 font-medium text-accent-light text-xs hover:bg-white dark:hover:bg-gray-800"
+            >
+              <FormattedMessage id="report.change" defaultMessage="Change" />
+            </button>
+          </div>
+        )}
+        <label className="relative">
+          <span className="sr-only">{label}</span>
+          <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-gray-400" />
+          <input
+            type="search"
+            value={searchValue}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder={intl.formatMessage({
+              id: 'report.affected_stop_search_placeholder',
+              defaultMessage: 'Search by station name or code',
+            })}
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pr-3 pl-9 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          />
+        </label>
+        {searchValue.trim().length > 0 && (
+          <div className="grid gap-2">
+            {getStationSearchResults(searchValue, filterLineIds).map(
+              (station) => (
+                <button
+                  key={`${id}:${station.id}`}
+                  type="button"
+                  onClick={() => onSelect(station.id)}
+                  className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
+                >
+                  {renderStationIdentity(station)}
+                </button>
+              ),
+            )}
+          </div>
+        )}
+        {searchValue.trim().length === 0 &&
+          selectedStation == null &&
+          stationSuggestions.length > 0 && (
+            <div className="grid gap-2">
+              <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+                <FormattedMessage
+                  id="report.affected_stop_quick_pick"
+                  defaultMessage="Stops on the selected line"
+                />
+              </p>
+              {stationSuggestions.map((station) => (
+                <button
+                  key={`${id}:${station.id}`}
+                  type="button"
+                  onClick={() => onSelect(station.id)}
+                  className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
+                >
+                  {renderStationIdentity(station)}
+                </button>
+              ))}
+            </div>
           )}
-        </div>
-      )}
-    </div>
-  );
+        {searchValue.trim().length === 0 &&
+          selectedStation == null &&
+          stationSuggestions.length === 0 && (
+            <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+              <FormattedMessage
+                id="report.affected_stop_search_hint"
+                defaultMessage="Search when you want to add a specific stop or range."
+              />
+            </p>
+          )}
+      </div>
+    );
+  };
 
   const renderEffectButton = (effectValue: IngestContentCrowdReportEffect) => {
     const selected = effect === effectValue;
@@ -1141,10 +1402,7 @@ function ReportPage() {
                 <button
                   key={scope}
                   type="button"
-                  onClick={() => {
-                    clearFieldError('scope');
-                    setReportScope(scope);
-                  }}
+                  onClick={() => chooseReportScope(scope)}
                   className={classNames(
                     'min-h-24 rounded-lg border p-3 text-start transition-colors focus:outline-none focus:ring-2 focus:ring-accent-light/30',
                     selected
@@ -1221,10 +1479,17 @@ function ReportPage() {
           <section className="flex flex-col gap-3">
             <div>
               <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                <FormattedMessage
-                  id="report.station"
-                  defaultMessage="Affected station"
-                />
+                {reportScope === 'train' ? (
+                  <FormattedMessage
+                    id="report.train_station"
+                    defaultMessage="Next station or destination"
+                  />
+                ) : (
+                  <FormattedMessage
+                    id="report.station"
+                    defaultMessage="Affected station"
+                  />
+                )}
               </span>
               {reportScope === 'train' && (
                 <span className="ms-2 text-gray-500 text-xs dark:text-gray-400">
@@ -1252,10 +1517,17 @@ function ReportPage() {
             )}
             <label className="relative">
               <span className="sr-only">
-                <FormattedMessage
-                  id="report.station_search"
-                  defaultMessage="Search station"
-                />
+                {reportScope === 'train' ? (
+                  <FormattedMessage
+                    id="report.train_station_search"
+                    defaultMessage="Search next station or destination"
+                  />
+                ) : (
+                  <FormattedMessage
+                    id="report.station_search"
+                    defaultMessage="Search station"
+                  />
+                )}
               </span>
               <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-gray-400" />
               <input
@@ -1267,8 +1539,14 @@ function ReportPage() {
                   setStationSearch(event.target.value);
                 }}
                 placeholder={intl.formatMessage({
-                  id: 'report.station_search_placeholder',
-                  defaultMessage: 'Search by station name or code',
+                  id:
+                    reportScope === 'train'
+                      ? 'report.train_station_search_placeholder'
+                      : 'report.station_search_placeholder',
+                  defaultMessage:
+                    reportScope === 'train'
+                      ? 'Search by next station, destination, or code'
+                      : 'Search by station name or code',
                 })}
                 aria-invalid={fieldErrors.station != null}
                 aria-describedby={
@@ -1285,7 +1563,7 @@ function ReportPage() {
                 {fieldErrors.station}
               </p>
             )}
-            {(stationSearch || selectedStation == null) && (
+            {stationSearchQuery.length > 0 && (
               <div className="grid gap-2 sm:grid-cols-2">
                 {stationSearchResults.map((station) => (
                   <button
@@ -1299,6 +1577,46 @@ function ReportPage() {
                 ))}
               </div>
             )}
+            {stationSearchQuery.length === 0 &&
+              selectedStation == null &&
+              mainStationSuggestions.length > 0 && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <p className="text-gray-500 text-xs leading-5 sm:col-span-2 dark:text-gray-400">
+                    <FormattedMessage
+                      id="report.station_quick_pick"
+                      defaultMessage="Stations on the selected line"
+                    />
+                  </p>
+                  {mainStationSuggestions.map((station) => (
+                    <button
+                      key={station.id}
+                      type="button"
+                      onClick={() => selectStation(station.id)}
+                      className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
+                    >
+                      {renderStationIdentity(station)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            {stationSearchQuery.length === 0 &&
+              selectedStation == null &&
+              mainStationSuggestions.length === 0 && (
+                <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+                  <FormattedMessage
+                    id={
+                      reportScope === 'train'
+                        ? 'report.train_station_search_hint'
+                        : 'report.station_search_hint'
+                    }
+                    defaultMessage={
+                      reportScope === 'train'
+                        ? 'Add this only if it helps describe where you are headed.'
+                        : 'Start typing a station name or station code.'
+                    }
+                  />
+                </p>
+              )}
           </section>
         )}
 
@@ -1341,7 +1659,7 @@ function ReportPage() {
                   <summary className="cursor-pointer font-medium text-gray-700 text-sm dark:text-gray-200">
                     <FormattedMessage
                       id="report.additional_lines"
-                      defaultMessage="Additional lines"
+                      defaultMessage="Use a different line"
                     />
                   </summary>
                   <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
@@ -1360,48 +1678,62 @@ function ReportPage() {
             </section>
           )}
 
-        <section className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
-          <div
-            className="flex flex-col gap-2"
-            ref={effectRef}
-            tabIndex={-1}
-            aria-describedby={
-              fieldErrors.effect ? 'report-effect-error' : undefined
-            }
-          >
-            <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+        {reportScope && !primaryContextComplete && (
+          <section className="flex gap-3 rounded-lg border border-gray-300 border-dashed bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-900">
+            <InformationCircleIcon className="mt-0.5 size-5 shrink-0 text-gray-400" />
+            <p className="text-gray-600 leading-5 dark:text-gray-300">
               <FormattedMessage
-                id="report.effect"
-                defaultMessage="What is happening?"
+                id="report.primary_context_hint"
+                defaultMessage="Add the affected line, station, or train direction before choosing what is happening."
               />
-            </span>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {IngestContentCrowdReportEffects.map(renderEffectButton)}
+            </p>
+          </section>
+        )}
+
+        {primaryContextComplete && (
+          <section className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
+            <div
+              className="flex flex-col gap-2"
+              ref={effectRef}
+              tabIndex={-1}
+              aria-describedby={
+                fieldErrors.effect ? 'report-effect-error' : undefined
+              }
+            >
+              <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+                <FormattedMessage
+                  id="report.effect"
+                  defaultMessage="What is happening?"
+                />
+              </span>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {IngestContentCrowdReportEffects.map(renderEffectButton)}
+              </div>
+              {fieldErrors.effect != null && (
+                <p
+                  className="text-red-700 text-sm dark:text-red-300"
+                  id="report-effect-error"
+                >
+                  {fieldErrors.effect}
+                </p>
+              )}
             </div>
-            {fieldErrors.effect != null && (
-              <p
-                className="text-red-700 text-sm dark:text-red-300"
-                id="report-effect-error"
-              >
-                {fieldErrors.effect}
-              </p>
-            )}
-          </div>
-          <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-900">
-            <input
-              type="checkbox"
-              checked={isStillHappening}
-              onChange={(event) => setIsStillHappening(event.target.checked)}
-              className="mt-1 size-4"
-            />
-            <span className="text-gray-700 dark:text-gray-200">
-              <FormattedMessage
-                id="report.still_happening"
-                defaultMessage="This is still happening now"
+            <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-900">
+              <input
+                type="checkbox"
+                checked={isStillHappening}
+                onChange={(event) => setIsStillHappening(event.target.checked)}
+                className="mt-1 size-4"
               />
-            </span>
-          </label>
-        </section>
+              <span className="text-gray-700 dark:text-gray-200">
+                <FormattedMessage
+                  id="report.still_happening"
+                  defaultMessage="This is still happening now"
+                />
+              </span>
+            </label>
+          </section>
+        )}
 
         {supportsAffectedStopRange && (
           <section
@@ -1550,71 +1882,73 @@ function ReportPage() {
           </section>
         )}
 
-        <details className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
-          <summary className="cursor-pointer font-medium text-gray-700 text-sm dark:text-gray-200">
-            <FormattedMessage
-              id="report.more_details"
-              defaultMessage="More details"
-            />
-          </summary>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2">
-              <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                <FormattedMessage
-                  id="report.delay_minutes"
-                  defaultMessage="Estimated delay"
-                />
-              </span>
-              <input
-                type="number"
-                min={0}
-                max={180}
-                inputMode="numeric"
-                value={delayMinutes}
-                onChange={(event) => setDelayMinutes(event.target.value)}
-                placeholder={intl.formatMessage({
-                  id: 'report.delay_placeholder',
-                  defaultMessage: 'Minutes, if known',
-                })}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+        {primaryContextComplete && (
+          <details className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
+            <summary className="cursor-pointer font-medium text-gray-700 text-sm dark:text-gray-200">
+              <FormattedMessage
+                id="report.more_details"
+                defaultMessage="More details"
               />
-            </label>
-            <label className="flex flex-col gap-2">
-              <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                <FormattedMessage
-                  id="report.observed_at"
-                  defaultMessage="Observed time"
+            </summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+                  <FormattedMessage
+                    id="report.delay_minutes"
+                    defaultMessage="Estimated delay"
+                  />
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  max={180}
+                  inputMode="numeric"
+                  value={delayMinutes}
+                  onChange={(event) => setDelayMinutes(event.target.value)}
+                  placeholder={intl.formatMessage({
+                    id: 'report.delay_placeholder',
+                    defaultMessage: 'Minutes, if known',
+                  })}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
                 />
-              </span>
-              <input
-                ref={observedAtRef}
-                type="datetime-local"
-                value={observedAt}
-                max={toSgDatetimeLocal(DateTime.now().plus({ minutes: 15 }))}
-                onChange={(event) => {
-                  clearFieldError('observedAt');
-                  setObservedAt(event.target.value);
-                }}
-                aria-invalid={fieldErrors.observedAt != null}
-                aria-describedby={
-                  fieldErrors.observedAt
-                    ? 'report-observed-at-error'
-                    : undefined
-                }
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
-                required
-              />
-              {fieldErrors.observedAt != null && (
-                <p
-                  className="text-red-700 text-sm dark:text-red-300"
-                  id="report-observed-at-error"
-                >
-                  {fieldErrors.observedAt}
-                </p>
-              )}
-            </label>
-          </div>
-        </details>
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+                  <FormattedMessage
+                    id="report.observed_at"
+                    defaultMessage="Observed time"
+                  />
+                </span>
+                <input
+                  ref={observedAtRef}
+                  type="datetime-local"
+                  value={observedAt}
+                  max={toSgDatetimeLocal(DateTime.now().plus({ minutes: 15 }))}
+                  onChange={(event) => {
+                    clearFieldError('observedAt');
+                    setObservedAt(event.target.value);
+                  }}
+                  aria-invalid={fieldErrors.observedAt != null}
+                  aria-describedby={
+                    fieldErrors.observedAt
+                      ? 'report-observed-at-error'
+                      : undefined
+                  }
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+                  required
+                />
+                {fieldErrors.observedAt != null && (
+                  <p
+                    className="text-red-700 text-sm dark:text-red-300"
+                    id="report-observed-at-error"
+                  >
+                    {fieldErrors.observedAt}
+                  </p>
+                )}
+              </label>
+            </div>
+          </details>
+        )}
 
         {turnstileSiteKey && (
           <div
