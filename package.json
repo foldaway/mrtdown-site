@@ -44,7 +44,7 @@
     "@tanstack/react-router": "1.170.15",
     "@tanstack/react-start": "1.168.25",
     "classnames": "^2.5.1",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^1.0.0-beta.22",
     "fflate": "^0.8.2",
     "html-entities": "^2.6.0",
     "isbot": "^5",
