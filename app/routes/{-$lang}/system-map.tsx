@@ -19,8 +19,8 @@ import { MapJan2012 } from '~/components/StationMap/components/MapJan2012';
 import { MapNov2017 } from '~/components/StationMap/components/MapNov2017';
 import { MapNov2024 } from '~/components/StationMap/components/MapNov2024';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { buildSeoMetadata } from '~/helpers/seo';
 import { getSystemMapFn } from '~/util/system-map.functions';
 
 const SYSTEM_MAP_SNAPSHOTS = {
@@ -44,11 +44,7 @@ export const Route = createFileRoute('/{-$lang}/system-map')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
-    const ogUrl = new URL(
-      buildLocaleAwareLink('/system-map', lang),
-      rootUrl,
-    ).toString();
-    const ogImage = new URL('/og_image.png', rootUrl).toString();
+    const seo = buildSeoMetadata({ path: '/system-map', lang, rootUrl });
 
     const intl = createIntl({
       locale: lang,
@@ -66,6 +62,7 @@ export const Route = createFileRoute('/{-$lang}/system-map')({
     });
 
     return {
+      links: seo.links,
       meta: [
         {
           title,
@@ -88,11 +85,11 @@ export const Route = createFileRoute('/{-$lang}/system-map')({
         },
         {
           property: 'og:url',
-          content: ogUrl,
+          content: seo.ogUrl,
         },
         {
           property: 'og:image',
-          content: ogImage,
+          content: seo.ogImage,
         },
       ],
     };

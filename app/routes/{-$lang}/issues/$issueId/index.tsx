@@ -14,8 +14,8 @@ import {
 } from 'react-intl';
 import { IssueTypeLabels } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { buildSeoMetadata } from '~/helpers/seo';
 import type { IssueInterval } from '~/types';
 import { assert } from '~/util/assert';
 import { getIssueFn } from '~/util/issue.functions';
@@ -104,11 +104,11 @@ export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
     const title = getLocalizedTranslation(issue.title, lang);
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
-    const ogUrl = new URL(
-      buildLocaleAwareLink(`/issues/${issueId}`, lang),
+    const seo = buildSeoMetadata({
+      path: `/issues/${issueId}`,
+      lang,
       rootUrl,
-    ).toString();
-    const ogImage = new URL('/og_image.png', rootUrl).toString();
+    });
 
     const { default: messages } = await import(
       `../../../../../lang/${lang}.json`
@@ -145,6 +145,7 @@ export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
     );
 
     return {
+      links: seo.links,
       meta: [
         {
           title,
@@ -167,11 +168,11 @@ export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
         },
         {
           property: 'og:url',
-          content: ogUrl,
+          content: seo.ogUrl,
         },
         {
           property: 'og:image',
-          content: ogImage,
+          content: seo.ogImage,
         },
         {
           'script:ld+json': {
@@ -189,8 +190,8 @@ export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
                 location: 'Singapore Public Transport',
               };
             }),
-            url: ogUrl,
-            image: ogImage,
+            url: seo.ogUrl,
+            image: seo.ogImage,
           },
         },
       ],

@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { createIntl, FormattedMessage } from 'react-intl';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { buildSeoMetadata } from '~/helpers/seo';
 import { getStatisticsFn } from '~/util/statistics.functions';
 import { StatisticsGrid } from './components/StatisticsGrid';
 import { StatisticsGridSkeleton } from './components/StatisticsGrid/components/StatisticsGridSkeleton';
@@ -18,11 +18,7 @@ export const Route = createFileRoute('/{-$lang}/statistics/')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
-    const ogUrl = new URL(
-      buildLocaleAwareLink('/statistics', lang),
-      rootUrl,
-    ).toString();
-    const ogImage = new URL('/og_image.png', rootUrl).toString();
+    const seo = buildSeoMetadata({ path: '/statistics', lang, rootUrl });
 
     const intl = createIntl({
       locale: lang,
@@ -40,6 +36,7 @@ export const Route = createFileRoute('/{-$lang}/statistics/')({
     });
 
     return {
+      links: seo.links,
       meta: [
         {
           title,
@@ -62,11 +59,11 @@ export const Route = createFileRoute('/{-$lang}/statistics/')({
         },
         {
           property: 'og:url',
-          content: ogUrl,
+          content: seo.ogUrl,
         },
         {
           property: 'og:image',
-          content: ogImage,
+          content: seo.ogImage,
         },
       ],
     };

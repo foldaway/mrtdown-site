@@ -174,6 +174,11 @@ Exit criteria:
 - 2026-06-21: Local sitemap crawl against the Vite dev server checked 47
   sitemap URLs with redirects disabled and a 25-second per-URL timeout. Every
   URL returned `200`, with no redirects or timeouts.
+- 2026-06-21: Continued Phase 2 by adding a shared SEO helper for canonical
+  URLs, Open Graph URLs, locale alternates, and head links. Home, static,
+  history, entity, report, and community report pages now emit canonical links
+  and full `hreflang` alternates from the same route path policy. XML sitemap
+  alternates now use the same helper and include `en-SG` plus `x-default`.
 
 ## Decision Log
 

@@ -2,8 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { DateTime, Interval } from 'luxon';
 import type { Element, Root } from 'xast';
 import { toXml } from 'xast-util-to-xml';
-import { LANGUAGES_NON_DEFAULT } from '~/constants';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { buildLocaleAlternates } from '~/helpers/seo';
 import { getSitemapData } from './db.queries';
 
 interface SitemapPathData {
@@ -48,14 +47,14 @@ function buildEntries(path: string, rootUrl: string): Element {
         attributes: {},
         children: [{ type: 'text', value: '0.7' }],
       },
-      ...LANGUAGES_NON_DEFAULT.map((lang) => {
+      ...buildLocaleAlternates(path, rootUrl).map((alternate) => {
         return {
           type: 'element' as const,
           name: 'xhtml:link',
           attributes: {
             rel: 'alternate',
-            hreflang: lang,
-            href: new URL(buildLocaleAwareLink(path, lang), rootUrl).toString(),
+            hreflang: alternate.hreflang,
+            href: alternate.href,
           },
           children: [],
         } satisfies Element;

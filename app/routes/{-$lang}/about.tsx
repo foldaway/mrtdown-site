@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { createIntl, FormattedMessage } from 'react-intl';
-import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
+import { buildSeoMetadata } from '~/helpers/seo';
 
 export const Route = createFileRoute('/{-$lang}/about')({
   component: AboutPage,
@@ -10,11 +10,7 @@ export const Route = createFileRoute('/{-$lang}/about')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
-    const ogUrl = new URL(
-      buildLocaleAwareLink('/about', lang),
-      rootUrl,
-    ).toString();
-    const ogImage = new URL('/og_image.png', rootUrl).toString();
+    const seo = buildSeoMetadata({ path: '/about', lang, rootUrl });
 
     const intl = createIntl({
       locale: lang,
@@ -32,6 +28,7 @@ export const Route = createFileRoute('/{-$lang}/about')({
     });
 
     return {
+      links: seo.links,
       meta: [
         {
           title,
@@ -54,11 +51,11 @@ export const Route = createFileRoute('/{-$lang}/about')({
         },
         {
           property: 'og:url',
-          content: ogUrl,
+          content: seo.ogUrl,
         },
         {
           property: 'og:image',
-          content: ogImage,
+          content: seo.ogImage,
         },
       ],
     };

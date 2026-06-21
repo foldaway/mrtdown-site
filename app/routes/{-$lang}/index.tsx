@@ -11,6 +11,7 @@ import { HOME_OVERVIEW_INITIAL_DATE_COUNT, LANGUAGES } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
+import { buildSeoMetadata } from '~/helpers/seo';
 import { useViewport } from '~/hooks/useViewport';
 import { getOverviewFn } from '~/util/overview.functions';
 import { CurrentAdvisoriesSection } from '../../components/CurrentAdvisoriesSection';
@@ -72,14 +73,10 @@ export const Route = createFileRoute('/{-$lang}/')({
     const rootUrl = import.meta.env.VITE_ROOT_URL;
     assert(rootUrl != null, 'VITE_ROOT_URL is not set');
 
-    let ogUrl = new URL(rootUrl).toString();
-    if (lang !== 'en-SG') {
-      ogUrl = new URL(`/${lang}/`, rootUrl).toString();
-    }
-
-    const ogImage = new URL('/og_image.png', rootUrl).toString();
+    const seo = buildSeoMetadata({ path: '/', lang, rootUrl });
 
     return {
+      links: seo.links,
       meta: [
         {
           title,
@@ -98,11 +95,11 @@ export const Route = createFileRoute('/{-$lang}/')({
         },
         {
           property: 'og:url',
-          content: ogUrl,
+          content: seo.ogUrl,
         },
         {
           property: 'og:image',
-          content: ogImage,
+          content: seo.ogImage,
         },
         {
           property: 'og:site_name',
