@@ -134,6 +134,62 @@ describe('buildCrowdReportFormOptions', () => {
     expect(Object.keys(options.lineStationPaths)).toEqual(['CURRENT']);
   });
 
+  it('excludes station codes that are not active on the reference date', () => {
+    const options = buildCrowdReportFormOptions({
+      referenceDate: '2026-06-17',
+      lines: [
+        {
+          id: 'ACTIVE',
+          name: name('Active Line'),
+          color: '#005ec4',
+          startedAt: '2020-01-01',
+          endedAt: null,
+        },
+      ],
+      stations: [
+        { id: 'CURRENT', name: name('Current Station') },
+        { id: 'ENDED', name: name('Ended Station') },
+        { id: 'FUTURE', name: name('Future Station') },
+      ],
+      stationCodes: [
+        {
+          stationId: 'CURRENT',
+          lineId: 'ACTIVE',
+          code: 'A1',
+          startedAt: '2020-01-01',
+          endedAt: null,
+        },
+        {
+          stationId: 'ENDED',
+          lineId: 'ACTIVE',
+          code: 'A2',
+          startedAt: '2020-01-01',
+          endedAt: '2025-12-31',
+        },
+        {
+          stationId: 'FUTURE',
+          lineId: 'ACTIVE',
+          code: 'A3',
+          startedAt: '2027-01-01',
+          endedAt: null,
+        },
+      ],
+      services: [],
+      serviceRevisions: [],
+      servicePathEntries: [],
+    });
+
+    expect(options.stations).toEqual([
+      {
+        id: 'CURRENT',
+        name: name('Current Station'),
+        codes: ['A1'],
+        codePills: [{ lineId: 'ACTIVE', code: 'A1' }],
+        lineIds: ['ACTIVE'],
+      },
+    ]);
+  });
+
   it('builds station search metadata and guided line choices', () => {
     const options = buildCrowdReportFormOptions({
       referenceDate: '2026-06-17',

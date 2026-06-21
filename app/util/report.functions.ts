@@ -35,6 +35,8 @@ type CrowdReportFormStationCodeRow = {
   lineId: string;
   stationId: string;
   code: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
 };
 
 type CrowdReportFormServiceRow = {
@@ -68,13 +70,16 @@ type BuildCrowdReportFormOptionsInput = {
 };
 
 function isLineInOperationOnDate(
-  line: CrowdReportFormLineRow,
+  entity: {
+    startedAt?: string | null;
+    endedAt?: string | null;
+  },
   referenceDate: string,
 ) {
-  if (line.startedAt != null && line.startedAt > referenceDate) {
+  if (entity.startedAt != null && entity.startedAt > referenceDate) {
     return false;
   }
-  if (line.endedAt != null && line.endedAt < referenceDate) {
+  if (entity.endedAt != null && entity.endedAt < referenceDate) {
     return false;
   }
   return true;
@@ -93,8 +98,10 @@ export function buildCrowdReportFormOptions({
     .filter((line) => isLineInOperationOnDate(line, referenceDate))
     .map(({ id, name, color }) => ({ id, name, color }));
   const operatingLineIds = new Set(operatingLines.map((line) => line.id));
-  const operatingStationCodes = stationCodes.filter((code) =>
-    operatingLineIds.has(code.lineId),
+  const operatingStationCodes = stationCodes.filter(
+    (code) =>
+      operatingLineIds.has(code.lineId) &&
+      isLineInOperationOnDate(code, referenceDate),
   );
   const operatingStationIds = new Set(
     operatingStationCodes.map((code) => code.stationId),
@@ -307,8 +314,19 @@ export const getCrowdReportFormOptionsFn = createServerFn({
         lineId: stationCodesTable.line_id,
         stationId: stationCodesTable.station_id,
         code: stationCodesTable.code,
+        startedAt: stationCodesTable.started_at,
+        endedAt: stationCodesTable.ended_at,
       })
       .from(stationCodesTable)
+      .where(
+        and(
+          lte(stationCodesTable.started_at, referenceDate),
+          or(
+            isNull(stationCodesTable.ended_at),
+            gte(stationCodesTable.ended_at, referenceDate),
+          ),
+        ),
+      )
       .orderBy(asc(stationCodesTable.code)),
     db
       .select({
