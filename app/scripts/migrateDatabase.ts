@@ -1,5 +1,7 @@
 import assert from 'node:assert';
-import { readMigrationFiles } from 'drizzle-orm/migrator';
+import { sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 
 const { Client } = pg;
@@ -11,71 +13,26 @@ assert(
   'DATABASE_URL must be set',
 );
 
-const migrations = readMigrationFiles({ migrationsFolder: 'drizzle' });
 const client = new Client({ connectionString: DATABASE_URL });
+const db = drizzle({ client });
 const MIGRATION_LOCK_ID = 612348731;
 
 try {
   await client.connect();
-  await client.query('CREATE SCHEMA IF NOT EXISTS drizzle');
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (
-      id SERIAL PRIMARY KEY,
-      hash text NOT NULL,
-      created_at bigint
-    )
-  `);
+  await db.execute(sql`SELECT pg_advisory_lock(${MIGRATION_LOCK_ID})`);
 
-  await client.query('BEGIN');
-  await client.query('SELECT pg_advisory_xact_lock($1)', [MIGRATION_LOCK_ID]);
-
-  const lastMigrationResult = await client.query<{
-    created_at: string | number;
-  }>(
-    'SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC LIMIT 1',
-  );
-  const lastMigration = lastMigrationResult.rows[0];
-  const lastMigrationCreatedAt =
-    lastMigration == null ? null : Number(lastMigration.created_at);
-  const pendingMigrations = migrations.filter(
-    (migration) =>
-      lastMigrationCreatedAt == null ||
-      lastMigrationCreatedAt < migration.folderMillis,
-  );
-
-  console.log(
-    `Applying ${pendingMigrations.length} pending database migration(s)`,
-  );
-
-  for (const migration of pendingMigrations) {
-    console.log(`Applying migration ${migration.folderMillis}`);
-    for (const [index, statement] of migration.sql.entries()) {
-      try {
-        await client.query(statement);
-      } catch (error) {
-        console.error(
-          `Migration ${migration.folderMillis} statement ${index + 1} failed`,
-        );
-        console.error(statement);
-        throw error;
-      }
-    }
-    await client.query(
-      'INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ($1, $2)',
-      [migration.hash, migration.folderMillis],
-    );
-  }
-  await client.query('COMMIT');
-
+  console.log('Applying pending database migrations');
+  await migrate(db, { migrationsFolder: 'drizzle' });
   console.log('Database migrations complete');
 } catch (error) {
-  try {
-    await client.query('ROLLBACK');
-  } catch {
-    // Ignore rollback errors so the original migration error remains visible.
-  }
   console.error(error);
   process.exitCode = 1;
 } finally {
+  try {
+    await db.execute(sql`SELECT pg_advisory_unlock(${MIGRATION_LOCK_ID})`);
+  } catch {
+    // Ignore unlock errors so the original migration error remains visible.
+  }
+
   await client.end();
 }

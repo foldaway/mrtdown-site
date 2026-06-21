@@ -1,5 +1,5 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
 import { asc, sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { DateTime } from 'luxon';
 import pg from 'pg';
 import {
@@ -12,9 +12,9 @@ import {
   stationsTable,
 } from '../db/schema.js';
 import {
-  persistAutomoderatedCrowdReport,
   type CrowdReportAbuseContext,
   type CrowdReportSubmission,
+  persistAutomoderatedCrowdReport,
 } from '../util/crowdReports.js';
 
 const { Pool } = pg;
@@ -269,7 +269,7 @@ async function main(): Promise<void> {
   }
 
   const pool = new Pool({ connectionString: DATABASE_URL });
-  const db = drizzle(pool) as Db;
+  const db = drizzle({ client: pool }) as Db;
 
   try {
     const now = DateTime.now().setZone(SG_TIMEZONE);
