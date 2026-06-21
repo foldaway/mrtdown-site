@@ -107,8 +107,8 @@ export const relations = defineRelations(schema, (r) => ({
       to: r.stations.id.through(r.crowdReportClusterStations.station_id),
     }),
     crowdReports: r.many.crowdReports({
-      from: r.crowdReportClusters.id.through(r.crowdReports.cluster_id),
-      to: r.crowdReports.id.through(r.crowdReports.duplicate_of_id),
+      from: r.crowdReportClusters.id,
+      to: r.crowdReports.cluster_id,
     }),
   },
   lines: {
