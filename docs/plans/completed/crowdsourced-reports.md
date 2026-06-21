@@ -533,6 +533,11 @@ Exit criteria:
 - 2026-06-19: Added regression coverage for community-report evidence
   permalinks so single-report sources must remain unclustered and tied to a
   persisted line or station scope before they are publicly linkable.
+- 2026-06-21: Completed the site-side plan after `npm run verify` passed and
+  manual browser QA confirmed successful desktop line-issue and mobile
+  station-issue report submissions. Phase 6 threshold tuning remains a
+  post-launch operations concern driven by observed false-positive and
+  duplicate rates, not an implementation blocker.
 
 ## Decision Log
 

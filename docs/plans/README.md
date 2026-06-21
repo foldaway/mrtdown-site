@@ -18,8 +18,6 @@ Use plans for:
 
 ## Active
 
-- [Crowdsourced reports](active/crowdsourced-reports.md): site-local public
-  report collection, moderation, clustering, and canonical ingest dispatch.
 - [Dynamic system map](active/dynamic-system-map.md): canonical schematic map
   data and data-driven site rendering.
 - [Production performance](active/production-performance.md): public route
@@ -27,6 +25,8 @@ Use plans for:
 
 ## Completed
 
+- [Crowdsourced reports](completed/crowdsourced-reports.md): site-local public
+  report collection, moderation, clustering, and canonical ingest dispatch.
 - [Markdown for agents](completed/markdown-for-agents.md): `llms.txt` and
   app-owned Markdown alternatives for agents and scrapers.
 - [Overhaul read model](completed/overhaul-read-model.md): local
