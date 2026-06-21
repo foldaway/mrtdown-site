@@ -34,6 +34,7 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
+    "@fontsource-variable/radio-canada-big": "^5.2.7",
     "@heroicons/react": "^2.2.0",
     "@mrtdown/core": "^2.0.0-alpha.26",
     "@mrtdown/fs": "^2.0.0-alpha.26",
