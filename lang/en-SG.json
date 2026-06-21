@@ -34,6 +34,7 @@
   "general.about": "About",
   "general.active_disruptions": "<bold>{count}</bold> Active {count, plural, one {Disruption} other {Disruptions}}",
   "general.active_intervals": "Active Intervals",
+  "general.beta": "Beta",
   "general.affected_stations": "Affected stations",
   "general.change_since_previous": "{change} vs previous",
   "general.close": "Close",

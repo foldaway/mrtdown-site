@@ -32,6 +32,7 @@
   "general.about": "关于",
   "general.active_disruptions": "<bold>{count}</bold> {count, plural, one {进行中的服务中断} other {进行中的服务中断}}",
   "general.active_intervals": "活跃间隔",
+  "general.beta": "Beta",
   "general.affected_stations": "受影响车站",
   "general.change_since_previous": "与之前相比 {change}",
   "general.close": "关闭",

@@ -32,6 +32,7 @@
   "general.about": "Tentang",
   "general.active_disruptions": "<bold>{count}</bold> {count, plural, one {Gangguan Aktif} other {Gangguan Aktif}}",
   "general.active_intervals": "Selang Masa Aktif",
+  "general.beta": "Beta",
   "general.affected_stations": "Stesen Terjejas",
   "general.change_since_previous": "{change} berbanding sebelumnya",
   "general.close": "Tutup",

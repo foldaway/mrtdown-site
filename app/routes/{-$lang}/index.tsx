@@ -3,6 +3,7 @@ import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { lazy, useMemo } from 'react';
 import { createIntl, FormattedMessage } from 'react-intl';
+import { BetaBadge } from '~/components/BetaBadge';
 import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
 import { LineSummaryBlock } from '~/components/LineSummaryBlock';
 import { CommunitySignalsSectionSkeleton } from '~/components/ProfileWidgetSkeletons';
@@ -208,12 +209,15 @@ function HomePage() {
         {crowdReportsEnabled && (
           <section className="flex flex-col gap-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-sky-900 dark:bg-sky-950/30">
             <div>
-              <h2 className="font-semibold text-base text-gray-900 dark:text-gray-100">
-                <FormattedMessage
-                  id="home.report_cta_title"
-                  defaultMessage="Seeing a train delay?"
-                />
-              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-semibold text-base text-gray-900 dark:text-gray-100">
+                  <FormattedMessage
+                    id="home.report_cta_title"
+                    defaultMessage="Seeing a train delay?"
+                  />
+                </h2>
+                <BetaBadge />
+              </div>
               <p className="mt-1 text-gray-600 text-sm leading-5 dark:text-gray-300">
                 <FormattedMessage
                   id="home.report_cta_body"
