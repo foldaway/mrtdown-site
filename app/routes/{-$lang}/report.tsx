@@ -39,6 +39,7 @@ import {
   useIntl,
 } from 'react-intl';
 import { z } from 'zod';
+import { BetaBadge } from '~/components/BetaBadge';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { assert } from '~/util/assert';
@@ -1350,12 +1351,15 @@ function ReportPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <header>
-        <h1 className="font-bold text-3xl text-gray-900 tracking-normal dark:text-gray-100">
-          <FormattedMessage
-            id="report.heading"
-            defaultMessage="Submit a community train report"
-          />
-        </h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="font-bold text-3xl text-gray-900 tracking-normal dark:text-gray-100">
+            <FormattedMessage
+              id="report.heading"
+              defaultMessage="Submit a community train report"
+            />
+          </h1>
+          <BetaBadge />
+        </div>
         <p className="mt-2 max-w-2xl text-gray-600 text-sm leading-6 dark:text-gray-300">
           <FormattedMessage
             id="report.intro"

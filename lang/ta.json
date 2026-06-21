@@ -32,6 +32,7 @@
   "general.about": "எங்களைப் பற்றி",
   "general.active_disruptions": "<bold>{count}</bold> {count, plural, one {நடைபெற்று வரும் தடை} other {நடைபெற்று வரும் தடைகள்}}",
   "general.active_intervals": "செயலில் உள்ள இடைவெளிகள்",
+  "general.beta": "Beta",
   "general.affected_stations": "பாதிக்கப்பட்ட நிலையங்கள்",
   "general.change_since_previous": "முந்தையதுடன் ஒப்பிடும் போது {change}",
   "general.close": "மூடு",

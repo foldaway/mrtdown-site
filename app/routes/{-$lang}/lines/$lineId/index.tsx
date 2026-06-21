@@ -8,6 +8,7 @@ import {
   FormattedMessage,
   useIntl,
 } from 'react-intl';
+import { BetaBadge } from '~/components/BetaBadge';
 import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import {
@@ -330,6 +331,7 @@ function ComponentPage() {
                       />
                     </Link>
                     <span className="max-w-md text-gray-300 text-xs leading-5">
+                      <BetaBadge />{' '}
                       <FormattedMessage
                         id="line.report_cta_note"
                         defaultMessage="Community reports are reviewed separately from official operator advisories."

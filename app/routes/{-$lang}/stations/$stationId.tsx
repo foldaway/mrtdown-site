@@ -10,6 +10,7 @@ import {
   type IntlShape,
   useIntl,
 } from 'react-intl';
+import { BetaBadge } from '~/components/BetaBadge';
 import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
 import {
   CommunitySignalsSectionSkeleton,
@@ -320,12 +321,13 @@ function StationPage() {
                   <Link
                     to="/{-$lang}/report"
                     search={{ stationId: station.id }}
-                    className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
                   >
                     <FormattedMessage
                       id="station.report_cta"
                       defaultMessage="Report issue here"
                     />
+                    <BetaBadge />
                   </Link>
                 )}
               </div>

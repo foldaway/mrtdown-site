@@ -10,6 +10,7 @@ import {
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import type { PublicCrowdReportSignal } from '~/util/crowdReports';
+import { BetaBadge } from './BetaBadge';
 import { LineBar } from './LineBar';
 
 const EFFECT_LABEL_MESSAGES = defineMessages({
@@ -66,12 +67,15 @@ export const CommunitySignalsSection: React.FC<Props> = (props) => {
           <ChatBubbleLeftRightIcon className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="font-semibold text-base text-gray-900 dark:text-gray-100">
-            <FormattedMessage
-              id="community_signals.title"
-              defaultMessage="Community reports"
-            />
-          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-semibold text-base text-gray-900 dark:text-gray-100">
+              <FormattedMessage
+                id="community_signals.title"
+                defaultMessage="Community reports"
+              />
+            </h2>
+            <BetaBadge />
+          </div>
           <p className="mt-1 text-gray-700 text-sm leading-5 dark:text-gray-300">
             <FormattedMessage
               id="community_signals.description"
