@@ -190,6 +190,98 @@ describe('buildCrowdReportFormOptions', () => {
     ]);
   });
 
+  it('excludes inactive stations from service paths and direction choices', () => {
+    const options = buildCrowdReportFormOptions({
+      referenceDate: '2026-06-17',
+      lines: [
+        {
+          id: 'ACTIVE',
+          name: name('Active Line'),
+          color: '#005ec4',
+          startedAt: '2020-01-01',
+          endedAt: null,
+        },
+      ],
+      stations: [
+        { id: 'START', name: name('Start') },
+        { id: 'HIDDEN', name: name('Hidden') },
+        { id: 'END', name: name('End') },
+        { id: 'TERMINAL', name: name('Inactive Terminal') },
+      ],
+      stationCodes: [
+        {
+          stationId: 'START',
+          lineId: 'ACTIVE',
+          code: 'A1',
+          startedAt: '2020-01-01',
+          endedAt: null,
+        },
+        {
+          stationId: 'HIDDEN',
+          lineId: 'ACTIVE',
+          code: 'A2',
+          startedAt: '2020-01-01',
+          endedAt: '2025-12-31',
+        },
+        {
+          stationId: 'END',
+          lineId: 'ACTIVE',
+          code: 'A3',
+          startedAt: '2020-01-01',
+          endedAt: null,
+        },
+        {
+          stationId: 'TERMINAL',
+          lineId: 'ACTIVE',
+          code: 'A4',
+          startedAt: '2027-01-01',
+          endedAt: null,
+        },
+      ],
+      services: [{ id: 'svc-active', lineId: 'ACTIVE' }],
+      serviceRevisions: [
+        {
+          id: 'current',
+          serviceId: 'svc-active',
+          start_at: '2020-01-01',
+          end_at: null,
+          updated_at: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      servicePathEntries: [
+        {
+          serviceRevisionId: 'current',
+          serviceId: 'svc-active',
+          stationId: 'START',
+          pathIndex: 0,
+        },
+        {
+          serviceRevisionId: 'current',
+          serviceId: 'svc-active',
+          stationId: 'HIDDEN',
+          pathIndex: 1,
+        },
+        {
+          serviceRevisionId: 'current',
+          serviceId: 'svc-active',
+          stationId: 'END',
+          pathIndex: 2,
+        },
+        {
+          serviceRevisionId: 'current',
+          serviceId: 'svc-active',
+          stationId: 'TERMINAL',
+          pathIndex: 3,
+        },
+      ],
+    });
+
+    expect(options.lineStationPaths.ACTIVE).toEqual([['START', 'END']]);
+    expect(
+      options.lineDirections.ACTIVE?.map((option) => option.stationId),
+    ).toEqual(['END', 'START']);
+  });
+
   it('builds station search metadata and guided line choices', () => {
     const options = buildCrowdReportFormOptions({
       referenceDate: '2026-06-17',
@@ -237,7 +329,11 @@ describe('buildCrowdReportFormOptions', () => {
         { id: 'BP13', name: name('Senja') },
         { id: 'BP14', name: name('Ten Mile Junction') },
       ],
-      stationCodes: [],
+      stationCodes: [
+        { stationId: 'BP1', lineId: 'BPLRT', code: 'BP1' },
+        { stationId: 'BP6', lineId: 'BPLRT', code: 'BP6' },
+        { stationId: 'BP13', lineId: 'BPLRT', code: 'BP13' },
+      ],
       services: [{ id: 'svc-bplrt', lineId: 'BPLRT' }],
       serviceRevisions: [
         {
@@ -322,7 +418,10 @@ describe('buildCrowdReportFormOptions', () => {
         { id: 'CC1', name: name('Dhoby Ghaut') },
         { id: 'CC29', name: name('HarbourFront') },
       ],
-      stationCodes: [],
+      stationCodes: [
+        { stationId: 'CC1', lineId: 'CCL', code: 'CC1' },
+        { stationId: 'CC29', lineId: 'CCL', code: 'CC29' },
+      ],
       services: [
         { id: 'svc-ccl-main', lineId: 'CCL' },
         { id: 'svc-ccl-alt', lineId: 'CCL' },

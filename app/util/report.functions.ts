@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { Translations } from '@mrtdown/core';
 import { createServerFn } from '@tanstack/react-start';
-import { and, asc, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { getDb } from '~/db';
 import {
@@ -167,7 +167,9 @@ export function buildCrowdReportFormOptions({
         `${latestRevision.id}::${service.id}`
       ] ?? []),
     ].sort((a, b) => a.pathIndex - b.pathIndex);
-    const pathStationIds = entries.map((entry) => entry.stationId);
+    const pathStationIds = entries
+      .map((entry) => entry.stationId)
+      .filter((stationId) => operatingStationIds.has(stationId));
     if (pathStationIds.length > 0) {
       stationPathsByLineId[service.lineId] ??= [];
       stationPathKeysByLineId[service.lineId] ??= new Set();
@@ -178,8 +180,8 @@ export function buildCrowdReportFormOptions({
       }
     }
     const terminalStationIds = [
-      entries[0]?.stationId,
-      entries[entries.length - 1]?.stationId,
+      pathStationIds[0],
+      pathStationIds[pathStationIds.length - 1],
     ].filter((stationId): stationId is string => stationId != null);
 
     for (const stationId of terminalStationIds) {
@@ -292,15 +294,6 @@ export const getCrowdReportFormOptionsFn = createServerFn({
         endedAt: linesTable.ended_at,
       })
       .from(linesTable)
-      .where(
-        and(
-          lte(linesTable.started_at, referenceDate),
-          or(
-            isNull(linesTable.ended_at),
-            gte(linesTable.ended_at, referenceDate),
-          ),
-        ),
-      )
       .orderBy(asc(linesTable.id)),
     db
       .select({
@@ -318,15 +311,6 @@ export const getCrowdReportFormOptionsFn = createServerFn({
         endedAt: stationCodesTable.ended_at,
       })
       .from(stationCodesTable)
-      .where(
-        and(
-          lte(stationCodesTable.started_at, referenceDate),
-          or(
-            isNull(stationCodesTable.ended_at),
-            gte(stationCodesTable.ended_at, referenceDate),
-          ),
-        ),
-      )
       .orderBy(asc(stationCodesTable.code)),
     db
       .select({
@@ -368,50 +352,30 @@ export const getCrowdReportFormOptionsFn = createServerFn({
     serviceRevisionByKey.set(`${revision.serviceId}::${revision.id}`, revision);
   }
   const serviceRevisions = Array.from(serviceRevisionByKey.values());
-  const revisionsByServiceId = serviceRevisions.reduce<
-    Record<string, typeof serviceRevisions>
-  >((acc, revision) => {
-    acc[revision.serviceId] ??= [];
-    acc[revision.serviceId].push(revision);
-    return acc;
-  }, {});
-  const selectedServiceRevisions = Object.values(revisionsByServiceId)
-    .map((revisions) =>
-      selectServiceRevisionForReferenceDate(revisions, referenceDate),
-    )
-    .filter((revision): revision is (typeof serviceRevisions)[number] => {
-      return revision != null;
-    });
+  const servicePathEntries = await db
+    .select({
+      serviceRevisionId:
+        serviceRevisionPathStationEntriesTable.service_revision_id,
+      serviceId: serviceRevisionPathStationEntriesTable.service_id,
+      stationId: serviceRevisionPathStationEntriesTable.station_id,
+      pathIndex: serviceRevisionPathStationEntriesTable.path_index,
+    })
+    .from(serviceRevisionPathStationEntriesTable);
 
-  const latestRevisionIds = [
-    ...new Set(selectedServiceRevisions.map((revision) => revision.id)),
-  ];
-  const servicePathEntries =
-    latestRevisionIds.length > 0
-      ? await db
-          .select({
-            serviceRevisionId:
-              serviceRevisionPathStationEntriesTable.service_revision_id,
-            serviceId: serviceRevisionPathStationEntriesTable.service_id,
-            stationId: serviceRevisionPathStationEntriesTable.station_id,
-            pathIndex: serviceRevisionPathStationEntriesTable.path_index,
-          })
-          .from(serviceRevisionPathStationEntriesTable)
-          .where(
-            inArray(
-              serviceRevisionPathStationEntriesTable.service_revision_id,
-              latestRevisionIds,
-            ),
-          )
-      : [];
-
-  return buildCrowdReportFormOptions({
-    referenceDate,
+  const formOptionRows = {
     lines,
     stations,
     stationCodes,
     services,
     serviceRevisions,
     servicePathEntries,
-  });
+  };
+
+  return {
+    ...buildCrowdReportFormOptions({
+      referenceDate,
+      ...formOptionRows,
+    }),
+    formOptionRows,
+  };
 });
