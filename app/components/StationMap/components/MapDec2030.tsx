@@ -1886,7 +1886,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_jur"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -1901,7 +1901,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cng"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -1916,7 +1916,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bbt"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -1928,7 +1928,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bgb"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -1940,7 +1940,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cck"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -1952,7 +1952,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ckw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -1967,7 +1967,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tgh"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -1979,7 +1979,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tgp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -1994,7 +1994,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tgk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2009,7 +2009,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bbw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2024,7 +2024,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tgn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2039,7 +2039,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_jth"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2054,7 +2054,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_pdr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2066,7 +2066,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_hgk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2081,7 +2081,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cpn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2093,7 +2093,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_jrw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2108,7 +2108,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bhj"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2123,7 +2123,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_etp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2135,7 +2135,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tkn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2147,7 +2147,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_jrh"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2159,7 +2159,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_jrp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2171,7 +2171,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_gkp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2186,7 +2186,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tws"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2198,7 +2198,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_nyg"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2213,7 +2213,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_nyc"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2228,7 +2228,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_pkh"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2243,7 +2243,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ywt"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2255,7 +2255,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bkp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2267,7 +2267,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_kth"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2279,7 +2279,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tkw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2291,7 +2291,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_pnx"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2303,7 +2303,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_snj"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2315,7 +2315,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_jlp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2327,7 +2327,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_sgr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2339,7 +2339,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_fjr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2351,7 +2351,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_stk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2363,7 +2363,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cgl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2375,7 +2375,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_fmw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2387,7 +2387,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_kpg"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2399,7 +2399,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tng"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2411,7 +2411,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_fnv"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2423,7 +2423,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_lyr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2435,7 +2435,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tkg"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2447,7 +2447,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_rnj"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2459,7 +2459,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_rng"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2471,7 +2471,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_kgk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2483,7 +2483,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bak"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2495,7 +2495,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_rmb"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2507,7 +2507,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cpv"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2519,7 +2519,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_smg"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2531,7 +2531,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_nbg"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2543,7 +2543,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_smd"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2555,7 +2555,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_pgp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2567,7 +2567,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tkl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2579,7 +2579,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_smk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2591,7 +2591,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_dam"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2603,7 +2603,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_oas"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2615,7 +2615,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_kdl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2627,7 +2627,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_riv"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2639,7 +2639,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cre"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2651,7 +2651,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_mrd"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2663,7 +2663,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cov"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2675,7 +2675,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bkt"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2687,7 +2687,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_pnd"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2699,7 +2699,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ptr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2711,7 +2711,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_shv"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="16"
             font-weight="600"
             letter-spacing="0em"
@@ -2723,7 +2723,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_krj"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2735,7 +2735,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_csw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2747,7 +2747,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_hvw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2759,7 +2759,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_hme"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2771,7 +2771,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_btw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2783,7 +2783,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_kap"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2795,7 +2795,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_sav"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2807,7 +2807,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tkk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2819,7 +2819,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_msl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2831,7 +2831,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_wdl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2843,7 +2843,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_wdn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2855,7 +2855,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_wds"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2867,7 +2867,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_spl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2879,7 +2879,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ltr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2891,7 +2891,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_mfl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2903,7 +2903,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_brh"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2915,7 +2915,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_uts"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2927,7 +2927,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_npr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2939,7 +2939,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_obv"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2951,7 +2951,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_adm"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2963,7 +2963,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_sbw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2975,7 +2975,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cbr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2987,7 +2987,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_yis"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -2999,7 +2999,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ktb"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3011,7 +3011,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_yck"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3023,7 +3023,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_amk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3035,7 +3035,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tge"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3047,7 +3047,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bsh"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3059,7 +3059,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_lrc"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3071,7 +3071,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ser"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3083,7 +3083,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bly"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3095,7 +3095,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tsg"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3107,7 +3107,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_mps"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3119,7 +3119,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ubi"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3131,7 +3131,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_kkb"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3143,7 +3143,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bdn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3155,7 +3155,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bdr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3170,7 +3170,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tpw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3185,7 +3185,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tam"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3197,7 +3197,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tpe"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3209,7 +3209,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_upc"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3221,7 +3221,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_xpo"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3233,7 +3233,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cga"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3248,7 +3248,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_xln"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3260,7 +3260,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_sgb"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3272,7 +3272,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_pyl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3284,7 +3284,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_dkt"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3296,7 +3296,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_mbt"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3308,7 +3308,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_sdm"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3320,7 +3320,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_nch"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3332,7 +3332,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_pmn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3344,7 +3344,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_epn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3356,7 +3356,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bbs"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3371,7 +3371,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bft"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3383,7 +3383,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bdl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3395,7 +3395,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tap"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3407,7 +3407,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_psr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3419,7 +3419,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_pre"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3434,7 +3434,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_lyg"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3446,7 +3446,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_avp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3461,7 +3461,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tpn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3473,7 +3473,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_dfu"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3485,7 +3485,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_sgn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3500,7 +3500,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tvk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3512,7 +3512,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_pgc"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3527,7 +3527,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_pgl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3539,7 +3539,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_skg"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3551,7 +3551,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bgk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3563,7 +3563,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_hgn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3575,7 +3575,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_kvn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3587,7 +3587,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_wlh"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3599,7 +3599,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ptp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3611,7 +3611,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bnk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3623,7 +3623,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_frp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3635,7 +3635,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_sim"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3647,7 +3647,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bdk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3659,7 +3659,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_eun"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3671,7 +3671,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_alj"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3683,7 +3683,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_kal"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3695,7 +3695,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_lvr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3707,7 +3707,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_kem"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3719,7 +3719,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tnm"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3731,7 +3731,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_nov"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3743,7 +3743,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_new"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3755,7 +3755,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_orc"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3767,7 +3767,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_grw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3779,7 +3779,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_hvl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3791,7 +3791,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_max"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3803,7 +3803,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_shw"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3815,7 +3815,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_som"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3827,7 +3827,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cth"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3842,7 +3842,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tpg"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3857,7 +3857,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_rfp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3872,7 +3872,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_mrb"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3884,7 +3884,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_grb"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3896,7 +3896,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_trh"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3908,7 +3908,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_fdm"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3920,7 +3920,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ktp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3932,7 +3932,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tkt"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3944,7 +3944,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_mpr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3956,7 +3956,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_mtc"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3968,7 +3968,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_sgl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3980,7 +3980,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bsr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -3992,7 +3992,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bds"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4004,7 +4004,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_msp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4016,7 +4016,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_hbf"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4028,7 +4028,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tlb"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4040,7 +4040,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_lbd"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4052,7 +4052,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ppj"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4064,7 +4064,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_hpv"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4076,7 +4076,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_krg"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4088,7 +4088,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_onh"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4100,7 +4100,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bnv"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4112,7 +4112,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_dvr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4124,7 +4124,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cle"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4136,7 +4136,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_lks"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4148,7 +4148,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bnl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4160,7 +4160,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_pnr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4172,7 +4172,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_jkn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4184,7 +4184,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_gcl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4196,7 +4196,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tcr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4211,7 +4211,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_twr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4229,7 +4229,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tlk"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4241,7 +4241,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_hlv"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4253,7 +4253,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_frr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4265,7 +4265,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_cdt"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4277,7 +4277,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_mrm"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4289,7 +4289,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_btn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4304,7 +4304,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_stv"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4316,7 +4316,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_lti"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4331,7 +4331,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_rcr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4343,7 +4343,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bdm"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4355,7 +4355,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_glb"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4367,7 +4367,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_mtr"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4379,7 +4379,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_jlb"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4391,7 +4391,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bgs"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4403,7 +4403,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_dtn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4415,7 +4415,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tla"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4430,7 +4430,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ctn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4442,7 +4442,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_otp"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4454,7 +4454,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_tib"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4466,7 +4466,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_rdh"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4478,7 +4478,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_que"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4490,7 +4490,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_com"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4502,7 +4502,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_fcn"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4514,7 +4514,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_bcl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4526,7 +4526,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_dbg"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4541,7 +4541,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_crq"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4556,7 +4556,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_kpl"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4568,7 +4568,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_ctm"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4580,7 +4580,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
           <text
             id="label_per"
             fill="#2D2A26"
-            font-family="Radio Canada Big"
+            font-family="Radio Canada Big Variable"
             font-size="20"
             font-weight="600"
             letter-spacing="0em"
@@ -4606,7 +4606,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 17"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4626,7 +4626,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 15"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4650,7 +4650,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PTC"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4670,7 +4670,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 17"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4694,7 +4694,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 16"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4714,7 +4714,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="STC"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4738,7 +4738,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 12"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4758,7 +4758,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 13"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4782,7 +4782,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 26"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4802,7 +4802,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 10"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4826,7 +4826,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 8"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4846,7 +4846,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 9"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4870,7 +4870,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4890,7 +4890,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CG"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4914,7 +4914,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 15"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4934,7 +4934,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 4"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4958,7 +4958,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 16"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -4978,7 +4978,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CE 1"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5002,7 +5002,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 14"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5022,7 +5022,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 22"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5046,7 +5046,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 25"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5066,7 +5066,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 13"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5090,7 +5090,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 26"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5110,7 +5110,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 14"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5134,7 +5134,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 29"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5154,7 +5154,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5178,7 +5178,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 24"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5198,7 +5198,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 6"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5218,7 +5218,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 1"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5242,7 +5242,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 16"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5262,7 +5262,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5282,7 +5282,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 17"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5306,7 +5306,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 27"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5326,7 +5326,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 20"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5346,7 +5346,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CE 2"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5372,7 +5372,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 21"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5410,7 +5410,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 11"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5434,7 +5434,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JE 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5454,7 +5454,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5474,7 +5474,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 24"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5498,7 +5498,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 22"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5518,7 +5518,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 21"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5542,7 +5542,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 19"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5562,7 +5562,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 9"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5586,7 +5586,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5606,7 +5606,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 12"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5630,7 +5630,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 12"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5650,7 +5650,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 14"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5674,7 +5674,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CG 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5694,7 +5694,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 35"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5718,7 +5718,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 31"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5738,7 +5738,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 37"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5762,7 +5762,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5782,7 +5782,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 19"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5806,7 +5806,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 10"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5826,7 +5826,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 11"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5850,7 +5850,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 17"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5870,7 +5870,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 9"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5894,7 +5894,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5914,7 +5914,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5934,7 +5934,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5960,7 +5960,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 6"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -5998,7 +5998,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6023,7 +6023,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
               <text
                 id="EW 2"
                 fill="white"
-                font-family="Radio Canada Big"
+                font-family="Radio Canada Big Variable"
                 font-size="16"
                 font-weight="600"
                 letter-spacing="0em"
@@ -6065,7 +6065,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
               <text
                 id="DT 32"
                 fill="white"
-                font-family="Radio Canada Big"
+                font-family="Radio Canada Big Variable"
                 font-size="16"
                 font-weight="600"
                 letter-spacing="0em"
@@ -6088,7 +6088,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 9"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6108,7 +6108,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6132,7 +6132,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 32"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6156,7 +6156,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 31"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6180,7 +6180,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 30"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6204,7 +6204,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 29"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6228,7 +6228,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 28"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6252,7 +6252,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 27"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6272,7 +6272,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 8"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6296,7 +6296,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 33"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6320,7 +6320,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 26"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6344,7 +6344,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 25"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6368,7 +6368,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 23"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6392,7 +6392,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6416,7 +6416,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6440,7 +6440,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6464,7 +6464,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6488,7 +6488,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6512,7 +6512,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6536,7 +6536,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6560,7 +6560,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6584,7 +6584,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 8"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6608,7 +6608,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 9"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6632,7 +6632,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 10"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6656,7 +6656,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 11"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6680,7 +6680,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 12"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6704,7 +6704,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="BP 13"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6728,7 +6728,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PW 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6752,7 +6752,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PW 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6776,7 +6776,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PW 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6800,7 +6800,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PW 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6824,7 +6824,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PE 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6848,7 +6848,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PE 6"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6872,7 +6872,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PE 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6896,7 +6896,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PE 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6920,7 +6920,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PE 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6944,7 +6944,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PE 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6968,7 +6968,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SW 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -6992,7 +6992,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SW 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7016,7 +7016,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SW 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7040,7 +7040,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SW 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7064,7 +7064,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SW 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7088,7 +7088,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SW 6"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7112,7 +7112,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SW 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7136,7 +7136,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SW 8"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7160,7 +7160,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SE 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7184,7 +7184,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SE 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7208,7 +7208,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SE 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7232,7 +7232,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SE 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7256,7 +7256,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="SE 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7280,7 +7280,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PW 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7304,7 +7304,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PW 6"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7328,7 +7328,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PW 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7352,7 +7352,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7376,7 +7376,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 8"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7400,7 +7400,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7424,7 +7424,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7448,7 +7448,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7472,7 +7472,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7496,7 +7496,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 6"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7520,7 +7520,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7540,7 +7540,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 13"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7564,7 +7564,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 8"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7588,7 +7588,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 12"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7612,7 +7612,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 13"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7636,7 +7636,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 15"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7660,7 +7660,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 16"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7684,7 +7684,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 18"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7708,7 +7708,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7732,7 +7732,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 8"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7756,7 +7756,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 9"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7780,7 +7780,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 10"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7804,7 +7804,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 11"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7828,7 +7828,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 13"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7852,7 +7852,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 14"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7872,7 +7872,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 8"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7896,7 +7896,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 15"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7920,7 +7920,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NE 18"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7944,7 +7944,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 19"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7968,7 +7968,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 22"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -7992,7 +7992,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 23"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8016,7 +8016,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 22A"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8040,7 +8040,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 24"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8064,7 +8064,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 25"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8088,7 +8088,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 26"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8112,7 +8112,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 27"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8136,7 +8136,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 28"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8160,7 +8160,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 29"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8184,7 +8184,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="TE 30"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8208,7 +8208,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 10"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8232,7 +8232,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 11"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8256,7 +8256,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 12"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8280,7 +8280,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 13"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8304,7 +8304,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 14"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8328,7 +8328,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 15"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8352,7 +8352,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 16"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8372,7 +8372,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 11"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8396,7 +8396,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 18"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8420,7 +8420,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 19"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8444,7 +8444,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 20"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8468,7 +8468,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 23"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8492,7 +8492,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="NS 28"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8516,7 +8516,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8540,7 +8540,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8564,7 +8564,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8588,7 +8588,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8612,7 +8612,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 6"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8636,7 +8636,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8660,7 +8660,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 8"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8684,7 +8684,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 13"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8708,7 +8708,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 17"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8732,7 +8732,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 18"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8756,7 +8756,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 20"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8780,7 +8780,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 21"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8804,7 +8804,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 22"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8828,7 +8828,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 23"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8852,7 +8852,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 24"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8876,7 +8876,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 25"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8900,7 +8900,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 27"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8924,7 +8924,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 28"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8948,7 +8948,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 29"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8972,7 +8972,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 30"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -8996,7 +8996,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 31"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9020,7 +9020,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 33"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9044,7 +9044,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 34"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9068,7 +9068,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="DT 34_2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9092,7 +9092,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 22"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9116,7 +9116,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 20"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9140,7 +9140,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 19"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9164,7 +9164,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 18"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9188,7 +9188,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 17"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9212,7 +9212,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 28"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9236,7 +9236,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 27"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9260,7 +9260,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 26"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9284,7 +9284,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 25"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9308,7 +9308,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 24"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9332,7 +9332,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 23"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9356,7 +9356,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 21"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9380,7 +9380,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 20"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9404,7 +9404,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 16"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9428,7 +9428,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 14"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9452,7 +9452,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 12"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9476,7 +9476,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 11"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9500,7 +9500,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 8"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9524,7 +9524,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 7"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9548,7 +9548,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 6"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9572,7 +9572,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 5"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9596,7 +9596,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 3"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9620,7 +9620,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 2"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9644,7 +9644,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 15"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9668,7 +9668,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 11"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9692,7 +9692,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 10"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9716,7 +9716,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 9"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9740,7 +9740,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9764,7 +9764,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 6"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9788,7 +9788,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9812,7 +9812,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9836,7 +9836,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9856,7 +9856,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="EW 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="16"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9880,7 +9880,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CG 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9904,7 +9904,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9928,7 +9928,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9952,7 +9952,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JE 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -9976,7 +9976,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JE 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10000,7 +10000,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JE 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10024,7 +10024,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10048,7 +10048,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10072,7 +10072,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 6"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10096,7 +10096,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10120,7 +10120,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JW 1"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10144,7 +10144,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JW 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10168,7 +10168,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JE 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10192,7 +10192,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JE 6"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10216,7 +10216,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JE 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10240,7 +10240,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 9"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10264,7 +10264,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 10"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10288,7 +10288,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 11"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10312,7 +10312,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JS 12"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10336,7 +10336,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JW 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10360,7 +10360,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JW 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10384,7 +10384,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="JW 5"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10408,7 +10408,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 6"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10432,7 +10432,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10456,7 +10456,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 3"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10480,7 +10480,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 2"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10504,7 +10504,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 7"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10528,7 +10528,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 9"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10552,7 +10552,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 10"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10576,7 +10576,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CR 12"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10600,7 +10600,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="PE 4"
                   fill="white"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="12"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10624,7 +10624,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 30"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10648,7 +10648,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 31"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
@@ -10672,7 +10672,7 @@ const _MapDec2030: React.ForwardRefRenderFunction<SVGSVGElement> = (
                 <text
                   id="CC 32"
                   fill="#383A37"
-                  font-family="Radio Canada Big"
+                  font-family="Radio Canada Big Variable"
                   font-size="14"
                   font-weight="600"
                   letter-spacing="0em"
