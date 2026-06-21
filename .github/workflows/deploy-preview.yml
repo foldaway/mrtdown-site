@@ -48,7 +48,7 @@ jobs:
 
       - name: Deploy to Cloudflare Workers
         id: deploy
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           command: deploy --env preview
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
