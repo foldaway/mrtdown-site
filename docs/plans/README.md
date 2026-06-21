@@ -22,6 +22,8 @@ Use plans for:
   data and data-driven site rendering.
 - [Production performance](active/production-performance.md): public route
   latency and payload reduction plan.
+- [SEO remediation](active/seo-remediation.md): crawl-clean sitemap output,
+  canonical metadata, locale alternates, and metadata quality fixes.
 
 ## Completed
 
