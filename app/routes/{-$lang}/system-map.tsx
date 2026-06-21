@@ -59,6 +59,11 @@ export const Route = createFileRoute('/{-$lang}/system-map')({
       id: 'general.system_map',
       defaultMessage: 'System Map',
     });
+    const description = intl.formatMessage({
+      id: 'site.system_map.subtitle',
+      defaultMessage:
+        "Real-time status and network overview of Singapore's MRT and LRT system",
+    });
 
     return {
       meta: [
@@ -66,8 +71,16 @@ export const Route = createFileRoute('/{-$lang}/system-map')({
           title,
         },
         {
+          name: 'description',
+          content: description,
+        },
+        {
           property: 'og:title',
           content: title,
+        },
+        {
+          property: 'og:description',
+          content: description,
         },
         {
           property: 'og:type',

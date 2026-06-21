@@ -13,6 +13,9 @@ interface SitemapPathData {
   issueIds: string[];
   monthEarliest: string;
   monthLatest: string;
+  operationalFactCoverageDates: string[];
+  operationalFactCoverageStartDate: string | null;
+  currentDate: string;
 }
 
 function buildEntries(path: string, rootUrl: string): Element {
@@ -96,14 +99,11 @@ export function buildSitemapPaths({
   issueIds,
   monthEarliest,
   monthLatest,
+  operationalFactCoverageDates,
+  operationalFactCoverageStartDate,
+  currentDate,
 }: SitemapPathData) {
-  const paths: string[] = [
-    '/',
-    '/history',
-    '/statistics',
-    '/system-map',
-    '/about',
-  ];
+  const paths: string[] = ['/', '/statistics', '/system-map', '/about'];
 
   for (const lineId of lineIds) {
     paths.push(`/lines/${lineId}`);
@@ -120,6 +120,12 @@ export function buildSitemapPaths({
 
   const monthEarliestDateTime = DateTime.fromISO(monthEarliest);
   const monthLatestDateTime = DateTime.fromISO(monthLatest);
+  const coverageDates = new Set(operationalFactCoverageDates);
+  const coverageStartDateTime =
+    operationalFactCoverageStartDate == null
+      ? null
+      : DateTime.fromISO(operationalFactCoverageStartDate);
+  const currentDateTime = DateTime.fromISO(currentDate);
   const interval = Interval.fromDateTimes(
     monthEarliestDateTime,
     monthLatestDateTime.plus({ month: 1 }),
@@ -130,14 +136,117 @@ export function buildSitemapPaths({
       continue;
     }
 
-    if (!paths.includes(`/history/${monthDateTime.toFormat('yyyy')}`)) {
-      paths.push(`/history/${monthDateTime.toFormat('yyyy')}`);
+    if (
+      !isHistoryMonthRenderable({
+        coverageDates,
+        coverageStartDateTime,
+        currentDateTime,
+        monthDateTime,
+      })
+    ) {
+      continue;
     }
 
+    const yearPath = `/history/${monthDateTime.toFormat('yyyy')}`;
+    if (
+      !paths.includes(yearPath) &&
+      isHistoryYearRenderable({
+        coverageDates,
+        coverageStartDateTime,
+        currentDateTime,
+        yearDateTime: monthDateTime.startOf('year'),
+      })
+    ) {
+      paths.push(yearPath);
+    }
     paths.push(
       `/history/${monthDateTime.toFormat('yyyy')}/${monthDateTime.toFormat('MM')}`,
     );
   }
 
   return paths;
+}
+
+function isHistoryMonthRenderable({
+  coverageDates,
+  coverageStartDateTime,
+  currentDateTime,
+  monthDateTime,
+}: {
+  coverageDates: Set<string>;
+  coverageStartDateTime: DateTime | null;
+  currentDateTime: DateTime;
+  monthDateTime: DateTime;
+}) {
+  const monthStart = monthDateTime.startOf('month');
+  const monthEnd = monthStart.endOf('month').startOf('day');
+
+  return isHistoryDateRangeRenderable({
+    coverageDates,
+    coverageStartDateTime,
+    currentDateTime,
+    rangeStart: monthStart,
+    rangeEnd: monthEnd,
+  });
+}
+
+function isHistoryYearRenderable({
+  coverageDates,
+  coverageStartDateTime,
+  currentDateTime,
+  yearDateTime,
+}: {
+  coverageDates: Set<string>;
+  coverageStartDateTime: DateTime | null;
+  currentDateTime: DateTime;
+  yearDateTime: DateTime;
+}) {
+  const yearStart = yearDateTime.startOf('year');
+  const yearEnd = yearStart.plus({ years: 1 }).minus({ days: 1 });
+
+  return isHistoryDateRangeRenderable({
+    coverageDates,
+    coverageStartDateTime,
+    currentDateTime,
+    rangeStart: yearStart,
+    rangeEnd: yearEnd,
+  });
+}
+
+function isHistoryDateRangeRenderable({
+  coverageDates,
+  coverageStartDateTime,
+  currentDateTime,
+  rangeStart,
+  rangeEnd,
+}: {
+  coverageDates: Set<string>;
+  coverageStartDateTime: DateTime | null;
+  currentDateTime: DateTime;
+  rangeStart: DateTime;
+  rangeEnd: DateTime;
+}) {
+  const start = rangeStart.startOf('day');
+  const end = rangeEnd.startOf('day');
+  const today = currentDateTime.startOf('day');
+
+  if (end >= today) {
+    return true;
+  }
+
+  if (
+    coverageStartDateTime != null &&
+    start < coverageStartDateTime.startOf('day')
+  ) {
+    return true;
+  }
+
+  for (let cursor = start; cursor <= end; cursor = cursor.plus({ day: 1 })) {
+    const date = cursor.toISODate();
+    if (date == null || !coverageDates.has(date)) {
+      return false;
+    }
+  }
+
+  return true;
 }

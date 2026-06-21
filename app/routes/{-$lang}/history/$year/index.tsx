@@ -48,7 +48,7 @@ export const Route = createFileRoute('/{-$lang}/history/$year/')({
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
     const ogUrl = new URL(
-      buildLocaleAwareLink('/history/$year', lang),
+      buildLocaleAwareLink(`/history/${ctx.params.year}`, lang),
       rootUrl,
     ).toString();
     const ogImage = new URL('/og_image.png', rootUrl).toString();
@@ -71,6 +71,16 @@ export const Route = createFileRoute('/{-$lang}/history/$year/')({
         startAt: dateTimeStartAt.toMillis(),
       },
     );
+    const description = intl.formatMessage(
+      {
+        id: 'site.history.year_description',
+        defaultMessage:
+          'Past service disruptions and maintenance events in {startAt, date, ::yyyy}.',
+      },
+      {
+        startAt: dateTimeStartAt.toMillis(),
+      },
+    );
 
     return {
       meta: [
@@ -78,8 +88,16 @@ export const Route = createFileRoute('/{-$lang}/history/$year/')({
           title,
         },
         {
+          name: 'description',
+          content: description,
+        },
+        {
           property: 'og:title',
           content: title,
+        },
+        {
+          property: 'og:description',
+          content: description,
         },
         {
           property: 'og:type',

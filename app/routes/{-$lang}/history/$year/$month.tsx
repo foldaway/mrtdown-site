@@ -64,6 +64,16 @@ export const Route = createFileRoute('/{-$lang}/history/$year/$month')({
         startAt: dateTimeStartAt.toMillis(),
       },
     );
+    const description = intl.formatMessage(
+      {
+        id: 'site.history.month_description',
+        defaultMessage:
+          'Past service disruptions and maintenance events in {startAt, date, ::MMMM yyyy}.',
+      },
+      {
+        startAt: dateTimeStartAt.toMillis(),
+      },
+    );
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
@@ -79,8 +89,16 @@ export const Route = createFileRoute('/{-$lang}/history/$year/$month')({
           title,
         },
         {
+          name: 'description',
+          content: description,
+        },
+        {
           property: 'og:title',
           content: title,
+        },
+        {
+          property: 'og:description',
+          content: description,
         },
         {
           property: 'og:type',

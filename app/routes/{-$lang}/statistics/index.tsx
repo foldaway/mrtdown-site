@@ -33,6 +33,11 @@ export const Route = createFileRoute('/{-$lang}/statistics/')({
       id: 'general.statistics',
       defaultMessage: 'Statistics',
     });
+    const description = intl.formatMessage({
+      id: 'site.statistics.subtitle',
+      defaultMessage:
+        "Historical performance data and analytics for Singapore's MRT and LRT network",
+    });
 
     return {
       meta: [
@@ -40,8 +45,16 @@ export const Route = createFileRoute('/{-$lang}/statistics/')({
           title,
         },
         {
+          name: 'description',
+          content: description,
+        },
+        {
           property: 'og:title',
           content: title,
+        },
+        {
+          property: 'og:description',
+          content: description,
         },
         {
           property: 'og:type',
