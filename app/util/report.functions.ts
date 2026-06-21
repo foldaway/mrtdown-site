@@ -113,7 +113,7 @@ export function buildCrowdReportFormOptions({
     operatingLineIds.has(service.lineId),
   );
   const stationById = Object.fromEntries(
-    stations.map((station) => [station.id, station]),
+    operatingStations.map((station) => [station.id, station]),
   );
   const revisionsByServiceId = serviceRevisions.reduce<
     Record<string, CrowdReportFormServiceRevisionRow[]>
