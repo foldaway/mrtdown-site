@@ -129,20 +129,6 @@ describe('buildCrowdReportFormOptions', () => {
         codePills: [{ lineId: 'CURRENT', code: 'C1' }],
         lineIds: ['CURRENT'],
       },
-      {
-        id: 'B',
-        name: name('Beta'),
-        codes: [],
-        codePills: [],
-        lineIds: [],
-      },
-      {
-        id: 'C',
-        name: name('Gamma'),
-        codes: [],
-        codePills: [],
-        lineIds: [],
-      },
     ]);
     expect(Object.keys(options.lineDirections)).toEqual(['CURRENT']);
     expect(Object.keys(options.lineStationPaths)).toEqual(['CURRENT']);
@@ -179,13 +165,6 @@ describe('buildCrowdReportFormOptions', () => {
           { lineId: 'DTL', code: 'DT1' },
         ],
         lineIds: ['BPLRT', 'DTL'],
-      },
-      {
-        id: 'DT1',
-        name: name('Bukit Panjang'),
-        codes: [],
-        codePills: [],
-        lineIds: [],
       },
     ]);
   });

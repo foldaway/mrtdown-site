@@ -265,6 +265,7 @@ function makeFakePublicSignalDb() {
 
 function makeFakeReferenceDb(selectResults: unknown[][]) {
   const nextSelectResult = () => selectResults.shift() ?? [];
+  const whereCalls: unknown[] = [];
   const selectBuilder = {
     from() {
       return this;
@@ -272,7 +273,8 @@ function makeFakeReferenceDb(selectResults: unknown[][]) {
     innerJoin() {
       return this;
     },
-    where() {
+    where(condition: unknown) {
+      whereCalls.push(condition);
       return Promise.resolve(nextSelectResult());
     },
   };
@@ -283,6 +285,7 @@ function makeFakeReferenceDb(selectResults: unknown[][]) {
         return selectBuilder;
       },
     },
+    whereCalls,
   };
 }
 
@@ -832,6 +835,7 @@ describe('findMissingCrowdReportReferences', () => {
     const fake = makeFakeReferenceDb([
       [{ id: 'BPLRT' }],
       [{ id: 'BP6' }],
+      [{ id: 'BP6' }],
       [
         {
           id: 'rev-current',
@@ -861,6 +865,7 @@ describe('findMissingCrowdReportReferences', () => {
     await expect(
       findMissingCrowdReportReferences(fake.db as never, {
         lineIds: ['BPLRT'],
+        observedAt: '2026-05-24T12:30:00.000+08:00',
         stationIds: [],
         directionStationId: 'BP6',
       }),
@@ -874,6 +879,7 @@ describe('findMissingCrowdReportReferences', () => {
   it('rejects a direction station that is not offered for the selected line', async () => {
     const fake = makeFakeReferenceDb([
       [{ id: 'BPLRT' }],
+      [{ id: 'BP6' }],
       [{ id: 'BP6' }],
       [
         {
@@ -904,6 +910,7 @@ describe('findMissingCrowdReportReferences', () => {
     await expect(
       findMissingCrowdReportReferences(fake.db as never, {
         lineIds: ['BPLRT'],
+        observedAt: '2026-05-24T12:30:00.000+08:00',
         stationIds: [],
         directionStationId: 'BP6',
       }),
@@ -918,11 +925,13 @@ describe('findMissingCrowdReportReferences', () => {
     const fake = makeFakeReferenceDb([
       [{ id: 'BPLRT' }, { id: 'CCL' }],
       [{ id: 'BP6' }],
+      [{ id: 'BP6' }],
     ]);
 
     await expect(
       findMissingCrowdReportReferences(fake.db as never, {
         lineIds: ['BPLRT', 'CCL'],
+        observedAt: '2026-05-24T12:30:00.000+08:00',
         stationIds: [],
         directionStationId: 'BP6',
       }),
@@ -931,6 +940,49 @@ describe('findMissingCrowdReportReferences', () => {
       stationIds: [],
       directionStationIds: ['BP6'],
     });
+  });
+
+  it('rejects stations without an active station code', async () => {
+    const fake = makeFakeReferenceDb([[{ id: 'BP6' }], []]);
+
+    await expect(
+      findMissingCrowdReportReferences(fake.db as never, {
+        lineIds: [],
+        observedAt: '2026-05-24T12:30:00.000+08:00',
+        stationIds: ['BP6'],
+      }),
+    ).resolves.toEqual({
+      lineIds: [],
+      stationIds: ['BP6'],
+      directionStationIds: [],
+    });
+  });
+
+  it('checks line and station activity against the observed Singapore date', async () => {
+    const fake = makeFakeReferenceDb([
+      [{ id: 'BPLRT' }],
+      [{ id: 'BP6' }],
+      [{ id: 'BP6' }],
+    ]);
+
+    await expect(
+      findMissingCrowdReportReferences(fake.db as never, {
+        lineIds: ['BPLRT'],
+        observedAt: '2026-05-23T23:30:00-05:00',
+        stationIds: ['BP6'],
+      }),
+    ).resolves.toEqual({
+      lineIds: [],
+      stationIds: [],
+      directionStationIds: [],
+    });
+
+    const dialect = new PgDialect();
+    const lineWhereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL);
+    const stationCodeWhereSql = dialect.sqlToQuery(fake.whereCalls[2] as SQL);
+
+    expect(lineWhereSql.params).toContain('2026-05-24');
+    expect(stationCodeWhereSql.params).toContain('2026-05-24');
   });
 });
 

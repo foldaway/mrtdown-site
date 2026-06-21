@@ -96,6 +96,12 @@ export function buildCrowdReportFormOptions({
   const operatingStationCodes = stationCodes.filter((code) =>
     operatingLineIds.has(code.lineId),
   );
+  const operatingStationIds = new Set(
+    operatingStationCodes.map((code) => code.stationId),
+  );
+  const operatingStations = stations.filter((station) =>
+    operatingStationIds.has(station.id),
+  );
   const operatingServices = services.filter((service) =>
     operatingLineIds.has(service.lineId),
   );
@@ -236,7 +242,7 @@ export function buildCrowdReportFormOptions({
     lines: operatingLines,
     lineDirections: directionsByLineId,
     lineStationPaths: stationPathsByLineId,
-    stations: stations.map((station) => ({
+    stations: operatingStations.map((station) => ({
       ...station,
       codes: stationCodesByStationId[station.id] ?? [],
       codePills: stationCodePillsByStationId[station.id] ?? [],

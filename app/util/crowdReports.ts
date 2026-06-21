@@ -29,6 +29,7 @@ import {
   serviceRevisionPathStationEntriesTable,
   serviceRevisionsTable,
   servicesTable,
+  stationCodesTable,
   stationsTable,
   crowdReportStationsTable,
 } from '~/db/schema';
@@ -778,18 +779,16 @@ export async function findMissingCrowdReportReferences(
   db: AppDb,
   submission: Pick<
     CrowdReportSubmission,
-    'directionStationId' | 'lineIds' | 'stationIds'
+    'directionStationId' | 'lineIds' | 'observedAt' | 'stationIds'
   >,
 ) {
-  const referenceDate =
-    DateTime.now().setZone(SG_TIMEZONE).toISODate() ??
-    new Date().toISOString().slice(0, 10);
+  const referenceDate = getCrowdReportReferenceDate(submission);
   const referencedStationIds = [
     ...submission.stationIds,
     ...(submission.directionStationId ? [submission.directionStationId] : []),
   ];
-  const [lineRows, stationRows, invalidDirectionStationIds] = await Promise.all(
-    [
+  const [lineRows, stationRows, activeStationRows, invalidDirectionStationIds] =
+    await Promise.all([
       submission.lineIds.length > 0
         ? db
             .select({ id: linesTable.id })
@@ -811,20 +810,56 @@ export async function findMissingCrowdReportReferences(
             .from(stationsTable)
             .where(inArray(stationsTable.id, referencedStationIds))
         : Promise.resolve([]),
-      findInvalidDirectionStationIds(db, submission),
-    ],
-  );
+      referencedStationIds.length > 0
+        ? db
+            .select({ id: stationCodesTable.station_id })
+            .from(stationCodesTable)
+            .innerJoin(linesTable, eq(stationCodesTable.line_id, linesTable.id))
+            .where(
+              and(
+                inArray(stationCodesTable.station_id, referencedStationIds),
+                lte(linesTable.started_at, referenceDate),
+                or(
+                  isNull(linesTable.ended_at),
+                  gte(linesTable.ended_at, referenceDate),
+                ),
+                lte(stationCodesTable.started_at, referenceDate),
+                or(
+                  isNull(stationCodesTable.ended_at),
+                  gte(stationCodesTable.ended_at, referenceDate),
+                ),
+              ),
+            )
+        : Promise.resolve([]),
+      findInvalidDirectionStationIds(db, submission, referenceDate),
+    ]);
 
   const existingLineIds = new Set(lineRows.map((row) => row.id));
   const existingStationIds = new Set(stationRows.map((row) => row.id));
+  const activeStationIds = new Set(activeStationRows.map((row) => row.id));
 
   return {
     lineIds: submission.lineIds.filter((id) => !existingLineIds.has(id)),
     stationIds: referencedStationIds.filter(
-      (id) => !existingStationIds.has(id),
+      (id) => !existingStationIds.has(id) || !activeStationIds.has(id),
     ),
     directionStationIds: invalidDirectionStationIds,
   };
+}
+
+function getCrowdReportReferenceDate(
+  submission: Pick<CrowdReportSubmission, 'observedAt'>,
+) {
+  const observedDate = DateTime.fromISO(submission.observedAt, {
+    setZone: true,
+  })
+    .setZone(SG_TIMEZONE)
+    .toISODate();
+  return (
+    observedDate ??
+    DateTime.now().setZone(SG_TIMEZONE).toISODate() ??
+    new Date().toISOString().slice(0, 10)
+  );
 }
 
 async function findInvalidDirectionStationIds(
@@ -833,6 +868,7 @@ async function findInvalidDirectionStationIds(
     CrowdReportSubmission,
     'directionStationId' | 'lineIds' | 'stationIds'
   >,
+  referenceDate: string,
 ) {
   if (submission.directionStationId == null) {
     return [];
@@ -841,9 +877,6 @@ async function findInvalidDirectionStationIds(
     return [submission.directionStationId];
   }
 
-  const referenceDate =
-    DateTime.now().setZone(SG_TIMEZONE).toISODate() ??
-    new Date().toISOString().slice(0, 10);
   const serviceRevisionRows = await db
     .select({
       id: serviceRevisionsTable.id,
