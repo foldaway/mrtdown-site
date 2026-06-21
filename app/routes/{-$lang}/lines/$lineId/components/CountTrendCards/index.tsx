@@ -65,9 +65,7 @@ export const CountTrendCards: React.FC<Props> = (props) => {
           defaultMessage="{count, plural, one {{count} disruption} other {{count} disruptions}}"
           values={{
             count:
-              (graph.dataCumulative[0]?.payload?.[
-                'count.disruption'
-              ] as number) ?? 0,
+              (graph.dataCumulative[0]?.payload?.disruption as number) ?? 0,
           }}
         />
       </span>
@@ -79,12 +77,10 @@ export const CountTrendCards: React.FC<Props> = (props) => {
             change: (
               <FormattedNumber
                 value={
-                  ((graph.dataCumulative[0]?.payload?.[
-                    'count.disruption'
-                  ] as number) ?? 0) -
-                  ((graph.dataCumulative[1]?.payload?.[
-                    'count.disruption'
-                  ] as number) ?? 0)
+                  ((graph.dataCumulative[0]?.payload?.disruption as number) ??
+                    0) -
+                  ((graph.dataCumulative[1]?.payload?.disruption as number) ??
+                    0)
                 }
                 signDisplay="always"
               />
