@@ -1,11 +1,12 @@
 /* Workaround for https://github.com/TanStack/router/issues/5812, which causes flash of unstyled content before hydration */
 @import "tailwindcss" source("./");
 
-html {
-    font-family: "Radio Canada Big", sans-serif;
-}
+@import '@fontsource-variable/radio-canada-big/wght.css';
+@import '@fontsource-variable/radio-canada-big/wght-italic.css';
 
 @theme {
+    --font-sans: 'Radio Canada Big Variable', sans-serif;
+
     --color-disruption-light: var(--color-red-600);
     --color-disruption-dark: var(--color-red-400);
 

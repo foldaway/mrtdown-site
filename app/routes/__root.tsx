@@ -5,8 +5,8 @@ import {
   Scripts,
   useRouterState,
 } from '@tanstack/react-router';
-import { LANGUAGES } from '~/constants';
 import { RouteWebVitals } from '~/components/RouteWebVitals';
+import { LANGUAGES } from '~/constants';
 import { getPosthogOptions } from '~/helpers/getPosthogOptions';
 import { OptionalPostHogProvider } from '~/helpers/OptionalPostHogProvider';
 import stylesheet from '../index.css?url';
@@ -22,16 +22,6 @@ export const Route = createRootRoute({
         { charSet: 'utf-8' },
       ],
       links: [
-        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-        {
-          rel: 'preconnect',
-          href: 'https://fonts.gstatic.com',
-          crossOrigin: 'anonymous',
-        },
-        {
-          rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Radio+Canada+Big:ital,wght@0,400..700;1,400..700&display=swap',
-        },
         { rel: 'stylesheet', href: stylesheet },
         {
           rel: 'apple-touch-icon',
