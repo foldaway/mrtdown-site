@@ -25,6 +25,7 @@ import {
   type ComponentType,
   type FormEvent,
   type SVGProps,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -49,6 +50,33 @@ type ReportSearch = {
 };
 
 type ReportScope = 'line' | 'station' | 'train';
+type ReportContextBase = {
+  observedAt: string;
+  effect: IngestContentCrowdReportEffect | '';
+  delayMinutes: string;
+  isStillHappening: boolean;
+};
+type EmptyReportContext = ReportContextBase & { scope: '' };
+type LineReportContext = ReportContextBase & {
+  scope: 'line';
+  lineIds: string[];
+};
+type StationReportContext = ReportContextBase & {
+  scope: 'station';
+  stationId: string | null;
+  lineIds: string[];
+};
+type TrainReportContext = ReportContextBase & {
+  scope: 'train';
+  lineId: string | null;
+  directionChoice: string;
+  stationId: string | null;
+};
+type ReportContext =
+  | EmptyReportContext
+  | LineReportContext
+  | StationReportContext
+  | TrainReportContext;
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 type FieldErrorKey =
   | 'scope'
@@ -254,6 +282,23 @@ function datetimeLocalToSgIso(value: string) {
   }).toISO();
 }
 
+function getReportContextLineIds(context: ReportContext) {
+  if (context.scope === 'line' || context.scope === 'station') {
+    return context.lineIds;
+  }
+  if (context.scope === 'train' && context.lineId != null) {
+    return [context.lineId];
+  }
+  return [];
+}
+
+function getReportContextStationId(context: ReportContext) {
+  if (context.scope === 'station' || context.scope === 'train') {
+    return context.stationId;
+  }
+  return null;
+}
+
 function ReportPage() {
   const { lineDirections, lineStationPaths, lines, stations } =
     Route.useLoaderData();
@@ -279,33 +324,40 @@ function ReportPage() {
     stations.some((station) => station.id === search.stationId)
       ? search.stationId
       : undefined;
-  const [reportScope, setReportScope] = useState<ReportScope | ''>(() => {
+  const [reportContext, setReportContext] = useState<ReportContext>(() => {
+    const base: ReportContextBase = {
+      observedAt: toSgDatetimeLocal(DateTime.now()),
+      effect: '',
+      delayMinutes: '',
+      isStillHappening: true,
+    };
     if (prefilledStationId != null) {
-      return 'station';
+      const prefilledStation = stations.find(
+        (station) => station.id === prefilledStationId,
+      );
+      const lineIds =
+        prefilledLineId != null
+          ? [prefilledLineId]
+          : prefilledStation?.lineIds.length === 1
+            ? [prefilledStation.lineIds[0]]
+            : [];
+      return {
+        ...base,
+        scope: 'station',
+        stationId: prefilledStationId,
+        lineIds,
+      };
     }
     if (prefilledLineId != null) {
-      return 'line';
+      return { ...base, scope: 'line', lineIds: [prefilledLineId] };
     }
-    return '';
+    return { ...base, scope: '' };
   });
-  const [selectedLineIds, setSelectedLineIds] = useState<string[]>(
-    prefilledLineId != null ? [prefilledLineId] : [],
-  );
-  const [selectedStationIds, setSelectedStationIds] = useState<string[]>(
-    prefilledStationId != null ? [prefilledStationId] : [],
-  );
-  const [observedAt, setObservedAt] = useState(() =>
-    toSgDatetimeLocal(DateTime.now()),
-  );
   const [stationSearch, setStationSearch] = useState('');
   const [rangeStartStationId, setRangeStartStationId] = useState('');
   const [rangeEndStationId, setRangeEndStationId] = useState('');
   const [rangeStartStationSearch, setRangeStartStationSearch] = useState('');
   const [rangeEndStationSearch, setRangeEndStationSearch] = useState('');
-  const [directionChoice, setDirectionChoice] = useState('');
-  const [effect, setEffect] = useState('');
-  const [delayMinutes, setDelayMinutes] = useState('');
-  const [isStillHappening, setIsStillHappening] = useState(true);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [clientError, setClientError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<
@@ -360,9 +412,68 @@ function ReportPage() {
     () => Object.fromEntries(stations.map((station) => [station.id, station])),
     [stations],
   );
-  const selectedStation = selectedStationIds[0]
-    ? stationById[selectedStationIds[0]]
+  const reportScope = reportContext.scope;
+  const selectedLineIds = getReportContextLineIds(reportContext);
+  const selectedStationId = getReportContextStationId(reportContext);
+  const selectedStation = selectedStationId
+    ? stationById[selectedStationId]
     : undefined;
+  const selectedStationIds = selectedStationId ? [selectedStationId] : [];
+  const observedAt = reportContext.observedAt;
+  const effect = reportContext.effect;
+  const delayMinutes = reportContext.delayMinutes;
+  const isStillHappening = reportContext.isStillHappening;
+  const directionChoice =
+    reportContext.scope === 'train' ? reportContext.directionChoice : '';
+  const setObservedAt = (observedAtValue: string) => {
+    setReportContext((current) => ({
+      ...current,
+      observedAt: observedAtValue,
+    }));
+  };
+  const setEffect = (effectValue: IngestContentCrowdReportEffect) => {
+    setReportContext((current) => ({
+      ...current,
+      effect: effectValue,
+    }));
+  };
+  const setDelayMinutes = (delayMinutesValue: string) => {
+    setReportContext((current) => ({
+      ...current,
+      delayMinutes: delayMinutesValue,
+    }));
+  };
+  const setIsStillHappening = (isStillHappeningValue: boolean) => {
+    setReportContext((current) => ({
+      ...current,
+      isStillHappening: isStillHappeningValue,
+    }));
+  };
+  const setDirectionChoice = useCallback((directionChoiceValue: string) => {
+    setReportContext((current) =>
+      current.scope === 'train'
+        ? { ...current, directionChoice: directionChoiceValue }
+        : current,
+    );
+  }, []);
+  const setSelectedLineIds = useCallback(
+    (value: string[] | ((current: string[]) => string[])) => {
+      setReportContext((current) => {
+        const nextLineIds =
+          typeof value === 'function'
+            ? value(getReportContextLineIds(current))
+            : value;
+        if (current.scope === 'line' || current.scope === 'station') {
+          return { ...current, lineIds: nextLineIds };
+        }
+        if (current.scope === 'train') {
+          return { ...current, lineId: nextLineIds[0] ?? null };
+        }
+        return current;
+      });
+    },
+    [],
+  );
   const selectedStationLineIds =
     selectedStation?.lineIds.filter((lineId) => lineById[lineId] != null) ?? [];
   const rangeStartStation = rangeStartStationId
@@ -482,7 +593,41 @@ function ReportPage() {
       })
       .slice(0, 8);
   };
+  const getLineStationSuggestions = (filterLineIds?: string[]) => {
+    if (filterLineIds == null || filterLineIds.length === 0) {
+      return [];
+    }
+
+    const stationIds: string[] = [];
+    for (const lineId of filterLineIds) {
+      for (const path of lineStationPaths[lineId] ?? []) {
+        for (const stationId of path) {
+          if (!stationIds.includes(stationId)) {
+            stationIds.push(stationId);
+          }
+        }
+      }
+    }
+
+    const orderedStations = stationIds
+      .map((stationId) => stationById[stationId])
+      .filter((station): station is (typeof stations)[number] => {
+        return station != null;
+      });
+    if (orderedStations.length > 0) {
+      return orderedStations.slice(0, 12);
+    }
+
+    return getStationSearchResults('', filterLineIds).slice(0, 12);
+  };
   const stationSearchResults = getStationSearchResults(stationSearch);
+  const mainStationSuggestionLineIds =
+    reportScope === 'train' && selectedLineIds.length > 0
+      ? selectedLineIds
+      : undefined;
+  const mainStationSuggestions = getLineStationSuggestions(
+    mainStationSuggestionLineIds,
+  );
 
   useEffect(() => {
     if (
@@ -494,7 +639,12 @@ function ReportPage() {
       return;
     }
     setSelectedLineIds([selectedStation.lineIds[0]]);
-  }, [reportScope, selectedLineIds.length, selectedStation]);
+  }, [
+    reportScope,
+    selectedLineIds.length,
+    selectedStation,
+    setSelectedLineIds,
+  ]);
 
   useEffect(() => {
     if (reportScope !== 'train') {
@@ -526,6 +676,7 @@ function ReportPage() {
     reportScope,
     selectedLineDirectionOptions,
     selectedLineIds.length,
+    setDirectionChoice,
   ]);
 
   useEffect(() => {
@@ -625,53 +776,74 @@ function ReportPage() {
   const selectStation = (stationId: string) => {
     const station = stationById[stationId];
     clearFieldError('station');
-    setSelectedStationIds([stationId]);
     setStationSearch('');
-    if (reportScope === '') {
-      setReportScope('station');
-    }
-    if (reportScope === 'station' && station != null) {
-      if (station.lineIds.length === 1) {
-        setSelectedLineIds([station.lineIds[0]]);
-        return;
+    setReportContext((current) => {
+      if (current.scope === 'train') {
+        return { ...current, stationId };
       }
-      setSelectedLineIds((current) =>
-        current.filter((lineId) => station.lineIds.includes(lineId)),
-      );
-    }
+
+      const selectedStationLineIds = station?.lineIds ?? [];
+      const lineIds =
+        selectedStationLineIds.length === 1
+          ? [selectedStationLineIds[0]]
+          : getReportContextLineIds(current).filter((lineId) =>
+              selectedStationLineIds.includes(lineId),
+            );
+      return {
+        ...current,
+        scope: 'station',
+        stationId,
+        lineIds,
+      };
+    });
   };
 
   const clearStation = () => {
-    setSelectedStationIds([]);
+    setReportContext((current) => {
+      if (current.scope === 'station') {
+        return { ...current, stationId: null, lineIds: [] };
+      }
+      if (current.scope === 'train') {
+        return { ...current, stationId: null };
+      }
+      return current;
+    });
   };
 
   const chooseReportScope = (scope: ReportScope) => {
     clearFieldError('scope');
-    setReportScope(scope);
+    setStationSearch('');
+    setReportContext((current) => {
+      if (scope === 'line') {
+        return {
+          ...current,
+          scope: 'line',
+          lineIds: getReportContextLineIds(current),
+        };
+      }
 
-    if (scope === 'line') {
-      setSelectedStationIds([]);
-      setStationSearch('');
-      return;
-    }
-
-    if (scope === 'station') {
-      setSelectedLineIds((current) => {
-        if (selectedStation == null) {
-          return [];
+      if (scope === 'station') {
+        const stationId = getReportContextStationId(current);
+        if (stationId == null) {
+          return { ...current, scope: 'station', stationId: null, lineIds: [] };
         }
-        return current.filter((lineId) =>
-          selectedStation.lineIds.includes(lineId),
+        const station = stationById[stationId];
+        const lineIds = getReportContextLineIds(current).filter((lineId) =>
+          station?.lineIds.includes(lineId),
         );
-      });
-      return;
-    }
+        return { ...current, scope: 'station', stationId, lineIds };
+      }
 
-    if (scope === 'train') {
-      setSelectedStationIds([]);
-      setStationSearch('');
-      setSelectedLineIds((current) => (current.length === 1 ? current : []));
-    }
+      const lineIds = getReportContextLineIds(current);
+      return {
+        ...current,
+        scope: 'train',
+        lineId: lineIds.length === 1 ? lineIds[0] : null,
+        directionChoice:
+          current.scope === 'train' ? current.directionChoice : '',
+        stationId: null,
+      };
+    });
   };
 
   const resetTurnstile = () => {
@@ -1033,63 +1205,91 @@ function ReportPage() {
     onSearchChange: (value: string) => void;
     onSelect: (stationId: string) => void;
     onClear: () => void;
-  }) => (
-    <div className="flex flex-col gap-2">
-      <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-        {label}
-      </span>
-      {selectedStation != null && (
-        <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
-          {renderStationIdentity(selectedStation)}
-          <button
-            type="button"
-            onClick={onClear}
-            className="ms-auto shrink-0 rounded-md px-2 py-1 font-medium text-accent-light text-xs hover:bg-white dark:hover:bg-gray-800"
-          >
-            <FormattedMessage id="report.change" defaultMessage="Change" />
-          </button>
-        </div>
-      )}
-      <label className="relative">
-        <span className="sr-only">{label}</span>
-        <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-gray-400" />
-        <input
-          type="search"
-          value={searchValue}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder={intl.formatMessage({
-            id: 'report.affected_stop_search_placeholder',
-            defaultMessage: 'Search by station name or code',
-          })}
-          className="w-full rounded-lg border border-gray-300 bg-white py-2 pr-3 pl-9 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-        />
-      </label>
-      {searchValue.trim().length > 0 && (
-        <div className="grid gap-2">
-          {getStationSearchResults(searchValue, filterLineIds).map(
-            (station) => (
-              <button
-                key={`${id}:${station.id}`}
-                type="button"
-                onClick={() => onSelect(station.id)}
-                className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
-              >
-                {renderStationIdentity(station)}
-              </button>
-            ),
-          )}
-        </div>
-      )}
-      {searchValue.trim().length === 0 && selectedStation == null && (
-        <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
-          <FormattedMessage
-            id="report.affected_stop_search_hint"
-            defaultMessage="Search when you want to add a specific stop or range."
+  }) => {
+    const stationSuggestions = getLineStationSuggestions(filterLineIds);
+
+    return (
+      <div className="flex flex-col gap-2">
+        <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+          {label}
+        </span>
+        {selectedStation != null && (
+          <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
+            {renderStationIdentity(selectedStation)}
+            <button
+              type="button"
+              onClick={onClear}
+              className="ms-auto shrink-0 rounded-md px-2 py-1 font-medium text-accent-light text-xs hover:bg-white dark:hover:bg-gray-800"
+            >
+              <FormattedMessage id="report.change" defaultMessage="Change" />
+            </button>
+          </div>
+        )}
+        <label className="relative">
+          <span className="sr-only">{label}</span>
+          <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-gray-400" />
+          <input
+            type="search"
+            value={searchValue}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder={intl.formatMessage({
+              id: 'report.affected_stop_search_placeholder',
+              defaultMessage: 'Search by station name or code',
+            })}
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pr-3 pl-9 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
           />
-        </p>
-      )}
-    </div>
-  );
+        </label>
+        {searchValue.trim().length > 0 && (
+          <div className="grid gap-2">
+            {getStationSearchResults(searchValue, filterLineIds).map(
+              (station) => (
+                <button
+                  key={`${id}:${station.id}`}
+                  type="button"
+                  onClick={() => onSelect(station.id)}
+                  className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
+                >
+                  {renderStationIdentity(station)}
+                </button>
+              ),
+            )}
+          </div>
+        )}
+        {searchValue.trim().length === 0 &&
+          selectedStation == null &&
+          stationSuggestions.length > 0 && (
+            <div className="grid gap-2">
+              <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+                <FormattedMessage
+                  id="report.affected_stop_quick_pick"
+                  defaultMessage="Stops on the selected line"
+                />
+              </p>
+              {stationSuggestions.map((station) => (
+                <button
+                  key={`${id}:${station.id}`}
+                  type="button"
+                  onClick={() => onSelect(station.id)}
+                  className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
+                >
+                  {renderStationIdentity(station)}
+                </button>
+              ))}
+            </div>
+          )}
+        {searchValue.trim().length === 0 &&
+          selectedStation == null &&
+          stationSuggestions.length === 0 && (
+            <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+              <FormattedMessage
+                id="report.affected_stop_search_hint"
+                defaultMessage="Search when you want to add a specific stop or range."
+              />
+            </p>
+          )}
+      </div>
+    );
+  };
 
   const renderEffectButton = (effectValue: IngestContentCrowdReportEffect) => {
     const selected = effect === effectValue;
@@ -1377,22 +1577,46 @@ function ReportPage() {
                 ))}
               </div>
             )}
-            {stationSearchQuery.length === 0 && selectedStation == null && (
-              <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
-                <FormattedMessage
-                  id={
-                    reportScope === 'train'
-                      ? 'report.train_station_search_hint'
-                      : 'report.station_search_hint'
-                  }
-                  defaultMessage={
-                    reportScope === 'train'
-                      ? 'Add this only if it helps describe where you are headed.'
-                      : 'Start typing a station name or station code.'
-                  }
-                />
-              </p>
-            )}
+            {stationSearchQuery.length === 0 &&
+              selectedStation == null &&
+              mainStationSuggestions.length > 0 && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <p className="text-gray-500 text-xs leading-5 sm:col-span-2 dark:text-gray-400">
+                    <FormattedMessage
+                      id="report.station_quick_pick"
+                      defaultMessage="Stations on the selected line"
+                    />
+                  </p>
+                  {mainStationSuggestions.map((station) => (
+                    <button
+                      key={station.id}
+                      type="button"
+                      onClick={() => selectStation(station.id)}
+                      className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
+                    >
+                      {renderStationIdentity(station)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            {stationSearchQuery.length === 0 &&
+              selectedStation == null &&
+              mainStationSuggestions.length === 0 && (
+                <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+                  <FormattedMessage
+                    id={
+                      reportScope === 'train'
+                        ? 'report.train_station_search_hint'
+                        : 'report.station_search_hint'
+                    }
+                    defaultMessage={
+                      reportScope === 'train'
+                        ? 'Add this only if it helps describe where you are headed.'
+                        : 'Start typing a station name or station code.'
+                    }
+                  />
+                </p>
+              )}
           </section>
         )}
 
