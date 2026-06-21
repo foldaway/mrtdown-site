@@ -2,7 +2,18 @@ import {
   type IngestContentCrowdReportEffect,
   IngestContentCrowdReportEffectSchema,
 } from '@mrtdown/ingest-contracts';
-import { and, desc, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
 import {
@@ -770,6 +781,9 @@ export async function findMissingCrowdReportReferences(
     'directionStationId' | 'lineIds' | 'stationIds'
   >,
 ) {
+  const referenceDate =
+    DateTime.now().setZone(SG_TIMEZONE).toISODate() ??
+    new Date().toISOString().slice(0, 10);
   const referencedStationIds = [
     ...submission.stationIds,
     ...(submission.directionStationId ? [submission.directionStationId] : []),
@@ -780,7 +794,16 @@ export async function findMissingCrowdReportReferences(
         ? db
             .select({ id: linesTable.id })
             .from(linesTable)
-            .where(inArray(linesTable.id, submission.lineIds))
+            .where(
+              and(
+                inArray(linesTable.id, submission.lineIds),
+                lte(linesTable.started_at, referenceDate),
+                or(
+                  isNull(linesTable.ended_at),
+                  gte(linesTable.ended_at, referenceDate),
+                ),
+              ),
+            )
         : Promise.resolve([]),
       referencedStationIds.length > 0
         ? db

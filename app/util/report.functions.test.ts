@@ -16,6 +16,138 @@ function name(en: string) {
 }
 
 describe('buildCrowdReportFormOptions', () => {
+  it('excludes lines that are not in operation on the reference date', () => {
+    const options = buildCrowdReportFormOptions({
+      referenceDate: '2026-06-17',
+      lines: [
+        {
+          id: 'CURRENT',
+          name: name('Current Line'),
+          color: '#005ec4',
+          startedAt: '2020-01-01',
+          endedAt: null,
+        },
+        {
+          id: 'ENDED',
+          name: name('Ended Line'),
+          color: '#748477',
+          startedAt: '2010-01-01',
+          endedAt: '2025-12-31',
+        },
+        {
+          id: 'FUTURE',
+          name: name('Future Line'),
+          color: '#fa9e0d',
+          startedAt: '2027-01-01',
+          endedAt: null,
+        },
+      ],
+      stations: [
+        { id: 'A', name: name('Alpha') },
+        { id: 'B', name: name('Beta') },
+        { id: 'C', name: name('Gamma') },
+      ],
+      stationCodes: [
+        { stationId: 'A', lineId: 'CURRENT', code: 'C1' },
+        { stationId: 'B', lineId: 'ENDED', code: 'E1' },
+        { stationId: 'C', lineId: 'FUTURE', code: 'F1' },
+      ],
+      services: [
+        { id: 'svc-current', lineId: 'CURRENT' },
+        { id: 'svc-ended', lineId: 'ENDED' },
+        { id: 'svc-future', lineId: 'FUTURE' },
+      ],
+      serviceRevisions: [
+        {
+          id: 'current',
+          serviceId: 'svc-current',
+          start_at: '2020-01-01',
+          end_at: null,
+          updated_at: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'ended',
+          serviceId: 'svc-ended',
+          start_at: '2010-01-01',
+          end_at: null,
+          updated_at: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'future',
+          serviceId: 'svc-future',
+          start_at: '2020-01-01',
+          end_at: null,
+          updated_at: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      servicePathEntries: [
+        {
+          serviceRevisionId: 'current',
+          serviceId: 'svc-current',
+          stationId: 'A',
+          pathIndex: 0,
+        },
+        {
+          serviceRevisionId: 'current',
+          serviceId: 'svc-current',
+          stationId: 'B',
+          pathIndex: 1,
+        },
+        {
+          serviceRevisionId: 'ended',
+          serviceId: 'svc-ended',
+          stationId: 'B',
+          pathIndex: 0,
+        },
+        {
+          serviceRevisionId: 'ended',
+          serviceId: 'svc-ended',
+          stationId: 'C',
+          pathIndex: 1,
+        },
+        {
+          serviceRevisionId: 'future',
+          serviceId: 'svc-future',
+          stationId: 'C',
+          pathIndex: 0,
+        },
+        {
+          serviceRevisionId: 'future',
+          serviceId: 'svc-future',
+          stationId: 'A',
+          pathIndex: 1,
+        },
+      ],
+    });
+
+    expect(options.lines.map((line) => line.id)).toEqual(['CURRENT']);
+    expect(options.stations).toEqual([
+      {
+        id: 'A',
+        name: name('Alpha'),
+        codes: ['C1'],
+        codePills: [{ lineId: 'CURRENT', code: 'C1' }],
+        lineIds: ['CURRENT'],
+      },
+      {
+        id: 'B',
+        name: name('Beta'),
+        codes: [],
+        codePills: [],
+        lineIds: [],
+      },
+      {
+        id: 'C',
+        name: name('Gamma'),
+        codes: [],
+        codePills: [],
+        lineIds: [],
+      },
+    ]);
+    expect(Object.keys(options.lineDirections)).toEqual(['CURRENT']);
+    expect(Object.keys(options.lineStationPaths)).toEqual(['CURRENT']);
+  });
+
   it('builds station search metadata and guided line choices', () => {
     const options = buildCrowdReportFormOptions({
       referenceDate: '2026-06-17',

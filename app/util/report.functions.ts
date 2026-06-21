@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { Translations } from '@mrtdown/core';
 import { createServerFn } from '@tanstack/react-start';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { getDb } from '~/db';
 import {
@@ -22,6 +22,8 @@ type CrowdReportFormLineRow = {
   id: string;
   name: Translations;
   color: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
 };
 
 type CrowdReportFormStationRow = {
@@ -65,6 +67,19 @@ type BuildCrowdReportFormOptionsInput = {
   servicePathEntries: CrowdReportFormPathEntryRow[];
 };
 
+function isLineInOperationOnDate(
+  line: CrowdReportFormLineRow,
+  referenceDate: string,
+) {
+  if (line.startedAt != null && line.startedAt > referenceDate) {
+    return false;
+  }
+  if (line.endedAt != null && line.endedAt < referenceDate) {
+    return false;
+  }
+  return true;
+}
+
 export function buildCrowdReportFormOptions({
   referenceDate,
   lines,
@@ -74,6 +89,16 @@ export function buildCrowdReportFormOptions({
   serviceRevisions,
   servicePathEntries,
 }: BuildCrowdReportFormOptionsInput) {
+  const operatingLines = lines
+    .filter((line) => isLineInOperationOnDate(line, referenceDate))
+    .map(({ id, name, color }) => ({ id, name, color }));
+  const operatingLineIds = new Set(operatingLines.map((line) => line.id));
+  const operatingStationCodes = stationCodes.filter((code) =>
+    operatingLineIds.has(code.lineId),
+  );
+  const operatingServices = services.filter((service) =>
+    operatingLineIds.has(service.lineId),
+  );
   const stationById = Object.fromEntries(
     stations.map((station) => [station.id, station]),
   );
@@ -118,7 +143,7 @@ export function buildCrowdReportFormOptions({
   const stationPathsByLineId: Record<string, string[][]> = {};
   const stationPathKeysByLineId: Record<string, Set<string>> = {};
 
-  for (const service of services) {
+  for (const service of operatingServices) {
     const latestRevision = latestRevisionByServiceId[service.id];
     if (latestRevision == null) {
       continue;
@@ -166,18 +191,17 @@ export function buildCrowdReportFormOptions({
     lineDirections.sort((a, b) => a.stationId.localeCompare(b.stationId));
   }
 
-  const stationCodesByStationId = stationCodes.reduce<Record<string, string[]>>(
-    (acc, code) => {
-      acc[code.stationId] ??= [];
-      if (!acc[code.stationId].includes(code.code)) {
-        acc[code.stationId].push(code.code);
-      }
-      return acc;
-    },
-    {},
-  );
+  const stationCodesByStationId = operatingStationCodes.reduce<
+    Record<string, string[]>
+  >((acc, code) => {
+    acc[code.stationId] ??= [];
+    if (!acc[code.stationId].includes(code.code)) {
+      acc[code.stationId].push(code.code);
+    }
+    return acc;
+  }, {});
 
-  const stationCodePillsByStationId = stationCodes.reduce<
+  const stationCodePillsByStationId = operatingStationCodes.reduce<
     Record<string, Array<{ code: string; lineId: string }>>
   >((acc, code) => {
     acc[code.stationId] ??= [];
@@ -194,7 +218,7 @@ export function buildCrowdReportFormOptions({
     return acc;
   }, {});
 
-  const stationLineIdsByStationId = stationCodes.reduce<
+  const stationLineIdsByStationId = operatingStationCodes.reduce<
     Record<string, string[]>
   >((acc, code) => {
     acc[code.stationId] ??= [];
@@ -209,7 +233,7 @@ export function buildCrowdReportFormOptions({
   }
 
   return {
-    lines,
+    lines: operatingLines,
     lineDirections: directionsByLineId,
     lineStationPaths: stationPathsByLineId,
     stations: stations.map((station) => ({
@@ -251,8 +275,19 @@ export const getCrowdReportFormOptionsFn = createServerFn({
         id: linesTable.id,
         name: linesTable.name,
         color: linesTable.color,
+        startedAt: linesTable.started_at,
+        endedAt: linesTable.ended_at,
       })
       .from(linesTable)
+      .where(
+        and(
+          lte(linesTable.started_at, referenceDate),
+          or(
+            isNull(linesTable.ended_at),
+            gte(linesTable.ended_at, referenceDate),
+          ),
+        ),
+      )
       .orderBy(asc(linesTable.id)),
     db
       .select({
