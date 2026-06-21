@@ -668,6 +668,8 @@ function ReportPage() {
     }
 
     if (scope === 'train') {
+      setSelectedStationIds([]);
+      setStationSearch('');
       setSelectedLineIds((current) => (current.length === 1 ? current : []));
     }
   };
