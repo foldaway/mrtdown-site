@@ -303,5 +303,10 @@
   "report.train_station_search_placeholder": "按下一站、目的地或代码搜索",
   "report.turnstile_unavailable": "无法加载验证。请刷新后重试。",
   "report.verification": "提交验证",
-  "station.report_cta": "在此报告问题"
+  "station.report_cta": "在此报告问题",
+  "issue.period_range": "{startDate}至{endDate}",
+  "issue.period_since": "自 {startDate} 起",
+  "issue.period_unknown": "未知日期",
+  "site.history.month_description": "{startAt, date, ::MMMM yyyy} 的过往服务中断和维护事件。",
+  "site.history.year_description": "{startAt, date, ::yyyy} 年的过往服务中断和维护事件。"
 }

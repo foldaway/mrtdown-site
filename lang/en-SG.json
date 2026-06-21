@@ -295,5 +295,10 @@
   "status.ongoing_infra": "Infrastructure",
   "status.ongoing_maintenance": "Maintenance",
   "status.operational": "Operational",
-  "status.service_ended": "Outside Service Hours"
+  "status.service_ended": "Outside Service Hours",
+  "issue.period_range": "{startDate} to {endDate}",
+  "issue.period_since": "since {startDate}",
+  "issue.period_unknown": "an unknown date",
+  "site.history.month_description": "Past service disruptions and maintenance events in {startAt, date, ::MMMM yyyy}.",
+  "site.history.year_description": "Past service disruptions and maintenance events in {startAt, date, ::yyyy}."
 }

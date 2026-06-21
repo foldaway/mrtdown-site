@@ -5,16 +5,90 @@ import {
 } from '@heroicons/react/16/solid';
 import { createFileRoute } from '@tanstack/react-router';
 import classNames from 'classnames';
-import { createIntl, FormattedMessage, useIntl } from 'react-intl';
+import { DateTime } from 'luxon';
+import {
+  createIntl,
+  FormattedMessage,
+  type IntlShape,
+  useIntl,
+} from 'react-intl';
 import { IssueTypeLabels } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import type { IssueInterval } from '~/types';
 import { assert } from '~/util/assert';
 import { getIssueFn } from '~/util/issue.functions';
 import { Attributes } from './components/Attributes';
 import { StatsCard } from './components/StatsCard';
 import { TimelineCard } from './components/TimelineCard';
+
+const SG_TIMEZONE = 'Asia/Singapore';
+
+function formatIssueDescriptionPeriod(
+  intervals: IssueInterval[],
+  intl: IntlShape,
+) {
+  if (intervals.length === 0) {
+    return intl.formatMessage({
+      id: 'issue.period_unknown',
+      defaultMessage: 'an unknown date',
+    });
+  }
+
+  const sortedIntervals = [...intervals].sort((a, b) => {
+    return (
+      DateTime.fromISO(a.startAt).toMillis() -
+      DateTime.fromISO(b.startAt).toMillis()
+    );
+  });
+  const firstInterval = sortedIntervals[0];
+  const lastInterval = sortedIntervals.at(-1);
+  assert(firstInterval != null);
+  assert(lastInterval != null);
+
+  const start = DateTime.fromISO(firstInterval.startAt).setZone(SG_TIMEZONE);
+  const end =
+    lastInterval.endAt == null
+      ? null
+      : DateTime.fromISO(lastInterval.endAt).setZone(SG_TIMEZONE);
+  const startDate = intl.formatDate(start.toJSDate(), {
+    day: 'numeric',
+    month: 'long',
+    timeZone: SG_TIMEZONE,
+    year: 'numeric',
+  });
+
+  if (end == null) {
+    return intl.formatMessage(
+      {
+        id: 'issue.period_since',
+        defaultMessage: 'since {startDate}',
+      },
+      { startDate },
+    );
+  }
+
+  if (start.hasSame(end, 'day')) {
+    return startDate;
+  }
+
+  return intl.formatMessage(
+    {
+      id: 'issue.period_range',
+      defaultMessage: '{startDate} to {endDate}',
+    },
+    {
+      startDate,
+      endDate: intl.formatDate(end.toJSDate(), {
+        day: 'numeric',
+        month: 'long',
+        timeZone: SG_TIMEZONE,
+        year: 'numeric',
+      }),
+    },
+  );
+}
 
 export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
   component: IssuePage,
@@ -66,7 +140,7 @@ export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
       {
         stationCount,
         lineNames: intl.formatList(lineNames),
-        period: 'WIP',
+        period: formatIssueDescriptionPeriod(issue.intervals, intl),
       },
     );
 

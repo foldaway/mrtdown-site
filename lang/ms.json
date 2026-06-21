@@ -303,5 +303,10 @@
   "report.train_station_search_placeholder": "Cari mengikut stesen seterusnya, destinasi, atau kod",
   "report.turnstile_unavailable": "Pengesahan tidak dapat dimuatkan. Sila segar semula dan cuba lagi.",
   "report.verification": "Pengesahan penghantaran",
-  "station.report_cta": "Laporkan isu di sini"
+  "station.report_cta": "Laporkan isu di sini",
+  "issue.period_range": "{startDate} hingga {endDate}",
+  "issue.period_since": "sejak {startDate}",
+  "issue.period_unknown": "tarikh yang tidak diketahui",
+  "site.history.month_description": "Gangguan perkhidmatan dan acara penyelenggaraan lalu pada {startAt, date, ::MMMM yyyy}.",
+  "site.history.year_description": "Gangguan perkhidmatan dan acara penyelenggaraan lalu pada {startAt, date, ::yyyy}."
 }

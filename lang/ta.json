@@ -303,5 +303,10 @@
   "report.train_station_search_placeholder": "அடுத்த நிலையம், இலக்கு அல்லது குறியீட்டால் தேடவும்",
   "report.turnstile_unavailable": "சரிபார்ப்பை ஏற்ற முடியவில்லை. புதுப்பித்து மீண்டும் முயற்சிக்கவும்.",
   "report.verification": "சமர்ப்பிப்பு சரிபார்ப்பு",
-  "station.report_cta": "இங்கே சிக்கலைத் தெரிவிக்கவும்"
+  "station.report_cta": "இங்கே சிக்கலைத் தெரிவிக்கவும்",
+  "issue.period_range": "{startDate} முதல் {endDate} வரை",
+  "issue.period_since": "{startDate} முதல்",
+  "issue.period_unknown": "தெரியாத தேதி",
+  "site.history.month_description": "{startAt, date, ::MMMM yyyy} காலத்திலான கடந்தகால சேவை தடைகள் மற்றும் பராமரிப்பு நிகழ்வுகள்.",
+  "site.history.year_description": "{startAt, date, ::yyyy} ஆண்டின் கடந்தகால சேவை தடைகள் மற்றும் பராமரிப்பு நிகழ்வுகள்."
 }

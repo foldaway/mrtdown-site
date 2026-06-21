@@ -25,6 +25,11 @@ export const Route = createFileRoute('/{-$lang}/about')({
       id: 'general.about',
       defaultMessage: 'About',
     });
+    const description = intl.formatMessage({
+      id: 'site.about.subtitle',
+      defaultMessage:
+        'Learn more about our mission, data collection methods, and frequently asked questions',
+    });
 
     return {
       meta: [
@@ -32,8 +37,16 @@ export const Route = createFileRoute('/{-$lang}/about')({
           title,
         },
         {
+          name: 'description',
+          content: description,
+        },
+        {
           property: 'og:title',
           content: title,
+        },
+        {
+          property: 'og:description',
+          content: description,
         },
         {
           property: 'og:type',

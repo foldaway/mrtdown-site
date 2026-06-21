@@ -165,6 +165,15 @@ Exit criteria:
 - 2026-06-21: Local SEO audit completed and plan created. `npm run verify`
   passed after rerunning outside the sandbox because the first sandboxed run
   failed when `tsx` could not create its IPC pipe.
+- 2026-06-21: Started Phase 1 and Phase 3 remediation. Sitemap generation now
+  omits the redirect-only `/history` URL and skips historical month URLs when
+  operational fact coverage is missing and the legacy fallback cannot render the
+  route. Static/history pages now emit meta descriptions and `og:description`,
+  the history year route uses the concrete year in `og:url`, and issue
+  descriptions no longer emit the `WIP` period placeholder.
+- 2026-06-21: Local sitemap crawl against the Vite dev server checked 47
+  sitemap URLs with redirects disabled and a 25-second per-URL timeout. Every
+  URL returned `200`, with no redirects or timeouts.
 
 ## Decision Log
 
@@ -173,6 +182,10 @@ Exit criteria:
   tests and avoiding duplicate search crawl surfaces.
 - 2026-06-21: Treat crawl-clean sitemap output as the first phase because search
   engines should not be directed to redirects, errors, or very slow pages.
+- 2026-06-21: Exclude historical month URLs from the XML sitemap when the month
+  is before today, lacks full operational fact coverage, and is not before the
+  operational fact coverage start date. This mirrors the history route's
+  degraded-render fallback and avoids advertising known `500` month pages.
 
 ## Validation
 

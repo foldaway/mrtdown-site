@@ -38,6 +38,12 @@ describe('agent Markdown discovery', () => {
       issueIds: ['issue-1'],
       monthEarliest: '2026-04-01',
       monthLatest: '2026-05-01',
+      operationalFactCoverageDates: [
+        ...buildCoverageDates('2026-04'),
+        ...buildCoverageDates('2026-05'),
+      ],
+      operationalFactCoverageStartDate: '2026-04-01',
+      currentDate: '2026-06-21',
     });
 
     expect(paths).toEqual(
@@ -59,4 +65,65 @@ describe('agent Markdown discovery', () => {
     expect(paths).not.toContain('/issues/issue-1/index.md');
     expect(paths.every((path) => !path.endsWith('.md'))).toBe(true);
   });
+
+  it('excludes redirect-only history paths from the XML sitemap', () => {
+    const paths = buildSitemapPaths({
+      lineIds: [],
+      stationIds: [],
+      operatorIds: [],
+      issueIds: [],
+      monthEarliest: '2026-06-01',
+      monthLatest: '2026-06-01',
+      operationalFactCoverageDates: [],
+      operationalFactCoverageStartDate: null,
+      currentDate: '2026-06-21',
+    });
+
+    expect(paths).not.toContain('/history');
+  });
+
+  it('skips historical months that cannot render from facts or legacy fallback', () => {
+    const paths = buildSitemapPaths({
+      lineIds: [],
+      stationIds: [],
+      operatorIds: [],
+      issueIds: [],
+      monthEarliest: '2026-04-01',
+      monthLatest: '2026-06-01',
+      operationalFactCoverageDates: buildCoverageDates('2026-06'),
+      operationalFactCoverageStartDate: '2026-05-01',
+      currentDate: '2026-06-21',
+    });
+
+    expect(paths).toContain('/history/2026/04');
+    expect(paths).not.toContain('/history/2026/05');
+    expect(paths).toContain('/history/2026/06');
+  });
+
+  it('only includes history year paths when the full year can render', () => {
+    const paths = buildSitemapPaths({
+      lineIds: [],
+      stationIds: [],
+      operatorIds: [],
+      issueIds: [],
+      monthEarliest: '2025-01-01',
+      monthLatest: '2025-01-01',
+      operationalFactCoverageDates: buildCoverageDates('2025-01'),
+      operationalFactCoverageStartDate: '2025-01-01',
+      currentDate: '2026-06-21',
+    });
+
+    expect(paths).toContain('/history/2025/01');
+    expect(paths).not.toContain('/history/2025');
+  });
 });
+
+function buildCoverageDates(month: string) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const dateCount = new Date(year, monthNumber, 0).getDate();
+
+  return Array.from({ length: dateCount }, (_, index) => {
+    const day = String(index + 1).padStart(2, '0');
+    return `${month}-${day}`;
+  });
+}

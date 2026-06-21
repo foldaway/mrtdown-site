@@ -4334,15 +4334,33 @@ export async function getSitemapData() {
   const earliest = firstDates.sort((a, b) => a.toMillis() - b.toMillis())[0];
   const latest = firstDates.sort((a, b) => b.toMillis() - a.toMillis())[0];
 
+  const monthEarliest =
+    earliest != null ? isoDate(earliest.startOf('month')) : isoDate(nowSg());
+  const monthLatest =
+    latest != null ? isoDate(latest.startOf('month')) : isoDate(nowSg());
+  const monthEarliestDateTime = DateTime.fromISO(monthEarliest, {
+    zone: SG_TIMEZONE,
+  });
+  const monthLatestDateTime = DateTime.fromISO(monthLatest, {
+    zone: SG_TIMEZONE,
+  });
+  const coverageRows = await getOperationalFactCoverageDatesInRange(
+    monthEarliestDateTime,
+    monthLatestDateTime.endOf('month'),
+  );
+  const operationalFactCoverageStartDate =
+    await getOperationalFactCoverageStartDate();
+
   return {
     lineIds: Object.keys(dataset.included.lines).sort(),
     stationIds: Object.keys(dataset.included.stations).sort(),
     operatorIds: Object.keys(dataset.included.operators).sort(),
     issueIds: issues.map((issue) => issue.id),
-    monthEarliest:
-      earliest != null ? isoDate(earliest.startOf('month')) : isoDate(nowSg()),
-    monthLatest:
-      latest != null ? isoDate(latest.startOf('month')) : isoDate(nowSg()),
+    monthEarliest,
+    monthLatest,
+    operationalFactCoverageDates: coverageRows.map((row) => row.date),
+    operationalFactCoverageStartDate,
+    currentDate: isoDate(nowSg()),
   };
 }
 
