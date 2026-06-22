@@ -93,7 +93,7 @@ function makeFakeDb(
     },
   };
   const tx = {
-    execute(query: unknown) {
+    run(query: unknown) {
       executes.push(query);
       return Promise.resolve();
     },
@@ -190,7 +190,7 @@ function makeFakeAutomoderationDb(
   };
 
   const tx = {
-    execute(query: unknown) {
+    run(query: unknown) {
       executes.push(query);
       return Promise.resolve();
     },

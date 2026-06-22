@@ -27,7 +27,7 @@ import {
   or,
   sql,
 } from 'drizzle-orm';
-import type { getDb } from '../../../db/index.js';
+import type { AppDb } from '../../../db/index.js';
 import {
   evidencesTable,
   impactEventBasisEvidencesTable,
@@ -73,7 +73,7 @@ const BATCH = 500;
 /** Max ids per `IN (...)` cleanup query. Keep below proxy/driver bind limits. */
 const DELETE_BATCH = 50;
 
-type Db = ReturnType<typeof getDb>;
+type Db = AppDb;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type ServiceRevision = Service['revisions'][number];
 
@@ -119,7 +119,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
 /** Clears all pull staging tables before a new parse run. */
 export async function truncateStagingTables(db: Db): Promise<void> {
   // Multi-table TRUNCATE is DDL; Drizzle has no builder — use `sql` with table refs.
-  await db.execute(
+  await db.run(
     sql`TRUNCATE ${operatorsNextTable}, ${townsNextTable}, ${landmarksNextTable}, ${linesNextTable}, ${stationsNextTable}, ${servicesNextTable}, ${issuesNextTable} RESTART IDENTITY`,
   );
 }
@@ -1695,7 +1695,7 @@ export async function syncIssues(db: Db): Promise<void> {
 /** Truncates staging tables and records `manifest_last_pulled_at` in one transaction. */
 export async function finalizePull(db: Db): Promise<void> {
   await db.transaction(async (tx) => {
-    await tx.execute(
+    await tx.run(
       sql`TRUNCATE ${operatorsNextTable}, ${townsNextTable}, ${landmarksNextTable}, ${linesNextTable}, ${stationsNextTable}, ${servicesNextTable}, ${issuesNextTable} RESTART IDENTITY`,
     );
     await tx

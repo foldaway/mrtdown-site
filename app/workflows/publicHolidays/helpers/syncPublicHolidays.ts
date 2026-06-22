@@ -1,6 +1,6 @@
 import { and, gte, lte, notInArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import type { getDb } from '../../../db/index.js';
+import type { AppDb } from '../../../db/index.js';
 import { publicHolidaysTable } from '../../../db/schema.js';
 import { withDbDiagnostics } from '../../../util/dbDiagnostics.js';
 
@@ -10,7 +10,7 @@ const DATA_GOV_DATASTORE_SEARCH_URL =
   'https://data.gov.sg/api/action/datastore_search';
 const DATA_GOV_PAGE_LIMIT = 500;
 
-type Db = ReturnType<typeof getDb>;
+type Db = AppDb;
 
 export type PublicHolidaySyncRow = {
   id: string;

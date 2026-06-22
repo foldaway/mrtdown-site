@@ -269,7 +269,7 @@ async function main(): Promise<void> {
   }
 
   const pool = new Pool({ connectionString: DATABASE_URL });
-  const db = drizzle({ client: pool }) as Db;
+  const db = drizzle({ client: pool }) as unknown as Db;
 
   try {
     const now = DateTime.now().setZone(SG_TIMEZONE);

@@ -5,6 +5,7 @@ import {
 import { and, desc, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
+import type { AppDb } from '~/db';
 import {
   crowdReportAbuseEventsTable,
   crowdReportClusterLinesTable,
@@ -100,7 +101,6 @@ export type CrowdReportJsonBodyResult =
   | { success: true; body: unknown }
   | { success: false; status: 400 | 413; error: string };
 
-type AppDb = ReturnType<typeof import('~/db').getDb>;
 type CrowdReportTransaction = Parameters<
   Parameters<AppDb['transaction']>[0]
 >[0];
@@ -196,19 +196,19 @@ function buildDuplicateLockKey(submission: CrowdReportSubmission) {
 }
 
 async function lockCrowdReportClusterDispatchInTransaction(
-  tx: Pick<CrowdReportTransaction, 'execute'>,
+  tx: Pick<CrowdReportTransaction, 'run'>,
   clusterId: string,
 ) {
-  await tx.execute(
+  await tx.run(
     sql`select pg_advisory_xact_lock(hashtextextended(${buildCrowdReportDispatchLockKey('cluster', clusterId)}, 0::bigint))`,
   );
 }
 
 async function lockCrowdReportDispatchInTransaction(
-  tx: Pick<CrowdReportTransaction, 'execute'>,
+  tx: Pick<CrowdReportTransaction, 'run'>,
   reportId: string,
 ) {
-  await tx.execute(
+  await tx.run(
     sql`select pg_advisory_xact_lock(hashtextextended(${buildCrowdReportDispatchLockKey('report', reportId)}, 0::bigint))`,
   );
 }
@@ -1086,7 +1086,7 @@ async function automoderateCrowdReportInTransaction(
   publicSignalMinReports = DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
   publicSignalMinDistinctIpHashes = DEFAULT_PUBLIC_SIGNAL_MIN_DISTINCT_IP_HASHES,
 ) {
-  await tx.execute(
+  await tx.run(
     sql`select pg_advisory_xact_lock(hashtextextended(${buildDuplicateLockKey(submission)}, 0::bigint))`,
   );
 

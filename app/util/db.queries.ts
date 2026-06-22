@@ -7,6 +7,7 @@ import {
 } from '@mrtdown/core';
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
+import type { AppDb } from '~/db';
 import {
   evidencesTable,
   impactEventCausesTable,
@@ -215,8 +216,6 @@ let cachedBaseDataset:
 let pendingBaseDataset: Promise<BaseDataset> | undefined;
 const dateTimeCache = new Map<string, DateTime>();
 const issueBoundsCache = new WeakMap<Issue, IssueIntervalBounds[]>();
-
-type AppDb = ReturnType<typeof import('~/db').getDb>;
 
 type IssueIntervalBounds = {
   start: DateTime;

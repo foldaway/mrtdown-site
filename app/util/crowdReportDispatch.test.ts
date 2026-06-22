@@ -164,16 +164,16 @@ function makeFakeDispatchEligibilityDb() {
     db: {
       transaction<T>(
         callback: (transaction: {
-          execute: (
+          run: (
             query: unknown,
-          ) => Promise<{ rows: Array<{ locked: boolean }> }>;
+          ) => Promise<{ results: Array<{ locked: boolean }> }>;
           select: () => typeof selectBuilder;
         }) => Promise<T>,
       ) {
         return callback({
-          execute(query: unknown) {
+          run(query: unknown) {
             executeCalls.push(query);
-            return Promise.resolve({ rows: [{ locked: true }] });
+            return Promise.resolve({ results: [{ locked: true }] });
           },
           select() {
             return selectBuilder;
@@ -229,17 +229,17 @@ function makeFakePostSendMarkMissDb() {
     db: {
       transaction<T>(
         callback: (transaction: {
-          execute: (
+          run: (
             query: unknown,
-          ) => Promise<{ rows: Array<{ locked: boolean }> }>;
+          ) => Promise<{ results: Array<{ locked: boolean }> }>;
           select: () => typeof selectBuilder;
           update: () => typeof updateBuilder;
         }) => Promise<T>,
       ) {
         return callback({
-          execute(query: unknown) {
+          run(query: unknown) {
             executeCalls.push(query);
-            return Promise.resolve({ rows: [{ locked: true }] });
+            return Promise.resolve({ results: [{ locked: true }] });
           },
           select() {
             return selectBuilder;
@@ -446,7 +446,8 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(clusterUpdateWhereSql).toContain('not exists');
     expect(clusterUpdateWhereSql).toContain('"still_happening" is true');
     expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" not in');
-    expect(clusterUpdateWhereSql).toContain('count(*)::int');
+    expect(clusterUpdateWhereSql).toContain('count(*)');
+    expect(clusterUpdateWhereSql).not.toContain('::int');
     expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).not.toContain(
@@ -531,7 +532,8 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(eligibilityWhereSql).toContain('not exists');
     expect(eligibilityWhereSql).toContain('"still_happening" is true');
     expect(eligibilityWhereSql).toContain('"crowd_reports"."id" not in');
-    expect(eligibilityWhereSql).toContain('count(*)::int');
+    expect(eligibilityWhereSql).toContain('count(*)');
+    expect(eligibilityWhereSql).not.toContain('::int');
     expect(eligibilityWhereSql).toContain('"crowd_reports"."id" in');
   });
 

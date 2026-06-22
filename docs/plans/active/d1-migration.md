@@ -301,6 +301,10 @@ Exit criteria:
 
 - 2026-06-22: Created the D1 migration plan and proposed an umbrella
   branch/stacked PR structure.
+- 2026-06-22: Started Phase 1 on `codex/d1-migration-runtime` by replacing
+  the runtime DB entrypoint with Drizzle D1 wiring, switching Wrangler bindings
+  to `DB`, regenerating Worker environment types, and adding runtime-level DB
+  binding tests.
 
 ## Decision Log
 

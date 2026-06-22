@@ -16,7 +16,20 @@
     "cpu_ms": 300000
   },
   "vars": {
-    "TIER": "production"
+    "TIER": "production",
+    "VITE_ROOT_URL": "https://www.mrtdown.org",
+    "MRTDOWN_DATA_URL": "https://data.mrtdown.com",
+    "CROWD_REPORT_DISPATCH_GITHUB_OWNER": "foldaway",
+    "CROWD_REPORT_DISPATCH_GITHUB_REPO": "mrtdown-data",
+    "CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE": "ingest",
+    "CROWD_REPORT_DISPATCH_LIMIT": "10"
+  },
+  "secrets": {
+    "required": [
+      "SENTRY_DSN",
+      "INTERNAL_API_TOKENS",
+      "CROWD_REPORT_DISPATCH_GITHUB_TOKEN"
+    ]
   },
   "ratelimits": [
     {
@@ -28,11 +41,11 @@
       }
     }
   ],
-  "hyperdrive": [
+  "d1_databases": [
     {
-      "binding": "HYPERDRIVE",
-      "id": "e9034596011b46179c4c7f65c2ebc773",
-      "localConnectionString": "postgresql://postgres:postgres@localhost:5432/mrtdown-db"
+      "binding": "DB",
+      "database_name": "mrtdown-preview",
+      "database_id": "00000000-0000-0000-0000-000000000001"
     }
   ],
   "workflows": [
@@ -53,7 +66,20 @@
   "env": {
     "preview": {
       "vars": {
-        "TIER": "preview"
+        "TIER": "preview",
+        "VITE_ROOT_URL": "https://www.mrtdown.org",
+        "MRTDOWN_DATA_URL": "https://data.mrtdown.com",
+        "CROWD_REPORT_DISPATCH_GITHUB_OWNER": "foldaway",
+        "CROWD_REPORT_DISPATCH_GITHUB_REPO": "mrtdown-data",
+        "CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE": "ingest",
+        "CROWD_REPORT_DISPATCH_LIMIT": "10"
+      },
+      "secrets": {
+        "required": [
+          "SENTRY_DSN",
+          "INTERNAL_API_TOKENS",
+          "CROWD_REPORT_DISPATCH_GITHUB_TOKEN"
+        ]
       },
       "workflows": [
         {
@@ -67,10 +93,11 @@
           "class_name": "PublicHolidaysWorkflow"
         }
       ],
-      "hyperdrive": [
+      "d1_databases": [
         {
-          "binding": "HYPERDRIVE",
-          "id": "e9034596011b46179c4c7f65c2ebc773"
+          "binding": "DB",
+          "database_name": "mrtdown-preview",
+          "database_id": "00000000-0000-0000-0000-000000000001"
         }
       ],
       "ratelimits": [
@@ -97,7 +124,20 @@
     },
     "staging": {
       "vars": {
-        "TIER": "staging"
+        "TIER": "staging",
+        "VITE_ROOT_URL": "https://www.mrtdown.org",
+        "MRTDOWN_DATA_URL": "https://data.mrtdown.com",
+        "CROWD_REPORT_DISPATCH_GITHUB_OWNER": "foldaway",
+        "CROWD_REPORT_DISPATCH_GITHUB_REPO": "mrtdown-data",
+        "CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE": "ingest",
+        "CROWD_REPORT_DISPATCH_LIMIT": "10"
+      },
+      "secrets": {
+        "required": [
+          "SENTRY_DSN",
+          "INTERNAL_API_TOKENS",
+          "CROWD_REPORT_DISPATCH_GITHUB_TOKEN"
+        ]
       },
       "triggers": {
         "crons": ["0 0,6,12,18 * * *", "0 18 * * SUN"]
@@ -114,10 +154,11 @@
           "class_name": "PublicHolidaysWorkflow"
         }
       ],
-      "hyperdrive": [
+      "d1_databases": [
         {
-          "binding": "HYPERDRIVE",
-          "id": "1413ff84b6ef40a19973b1bc8a662736"
+          "binding": "DB",
+          "database_name": "mrtdown-staging",
+          "database_id": "00000000-0000-0000-0000-000000000002"
         }
       ],
       "ratelimits": [
@@ -144,7 +185,20 @@
     },
     "production": {
       "vars": {
-        "TIER": "production"
+        "TIER": "production",
+        "VITE_ROOT_URL": "https://www.mrtdown.org",
+        "MRTDOWN_DATA_URL": "https://data.mrtdown.com",
+        "CROWD_REPORT_DISPATCH_GITHUB_OWNER": "foldaway",
+        "CROWD_REPORT_DISPATCH_GITHUB_REPO": "mrtdown-data",
+        "CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE": "ingest",
+        "CROWD_REPORT_DISPATCH_LIMIT": "10"
+      },
+      "secrets": {
+        "required": [
+          "SENTRY_DSN",
+          "INTERNAL_API_TOKENS",
+          "CROWD_REPORT_DISPATCH_GITHUB_TOKEN"
+        ]
       },
       "triggers": {
         "crons": ["0 0,6,12,18 * * *", "0 18 * * SUN"]
@@ -160,10 +214,11 @@
       "limits": {
         "cpu_ms": 300000
       },
-      "hyperdrive": [
+      "d1_databases": [
         {
-          "binding": "HYPERDRIVE",
-          "id": "1d9561e9411649a6afe8612881ff926d"
+          "binding": "DB",
+          "database_name": "mrtdown-production",
+          "database_id": "00000000-0000-0000-0000-000000000003"
         }
       ],
       "ratelimits": [
