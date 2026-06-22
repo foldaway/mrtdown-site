@@ -1,5 +1,7 @@
 import * as Sentry from '@sentry/cloudflare';
 import handler from '@tanstack/react-start/server-entry';
+import type { Root } from 'xast';
+import { toXml } from 'xast-util-to-xml';
 import {
   applyPublicHtmlCacheHeaders,
   getCachedPublicHtmlResponse,
@@ -60,7 +62,20 @@ async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
     );
   }
 
-  const response = await handler.fetch(request);
+  let response: Response;
+  try {
+    response = await handler.fetch(request);
+  } catch (error) {
+    if (isSitemapRequest(request)) {
+      const elapsedMs = performance.now() - startedAt;
+      return addResponseInstrumentationHeaders(
+        createWorkerSitemapErrorResponse(request, error),
+        elapsedMs,
+        'worker',
+      );
+    }
+    throw error;
+  }
   const elapsedMs = performance.now() - startedAt;
   const shouldStorePublicHtml =
     shouldUsePublicHtmlCache && shouldCachePublicHtml(request, response);
@@ -89,6 +104,79 @@ async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
   }
 
   return addSentryAnonymousUserCookie(responseWithHeaders, sentryAnonymousUser);
+}
+
+function isSitemapRequest(request: Request) {
+  const url = new URL(request.url);
+  return request.method === 'GET' && url.pathname === '/sitemap.xml';
+}
+
+function createWorkerSitemapErrorResponse(request: Request, error: unknown) {
+  const rootUrl =
+    import.meta.env.VITE_ROOT_URL ?? new URL('/', request.url).href;
+  const root: Root = {
+    type: 'root',
+    children: [
+      {
+        type: 'element',
+        name: 'urlset',
+        attributes: {
+          xmlns: 'http://www.sitemaps.org/schemas/sitemap/0.9',
+        },
+        children: [
+          {
+            type: 'element',
+            name: 'url',
+            attributes: {},
+            children: [
+              {
+                type: 'element',
+                name: 'loc',
+                attributes: {},
+                children: [
+                  {
+                    type: 'text',
+                    value: new URL('/', rootUrl).toString(),
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  return new Response(toXml(root), {
+    status: 200,
+    headers: {
+      'content-type': 'application/xml',
+      'x-sitemap-status': 'worker-fallback',
+      'x-sitemap-error-stage': 'handler_fetch',
+      'x-sitemap-error-name': sanitizeDiagnosticHeader(getErrorName(error)),
+      'x-sitemap-error-message': sanitizeDiagnosticHeader(
+        getErrorMessage(error),
+      ),
+    },
+  });
+}
+
+function getErrorName(error: unknown) {
+  if (error instanceof Error) {
+    return error.name;
+  }
+  return typeof error;
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function sanitizeDiagnosticHeader(value: string) {
+  return value.replace(/[\r\n]/g, ' ').slice(0, 180);
 }
 
 function shouldBypassPublicHtmlCacheForCrowdReports(

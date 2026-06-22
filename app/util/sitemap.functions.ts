@@ -1,4 +1,3 @@
-import { createServerFn } from '@tanstack/react-start';
 import { DateTime, Interval } from 'luxon';
 import type { Element, Root } from 'xast';
 import { toXml } from 'xast-util-to-xml';
@@ -15,6 +14,69 @@ interface SitemapPathData {
   operationalFactCoverageDates: string[];
   operationalFactCoverageStartDate: string | null;
   currentDate: string;
+}
+
+export class SitemapGenerationError extends Error {
+  readonly stage: string;
+
+  constructor(stage: string, cause: unknown) {
+    super(getErrorMessage(cause), { cause });
+    this.name = 'SitemapGenerationError';
+    this.stage = stage;
+  }
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function getErrorName(error: unknown) {
+  if (error instanceof Error) {
+    return error.name;
+  }
+  return typeof error;
+}
+
+function sanitizeHeaderValue(value: string) {
+  return value.replace(/[\r\n]/g, ' ').slice(0, 180);
+}
+
+export function createSitemapErrorResponse(error: unknown, rootUrl: string) {
+  const stage =
+    error instanceof SitemapGenerationError ? error.stage : 'route_handler';
+  const cause =
+    error instanceof SitemapGenerationError && error.cause != null
+      ? error.cause
+      : error;
+
+  const fallbackRoot: Root = {
+    type: 'root',
+    children: [
+      {
+        type: 'element',
+        name: 'urlset',
+        attributes: {
+          xmlns: 'http://www.sitemaps.org/schemas/sitemap/0.9',
+          'xmlns:xhtml': 'http://www.w3.org/1999/xhtml',
+        },
+        children: [buildEntries('/', rootUrl)],
+      },
+    ],
+  };
+
+  return new Response(toXml(fallbackRoot), {
+    status: 200,
+    headers: {
+      'content-type': 'application/xml',
+      'x-sitemap-status': 'fallback',
+      'x-sitemap-error-stage': sanitizeHeaderValue(stage),
+      'x-sitemap-error-name': sanitizeHeaderValue(getErrorName(cause)),
+      'x-sitemap-error-message': sanitizeHeaderValue(getErrorMessage(cause)),
+    },
+  });
 }
 
 function buildEntries(path: string, rootUrl: string): Element {
@@ -63,62 +125,60 @@ function buildEntries(path: string, rootUrl: string): Element {
   };
 }
 
-export const getSitemapFn = createServerFn({ method: 'GET' }).handler(
-  async () => {
-    const startedAt = performance.now();
-    const rootUrl = import.meta.env.VITE_ROOT_URL ?? 'http://localhost:3000';
-    let stage = 'load_sitemap_data';
+export async function getSitemapXml() {
+  const startedAt = performance.now();
+  const rootUrl = import.meta.env.VITE_ROOT_URL ?? 'http://localhost:3000';
+  let stage = 'load_sitemap_data';
 
-    try {
-      const sitemapData = await getSitemapData();
-      stage = 'build_sitemap_paths';
-      const paths = buildSitemapPaths(sitemapData);
+  try {
+    const sitemapData = await getSitemapData();
+    stage = 'build_sitemap_paths';
+    const paths = buildSitemapPaths(sitemapData);
 
-      console.info('[SITEMAP] Generated sitemap', {
-        durationMs: Math.round(performance.now() - startedAt),
-        rootUrl,
-        pathCount: paths.length,
-        lineCount: sitemapData.lineIds.length,
-        stationCount: sitemapData.stationIds.length,
-        operatorCount: sitemapData.operatorIds.length,
-        issueCount: sitemapData.issueIds.length,
-        historyPathCount: paths.filter((path) => path.startsWith('/history/'))
-          .length,
-        monthEarliest: sitemapData.monthEarliest,
-        monthLatest: sitemapData.monthLatest,
-        operationalFactCoverageDateCount:
-          sitemapData.operationalFactCoverageDates.length,
-        operationalFactCoverageStartDate:
-          sitemapData.operationalFactCoverageStartDate,
-        currentDate: sitemapData.currentDate,
-      });
+    console.info('[SITEMAP] Generated sitemap', {
+      durationMs: Math.round(performance.now() - startedAt),
+      rootUrl,
+      pathCount: paths.length,
+      lineCount: sitemapData.lineIds.length,
+      stationCount: sitemapData.stationIds.length,
+      operatorCount: sitemapData.operatorIds.length,
+      issueCount: sitemapData.issueIds.length,
+      historyPathCount: paths.filter((path) => path.startsWith('/history/'))
+        .length,
+      monthEarliest: sitemapData.monthEarliest,
+      monthLatest: sitemapData.monthLatest,
+      operationalFactCoverageDateCount:
+        sitemapData.operationalFactCoverageDates.length,
+      operationalFactCoverageStartDate:
+        sitemapData.operationalFactCoverageStartDate,
+      currentDate: sitemapData.currentDate,
+    });
 
-      stage = 'build_xml_entries';
-      const elementUrlSet: Element = {
-        type: 'element',
-        name: 'urlset',
-        attributes: {
-          xmlns: 'http://www.sitemaps.org/schemas/sitemap/0.9',
-          'xmlns:xhtml': 'http://www.w3.org/1999/xhtml',
-        },
-        children: paths.map((path) => {
-          return buildEntries(path, rootUrl);
-        }),
-      };
+    stage = 'build_xml_entries';
+    const elementUrlSet: Element = {
+      type: 'element',
+      name: 'urlset',
+      attributes: {
+        xmlns: 'http://www.sitemaps.org/schemas/sitemap/0.9',
+        'xmlns:xhtml': 'http://www.w3.org/1999/xhtml',
+      },
+      children: paths.map((path) => {
+        return buildEntries(path, rootUrl);
+      }),
+    };
 
-      const root: Root = {
-        type: 'root',
-        children: [elementUrlSet],
-      };
+    const root: Root = {
+      type: 'root',
+      children: [elementUrlSet],
+    };
 
-      stage = 'serialize_xml';
-      return toXml(root);
-    } catch (error) {
-      console.error('[SITEMAP] Failed to generate sitemap', { error, stage });
-      throw error;
-    }
-  },
-);
+    stage = 'serialize_xml';
+    return toXml(root);
+  } catch (error) {
+    console.error('[SITEMAP] Failed to generate sitemap', { error, stage });
+    throw new SitemapGenerationError(stage, error);
+  }
+}
 
 export function buildSitemapPaths({
   lineIds,
