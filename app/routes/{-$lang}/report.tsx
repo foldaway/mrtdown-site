@@ -283,10 +283,13 @@ function datetimeLocalToSgIso(value: string) {
 }
 
 function datetimeLocalToSgDate(value: string) {
+  return DateTime.fromFormat(value, "yyyy-MM-dd'T'HH:mm", {
+    zone: 'Asia/Singapore',
+  }).toISODate();
+}
+
+function fallbackSgDate() {
   return (
-    DateTime.fromFormat(value, "yyyy-MM-dd'T'HH:mm", {
-      zone: 'Asia/Singapore',
-    }).toISODate() ??
     DateTime.now().setZone('Asia/Singapore').toISODate() ??
     new Date().toISOString().slice(0, 10)
   );
@@ -326,12 +329,16 @@ function ReportPage() {
   const turnstileWidgetIdRef = useRef<string | undefined>(undefined);
   const initialObservedAtRef = useRef<string | null>(null);
   initialObservedAtRef.current ??= toSgDatetimeLocal(DateTime.now());
+  const initialReferenceDateRef = useRef<string | null>(null);
+  initialReferenceDateRef.current ??=
+    datetimeLocalToSgDate(initialObservedAtRef.current) ?? fallbackSgDate();
+  const lastValidReferenceDateRef = useRef<string | null>(
+    initialReferenceDateRef.current,
+  );
   const initialOptions = useMemo(
     () =>
       buildCrowdReportFormOptions({
-        referenceDate: datetimeLocalToSgDate(
-          initialObservedAtRef.current ?? '',
-        ),
+        referenceDate: initialReferenceDateRef.current ?? fallbackSgDate(),
         ...loaderData.formOptionRows,
       }),
     [loaderData.formOptionRows],
@@ -428,13 +435,24 @@ function ReportPage() {
   }, [intl]);
 
   const observedAt = reportContext.observedAt;
+  const observedAtReferenceDate = datetimeLocalToSgDate(observedAt);
+  const formOptionsReferenceDate =
+    observedAtReferenceDate ??
+    lastValidReferenceDateRef.current ??
+    initialReferenceDateRef.current ??
+    fallbackSgDate();
+  useEffect(() => {
+    if (observedAtReferenceDate != null) {
+      lastValidReferenceDateRef.current = observedAtReferenceDate;
+    }
+  }, [observedAtReferenceDate]);
   const { lineDirections, lineStationPaths, lines, stations } = useMemo(
     () =>
       buildCrowdReportFormOptions({
-        referenceDate: datetimeLocalToSgDate(observedAt),
+        referenceDate: formOptionsReferenceDate,
         ...loaderData.formOptionRows,
       }),
-    [loaderData.formOptionRows, observedAt],
+    [formOptionsReferenceDate, loaderData.formOptionRows],
   );
   const lineById = useMemo(
     () => Object.fromEntries(lines.map((line) => [line.id, line])),
@@ -843,12 +861,22 @@ function ReportPage() {
 
   useEffect(() => {
     const activeLineIds = selectedLineIds.filter(
-      (lineId) => lineById[lineId] != null,
+      (lineId) =>
+        lineById[lineId] != null &&
+        (reportScope !== 'station' ||
+          selectedStation == null ||
+          selectedStation.lineIds.includes(lineId)),
     );
     if (activeLineIds.length !== selectedLineIds.length) {
       setSelectedLineIds(activeLineIds);
     }
-  }, [lineById, selectedLineIds, setSelectedLineIds]);
+  }, [
+    lineById,
+    reportScope,
+    selectedLineIds,
+    selectedStation,
+    setSelectedLineIds,
+  ]);
 
   useEffect(() => {
     if (selectedStationId == null || selectedStation != null) {

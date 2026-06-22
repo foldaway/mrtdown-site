@@ -18,12 +18,14 @@ import {
 } from './crowdReportFeatureFlag';
 import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
+const SG_TIMEZONE = 'Asia/Singapore';
+
 type CrowdReportFormLineRow = {
   id: string;
   name: Translations;
   color: string;
-  startedAt?: string | null;
-  endedAt?: string | null;
+  startedAt?: Date | string | null;
+  endedAt?: Date | string | null;
 };
 
 type CrowdReportFormStationRow = {
@@ -35,8 +37,8 @@ type CrowdReportFormStationCodeRow = {
   lineId: string;
   stationId: string;
   code: string;
-  startedAt?: string | null;
-  endedAt?: string | null;
+  startedAt?: Date | string | null;
+  endedAt?: Date | string | null;
 };
 
 type CrowdReportFormServiceRow = {
@@ -69,17 +71,33 @@ type BuildCrowdReportFormOptionsInput = {
   servicePathEntries: CrowdReportFormPathEntryRow[];
 };
 
-function isLineInOperationOnDate(
+function normalizeDateValue(value: Date | string | null | undefined) {
+  if (value == null) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return DateTime.fromJSDate(value, { zone: 'utc' }).toISODate();
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+  const parsed = DateTime.fromISO(value, { setZone: true });
+  return parsed.isValid ? parsed.setZone(SG_TIMEZONE).toISODate() : value;
+}
+
+function isEntityInOperationOnDate(
   entity: {
-    startedAt?: string | null;
-    endedAt?: string | null;
+    startedAt?: Date | string | null;
+    endedAt?: Date | string | null;
   },
   referenceDate: string,
 ) {
-  if (entity.startedAt != null && entity.startedAt > referenceDate) {
+  const startedAt = normalizeDateValue(entity.startedAt);
+  const endedAt = normalizeDateValue(entity.endedAt);
+  if (startedAt != null && startedAt > referenceDate) {
     return false;
   }
-  if (entity.endedAt != null && entity.endedAt < referenceDate) {
+  if (endedAt != null && endedAt < referenceDate) {
     return false;
   }
   return true;
@@ -95,16 +113,19 @@ export function buildCrowdReportFormOptions({
   servicePathEntries,
 }: BuildCrowdReportFormOptionsInput) {
   const operatingLines = lines
-    .filter((line) => isLineInOperationOnDate(line, referenceDate))
+    .filter((line) => isEntityInOperationOnDate(line, referenceDate))
     .map(({ id, name, color }) => ({ id, name, color }));
   const operatingLineIds = new Set(operatingLines.map((line) => line.id));
   const operatingStationCodes = stationCodes.filter(
     (code) =>
       operatingLineIds.has(code.lineId) &&
-      isLineInOperationOnDate(code, referenceDate),
+      isEntityInOperationOnDate(code, referenceDate),
   );
   const operatingStationIds = new Set(
     operatingStationCodes.map((code) => code.stationId),
+  );
+  const operatingStationLineKeys = new Set(
+    operatingStationCodes.map((code) => `${code.lineId}::${code.stationId}`),
   );
   const operatingStations = stations.filter((station) =>
     operatingStationIds.has(station.id),
@@ -169,7 +190,9 @@ export function buildCrowdReportFormOptions({
     ].sort((a, b) => a.pathIndex - b.pathIndex);
     const pathStationIds = entries
       .map((entry) => entry.stationId)
-      .filter((stationId) => operatingStationIds.has(stationId));
+      .filter((stationId) =>
+        operatingStationLineKeys.has(`${service.lineId}::${stationId}`),
+      );
     if (pathStationIds.length > 0) {
       stationPathsByLineId[service.lineId] ??= [];
       stationPathKeysByLineId[service.lineId] ??= new Set();
@@ -276,7 +299,7 @@ export const getCrowdReportFormOptionsFn = createServerFn({
 
   const db = getDb();
   const referenceDate =
-    DateTime.now().setZone('Asia/Singapore').toISODate() ??
+    DateTime.now().setZone(SG_TIMEZONE).toISODate() ??
     new Date().toISOString().slice(0, 10);
   const [
     lines,

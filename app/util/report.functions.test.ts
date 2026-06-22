@@ -156,7 +156,7 @@ describe('buildCrowdReportFormOptions', () => {
           stationId: 'CURRENT',
           lineId: 'ACTIVE',
           code: 'A1',
-          startedAt: '2020-01-01',
+          startedAt: new Date('2026-06-17T00:00:00.000Z'),
           endedAt: null,
         },
         {
@@ -201,6 +201,13 @@ describe('buildCrowdReportFormOptions', () => {
           startedAt: '2020-01-01',
           endedAt: null,
         },
+        {
+          id: 'OTHER',
+          name: name('Other Line'),
+          color: '#748477',
+          startedAt: '2020-01-01',
+          endedAt: null,
+        },
       ],
       stations: [
         { id: 'START', name: name('Start') },
@@ -222,6 +229,13 @@ describe('buildCrowdReportFormOptions', () => {
           code: 'A2',
           startedAt: '2020-01-01',
           endedAt: '2025-12-31',
+        },
+        {
+          stationId: 'HIDDEN',
+          lineId: 'OTHER',
+          code: 'O1',
+          startedAt: '2020-01-01',
+          endedAt: null,
         },
         {
           stationId: 'END',
