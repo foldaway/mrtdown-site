@@ -20,6 +20,8 @@ Use plans for:
 
 - [Dynamic system map](active/dynamic-system-map.md): canonical schematic map
   data and data-driven site rendering.
+- [Cloudflare D1 migration](active/d1-migration.md): migrate the
+  Postgres/Hyperdrive read model and site-local state to D1.
 - [Production performance](active/production-performance.md): public route
   latency and payload reduction plan.
 - [SEO remediation](active/seo-remediation.md): crawl-clean sitemap output,
