@@ -812,12 +812,18 @@ export async function findMissingCrowdReportReferences(
         : Promise.resolve([]),
       referencedStationIds.length > 0
         ? db
-            .select({ id: stationCodesTable.station_id })
+            .select({
+              lineId: stationCodesTable.line_id,
+              stationId: stationCodesTable.station_id,
+            })
             .from(stationCodesTable)
             .innerJoin(linesTable, eq(stationCodesTable.line_id, linesTable.id))
             .where(
               and(
                 inArray(stationCodesTable.station_id, referencedStationIds),
+                ...(submission.lineIds.length > 0
+                  ? [inArray(stationCodesTable.line_id, submission.lineIds)]
+                  : []),
                 lte(linesTable.started_at, referenceDate),
                 or(
                   isNull(linesTable.ended_at),
@@ -836,12 +842,23 @@ export async function findMissingCrowdReportReferences(
 
   const existingLineIds = new Set(lineRows.map((row) => row.id));
   const existingStationIds = new Set(stationRows.map((row) => row.id));
-  const activeStationIds = new Set(activeStationRows.map((row) => row.id));
+  const activeStationIds = new Set(
+    activeStationRows.map((row) => row.stationId),
+  );
+  const activeStationLineKeys = new Set(
+    activeStationRows.map((row) => `${row.lineId}::${row.stationId}`),
+  );
 
   return {
     lineIds: submission.lineIds.filter((id) => !existingLineIds.has(id)),
     stationIds: referencedStationIds.filter(
-      (id) => !existingStationIds.has(id) || !activeStationIds.has(id),
+      (stationId) =>
+        !existingStationIds.has(stationId) ||
+        (submission.lineIds.length === 0
+          ? !activeStationIds.has(stationId)
+          : !submission.lineIds.every((lineId) =>
+              activeStationLineKeys.has(`${lineId}::${stationId}`),
+            )),
     ),
     directionStationIds: invalidDirectionStationIds,
   };

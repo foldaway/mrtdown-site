@@ -835,7 +835,7 @@ describe('findMissingCrowdReportReferences', () => {
     const fake = makeFakeReferenceDb([
       [{ id: 'BPLRT' }],
       [{ id: 'BP6' }],
-      [{ id: 'BP6' }],
+      [{ lineId: 'BPLRT', stationId: 'BP6' }],
       [
         {
           id: 'rev-current',
@@ -880,7 +880,7 @@ describe('findMissingCrowdReportReferences', () => {
     const fake = makeFakeReferenceDb([
       [{ id: 'BPLRT' }],
       [{ id: 'BP6' }],
-      [{ id: 'BP6' }],
+      [{ lineId: 'BPLRT', stationId: 'BP6' }],
       [
         {
           id: 'rev-current',
@@ -925,7 +925,10 @@ describe('findMissingCrowdReportReferences', () => {
     const fake = makeFakeReferenceDb([
       [{ id: 'BPLRT' }, { id: 'CCL' }],
       [{ id: 'BP6' }],
-      [{ id: 'BP6' }],
+      [
+        { lineId: 'BPLRT', stationId: 'BP6' },
+        { lineId: 'CCL', stationId: 'BP6' },
+      ],
     ]);
 
     await expect(
@@ -958,11 +961,31 @@ describe('findMissingCrowdReportReferences', () => {
     });
   });
 
+  it('rejects stations without an active station code on every submitted line', async () => {
+    const fake = makeFakeReferenceDb([
+      [{ id: 'BPLRT' }, { id: 'CCL' }],
+      [{ id: 'BP6' }],
+      [{ lineId: 'CCL', stationId: 'BP6' }],
+    ]);
+
+    await expect(
+      findMissingCrowdReportReferences(fake.db as never, {
+        lineIds: ['BPLRT', 'CCL'],
+        observedAt: '2026-05-24T12:30:00.000+08:00',
+        stationIds: ['BP6'],
+      }),
+    ).resolves.toEqual({
+      lineIds: [],
+      stationIds: ['BP6'],
+      directionStationIds: [],
+    });
+  });
+
   it('checks line and station activity against the observed Singapore date', async () => {
     const fake = makeFakeReferenceDb([
       [{ id: 'BPLRT' }],
       [{ id: 'BP6' }],
-      [{ id: 'BP6' }],
+      [{ lineId: 'BPLRT', stationId: 'BP6' }],
     ]);
 
     await expect(
@@ -980,9 +1003,11 @@ describe('findMissingCrowdReportReferences', () => {
     const dialect = new PgDialect();
     const lineWhereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL);
     const stationCodeWhereSql = dialect.sqlToQuery(fake.whereCalls[2] as SQL);
+    const countReferenceDateParams = (params: unknown[]) =>
+      params.filter((param) => param === '2026-05-24').length;
 
-    expect(lineWhereSql.params).toContain('2026-05-24');
-    expect(stationCodeWhereSql.params).toContain('2026-05-24');
+    expect(countReferenceDateParams(lineWhereSql.params)).toBe(2);
+    expect(countReferenceDateParams(stationCodeWhereSql.params)).toBe(4);
   });
 });
 
