@@ -4325,12 +4325,24 @@ export async function getStatisticsData() {
 
 export async function getSitemapData() {
   const dataset = await getBaseDataset();
-  const issues = Object.values(dataset.allIssues).filter(
-    (issue) => issue.intervals[0] != null,
+  const skippedIssueIds: string[] = [];
+  const issuesWithFirstDates = Object.values(dataset.allIssues).flatMap(
+    (issue) => {
+      const firstInterval = issue.intervals[0];
+      if (firstInterval == null) {
+        return [];
+      }
+
+      const firstDate = parseDateTime(firstInterval.startAt);
+      if (!firstDate.isValid) {
+        skippedIssueIds.push(issue.id);
+        return [];
+      }
+
+      return [{ firstDate, issue }];
+    },
   );
-  const firstDates = issues.map((issue) =>
-    parseDateTime(issue.intervals[0].startAt),
-  );
+  const firstDates = issuesWithFirstDates.map(({ firstDate }) => firstDate);
   const earliest = firstDates.sort((a, b) => a.toMillis() - b.toMillis())[0];
   const latest = firstDates.sort((a, b) => b.toMillis() - a.toMillis())[0];
 
@@ -4351,11 +4363,18 @@ export async function getSitemapData() {
   const operationalFactCoverageStartDate =
     await getOperationalFactCoverageStartDate();
 
+  if (skippedIssueIds.length > 0) {
+    console.warn('[SITEMAP] Skipped issues with invalid first interval dates', {
+      count: skippedIssueIds.length,
+      issueIds: skippedIssueIds.slice(0, 20),
+    });
+  }
+
   return {
     lineIds: Object.keys(dataset.included.lines).sort(),
     stationIds: Object.keys(dataset.included.stations).sort(),
     operatorIds: Object.keys(dataset.included.operators).sort(),
-    issueIds: issues.map((issue) => issue.id),
+    issueIds: issuesWithFirstDates.map(({ issue }) => issue.id),
     monthEarliest,
     monthLatest,
     operationalFactCoverageDates: coverageRows.map((row) => row.date),

@@ -116,6 +116,31 @@ describe('agent Markdown discovery', () => {
     expect(paths).toContain('/history/2025/01');
     expect(paths).not.toContain('/history/2025');
   });
+
+  it('keeps sitemap generation alive when history date bounds are invalid', () => {
+    const paths = buildSitemapPaths({
+      lineIds: ['EWL'],
+      stationIds: ['EW1'],
+      operatorIds: ['SMRT'],
+      issueIds: ['issue-1'],
+      monthEarliest: 'not-a-date',
+      monthLatest: '2026-05-01',
+      operationalFactCoverageDates: [],
+      operationalFactCoverageStartDate: null,
+      currentDate: '2026-06-21',
+    });
+
+    expect(paths).toEqual([
+      '/',
+      '/statistics',
+      '/system-map',
+      '/about',
+      '/lines/EWL',
+      '/stations/EW1',
+      '/operators/SMRT',
+      '/issues/issue-1',
+    ]);
+  });
 });
 
 function buildCoverageDates(month: string) {

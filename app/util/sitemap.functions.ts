@@ -65,29 +65,58 @@ function buildEntries(path: string, rootUrl: string): Element {
 
 export const getSitemapFn = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const paths = buildSitemapPaths(await getSitemapData());
+    const startedAt = performance.now();
+    const rootUrl = import.meta.env.VITE_ROOT_URL ?? 'http://localhost:3000';
+    let stage = 'load_sitemap_data';
 
-    const elementUrlSet: Element = {
-      type: 'element',
-      name: 'urlset',
-      attributes: {
-        xmlns: 'http://www.sitemaps.org/schemas/sitemap/0.9',
-        'xmlns:xhtml': 'http://www.w3.org/1999/xhtml',
-      },
-      children: paths.map((path) => {
-        return buildEntries(
-          path,
-          import.meta.env.VITE_ROOT_URL ?? 'http://localhost:3000',
-        );
-      }),
-    };
+    try {
+      const sitemapData = await getSitemapData();
+      stage = 'build_sitemap_paths';
+      const paths = buildSitemapPaths(sitemapData);
 
-    const root: Root = {
-      type: 'root',
-      children: [elementUrlSet],
-    };
+      console.info('[SITEMAP] Generated sitemap', {
+        durationMs: Math.round(performance.now() - startedAt),
+        rootUrl,
+        pathCount: paths.length,
+        lineCount: sitemapData.lineIds.length,
+        stationCount: sitemapData.stationIds.length,
+        operatorCount: sitemapData.operatorIds.length,
+        issueCount: sitemapData.issueIds.length,
+        historyPathCount: paths.filter((path) => path.startsWith('/history/'))
+          .length,
+        monthEarliest: sitemapData.monthEarliest,
+        monthLatest: sitemapData.monthLatest,
+        operationalFactCoverageDateCount:
+          sitemapData.operationalFactCoverageDates.length,
+        operationalFactCoverageStartDate:
+          sitemapData.operationalFactCoverageStartDate,
+        currentDate: sitemapData.currentDate,
+      });
 
-    return toXml(root);
+      stage = 'build_xml_entries';
+      const elementUrlSet: Element = {
+        type: 'element',
+        name: 'urlset',
+        attributes: {
+          xmlns: 'http://www.sitemaps.org/schemas/sitemap/0.9',
+          'xmlns:xhtml': 'http://www.w3.org/1999/xhtml',
+        },
+        children: paths.map((path) => {
+          return buildEntries(path, rootUrl);
+        }),
+      };
+
+      const root: Root = {
+        type: 'root',
+        children: [elementUrlSet],
+      };
+
+      stage = 'serialize_xml';
+      return toXml(root);
+    } catch (error) {
+      console.error('[SITEMAP] Failed to generate sitemap', { error, stage });
+      throw error;
+    }
   },
 );
 
@@ -125,10 +154,34 @@ export function buildSitemapPaths({
       ? null
       : DateTime.fromISO(operationalFactCoverageStartDate);
   const currentDateTime = DateTime.fromISO(currentDate);
+  if (
+    !monthEarliestDateTime.isValid ||
+    !monthLatestDateTime.isValid ||
+    !currentDateTime.isValid ||
+    (coverageStartDateTime != null && !coverageStartDateTime.isValid)
+  ) {
+    console.warn('[SITEMAP] Skipping history paths with invalid date bounds', {
+      monthEarliest,
+      monthLatest,
+      operationalFactCoverageStartDate,
+      currentDate,
+    });
+    return paths;
+  }
+
   const interval = Interval.fromDateTimes(
     monthEarliestDateTime,
     monthLatestDateTime.plus({ month: 1 }),
   );
+  if (!interval.isValid) {
+    console.warn('[SITEMAP] Skipping history paths with invalid month range', {
+      monthEarliest,
+      monthLatest,
+      invalidReason: interval.invalidReason,
+    });
+    return paths;
+  }
+
   for (const monthInterval of interval.splitBy({ month: 1 })) {
     const monthDateTime = monthInterval.start;
     if (monthDateTime == null) {
