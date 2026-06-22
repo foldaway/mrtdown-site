@@ -30,11 +30,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Reset and migrate preview database
-        run: npm run db:preview:prepare
-        env:
-          ALLOW_DATABASE_RESET: "true"
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Block deploy until D1 migrations are configured
+        run: |
+          echo "::error::D1 runtime is configured, but D1 migrations are not wired yet. Keep this umbrella stack from deploying until the D1 schema/cutover phases replace this guard."
+          exit 1
 
       - name: Build
         run: npm run build
@@ -81,4 +80,3 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-

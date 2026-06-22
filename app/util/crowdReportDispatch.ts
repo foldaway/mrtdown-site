@@ -15,6 +15,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import { DateTime } from 'luxon';
+import type { AppDb } from '~/db';
 import {
   crowdReportAbuseEventsTable,
   crowdReportClusterLinesTable,
@@ -35,7 +36,6 @@ const DEFAULT_DISPATCH_MIN_ONGOING_REPORTS = 3;
 const DEFAULT_DISPATCH_MIN_DISTINCT_IP_HASHES = 2;
 const MAX_DISPATCH_LIMIT = 50;
 
-type AppDb = ReturnType<typeof import('~/db').getDb>;
 type CrowdReportTransaction = Parameters<
   Parameters<AppDb['transaction']>[0]
 >[0];
@@ -131,7 +131,7 @@ function hasCrowdReportClusterCurrentConfidence() {
 
 function getCrowdReportClusterOngoingReportCountSql() {
   return sql<number>`(
-    select count(*)::int
+    select count(*)
     from ${crowdReportsTable}
     where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
@@ -141,7 +141,7 @@ function getCrowdReportClusterOngoingReportCountSql() {
 
 function getCrowdReportClusterOngoingDistinctIpHashCountSql() {
   return sql<number>`(
-    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})::int
+    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})
     from ${crowdReportAbuseEventsTable}
     inner join ${crowdReportsTable}
       on ${crowdReportsTable.id} = ${crowdReportAbuseEventsTable.report_id}
@@ -618,7 +618,7 @@ function hasAllClusterDispatchPayloadReportsCurrent(
   }
 
   return sql`(
-    select count(*)::int
+    select count(*)
     from ${crowdReportsTable}
     where ${crowdReportsTable.cluster_id} = ${candidate.id}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
@@ -631,10 +631,10 @@ async function tryAcquireCrowdReportDispatchLock(
   tx: CrowdReportTransaction,
   candidate: CrowdReportDispatchCandidate,
 ) {
-  const result = await tx.execute<{ locked: boolean }>(
+  const result = (await tx.run(
     sql`select pg_try_advisory_xact_lock(hashtextextended(${buildCrowdReportDispatchLockKey(candidate.kind, candidate.id)}, 0::bigint)) as "locked"`,
-  );
-  return result.rows[0]?.locked === true;
+  )) as D1Result<{ locked: boolean }>;
+  return result.results[0]?.locked === true;
 }
 
 async function isCrowdReportDispatchCandidateEligible(

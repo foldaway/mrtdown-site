@@ -33,10 +33,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run database migrations
-        run: npm run db:migrate
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Block deploy until D1 migrations are configured
+        run: |
+          echo "::error::D1 runtime is configured, but D1 migrations are not wired yet. Keep this umbrella stack from deploying until the D1 schema/cutover phases replace this guard."
+          exit 1
 
   deploy-staging:
     if: github.ref == 'refs/heads/main'
@@ -112,10 +112,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run database migrations
-        run: npm run db:migrate
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Block deploy until D1 migrations are configured
+        run: |
+          echo "::error::D1 runtime is configured, but D1 migrations are not wired yet. Keep this umbrella stack from deploying until the D1 schema/cutover phases replace this guard."
+          exit 1
 
   deploy-production:
     if: github.ref == 'refs/heads/production'

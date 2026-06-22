@@ -2,7 +2,7 @@ import type { Translations } from '@mrtdown/core';
 import { createServerFn } from '@tanstack/react-start';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { getDb } from '~/db';
+import { type AppDb, getDb } from '~/db';
 import {
   crowdReportClusterLinesTable,
   crowdReportClustersTable,
@@ -22,7 +22,6 @@ const RequestSchema = z.object({
   sourceId: z.string().trim().min(1).max(128),
 });
 
-type AppDb = ReturnType<typeof getDb>;
 type CrowdReportSourceKind = z.infer<typeof CrowdReportSourceKindSchema>;
 type CrowdReportSourceStatus = 'accepted' | 'dispatched';
 

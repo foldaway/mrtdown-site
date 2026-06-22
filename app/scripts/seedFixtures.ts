@@ -129,7 +129,7 @@ async function main(): Promise<void> {
   }
 
   const pool = new Pool({ connectionString: DATABASE_URL });
-  const db = drizzle({ client: pool, relations }) as Db;
+  const db = drizzle({ client: pool, relations }) as unknown as Db;
 
   try {
     console.log(`Seeding preview database from ${DEFAULT_FIXTURES_BASE_URL}`);
