@@ -2,7 +2,18 @@ import {
   type IngestContentCrowdReportEffect,
   IngestContentCrowdReportEffectSchema,
 } from '@mrtdown/ingest-contracts';
-import { and, desc, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
 import {
@@ -18,6 +29,7 @@ import {
   serviceRevisionPathStationEntriesTable,
   serviceRevisionsTable,
   servicesTable,
+  stationCodesTable,
   stationsTable,
   crowdReportStationsTable,
 } from '~/db/schema';
@@ -767,20 +779,34 @@ export async function findMissingCrowdReportReferences(
   db: AppDb,
   submission: Pick<
     CrowdReportSubmission,
-    'directionStationId' | 'lineIds' | 'stationIds'
+    | 'directionStationId'
+    | 'lineIds'
+    | 'observedAt'
+    | 'reportScope'
+    | 'stationIds'
   >,
 ) {
+  const referenceDate = getCrowdReportReferenceDate(submission);
   const referencedStationIds = [
     ...submission.stationIds,
     ...(submission.directionStationId ? [submission.directionStationId] : []),
   ];
-  const [lineRows, stationRows, invalidDirectionStationIds] = await Promise.all(
-    [
+  const [lineRows, stationRows, activeStationRows, invalidDirectionStationIds] =
+    await Promise.all([
       submission.lineIds.length > 0
         ? db
             .select({ id: linesTable.id })
             .from(linesTable)
-            .where(inArray(linesTable.id, submission.lineIds))
+            .where(
+              and(
+                inArray(linesTable.id, submission.lineIds),
+                lte(linesTable.started_at, referenceDate),
+                or(
+                  isNull(linesTable.ended_at),
+                  gte(linesTable.ended_at, referenceDate),
+                ),
+              ),
+            )
         : Promise.resolve([]),
       referencedStationIds.length > 0
         ? db
@@ -788,20 +814,78 @@ export async function findMissingCrowdReportReferences(
             .from(stationsTable)
             .where(inArray(stationsTable.id, referencedStationIds))
         : Promise.resolve([]),
-      findInvalidDirectionStationIds(db, submission),
-    ],
-  );
+      referencedStationIds.length > 0
+        ? db
+            .select({
+              lineId: stationCodesTable.line_id,
+              stationId: stationCodesTable.station_id,
+            })
+            .from(stationCodesTable)
+            .innerJoin(linesTable, eq(stationCodesTable.line_id, linesTable.id))
+            .where(
+              and(
+                inArray(stationCodesTable.station_id, referencedStationIds),
+                ...(submission.reportScope !== 'station' &&
+                submission.lineIds.length > 0
+                  ? [inArray(stationCodesTable.line_id, submission.lineIds)]
+                  : []),
+                lte(linesTable.started_at, referenceDate),
+                or(
+                  isNull(linesTable.ended_at),
+                  gte(linesTable.ended_at, referenceDate),
+                ),
+                lte(stationCodesTable.started_at, referenceDate),
+                or(
+                  isNull(stationCodesTable.ended_at),
+                  gte(stationCodesTable.ended_at, referenceDate),
+                ),
+              ),
+            )
+        : Promise.resolve([]),
+      findInvalidDirectionStationIds(db, submission, referenceDate),
+    ]);
 
   const existingLineIds = new Set(lineRows.map((row) => row.id));
   const existingStationIds = new Set(stationRows.map((row) => row.id));
+  const activeStationIds = new Set(
+    activeStationRows.map((row) => row.stationId),
+  );
+  const activeStationLineKeys = new Set(
+    activeStationRows.map((row) => `${row.lineId}::${row.stationId}`),
+  );
 
   return {
     lineIds: submission.lineIds.filter((id) => !existingLineIds.has(id)),
     stationIds: referencedStationIds.filter(
-      (id) => !existingStationIds.has(id),
+      (stationId) =>
+        !existingStationIds.has(stationId) ||
+        (submission.lineIds.length === 0 || submission.reportScope === 'station'
+          ? !activeStationIds.has(stationId)
+          : submission.reportScope === 'line'
+            ? !submission.lineIds.some((lineId) =>
+                activeStationLineKeys.has(`${lineId}::${stationId}`),
+              )
+            : !submission.lineIds.every((lineId) =>
+                activeStationLineKeys.has(`${lineId}::${stationId}`),
+              )),
     ),
     directionStationIds: invalidDirectionStationIds,
   };
+}
+
+function getCrowdReportReferenceDate(
+  submission: Pick<CrowdReportSubmission, 'observedAt'>,
+) {
+  const observedDate = DateTime.fromISO(submission.observedAt, {
+    setZone: true,
+  })
+    .setZone(SG_TIMEZONE)
+    .toISODate();
+  return (
+    observedDate ??
+    DateTime.now().setZone(SG_TIMEZONE).toISODate() ??
+    new Date().toISOString().slice(0, 10)
+  );
 }
 
 async function findInvalidDirectionStationIds(
@@ -810,6 +894,7 @@ async function findInvalidDirectionStationIds(
     CrowdReportSubmission,
     'directionStationId' | 'lineIds' | 'stationIds'
   >,
+  referenceDate: string,
 ) {
   if (submission.directionStationId == null) {
     return [];
@@ -818,9 +903,6 @@ async function findInvalidDirectionStationIds(
     return [submission.directionStationId];
   }
 
-  const referenceDate =
-    DateTime.now().setZone(SG_TIMEZONE).toISODate() ??
-    new Date().toISOString().slice(0, 10);
   const serviceRevisionRows = await db
     .select({
       id: serviceRevisionsTable.id,
@@ -915,6 +997,30 @@ async function findInvalidDirectionStationIds(
         ),
       ),
     );
+  const activeDirectionStationRows = await db
+    .select({
+      stationId: stationCodesTable.station_id,
+    })
+    .from(stationCodesTable)
+    .innerJoin(linesTable, eq(stationCodesTable.line_id, linesTable.id))
+    .where(
+      and(
+        inArray(stationCodesTable.line_id, submission.lineIds),
+        lte(linesTable.started_at, referenceDate),
+        or(
+          isNull(linesTable.ended_at),
+          gte(linesTable.ended_at, referenceDate),
+        ),
+        lte(stationCodesTable.started_at, referenceDate),
+        or(
+          isNull(stationCodesTable.ended_at),
+          gte(stationCodesTable.ended_at, referenceDate),
+        ),
+      ),
+    );
+  const activeDirectionStationIds = new Set(
+    activeDirectionStationRows.map((row) => row.stationId),
+  );
 
   const terminalStationIds = new Set<string>();
   const pathRowsByRevisionKey = pathRows.reduce<
@@ -929,9 +1035,11 @@ async function findInvalidDirectionStationIds(
     return acc;
   }, {});
   for (const entries of Object.values(pathRowsByRevisionKey)) {
-    entries.sort((a, b) => a.pathIndex - b.pathIndex);
-    const firstStationId = entries[0]?.stationId;
-    const lastStationId = entries[entries.length - 1]?.stationId;
+    const activeEntries = entries
+      .filter((entry) => activeDirectionStationIds.has(entry.stationId))
+      .sort((a, b) => a.pathIndex - b.pathIndex);
+    const firstStationId = activeEntries[0]?.stationId;
+    const lastStationId = activeEntries[activeEntries.length - 1]?.stationId;
     if (firstStationId != null) {
       terminalStationIds.add(firstStationId);
     }

@@ -43,7 +43,10 @@ import { BetaBadge } from '~/components/BetaBadge';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildSeoMetadata } from '~/helpers/seo';
 import { assert } from '~/util/assert';
-import { getCrowdReportFormOptionsFn } from '~/util/report.functions';
+import {
+  buildCrowdReportFormOptions,
+  getCrowdReportFormOptionsFn,
+} from '~/util/report.functions';
 
 type ReportSearch = {
   lineId?: string;
@@ -279,6 +282,19 @@ function datetimeLocalToSgIso(value: string) {
   }).toISO();
 }
 
+function datetimeLocalToSgDate(value: string) {
+  return DateTime.fromFormat(value, "yyyy-MM-dd'T'HH:mm", {
+    zone: 'Asia/Singapore',
+  }).toISODate();
+}
+
+function fallbackSgDate() {
+  return (
+    DateTime.now().setZone('Asia/Singapore').toISODate() ??
+    new Date().toISOString().slice(0, 10)
+  );
+}
+
 function getReportContextLineIds(context: ReportContext) {
   if (context.scope === 'line' || context.scope === 'station') {
     return context.lineIds;
@@ -297,8 +313,7 @@ function getReportContextStationId(context: ReportContext) {
 }
 
 function ReportPage() {
-  const { lineDirections, lineStationPaths, lines, stations } =
-    Route.useLoaderData();
+  const loaderData = Route.useLoaderData();
   const search = Route.useSearch() as ReportSearch;
   const intl = useIntl();
   const posthog = usePostHog();
@@ -312,24 +327,42 @@ function ReportPage() {
   const observedAtRef = useRef<HTMLInputElement>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetIdRef = useRef<string | undefined>(undefined);
+  const initialObservedAtRef = useRef<string | null>(null);
+  initialObservedAtRef.current ??= toSgDatetimeLocal(DateTime.now());
+  const initialReferenceDateRef = useRef<string | null>(null);
+  initialReferenceDateRef.current ??=
+    datetimeLocalToSgDate(initialObservedAtRef.current) ?? fallbackSgDate();
+  const lastValidReferenceDateRef = useRef<string | null>(
+    initialReferenceDateRef.current,
+  );
+  const initialOptions = useMemo(
+    () =>
+      buildCrowdReportFormOptions({
+        referenceDate: initialReferenceDateRef.current ?? fallbackSgDate(),
+        ...loaderData.formOptionRows,
+      }),
+    [loaderData.formOptionRows],
+  );
   const prefilledLineId =
-    search.lineId != null && lines.some((line) => line.id === search.lineId)
+    search.lineId != null &&
+    initialOptions.lines.some((line) => line.id === search.lineId)
       ? search.lineId
       : undefined;
   const prefilledStationId =
     search.stationId != null &&
-    stations.some((station) => station.id === search.stationId)
+    initialOptions.stations.some((station) => station.id === search.stationId)
       ? search.stationId
       : undefined;
   const [reportContext, setReportContext] = useState<ReportContext>(() => {
     const base: ReportContextBase = {
-      observedAt: toSgDatetimeLocal(DateTime.now()),
+      observedAt:
+        initialObservedAtRef.current ?? toSgDatetimeLocal(DateTime.now()),
       effect: '',
       delayMinutes: '',
       isStillHappening: true,
     };
     if (prefilledStationId != null) {
-      const prefilledStation = stations.find(
+      const prefilledStation = initialOptions.stations.find(
         (station) => station.id === prefilledStationId,
       );
       const lineIds =
@@ -401,6 +434,26 @@ function ReportPage() {
     };
   }, [intl]);
 
+  const observedAt = reportContext.observedAt;
+  const observedAtReferenceDate = datetimeLocalToSgDate(observedAt);
+  const formOptionsReferenceDate =
+    observedAtReferenceDate ??
+    lastValidReferenceDateRef.current ??
+    initialReferenceDateRef.current ??
+    fallbackSgDate();
+  useEffect(() => {
+    if (observedAtReferenceDate != null) {
+      lastValidReferenceDateRef.current = observedAtReferenceDate;
+    }
+  }, [observedAtReferenceDate]);
+  const { lineDirections, lineStationPaths, lines, stations } = useMemo(
+    () =>
+      buildCrowdReportFormOptions({
+        referenceDate: formOptionsReferenceDate,
+        ...loaderData.formOptionRows,
+      }),
+    [formOptionsReferenceDate, loaderData.formOptionRows],
+  );
   const lineById = useMemo(
     () => Object.fromEntries(lines.map((line) => [line.id, line])),
     [lines],
@@ -416,7 +469,6 @@ function ReportPage() {
     ? stationById[selectedStationId]
     : undefined;
   const selectedStationIds = selectedStationId ? [selectedStationId] : [];
-  const observedAt = reportContext.observedAt;
   const effect = reportContext.effect;
   const delayMinutes = reportContext.delayMinutes;
   const isStillHappening = reportContext.isStillHappening;
@@ -806,6 +858,58 @@ function ReportPage() {
       return current;
     });
   };
+
+  useEffect(() => {
+    const activeLineIds = selectedLineIds.filter(
+      (lineId) => lineById[lineId] != null,
+    );
+    if (activeLineIds.length !== selectedLineIds.length) {
+      setSelectedLineIds(activeLineIds);
+    }
+  }, [lineById, selectedLineIds, setSelectedLineIds]);
+
+  useEffect(() => {
+    if (selectedStationId == null || selectedStation != null) {
+      return;
+    }
+    setReportContext((current) => {
+      if (current.scope === 'station') {
+        return { ...current, stationId: null, lineIds: [] };
+      }
+      if (current.scope === 'train') {
+        return { ...current, stationId: null };
+      }
+      return current;
+    });
+  }, [selectedStation, selectedStationId]);
+
+  useEffect(() => {
+    if (
+      reportScope !== 'train' ||
+      selectedStation == null ||
+      selectedLineIds.length === 0 ||
+      selectedStation.lineIds.some((lineId) => selectedLineIds.includes(lineId))
+    ) {
+      return;
+    }
+    setReportContext((current) =>
+      current.scope === 'train' ? { ...current, stationId: null } : current,
+    );
+  }, [reportScope, selectedLineIds, selectedStation]);
+
+  useEffect(() => {
+    if (rangeStartStationId.length > 0 && rangeStartStation == null) {
+      setRangeStartStationId('');
+    }
+    if (rangeEndStationId.length > 0 && rangeEndStation == null) {
+      setRangeEndStationId('');
+    }
+  }, [
+    rangeEndStation,
+    rangeEndStationId,
+    rangeStartStation,
+    rangeStartStationId,
+  ]);
 
   const chooseReportScope = (scope: ReportScope) => {
     clearFieldError('scope');

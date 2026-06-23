@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { Translations } from '@mrtdown/core';
 import { createServerFn } from '@tanstack/react-start';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { getDb } from '~/db';
 import {
@@ -18,10 +18,14 @@ import {
 } from './crowdReportFeatureFlag';
 import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
+const SG_TIMEZONE = 'Asia/Singapore';
+
 type CrowdReportFormLineRow = {
   id: string;
   name: Translations;
   color: string;
+  startedAt?: Date | string | null;
+  endedAt?: Date | string | null;
 };
 
 type CrowdReportFormStationRow = {
@@ -33,6 +37,8 @@ type CrowdReportFormStationCodeRow = {
   lineId: string;
   stationId: string;
   code: string;
+  startedAt?: Date | string | null;
+  endedAt?: Date | string | null;
 };
 
 type CrowdReportFormServiceRow = {
@@ -65,6 +71,38 @@ type BuildCrowdReportFormOptionsInput = {
   servicePathEntries: CrowdReportFormPathEntryRow[];
 };
 
+function normalizeDateValue(value: Date | string | null | undefined) {
+  if (value == null) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return DateTime.fromJSDate(value, { zone: 'utc' }).toISODate();
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+  const parsed = DateTime.fromISO(value, { setZone: true });
+  return parsed.isValid ? parsed.setZone(SG_TIMEZONE).toISODate() : value;
+}
+
+function isEntityInOperationOnDate(
+  entity: {
+    startedAt?: Date | string | null;
+    endedAt?: Date | string | null;
+  },
+  referenceDate: string,
+) {
+  const startedAt = normalizeDateValue(entity.startedAt);
+  const endedAt = normalizeDateValue(entity.endedAt);
+  if (startedAt != null && startedAt > referenceDate) {
+    return false;
+  }
+  if (endedAt != null && endedAt < referenceDate) {
+    return false;
+  }
+  return true;
+}
+
 export function buildCrowdReportFormOptions({
   referenceDate,
   lines,
@@ -74,8 +112,29 @@ export function buildCrowdReportFormOptions({
   serviceRevisions,
   servicePathEntries,
 }: BuildCrowdReportFormOptionsInput) {
+  const operatingLines = lines
+    .filter((line) => isEntityInOperationOnDate(line, referenceDate))
+    .map(({ id, name, color }) => ({ id, name, color }));
+  const operatingLineIds = new Set(operatingLines.map((line) => line.id));
+  const operatingStationCodes = stationCodes.filter(
+    (code) =>
+      operatingLineIds.has(code.lineId) &&
+      isEntityInOperationOnDate(code, referenceDate),
+  );
+  const operatingStationIds = new Set(
+    operatingStationCodes.map((code) => code.stationId),
+  );
+  const operatingStationLineKeys = new Set(
+    operatingStationCodes.map((code) => `${code.lineId}::${code.stationId}`),
+  );
+  const operatingStations = stations.filter((station) =>
+    operatingStationIds.has(station.id),
+  );
+  const operatingServices = services.filter((service) =>
+    operatingLineIds.has(service.lineId),
+  );
   const stationById = Object.fromEntries(
-    stations.map((station) => [station.id, station]),
+    operatingStations.map((station) => [station.id, station]),
   );
   const revisionsByServiceId = serviceRevisions.reduce<
     Record<string, CrowdReportFormServiceRevisionRow[]>
@@ -118,7 +177,7 @@ export function buildCrowdReportFormOptions({
   const stationPathsByLineId: Record<string, string[][]> = {};
   const stationPathKeysByLineId: Record<string, Set<string>> = {};
 
-  for (const service of services) {
+  for (const service of operatingServices) {
     const latestRevision = latestRevisionByServiceId[service.id];
     if (latestRevision == null) {
       continue;
@@ -129,7 +188,11 @@ export function buildCrowdReportFormOptions({
         `${latestRevision.id}::${service.id}`
       ] ?? []),
     ].sort((a, b) => a.pathIndex - b.pathIndex);
-    const pathStationIds = entries.map((entry) => entry.stationId);
+    const pathStationIds = entries
+      .map((entry) => entry.stationId)
+      .filter((stationId) =>
+        operatingStationLineKeys.has(`${service.lineId}::${stationId}`),
+      );
     if (pathStationIds.length > 0) {
       stationPathsByLineId[service.lineId] ??= [];
       stationPathKeysByLineId[service.lineId] ??= new Set();
@@ -140,8 +203,8 @@ export function buildCrowdReportFormOptions({
       }
     }
     const terminalStationIds = [
-      entries[0]?.stationId,
-      entries[entries.length - 1]?.stationId,
+      pathStationIds[0],
+      pathStationIds[pathStationIds.length - 1],
     ].filter((stationId): stationId is string => stationId != null);
 
     for (const stationId of terminalStationIds) {
@@ -166,18 +229,17 @@ export function buildCrowdReportFormOptions({
     lineDirections.sort((a, b) => a.stationId.localeCompare(b.stationId));
   }
 
-  const stationCodesByStationId = stationCodes.reduce<Record<string, string[]>>(
-    (acc, code) => {
-      acc[code.stationId] ??= [];
-      if (!acc[code.stationId].includes(code.code)) {
-        acc[code.stationId].push(code.code);
-      }
-      return acc;
-    },
-    {},
-  );
+  const stationCodesByStationId = operatingStationCodes.reduce<
+    Record<string, string[]>
+  >((acc, code) => {
+    acc[code.stationId] ??= [];
+    if (!acc[code.stationId].includes(code.code)) {
+      acc[code.stationId].push(code.code);
+    }
+    return acc;
+  }, {});
 
-  const stationCodePillsByStationId = stationCodes.reduce<
+  const stationCodePillsByStationId = operatingStationCodes.reduce<
     Record<string, Array<{ code: string; lineId: string }>>
   >((acc, code) => {
     acc[code.stationId] ??= [];
@@ -194,7 +256,7 @@ export function buildCrowdReportFormOptions({
     return acc;
   }, {});
 
-  const stationLineIdsByStationId = stationCodes.reduce<
+  const stationLineIdsByStationId = operatingStationCodes.reduce<
     Record<string, string[]>
   >((acc, code) => {
     acc[code.stationId] ??= [];
@@ -209,10 +271,10 @@ export function buildCrowdReportFormOptions({
   }
 
   return {
-    lines,
+    lines: operatingLines,
     lineDirections: directionsByLineId,
     lineStationPaths: stationPathsByLineId,
-    stations: stations.map((station) => ({
+    stations: operatingStations.map((station) => ({
       ...station,
       codes: stationCodesByStationId[station.id] ?? [],
       codePills: stationCodePillsByStationId[station.id] ?? [],
@@ -237,7 +299,7 @@ export const getCrowdReportFormOptionsFn = createServerFn({
 
   const db = getDb();
   const referenceDate =
-    DateTime.now().setZone('Asia/Singapore').toISODate() ??
+    DateTime.now().setZone(SG_TIMEZONE).toISODate() ??
     new Date().toISOString().slice(0, 10);
   const [
     lines,
@@ -251,6 +313,8 @@ export const getCrowdReportFormOptionsFn = createServerFn({
         id: linesTable.id,
         name: linesTable.name,
         color: linesTable.color,
+        startedAt: linesTable.started_at,
+        endedAt: linesTable.ended_at,
       })
       .from(linesTable)
       .orderBy(asc(linesTable.id)),
@@ -266,6 +330,8 @@ export const getCrowdReportFormOptionsFn = createServerFn({
         lineId: stationCodesTable.line_id,
         stationId: stationCodesTable.station_id,
         code: stationCodesTable.code,
+        startedAt: stationCodesTable.started_at,
+        endedAt: stationCodesTable.ended_at,
       })
       .from(stationCodesTable)
       .orderBy(asc(stationCodesTable.code)),
@@ -309,50 +375,30 @@ export const getCrowdReportFormOptionsFn = createServerFn({
     serviceRevisionByKey.set(`${revision.serviceId}::${revision.id}`, revision);
   }
   const serviceRevisions = Array.from(serviceRevisionByKey.values());
-  const revisionsByServiceId = serviceRevisions.reduce<
-    Record<string, typeof serviceRevisions>
-  >((acc, revision) => {
-    acc[revision.serviceId] ??= [];
-    acc[revision.serviceId].push(revision);
-    return acc;
-  }, {});
-  const selectedServiceRevisions = Object.values(revisionsByServiceId)
-    .map((revisions) =>
-      selectServiceRevisionForReferenceDate(revisions, referenceDate),
-    )
-    .filter((revision): revision is (typeof serviceRevisions)[number] => {
-      return revision != null;
-    });
+  const servicePathEntries = await db
+    .select({
+      serviceRevisionId:
+        serviceRevisionPathStationEntriesTable.service_revision_id,
+      serviceId: serviceRevisionPathStationEntriesTable.service_id,
+      stationId: serviceRevisionPathStationEntriesTable.station_id,
+      pathIndex: serviceRevisionPathStationEntriesTable.path_index,
+    })
+    .from(serviceRevisionPathStationEntriesTable);
 
-  const latestRevisionIds = [
-    ...new Set(selectedServiceRevisions.map((revision) => revision.id)),
-  ];
-  const servicePathEntries =
-    latestRevisionIds.length > 0
-      ? await db
-          .select({
-            serviceRevisionId:
-              serviceRevisionPathStationEntriesTable.service_revision_id,
-            serviceId: serviceRevisionPathStationEntriesTable.service_id,
-            stationId: serviceRevisionPathStationEntriesTable.station_id,
-            pathIndex: serviceRevisionPathStationEntriesTable.path_index,
-          })
-          .from(serviceRevisionPathStationEntriesTable)
-          .where(
-            inArray(
-              serviceRevisionPathStationEntriesTable.service_revision_id,
-              latestRevisionIds,
-            ),
-          )
-      : [];
-
-  return buildCrowdReportFormOptions({
-    referenceDate,
+  const formOptionRows = {
     lines,
     stations,
     stationCodes,
     services,
     serviceRevisions,
     servicePathEntries,
-  });
+  };
+
+  return {
+    ...buildCrowdReportFormOptions({
+      referenceDate,
+      ...formOptionRows,
+    }),
+    formOptionRows,
+  };
 });
