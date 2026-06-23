@@ -25,7 +25,6 @@ import {
   crowdReportsTable,
   crowdReportStationsTable,
 } from '~/db/schema';
-import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
 
 const DEFAULT_DISPATCH_OWNER = 'foldaway';
 const DEFAULT_DISPATCH_REPO = 'mrtdown-data';
@@ -541,13 +540,16 @@ async function markCrowdReportDispatchSuccessInTransaction(
   candidate: CrowdReportDispatchCandidate,
   dispatchedAt: string,
 ) {
+  const updatedAt = DateTime.fromISO(dispatchedAt).isValid
+    ? (DateTime.fromISO(dispatchedAt).toUTC().toISO() ?? dispatchedAt)
+    : new Date().toISOString();
   if (candidate.kind === 'cluster') {
     const updatedClusters = await tx
       .update(crowdReportClustersTable)
       .set({
         status: 'dispatched',
         dispatched_at: dispatchedAt,
-        updated_at: sql`now()`,
+        updated_at: updatedAt,
       })
       .where(
         and(
@@ -570,7 +572,7 @@ async function markCrowdReportDispatchSuccessInTransaction(
       dispatched_at: dispatchedAt,
       dispatch_payload: candidate.payload,
       dispatch_error: null,
-      updated_at: sql`now()`,
+      updated_at: updatedAt,
     })
     .where(getCrowdReportDispatchReportScope(candidate));
   return true;
@@ -581,12 +583,13 @@ async function markCrowdReportDispatchFailureInTransaction(
   candidate: CrowdReportDispatchCandidate,
   message: string,
 ) {
+  const updatedAt = DateTime.now().toUTC().toISO() ?? new Date().toISOString();
   await tx
     .update(crowdReportsTable)
     .set({
       dispatch_payload: candidate.payload,
       dispatch_error: message.slice(0, 2000),
-      updated_at: sql`now()`,
+      updated_at: updatedAt,
     })
     .where(getCrowdReportDispatchReportScope(candidate));
 }
@@ -631,10 +634,34 @@ async function tryAcquireCrowdReportDispatchLock(
   tx: CrowdReportTransaction,
   candidate: CrowdReportDispatchCandidate,
 ) {
-  const result = (await tx.run(
-    sql`select pg_try_advisory_xact_lock(hashtextextended(${buildCrowdReportDispatchLockKey(candidate.kind, candidate.id)}, 0::bigint)) as "locked"`,
-  )) as D1Result<{ locked: boolean }>;
-  return result.results[0]?.locked === true;
+  if (candidate.kind === 'cluster') {
+    const rows = await tx
+      .update(crowdReportClustersTable)
+      .set({ updated_at: sql`${crowdReportClustersTable.updated_at}` })
+      .where(
+        and(
+          eq(crowdReportClustersTable.id, candidate.id),
+          eq(crowdReportClustersTable.status, 'accepted'),
+          isNull(crowdReportClustersTable.dispatched_at),
+        ),
+      )
+      .returning({ id: crowdReportClustersTable.id });
+    return rows.length > 0;
+  }
+
+  const rows = await tx
+    .update(crowdReportsTable)
+    .set({ updated_at: sql`${crowdReportsTable.updated_at}` })
+    .where(
+      and(
+        eq(crowdReportsTable.id, candidate.id),
+        eq(crowdReportsTable.status, 'accepted'),
+        isNull(crowdReportsTable.dispatched_at),
+        isNull(crowdReportsTable.cluster_id),
+      ),
+    )
+    .returning({ id: crowdReportsTable.id });
+  return rows.length > 0;
 }
 
 async function isCrowdReportDispatchCandidateEligible(

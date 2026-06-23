@@ -143,7 +143,6 @@ function makeFakeDispatchUpdateDb(
 }
 
 function makeFakeDispatchEligibilityDb() {
-  const executeCalls: unknown[] = [];
   const whereCalls: unknown[] = [];
   const selectBuilder = {
     from() {
@@ -157,23 +156,33 @@ function makeFakeDispatchEligibilityDb() {
       return Promise.resolve([]);
     },
   };
+  const updateBuilder = {
+    set() {
+      return {
+        where(condition: unknown) {
+          whereCalls.push(condition);
+          return {
+            returning() {
+              return Promise.resolve([{ id: 'cluster-1' }]);
+            },
+          };
+        },
+      };
+    },
+  };
 
   return {
-    executeCalls,
     whereCalls,
     db: {
       transaction<T>(
         callback: (transaction: {
-          run: (
-            query: unknown,
-          ) => Promise<{ results: Array<{ locked: boolean }> }>;
+          update: () => typeof updateBuilder;
           select: () => typeof selectBuilder;
         }) => Promise<T>,
       ) {
         return callback({
-          run(query: unknown) {
-            executeCalls.push(query);
-            return Promise.resolve({ results: [{ locked: true }] });
+          update() {
+            return updateBuilder;
           },
           select() {
             return selectBuilder;
@@ -185,7 +194,6 @@ function makeFakeDispatchEligibilityDb() {
 }
 
 function makeFakePostSendMarkMissDb() {
-  const executeCalls: unknown[] = [];
   const updateSets: unknown[] = [];
   const whereCalls: unknown[] = [];
   let updateCount = 0;
@@ -212,6 +220,13 @@ function makeFakePostSendMarkMissDb() {
           if (updateIndex === 0) {
             return {
               returning() {
+                return Promise.resolve([{ id: 'cluster-1' }]);
+              },
+            };
+          }
+          if (updateIndex === 1) {
+            return {
+              returning() {
                 return Promise.resolve([]);
               },
             };
@@ -223,24 +238,16 @@ function makeFakePostSendMarkMissDb() {
   };
 
   return {
-    executeCalls,
     updateSets,
     whereCalls,
     db: {
       transaction<T>(
         callback: (transaction: {
-          run: (
-            query: unknown,
-          ) => Promise<{ results: Array<{ locked: boolean }> }>;
           select: () => typeof selectBuilder;
           update: () => typeof updateBuilder;
         }) => Promise<T>,
       ) {
         return callback({
-          run(query: unknown) {
-            executeCalls.push(query);
-            return Promise.resolve({ results: [{ locked: true }] });
-          },
           select() {
             return selectBuilder;
           },
@@ -522,13 +529,17 @@ describe('getDispatchableCrowdReportCandidates', () => {
     );
 
     const dialect = new PgDialect();
-    const lockSql = dialect.sqlToQuery(fake.executeCalls[0] as SQL);
+    const lockWhereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
     const eligibilityWhereSql = dialect.sqlToQuery(
-      fake.whereCalls[0] as SQL,
+      fake.whereCalls[1] as SQL,
     ).sql;
 
     expect(fetchImpl).not.toHaveBeenCalled();
-    expect(lockSql.params).toContain('crowd-report-dispatch:cluster:cluster-1');
+    expect(lockWhereSql).toContain('"crowd_report_clusters"."id" =');
+    expect(lockWhereSql).toContain('"crowd_report_clusters"."status" =');
+    expect(lockWhereSql).toContain(
+      '"crowd_report_clusters"."dispatched_at" is null',
+    );
     expect(eligibilityWhereSql).toContain('not exists');
     expect(eligibilityWhereSql).toContain('"still_happening" is true');
     expect(eligibilityWhereSql).toContain('"crowd_reports"."id" not in');
@@ -592,8 +603,8 @@ describe('getDispatchableCrowdReportCandidates', () => {
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(fake.updateSets).toHaveLength(2);
-    expect(fake.updateSets[1]).toMatchObject({
+    expect(fake.updateSets).toHaveLength(3);
+    expect(fake.updateSets[2]).toMatchObject({
       dispatch_error:
         'Crowd report dispatch was sent, but local success marking became stale',
     });

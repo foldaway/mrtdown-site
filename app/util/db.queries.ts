@@ -207,6 +207,7 @@ type BaseDataset = {
 
 const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
 const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 30;
+const OPERATIONAL_FACTS_WRITE_BATCH = 10;
 let cachedBaseDataset:
   | {
       expiresAt: number;
@@ -3105,12 +3106,12 @@ async function replaceOperationalFactRows(
         .where(inArray(lineDayFactsTable.date, batch));
     }
 
-    for (const batch of chunk(issueRows, 500)) {
+    for (const batch of chunk(issueRows, OPERATIONAL_FACTS_WRITE_BATCH)) {
       if (batch.length > 0) {
         await tx.insert(issueDayFactsTable).values(batch);
       }
     }
-    for (const batch of chunk(lineRows, 500)) {
+    for (const batch of chunk(lineRows, OPERATIONAL_FACTS_WRITE_BATCH)) {
       if (batch.length > 0) {
         await tx.insert(lineDayFactsTable).values(batch);
       }
@@ -4273,7 +4274,7 @@ export async function rebuildStatisticsSnapshot(db?: AppDb) {
           set: {
             as_of: asOf,
             data: snapshotPayload,
-            updated_at: sql`now()`,
+            updated_at: asOf,
           },
         }),
     );

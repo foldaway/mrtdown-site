@@ -1,4 +1,4 @@
-import { and, gte, lte, notInArray, sql } from 'drizzle-orm';
+import { and, gte, inArray, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AppDb } from '../../../db/index.js';
 import { publicHolidaysTable } from '../../../db/schema.js';
@@ -9,6 +9,8 @@ const DATA_GOV_PUBLIC_HOLIDAYS_DATASET_ID =
 const DATA_GOV_DATASTORE_SEARCH_URL =
   'https://data.gov.sg/api/action/datastore_search';
 const DATA_GOV_PAGE_LIMIT = 500;
+const D1_DELETE_BATCH = 50;
+const D1_WRITE_BATCH = 10;
 
 type Db = AppDb;
 
@@ -29,6 +31,14 @@ export type PublicHolidaySyncResult = {
     end: string;
   } | null;
 };
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
 
 const DataGovResponseSchema = z
   .object({
@@ -208,37 +218,37 @@ export async function syncPublicHolidays(
   await withPublicHolidayDbDiagnostics(sortedRows, () =>
     db.transaction(async (tx) => {
       const now = new Date().toISOString();
-      await tx
-        .insert(publicHolidaysTable)
-        .values(
-          sortedRows.map((row) => ({
-            id: row.id,
-            date: row.date,
-            holiday_name: row.holidayName,
-            hash: row.hash,
-          })),
-        )
-        .onConflictDoUpdate({
-          target: publicHolidaysTable.id,
-          set: {
-            date: sql.raw(`excluded.${publicHolidaysTable.date.name}`),
-            holiday_name: sql.raw(
-              `excluded.${publicHolidaysTable.holiday_name.name}`,
-            ),
-            hash: sql.raw(`excluded.${publicHolidaysTable.hash.name}`),
-            updated_at: now,
-          },
-        });
+      const upsertRows = sortedRows.map((row) => ({
+        id: row.id,
+        date: row.date,
+        holiday_name: row.holidayName,
+        hash: row.hash,
+      }));
+      for (const rows of chunk(upsertRows, D1_WRITE_BATCH)) {
+        await tx
+          .insert(publicHolidaysTable)
+          .values(rows)
+          .onConflictDoUpdate({
+            target: publicHolidaysTable.id,
+            set: {
+              date: sql.raw(`excluded.${publicHolidaysTable.date.name}`),
+              holiday_name: sql.raw(
+                `excluded.${publicHolidaysTable.holiday_name.name}`,
+              ),
+              hash: sql.raw(`excluded.${publicHolidaysTable.hash.name}`),
+              updated_at: now,
+            },
+          });
+      }
 
-      await tx
-        .delete(publicHolidaysTable)
-        .where(
-          and(
-            gte(publicHolidaysTable.date, start),
-            lte(publicHolidaysTable.date, end),
-            notInArray(publicHolidaysTable.id, [...incomingIds]),
-          ),
-        );
+      for (const ids of chunk(
+        staleRows.map((row) => row.id),
+        D1_DELETE_BATCH,
+      )) {
+        await tx
+          .delete(publicHolidaysTable)
+          .where(inArray(publicHolidaysTable.id, ids));
+      }
     }),
   );
 
