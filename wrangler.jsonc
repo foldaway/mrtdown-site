@@ -45,7 +45,8 @@
     {
       "binding": "DB",
       "database_name": "mrtdown-preview",
-      "database_id": "00000000-0000-0000-0000-000000000001"
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "migrations"
     }
   ],
   "workflows": [
@@ -97,7 +98,8 @@
         {
           "binding": "DB",
           "database_name": "mrtdown-preview",
-          "database_id": "00000000-0000-0000-0000-000000000001"
+          "database_id": "00000000-0000-0000-0000-000000000001",
+          "migrations_dir": "migrations"
         }
       ],
       "ratelimits": [
@@ -158,7 +160,8 @@
         {
           "binding": "DB",
           "database_name": "mrtdown-staging",
-          "database_id": "00000000-0000-0000-0000-000000000002"
+          "database_id": "00000000-0000-0000-0000-000000000002",
+          "migrations_dir": "migrations"
         }
       ],
       "ratelimits": [
@@ -218,7 +221,8 @@
         {
           "binding": "DB",
           "database_name": "mrtdown-production",
-          "database_id": "00000000-0000-0000-0000-000000000003"
+          "database_id": "00000000-0000-0000-0000-000000000003",
+          "migrations_dir": "migrations"
         }
       ],
       "ratelimits": [

@@ -68,8 +68,12 @@ import {
   withDbDiagnostics as withSharedDbDiagnostics,
 } from '../../../util/dbDiagnostics.js';
 
-/** Max rows per `insert().values()` batch to stay within driver/param limits. */
-const BATCH = 500;
+/**
+ * Max rows per batched statement. D1 caps bound parameters per statement, and
+ * the widest inserts in this workflow currently bind at most 10 values per row,
+ * so 10 rows keeps each statement within the 100-parameter ceiling.
+ */
+const BATCH = 10;
 /** Max ids per `IN (...)` cleanup query. Keep below proxy/driver bind limits. */
 const DELETE_BATCH = 50;
 
@@ -118,10 +122,13 @@ function chunk<T>(arr: T[], size: number): T[][] {
 
 /** Clears all pull staging tables before a new parse run. */
 export async function truncateStagingTables(db: Db): Promise<void> {
-  // Multi-table TRUNCATE is DDL; Drizzle has no builder — use `sql` with table refs.
-  await db.run(
-    sql`TRUNCATE ${operatorsNextTable}, ${townsNextTable}, ${landmarksNextTable}, ${linesNextTable}, ${stationsNextTable}, ${servicesNextTable}, ${issuesNextTable} RESTART IDENTITY`,
-  );
+  await db.delete(operatorsNextTable);
+  await db.delete(townsNextTable);
+  await db.delete(landmarksNextTable);
+  await db.delete(linesNextTable);
+  await db.delete(stationsNextTable);
+  await db.delete(servicesNextTable);
+  await db.delete(issuesNextTable);
 }
 
 export async function insertOperatorsStaging(

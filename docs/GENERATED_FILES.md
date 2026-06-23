@@ -11,7 +11,9 @@ Several large files are generated or mechanically produced and should not be han
 ## Drizzle Migrations
 
 - Path: `drizzle/**`
-- Source: Drizzle Kit
+- Path: `migrations/**`
+- Source: Drizzle Kit, with `migrations/*.sql` mirrored from
+  `drizzle/*/migration.sql` for Wrangler D1 migration application.
 - Script: `npm run db:generate`
 - Check: `npm run db:generate:check`
 
