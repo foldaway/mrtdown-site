@@ -79,7 +79,6 @@ export const Route = createFileRoute('/{-$lang}/history/$year/$month')({
 
     const seo = buildSeoMetadata({
       path: `/history/${year}/${month}`,
-      lang,
       rootUrl,
     });
 

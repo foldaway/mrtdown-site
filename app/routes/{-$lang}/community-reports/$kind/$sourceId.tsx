@@ -96,7 +96,6 @@ export const Route = createFileRoute(
       path: `/community-reports/${encodeURIComponent(kind)}/${encodeURIComponent(
         sourceId,
       )}`,
-      lang,
       rootUrl,
     });
 
