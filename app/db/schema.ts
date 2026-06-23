@@ -623,8 +623,8 @@ export const stationCodesTable = pgTable(
       .references(() => stationsTable.id)
       .notNull(),
     code: text('code').notNull(),
-    started_at: date('started_at').notNull(),
-    ended_at: date('ended_at'),
+    started_at: date('started_at', { mode: 'string' }).notNull(),
+    ended_at: date('ended_at', { mode: 'string' }),
     structure_type: stationStructureTypeEnum().notNull(),
     ...timestampColumns,
   },
