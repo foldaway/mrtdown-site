@@ -861,22 +861,12 @@ function ReportPage() {
 
   useEffect(() => {
     const activeLineIds = selectedLineIds.filter(
-      (lineId) =>
-        lineById[lineId] != null &&
-        (reportScope !== 'station' ||
-          selectedStation == null ||
-          selectedStation.lineIds.includes(lineId)),
+      (lineId) => lineById[lineId] != null,
     );
     if (activeLineIds.length !== selectedLineIds.length) {
       setSelectedLineIds(activeLineIds);
     }
-  }, [
-    lineById,
-    reportScope,
-    selectedLineIds,
-    selectedStation,
-    setSelectedLineIds,
-  ]);
+  }, [lineById, selectedLineIds, setSelectedLineIds]);
 
   useEffect(() => {
     if (selectedStationId == null || selectedStation != null) {
@@ -892,6 +882,20 @@ function ReportPage() {
       return current;
     });
   }, [selectedStation, selectedStationId]);
+
+  useEffect(() => {
+    if (
+      reportScope !== 'train' ||
+      selectedStation == null ||
+      selectedLineIds.length === 0 ||
+      selectedStation.lineIds.some((lineId) => selectedLineIds.includes(lineId))
+    ) {
+      return;
+    }
+    setReportContext((current) =>
+      current.scope === 'train' ? { ...current, stationId: null } : current,
+    );
+  }, [reportScope, selectedLineIds, selectedStation]);
 
   useEffect(() => {
     if (rangeStartStationId.length > 0 && rangeStartStation == null) {

@@ -779,7 +779,11 @@ export async function findMissingCrowdReportReferences(
   db: AppDb,
   submission: Pick<
     CrowdReportSubmission,
-    'directionStationId' | 'lineIds' | 'observedAt' | 'stationIds'
+    | 'directionStationId'
+    | 'lineIds'
+    | 'observedAt'
+    | 'reportScope'
+    | 'stationIds'
   >,
 ) {
   const referenceDate = getCrowdReportReferenceDate(submission);
@@ -821,7 +825,8 @@ export async function findMissingCrowdReportReferences(
             .where(
               and(
                 inArray(stationCodesTable.station_id, referencedStationIds),
-                ...(submission.lineIds.length > 0
+                ...(submission.reportScope !== 'station' &&
+                submission.lineIds.length > 0
                   ? [inArray(stationCodesTable.line_id, submission.lineIds)]
                   : []),
                 lte(linesTable.started_at, referenceDate),
@@ -854,11 +859,15 @@ export async function findMissingCrowdReportReferences(
     stationIds: referencedStationIds.filter(
       (stationId) =>
         !existingStationIds.has(stationId) ||
-        (submission.lineIds.length === 0
+        (submission.lineIds.length === 0 || submission.reportScope === 'station'
           ? !activeStationIds.has(stationId)
-          : !submission.lineIds.every((lineId) =>
-              activeStationLineKeys.has(`${lineId}::${stationId}`),
-            )),
+          : submission.reportScope === 'line'
+            ? !submission.lineIds.some((lineId) =>
+                activeStationLineKeys.has(`${lineId}::${stationId}`),
+              )
+            : !submission.lineIds.every((lineId) =>
+                activeStationLineKeys.has(`${lineId}::${stationId}`),
+              )),
     ),
     directionStationIds: invalidDirectionStationIds,
   };
@@ -988,6 +997,30 @@ async function findInvalidDirectionStationIds(
         ),
       ),
     );
+  const activeDirectionStationRows = await db
+    .select({
+      stationId: stationCodesTable.station_id,
+    })
+    .from(stationCodesTable)
+    .innerJoin(linesTable, eq(stationCodesTable.line_id, linesTable.id))
+    .where(
+      and(
+        inArray(stationCodesTable.line_id, submission.lineIds),
+        lte(linesTable.started_at, referenceDate),
+        or(
+          isNull(linesTable.ended_at),
+          gte(linesTable.ended_at, referenceDate),
+        ),
+        lte(stationCodesTable.started_at, referenceDate),
+        or(
+          isNull(stationCodesTable.ended_at),
+          gte(stationCodesTable.ended_at, referenceDate),
+        ),
+      ),
+    );
+  const activeDirectionStationIds = new Set(
+    activeDirectionStationRows.map((row) => row.stationId),
+  );
 
   const terminalStationIds = new Set<string>();
   const pathRowsByRevisionKey = pathRows.reduce<
@@ -1002,9 +1035,11 @@ async function findInvalidDirectionStationIds(
     return acc;
   }, {});
   for (const entries of Object.values(pathRowsByRevisionKey)) {
-    entries.sort((a, b) => a.pathIndex - b.pathIndex);
-    const firstStationId = entries[0]?.stationId;
-    const lastStationId = entries[entries.length - 1]?.stationId;
+    const activeEntries = entries
+      .filter((entry) => activeDirectionStationIds.has(entry.stationId))
+      .sort((a, b) => a.pathIndex - b.pathIndex);
+    const firstStationId = activeEntries[0]?.stationId;
+    const lastStationId = activeEntries[activeEntries.length - 1]?.stationId;
     if (firstStationId != null) {
       terminalStationIds.add(firstStationId);
     }
