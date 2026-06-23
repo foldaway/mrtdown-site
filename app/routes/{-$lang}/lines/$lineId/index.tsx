@@ -119,7 +119,6 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
 
     const seo = buildSeoMetadata({
       path: `/lines/${lineId}`,
-      lang,
       rootUrl,
     });
 

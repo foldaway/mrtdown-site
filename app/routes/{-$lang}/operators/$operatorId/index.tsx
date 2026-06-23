@@ -107,7 +107,6 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
 
     const seo = buildSeoMetadata({
       path: `/operators/${ctx.params.operatorId}`,
-      lang,
       rootUrl,
     });
 

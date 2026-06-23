@@ -3,6 +3,8 @@ import { buildLocaleAwareLink } from './buildLocaleAwareLink';
 
 type SeoLanguage = (typeof LANGUAGES)[number];
 
+const CANONICAL_LANG = 'en-SG';
+
 export interface LocaleAlternate {
   href: string;
   hreflang: SeoLanguage | 'x-default';
@@ -26,16 +28,18 @@ export interface SeoHeadMetadata {
 }
 
 export function buildSeoMetadata({
-  lang = 'en-SG',
   path,
   rootUrl,
 }: {
-  lang?: string;
   path: string;
   rootUrl: string;
 }): SeoHeadMetadata {
   const normalizedPath = normalizeSeoPath(path);
-  const canonicalUrl = buildLocalizedAbsoluteUrl(normalizedPath, lang, rootUrl);
+  const canonicalUrl = buildLocalizedAbsoluteUrl(
+    normalizedPath,
+    CANONICAL_LANG,
+    rootUrl,
+  );
 
   return {
     canonicalUrl,

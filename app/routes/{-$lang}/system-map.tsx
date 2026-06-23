@@ -44,7 +44,7 @@ export const Route = createFileRoute('/{-$lang}/system-map')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
-    const seo = buildSeoMetadata({ path: '/system-map', lang, rootUrl });
+    const seo = buildSeoMetadata({ path: '/system-map', rootUrl });
 
     const intl = createIntl({
       locale: lang,

@@ -38,16 +38,13 @@ describe('SEO helpers', () => {
     ]);
   });
 
-  it('uses the same localized URL for canonical and og:url', () => {
+  it('uses the en-SG URL for canonical and og:url', () => {
     const metadata = buildSeoMetadata({
-      lang: 'ta',
       path: '/history/2026/',
       rootUrl: ROOT_URL,
     });
 
-    expect(metadata.canonicalUrl).toBe(
-      'https://www.mrtdown.org/ta/history/2026',
-    );
+    expect(metadata.canonicalUrl).toBe('https://www.mrtdown.org/history/2026');
     expect(metadata.ogUrl).toBe(metadata.canonicalUrl);
     expect(metadata.ogImage).toBe('https://www.mrtdown.org/og_image.png');
     expect(metadata.links).toContainEqual({
@@ -58,6 +55,25 @@ describe('SEO helpers', () => {
       rel: 'alternate',
       hrefLang: 'x-default',
       href: 'https://www.mrtdown.org/history/2026',
+    });
+  });
+
+  it('keeps locale alternates when canonicalizing to en-SG', () => {
+    const metadata = buildSeoMetadata({
+      path: '/lines/BPLRT/',
+      rootUrl: ROOT_URL,
+    });
+
+    expect(metadata.canonicalUrl).toBe('https://www.mrtdown.org/lines/BPLRT');
+    expect(metadata.ogUrl).toBe(metadata.canonicalUrl);
+    expect(metadata.links).toContainEqual({
+      rel: 'canonical',
+      href: 'https://www.mrtdown.org/lines/BPLRT',
+    });
+    expect(metadata.links).toContainEqual({
+      rel: 'alternate',
+      hrefLang: 'ta',
+      href: 'https://www.mrtdown.org/ta/lines/BPLRT',
     });
   });
 });
