@@ -207,7 +207,7 @@ export async function syncPublicHolidays(
 
   await withPublicHolidayDbDiagnostics(sortedRows, () =>
     db.transaction(async (tx) => {
-      const now = new Date();
+      const now = new Date().toISOString();
       await tx
         .insert(publicHolidaysTable)
         .values(

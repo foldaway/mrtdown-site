@@ -305,6 +305,11 @@ Exit criteria:
   the runtime DB entrypoint with Drizzle D1 wiring, switching Wrangler bindings
   to `DB`, regenerating Worker environment types, and adding runtime-level DB
   binding tests.
+- 2026-06-23: Continued Phase 2 by converting the Drizzle schema and migration
+  generation surface to SQLite/D1, replacing PostGIS station points with
+  latitude/longitude columns, replacing Postgres JSON/timestamp/enum/interval
+  storage with D1-compatible columns, and generating a fresh SQLite baseline
+  migration.
 
 ## Decision Log
 

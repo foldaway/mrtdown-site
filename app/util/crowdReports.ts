@@ -1580,10 +1580,7 @@ export async function getPublicCrowdReportSignals(
         stationIds,
         windowStartAt: cluster.windowStartAt,
         windowEndAt: cluster.windowEndAt,
-        updatedAt:
-          cluster.updatedAt instanceof Date
-            ? cluster.updatedAt.toISOString()
-            : cluster.updatedAt,
+        updatedAt: cluster.updatedAt,
       };
     })
     .filter((signal) => {

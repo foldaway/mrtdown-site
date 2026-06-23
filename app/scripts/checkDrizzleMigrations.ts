@@ -94,7 +94,7 @@ try {
     [
       'generate',
       '--dialect',
-      'postgresql',
+      'sqlite',
       '--schema',
       join(projectRoot, 'app/db/schema.ts'),
       '--out',

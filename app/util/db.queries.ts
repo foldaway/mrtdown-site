@@ -931,8 +931,8 @@ async function buildDataset(
             id: stationsTable.id,
             name: stationsTable.name,
             townId: stationsTable.townId,
-            latitude: sql<number>`ST_Y(${stationsTable.geo})`,
-            longitude: sql<number>`ST_X(${stationsTable.geo})`,
+            latitude: stationsTable.latitude,
+            longitude: stationsTable.longitude,
           })
           .from(stationsTable),
       ),

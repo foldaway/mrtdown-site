@@ -1,1 +1,0 @@
-ALTER TABLE "service_revisions" ADD COLUMN "end_at" date;

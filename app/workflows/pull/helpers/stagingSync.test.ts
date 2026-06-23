@@ -147,7 +147,7 @@ describe('pull staging inserts', () => {
     ]);
   });
 
-  it('stages station geography and nested membership data', async () => {
+  it('stages station coordinates and nested membership data', async () => {
     const { db, inserts } = createInsertDb();
     const stations = [
       {
@@ -182,7 +182,8 @@ describe('pull staging inserts', () => {
             id: 'BP6',
             hash: 'station-hash',
             name: translation,
-            geo: [103.761, 1.379],
+            latitude: 1.379,
+            longitude: 103.761,
             town_id: 'bukit-panjang',
             station_codes: [
               {

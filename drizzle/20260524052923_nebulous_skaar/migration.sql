@@ -1,1 +1,0 @@
-ALTER TABLE "crowd_reports" ADD CONSTRAINT "crowd_reports_duplicate_of_id_crowd_reports_id_fk" FOREIGN KEY ("duplicate_of_id") REFERENCES "public"."crowd_reports"("id") ON DELETE set null ON UPDATE no action;

@@ -223,8 +223,8 @@ export async function insertStationsStaging(
     id: s.id,
     hash: s.hash,
     name: s.name,
-    // Drizzle/PostGIS: [longitude, latitude] tuple for SRID 4326 point
-    geo: [s.geo.longitude, s.geo.latitude] as [number, number],
+    latitude: s.geo.latitude,
+    longitude: s.geo.longitude,
     town_id: s.townId,
     station_codes: s.stationCodes,
     landmark_ids: s.landmarkIds,
@@ -396,7 +396,7 @@ async function upsertChangedOperators(
           name: sql.raw(`excluded.${operatorsTable.name.name}`),
           founded_at: sql.raw(`excluded.${operatorsTable.founded_at.name}`),
           url: sql.raw(`excluded.${operatorsTable.url.name}`),
-          updated_at: new Date(),
+          updated_at: new Date().toISOString(),
         },
       });
   }
@@ -460,7 +460,7 @@ async function upsertChangedTowns(
           set: {
             hash: row.hash,
             name: row.name,
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         });
     }
@@ -515,7 +515,7 @@ async function upsertChangedLandmarks(
           set: {
             hash: row.hash,
             name: row.name,
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         });
     }
@@ -623,7 +623,7 @@ export async function syncLines(db: Db): Promise<void> {
               started_at: row.started_at,
               ended_at: row.ended_at,
               operating_hours: row.operating_hours,
-              updated_at: new Date(),
+              updated_at: new Date().toISOString(),
             },
           });
       }
@@ -746,7 +746,8 @@ export async function syncStations(db: Db): Promise<void> {
             id: row.id,
             hash: row.hash,
             name: row.name,
-            geo: row.geo,
+            latitude: row.latitude,
+            longitude: row.longitude,
             townId: row.town_id,
           })
           .onConflictDoUpdate({
@@ -754,7 +755,8 @@ export async function syncStations(db: Db): Promise<void> {
             set: {
               hash: row.hash,
               name: row.name,
-              geo: row.geo,
+              latitude: row.latitude,
+              longitude: row.longitude,
               townId: row.town_id,
             },
           });
@@ -1010,7 +1012,7 @@ export async function syncServices(db: Db): Promise<void> {
                 start_at: serviceRevisionStartAt(revisionData),
                 end_at: serviceRevisionEndAt(revisionData),
                 operating_hours: revisionData.operatingHours,
-                updated_at: new Date(),
+                updated_at: new Date().toISOString(),
               },
             });
 
@@ -1343,7 +1345,7 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
             type: sql.raw(`excluded.${issuesTable.type.name}`),
             title: sql.raw(`excluded.${issuesTable.title.name}`),
             title_meta: sql.raw(`excluded.${issuesTable.title_meta.name}`),
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         });
     }
