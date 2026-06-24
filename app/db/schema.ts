@@ -43,7 +43,7 @@ import {
 /*
  * Pull staging (`*_next`): snapshot of manifest data between workflow steps.
  * Spreads below pair staging with live tables so column definitions stay in sync.
- * Staging has no FKs; nested data is JSONB where live uses child tables.
+ * Staging has no FKs; nested data is JSON text where live uses child tables.
  */
 
 /** Shared by `operators` and `operators_next` (same logical fields). */
@@ -110,7 +110,7 @@ export const metadataTable = sqliteTable('metadata', {
   value: text('value').notNull(),
 });
 
-/** Staging for pull workflow — no FKs; JSONB holds nested child data. */
+/** Staging for pull workflow — no FKs; JSON text holds nested child data. */
 export const operatorsNextTable = sqliteTable('operators_next', {
   id: text('id').primaryKey(),
   ...operatorEntitySharedColumns,

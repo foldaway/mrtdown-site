@@ -310,6 +310,15 @@ Exit criteria:
   latitude/longitude columns, replacing Postgres JSON/timestamp/enum/interval
   storage with D1-compatible columns, and generating a fresh SQLite baseline
   migration.
+- 2026-06-25: Started Phase 3 on `codex/d1-migration-pull-workflow` by
+  replacing remaining pull-workflow `excluded.*` and raw orphan-cleanup SQL with
+  D1-safe Drizzle expressions, keeping staging cleanup on SQLite-compatible
+  deletes, and renaming the staging cleanup entrypoint away from `truncate`.
+- 2026-06-25: Verified that a fresh local D1 database applies all generated
+  migrations. The local dev pull endpoint accepts workflow creation at
+  `/internal/api/tasks/pull/`, but did not execute the workflow in the local
+  runtime during validation; D1 row counts remained zero, so end-to-end pull
+  validation still needs a preview or workflow-capable runtime.
 
 ## Decision Log
 

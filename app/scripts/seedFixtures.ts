@@ -21,7 +21,7 @@ import {
   syncOperatorsTownsLandmarks,
   syncServices,
   syncStations,
-  truncateStagingTables,
+  clearStagingTables,
 } from '../workflows/pull/helpers/stagingSync.js';
 
 const { Pool } = pg;
@@ -30,7 +30,7 @@ const DEFAULT_FIXTURES_BASE_URL =
   'https://foldaway.github.io/mrtdown-data/fixtures';
 const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
 
-type Db = Parameters<typeof truncateStagingTables>[0];
+type Db = Parameters<typeof clearStagingTables>[0];
 
 async function stageFixtures(db: Db, baseUrl: string): Promise<void> {
   const manifest = await fetchManifest(baseUrl);
@@ -48,7 +48,7 @@ async function stageFixtures(db: Db, baseUrl: string): Promise<void> {
     return hash;
   };
 
-  await truncateStagingTables(db);
+  await clearStagingTables(db);
 
   const stations = repo.stations.list().map((station) => ({
     ...station,
