@@ -101,9 +101,22 @@ function makeFakeClusterCandidateDb() {
 
 function makeFakeDispatchUpdateDb(
   clusterUpdateRows: Array<{ id: string }> = [{ id: 'cluster-1' }],
+  currentReportRows: Array<{ id: string }> = [
+    { id: 'ongoing-report-1' },
+    { id: 'ongoing-report-2' },
+  ],
 ) {
   const whereCalls: unknown[] = [];
   let updateCount = 0;
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    where(condition: unknown) {
+      whereCalls.push(condition);
+      return Promise.resolve(currentReportRows);
+    },
+  };
   const updateBuilder = {
     set() {
       const updateIndex = updateCount;
@@ -129,10 +142,14 @@ function makeFakeDispatchUpdateDb(
     db: {
       transaction<T>(
         callback: (transaction: {
+          select: () => typeof selectBuilder;
           update: () => typeof updateBuilder;
         }) => Promise<T>,
       ) {
         return callback({
+          select() {
+            return selectBuilder;
+          },
           update() {
             return updateBuilder;
           },
@@ -143,7 +160,6 @@ function makeFakeDispatchUpdateDb(
 }
 
 function makeFakeDispatchEligibilityDb() {
-  const executeCalls: unknown[] = [];
   const whereCalls: unknown[] = [];
   const selectBuilder = {
     from() {
@@ -157,23 +173,33 @@ function makeFakeDispatchEligibilityDb() {
       return Promise.resolve([]);
     },
   };
+  const updateBuilder = {
+    set() {
+      return {
+        where(condition: unknown) {
+          whereCalls.push(condition);
+          return {
+            returning() {
+              return Promise.resolve([{ id: 'cluster-1' }]);
+            },
+          };
+        },
+      };
+    },
+  };
 
   return {
-    executeCalls,
     whereCalls,
     db: {
       transaction<T>(
         callback: (transaction: {
-          run: (
-            query: unknown,
-          ) => Promise<{ results: Array<{ locked: boolean }> }>;
+          update: () => typeof updateBuilder;
           select: () => typeof selectBuilder;
         }) => Promise<T>,
       ) {
         return callback({
-          run(query: unknown) {
-            executeCalls.push(query);
-            return Promise.resolve({ results: [{ locked: true }] });
+          update() {
+            return updateBuilder;
           },
           select() {
             return selectBuilder;
@@ -185,21 +211,28 @@ function makeFakeDispatchEligibilityDb() {
 }
 
 function makeFakePostSendMarkMissDb() {
-  const executeCalls: unknown[] = [];
   const updateSets: unknown[] = [];
   const whereCalls: unknown[] = [];
+  let selectCount = 0;
   let updateCount = 0;
-  const selectBuilder = {
-    from() {
-      return this;
-    },
-    where(condition: unknown) {
-      whereCalls.push(condition);
-      return this;
-    },
-    limit() {
-      return Promise.resolve([{ id: 'cluster-1' }]);
-    },
+  const makeSelectBuilder = () => {
+    const selectIndex = selectCount;
+    selectCount += 1;
+    return {
+      from() {
+        return this;
+      },
+      where(condition: unknown) {
+        whereCalls.push(condition);
+        if (selectIndex === 1 || selectIndex === 2) {
+          return Promise.resolve([{ id: 'stale-report-1' }]);
+        }
+        return this;
+      },
+      limit() {
+        return Promise.resolve([{ id: 'cluster-1' }]);
+      },
+    };
   };
   const updateBuilder = {
     set(values: unknown) {
@@ -210,6 +243,13 @@ function makeFakePostSendMarkMissDb() {
         where(condition: unknown) {
           whereCalls.push(condition);
           if (updateIndex === 0) {
+            return {
+              returning() {
+                return Promise.resolve([{ id: 'cluster-1' }]);
+              },
+            };
+          }
+          if (updateIndex === 1) {
             return {
               returning() {
                 return Promise.resolve([]);
@@ -223,26 +263,18 @@ function makeFakePostSendMarkMissDb() {
   };
 
   return {
-    executeCalls,
     updateSets,
     whereCalls,
     db: {
       transaction<T>(
         callback: (transaction: {
-          run: (
-            query: unknown,
-          ) => Promise<{ results: Array<{ locked: boolean }> }>;
-          select: () => typeof selectBuilder;
+          select: () => ReturnType<typeof makeSelectBuilder>;
           update: () => typeof updateBuilder;
         }) => Promise<T>,
       ) {
         return callback({
-          run(query: unknown) {
-            executeCalls.push(query);
-            return Promise.resolve({ results: [{ locked: true }] });
-          },
           select() {
-            return selectBuilder;
+            return makeSelectBuilder();
           },
           update() {
             return updateBuilder;
@@ -437,18 +469,17 @@ describe('getDispatchableCrowdReportCandidates', () => {
 
     const dialect = new PgDialect();
     const clusterUpdateWhereSql = dialect.sqlToQuery(
-      fake.whereCalls[0] as SQL,
-    ).sql;
-    const reportUpdateWhereSql = dialect.sqlToQuery(
       fake.whereCalls[1] as SQL,
     ).sql;
+    const reportUpdateWhereSql = dialect.sqlToQuery(
+      fake.whereCalls[2] as SQL,
+    ).sql;
 
-    expect(clusterUpdateWhereSql).toContain('not exists');
     expect(clusterUpdateWhereSql).toContain('"still_happening" is true');
-    expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" not in');
     expect(clusterUpdateWhereSql).toContain('count(*)');
     expect(clusterUpdateWhereSql).not.toContain('::int');
-    expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" in');
+    expect(clusterUpdateWhereSql).not.toContain('"crowd_reports"."id" not in');
+    expect(clusterUpdateWhereSql).not.toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).not.toContain(
       '"crowd_reports"."cluster_id" =',
@@ -456,7 +487,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
   });
 
   it('does not mark cluster payload reports when the cluster freshness update misses', async () => {
-    const fake = makeFakeDispatchUpdateDb([]);
+    const fake = makeFakeDispatchUpdateDb([], [{ id: 'stale-report-1' }]);
 
     await expect(
       markCrowdReportDispatchSuccess(
@@ -484,7 +515,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
       ),
     ).resolves.toBe(false);
 
-    expect(fake.whereCalls).toHaveLength(1);
+    expect(fake.whereCalls).toHaveLength(2);
   });
 
   it('rechecks cluster payload freshness under the dispatch lock', async () => {
@@ -522,19 +553,22 @@ describe('getDispatchableCrowdReportCandidates', () => {
     );
 
     const dialect = new PgDialect();
-    const lockSql = dialect.sqlToQuery(fake.executeCalls[0] as SQL);
+    const lockWhereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
     const eligibilityWhereSql = dialect.sqlToQuery(
-      fake.whereCalls[0] as SQL,
+      fake.whereCalls[1] as SQL,
     ).sql;
 
     expect(fetchImpl).not.toHaveBeenCalled();
-    expect(lockSql.params).toContain('crowd-report-dispatch:cluster:cluster-1');
-    expect(eligibilityWhereSql).toContain('not exists');
+    expect(lockWhereSql).toContain('"crowd_report_clusters"."id" =');
+    expect(lockWhereSql).toContain('"crowd_report_clusters"."status" =');
+    expect(lockWhereSql).toContain(
+      '"crowd_report_clusters"."dispatched_at" is null',
+    );
     expect(eligibilityWhereSql).toContain('"still_happening" is true');
-    expect(eligibilityWhereSql).toContain('"crowd_reports"."id" not in');
     expect(eligibilityWhereSql).toContain('count(*)');
     expect(eligibilityWhereSql).not.toContain('::int');
-    expect(eligibilityWhereSql).toContain('"crowd_reports"."id" in');
+    expect(eligibilityWhereSql).not.toContain('"crowd_reports"."id" not in');
+    expect(eligibilityWhereSql).not.toContain('"crowd_reports"."id" in');
   });
 
   it('reports a post-send stale local success mark as failed without closing the cluster', async () => {
@@ -592,8 +626,8 @@ describe('getDispatchableCrowdReportCandidates', () => {
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(fake.updateSets).toHaveLength(2);
-    expect(fake.updateSets[1]).toMatchObject({
+    expect(fake.updateSets).toHaveLength(3);
+    expect(fake.updateSets[2]).toMatchObject({
       dispatch_error:
         'Crowd report dispatch was sent, but local success marking became stale',
     });

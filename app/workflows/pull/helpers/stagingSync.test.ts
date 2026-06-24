@@ -1,16 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  issuesNextTable,
+  landmarksNextTable,
   linesNextTable,
   operatorsNextTable,
+  servicesNextTable,
   stationsNextTable,
+  townsNextTable,
 } from '../../../db/schema.js';
 import {
   insertLinesStaging,
   insertOperatorsStaging,
   insertStationsStaging,
+  truncateStagingTables,
 } from './stagingSync';
 
 type InsertDb = Parameters<typeof insertOperatorsStaging>[0];
+type TruncateDb = Parameters<typeof truncateStagingTables>[0];
 
 function createInsertDb() {
   const inserts: Array<{
@@ -35,6 +41,19 @@ function createInsertDb() {
   return { db, inserts };
 }
 
+function createDeleteDb() {
+  const deletes: unknown[] = [];
+
+  const db = {
+    delete(table: unknown) {
+      deletes.push(table);
+      return Promise.resolve();
+    },
+  } as unknown as TruncateDb;
+
+  return { db, deletes };
+}
+
 const translation = {
   'en-SG': 'Name',
   'zh-Hans': null,
@@ -45,7 +64,7 @@ const translation = {
 describe('pull staging inserts', () => {
   it('batches operator staging inserts', async () => {
     const { db, inserts } = createInsertDb();
-    const operators = Array.from({ length: 501 }, (_, index) => {
+    const operators = Array.from({ length: 21 }, (_, index) => {
       return {
         id: `operator-${index}`,
         hash: `hash-${index}`,
@@ -57,7 +76,7 @@ describe('pull staging inserts', () => {
 
     await insertOperatorsStaging(db, operators);
 
-    expect(inserts).toHaveLength(2);
+    expect(inserts).toHaveLength(3);
     expect(inserts[0]).toMatchObject({
       table: operatorsNextTable,
       rows: expect.arrayContaining([
@@ -70,8 +89,25 @@ describe('pull staging inserts', () => {
         },
       ]),
     });
-    expect(inserts[0].rows).toHaveLength(500);
-    expect(inserts[1].rows).toHaveLength(1);
+    expect(inserts[0].rows).toHaveLength(10);
+    expect(inserts[1].rows).toHaveLength(10);
+    expect(inserts[2].rows).toHaveLength(1);
+  });
+
+  it('clears staging tables with SQLite-compatible deletes', async () => {
+    const { db, deletes } = createDeleteDb();
+
+    await truncateStagingTables(db);
+
+    expect(deletes).toEqual([
+      operatorsNextTable,
+      townsNextTable,
+      landmarksNextTable,
+      linesNextTable,
+      stationsNextTable,
+      servicesNextTable,
+      issuesNextTable,
+    ]);
   });
 
   it('stages only lines with read-model required fields', async () => {
@@ -147,7 +183,7 @@ describe('pull staging inserts', () => {
     ]);
   });
 
-  it('stages station geography and nested membership data', async () => {
+  it('stages station coordinates and nested membership data', async () => {
     const { db, inserts } = createInsertDb();
     const stations = [
       {
@@ -182,7 +218,8 @@ describe('pull staging inserts', () => {
             id: 'BP6',
             hash: 'station-hash',
             name: translation,
-            geo: [103.761, 1.379],
+            latitude: 1.379,
+            longitude: 103.761,
             town_id: 'bukit-panjang',
             station_codes: [
               {

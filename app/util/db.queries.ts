@@ -206,7 +206,11 @@ type BaseDataset = {
 };
 
 const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
+const D1_SELECT_IN_BATCH = 90;
+const CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX =
+  'crowd_report_duplicate_lock:';
 const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 30;
+const OPERATIONAL_FACTS_WRITE_BATCH = 10;
 let cachedBaseDataset:
   | {
       expiresAt: number;
@@ -912,7 +916,7 @@ async function buildDataset(
   ] = await timeServerSpan('dataset_base_queries', () =>
     Promise.all([
       timeDbQuery('dataset_q_metadata', () =>
-        database.select().from(metadataTable),
+        database.select().from(metadataTable).where(publicMetadataKeySql()),
       ),
       timeDbQuery('dataset_q_lines', () => database.select().from(linesTable)),
       timeDbQuery('dataset_q_line_operators', () =>
@@ -931,8 +935,8 @@ async function buildDataset(
             id: stationsTable.id,
             name: stationsTable.name,
             townId: stationsTable.townId,
-            latitude: sql<number>`ST_Y(${stationsTable.geo})`,
-            longitude: sql<number>`ST_X(${stationsTable.geo})`,
+            latitude: stationsTable.latitude,
+            longitude: stationsTable.longitude,
           })
           .from(stationsTable),
       ),
@@ -955,14 +959,14 @@ async function buildDataset(
         ? timeDbQuery('dataset_q_issues', () =>
             database.select().from(issuesTable),
           )
-        : selectedIssueIds.length > 0
-          ? timeDbQuery('dataset_q_issues', () =>
+        : timeDbQuery('dataset_q_issues', () =>
+            selectByIdChunks(selectedIssueIds, (ids) =>
               database
                 .select()
                 .from(issuesTable)
-                .where(inArray(issuesTable.id, selectedIssueIds)),
-            )
-          : [],
+                .where(inArray(issuesTable.id, ids)),
+            ),
+          ),
       selectedIssueIds == null
         ? timeDbQuery('dataset_q_latest_evidence', () =>
             database
@@ -973,30 +977,30 @@ async function buildDataset(
               .from(evidencesTable)
               .groupBy(evidencesTable.issue_id),
           )
-        : selectedIssueIds.length > 0
-          ? timeDbQuery('dataset_q_latest_evidence', () =>
+        : timeDbQuery('dataset_q_latest_evidence', () =>
+            selectByIdChunks(selectedIssueIds, (ids) =>
               database
                 .select({
                   issue_id: evidencesTable.issue_id,
                   latest_ts: sql<string>`max(${evidencesTable.ts})`,
                 })
                 .from(evidencesTable)
-                .where(inArray(evidencesTable.issue_id, selectedIssueIds))
+                .where(inArray(evidencesTable.issue_id, ids))
                 .groupBy(evidencesTable.issue_id),
-            )
-          : [],
+            ),
+          ),
       selectedIssueIds == null
         ? timeDbQuery('dataset_q_impact_events', () =>
             database.select().from(impactEventsTable),
           )
-        : selectedIssueIds.length > 0
-          ? timeDbQuery('dataset_q_impact_events', () =>
+        : timeDbQuery('dataset_q_impact_events', () =>
+            selectByIdChunks(selectedIssueIds, (ids) =>
               database
                 .select()
                 .from(impactEventsTable)
-                .where(inArray(impactEventsTable.issue_id, selectedIssueIds)),
-            )
-          : [],
+                .where(inArray(impactEventsTable.issue_id, ids)),
+            ),
+          ),
     ]),
   );
 
@@ -1060,97 +1064,70 @@ async function buildDataset(
     impactEventFacilityEffectRows,
   ] = await timeServerSpan('dataset_issue_detail_queries', () =>
     Promise.all([
-      periodImpactEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_periods', () =>
-            database
-              .select()
-              .from(impactEventPeriodsTable)
-              .where(
-                inArray(
-                  impactEventPeriodsTable.impact_event_id,
-                  periodImpactEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventPeriodsTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_services', () =>
-            database
-              .select()
-              .from(impactEventEntityServicesTable)
-              .where(
-                inArray(
-                  impactEventEntityServicesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventEntityServicesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_facilities', () =>
-            database
-              .select()
-              .from(impactEventEntityFacilitiesTable)
-              .where(
-                inArray(
-                  impactEventEntityFacilitiesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventEntityFacilitiesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_causes', () =>
-            database
-              .select()
-              .from(impactEventCausesTable)
-              .where(
-                inArray(
-                  impactEventCausesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventCausesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_service_scopes', () =>
-            database
-              .select()
-              .from(impactEventServiceScopesTable)
-              .where(
-                inArray(
-                  impactEventServiceScopesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventServiceScopesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_service_effects', () =>
-            database
-              .select()
-              .from(impactEventServiceEffectsTable)
-              .where(
-                inArray(
-                  impactEventServiceEffectsTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventServiceEffectsTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_facility_effects', () =>
-            database
-              .select()
-              .from(impactEventFacilityEffectsTable)
-              .where(
-                inArray(
-                  impactEventFacilityEffectsTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventFacilityEffectsTable.$inferSelect)[]),
+      timeDbQuery('dataset_q_impact_event_periods', () =>
+        selectByIdChunks(periodImpactEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventPeriodsTable)
+            .where(inArray(impactEventPeriodsTable.impact_event_id, ids)),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_services', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventEntityServicesTable)
+            .where(
+              inArray(impactEventEntityServicesTable.impact_event_id, ids),
+            ),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_facilities', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventEntityFacilitiesTable)
+            .where(
+              inArray(impactEventEntityFacilitiesTable.impact_event_id, ids),
+            ),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_causes', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventCausesTable)
+            .where(inArray(impactEventCausesTable.impact_event_id, ids)),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_service_scopes', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventServiceScopesTable)
+            .where(inArray(impactEventServiceScopesTable.impact_event_id, ids)),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_service_effects', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventServiceEffectsTable)
+            .where(
+              inArray(impactEventServiceEffectsTable.impact_event_id, ids),
+            ),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_facility_effects', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventFacilityEffectsTable)
+            .where(
+              inArray(impactEventFacilityEffectsTable.impact_event_id, ids),
+            ),
+        ),
+      ),
     ]),
   );
 
@@ -1262,17 +1239,17 @@ async function buildDataset(
   const servicePathRows = await timeServerSpan(
     'dataset_service_path_query',
     () =>
-      allRevisionIds.length > 0
-        ? database
-            .select()
-            .from(serviceRevisionPathStationEntriesTable)
-            .where(
-              inArray(
-                serviceRevisionPathStationEntriesTable.service_revision_id,
-                allRevisionIds,
-              ),
-            )
-        : Promise.resolve([]),
+      selectByIdChunks(allRevisionIds, (ids) =>
+        database
+          .select()
+          .from(serviceRevisionPathStationEntriesTable)
+          .where(
+            inArray(
+              serviceRevisionPathStationEntriesTable.service_revision_id,
+              ids,
+            ),
+          ),
+      ),
   );
   const assemblyStartedAt = performance.now();
 
@@ -2688,12 +2665,27 @@ function buildIssueDurationGraphs(issues: Issue[]) {
   });
 }
 
-function chunk<T>(items: T[], size: number) {
+function chunk<T>(items: readonly T[], size: number) {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+async function selectByIdChunks<T>(
+  ids: readonly string[],
+  selectBatch: (ids: string[]) => Promise<T[]>,
+) {
+  const rows: T[] = [];
+  for (const batch of chunk(ids, D1_SELECT_IN_BATCH)) {
+    rows.push(...(await selectBatch(batch)));
+  }
+  return rows;
+}
+
+function publicMetadataKeySql() {
+  return sql`${metadataTable.key} not like ${`${CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX}%`}`;
 }
 
 function buildIssuesByLineId(issues: Iterable<IssueWithOperationalEffects>) {
@@ -3105,12 +3097,12 @@ async function replaceOperationalFactRows(
         .where(inArray(lineDayFactsTable.date, batch));
     }
 
-    for (const batch of chunk(issueRows, 500)) {
+    for (const batch of chunk(issueRows, OPERATIONAL_FACTS_WRITE_BATCH)) {
       if (batch.length > 0) {
         await tx.insert(issueDayFactsTable).values(batch);
       }
     }
-    for (const batch of chunk(lineRows, 500)) {
+    for (const batch of chunk(lineRows, OPERATIONAL_FACTS_WRITE_BATCH)) {
       if (batch.length > 0) {
         await tx.insert(lineDayFactsTable).values(batch);
       }
@@ -3248,7 +3240,11 @@ export async function getRootData() {
               .orderBy(asc(linesTable.id)),
           ),
           timeDbQuery('root_q_metadata', () =>
-            db.select().from(metadataTable).orderBy(asc(metadataTable.key)),
+            db
+              .select()
+              .from(metadataTable)
+              .where(publicMetadataKeySql())
+              .orderBy(asc(metadataTable.key)),
           ),
           timeDbQuery('root_q_operators', () =>
             db
@@ -4273,7 +4269,7 @@ export async function rebuildStatisticsSnapshot(db?: AppDb) {
           set: {
             as_of: asOf,
             data: snapshotPayload,
-            updated_at: sql`now()`,
+            updated_at: asOf,
           },
         }),
     );
