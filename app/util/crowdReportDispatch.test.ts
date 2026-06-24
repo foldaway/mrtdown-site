@@ -101,9 +101,22 @@ function makeFakeClusterCandidateDb() {
 
 function makeFakeDispatchUpdateDb(
   clusterUpdateRows: Array<{ id: string }> = [{ id: 'cluster-1' }],
+  currentReportRows: Array<{ id: string }> = [
+    { id: 'ongoing-report-1' },
+    { id: 'ongoing-report-2' },
+  ],
 ) {
   const whereCalls: unknown[] = [];
   let updateCount = 0;
+  const selectBuilder = {
+    from() {
+      return this;
+    },
+    where(condition: unknown) {
+      whereCalls.push(condition);
+      return Promise.resolve(currentReportRows);
+    },
+  };
   const updateBuilder = {
     set() {
       const updateIndex = updateCount;
@@ -129,10 +142,14 @@ function makeFakeDispatchUpdateDb(
     db: {
       transaction<T>(
         callback: (transaction: {
+          select: () => typeof selectBuilder;
           update: () => typeof updateBuilder;
         }) => Promise<T>,
       ) {
         return callback({
+          select() {
+            return selectBuilder;
+          },
           update() {
             return updateBuilder;
           },
@@ -196,18 +213,26 @@ function makeFakeDispatchEligibilityDb() {
 function makeFakePostSendMarkMissDb() {
   const updateSets: unknown[] = [];
   const whereCalls: unknown[] = [];
+  let selectCount = 0;
   let updateCount = 0;
-  const selectBuilder = {
-    from() {
-      return this;
-    },
-    where(condition: unknown) {
-      whereCalls.push(condition);
-      return this;
-    },
-    limit() {
-      return Promise.resolve([{ id: 'cluster-1' }]);
-    },
+  const makeSelectBuilder = () => {
+    const selectIndex = selectCount;
+    selectCount += 1;
+    return {
+      from() {
+        return this;
+      },
+      where(condition: unknown) {
+        whereCalls.push(condition);
+        if (selectIndex === 1 || selectIndex === 2) {
+          return Promise.resolve([{ id: 'stale-report-1' }]);
+        }
+        return this;
+      },
+      limit() {
+        return Promise.resolve([{ id: 'cluster-1' }]);
+      },
+    };
   };
   const updateBuilder = {
     set(values: unknown) {
@@ -243,13 +268,13 @@ function makeFakePostSendMarkMissDb() {
     db: {
       transaction<T>(
         callback: (transaction: {
-          select: () => typeof selectBuilder;
+          select: () => ReturnType<typeof makeSelectBuilder>;
           update: () => typeof updateBuilder;
         }) => Promise<T>,
       ) {
         return callback({
           select() {
-            return selectBuilder;
+            return makeSelectBuilder();
           },
           update() {
             return updateBuilder;
@@ -444,10 +469,10 @@ describe('getDispatchableCrowdReportCandidates', () => {
 
     const dialect = new PgDialect();
     const clusterUpdateWhereSql = dialect.sqlToQuery(
-      fake.whereCalls[0] as SQL,
+      fake.whereCalls[1] as SQL,
     ).sql;
     const reportUpdateWhereSql = dialect.sqlToQuery(
-      fake.whereCalls[1] as SQL,
+      fake.whereCalls[2] as SQL,
     ).sql;
 
     expect(clusterUpdateWhereSql).toContain('"still_happening" is true');
@@ -462,7 +487,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
   });
 
   it('does not mark cluster payload reports when the cluster freshness update misses', async () => {
-    const fake = makeFakeDispatchUpdateDb([]);
+    const fake = makeFakeDispatchUpdateDb([], [{ id: 'stale-report-1' }]);
 
     await expect(
       markCrowdReportDispatchSuccess(
@@ -490,7 +515,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
       ),
     ).resolves.toBe(false);
 
-    expect(fake.whereCalls).toHaveLength(1);
+    expect(fake.whereCalls).toHaveLength(2);
   });
 
   it('rechecks cluster payload freshness under the dispatch lock', async () => {

@@ -544,6 +544,10 @@ async function markCrowdReportDispatchSuccessInTransaction(
     ? (DateTime.fromISO(dispatchedAt).toUTC().toISO() ?? dispatchedAt)
     : new Date().toISOString();
   if (candidate.kind === 'cluster') {
+    if (!(await isCrowdReportClusterDispatchPayloadCurrent(tx, candidate))) {
+      return false;
+    }
+
     const updatedClusters = await tx
       .update(crowdReportClustersTable)
       .set({
@@ -616,6 +620,32 @@ function hasCrowdReportClusterDispatchPayloadReportCount(
   ) = ${candidate.reportIds.length}`;
 }
 
+async function isCrowdReportClusterDispatchPayloadCurrent(
+  tx: Pick<CrowdReportTransaction, 'select'>,
+  candidate: CrowdReportDispatchCandidate,
+) {
+  const expectedIds = new Set(candidate.reportIds);
+  if (expectedIds.size === 0) {
+    return false;
+  }
+
+  const currentRows = await tx
+    .select({ id: crowdReportsTable.id })
+    .from(crowdReportsTable)
+    .where(
+      and(
+        eq(crowdReportsTable.cluster_id, candidate.id),
+        inArray(crowdReportsTable.status, ['accepted', 'duplicate']),
+        eq(crowdReportsTable.still_happening, true),
+      ),
+    );
+
+  return (
+    currentRows.length === expectedIds.size &&
+    currentRows.every((row) => expectedIds.has(row.id))
+  );
+}
+
 async function tryAcquireCrowdReportDispatchLock(
   tx: CrowdReportTransaction,
   candidate: CrowdReportDispatchCandidate,
@@ -669,7 +699,10 @@ async function isCrowdReportDispatchCandidateEligible(
         ),
       )
       .limit(1);
-    return rows.length > 0;
+    return (
+      rows.length > 0 &&
+      (await isCrowdReportClusterDispatchPayloadCurrent(tx, candidate))
+    );
   }
 
   const rows = await tx

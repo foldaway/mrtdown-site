@@ -207,6 +207,8 @@ type BaseDataset = {
 
 const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
 const D1_SELECT_IN_BATCH = 90;
+const CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX =
+  'crowd_report_duplicate_lock:';
 const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 30;
 const OPERATIONAL_FACTS_WRITE_BATCH = 10;
 let cachedBaseDataset:
@@ -914,7 +916,7 @@ async function buildDataset(
   ] = await timeServerSpan('dataset_base_queries', () =>
     Promise.all([
       timeDbQuery('dataset_q_metadata', () =>
-        database.select().from(metadataTable),
+        database.select().from(metadataTable).where(publicMetadataKeySql()),
       ),
       timeDbQuery('dataset_q_lines', () => database.select().from(linesTable)),
       timeDbQuery('dataset_q_line_operators', () =>
@@ -957,14 +959,14 @@ async function buildDataset(
         ? timeDbQuery('dataset_q_issues', () =>
             database.select().from(issuesTable),
           )
-        : selectedIssueIds.length > 0
-          ? timeDbQuery('dataset_q_issues', () =>
+        : timeDbQuery('dataset_q_issues', () =>
+            selectByIdChunks(selectedIssueIds, (ids) =>
               database
                 .select()
                 .from(issuesTable)
-                .where(inArray(issuesTable.id, selectedIssueIds)),
-            )
-          : [],
+                .where(inArray(issuesTable.id, ids)),
+            ),
+          ),
       selectedIssueIds == null
         ? timeDbQuery('dataset_q_latest_evidence', () =>
             database
@@ -975,30 +977,30 @@ async function buildDataset(
               .from(evidencesTable)
               .groupBy(evidencesTable.issue_id),
           )
-        : selectedIssueIds.length > 0
-          ? timeDbQuery('dataset_q_latest_evidence', () =>
+        : timeDbQuery('dataset_q_latest_evidence', () =>
+            selectByIdChunks(selectedIssueIds, (ids) =>
               database
                 .select({
                   issue_id: evidencesTable.issue_id,
                   latest_ts: sql<string>`max(${evidencesTable.ts})`,
                 })
                 .from(evidencesTable)
-                .where(inArray(evidencesTable.issue_id, selectedIssueIds))
+                .where(inArray(evidencesTable.issue_id, ids))
                 .groupBy(evidencesTable.issue_id),
-            )
-          : [],
+            ),
+          ),
       selectedIssueIds == null
         ? timeDbQuery('dataset_q_impact_events', () =>
             database.select().from(impactEventsTable),
           )
-        : selectedIssueIds.length > 0
-          ? timeDbQuery('dataset_q_impact_events', () =>
+        : timeDbQuery('dataset_q_impact_events', () =>
+            selectByIdChunks(selectedIssueIds, (ids) =>
               database
                 .select()
                 .from(impactEventsTable)
-                .where(inArray(impactEventsTable.issue_id, selectedIssueIds)),
-            )
-          : [],
+                .where(inArray(impactEventsTable.issue_id, ids)),
+            ),
+          ),
     ]),
   );
 
@@ -2682,6 +2684,10 @@ async function selectByIdChunks<T>(
   return rows;
 }
 
+function publicMetadataKeySql() {
+  return sql`${metadataTable.key} not like ${`${CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX}%`}`;
+}
+
 function buildIssuesByLineId(issues: Iterable<IssueWithOperationalEffects>) {
   const issuesByLineId: Record<string, IssueWithOperationalEffects[]> = {};
 
@@ -3234,7 +3240,11 @@ export async function getRootData() {
               .orderBy(asc(linesTable.id)),
           ),
           timeDbQuery('root_q_metadata', () =>
-            db.select().from(metadataTable).orderBy(asc(metadataTable.key)),
+            db
+              .select()
+              .from(metadataTable)
+              .where(publicMetadataKeySql())
+              .orderBy(asc(metadataTable.key)),
           ),
           timeDbQuery('root_q_operators', () =>
             db
