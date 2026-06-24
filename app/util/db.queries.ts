@@ -300,6 +300,15 @@ type OperationalFactRowsForDate = {
   lineRows: (typeof lineDayFactsTable.$inferInsert)[];
 };
 
+type OperationalFactCoverageStart =
+  | {
+      status: 'available';
+      startDate: string | null;
+    }
+  | {
+      status: 'missing_table';
+    };
+
 function nowSg() {
   return DateTime.now().setZone(SG_TIMEZONE);
 }
@@ -2780,13 +2789,48 @@ function buildDurationChartsFromIssueFacts(rows: IssueDayFactRow[]) {
   });
 }
 
-function isUndefinedTableError(error: unknown) {
-  return (
-    error != null &&
-    typeof error === 'object' &&
-    'code' in error &&
-    error.code === '42P01'
-  );
+function readStringField(value: unknown, field: string) {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const fieldValue = value[field];
+  return typeof fieldValue === 'string' ? fieldValue : null;
+}
+
+export function isMissingTableError(error: unknown) {
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+
+  for (let depth = 0; current != null && depth < 6; depth++) {
+    if (seen.has(current)) {
+      break;
+    }
+    seen.add(current);
+
+    const code = readStringField(current, 'code');
+    if (code === '42P01') {
+      return true;
+    }
+
+    const message =
+      current instanceof Error
+        ? current.message
+        : readStringField(current, 'message');
+    if (
+      message != null &&
+      /\bno such table\b/i.test(message) &&
+      (message.includes('D1_ERROR') ||
+        message.includes('SQLITE_ERROR') ||
+        code === 'SQLITE_ERROR')
+    ) {
+      return true;
+    }
+
+    current = isRecord(current) ? current.cause : null;
+  }
+
+  return false;
 }
 
 async function getIssueDayFactsInRange(
@@ -2814,7 +2858,7 @@ async function getIssueDayFactsInRange(
         ),
     );
   } catch (error) {
-    if (isUndefinedTableError(error)) {
+    if (isMissingTableError(error)) {
       return [];
     }
     throw error;
@@ -2843,14 +2887,14 @@ async function getOperationalFactCoverageDatesInRange(
         .groupBy(lineDayFactsTable.date),
     );
   } catch (error) {
-    if (isUndefinedTableError(error)) {
+    if (isMissingTableError(error)) {
       return [];
     }
     throw error;
   }
 }
 
-async function getOperationalFactCoverageStartDate() {
+async function getOperationalFactCoverageStart(): Promise<OperationalFactCoverageStart> {
   const db = await getDefaultDb();
   try {
     const [row] = await timeServerSpan('fact_coverage_start_query', () =>
@@ -2860,10 +2904,15 @@ async function getOperationalFactCoverageStartDate() {
         })
         .from(lineDayFactsTable),
     );
-    return row?.startDate ?? null;
+    return {
+      status: 'available',
+      startDate: row?.startDate ?? null,
+    };
   } catch (error) {
-    if (isUndefinedTableError(error)) {
-      return null;
+    if (isMissingTableError(error)) {
+      return {
+        status: 'missing_table',
+      };
     }
     throw error;
   }
@@ -2884,6 +2933,44 @@ function hasFullDateCoverage(
   return dates.size === expectedDays;
 }
 
+export function selectLegacyHistoryFallback(
+  start: DateTime,
+  end: DateTime,
+  today: DateTime,
+  coverageRows: Array<{ date: string }>,
+  coverageStart: OperationalFactCoverageStart,
+  context: string,
+) {
+  if (end.startOf('day') >= today) {
+    return true;
+  }
+
+  const coverageEnd = end.startOf('day') < today ? end.startOf('day') : today;
+  if (coverageEnd < start.startOf('day')) {
+    return false;
+  }
+
+  if (hasFullDateCoverage(coverageRows, start, coverageEnd)) {
+    return false;
+  }
+
+  if (coverageStart.status === 'missing_table') {
+    return true;
+  }
+
+  if (
+    coverageStart.startDate != null &&
+    start.startOf('day') <
+      DateTime.fromISO(coverageStart.startDate, { zone: SG_TIMEZONE })
+  ) {
+    return true;
+  }
+
+  throw new Error(
+    `Missing operational fact coverage for ${context}: ${start.toISODate()} to ${coverageEnd.toISODate()}`,
+  );
+}
+
 async function shouldUseLegacyHistoryFallback(
   start: DateTime,
   end: DateTime,
@@ -2895,29 +2982,19 @@ async function shouldUseLegacyHistoryFallback(
   }
 
   const coverageEnd = end.startOf('day') < today ? end.startOf('day') : today;
-  if (coverageEnd < start.startOf('day')) {
-    return false;
-  }
+  const coverageRows =
+    coverageEnd < start.startOf('day')
+      ? []
+      : await getOperationalFactCoverageDatesInRange(start, coverageEnd);
+  const coverageStart = await getOperationalFactCoverageStart();
 
-  const coverageRows = await getOperationalFactCoverageDatesInRange(
+  return selectLegacyHistoryFallback(
     start,
-    coverageEnd,
-  );
-  if (hasFullDateCoverage(coverageRows, start, coverageEnd)) {
-    return false;
-  }
-
-  const coverageStart = await getOperationalFactCoverageStartDate();
-  if (
-    coverageStart != null &&
-    start.startOf('day') <
-      DateTime.fromISO(coverageStart, { zone: SG_TIMEZONE })
-  ) {
-    return true;
-  }
-
-  throw new Error(
-    `Missing operational fact coverage for ${context}: ${start.toISODate()} to ${coverageEnd.toISODate()}`,
+    end,
+    today,
+    coverageRows,
+    coverageStart,
+    context,
   );
 }
 
@@ -4036,7 +4113,7 @@ async function getLatestStatisticsSnapshot(db?: AppDb) {
     );
     return parseStatisticsSnapshotPayload(snapshot?.data);
   } catch (error) {
-    if (isUndefinedTableError(error)) {
+    if (isMissingTableError(error)) {
       return null;
     }
     throw error;
@@ -4343,8 +4420,11 @@ export async function getSitemapData() {
     monthEarliestDateTime,
     monthLatestDateTime.endOf('month'),
   );
+  const operationalFactCoverageStart = await getOperationalFactCoverageStart();
   const operationalFactCoverageStartDate =
-    await getOperationalFactCoverageStartDate();
+    operationalFactCoverageStart.status === 'available'
+      ? operationalFactCoverageStart.startDate
+      : null;
 
   return {
     lineIds: Object.keys(dataset.included.lines).sort(),
@@ -4354,6 +4434,8 @@ export async function getSitemapData() {
     monthEarliest,
     monthLatest,
     operationalFactCoverageDates: coverageRows.map((row) => row.date),
+    operationalFactCoverageMissing:
+      operationalFactCoverageStart.status === 'missing_table',
     operationalFactCoverageStartDate,
     currentDate: isoDate(nowSg()),
   };
