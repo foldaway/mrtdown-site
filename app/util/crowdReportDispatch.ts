@@ -4,16 +4,7 @@ import {
   type IngestContentCrowdReport,
   type IngestPayload,
 } from '@mrtdown/ingest-contracts';
-import {
-  and,
-  desc,
-  eq,
-  inArray,
-  isNull,
-  notInArray,
-  or,
-  sql,
-} from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import type { AppDb } from '~/db';
 import {
@@ -25,7 +16,6 @@ import {
   crowdReportsTable,
   crowdReportStationsTable,
 } from '~/db/schema';
-import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
 
 const DEFAULT_DISPATCH_OWNER = 'foldaway';
 const DEFAULT_DISPATCH_REPO = 'mrtdown-data';
@@ -35,6 +25,7 @@ const DEFAULT_DISPATCH_TIMEOUT_MS = 15_000;
 const DEFAULT_DISPATCH_MIN_ONGOING_REPORTS = 3;
 const DEFAULT_DISPATCH_MIN_DISTINCT_IP_HASHES = 2;
 const MAX_DISPATCH_LIMIT = 50;
+const D1_REPORT_UPDATE_BATCH = 90;
 
 type CrowdReportTransaction = Parameters<
   Parameters<AppDb['transaction']>[0]
@@ -109,6 +100,14 @@ function clampDispatchLimit(limit: number | undefined) {
 
 function normalizeTimestamp(value: string | Date) {
   return value instanceof Date ? value.toISOString() : value;
+}
+
+function chunk<T>(items: readonly T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
 }
 
 function hasCrowdReportClusterScope() {
@@ -541,19 +540,25 @@ async function markCrowdReportDispatchSuccessInTransaction(
   candidate: CrowdReportDispatchCandidate,
   dispatchedAt: string,
 ) {
+  const updatedAt = DateTime.fromISO(dispatchedAt).isValid
+    ? (DateTime.fromISO(dispatchedAt).toUTC().toISO() ?? dispatchedAt)
+    : new Date().toISOString();
   if (candidate.kind === 'cluster') {
+    if (!(await isCrowdReportClusterDispatchPayloadCurrent(tx, candidate))) {
+      return false;
+    }
+
     const updatedClusters = await tx
       .update(crowdReportClustersTable)
       .set({
         status: 'dispatched',
         dispatched_at: dispatchedAt,
-        updated_at: sql`now()`,
+        updated_at: updatedAt,
       })
       .where(
         and(
           eq(crowdReportClustersTable.id, candidate.id),
-          hasNoOngoingClusterReportsOutsideDispatchPayload(candidate),
-          hasAllClusterDispatchPayloadReportsCurrent(candidate),
+          hasCrowdReportClusterDispatchPayloadReportCount(candidate),
         ),
       )
       .returning({ id: crowdReportClustersTable.id });
@@ -563,16 +568,13 @@ async function markCrowdReportDispatchSuccessInTransaction(
     }
   }
 
-  await tx
-    .update(crowdReportsTable)
-    .set({
-      status: 'dispatched',
-      dispatched_at: dispatchedAt,
-      dispatch_payload: candidate.payload,
-      dispatch_error: null,
-      updated_at: sql`now()`,
-    })
-    .where(getCrowdReportDispatchReportScope(candidate));
+  await updateCrowdReportDispatchReportsInTransaction(tx, candidate, {
+    status: 'dispatched',
+    dispatched_at: dispatchedAt,
+    dispatch_payload: candidate.payload,
+    dispatch_error: null,
+    updated_at: updatedAt,
+  });
   return true;
 }
 
@@ -581,36 +583,28 @@ async function markCrowdReportDispatchFailureInTransaction(
   candidate: CrowdReportDispatchCandidate,
   message: string,
 ) {
-  await tx
-    .update(crowdReportsTable)
-    .set({
-      dispatch_payload: candidate.payload,
-      dispatch_error: message.slice(0, 2000),
-      updated_at: sql`now()`,
-    })
-    .where(getCrowdReportDispatchReportScope(candidate));
+  const updatedAt = DateTime.now().toUTC().toISO() ?? new Date().toISOString();
+  await updateCrowdReportDispatchReportsInTransaction(tx, candidate, {
+    dispatch_payload: candidate.payload,
+    dispatch_error: message.slice(0, 2000),
+    updated_at: updatedAt,
+  });
 }
 
-function getCrowdReportDispatchReportScope(
+async function updateCrowdReportDispatchReportsInTransaction(
+  tx: Pick<CrowdReportTransaction, 'update'>,
   candidate: CrowdReportDispatchCandidate,
+  values: Partial<typeof crowdReportsTable.$inferInsert>,
 ) {
-  return inArray(crowdReportsTable.id, candidate.reportIds);
+  for (const reportIds of chunk(candidate.reportIds, D1_REPORT_UPDATE_BATCH)) {
+    await tx
+      .update(crowdReportsTable)
+      .set(values)
+      .where(inArray(crowdReportsTable.id, reportIds));
+  }
 }
 
-function hasNoOngoingClusterReportsOutsideDispatchPayload(
-  candidate: CrowdReportDispatchCandidate,
-) {
-  return sql`not exists (
-    select 1
-    from ${crowdReportsTable}
-    where ${crowdReportsTable.cluster_id} = ${candidate.id}
-      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
-      and ${crowdReportsTable.still_happening} is true
-      and ${notInArray(crowdReportsTable.id, candidate.reportIds)}
-  )`;
-}
-
-function hasAllClusterDispatchPayloadReportsCurrent(
+function hasCrowdReportClusterDispatchPayloadReportCount(
   candidate: CrowdReportDispatchCandidate,
 ) {
   if (candidate.reportIds.length === 0) {
@@ -623,18 +617,67 @@ function hasAllClusterDispatchPayloadReportsCurrent(
     where ${crowdReportsTable.cluster_id} = ${candidate.id}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
       and ${crowdReportsTable.still_happening} is true
-      and ${inArray(crowdReportsTable.id, candidate.reportIds)}
   ) = ${candidate.reportIds.length}`;
+}
+
+async function isCrowdReportClusterDispatchPayloadCurrent(
+  tx: Pick<CrowdReportTransaction, 'select'>,
+  candidate: CrowdReportDispatchCandidate,
+) {
+  const expectedIds = new Set(candidate.reportIds);
+  if (expectedIds.size === 0) {
+    return false;
+  }
+
+  const currentRows = await tx
+    .select({ id: crowdReportsTable.id })
+    .from(crowdReportsTable)
+    .where(
+      and(
+        eq(crowdReportsTable.cluster_id, candidate.id),
+        inArray(crowdReportsTable.status, ['accepted', 'duplicate']),
+        eq(crowdReportsTable.still_happening, true),
+      ),
+    );
+
+  return (
+    currentRows.length === expectedIds.size &&
+    currentRows.every((row) => expectedIds.has(row.id))
+  );
 }
 
 async function tryAcquireCrowdReportDispatchLock(
   tx: CrowdReportTransaction,
   candidate: CrowdReportDispatchCandidate,
 ) {
-  const result = (await tx.run(
-    sql`select pg_try_advisory_xact_lock(hashtextextended(${buildCrowdReportDispatchLockKey(candidate.kind, candidate.id)}, 0::bigint)) as "locked"`,
-  )) as D1Result<{ locked: boolean }>;
-  return result.results[0]?.locked === true;
+  if (candidate.kind === 'cluster') {
+    const rows = await tx
+      .update(crowdReportClustersTable)
+      .set({ updated_at: sql`${crowdReportClustersTable.updated_at}` })
+      .where(
+        and(
+          eq(crowdReportClustersTable.id, candidate.id),
+          eq(crowdReportClustersTable.status, 'accepted'),
+          isNull(crowdReportClustersTable.dispatched_at),
+        ),
+      )
+      .returning({ id: crowdReportClustersTable.id });
+    return rows.length > 0;
+  }
+
+  const rows = await tx
+    .update(crowdReportsTable)
+    .set({ updated_at: sql`${crowdReportsTable.updated_at}` })
+    .where(
+      and(
+        eq(crowdReportsTable.id, candidate.id),
+        eq(crowdReportsTable.status, 'accepted'),
+        isNull(crowdReportsTable.dispatched_at),
+        isNull(crowdReportsTable.cluster_id),
+      ),
+    )
+    .returning({ id: crowdReportsTable.id });
+  return rows.length > 0;
 }
 
 async function isCrowdReportDispatchCandidateEligible(
@@ -652,12 +695,14 @@ async function isCrowdReportDispatchCandidateEligible(
           isNull(crowdReportClustersTable.dispatched_at),
           hasCrowdReportClusterScope(),
           hasCrowdReportClusterCurrentConfidence(),
-          hasNoOngoingClusterReportsOutsideDispatchPayload(candidate),
-          hasAllClusterDispatchPayloadReportsCurrent(candidate),
+          hasCrowdReportClusterDispatchPayloadReportCount(candidate),
         ),
       )
       .limit(1);
-    return rows.length > 0;
+    return (
+      rows.length > 0 &&
+      (await isCrowdReportClusterDispatchPayloadCurrent(tx, candidate))
+    );
   }
 
   const rows = await tx

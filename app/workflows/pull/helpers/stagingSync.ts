@@ -68,12 +68,17 @@ import {
   withDbDiagnostics as withSharedDbDiagnostics,
 } from '../../../util/dbDiagnostics.js';
 
-/** Max rows per `insert().values()` batch to stay within driver/param limits. */
-const BATCH = 500;
+/**
+ * Max rows per batched statement. D1 caps bound parameters per statement, and
+ * the widest inserts in this workflow currently bind at most 10 values per row,
+ * so 10 rows keeps each statement within the 100-parameter ceiling.
+ */
+const BATCH = 10;
 /** Max ids per `IN (...)` cleanup query. Keep below proxy/driver bind limits. */
 const DELETE_BATCH = 50;
 
 type Db = AppDb;
+type DeleteDb = Pick<AppDb, 'delete'>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type ServiceRevision = Service['revisions'][number];
 
@@ -117,11 +122,19 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 /** Clears all pull staging tables before a new parse run. */
+async function deleteStagingTables(db: DeleteDb): Promise<void> {
+  await db.delete(operatorsNextTable);
+  await db.delete(townsNextTable);
+  await db.delete(landmarksNextTable);
+  await db.delete(linesNextTable);
+  await db.delete(stationsNextTable);
+  await db.delete(servicesNextTable);
+  await db.delete(issuesNextTable);
+}
+
+/** Clears all pull staging tables before a new parse run. */
 export async function truncateStagingTables(db: Db): Promise<void> {
-  // Multi-table TRUNCATE is DDL; Drizzle has no builder — use `sql` with table refs.
-  await db.run(
-    sql`TRUNCATE ${operatorsNextTable}, ${townsNextTable}, ${landmarksNextTable}, ${linesNextTable}, ${stationsNextTable}, ${servicesNextTable}, ${issuesNextTable} RESTART IDENTITY`,
-  );
+  await deleteStagingTables(db);
 }
 
 export async function insertOperatorsStaging(
@@ -223,8 +236,8 @@ export async function insertStationsStaging(
     id: s.id,
     hash: s.hash,
     name: s.name,
-    // Drizzle/PostGIS: [longitude, latitude] tuple for SRID 4326 point
-    geo: [s.geo.longitude, s.geo.latitude] as [number, number],
+    latitude: s.geo.latitude,
+    longitude: s.geo.longitude,
     town_id: s.townId,
     station_codes: s.stationCodes,
     landmark_ids: s.landmarkIds,
@@ -396,7 +409,7 @@ async function upsertChangedOperators(
           name: sql.raw(`excluded.${operatorsTable.name.name}`),
           founded_at: sql.raw(`excluded.${operatorsTable.founded_at.name}`),
           url: sql.raw(`excluded.${operatorsTable.url.name}`),
-          updated_at: new Date(),
+          updated_at: new Date().toISOString(),
         },
       });
   }
@@ -460,7 +473,7 @@ async function upsertChangedTowns(
           set: {
             hash: row.hash,
             name: row.name,
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         });
     }
@@ -515,7 +528,7 @@ async function upsertChangedLandmarks(
           set: {
             hash: row.hash,
             name: row.name,
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         });
     }
@@ -623,7 +636,7 @@ export async function syncLines(db: Db): Promise<void> {
               started_at: row.started_at,
               ended_at: row.ended_at,
               operating_hours: row.operating_hours,
-              updated_at: new Date(),
+              updated_at: new Date().toISOString(),
             },
           });
       }
@@ -746,7 +759,8 @@ export async function syncStations(db: Db): Promise<void> {
             id: row.id,
             hash: row.hash,
             name: row.name,
-            geo: row.geo,
+            latitude: row.latitude,
+            longitude: row.longitude,
             townId: row.town_id,
           })
           .onConflictDoUpdate({
@@ -754,7 +768,8 @@ export async function syncStations(db: Db): Promise<void> {
             set: {
               hash: row.hash,
               name: row.name,
-              geo: row.geo,
+              latitude: row.latitude,
+              longitude: row.longitude,
               townId: row.town_id,
             },
           });
@@ -1010,42 +1025,44 @@ export async function syncServices(db: Db): Promise<void> {
                 start_at: serviceRevisionStartAt(revisionData),
                 end_at: serviceRevisionEndAt(revisionData),
                 operating_hours: revisionData.operatingHours,
-                updated_at: new Date(),
+                updated_at: new Date().toISOString(),
               },
             });
 
-          await tx
-            .insert(serviceRevisionPathStationEntriesTable)
-            .values(
-              revisionData.path.stations.map((station, index) => {
-                return {
-                  service_revision_id: revisionData.id,
-                  service_id: row.id,
-                  station_id: station.stationId,
-                  display_code: station.displayCode,
-                  path_index: index,
-                } satisfies InferInsertModel<
-                  typeof serviceRevisionPathStationEntriesTable
-                >;
-              }),
-            )
-            // Postgres `excluded.*` — update display_code/path_index on conflict
-            .onConflictDoUpdate({
-              target: [
-                serviceRevisionPathStationEntriesTable.service_revision_id,
-                serviceRevisionPathStationEntriesTable.service_id,
-                serviceRevisionPathStationEntriesTable.station_id,
-                serviceRevisionPathStationEntriesTable.path_index,
-              ],
-              set: {
-                display_code: sql.raw(
-                  `excluded.${serviceRevisionPathStationEntriesTable.display_code.name}`,
-                ),
-                path_index: sql.raw(
-                  `excluded.${serviceRevisionPathStationEntriesTable.path_index.name}`,
-                ),
-              },
-            });
+          const pathEntryRows = revisionData.path.stations.map(
+            (station, index) => {
+              return {
+                service_revision_id: revisionData.id,
+                service_id: row.id,
+                station_id: station.stationId,
+                display_code: station.displayCode,
+                path_index: index,
+              } satisfies InferInsertModel<
+                typeof serviceRevisionPathStationEntriesTable
+              >;
+            },
+          );
+          for (const rows of chunk(pathEntryRows, BATCH)) {
+            await tx
+              .insert(serviceRevisionPathStationEntriesTable)
+              .values(rows)
+              .onConflictDoUpdate({
+                target: [
+                  serviceRevisionPathStationEntriesTable.service_revision_id,
+                  serviceRevisionPathStationEntriesTable.service_id,
+                  serviceRevisionPathStationEntriesTable.station_id,
+                  serviceRevisionPathStationEntriesTable.path_index,
+                ],
+                set: {
+                  display_code: sql.raw(
+                    `excluded.${serviceRevisionPathStationEntriesTable.display_code.name}`,
+                  ),
+                  path_index: sql.raw(
+                    `excluded.${serviceRevisionPathStationEntriesTable.path_index.name}`,
+                  ),
+                },
+              });
+          }
         }
       }
     }
@@ -1332,10 +1349,10 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
       }
     }
 
-    if (issueRows.length > 0) {
+    for (const rows of chunk(issueRows, BATCH)) {
       await tx
         .insert(issuesTable)
-        .values(issueRows)
+        .values(rows)
         .onConflictDoUpdate({
           target: [issuesTable.id],
           set: {
@@ -1343,7 +1360,7 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
             type: sql.raw(`excluded.${issuesTable.type.name}`),
             title: sql.raw(`excluded.${issuesTable.title.name}`),
             title_meta: sql.raw(`excluded.${issuesTable.title_meta.name}`),
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         });
     }
@@ -1692,12 +1709,10 @@ export async function syncIssues(db: Db): Promise<void> {
   }
 }
 
-/** Truncates staging tables and records `manifest_last_pulled_at` in one transaction. */
+/** Clears staging tables and records `manifest_last_pulled_at` in one transaction. */
 export async function finalizePull(db: Db): Promise<void> {
   await db.transaction(async (tx) => {
-    await tx.run(
-      sql`TRUNCATE ${operatorsNextTable}, ${townsNextTable}, ${landmarksNextTable}, ${linesNextTable}, ${stationsNextTable}, ${servicesNextTable}, ${issuesNextTable} RESTART IDENTITY`,
-    );
+    await deleteStagingTables(tx);
     await tx
       .insert(metadataTable)
       .values({
