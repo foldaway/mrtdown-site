@@ -12,11 +12,11 @@ import {
   insertLinesStaging,
   insertOperatorsStaging,
   insertStationsStaging,
-  truncateStagingTables,
+  clearStagingTables,
 } from './stagingSync';
 
 type InsertDb = Parameters<typeof insertOperatorsStaging>[0];
-type TruncateDb = Parameters<typeof truncateStagingTables>[0];
+type ClearDb = Parameters<typeof clearStagingTables>[0];
 
 function createInsertDb() {
   const inserts: Array<{
@@ -49,7 +49,7 @@ function createDeleteDb() {
       deletes.push(table);
       return Promise.resolve();
     },
-  } as unknown as TruncateDb;
+  } as unknown as ClearDb;
 
   return { db, deletes };
 }
@@ -97,7 +97,7 @@ describe('pull staging inserts', () => {
   it('clears staging tables with SQLite-compatible deletes', async () => {
     const { db, deletes } = createDeleteDb();
 
-    await truncateStagingTables(db);
+    await clearStagingTables(db);
 
     expect(deletes).toEqual([
       operatorsNextTable,

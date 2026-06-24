@@ -17,15 +17,16 @@ import {
   type Town,
 } from '@mrtdown/core';
 import {
+  and,
   asc,
   eq,
   type InferInsertModel,
   inArray,
+  isNotNull,
   isNull,
   ne,
   notExists,
   or,
-  sql,
 } from 'drizzle-orm';
 import type { AppDb } from '../../../db/index.js';
 import {
@@ -133,7 +134,7 @@ async function deleteStagingTables(db: DeleteDb): Promise<void> {
 }
 
 /** Clears all pull staging tables before a new parse run. */
-export async function truncateStagingTables(db: Db): Promise<void> {
+export async function clearStagingTables(db: Db): Promise<void> {
   await deleteStagingTables(db);
 }
 
@@ -391,27 +392,27 @@ async function upsertChangedOperators(
       .from(operatorsNextTable)
       .where(inArray(operatorsNextTable.id, ids));
     if (full.length === 0) continue;
-    await tx
-      .insert(operatorsTable)
-      .values(
-        full.map((row) => ({
+    for (const row of full) {
+      await tx
+        .insert(operatorsTable)
+        .values({
           id: row.id,
           hash: row.hash,
           name: row.name,
           founded_at: row.founded_at,
           url: row.url,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: [operatorsTable.id],
-        set: {
-          hash: sql.raw(`excluded.${operatorsTable.hash.name}`),
-          name: sql.raw(`excluded.${operatorsTable.name.name}`),
-          founded_at: sql.raw(`excluded.${operatorsTable.founded_at.name}`),
-          url: sql.raw(`excluded.${operatorsTable.url.name}`),
-          updated_at: new Date().toISOString(),
-        },
-      });
+        })
+        .onConflictDoUpdate({
+          target: [operatorsTable.id],
+          set: {
+            hash: row.hash,
+            name: row.name,
+            founded_at: row.founded_at,
+            url: row.url,
+            updated_at: new Date().toISOString(),
+          },
+        });
+    }
   }
 }
 
@@ -707,13 +708,19 @@ export async function deleteLineOrphans(db: Db): Promise<void> {
     await tx
       .update(impactEventEntityFacilitiesTable)
       .set({ line_id: null })
-      .where(sql`
-        ${impactEventEntityFacilitiesTable.line_id} IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM ${linesNextTable}
-          WHERE ${linesNextTable.id} = ${impactEventEntityFacilitiesTable.line_id}
-        )
-      `);
+      .where(
+        and(
+          isNotNull(impactEventEntityFacilitiesTable.line_id),
+          notExists(
+            tx
+              .select()
+              .from(linesNextTable)
+              .where(
+                eq(linesNextTable.id, impactEventEntityFacilitiesTable.line_id),
+              ),
+          ),
+        ),
+      );
     await tx
       .delete(linesTable)
       .where(
@@ -847,20 +854,54 @@ export async function deleteStationOrphans(db: Db): Promise<void> {
             ),
         ),
       );
-    await tx.delete(impactEventServiceScopesTable).where(sql`
-        (${impactEventServiceScopesTable.station_id} IS NOT NULL AND NOT EXISTS (
-          SELECT 1 FROM ${stationsNextTable}
-          WHERE ${stationsNextTable.id} = ${impactEventServiceScopesTable.station_id}
-        ))
-        OR (${impactEventServiceScopesTable.from_station_id} IS NOT NULL AND NOT EXISTS (
-          SELECT 1 FROM ${stationsNextTable}
-          WHERE ${stationsNextTable.id} = ${impactEventServiceScopesTable.from_station_id}
-        ))
-        OR (${impactEventServiceScopesTable.to_station_id} IS NOT NULL AND NOT EXISTS (
-          SELECT 1 FROM ${stationsNextTable}
-          WHERE ${stationsNextTable.id} = ${impactEventServiceScopesTable.to_station_id}
-        ))
-      `);
+    await tx
+      .delete(impactEventServiceScopesTable)
+      .where(
+        or(
+          and(
+            isNotNull(impactEventServiceScopesTable.station_id),
+            notExists(
+              tx
+                .select()
+                .from(stationsNextTable)
+                .where(
+                  eq(
+                    stationsNextTable.id,
+                    impactEventServiceScopesTable.station_id,
+                  ),
+                ),
+            ),
+          ),
+          and(
+            isNotNull(impactEventServiceScopesTable.from_station_id),
+            notExists(
+              tx
+                .select()
+                .from(stationsNextTable)
+                .where(
+                  eq(
+                    stationsNextTable.id,
+                    impactEventServiceScopesTable.from_station_id,
+                  ),
+                ),
+            ),
+          ),
+          and(
+            isNotNull(impactEventServiceScopesTable.to_station_id),
+            notExists(
+              tx
+                .select()
+                .from(stationsNextTable)
+                .where(
+                  eq(
+                    stationsNextTable.id,
+                    impactEventServiceScopesTable.to_station_id,
+                  ),
+                ),
+            ),
+          ),
+        ),
+      );
     await tx
       .delete(impactEventEntityFacilitiesTable)
       .where(
@@ -1043,25 +1084,23 @@ export async function syncServices(db: Db): Promise<void> {
             },
           );
           for (const rows of chunk(pathEntryRows, BATCH)) {
-            await tx
-              .insert(serviceRevisionPathStationEntriesTable)
-              .values(rows)
-              .onConflictDoUpdate({
-                target: [
-                  serviceRevisionPathStationEntriesTable.service_revision_id,
-                  serviceRevisionPathStationEntriesTable.service_id,
-                  serviceRevisionPathStationEntriesTable.station_id,
-                  serviceRevisionPathStationEntriesTable.path_index,
-                ],
-                set: {
-                  display_code: sql.raw(
-                    `excluded.${serviceRevisionPathStationEntriesTable.display_code.name}`,
-                  ),
-                  path_index: sql.raw(
-                    `excluded.${serviceRevisionPathStationEntriesTable.path_index.name}`,
-                  ),
-                },
-              });
+            for (const pathEntryRow of rows) {
+              await tx
+                .insert(serviceRevisionPathStationEntriesTable)
+                .values(pathEntryRow)
+                .onConflictDoUpdate({
+                  target: [
+                    serviceRevisionPathStationEntriesTable.service_revision_id,
+                    serviceRevisionPathStationEntriesTable.service_id,
+                    serviceRevisionPathStationEntriesTable.station_id,
+                    serviceRevisionPathStationEntriesTable.path_index,
+                  ],
+                  set: {
+                    display_code: pathEntryRow.display_code,
+                    path_index: pathEntryRow.path_index,
+                  },
+                });
+            }
           }
         }
       }
@@ -1350,19 +1389,21 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
     }
 
     for (const rows of chunk(issueRows, BATCH)) {
-      await tx
-        .insert(issuesTable)
-        .values(rows)
-        .onConflictDoUpdate({
-          target: [issuesTable.id],
-          set: {
-            hash: sql.raw(`excluded.${issuesTable.hash.name}`),
-            type: sql.raw(`excluded.${issuesTable.type.name}`),
-            title: sql.raw(`excluded.${issuesTable.title.name}`),
-            title_meta: sql.raw(`excluded.${issuesTable.title_meta.name}`),
-            updated_at: new Date().toISOString(),
-          },
-        });
+      for (const row of rows) {
+        await tx
+          .insert(issuesTable)
+          .values(row)
+          .onConflictDoUpdate({
+            target: [issuesTable.id],
+            set: {
+              hash: row.hash,
+              type: row.type,
+              title: row.title,
+              title_meta: row.title_meta,
+              updated_at: new Date().toISOString(),
+            },
+          });
+      }
     }
     if (evidenceRows.length > 0) {
       const dedupedEvidenceRows = uniqueBy(
