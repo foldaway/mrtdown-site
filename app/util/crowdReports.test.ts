@@ -12,6 +12,7 @@ import {
   crowdReportRateLimitsTable,
   crowdReportsTable,
   crowdReportStationsTable,
+  metadataTable,
 } from '~/db/schema';
 import {
   assessCrowdReportAutomationPolicy,
@@ -119,6 +120,15 @@ function makeFakeDb(
     insert(table: unknown) {
       return {
         values(values: unknown) {
+          if (table === metadataTable) {
+            return {
+              onConflictDoUpdate(config: unknown) {
+                conflictUpdates.push(config);
+                return Promise.resolve();
+              },
+            };
+          }
+
           inserts.push({ table, values });
 
           if (table === crowdReportRateLimitsTable) {
@@ -216,6 +226,14 @@ function makeFakeAutomoderationDb(
     insert(table: unknown) {
       return {
         values(values: unknown) {
+          if (table === metadataTable) {
+            return {
+              onConflictDoUpdate() {
+                return Promise.resolve();
+              },
+            };
+          }
+
           inserts.push({ table, values });
           return Promise.resolve();
         },
@@ -965,7 +983,7 @@ describe('persistCrowdReport', () => {
     ]);
     expect(fake.inserts[1]?.values).toMatchObject({
       id: 'fixed-id',
-      observed_at: VALID_SUBMISSION.observedAt,
+      observed_at: '2026-05-24T04:30:00.000Z',
       status: 'pending',
       still_happening: true,
       text: 'Structured community report. Scope: train. Effect: delay. Lines: BPLRT. Stations: BP6. Direction station: BP6. Delay: 10 minutes. Still happening: yes.',

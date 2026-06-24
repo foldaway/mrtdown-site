@@ -206,6 +206,7 @@ type BaseDataset = {
 };
 
 const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
+const D1_SELECT_IN_BATCH = 90;
 const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 30;
 const OPERATIONAL_FACTS_WRITE_BATCH = 10;
 let cachedBaseDataset:
@@ -1061,97 +1062,70 @@ async function buildDataset(
     impactEventFacilityEffectRows,
   ] = await timeServerSpan('dataset_issue_detail_queries', () =>
     Promise.all([
-      periodImpactEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_periods', () =>
-            database
-              .select()
-              .from(impactEventPeriodsTable)
-              .where(
-                inArray(
-                  impactEventPeriodsTable.impact_event_id,
-                  periodImpactEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventPeriodsTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_services', () =>
-            database
-              .select()
-              .from(impactEventEntityServicesTable)
-              .where(
-                inArray(
-                  impactEventEntityServicesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventEntityServicesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_facilities', () =>
-            database
-              .select()
-              .from(impactEventEntityFacilitiesTable)
-              .where(
-                inArray(
-                  impactEventEntityFacilitiesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventEntityFacilitiesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_causes', () =>
-            database
-              .select()
-              .from(impactEventCausesTable)
-              .where(
-                inArray(
-                  impactEventCausesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventCausesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_service_scopes', () =>
-            database
-              .select()
-              .from(impactEventServiceScopesTable)
-              .where(
-                inArray(
-                  impactEventServiceScopesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventServiceScopesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_service_effects', () =>
-            database
-              .select()
-              .from(impactEventServiceEffectsTable)
-              .where(
-                inArray(
-                  impactEventServiceEffectsTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventServiceEffectsTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_facility_effects', () =>
-            database
-              .select()
-              .from(impactEventFacilityEffectsTable)
-              .where(
-                inArray(
-                  impactEventFacilityEffectsTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventFacilityEffectsTable.$inferSelect)[]),
+      timeDbQuery('dataset_q_impact_event_periods', () =>
+        selectByIdChunks(periodImpactEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventPeriodsTable)
+            .where(inArray(impactEventPeriodsTable.impact_event_id, ids)),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_services', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventEntityServicesTable)
+            .where(
+              inArray(impactEventEntityServicesTable.impact_event_id, ids),
+            ),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_facilities', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventEntityFacilitiesTable)
+            .where(
+              inArray(impactEventEntityFacilitiesTable.impact_event_id, ids),
+            ),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_causes', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventCausesTable)
+            .where(inArray(impactEventCausesTable.impact_event_id, ids)),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_service_scopes', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventServiceScopesTable)
+            .where(inArray(impactEventServiceScopesTable.impact_event_id, ids)),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_service_effects', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventServiceEffectsTable)
+            .where(
+              inArray(impactEventServiceEffectsTable.impact_event_id, ids),
+            ),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_facility_effects', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventFacilityEffectsTable)
+            .where(
+              inArray(impactEventFacilityEffectsTable.impact_event_id, ids),
+            ),
+        ),
+      ),
     ]),
   );
 
@@ -1263,17 +1237,17 @@ async function buildDataset(
   const servicePathRows = await timeServerSpan(
     'dataset_service_path_query',
     () =>
-      allRevisionIds.length > 0
-        ? database
-            .select()
-            .from(serviceRevisionPathStationEntriesTable)
-            .where(
-              inArray(
-                serviceRevisionPathStationEntriesTable.service_revision_id,
-                allRevisionIds,
-              ),
-            )
-        : Promise.resolve([]),
+      selectByIdChunks(allRevisionIds, (ids) =>
+        database
+          .select()
+          .from(serviceRevisionPathStationEntriesTable)
+          .where(
+            inArray(
+              serviceRevisionPathStationEntriesTable.service_revision_id,
+              ids,
+            ),
+          ),
+      ),
   );
   const assemblyStartedAt = performance.now();
 
@@ -2689,12 +2663,23 @@ function buildIssueDurationGraphs(issues: Issue[]) {
   });
 }
 
-function chunk<T>(items: T[], size: number) {
+function chunk<T>(items: readonly T[], size: number) {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+async function selectByIdChunks<T>(
+  ids: readonly string[],
+  selectBatch: (ids: string[]) => Promise<T[]>,
+) {
+  const rows: T[] = [];
+  for (const batch of chunk(ids, D1_SELECT_IN_BATCH)) {
+    rows.push(...(await selectBatch(batch)));
+  }
+  return rows;
 }
 
 function buildIssuesByLineId(issues: Iterable<IssueWithOperationalEffects>) {

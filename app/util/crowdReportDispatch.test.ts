@@ -450,12 +450,11 @@ describe('getDispatchableCrowdReportCandidates', () => {
       fake.whereCalls[1] as SQL,
     ).sql;
 
-    expect(clusterUpdateWhereSql).toContain('not exists');
     expect(clusterUpdateWhereSql).toContain('"still_happening" is true');
-    expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" not in');
     expect(clusterUpdateWhereSql).toContain('count(*)');
     expect(clusterUpdateWhereSql).not.toContain('::int');
-    expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" in');
+    expect(clusterUpdateWhereSql).not.toContain('"crowd_reports"."id" not in');
+    expect(clusterUpdateWhereSql).not.toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).not.toContain(
       '"crowd_reports"."cluster_id" =',
@@ -540,12 +539,11 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(lockWhereSql).toContain(
       '"crowd_report_clusters"."dispatched_at" is null',
     );
-    expect(eligibilityWhereSql).toContain('not exists');
     expect(eligibilityWhereSql).toContain('"still_happening" is true');
-    expect(eligibilityWhereSql).toContain('"crowd_reports"."id" not in');
     expect(eligibilityWhereSql).toContain('count(*)');
     expect(eligibilityWhereSql).not.toContain('::int');
-    expect(eligibilityWhereSql).toContain('"crowd_reports"."id" in');
+    expect(eligibilityWhereSql).not.toContain('"crowd_reports"."id" not in');
+    expect(eligibilityWhereSql).not.toContain('"crowd_reports"."id" in');
   });
 
   it('reports a post-send stale local success mark as failed without closing the cluster', async () => {

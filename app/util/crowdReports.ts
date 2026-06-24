@@ -21,6 +21,7 @@ import {
   servicesTable,
   stationsTable,
   crowdReportStationsTable,
+  metadataTable,
 } from '~/db/schema';
 import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
@@ -36,7 +37,7 @@ const DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES = 90;
 const DEFAULT_PUBLIC_SIGNAL_LIMIT = 20;
 const AUTO_REJECT_RESOLVED_STALE_HOURS = 6;
 const AUTO_REJECT_UNCONFIRMED_STALE_HOURS = 12;
-const DUPLICATE_CANDIDATE_PAGE_SIZE = 100;
+const DUPLICATE_CANDIDATE_PAGE_SIZE = 90;
 export const MAX_CROWD_REPORT_REQUEST_BYTES = 10_000;
 
 export const CrowdReportEffectSchema = IngestContentCrowdReportEffectSchema;
@@ -549,6 +550,37 @@ export function buildCrowdReportStorageText(
     );
   }
   return summary.join(' ');
+}
+
+function normalizeCrowdReportObservedAt(value: string) {
+  const observedAt = DateTime.fromISO(value, { setZone: true });
+  return observedAt.isValid ? (observedAt.toUTC().toISO() ?? value) : value;
+}
+
+function buildDuplicateLockKey(submission: CrowdReportSubmission) {
+  return `crowd_report_duplicate_lock:${JSON.stringify({
+    effect: submission.effect ?? null,
+    directionText: normalizeComparableText(submission.directionText),
+    lineIds: normalizeIdSet(submission.lineIds),
+    stationIds: normalizeIdSet(submission.stationIds),
+  })}`;
+}
+
+async function lockCrowdReportDuplicateContextInTransaction(
+  tx: Pick<CrowdReportTransaction, 'insert'>,
+  submission: CrowdReportSubmission,
+  nowIso: string,
+) {
+  await tx
+    .insert(metadataTable)
+    .values({
+      key: buildDuplicateLockKey(submission),
+      value: nowIso,
+    })
+    .onConflictDoUpdate({
+      target: [metadataTable.key],
+      set: { value: nowIso },
+    });
 }
 
 export async function parseCrowdReportJsonBody(
@@ -1113,6 +1145,8 @@ async function automoderateCrowdReportInTransaction(
     );
   }
 
+  await lockCrowdReportDuplicateContextInTransaction(tx, submission, nowIso);
+
   let duplicate = await findDuplicateCrowdReport(
     tx,
     reportId,
@@ -1352,7 +1386,7 @@ async function persistCrowdReportInTransaction(
 
   await tx.insert(crowdReportsTable).values({
     id: context.reportId,
-    observed_at: submission.observedAt,
+    observed_at: normalizeCrowdReportObservedAt(submission.observedAt),
     direction_text: submission.directionText,
     effect: submission.effect,
     delay_minutes: submission.delayMinutes,
