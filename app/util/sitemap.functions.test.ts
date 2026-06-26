@@ -100,6 +100,25 @@ describe('agent Markdown discovery', () => {
     expect(paths).toContain('/history/2026/06');
   });
 
+  it('includes historical months when D1 fact tables are absent', () => {
+    const paths = buildSitemapPaths({
+      lineIds: [],
+      stationIds: [],
+      operatorIds: [],
+      issueIds: [],
+      monthEarliest: '2026-04-01',
+      monthLatest: '2026-05-01',
+      operationalFactCoverageDates: [],
+      operationalFactCoverageMissing: true,
+      operationalFactCoverageStartDate: null,
+      currentDate: '2026-06-21',
+    });
+
+    expect(paths).toContain('/history/2026');
+    expect(paths).toContain('/history/2026/04');
+    expect(paths).toContain('/history/2026/05');
+  });
+
   it('only includes history year paths when the full year can render', () => {
     const paths = buildSitemapPaths({
       lineIds: [],
