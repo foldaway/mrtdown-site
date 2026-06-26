@@ -319,6 +319,12 @@ Exit criteria:
   `/internal/api/tasks/pull/`, but did not execute the workflow in the local
   runtime during validation; D1 row counts remained zero, so end-to-end pull
   validation still needs a preview or workflow-capable runtime.
+- 2026-06-25: Started Phase 4 read-path hardening by making public statistics
+  and fact-table fallbacks recognize D1/SQLite missing-table errors in addition
+  to Postgres `42P01`, with focused coverage for D1-style wrapped errors.
+- 2026-06-26: Extended Phase 4 sitemap read-path handling so a missing D1
+  operational fact table keeps legacy-renderable history paths discoverable
+  instead of treating the state like an existing empty facts table.
 
 ## Decision Log
 
