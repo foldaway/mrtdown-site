@@ -1,4 +1,4 @@
-import { and, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AppDb } from '../../../db/index.js';
 import { publicHolidaysTable } from '../../../db/schema.js';
@@ -225,20 +225,20 @@ export async function syncPublicHolidays(
         hash: row.hash,
       }));
       for (const rows of chunk(upsertRows, D1_WRITE_BATCH)) {
-        await tx
-          .insert(publicHolidaysTable)
-          .values(rows)
-          .onConflictDoUpdate({
-            target: publicHolidaysTable.id,
-            set: {
-              date: sql.raw(`excluded.${publicHolidaysTable.date.name}`),
-              holiday_name: sql.raw(
-                `excluded.${publicHolidaysTable.holiday_name.name}`,
-              ),
-              hash: sql.raw(`excluded.${publicHolidaysTable.hash.name}`),
-              updated_at: now,
-            },
-          });
+        for (const row of rows) {
+          await tx
+            .insert(publicHolidaysTable)
+            .values(row)
+            .onConflictDoUpdate({
+              target: publicHolidaysTable.id,
+              set: {
+                date: row.date,
+                holiday_name: row.holiday_name,
+                hash: row.hash,
+                updated_at: now,
+              },
+            });
+        }
       }
 
       for (const ids of chunk(

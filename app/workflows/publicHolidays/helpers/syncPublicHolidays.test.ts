@@ -20,7 +20,7 @@ describe('normalizeDataGovPublicHolidayRecord', () => {
     });
   });
 
-  it('uses a Postgres text-safe hash', () => {
+  it('uses a database text-safe hash', () => {
     const row = normalizeDataGovPublicHolidayRecord({
       date: '2026-01-01',
       day: 'Thursday',
