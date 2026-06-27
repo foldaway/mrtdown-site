@@ -325,6 +325,12 @@ Exit criteria:
 - 2026-06-26: Extended Phase 4 sitemap read-path handling so a missing D1
   operational fact table keeps legacy-renderable history paths discoverable
   instead of treating the state like an existing empty facts table.
+- 2026-06-27: Started Phase 5 dispatch hardening by moving crowd-report GitHub
+  dispatch out of the DB transaction. Dispatch now claims affected report rows
+  with a short-lived D1-compatible in-progress marker, commits that claim before
+  the external `repository_dispatch` call, then marks success or failure in a
+  separate transaction. Also replaced the public-holiday sync's raw
+  `excluded.*` upsert fields with per-row bound update values.
 
 ## Decision Log
 

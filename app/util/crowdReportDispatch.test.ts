@@ -131,7 +131,11 @@ function makeFakeDispatchUpdateDb(
               },
             };
           }
-          return Promise.resolve();
+          return {
+            returning() {
+              return Promise.resolve(currentReportRows);
+            },
+          };
         },
       };
     },
@@ -211,10 +215,17 @@ function makeFakeDispatchEligibilityDb() {
 }
 
 function makeFakePostSendMarkMissDb() {
+  let inTransaction = false;
   const updateSets: unknown[] = [];
   const whereCalls: unknown[] = [];
   let selectCount = 0;
   let updateCount = 0;
+  const updateRowsByIndex = [
+    [{ id: 'cluster-1' }],
+    [{ id: 'stale-report-1' }],
+    [],
+    [{ id: 'stale-report-1' }],
+  ];
   const makeSelectBuilder = () => {
     const selectIndex = selectCount;
     selectCount += 1;
@@ -245,41 +256,46 @@ function makeFakePostSendMarkMissDb() {
           if (updateIndex === 0) {
             return {
               returning() {
-                return Promise.resolve([{ id: 'cluster-1' }]);
+                return Promise.resolve(updateRowsByIndex[updateIndex] ?? []);
               },
             };
           }
-          if (updateIndex === 1) {
-            return {
-              returning() {
-                return Promise.resolve([]);
-              },
-            };
-          }
-          return Promise.resolve();
+          return {
+            returning() {
+              return Promise.resolve(updateRowsByIndex[updateIndex] ?? []);
+            },
+          };
         },
       };
     },
   };
 
   return {
+    get inTransaction() {
+      return inTransaction;
+    },
     updateSets,
     whereCalls,
     db: {
-      transaction<T>(
+      async transaction<T>(
         callback: (transaction: {
           select: () => ReturnType<typeof makeSelectBuilder>;
           update: () => typeof updateBuilder;
         }) => Promise<T>,
       ) {
-        return callback({
-          select() {
-            return makeSelectBuilder();
-          },
-          update() {
-            return updateBuilder;
-          },
-        });
+        inTransaction = true;
+        try {
+          return await callback({
+            select() {
+              return makeSelectBuilder();
+            },
+            update() {
+              return updateBuilder;
+            },
+          });
+        } finally {
+          inTransaction = false;
+        }
       },
     },
   };
@@ -405,6 +421,8 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(whereSql).toContain('crowd_report_cluster_stations');
     expect(whereSql).toContain('still_happening');
     expect(whereSql).toContain('count(distinct');
+    expect(whereSql).toContain('"crowd_report_clusters"."dispatched_at"');
+    expect(whereSql).toContain('"crowd_reports"."dispatch_error"');
   });
 
   it('requires single-report affected-area scope before applying the result limit', async () => {
@@ -421,6 +439,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
 
     expect(whereSql).toContain('crowd_report_lines');
     expect(whereSql).toContain('crowd_report_stations');
+    expect(whereSql).toContain('"crowd_reports"."dispatch_error"');
   });
 
   it('builds cluster dispatch payloads from ongoing reports only', async () => {
@@ -481,9 +500,8 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(clusterUpdateWhereSql).not.toContain('"crowd_reports"."id" not in');
     expect(clusterUpdateWhereSql).not.toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).toContain('"crowd_reports"."id" in');
-    expect(reportUpdateWhereSql).not.toContain(
-      '"crowd_reports"."cluster_id" =',
-    );
+    expect(reportUpdateWhereSql).toContain('"crowd_reports"."cluster_id" =');
+    expect(reportUpdateWhereSql).toContain('"crowd_reports"."dispatch_error"');
   });
 
   it('does not mark cluster payload reports when the cluster freshness update misses', async () => {
@@ -554,9 +572,6 @@ describe('getDispatchableCrowdReportCandidates', () => {
 
     const dialect = new PgDialect();
     const lockWhereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
-    const eligibilityWhereSql = dialect.sqlToQuery(
-      fake.whereCalls[1] as SQL,
-    ).sql;
 
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(lockWhereSql).toContain('"crowd_report_clusters"."id" =');
@@ -564,20 +579,23 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(lockWhereSql).toContain(
       '"crowd_report_clusters"."dispatched_at" is null',
     );
-    expect(eligibilityWhereSql).toContain('"still_happening" is true');
-    expect(eligibilityWhereSql).toContain('count(*)');
-    expect(eligibilityWhereSql).not.toContain('::int');
-    expect(eligibilityWhereSql).not.toContain('"crowd_reports"."id" not in');
-    expect(eligibilityWhereSql).not.toContain('"crowd_reports"."id" in');
+    expect(lockWhereSql).toContain('"still_happening" is true');
+    expect(lockWhereSql).toContain('count(*)');
+    expect(lockWhereSql).not.toContain('::int');
+    expect(lockWhereSql).not.toContain('"crowd_reports"."id" not in');
+    expect(lockWhereSql).not.toContain('"crowd_reports"."id" in');
   });
 
   it('reports a post-send stale local success mark as failed without closing the cluster', async () => {
     const fake = makeFakePostSendMarkMissDb();
-    const fetchImpl = vi.fn().mockResolvedValue(
-      new Response(null, {
-        status: 204,
-      }),
-    );
+    const fetchImpl = vi.fn().mockImplementation(() => {
+      expect(fake.inTransaction).toBe(false);
+      return Promise.resolve(
+        new Response(null, {
+          status: 204,
+        }),
+      );
+    });
 
     await expect(
       dispatchPendingCrowdReports(
@@ -626,8 +644,8 @@ describe('getDispatchableCrowdReportCandidates', () => {
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(fake.updateSets).toHaveLength(3);
-    expect(fake.updateSets[2]).toMatchObject({
+    expect(fake.updateSets).toHaveLength(5);
+    expect(fake.updateSets[4]).toMatchObject({
       dispatch_error:
         'Crowd report dispatch was sent, but local success marking became stale',
     });
