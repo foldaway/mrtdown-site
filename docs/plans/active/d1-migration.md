@@ -331,6 +331,25 @@ Exit criteria:
   the external `repository_dispatch` call, then marks success or failure in a
   separate transaction. Also replaced the public-holiday sync's raw
   `excluded.*` upsert fields with per-row bound update values.
+- 2026-06-27: Started Phase 7 cutover enablement by replacing the deploy
+  workflow D1 blockers with Wrangler D1 migration steps for preview, staging,
+  and production. Preview deploys now apply migrations before build/deploy and
+  then trigger the canonical pull workflow against the preview D1 database.
+- 2026-06-27: Hardened Phase 7 cutover workflows after review by injecting real
+  D1 database IDs from GitHub environment variables before remote Wrangler
+  commands, adding preview public-holiday sync before the preview canonical
+  pull, and blocking production deploy until `D1_CUTOVER_READY=true` confirms
+  site-local import, canonical pull, public-holiday sync, and route checks.
+- 2026-06-27: Extended the D1 cutover readiness gate to staging so staging
+  deploys cannot serve from a freshly migrated but unpopulated D1 database.
+- 2026-06-27: Moved the staging readiness gate after the staging migration job
+  so fresh D1 databases can still receive schema migrations before the Worker
+  deploy is blocked pending population and route checks.
+- 2026-06-27: Serialized the staging/production deploy workflow per branch so
+  migrations and Worker deploys cannot overlap across consecutive workflow runs.
+- 2026-06-28: Added a production build and Wrangler deploy dry-run preflight
+  before production D1 migrations so schema changes do not apply ahead of a
+  deployable Worker bundle.
 
 ## Decision Log
 
