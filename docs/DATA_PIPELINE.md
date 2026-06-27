@@ -1,6 +1,7 @@
 # Data Pipeline
 
-The overhaul introduces a local read model for canonical mrtdown data.
+The app stores its local canonical read model and site-local writable state in
+Cloudflare D1.
 
 ## Pull Workflow
 
@@ -51,4 +52,5 @@ Staging tables are named with a `_next` suffix. They are the durable handoff bet
 
 ## Live Reads
 
-Server functions call `app/util/db.queries.ts`, which reads normalized live tables and returns the source-owned shapes in `app/types.ts`.
+Server functions call `app/util/db.queries.ts`, which reads normalized live
+tables from D1 and returns the source-owned shapes in `app/types.ts`.

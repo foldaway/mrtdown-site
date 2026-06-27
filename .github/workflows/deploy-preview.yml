@@ -30,10 +30,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Block deploy until D1 migrations are configured
-        run: |
-          echo "::error::D1 runtime is configured, but D1 migrations are not wired yet. Keep this umbrella stack from deploying until the D1 schema/cutover phases replace this guard."
-          exit 1
+      - name: Inject preview D1 database ID
+        run: npm run cf:prepare-d1-config
+        env:
+          CLOUDFLARE_ENV: preview
+          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+
+      - name: Apply D1 migrations
+        run: npm run db:migrate -- --env preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Build
         run: npm run build
@@ -53,16 +60,44 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Run preview public holidays workflow
+        timeout-minutes: 15
+        run: |-
+          set -euo pipefail
+
+          instance_id="$(uuidgen)"
+          npx wrangler workflows trigger mrtdown-public-holidays-preview --env preview --id "$instance_id"
+
+          while true; do
+            output="$(npx wrangler workflows instances describe mrtdown-public-holidays-preview "$instance_id" --env preview --step-output=false)"
+            echo "$output"
+
+            status="$(echo "$output" | sed -n 's/^Status:[[:space:]]*//p')"
+            case "$status" in
+              *Completed*)
+                exit 0
+                ;;
+              *Errored*|*Terminated*)
+                exit 1
+                ;;
+            esac
+
+            sleep 30
+          done
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Run preview pull workflow
         timeout-minutes: 30
         run: |-
           set -euo pipefail
 
           instance_id="$(uuidgen)"
-          npx wrangler workflows trigger mrtdown-pull-preview --id "$instance_id"
+          npx wrangler workflows trigger mrtdown-pull-preview --env preview --id "$instance_id"
 
           while true; do
-            output="$(npx wrangler workflows instances describe mrtdown-pull-preview "$instance_id" --step-output=false)"
+            output="$(npx wrangler workflows instances describe mrtdown-pull-preview "$instance_id" --env preview --step-output=false)"
             echo "$output"
 
             status="$(echo "$output" | sed -n 's/^Status:[[:space:]]*//p')"
