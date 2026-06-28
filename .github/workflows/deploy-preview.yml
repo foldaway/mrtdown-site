@@ -116,6 +116,19 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Check preview D1 readiness
+        run: npm run d1:check-readiness -- preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_MIN_LINES: ${{ vars.D1_MIN_LINES }}
+          D1_MIN_STATIONS: ${{ vars.D1_MIN_STATIONS }}
+          D1_MIN_SERVICES: ${{ vars.D1_MIN_SERVICES }}
+          D1_MIN_SERVICE_REVISIONS: ${{ vars.D1_MIN_SERVICE_REVISIONS }}
+          D1_MIN_PUBLIC_HOLIDAYS: ${{ vars.D1_MIN_PUBLIC_HOLIDAYS }}
+          D1_MIN_LINE_DAY_FACTS: ${{ vars.D1_MIN_LINE_DAY_FACTS }}
+          D1_MIN_STATISTICS_SNAPSHOTS: ${{ vars.D1_MIN_STATISTICS_SNAPSHOTS }}
+
       - name: Check preview D1 routes
         run: npm run perf:routes -- "$DEPLOYMENT_URL"
         env:

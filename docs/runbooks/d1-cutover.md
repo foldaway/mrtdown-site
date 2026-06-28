@@ -8,6 +8,10 @@ database to Cloudflare D1. Canonical transit rows are rebuilt from
 
 - A production D1 database with all Wrangler migrations applied.
 - The production `D1_DATABASE_ID` GitHub environment variable.
+- Realistic production D1 readiness minimums in GitHub environment variables:
+  `D1_MIN_LINES`, `D1_MIN_STATIONS`, `D1_MIN_SERVICES`,
+  `D1_MIN_SERVICE_REVISIONS`, `D1_MIN_PUBLIC_HOLIDAYS`,
+  `D1_MIN_LINE_DAY_FACTS`, and `D1_MIN_STATISTICS_SNAPSHOTS`.
 - `D1_CUTOVER_READY=false` until every validation step below passes.
 - Temporary read access to the old Postgres database for no-import checks.
 - Cloudflare credentials for `wrangler d1 execute` validation queries.
@@ -56,14 +60,20 @@ one-off migration.
 9. Confirm D1 has rebuilt canonical/public state and has no pre-cutover
    crowd-report rows:
 
-    ```sh
-    npx wrangler d1 execute DB --env production --remote --command \
-      "select 'lines' as table_name, count(*) as rows from lines
-       union all select 'stations', count(*) from stations
-       union all select 'public_holidays', count(*) from public_holidays
-       union all select 'crowd_reports', count(*) from crowd_reports
-       union all select 'crowd_report_clusters', count(*) from crowd_report_clusters;"
-    ```
+   ```sh
+   D1_MIN_LINES="$D1_MIN_LINES" \
+   D1_MIN_STATIONS="$D1_MIN_STATIONS" \
+   D1_MIN_SERVICES="$D1_MIN_SERVICES" \
+   D1_MIN_SERVICE_REVISIONS="$D1_MIN_SERVICE_REVISIONS" \
+   D1_MIN_PUBLIC_HOLIDAYS="$D1_MIN_PUBLIC_HOLIDAYS" \
+   D1_MIN_LINE_DAY_FACTS="$D1_MIN_LINE_DAY_FACTS" \
+   D1_MIN_STATISTICS_SNAPSHOTS="$D1_MIN_STATISTICS_SNAPSHOTS" \
+     npm run d1:check-readiness -- production
+
+   npx wrangler d1 execute DB --env production --remote --command \
+     "select 'crowd_reports' as table_name, count(*) as rows from crowd_reports
+      union all select 'crowd_report_clusters', count(*) from crowd_report_clusters;"
+   ```
 
 10. Run route checks for `/`, `/statistics`, `/history`, representative line,
     station, operator, issue, Markdown, and sitemap routes.
