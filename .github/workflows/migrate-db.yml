@@ -40,6 +40,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Inject D1 database ID
+        run: npm run cf:prepare-d1-config
+        env:
+          CLOUDFLARE_ENV: ${{ inputs.environment }}
+          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+
+      - name: Build production preflight
+        if: inputs.environment == 'production'
+        run: npm run build
+        env:
+          # Used by the Cloudflare Vite plugin for wrangler env key https://developers.cloudflare.com/workers/vite-plugin/reference/cloudflare-environments/
+          CLOUDFLARE_ENV: production
+          GIT_SHA: ${{ github.sha }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_RELEASE: ${{ github.sha }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          TIER: production
+          VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY }}
+          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
+          VITE_ROOT_URL: "https://www.mrtdown.org"
+
+      - name: Validate production deploy bundle
+        if: inputs.environment == 'production'
+        run: npx wrangler deploy --env production --dry-run
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Run database migrations
         run: npm run db:migrate -- --env ${{ inputs.environment }}
         env:
