@@ -354,6 +354,11 @@ Exit criteria:
   direct `pg` dependencies after the D1 runtime and Wrangler migration commands
   became the only supported database entrypoints, and switched crowd-report SQL
   rendering tests to SQLite/D1 dialect coverage.
+- 2026-06-28: Started Phase 6 by documenting the production D1 cutover runbook
+  under `docs/runbooks` and simplifying the default cutover path to skip
+  Postgres site-local import while production crowd-report tables remain empty.
+  If crowd-report rows appear before the freeze, cutover should pause for a
+  one-off migration plan.
 
 ## Decision Log
 

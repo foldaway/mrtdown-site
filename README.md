@@ -115,6 +115,7 @@ See `docs/GENERATED_FILES.md` for more detail.
   mapping.
 - `docs/DATA_PIPELINE.md`: canonical data pull and read model flow.
 - `docs/QUALITY.md`: verification harness and current test gaps.
+- `docs/runbooks/`: operational procedures for deployments and recovery.
 - `docs/OVERHAUL_BASELINE.md`: historical baseline for the read-model
   migration.
 - `docs/plans/README.md`: conventions for checked-in execution plans.
