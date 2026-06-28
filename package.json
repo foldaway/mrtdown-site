@@ -16,6 +16,7 @@
     "format:check": "biome format .",
     "seo:check": "tsx app/scripts/checkSeo.ts",
     "perf:routes": "tsx app/scripts/checkRouteTimings.ts",
+    "d1:check-readiness": "tsx app/scripts/checkD1Readiness.ts",
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run db:generate:check && npm run test:run",
     "verify:strict": "npm run typecheck && npm run lint && npm run format:check && npm run db:generate:check && npm run test:run",
     "dev:pull": "curl -i -X POST http://localhost:3000/internal/api/tasks/pull",

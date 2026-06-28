@@ -90,6 +90,19 @@ jobs:
           CLOUDFLARE_ENV: staging
           D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
 
+      - name: Check staging D1 readiness
+        run: npm run d1:check-readiness -- staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_MIN_LINES: ${{ vars.D1_MIN_LINES }}
+          D1_MIN_STATIONS: ${{ vars.D1_MIN_STATIONS }}
+          D1_MIN_SERVICES: ${{ vars.D1_MIN_SERVICES }}
+          D1_MIN_SERVICE_REVISIONS: ${{ vars.D1_MIN_SERVICE_REVISIONS }}
+          D1_MIN_PUBLIC_HOLIDAYS: ${{ vars.D1_MIN_PUBLIC_HOLIDAYS }}
+          D1_MIN_LINE_DAY_FACTS: ${{ vars.D1_MIN_LINE_DAY_FACTS }}
+          D1_MIN_STATISTICS_SNAPSHOTS: ${{ vars.D1_MIN_STATISTICS_SNAPSHOTS }}
+
       - name: Build
         run: npm run build
         env:
@@ -221,6 +234,19 @@ jobs:
         env:
           CLOUDFLARE_ENV: production
           D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+
+      - name: Check production D1 readiness
+        run: npm run d1:check-readiness -- production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_MIN_LINES: ${{ vars.D1_MIN_LINES }}
+          D1_MIN_STATIONS: ${{ vars.D1_MIN_STATIONS }}
+          D1_MIN_SERVICES: ${{ vars.D1_MIN_SERVICES }}
+          D1_MIN_SERVICE_REVISIONS: ${{ vars.D1_MIN_SERVICE_REVISIONS }}
+          D1_MIN_PUBLIC_HOLIDAYS: ${{ vars.D1_MIN_PUBLIC_HOLIDAYS }}
+          D1_MIN_LINE_DAY_FACTS: ${{ vars.D1_MIN_LINE_DAY_FACTS }}
+          D1_MIN_STATISTICS_SNAPSHOTS: ${{ vars.D1_MIN_STATISTICS_SNAPSHOTS }}
 
       - name: Build
         run: npm run build

@@ -373,6 +373,12 @@ Exit criteria:
 - 2026-06-28: Extended D1 route smoke checks to staging and production deploys
   so the live Worker URL is probed after the readiness gate and deploy
   complete.
+- 2026-06-28: Added automated D1 readiness checks for preview, staging, and
+  production deploys. The check queries remote D1 table counts for canonical
+  rows, public holidays, line day facts, and statistics snapshots, prints
+  Wrangler D1 query metrics, requires environment-specific `D1_MIN_*`
+  thresholds, and fails deploy validation before route checks if the database
+  is still empty or underpopulated.
 
 ## Decision Log
 
