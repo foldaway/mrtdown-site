@@ -381,6 +381,9 @@ Exit criteria:
 - 2026-06-29: Removed the D1 Wrangler config injection helper and workflow
   steps after deciding the real environment D1 database IDs will be filled into
   `wrangler.jsonc` before merging the cutover branch.
+- 2026-06-29: Hardened the D1 route smoke checker so successful route probes
+  must return the expected HTML, Markdown/plain-text, or XML content type
+  instead of only checking status codes and non-empty response bodies.
 
 ## Decision Log
 
