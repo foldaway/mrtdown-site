@@ -366,6 +366,10 @@ Exit criteria:
   running Wrangler, and production manual migrations use the same build and
   Wrangler dry-run preflight as the production deploy workflow before applying
   remote schema changes.
+- 2026-06-28: Added a preview D1 route smoke check after public-holiday sync
+  and canonical pull workflow completion. The repeatable route timing script
+  now covers representative public HTML, Markdown, and sitemap routes and fails
+  CI when a probe returns an unexpected status or an empty successful body.
 
 ## Decision Log
 
