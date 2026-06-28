@@ -361,6 +361,11 @@ Exit criteria:
   Canonical rows are rebuilt from `mrtdown-data`, public holidays are refreshed
   by the D1 workflow, and old Postgres crowd-report tables must be confirmed
   empty or explicitly dispositioned before `D1_CUTOVER_READY=true`.
+- 2026-06-28: Hardened the manual D1 migration workflow so staging and
+  production migrations inject the real environment D1 database ID before
+  running Wrangler, and production manual migrations use the same build and
+  Wrangler dry-run preflight as the production deploy workflow before applying
+  remote schema changes.
 
 ## Decision Log
 
