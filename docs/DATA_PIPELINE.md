@@ -46,6 +46,16 @@ The existing six-hourly scheduled cron also invokes the same dispatch path when
 `CROWD_REPORT_DISPATCH_LIMIT` to tune the maximum number of dispatch candidates
 processed per scheduled run.
 
+## Site-Local Cutover
+
+Production D1 cutover normally does not import site-local state from Postgres:
+production currently has no crowd reports, and public holidays are refreshed
+from data.gov.sg by the public-holiday workflow. If crowd-report rows appear
+before the production freeze, pause cutover and prepare a one-off migration plan
+for those rows. The canonical pull must run before any such import because
+crowd-report line and station joins reference the canonical `lines` and
+`stations` tables. See `docs/runbooks/d1-cutover.md`.
+
 ## Staging Tables
 
 Staging tables are named with a `_next` suffix. They are the durable handoff between workflow steps and avoid returning large parsed payloads between Cloudflare Workflow steps.
