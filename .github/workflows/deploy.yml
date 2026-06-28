@@ -113,6 +113,13 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Check staging D1 routes
+        run: npm run perf:routes -- "$DEPLOYMENT_URL"
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+          PROBES: all
+          SAMPLES: 1
+
       - name: Print deployment URL
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
@@ -238,3 +245,10 @@ jobs:
           command: deploy --env production
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Check production D1 routes
+        run: npm run perf:routes -- "$DEPLOYMENT_URL"
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+          PROBES: all
+          SAMPLES: 1

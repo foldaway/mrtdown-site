@@ -370,6 +370,9 @@ Exit criteria:
   and canonical pull workflow completion. The repeatable route timing script
   now covers representative public HTML, Markdown, and sitemap routes and fails
   CI when a probe returns an unexpected status or an empty successful body.
+- 2026-06-28: Extended D1 route smoke checks to staging and production deploys
+  so the live Worker URL is probed after the readiness gate and deploy
+  complete.
 
 ## Decision Log
 
