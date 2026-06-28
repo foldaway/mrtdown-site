@@ -1,6 +1,6 @@
 import { IngestPayloadSchema } from '@mrtdown/ingest-contracts';
 import type { SQL } from 'drizzle-orm';
-import { PgDialect } from 'drizzle-orm/pg-core';
+import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildCrowdReportIngestPayload,
@@ -414,7 +414,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
       rootUrl: 'https://mrtdown.example',
     });
 
-    const dialect = new PgDialect();
+    const dialect = new SQLiteSyncDialect();
     const whereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
 
     expect(whereSql).toContain('crowd_report_cluster_lines');
@@ -434,7 +434,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
       rootUrl: 'https://mrtdown.example',
     });
 
-    const dialect = new PgDialect();
+    const dialect = new SQLiteSyncDialect();
     const whereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
 
     expect(whereSql).toContain('crowd_report_lines');
@@ -451,7 +451,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
       rootUrl: 'https://mrtdown.example',
     });
 
-    const dialect = new PgDialect();
+    const dialect = new SQLiteSyncDialect();
     const reportRowsWhereSql = dialect.sqlToQuery(
       fake.whereCalls[3] as SQL,
     ).sql;
@@ -486,7 +486,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
       '2026-05-24T04:45:00.000Z',
     );
 
-    const dialect = new PgDialect();
+    const dialect = new SQLiteSyncDialect();
     const clusterUpdateWhereSql = dialect.sqlToQuery(
       fake.whereCalls[1] as SQL,
     ).sql;
@@ -570,7 +570,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
       fetchImpl,
     );
 
-    const dialect = new PgDialect();
+    const dialect = new SQLiteSyncDialect();
     const lockWhereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
 
     expect(fetchImpl).not.toHaveBeenCalled();
