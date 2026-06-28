@@ -18,6 +18,10 @@ import { DateTime } from 'luxon';
 import { z } from 'zod';
 import type { AppDb } from '~/db';
 import {
+  type AppDbStatementRunner,
+  runDbOrderedStatements,
+} from '~/db/orderedStatements';
+import {
   crowdReportAbuseEventsTable,
   crowdReportClusterLinesTable,
   crowdReportClustersTable,
@@ -113,9 +117,7 @@ export type CrowdReportJsonBodyResult =
   | { success: true; body: unknown }
   | { success: false; status: 400 | 413; error: string };
 
-type CrowdReportTransaction = Parameters<
-  Parameters<AppDb['transaction']>[0]
->[0];
+type CrowdReportTransaction = AppDbStatementRunner;
 type CrowdReportReadableDb = Pick<CrowdReportTransaction, 'select'>;
 
 type PersistCrowdReportOptions = {
@@ -1193,7 +1195,7 @@ export async function automoderateCrowdReport(
     options.duplicateWindowMinutes ?? DEFAULT_DUPLICATE_WINDOW_MINUTES;
   const now = options.now ?? DateTime.now().setZone(SG_TIMEZONE);
 
-  return db.transaction((tx) =>
+  return runDbOrderedStatements(db, (tx) =>
     automoderateCrowdReportInTransaction(
       tx,
       reportId,
@@ -1555,7 +1557,7 @@ export async function persistCrowdReport(
   const idFactory = options.idFactory ?? (() => crypto.randomUUID());
   const reportId = idFactory();
 
-  return db.transaction((tx) =>
+  return runDbOrderedStatements(db, (tx) =>
     persistCrowdReportInTransaction(tx, submission, abuseContext, {
       rateLimitPerHour: limit,
       idFactory,
@@ -1581,7 +1583,7 @@ export async function persistAutomoderatedCrowdReport(
   const idFactory = options.idFactory ?? (() => crypto.randomUUID());
   const reportId = idFactory();
 
-  return db.transaction(async (tx) => {
+  return runDbOrderedStatements(db, async (tx) => {
     const report = await persistCrowdReportInTransaction(
       tx,
       submission,

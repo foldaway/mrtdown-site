@@ -30,6 +30,10 @@ import {
 } from 'drizzle-orm';
 import type { AppDb } from '../../../db/index.js';
 import {
+  type AppDbStatementRunner,
+  runDbOrderedStatements,
+} from '../../../db/orderedStatements.js';
+import {
   evidencesTable,
   impactEventBasisEvidencesTable,
   impactEventCausesTable,
@@ -80,7 +84,7 @@ const DELETE_BATCH = 50;
 
 type Db = AppDb;
 type DeleteDb = Pick<AppDb, 'delete'>;
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+type Tx = AppDbStatementRunner;
 type ServiceRevision = Service['revisions'][number];
 
 function serviceRevisionEndAt(revision: ServiceRevision): string | null {
@@ -368,9 +372,7 @@ function uniqueBy<T>(rows: T[], keyForRow: (row: T) => string): T[] {
 }
 
 /** Hash diff staging vs live; upsert changed rows. */
-async function upsertChangedOperators(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function upsertChangedOperators(tx: Tx): Promise<void> {
   const rows = await tx
     .select({
       id: operatorsNextTable.id,
@@ -379,7 +381,6 @@ async function upsertChangedOperators(
     })
     .from(operatorsNextTable)
     .leftJoin(operatorsTable, eq(operatorsNextTable.id, operatorsTable.id));
-
   const toUpsert = rows.filter(
     (r) => r.liveHash == null || r.liveHash !== r.nextHash,
   );
@@ -416,9 +417,7 @@ async function upsertChangedOperators(
   }
 }
 
-async function deleteOrphanOperators(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function deleteOrphanOperators(tx: Tx): Promise<void> {
   await tx
     .delete(lineOperatorsTable)
     .where(
@@ -442,9 +441,7 @@ async function deleteOrphanOperators(
 }
 
 /** @see upsertChangedOperators */
-async function upsertChangedTowns(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function upsertChangedTowns(tx: Tx): Promise<void> {
   const rows = await tx
     .select({
       id: townsNextTable.id,
@@ -481,9 +478,7 @@ async function upsertChangedTowns(
   }
 }
 
-async function deleteOrphanTowns(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function deleteOrphanTowns(tx: Tx): Promise<void> {
   await tx
     .delete(townsTable)
     .where(
@@ -497,9 +492,7 @@ async function deleteOrphanTowns(
 }
 
 /** @see upsertChangedOperators */
-async function upsertChangedLandmarks(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function upsertChangedLandmarks(tx: Tx): Promise<void> {
   const rows = await tx
     .select({
       id: landmarksNextTable.id,
@@ -536,9 +529,7 @@ async function upsertChangedLandmarks(
   }
 }
 
-async function deleteOrphanLandmarks(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function deleteOrphanLandmarks(tx: Tx): Promise<void> {
   await tx
     .delete(stationLandmarksTable)
     .where(
@@ -565,7 +556,7 @@ async function deleteOrphanLandmarks(
 export async function syncOperatorsTownsLandmarksUpserts(
   db: Db,
 ): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     await upsertChangedOperators(tx);
     await upsertChangedTowns(tx);
     await upsertChangedLandmarks(tx);
@@ -576,7 +567,7 @@ export async function syncOperatorsTownsLandmarksUpserts(
 export async function deleteOperatorsTownsLandmarksOrphans(
   db: Db,
 ): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     await deleteOrphanOperators(tx);
     await deleteOrphanTowns(tx);
     await deleteOrphanLandmarks(tx);
@@ -594,7 +585,7 @@ export async function syncOperatorsTownsLandmarks(db: Db): Promise<void> {
  * line ids. Orphan deletes run later after services/stations/issues are reconciled.
  */
 export async function syncLines(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     const rows = await tx
       .select({
         id: linesNextTable.id,
@@ -664,7 +655,7 @@ export async function syncLines(db: Db): Promise<void> {
 }
 
 export async function deleteLineOrphans(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     await tx
       .delete(lineOperatorsTable)
       .where(
@@ -739,7 +730,7 @@ export async function deleteLineOrphans(db: Db): Promise<void> {
  * child rows are removed and reinserted from staging JSON.
  */
 export async function syncStations(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     const rows = await tx
       .select({
         id: stationsNextTable.id,
@@ -818,7 +809,7 @@ export async function syncStations(db: Db): Promise<void> {
 }
 
 export async function deleteStationOrphans(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     await tx
       .delete(stationCodesTable)
       .where(
@@ -935,7 +926,7 @@ export async function deleteStationOrphans(db: Db): Promise<void> {
  * get revisions/path wiped before reinsert (FK order: path entries → revisions → line_services).
  */
 export async function syncServices(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     const rows = await tx
       .select({
         id: servicesNextTable.id,
@@ -1109,7 +1100,7 @@ export async function syncServices(db: Db): Promise<void> {
 }
 
 export async function deleteServiceOrphans(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     await tx
       .delete(impactEventEntityServicesTable)
       .where(
@@ -1682,7 +1673,9 @@ export async function syncChangedIssuesBatch(
   db: Db,
   limit = BATCH,
 ): Promise<number> {
-  return db.transaction((tx) => syncChangedIssuesBatchTx(tx, limit));
+  return runDbOrderedStatements(db, (tx) =>
+    syncChangedIssuesBatchTx(tx, limit),
+  );
 }
 
 async function syncChangedIssuesBatchTx(
@@ -1712,7 +1705,9 @@ export async function deleteOrphanIssuesBatch(
   db: Db,
   limit = BATCH,
 ): Promise<number> {
-  return db.transaction((tx) => deleteOrphanIssuesBatchTx(tx, limit));
+  return runDbOrderedStatements(db, (tx) =>
+    deleteOrphanIssuesBatchTx(tx, limit),
+  );
 }
 
 async function deleteOrphanIssuesBatchTx(
@@ -1750,9 +1745,9 @@ export async function syncIssues(db: Db): Promise<void> {
   }
 }
 
-/** Clears staging tables and records `manifest_last_pulled_at` in one transaction. */
+/** Clears staging tables and records `manifest_last_pulled_at`. */
 export async function finalizePull(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     await deleteStagingTables(tx);
     await tx
       .insert(metadataTable)

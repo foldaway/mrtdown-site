@@ -8,6 +8,10 @@ import { and, desc, eq, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import type { AppDb } from '~/db';
 import {
+  type AppDbStatementRunner,
+  runDbOrderedStatements,
+} from '~/db/orderedStatements';
+import {
   crowdReportAbuseEventsTable,
   crowdReportClusterLinesTable,
   crowdReportClustersTable,
@@ -31,9 +35,7 @@ const DISPATCH_LOCK_ERROR = 'Dispatch in progress';
 const STALE_DISPATCH_SUCCESS_ERROR =
   'Crowd report dispatch was sent, but local success marking became stale';
 
-type CrowdReportTransaction = Parameters<
-  Parameters<AppDb['transaction']>[0]
->[0];
+type CrowdReportTransaction = AppDbStatementRunner;
 
 export type CrowdReportDispatchKind = 'cluster' | 'report';
 
@@ -570,7 +572,7 @@ export async function markCrowdReportDispatchSuccess(
   candidate: CrowdReportDispatchCandidate,
   dispatchedAt = DateTime.now().toUTC().toISO() ?? new Date().toISOString(),
 ) {
-  return db.transaction((tx) =>
+  return runDbOrderedStatements(db, (tx) =>
     markCrowdReportDispatchSuccessInTransaction(tx, candidate, dispatchedAt),
   );
 }
@@ -581,7 +583,7 @@ export async function markCrowdReportDispatchFailure(
   error: unknown,
 ) {
   const message = error instanceof Error ? error.message : String(error);
-  await db.transaction((tx) =>
+  await runDbOrderedStatements(db, (tx) =>
     markCrowdReportDispatchFailureInTransaction(tx, candidate, message),
   );
 }
@@ -876,7 +878,7 @@ async function tryAcquireCrowdReportDispatchLock(
   db: AppDb,
   candidate: CrowdReportDispatchCandidate,
 ) {
-  return db.transaction((tx) =>
+  return runDbOrderedStatements(db, (tx) =>
     tryAcquireCrowdReportDispatchLockInTransaction(tx, candidate),
   );
 }

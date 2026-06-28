@@ -74,7 +74,6 @@ function makeFakeDb(
   const conflictUpdates: unknown[] = [];
   const updates: Array<{ table: unknown; values: unknown }> = [];
   const executes: unknown[] = [];
-  let transactions = 0;
   const nextSelectResult = () => selectResults.shift() ?? [];
   const selectBuilder = {
     from() {
@@ -157,15 +156,7 @@ function makeFakeDb(
     conflictUpdates,
     updates,
     executes,
-    get transactions() {
-      return transactions;
-    },
-    db: {
-      transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
-        transactions += 1;
-        return callback(tx);
-      },
-    },
+    db: tx,
   };
 }
 
@@ -245,11 +236,7 @@ function makeFakeAutomoderationDb(
     inserts,
     updates,
     executes,
-    db: {
-      transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
-        return callback(tx);
-      },
-    },
+    db: tx,
   };
 }
 
@@ -1204,7 +1191,7 @@ describe('persistCrowdReport', () => {
 });
 
 describe('persistAutomoderatedCrowdReport', () => {
-  it('persists and automoderates a report in one transaction', async () => {
+  it('persists and automoderates a report in one ordered write sequence', async () => {
     const fake = makeFakeDb(1, [[]], {
       id: 'fixed-id',
       status: 'accepted',
@@ -1231,7 +1218,6 @@ describe('persistAutomoderatedCrowdReport', () => {
       duplicateOfId: null,
     });
 
-    expect(fake.transactions).toBe(1);
     expect(fake.inserts.map((insert) => insert.table)).toEqual([
       crowdReportRateLimitsTable,
       crowdReportsTable,

@@ -8,6 +8,7 @@ import {
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import type { AppDb } from '~/db';
+import { runDbOrderedStatements } from '~/db/orderedStatements';
 import {
   evidencesTable,
   impactEventCausesTable,
@@ -3161,7 +3162,7 @@ async function replaceOperationalFactRows(
   const issueRows = rowsByDate.flatMap((rows) => rows.issueRows);
   const lineRows = rowsByDate.flatMap((rows) => rows.lineRows);
 
-  await database.transaction(async (tx) => {
+  await runDbOrderedStatements(database, async (tx) => {
     for (const batch of chunk(dates, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
       if (batch.length === 0) {
         continue;
