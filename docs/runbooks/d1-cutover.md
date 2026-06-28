@@ -2,22 +2,28 @@
 
 This runbook covers the production switch from the old Postgres/Hyperdrive
 database to Cloudflare D1. Canonical transit rows are rebuilt from
-`mrtdown-data`.
-
-As of the D1 migration work, production has no crowd-report rows. The default
-cutover path therefore does not import Postgres site-local state. Public
-holidays are refreshed from data.gov.sg by the D1 public-holiday workflow.
-
-If crowd-report rows appear before the production freeze, pause cutover and
-prepare a one-off migration plan for those rows.
+`mrtdown-data`. The cutover does not import rows from Postgres.
 
 ## Inputs
 
-- A deployed D1 database with all Wrangler migrations applied.
+- A production D1 database with all Wrangler migrations applied.
 - The production `D1_DATABASE_ID` GitHub environment variable.
 - `D1_CUTOVER_READY=false` until every validation step below passes.
+- Temporary read access to the old Postgres database for no-import checks.
+- Cloudflare credentials for `wrangler d1 execute` validation queries.
 
-## Default Production Sequence
+## No-Import Policy
+
+Do not copy canonical or site-local rows from Postgres into D1 during cutover.
+Canonical transit rows are rebuilt from `mrtdown-data`; public holidays are
+refreshed from data.gov.sg by the public-holiday workflow.
+
+During the production freeze, confirm old Postgres crowd-report tables are
+empty. If any rows exist, pause cutover and decide whether those reports can be
+discarded, manually recreated through the D1-backed UI, or handled by a separate
+one-off migration.
+
+## Production Sequence
 
 1. Keep `D1_CUTOVER_READY=false`.
 2. Apply production D1 migrations through the deploy workflow preflight.
@@ -30,15 +36,38 @@ prepare a one-off migration plan for those rows.
    ```sql
    select count(*) as crowd_reports from crowd_reports;
    select count(*) as crowd_report_clusters from crowd_report_clusters;
+   select count(*) as crowd_report_cluster_lines from crowd_report_cluster_lines;
+   select count(*) as crowd_report_cluster_stations from crowd_report_cluster_stations;
+   select count(*) as crowd_report_lines from crowd_report_lines;
+   select count(*) as crowd_report_stations from crowd_report_stations;
    select count(*) as crowd_report_moderation_events from crowd_report_moderation_events;
    select count(*) as crowd_report_rate_limits from crowd_report_rate_limits;
    select count(*) as crowd_report_abuse_events from crowd_report_abuse_events;
    ```
 
-8. If every count is zero, skip Postgres site-local import.
-9. Run route checks for `/`, `/statistics`, `/history`, representative line,
-   station, operator, issue, Markdown, and sitemap routes.
-10. Run a crowd-report dispatch dry run:
+8. Inject the real production D1 database ID into the local Wrangler config:
+
+   ```sh
+   CLOUDFLARE_ENV=production \
+   D1_DATABASE_ID="$D1_DATABASE_ID" \
+   npm run cf:prepare-d1-config
+   ```
+
+9. Confirm D1 has rebuilt canonical/public state and has no pre-cutover
+   crowd-report rows:
+
+    ```sh
+    npx wrangler d1 execute DB --env production --remote --command \
+      "select 'lines' as table_name, count(*) as rows from lines
+       union all select 'stations', count(*) from stations
+       union all select 'public_holidays', count(*) from public_holidays
+       union all select 'crowd_reports', count(*) from crowd_reports
+       union all select 'crowd_report_clusters', count(*) from crowd_report_clusters;"
+    ```
+
+10. Run route checks for `/`, `/statistics`, `/history`, representative line,
+    station, operator, issue, Markdown, and sitemap routes.
+11. Run a crowd-report dispatch dry run:
 
     ```sh
     curl -X POST "$VITE_ROOT_URL/internal/api/tasks/crowd-report-dispatch" \
@@ -46,8 +75,9 @@ prepare a one-off migration plan for those rows.
       --data '{"dryRun":true}'
     ```
 
-11. Set `D1_CUTOVER_READY=true` only after row-count and route validation pass.
-12. Run the production deploy.
+12. Set `D1_CUTOVER_READY=true` only after no-import checks, route validation,
+    and dispatch dry run pass.
+13. Run the production deploy.
 
 ## Recovery
 

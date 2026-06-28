@@ -143,7 +143,7 @@ Stacked branches:
    - Base: previous stack branch.
    - PR title: `chore: cut over production data store to D1`
    - Scope: Wrangler bindings, deployment configuration, migration runbook,
-     export/import scripts for site-local state, and revert notes.
+     no-import site-local checks, and revert notes.
 
 Each stacked PR should update this plan's progress log. Rebase stacked branches
 forward after review changes so the final history reads as a deliberate
@@ -260,22 +260,23 @@ Exit criteria:
 
 ### Phase 6: Site-Local State Migration
 
-- Export site-local mutable tables from Postgres:
-  - public holidays;
-  - crowd report tables;
-  - moderation events;
-  - rate limits and abuse events if they are still operationally useful;
-  - dispatch status and dispatch payload/error fields.
-- Import into D1 with foreign-key-safe ordering.
+- Do not import rows from Postgres during cutover.
+- Rebuild public holidays through the D1 public-holiday workflow.
+- Confirm old Postgres crowd-report tables are empty during the production
+  freeze before enabling D1 traffic.
+- If crowd-report rows exist before cutover, pause and decide whether they can
+  be discarded, manually recreated through the D1-backed UI, or handled by a
+  separate one-off migration.
 - Rebuild canonical tables from `mrtdown-data` instead of importing them from
   Postgres.
-- Run consistency checks after import.
+- Run consistency checks after the canonical pull and public-holiday sync.
 
 Exit criteria:
 
-- D1 contains all required site-local state.
-- Canonical and derived rows can be rebuilt from the archive after import.
-- A revert/import recovery path is documented.
+- D1 contains rebuilt canonical rows and refreshed public holidays.
+- The no-import decision for old crowd-report state is explicitly validated.
+- Canonical and derived rows can be rebuilt from the archive.
+- A revert recovery path is documented.
 
 ### Phase 7: Preview And Cutover
 
@@ -285,7 +286,8 @@ Exit criteria:
 - Compare route data and timings against the Postgres-backed environment.
 - Cut production bindings to D1 only after preview has passed.
 - Keep the production cutover small: merge the stack, apply D1 migrations,
-  import site-local state, run the canonical pull, then deploy D1 bindings.
+  run the canonical pull and public-holiday sync, validate no-import
+  site-local checks, then deploy D1 bindings.
 - Document how to revert the stack and restore the previous Postgres-backed
   deployment if cutover fails.
 
@@ -339,7 +341,8 @@ Exit criteria:
   D1 database IDs from GitHub environment variables before remote Wrangler
   commands, adding preview public-holiday sync before the preview canonical
   pull, and blocking production deploy until `D1_CUTOVER_READY=true` confirms
-  site-local import, canonical pull, public-holiday sync, and route checks.
+  no-import site-local checks, canonical pull, public-holiday sync, and route
+  checks.
 - 2026-06-27: Extended the D1 cutover readiness gate to staging so staging
   deploys cannot serve from a freshly migrated but unpopulated D1 database.
 - 2026-06-27: Moved the staging readiness gate after the staging migration job
@@ -354,11 +357,10 @@ Exit criteria:
   direct `pg` dependencies after the D1 runtime and Wrangler migration commands
   became the only supported database entrypoints, and switched crowd-report SQL
   rendering tests to SQLite/D1 dialect coverage.
-- 2026-06-28: Started Phase 6 by documenting the production D1 cutover runbook
-  under `docs/runbooks` and simplifying the default cutover path to skip
-  Postgres site-local import while production crowd-report tables remain empty.
-  If crowd-report rows appear before the freeze, cutover should pause for a
-  one-off migration plan.
+- 2026-06-28: Refined Phase 6 to avoid Postgres row imports during cutover.
+  Canonical rows are rebuilt from `mrtdown-data`, public holidays are refreshed
+  by the D1 workflow, and old Postgres crowd-report tables must be confirmed
+  empty or explicitly dispositioned before `D1_CUTOVER_READY=true`.
 
 ## Decision Log
 
