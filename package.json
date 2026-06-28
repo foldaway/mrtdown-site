@@ -29,7 +29,6 @@
     "db:migrate": "wrangler d1 migrations apply DB --remote",
     "db:preview:prepare": "npm run db:migrate:local",
     "db:studio": "drizzle-kit studio",
-    "cf:prepare-d1-config": "tsx app/scripts/prepareD1Config.ts",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {

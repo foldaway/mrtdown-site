@@ -37,12 +37,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Inject staging D1 database ID
-        run: npm run cf:prepare-d1-config
-        env:
-          CLOUDFLARE_ENV: staging
-          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
-
       - name: Apply D1 migrations
         run: npm run db:migrate -- --env staging
         env:
@@ -83,12 +77,6 @@ jobs:
           fi
         env:
           D1_CUTOVER_READY: ${{ vars.D1_CUTOVER_READY }}
-
-      - name: Inject staging D1 database ID
-        run: npm run cf:prepare-d1-config
-        env:
-          CLOUDFLARE_ENV: staging
-          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
 
       - name: Check staging D1 readiness
         run: npm run d1:check-readiness -- staging
@@ -160,12 +148,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Inject production D1 database ID
-        run: npm run cf:prepare-d1-config
-        env:
-          CLOUDFLARE_ENV: production
-          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
-
       - name: Build production preflight
         run: npm run build
         env:
@@ -228,12 +210,6 @@ jobs:
           fi
         env:
           D1_CUTOVER_READY: ${{ vars.D1_CUTOVER_READY }}
-
-      - name: Inject production D1 database ID
-        run: npm run cf:prepare-d1-config
-        env:
-          CLOUDFLARE_ENV: production
-          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
 
       - name: Check production D1 readiness
         run: npm run d1:check-readiness -- production

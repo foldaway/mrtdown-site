@@ -34,9 +34,8 @@ Deploy workflows are branch-driven and map branches to environments as follows:
 This mapping is intentional so environment state is tied to a single long-lived branch rather than per-PR preview deploys.
 
 Each deployed environment applies pending D1 migrations before the Worker is
-deployed. CI keeps placeholder D1 IDs in the checked-in Wrangler config and
-injects the real environment ID from the `D1_DATABASE_ID` GitHub environment
-variable before remote Wrangler commands run.
+deployed. The cutover branch must have the real environment D1 database IDs in
+the checked-in Wrangler config before it is merged or deployed.
 
 The preview workflow also triggers the public-holidays workflow and then the
 canonical pull workflow after deployment so the preview D1 read model can be

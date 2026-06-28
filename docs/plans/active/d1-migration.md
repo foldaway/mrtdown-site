@@ -337,12 +337,10 @@ Exit criteria:
   workflow D1 blockers with Wrangler D1 migration steps for preview, staging,
   and production. Preview deploys now apply migrations before build/deploy and
   then trigger the canonical pull workflow against the preview D1 database.
-- 2026-06-27: Hardened Phase 7 cutover workflows after review by injecting real
-  D1 database IDs from GitHub environment variables before remote Wrangler
-  commands, adding preview public-holiday sync before the preview canonical
-  pull, and blocking production deploy until `D1_CUTOVER_READY=true` confirms
-  no-import site-local checks, canonical pull, public-holiday sync, and route
-  checks.
+- 2026-06-27: Hardened Phase 7 cutover workflows after review by adding preview
+  public-holiday sync before the preview canonical pull, and blocking
+  production deploy until `D1_CUTOVER_READY=true` confirms no-import site-local
+  checks, canonical pull, public-holiday sync, and route checks.
 - 2026-06-27: Extended the D1 cutover readiness gate to staging so staging
   deploys cannot serve from a freshly migrated but unpopulated D1 database.
 - 2026-06-27: Moved the staging readiness gate after the staging migration job
@@ -361,11 +359,9 @@ Exit criteria:
   Canonical rows are rebuilt from `mrtdown-data`, public holidays are refreshed
   by the D1 workflow, and old Postgres crowd-report tables must be confirmed
   empty or explicitly dispositioned before `D1_CUTOVER_READY=true`.
-- 2026-06-28: Hardened the manual D1 migration workflow so staging and
-  production migrations inject the real environment D1 database ID before
-  running Wrangler, and production manual migrations use the same build and
-  Wrangler dry-run preflight as the production deploy workflow before applying
-  remote schema changes.
+- 2026-06-28: Hardened the manual D1 migration workflow so production manual
+  migrations use the same build and Wrangler dry-run preflight as the
+  production deploy workflow before applying remote schema changes.
 - 2026-06-28: Added a preview D1 route smoke check after public-holiday sync
   and canonical pull workflow completion. The repeatable route timing script
   now covers representative public HTML, Markdown, and sitemap routes and fails
@@ -382,6 +378,9 @@ Exit criteria:
 - 2026-06-29: Tightened the D1 ordered-statement helper type so callers no
   longer derive the runner shape from Drizzle's interactive `transaction`
   callback API.
+- 2026-06-29: Removed the D1 Wrangler config injection helper and workflow
+  steps after deciding the real environment D1 database IDs will be filled into
+  `wrangler.jsonc` before merging the cutover branch.
 
 ## Decision Log
 

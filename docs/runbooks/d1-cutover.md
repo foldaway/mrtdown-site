@@ -7,7 +7,8 @@ database to Cloudflare D1. Canonical transit rows are rebuilt from
 ## Inputs
 
 - A production D1 database with all Wrangler migrations applied.
-- The production `D1_DATABASE_ID` GitHub environment variable.
+- The production D1 database ID filled into the production `DB` binding in
+  `wrangler.jsonc` before merging the cutover branch.
 - Realistic production D1 readiness minimums in GitHub environment variables:
   `D1_MIN_LINES`, `D1_MIN_STATIONS`, `D1_MIN_SERVICES`,
   `D1_MIN_SERVICE_REVISIONS`, `D1_MIN_PUBLIC_HOLIDAYS`,
@@ -30,12 +31,14 @@ one-off migration.
 ## Production Sequence
 
 1. Keep `D1_CUTOVER_READY=false`.
-2. Apply production D1 migrations through the deploy workflow preflight.
-3. Deploy or invoke the D1-backed Worker in the isolated cutover environment.
-4. Trigger the canonical pull workflow and wait for it to complete.
-5. Trigger the public-holiday workflow and wait for it to complete.
-6. Confirm canonical `lines` and `stations` exist in D1.
-7. Confirm the old Postgres crowd-report tables are empty:
+2. Confirm the checked-in production Wrangler config points at the intended D1
+   database ID.
+3. Apply production D1 migrations through the deploy workflow preflight.
+4. Deploy or invoke the D1-backed Worker in the isolated cutover environment.
+5. Trigger the canonical pull workflow and wait for it to complete.
+6. Trigger the public-holiday workflow and wait for it to complete.
+7. Confirm canonical `lines` and `stations` exist in D1.
+8. Confirm the old Postgres crowd-report tables are empty:
 
    ```sql
    select count(*) as crowd_reports from crowd_reports;
@@ -47,14 +50,6 @@ one-off migration.
    select count(*) as crowd_report_moderation_events from crowd_report_moderation_events;
    select count(*) as crowd_report_rate_limits from crowd_report_rate_limits;
    select count(*) as crowd_report_abuse_events from crowd_report_abuse_events;
-   ```
-
-8. Inject the real production D1 database ID into the local Wrangler config:
-
-   ```sh
-   CLOUDFLARE_ENV=production \
-   D1_DATABASE_ID="$D1_DATABASE_ID" \
-   npm run cf:prepare-d1-config
    ```
 
 9. Confirm D1 has rebuilt canonical/public state and has no pre-cutover

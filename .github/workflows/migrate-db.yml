@@ -40,12 +40,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Inject D1 database ID
-        run: npm run cf:prepare-d1-config
-        env:
-          CLOUDFLARE_ENV: ${{ inputs.environment }}
-          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
-
       - name: Build production preflight
         if: inputs.environment == 'production'
         run: npm run build
