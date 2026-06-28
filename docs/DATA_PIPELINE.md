@@ -48,13 +48,13 @@ processed per scheduled run.
 
 ## Site-Local Cutover
 
-Production D1 cutover normally does not import site-local state from Postgres:
-production currently has no crowd reports, and public holidays are refreshed
-from data.gov.sg by the public-holiday workflow. If crowd-report rows appear
-before the production freeze, pause cutover and prepare a one-off migration plan
-for those rows. The canonical pull must run before any such import because
-crowd-report line and station joins reference the canonical `lines` and
-`stations` tables. See `docs/runbooks/d1-cutover.md`.
+D1 cutover does not import rows from Postgres. Canonical transit rows are
+rebuilt from `mrtdown-data`, and public holidays are refreshed through the
+public-holiday workflow. During the production freeze, confirm the old Postgres
+crowd-report tables are empty before enabling D1 traffic. If they are not empty,
+pause cutover and decide whether those reports can be discarded, manually
+recreated through the D1-backed UI, or handled by a separate one-off migration.
+See `docs/runbooks/d1-cutover.md`.
 
 ## Staging Tables
 

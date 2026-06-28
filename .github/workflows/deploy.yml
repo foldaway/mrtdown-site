@@ -203,7 +203,7 @@ jobs:
           set -euo pipefail
 
           if [ "${D1_CUTOVER_READY}" != "true" ]; then
-            echo "::error::Set the production D1_CUTOVER_READY environment variable to true only after site-local state has been imported, the canonical pull has completed, public holidays have synced, and route checks have passed against the production D1 database."
+            echo "::error::Set the production D1_CUTOVER_READY environment variable to true only after the no-import site-local checks have passed, the canonical pull has completed, public holidays have synced, and route checks have passed against the production D1 database."
             exit 1
           fi
         env:

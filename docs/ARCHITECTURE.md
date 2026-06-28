@@ -43,10 +43,8 @@ canonical pull workflow after deployment so the preview D1 read model can be
 validated before staging or production cutover. Staging and production deploys
 require `D1_CUTOVER_READY=true` in the matching GitHub environment. Set it only
 after the canonical pull, public-holiday sync, and route checks have passed
-against that environment's D1 database. Production currently has no
-crowd-report rows to import; if any appear before the freeze, pause cutover and
-prepare a one-off migration plan after the canonical pull has populated
-`lines` and `stations`.
+against that environment's D1 database. For production, also confirm the
+site-local no-import checks in the cutover runbook before enabling the gate.
 
 The staging/production deploy workflow is serialized per branch so D1
 migrations and Worker deploys advance together. A newer run waits for the
