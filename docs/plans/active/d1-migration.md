@@ -350,6 +350,10 @@ Exit criteria:
 - 2026-06-28: Added a production build and Wrangler deploy dry-run preflight
   before production D1 migrations so schema changes do not apply ahead of a
   deployable Worker bundle.
+- 2026-06-28: Removed the remaining direct Postgres maintenance scripts and
+  direct `pg` dependencies after the D1 runtime and Wrangler migration commands
+  became the only supported database entrypoints, and switched crowd-report SQL
+  rendering tests to SQLite/D1 dialect coverage.
 
 ## Decision Log
 
