@@ -144,20 +144,11 @@ function makeFakeDispatchUpdateDb(
   return {
     whereCalls,
     db: {
-      transaction<T>(
-        callback: (transaction: {
-          select: () => typeof selectBuilder;
-          update: () => typeof updateBuilder;
-        }) => Promise<T>,
-      ) {
-        return callback({
-          select() {
-            return selectBuilder;
-          },
-          update() {
-            return updateBuilder;
-          },
-        });
+      select() {
+        return selectBuilder;
+      },
+      update() {
+        return updateBuilder;
       },
     },
   };
@@ -195,20 +186,11 @@ function makeFakeDispatchEligibilityDb() {
   return {
     whereCalls,
     db: {
-      transaction<T>(
-        callback: (transaction: {
-          update: () => typeof updateBuilder;
-          select: () => typeof selectBuilder;
-        }) => Promise<T>,
-      ) {
-        return callback({
-          update() {
-            return updateBuilder;
-          },
-          select() {
-            return selectBuilder;
-          },
-        });
+      update() {
+        return updateBuilder;
+      },
+      select() {
+        return selectBuilder;
       },
     },
   };
@@ -277,25 +259,19 @@ function makeFakePostSendMarkMissDb() {
     updateSets,
     whereCalls,
     db: {
-      async transaction<T>(
-        callback: (transaction: {
-          select: () => ReturnType<typeof makeSelectBuilder>;
-          update: () => typeof updateBuilder;
-        }) => Promise<T>,
-      ) {
+      select() {
         inTransaction = true;
-        try {
-          return await callback({
-            select() {
-              return makeSelectBuilder();
-            },
-            update() {
-              return updateBuilder;
-            },
-          });
-        } finally {
+        queueMicrotask(() => {
           inTransaction = false;
-        }
+        });
+        return makeSelectBuilder();
+      },
+      update() {
+        inTransaction = true;
+        queueMicrotask(() => {
+          inTransaction = false;
+        });
+        return updateBuilder;
       },
     },
   };

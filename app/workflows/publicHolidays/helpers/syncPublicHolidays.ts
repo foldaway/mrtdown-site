@@ -2,6 +2,7 @@ import { and, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AppDb } from '../../../db/index.js';
 import { publicHolidaysTable } from '../../../db/schema.js';
+import { runDbOrderedStatements } from '../../../db/orderedStatements.js';
 import { withDbDiagnostics } from '../../../util/dbDiagnostics.js';
 
 const DATA_GOV_PUBLIC_HOLIDAYS_DATASET_ID =
@@ -216,7 +217,7 @@ export async function syncPublicHolidays(
   }
 
   await withPublicHolidayDbDiagnostics(sortedRows, () =>
-    db.transaction(async (tx) => {
+    runDbOrderedStatements(db, async (tx) => {
       const now = new Date().toISOString();
       const upsertRows = sortedRows.map((row) => ({
         id: row.id,
