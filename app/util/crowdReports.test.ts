@@ -1,5 +1,5 @@
 import type { SQL } from 'drizzle-orm';
-import { PgDialect } from 'drizzle-orm/pg-core';
+import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { DateTime } from 'luxon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -1777,7 +1777,7 @@ describe('getPublicCrowdReportSignals', () => {
 
     await getPublicCrowdReportSignals(fake.db as never);
 
-    const dialect = new PgDialect();
+    const dialect = new SQLiteSyncDialect();
     const whereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
 
     expect(whereSql).toContain('crowd_report_cluster_lines');
