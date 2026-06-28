@@ -379,6 +379,9 @@ Exit criteria:
   Wrangler D1 query metrics, requires environment-specific `D1_MIN_*`
   thresholds, and fails deploy validation before route checks if the database
   is still empty or underpopulated.
+- 2026-06-29: Tightened the D1 ordered-statement helper type so callers no
+  longer derive the runner shape from Drizzle's interactive `transaction`
+  callback API.
 
 ## Decision Log
 

@@ -1,8 +1,9 @@
 import type { AppDb } from './index.js';
 
-export type AppDbStatementRunner = Parameters<
-  Parameters<AppDb['transaction']>[0]
->[0];
+export type AppDbStatementRunner = Pick<
+  AppDb,
+  'delete' | 'insert' | 'select' | 'update'
+>;
 
 /**
  * Runs a sequence of Drizzle D1 statements without opening an interactive SQL
