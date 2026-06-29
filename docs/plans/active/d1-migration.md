@@ -384,6 +384,11 @@ Exit criteria:
 - 2026-06-29: Hardened the D1 route smoke checker so successful route probes
   must return the expected HTML, Markdown/plain-text, or XML content type
   instead of only checking status codes and non-empty response bodies.
+- 2026-06-30: Validated a working preview deployment backed by D1. This closes
+  the preview deployment proof point for Phase 7 and leaves the production
+  readiness gate, no-import checks, production D1 pull, public-holiday sync,
+  route checks, dispatch dry run, and final production deploy as the remaining
+  cutover work.
 
 ## Decision Log
 
