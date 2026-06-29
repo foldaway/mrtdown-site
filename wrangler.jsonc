@@ -160,7 +160,7 @@
         {
           "binding": "DB",
           "database_name": "mrtdown-staging",
-          "database_id": "00000000-0000-0000-0000-000000000002",
+          "database_id": "4b8fe0e8-562a-4181-9e61-37fcaaacd293",
           "migrations_dir": "migrations"
         }
       ],
@@ -221,7 +221,7 @@
         {
           "binding": "DB",
           "database_name": "mrtdown-production",
-          "database_id": "00000000-0000-0000-0000-000000000003",
+          "database_id": "571761d5-8c5b-4195-b6d0-9b232116c154",
           "migrations_dir": "migrations"
         }
       ],
