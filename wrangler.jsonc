@@ -45,7 +45,7 @@
     {
       "binding": "DB",
       "database_name": "mrtdown-preview",
-      "database_id": "00000000-0000-0000-0000-000000000001",
+      "database_id": "3a3eb397-0f96-4dae-ac51-d5f0250dd95c",
       "migrations_dir": "migrations"
     }
   ],
@@ -98,7 +98,7 @@
         {
           "binding": "DB",
           "database_name": "mrtdown-preview",
-          "database_id": "00000000-0000-0000-0000-000000000001",
+          "database_id": "3a3eb397-0f96-4dae-ac51-d5f0250dd95c",
           "migrations_dir": "migrations"
         }
       ],
