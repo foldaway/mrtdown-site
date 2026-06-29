@@ -1083,7 +1083,7 @@ describe('findMissingCrowdReportReferences', () => {
       directionStationIds: [],
     });
 
-    const dialect = new PgDialect();
+    const dialect = new SQLiteSyncDialect();
     const lineWhereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL);
     const stationCodeWhereSql = dialect.sqlToQuery(fake.whereCalls[2] as SQL);
     const countReferenceDateParams = (params: unknown[]) =>
