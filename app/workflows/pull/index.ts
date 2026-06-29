@@ -56,8 +56,8 @@ const syncStepConfig = {
   },
 };
 
-/** Keep each changed-issue step comfortably below D1 per-invocation query limits. */
-const ISSUE_SYNC_BATCH_SIZE = 100;
+/** Keep each changed-issue step comfortably below D1 per-invocation subrequest limits. */
+const ISSUE_SYNC_BATCH_SIZE = 10;
 const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
 
 const factsStepConfig = {

@@ -79,6 +79,8 @@ import {
  * so 10 rows keeps each statement within the 100-parameter ceiling.
  */
 const BATCH = 10;
+/** `impact_event_periods` binds 4 values per row, so 25 rows hits D1's 100-parameter ceiling. */
+const IMPACT_EVENT_PERIOD_INSERT_BATCH = 25;
 /** Max ids per `IN (...)` cleanup query. Keep below proxy/driver bind limits. */
 const DELETE_BATCH = 50;
 
@@ -1544,7 +1546,7 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         periodRows,
         (row) => `${row.impact_event_id}\0${row.index}`,
       );
-      for (const rows of chunk(dedupedRows, BATCH)) {
+      for (const rows of chunk(dedupedRows, IMPACT_EVENT_PERIOD_INSERT_BATCH)) {
         await withDbDiagnostics(
           {
             operation: 'insert impact-event periods',

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   issuesNextTable,
@@ -235,5 +236,17 @@ describe('pull staging inserts', () => {
         ],
       },
     ]);
+  });
+
+  it('uses the full D1 parameter budget for impact event period inserts', () => {
+    const source = readFileSync(
+      new URL('./stagingSync.ts', import.meta.url),
+      'utf8',
+    );
+
+    expect(source).toContain('const IMPACT_EVENT_PERIOD_INSERT_BATCH = 25;');
+    expect(source).toContain(
+      'chunk(dedupedRows, IMPACT_EVENT_PERIOD_INSERT_BATCH)',
+    );
   });
 });
