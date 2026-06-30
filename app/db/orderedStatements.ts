@@ -6,13 +6,23 @@ export type AppDbStatementRunner = Pick<
 >;
 
 /**
- * Runs a sequence of Drizzle D1 statements without opening an interactive SQL
- * transaction. D1 supports atomic prebuilt batches, but not the interactive
- * `db.transaction(async tx => ...)` shape Drizzle emits with BEGIN/SAVEPOINT.
+ * Runs a sequence of Drizzle D1 statements inside one SQL transaction so
+ * delete-then-insert refreshes and lock/update flows cannot partially commit.
  */
 export async function runDbOrderedStatements<T>(
   db: AppDb,
   callback: (runner: AppDbStatementRunner) => T | Promise<T>,
 ): Promise<T> {
-  return callback(db as unknown as AppDbStatementRunner);
+  const transaction = (
+    db as AppDb & {
+      transaction?: AppDb['transaction'];
+    }
+  ).transaction;
+  if (typeof transaction !== 'function') {
+    return callback(db as unknown as AppDbStatementRunner);
+  }
+
+  return transaction.call(db, async (tx) =>
+    callback(tx as unknown as AppDbStatementRunner),
+  ) as Promise<T>;
 }

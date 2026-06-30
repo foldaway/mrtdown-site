@@ -127,13 +127,13 @@ function makeFakeDispatchUpdateDb(
           if (updateIndex === 0) {
             return {
               returning() {
-                return Promise.resolve(clusterUpdateRows);
+                return Promise.resolve(currentReportRows);
               },
             };
           }
           return {
             returning() {
-              return Promise.resolve(currentReportRows);
+              return Promise.resolve(clusterUpdateRows);
             },
           };
         },
@@ -463,10 +463,10 @@ describe('getDispatchableCrowdReportCandidates', () => {
     );
 
     const dialect = new SQLiteSyncDialect();
-    const clusterUpdateWhereSql = dialect.sqlToQuery(
+    const reportUpdateWhereSql = dialect.sqlToQuery(
       fake.whereCalls[1] as SQL,
     ).sql;
-    const reportUpdateWhereSql = dialect.sqlToQuery(
+    const clusterUpdateWhereSql = dialect.sqlToQuery(
       fake.whereCalls[2] as SQL,
     ).sql;
 
@@ -480,7 +480,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(reportUpdateWhereSql).toContain('"crowd_reports"."dispatch_error"');
   });
 
-  it('does not mark cluster payload reports when the cluster freshness update misses', async () => {
+  it('reports post-send cluster freshness misses as stale local success marks', async () => {
     const fake = makeFakeDispatchUpdateDb([], [{ id: 'stale-report-1' }]);
 
     await expect(
@@ -507,9 +507,11 @@ describe('getDispatchableCrowdReportCandidates', () => {
         },
         '2026-05-24T04:45:00.000Z',
       ),
-    ).resolves.toBe(false);
+    ).rejects.toThrow(
+      'Crowd report dispatch was sent, but local success marking became stale',
+    );
 
-    expect(fake.whereCalls).toHaveLength(2);
+    expect(fake.whereCalls).toHaveLength(3);
   });
 
   it('rechecks cluster payload freshness under the dispatch lock', async () => {
