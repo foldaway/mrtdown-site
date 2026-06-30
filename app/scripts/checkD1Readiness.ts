@@ -29,6 +29,8 @@ select
   (select count(*) from statistics_snapshots) as statistics_snapshots;
 `;
 
+const WRANGLER_D1_EXECUTE_TIMEOUT_MS = 120_000;
+
 function getTargetEnv() {
   const targetEnv = process.argv[2] ?? process.env.CLOUDFLARE_ENV;
   if (targetEnv == null || targetEnv.length === 0) {
@@ -196,11 +198,18 @@ function main() {
     ],
     {
       encoding: 'utf8',
+      timeout: WRANGLER_D1_EXECUTE_TIMEOUT_MS,
     },
   );
 
   if (result.error != null) {
-    throw result.error;
+    const error = result.error as Error & { code?: string };
+    if (error.code === 'ETIMEDOUT') {
+      throw new Error(
+        `Wrangler D1 readiness query timed out after ${WRANGLER_D1_EXECUTE_TIMEOUT_MS}ms.`,
+      );
+    }
+    throw error;
   }
 
   if (result.status !== 0) {

@@ -21,6 +21,7 @@ const HTML_PROBES = [
   '/lines/BPLRT',
   '/stations/BKP',
   '/operators/SMRT_TRAINS',
+  '/issues/2026-06-15-ccl-minor-delay-lorong-chuan-to-bishan',
 ].map(
   (route) =>
     ({
