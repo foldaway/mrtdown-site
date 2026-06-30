@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { text } from 'drizzle-orm/sqlite-core';
+import { type AnySQLiteColumn, check, text } from 'drizzle-orm/sqlite-core';
 
 export const timestampColumns = {
   updated_at: text('updated_at')
@@ -38,6 +38,36 @@ export function sqliteEnum<const Values extends readonly [string, ...string[]]>(
   };
 }
 
+export function sqliteEnumCheck<
+  const Values extends readonly [string, ...string[]],
+>(name: string, column: AnySQLiteColumn, values: Values) {
+  const literals = values.map((value) =>
+    sql.raw(`'${value.replaceAll("'", "''")}'`),
+  );
+  return check(
+    name,
+    sql`${column} is null or ${column} in (${sql.join(literals, sql`, `)})`,
+  );
+}
+
 export function jsonText<T>(name: string) {
   return text(name, { mode: 'json' }).$type<T>();
+}
+
+export function jsonTextCheck(name: string, column: AnySQLiteColumn) {
+  return check(name, sql`${column} is null or json_valid(${column})`);
+}
+
+export function nullableBooleanIntegerCheck(
+  name: string,
+  column: AnySQLiteColumn,
+) {
+  return check(name, sql`${column} is null or ${column} in (0, 1)`);
+}
+
+export function requiredBooleanIntegerCheck(
+  name: string,
+  column: AnySQLiteColumn,
+) {
+  return check(name, sql`${column} in (0, 1)`);
 }

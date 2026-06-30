@@ -1,2 +1,3 @@
--- D1 baseline creates impact_event_entity_facilities.line_id directly.
-SELECT 1;
+ALTER TABLE "impact_event_entity_facilities" ADD COLUMN "line_id" text;--> statement-breakpoint
+ALTER TABLE "impact_event_entity_facilities" ADD CONSTRAINT "impact_event_entity_facilities_line_id_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."lines"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "impact_event_entity_facilities_line_id_idx" ON "impact_event_entity_facilities" USING btree ("line_id");

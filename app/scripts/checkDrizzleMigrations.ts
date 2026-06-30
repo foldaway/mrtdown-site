@@ -79,6 +79,20 @@ function readD1MigrationMirror(rootDir: string): Map<string, Buffer> {
   const snapshot = new Map<string, Buffer>();
 
   for (const entry of readdirSync(rootDir).sort()) {
+    const snapshotPath = join(rootDir, entry, 'snapshot.json');
+    if (!existsSync(snapshotPath)) {
+      continue;
+    }
+
+    const migrationSnapshot = JSON.parse(
+      readFileSync(snapshotPath, 'utf8'),
+    ) as {
+      dialect?: string;
+    };
+    if (migrationSnapshot.dialect !== 'sqlite') {
+      continue;
+    }
+
     const migrationPath = join(rootDir, entry, 'migration.sql');
     if (!existsSync(migrationPath)) {
       continue;

@@ -35,10 +35,41 @@ import {
 } from 'drizzle-orm/sqlite-core';
 import {
   enumToSqliteEnum,
+  jsonTextCheck,
   jsonText,
+  nullableBooleanIntegerCheck,
+  requiredBooleanIntegerCheck,
+  sqliteEnumCheck,
   sqliteEnum,
   timestampColumns,
 } from './columns.helpers.js';
+
+const impactEventTypeValues = [
+  'periods.set',
+  'service_scopes.set',
+  'service_effects.set',
+  'facility_effects.set',
+  'causes.set',
+] as const;
+
+const turnstileOutcomeValues = [
+  'skipped',
+  'passed',
+  'missing_token',
+  'failed',
+] as const;
+
+const crowdReportModerationActorValues = ['system'] as const;
+const crowdReportModerationActionValues = [
+  'submitted',
+  'automated_accepted',
+  'automated_duplicate',
+  'automated_rejected',
+] as const;
+
+function singlePrimaryKey(column: AnySQLiteColumn) {
+  return primaryKey({ columns: [column] });
+}
 
 /*
  * Pull staging (`*_next`): snapshot of manifest data between workflow steps.
@@ -105,36 +136,53 @@ const linesStagingExtraColumns = {
   operators: jsonText('operators').$type<Line['operators']>().notNull(),
 };
 
-export const metadataTable = sqliteTable('metadata', {
-  key: text('key').primaryKey(),
-  value: text('value').notNull(),
-});
+export const metadataTable = sqliteTable(
+  'metadata',
+  {
+    key: text('key').notNull(),
+    value: text('value').notNull(),
+  },
+  (table) => [singlePrimaryKey(table.key)],
+);
 
 /** Staging for pull workflow — no FKs; JSON text holds nested child data. */
-export const operatorsNextTable = sqliteTable('operators_next', {
-  id: text('id').primaryKey(),
-  ...operatorEntitySharedColumns,
-});
+export const operatorsNextTable = sqliteTable(
+  'operators_next',
+  {
+    id: text('id').notNull(),
+    ...operatorEntitySharedColumns,
+  },
+  (table) => [singlePrimaryKey(table.id)],
+);
 
-export const townsNextTable = sqliteTable('towns_next', {
-  id: text('id').primaryKey(),
-  ...translationsNamedEntitySharedColumns,
-});
+export const townsNextTable = sqliteTable(
+  'towns_next',
+  {
+    id: text('id').notNull(),
+    ...translationsNamedEntitySharedColumns,
+  },
+  (table) => [singlePrimaryKey(table.id)],
+);
 
-export const landmarksNextTable = sqliteTable('landmarks_next', {
-  id: text('id').primaryKey(),
-  ...translationsNamedEntitySharedColumns,
-});
+export const landmarksNextTable = sqliteTable(
+  'landmarks_next',
+  {
+    id: text('id').notNull(),
+    ...translationsNamedEntitySharedColumns,
+  },
+  (table) => [singlePrimaryKey(table.id)],
+);
 
 export const stationsNextTable = sqliteTable(
   'stations_next',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     ...stationNameHashSharedColumns,
     ...stationStagingExtraColumns,
   },
   (table) => {
     return [
+      singlePrimaryKey(table.id),
       index('stations_next_coordinates_idx').on(
         table.latitude,
         table.longitude,
@@ -143,43 +191,62 @@ export const stationsNextTable = sqliteTable(
   },
 );
 
-export const servicesNextTable = sqliteTable('services_next', {
-  id: text('id').primaryKey(),
-  ...serviceEntitySharedColumns,
-  ...servicesStagingExtraColumns,
-});
-
-// Entity Type: PublicHoliday
-export const publicHolidaysTable = sqliteTable('public_holidays', {
-  id: text('id').primaryKey(),
-  date: text('date').notNull(),
-  holiday_name: text('holiday_name').notNull(),
-  hash: text('hash').notNull(),
-  ...timestampColumns,
-});
-
-export const crowdReportEffectEnum = sqliteEnum(
-  'crowd_report_effect',
-  IngestContentCrowdReportEffects,
+export const servicesNextTable = sqliteTable(
+  'services_next',
+  {
+    id: text('id').notNull(),
+    ...serviceEntitySharedColumns,
+    ...servicesStagingExtraColumns,
+  },
+  (table) => [singlePrimaryKey(table.id)],
 );
 
-export const crowdReportStatusEnum = sqliteEnum('crowd_report_status', [
+// Entity Type: PublicHoliday
+export const publicHolidaysTable = sqliteTable(
+  'public_holidays',
+  {
+    id: text('id').notNull(),
+    date: text('date').notNull(),
+    holiday_name: text('holiday_name').notNull(),
+    hash: text('hash').notNull(),
+    ...timestampColumns,
+  },
+  (table) => [singlePrimaryKey(table.id)],
+);
+
+const crowdReportEffectValues = IngestContentCrowdReportEffects;
+export const crowdReportEffectEnum = sqliteEnum(
+  'crowd_report_effect',
+  crowdReportEffectValues,
+);
+
+const crowdReportStatusValues = [
   'pending',
   'accepted',
   'rejected',
   'duplicate',
   'dispatched',
-]);
+] as const;
+export const crowdReportStatusEnum = sqliteEnum(
+  'crowd_report_status',
+  crowdReportStatusValues,
+);
 
+const crowdReportClusterStatusValues = [
+  'pending',
+  'accepted',
+  'rejected',
+  'dispatched',
+] as const;
 export const crowdReportClusterStatusEnum = sqliteEnum(
   'crowd_report_cluster_status',
-  ['pending', 'accepted', 'rejected', 'dispatched'],
+  crowdReportClusterStatusValues,
 );
 
 export const crowdReportClustersTable = sqliteTable(
   'crowd_report_clusters',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     effect: crowdReportEffectEnum(),
     window_start_at: text('window_start_at').notNull(),
     window_end_at: text('window_end_at').notNull(),
@@ -190,9 +257,20 @@ export const crowdReportClustersTable = sqliteTable(
   },
   (table) => {
     return [
+      singlePrimaryKey(table.id),
       index('crowd_report_clusters_status_idx').on(table.status),
       index('crowd_report_clusters_window_start_at_idx').on(
         table.window_start_at,
+      ),
+      sqliteEnumCheck(
+        'crowd_report_clusters_effect_check',
+        table.effect,
+        crowdReportEffectValues,
+      ),
+      sqliteEnumCheck(
+        'crowd_report_clusters_status_check',
+        table.status,
+        crowdReportClusterStatusValues,
       ),
     ];
   },
@@ -241,7 +319,7 @@ export const crowdReportClusterStationsTable = sqliteTable(
 export const crowdReportsTable = sqliteTable(
   'crowd_reports',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     observed_at: text('observed_at').notNull(),
     direction_text: text('direction_text'),
     effect: crowdReportEffectEnum(),
@@ -263,10 +341,29 @@ export const crowdReportsTable = sqliteTable(
   },
   (table) => {
     return [
+      singlePrimaryKey(table.id),
       index('crowd_reports_observed_at_idx').on(table.observed_at),
       index('crowd_reports_status_idx').on(table.status),
       index('crowd_reports_cluster_id_idx').on(table.cluster_id),
       index('crowd_reports_duplicate_of_id_idx').on(table.duplicate_of_id),
+      sqliteEnumCheck(
+        'crowd_reports_effect_check',
+        table.effect,
+        crowdReportEffectValues,
+      ),
+      sqliteEnumCheck(
+        'crowd_reports_status_check',
+        table.status,
+        crowdReportStatusValues,
+      ),
+      nullableBooleanIntegerCheck(
+        'crowd_reports_still_happening_check',
+        table.still_happening,
+      ),
+      jsonTextCheck(
+        'crowd_reports_dispatch_payload_json_check',
+        table.dispatch_payload,
+      ),
       check(
         'crowd_reports_delay_minutes_check',
         sql`${table.delay_minutes} is null or (${table.delay_minutes} >= 0 and ${table.delay_minutes} <= 180)`,
@@ -314,7 +411,7 @@ export const crowdReportStationsTable = sqliteTable(
 export const crowdReportModerationEventsTable = sqliteTable(
   'crowd_report_moderation_events',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     report_id: text('report_id')
       .references(() => crowdReportsTable.id, { onDelete: 'cascade' })
       .notNull(),
@@ -325,9 +422,20 @@ export const crowdReportModerationEventsTable = sqliteTable(
   },
   (table) => {
     return [
+      singlePrimaryKey(table.id),
       index('crowd_report_moderation_events_report_id_idx').on(table.report_id),
       index('crowd_report_moderation_events_created_at_idx').on(
         table.created_at,
+      ),
+      sqliteEnumCheck(
+        'crowd_report_moderation_events_actor_check',
+        table.actor,
+        crowdReportModerationActorValues,
+      ),
+      sqliteEnumCheck(
+        'crowd_report_moderation_events_action_check',
+        table.action,
+        crowdReportModerationActionValues,
       ),
     ];
   },
@@ -355,7 +463,7 @@ export const crowdReportRateLimitsTable = sqliteTable(
 export const crowdReportAbuseEventsTable = sqliteTable(
   'crowd_report_abuse_events',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     report_id: text('report_id').references(() => crowdReportsTable.id, {
       onDelete: 'cascade',
     }),
@@ -369,41 +477,59 @@ export const crowdReportAbuseEventsTable = sqliteTable(
   },
   (table) => {
     return [
+      singlePrimaryKey(table.id),
       index('crowd_report_abuse_events_report_id_idx').on(table.report_id),
       index('crowd_report_abuse_events_ip_hash_created_at_idx').on(
         table.ip_hash,
         table.created_at,
+      ),
+      sqliteEnumCheck(
+        'crowd_report_abuse_events_turnstile_outcome_check',
+        table.turnstile_outcome,
+        turnstileOutcomeValues,
       ),
     ];
   },
 );
 
 // Entity Type: Town
-export const townsTable = sqliteTable('towns', {
-  id: text('id').primaryKey(),
-  ...translationsNamedEntitySharedColumns,
-  ...timestampColumns,
-});
+export const townsTable = sqliteTable(
+  'towns',
+  {
+    id: text('id').notNull(),
+    ...translationsNamedEntitySharedColumns,
+    ...timestampColumns,
+  },
+  (table) => [singlePrimaryKey(table.id)],
+);
 
 // Entity Type: Landmark
-export const landmarksTable = sqliteTable('landmarks', {
-  id: text('id').primaryKey(),
-  ...translationsNamedEntitySharedColumns,
-  ...timestampColumns,
-});
+export const landmarksTable = sqliteTable(
+  'landmarks',
+  {
+    id: text('id').notNull(),
+    ...translationsNamedEntitySharedColumns,
+    ...timestampColumns,
+  },
+  (table) => [singlePrimaryKey(table.id)],
+);
 
 // Entity Type: Operator
-export const operatorsTable = sqliteTable('operators', {
-  id: text('id').primaryKey(),
-  ...operatorEntitySharedColumns,
-  ...timestampColumns,
-});
+export const operatorsTable = sqliteTable(
+  'operators',
+  {
+    id: text('id').notNull(),
+    ...operatorEntitySharedColumns,
+    ...timestampColumns,
+  },
+  (table) => [singlePrimaryKey(table.id)],
+);
 
 // Entity Type: Station
 export const stationsTable = sqliteTable(
   'stations',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     ...stationNameHashSharedColumns,
     ...stationCoordinateColumns,
     townId: text('town_id')
@@ -413,15 +539,14 @@ export const stationsTable = sqliteTable(
   },
   (table) => {
     return [
+      singlePrimaryKey(table.id),
       index('stations_coordinates_idx').on(table.latitude, table.longitude),
     ];
   },
 );
 
-export const lineTypeEnum = sqliteEnum(
-  'line_type',
-  enumToSqliteEnum(LineTypeSchema.enum),
-);
+const lineTypeValues = enumToSqliteEnum(LineTypeSchema.enum);
+export const lineTypeEnum = sqliteEnum('line_type', lineTypeValues);
 
 /**
  * Shared by `lines` and `lines_next`.
@@ -439,18 +564,44 @@ export const lineEntitySharedColumns = {
   hash: text('hash').notNull(),
 };
 
-export const linesNextTable = sqliteTable('lines_next', {
-  id: text('id').primaryKey(),
-  ...lineEntitySharedColumns,
-  ...linesStagingExtraColumns,
-});
+export const linesNextTable = sqliteTable(
+  'lines_next',
+  {
+    id: text('id').notNull(),
+    ...lineEntitySharedColumns,
+    ...linesStagingExtraColumns,
+  },
+  (table) => {
+    return [
+      singlePrimaryKey(table.id),
+      sqliteEnumCheck('lines_next_type_check', table.type, lineTypeValues),
+      jsonTextCheck('lines_next_name_json_check', table.name),
+      jsonTextCheck(
+        'lines_next_operating_hours_json_check',
+        table.operating_hours,
+      ),
+      jsonTextCheck('lines_next_operators_json_check', table.operators),
+    ];
+  },
+);
 
 // Entity Type: Line
-export const linesTable = sqliteTable('lines', {
-  id: text('id').primaryKey(),
-  ...lineEntitySharedColumns,
-  ...timestampColumns,
-});
+export const linesTable = sqliteTable(
+  'lines',
+  {
+    id: text('id').notNull(),
+    ...lineEntitySharedColumns,
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      singlePrimaryKey(table.id),
+      sqliteEnumCheck('lines_type_check', table.type, lineTypeValues),
+      jsonTextCheck('lines_name_json_check', table.name),
+      jsonTextCheck('lines_operating_hours_json_check', table.operating_hours),
+    ];
+  },
+);
 
 // Normalized Entity Field: Line.operators
 export const lineOperatorsTable = sqliteTable(
@@ -479,7 +630,7 @@ export const lineOperatorsTable = sqliteTable(
 export const servicesTable = sqliteTable(
   'services',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     line_id: text('line_id')
       .references(() => linesTable.id)
       .notNull(),
@@ -487,7 +638,10 @@ export const servicesTable = sqliteTable(
     ...timestampColumns,
   },
   (table) => {
-    return [index('services_line_id_idx').on(table.line_id)];
+    return [
+      singlePrimaryKey(table.id),
+      index('services_line_id_idx').on(table.line_id),
+    ];
   },
 );
 
@@ -586,9 +740,12 @@ export const serviceRevisionPathStationEntriesTable = sqliteTable(
   },
 );
 
+const stationStructureTypeValues = enumToSqliteEnum(
+  StationStructureTypeSchema.enum,
+);
 export const stationStructureTypeEnum = sqliteEnum(
   'station_structure_type',
-  enumToSqliteEnum(StationStructureTypeSchema.enum),
+  stationStructureTypeValues,
 );
 
 // Normalized Entity Field: Station.stationCodes
@@ -612,6 +769,11 @@ export const stationCodesTable = sqliteTable(
       primaryKey({ columns: [table.line_id, table.station_id, table.code] }),
       index('station_codes_line_id_idx').on(table.line_id),
       index('station_codes_station_id_idx').on(table.station_id),
+      sqliteEnumCheck(
+        'station_codes_structure_type_check',
+        table.structure_type,
+        stationStructureTypeValues,
+      ),
     ];
   },
 );
@@ -637,10 +799,8 @@ export const stationLandmarksTable = sqliteTable(
   },
 );
 
-export const issueTypeEnum = sqliteEnum(
-  'issue_type',
-  enumToSqliteEnum(IssueTypeSchema.enum),
-);
+const issueTypeValues = enumToSqliteEnum(IssueTypeSchema.enum);
+export const issueTypeEnum = sqliteEnum('issue_type', issueTypeValues);
 
 /**
  * Shared by `issues` and `issues_next`.
@@ -653,29 +813,54 @@ export const issueEntitySharedColumns = {
   hash: text('hash').notNull(),
 };
 
-export const issuesNextTable = sqliteTable('issues_next', {
-  id: text('id').primaryKey(),
-  ...issueEntitySharedColumns,
-  ...issuesStagingExtraColumns,
-});
+export const issuesNextTable = sqliteTable(
+  'issues_next',
+  {
+    id: text('id').notNull(),
+    ...issueEntitySharedColumns,
+    ...issuesStagingExtraColumns,
+  },
+  (table) => {
+    return [
+      singlePrimaryKey(table.id),
+      sqliteEnumCheck('issues_next_type_check', table.type, issueTypeValues),
+      jsonTextCheck('issues_next_title_json_check', table.title),
+      jsonTextCheck('issues_next_title_meta_json_check', table.title_meta),
+      jsonTextCheck('issues_next_evidences_json_check', table.evidences),
+      jsonTextCheck(
+        'issues_next_impact_events_json_check',
+        table.impact_events,
+      ),
+    ];
+  },
+);
 
 // Entity Type: Issue
-export const issuesTable = sqliteTable('issues', {
-  id: text('id').primaryKey(),
-  ...issueEntitySharedColumns,
-  ...timestampColumns,
-});
-
-export const evidenceTypeEnum = sqliteEnum(
-  'evidence_type',
-  enumToSqliteEnum(EvidenceTypeSchema.enum),
+export const issuesTable = sqliteTable(
+  'issues',
+  {
+    id: text('id').notNull(),
+    ...issueEntitySharedColumns,
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      singlePrimaryKey(table.id),
+      sqliteEnumCheck('issues_type_check', table.type, issueTypeValues),
+      jsonTextCheck('issues_title_json_check', table.title),
+      jsonTextCheck('issues_title_meta_json_check', table.title_meta),
+    ];
+  },
 );
+
+const evidenceTypeValues = enumToSqliteEnum(EvidenceTypeSchema.enum);
+export const evidenceTypeEnum = sqliteEnum('evidence_type', evidenceTypeValues);
 
 // EntityType: Evidence
 export const evidencesTable = sqliteTable(
   'evidences',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     ts: text('ts').notNull(),
     text: text('text').notNull(),
     type: evidenceTypeEnum().notNull(),
@@ -691,8 +876,11 @@ export const evidencesTable = sqliteTable(
   },
   (table) => {
     return [
+      singlePrimaryKey(table.id),
       index('evidences_issue_id_idx').on(table.issue_id),
       index('evidences_ts_idx').on(table.ts),
+      sqliteEnumCheck('evidences_type_check', table.type, evidenceTypeValues),
+      jsonTextCheck('evidences_render_json_check', table.render),
     ];
   },
 );
@@ -701,7 +889,7 @@ export const evidencesTable = sqliteTable(
 export const impactEventsTable = sqliteTable(
   'impact_events',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     ts: text('ts').notNull(),
     issue_id: text('issue_id')
       .references(() => issuesTable.id, {
@@ -713,7 +901,15 @@ export const impactEventsTable = sqliteTable(
     ...timestampColumns,
   },
   (table) => {
-    return [index('impact_events_issue_id_idx').on(table.issue_id)];
+    return [
+      singlePrimaryKey(table.id),
+      index('impact_events_issue_id_idx').on(table.issue_id),
+      sqliteEnumCheck(
+        'impact_events_type_check',
+        table.type,
+        impactEventTypeValues,
+      ),
+    ];
   },
 );
 
@@ -804,6 +1000,19 @@ export const issueDayFactsTable = sqliteTable(
         table.issue_type,
       ),
       index('issue_day_facts_as_of_idx').on(table.as_of),
+      sqliteEnumCheck(
+        'issue_day_facts_issue_type_check',
+        table.issue_type,
+        issueTypeValues,
+      ),
+      requiredBooleanIntegerCheck(
+        'issue_day_facts_active_anytime_check',
+        table.active_anytime,
+      ),
+      requiredBooleanIntegerCheck(
+        'issue_day_facts_active_end_of_day_check',
+        table.active_end_of_day,
+      ),
     ];
   },
 );
@@ -850,19 +1059,25 @@ export const lineDayFactsTable = sqliteTable(
 export const statisticsSnapshotsTable = sqliteTable(
   'statistics_snapshots',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     as_of: text('as_of').notNull(),
     data: jsonText('data').$type<unknown>().notNull(),
     ...timestampColumns,
   },
   (table) => {
-    return [index('statistics_snapshots_as_of_idx').on(table.as_of)];
+    return [
+      singlePrimaryKey(table.id),
+      index('statistics_snapshots_as_of_idx').on(table.as_of),
+    ];
   },
 );
 
+const impactEventServiceScopeTypeValues = enumToSqliteEnum(
+  ServiceScopeTypeSchema.enum,
+);
 export const impactEventServiceScopeTypeEnum = sqliteEnum(
   'impact_event_service_scope_type',
-  enumToSqliteEnum(ServiceScopeTypeSchema.enum),
+  impactEventServiceScopeTypeValues,
 );
 
 // Normalized Entity Field: ImpactEventServiceScopeSet.serviceScopes
@@ -897,6 +1112,11 @@ export const impactEventServiceScopesTable = sqliteTable(
       index('impact_event_service_scopes_to_station_id_idx').on(
         table.to_station_id,
       ),
+      sqliteEnumCheck(
+        'impact_event_service_scopes_type_check',
+        table.type,
+        impactEventServiceScopeTypeValues,
+      ),
       check(
         'impact_event_service_scopes_type_station_shape_check',
         sql`
@@ -924,9 +1144,10 @@ export const impactEventServiceScopesTable = sqliteTable(
   },
 );
 
+const serviceEffectKindValues = enumToSqliteEnum(ServiceEffectKindSchema.enum);
 export const serviceEffectKindEnum = sqliteEnum(
   'service_effect_kind',
-  enumToSqliteEnum(ServiceEffectKindSchema.enum),
+  serviceEffectKindValues,
 );
 
 // Normalized Entity Field: ImpactEventServiceEffectSet.effect (ServiceEffect)
@@ -951,13 +1172,21 @@ export const impactEventServiceEffectsTable = sqliteTable(
         table.impact_event_id,
       ),
       index('impact_event_service_effects_kind_idx').on(table.kind),
+      sqliteEnumCheck(
+        'impact_event_service_effects_kind_check',
+        table.kind,
+        serviceEffectKindValues,
+      ),
     ];
   },
 );
 
+const facilityEffectKindValues = enumToSqliteEnum(
+  FacilityEffectKindSchema.enum,
+);
 export const facilityEffectKindEnum = sqliteEnum(
   'facility_effect_kind',
-  enumToSqliteEnum(FacilityEffectKindSchema.enum),
+  facilityEffectKindValues,
 );
 
 // Normalized Entity Field: ImpactEventFacilityEffectSet.effect (FacilityEffect)
@@ -980,6 +1209,11 @@ export const impactEventFacilityEffectsTable = sqliteTable(
         table.impact_event_id,
       ),
       index('impact_event_facility_effects_kind_idx').on(table.kind),
+      sqliteEnumCheck(
+        'impact_event_facility_effects_kind_check',
+        table.kind,
+        facilityEffectKindValues,
+      ),
     ];
   },
 );
@@ -1010,9 +1244,12 @@ export const impactEventEntityServicesTable = sqliteTable(
   },
 );
 
+const affectedEntityFacilityKindValues = enumToSqliteEnum(
+  AffectedEntityFacilityKindSchema.enum,
+);
 export const affectedEntityFacilityKindEnum = sqliteEnum(
   'affected_entity_facility_kind',
-  enumToSqliteEnum(AffectedEntityFacilityKindSchema.enum),
+  affectedEntityFacilityKindValues,
 );
 
 // Normalized Entity Field: ImpactEvent.entity (AffectedEntityFacility)
@@ -1044,17 +1281,23 @@ export const impactEventEntityFacilitiesTable = sqliteTable(
         table.station_id,
       ),
       index('impact_event_entity_facilities_line_id_idx').on(table.line_id),
+      sqliteEnumCheck(
+        'impact_event_entity_facilities_kind_check',
+        table.kind,
+        affectedEntityFacilityKindValues,
+      ),
     ];
   },
 );
 
+const impactEventCauseTypeValues = enumToSqliteEnum({
+  ...CauseDisruptionSchema.enum,
+  ...CauseMaintenanceSchema.enum,
+  ...CauseInfraSchema.enum,
+});
 export const impactEventCauseTypeEnum = sqliteEnum(
   'impact_event_cause_type',
-  enumToSqliteEnum({
-    ...CauseDisruptionSchema.enum,
-    ...CauseMaintenanceSchema.enum,
-    ...CauseInfraSchema.enum,
-  }),
+  impactEventCauseTypeValues,
 );
 
 export const impactEventCausesTable = sqliteTable(
@@ -1074,6 +1317,11 @@ export const impactEventCausesTable = sqliteTable(
       primaryKey({ columns: [table.impact_event_id, table.type] }),
       index('impact_event_causes_impact_event_id_idx').on(
         table.impact_event_id,
+      ),
+      sqliteEnumCheck(
+        'impact_event_causes_type_check',
+        table.type,
+        impactEventCauseTypeValues,
       ),
     ];
   },

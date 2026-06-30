@@ -1,2 +1,1 @@
--- D1 baseline creates service_revisions.end_at directly.
-SELECT 1;
+ALTER TABLE "service_revisions" ADD COLUMN "end_at" date;
