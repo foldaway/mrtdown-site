@@ -76,7 +76,6 @@ const ISSUE_TYPES = [
   'maintenance',
   'infra',
 ] as const satisfies readonly IssueType[];
-
 type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
 
 type DatasetLineBranch = {
@@ -206,6 +205,11 @@ type BaseDataset = {
   issuesByLineId: Record<string, IssueWithOperationalEffects[]>;
 };
 
+type OverviewDataset = Pick<
+  BaseDataset,
+  'included' | 'publicHolidaySet' | 'allIssues' | 'issuesByLineId'
+>;
+
 const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
 const D1_SELECT_IN_BATCH = 90;
 const CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX =
@@ -219,6 +223,14 @@ let cachedBaseDataset:
     }
   | undefined;
 let pendingBaseDataset: Promise<BaseDataset> | undefined;
+const cachedOverviewDatasets = new Map<
+  number,
+  {
+    expiresAt: number;
+    value: OverviewDataset;
+  }
+>();
+const pendingOverviewDatasets = new Map<number, Promise<OverviewDataset>>();
 const dateTimeCache = new Map<string, DateTime>();
 const issueBoundsCache = new WeakMap<Issue, IssueIntervalBounds[]>();
 
@@ -1835,6 +1847,138 @@ async function getBaseDataset() {
   }
 }
 
+async function getOverviewIssueIds(
+  days: number,
+  referenceNow = nowSg(),
+  db?: AppDb,
+) {
+  const database = db ?? (await getDefaultDb());
+  const rangeStart = referenceNow.startOf('day').minus({ days: days - 1 });
+  const rangeEnd = referenceNow.startOf('day').plus({ days: 1 });
+  const periodEventRows = await timeDbQuery('overview_q_period_events', () =>
+    database
+      .select({
+        id: impactEventsTable.id,
+        issue_id: impactEventsTable.issue_id,
+        ts: impactEventsTable.ts,
+      })
+      .from(impactEventsTable)
+      .where(eq(impactEventsTable.type, 'periods.set')),
+  );
+  const latestPeriodEventByIssueId = periodEventRows.reduce<
+    Record<string, (typeof periodEventRows)[number]>
+  >((acc, event) => {
+    const current = acc[event.issue_id];
+    if (current == null) {
+      acc[event.issue_id] = event;
+      return acc;
+    }
+
+    const tsDiff =
+      parseDateTime(event.ts).toMillis() - parseDateTime(current.ts).toMillis();
+    if (tsDiff > 0 || (tsDiff === 0 && event.id > current.id)) {
+      acc[event.issue_id] = event;
+    }
+    return acc;
+  }, {});
+  const latestPeriodEventIds = Object.values(latestPeriodEventByIssueId).map(
+    (event) => event.id,
+  );
+  const issueIdByPeriodEventId = Object.fromEntries(
+    Object.values(latestPeriodEventByIssueId).map((event) => [
+      event.id,
+      event.issue_id,
+    ]),
+  );
+  const periodRows = await timeDbQuery('overview_q_periods', () =>
+    selectByIdChunks(latestPeriodEventIds, (ids) =>
+      database
+        .select({
+          impact_event_id: impactEventPeriodsTable.impact_event_id,
+          start_at: impactEventPeriodsTable.start_at,
+          end_at: impactEventPeriodsTable.end_at,
+        })
+        .from(impactEventPeriodsTable)
+        .where(inArray(impactEventPeriodsTable.impact_event_id, ids)),
+    ),
+  );
+  const issueIds = new Set<string>();
+  for (const period of periodRows) {
+    const periodStart = parseDateTime(period.start_at);
+    const periodEnd =
+      period.end_at != null ? parseDateTime(period.end_at) : null;
+    const overlapsOverviewRange =
+      periodStart < rangeEnd && (periodEnd == null || periodEnd > rangeStart);
+    if (!overlapsOverviewRange) {
+      continue;
+    }
+
+    const issueId = issueIdByPeriodEventId[period.impact_event_id];
+    if (issueId != null) {
+      issueIds.add(issueId);
+    }
+  }
+
+  return [...issueIds];
+}
+
+async function buildOverviewDataset(
+  days: number,
+  referenceNow = nowSg(),
+  db?: AppDb,
+): Promise<OverviewDataset> {
+  return timeServerSpan('build_overview_dataset', async () => {
+    const database = db ?? (await getDefaultDb());
+    const issueIds = await timeServerSpan('overview_issue_candidates', () =>
+      getOverviewIssueIds(days, referenceNow, database),
+    );
+    const dataset = await buildDataset(referenceNow, database, issueIds);
+    return {
+      included: dataset.included,
+      publicHolidaySet: dataset.publicHolidaySet,
+      allIssues: dataset.allIssues,
+      issuesByLineId: dataset.issuesByLineId,
+    };
+  });
+}
+
+async function getOverviewDataset(days: number) {
+  const now = Date.now();
+  const cached = cachedOverviewDatasets.get(days);
+  if (cached != null && cached.expiresAt > now) {
+    recordServerTiming('overview_dataset', 0, 'cache=hit');
+    return cached.value;
+  }
+
+  const startedAt = performance.now();
+  const cacheState = pendingOverviewDatasets.has(days) ? 'pending' : 'miss';
+  let pending = pendingOverviewDatasets.get(days);
+  if (pending == null) {
+    pending = buildOverviewDataset(days)
+      .then((dataset) => {
+        cachedOverviewDatasets.set(days, {
+          expiresAt: Date.now() + BASE_DATASET_CACHE_TTL_MS,
+          value: dataset,
+        });
+        return dataset;
+      })
+      .finally(() => {
+        pendingOverviewDatasets.delete(days);
+      });
+    pendingOverviewDatasets.set(days, pending);
+  }
+
+  try {
+    return await pending;
+  } finally {
+    recordServerTiming(
+      'overview_dataset',
+      performance.now() - startedAt,
+      `cache=${cacheState}`,
+    );
+  }
+}
+
 async function getIncludedForIssueIds(issueIds: readonly string[]) {
   const dataset = await buildDataset(nowSg(), undefined, issueIds);
   return selectIncludedEntities(dataset.included, dataset.allIssues, {
@@ -3366,7 +3510,7 @@ export async function getOverviewData(
   options: CommunitySignalOptions = {},
 ) {
   return timeServerSpan('overview_data', async () => {
-    const dataset = await getBaseDataset();
+    const dataset = await getOverviewDataset(days);
     const issues = Object.values(dataset.allIssues);
     const lineSummaries = timeSyncServerSpan('overview_line_summaries', () =>
       rankLineSummaries(
