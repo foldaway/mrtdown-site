@@ -67,7 +67,14 @@ one-off migration.
 
    npx wrangler d1 execute DB --env production --remote --command \
      "select 'crowd_reports' as table_name, count(*) as rows from crowd_reports
-      union all select 'crowd_report_clusters', count(*) from crowd_report_clusters;"
+      union all select 'crowd_report_clusters', count(*) from crowd_report_clusters
+      union all select 'crowd_report_cluster_lines', count(*) from crowd_report_cluster_lines
+      union all select 'crowd_report_cluster_stations', count(*) from crowd_report_cluster_stations
+      union all select 'crowd_report_lines', count(*) from crowd_report_lines
+      union all select 'crowd_report_stations', count(*) from crowd_report_stations
+      union all select 'crowd_report_moderation_events', count(*) from crowd_report_moderation_events
+      union all select 'crowd_report_rate_limits', count(*) from crowd_report_rate_limits
+      union all select 'crowd_report_abuse_events', count(*) from crowd_report_abuse_events;"
    ```
 
 10. Run route checks for `/`, `/statistics`, `/history`, representative line,

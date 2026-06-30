@@ -67,9 +67,6 @@ from data archives.
   database.
 - `npm run db:migrate`: apply D1 migrations to a remote Wrangler environment;
   pass `-- --env preview`, `-- --env staging`, or `-- --env production`.
-- `npm run cf:prepare-d1-config`: inject the real environment D1 database ID
-  into `wrangler.jsonc` from `CLOUDFLARE_ENV` and `D1_DATABASE_ID` before CI
-  runs remote Wrangler commands.
 - `npm run dev:pull`: trigger the local pull workflow endpoint while the dev
   server is running.
 

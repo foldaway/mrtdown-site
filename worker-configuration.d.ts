@@ -11,7 +11,7 @@ declare namespace Cloudflare {
 		CF_VERSION_METADATA: WorkerVersionMetadata;
 		TIER: "preview";
 		VITE_ROOT_URL: "https://www.mrtdown.org";
-		MRTDOWN_DATA_URL: "https://data.mrtdown.com";
+		MRTDOWN_DATA_URL: "https://data.mrtdown.org";
 		CROWD_REPORT_DISPATCH_GITHUB_OWNER: "foldaway";
 		CROWD_REPORT_DISPATCH_GITHUB_REPO: "mrtdown-data";
 		CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE: "ingest";
@@ -28,7 +28,7 @@ declare namespace Cloudflare {
 		CF_VERSION_METADATA: WorkerVersionMetadata;
 		TIER: "staging";
 		VITE_ROOT_URL: "https://www.mrtdown.org";
-		MRTDOWN_DATA_URL: "https://data.mrtdown.com";
+		MRTDOWN_DATA_URL: "https://data.mrtdown.org";
 		CROWD_REPORT_DISPATCH_GITHUB_OWNER: "foldaway";
 		CROWD_REPORT_DISPATCH_GITHUB_REPO: "mrtdown-data";
 		CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE: "ingest";
@@ -45,7 +45,7 @@ declare namespace Cloudflare {
 		CF_VERSION_METADATA: WorkerVersionMetadata;
 		TIER: "production";
 		VITE_ROOT_URL: "https://www.mrtdown.org";
-		MRTDOWN_DATA_URL: "https://data.mrtdown.com";
+		MRTDOWN_DATA_URL: "https://data.mrtdown.org";
 		CROWD_REPORT_DISPATCH_GITHUB_OWNER: "foldaway";
 		CROWD_REPORT_DISPATCH_GITHUB_REPO: "mrtdown-data";
 		CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE: "ingest";
@@ -62,7 +62,7 @@ declare namespace Cloudflare {
 		CF_VERSION_METADATA: WorkerVersionMetadata;
 		TIER: "preview" | "staging" | "production";
 		VITE_ROOT_URL: "https://www.mrtdown.org";
-		MRTDOWN_DATA_URL: "https://data.mrtdown.com";
+		MRTDOWN_DATA_URL: "https://data.mrtdown.org";
 		CROWD_REPORT_DISPATCH_GITHUB_OWNER: "foldaway";
 		CROWD_REPORT_DISPATCH_GITHUB_REPO: "mrtdown-data";
 		CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE: "ingest";

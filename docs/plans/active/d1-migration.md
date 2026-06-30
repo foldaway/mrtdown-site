@@ -401,7 +401,8 @@ Exit criteria:
 - 2026-06-22: Keep the migration stack direct. The app should switch to D1
   rather than carry a long-lived Postgres/D1 compatibility layer.
 - 2026-06-22: Rebuild canonical read-model rows from `mrtdown-data` during
-  migration. Only site-local mutable rows need Postgres-to-D1 export/import.
+  migration. No Postgres-to-D1 export/import runs in the cutover path; site-local
+  mutable state starts empty and is rebuilt by D1-native workflows.
 
 ## Validation
 
