@@ -22,6 +22,11 @@ import {
   getIssuesHistoryYearFn,
   parseHistoryYearParam,
 } from '~/util/history.functions';
+import {
+  getHistoryNavigationYearOptions,
+  HISTORY_YEAR_BOUNDS,
+  isHistoryYearInBounds,
+} from '~/util/historyYearBounds';
 
 export const Route = createFileRoute('/{-$lang}/history/$year/')({
   component: HistoryYearPage,
@@ -127,15 +132,17 @@ function HistoryYearPage() {
     return DateTime.fromISO(startAt).setZone('Asia/Singapore');
   }, [startAt]);
 
-  const yearOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const startYear = 2010;
-    const years = [];
-    for (let y = currentYear; y >= startYear; y--) {
-      years.push(y);
-    }
-    return years;
-  }, []);
+  const yearOptions = getHistoryNavigationYearOptions();
+  const previousYear = dateTimeStartAt.minus({ year: 1 }).year;
+  const nextYear = dateTimeStartAt.plus({ year: 1 }).year;
+  const canNavigateToPreviousYear = isHistoryYearInBounds(
+    previousYear,
+    HISTORY_YEAR_BOUNDS,
+  );
+  const canNavigateToNextYear = isHistoryYearInBounds(
+    nextYear,
+    HISTORY_YEAR_BOUNDS,
+  );
 
   const isHydrated = useHydrated();
 
@@ -187,15 +194,20 @@ function HistoryYearPage() {
                 type="button"
                 className="rounded-lg p-3 text-gray-700 transition-all hover:bg-white hover:shadow-md disabled:pointer-events-none disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-600"
                 aria-label="Previous year"
+                disabled={!canNavigateToPreviousYear}
               >
-                <Link
-                  to="/{-$lang}/history/$year"
-                  params={{
-                    year: dateTimeStartAt.minus({ year: 1 }).year.toString(),
-                  }}
-                >
+                {canNavigateToPreviousYear ? (
+                  <Link
+                    to="/{-$lang}/history/$year"
+                    params={{
+                      year: previousYear.toString(),
+                    }}
+                  >
+                    <ArrowLeftIcon className="size-5" />
+                  </Link>
+                ) : (
                   <ArrowLeftIcon className="size-5" />
-                </Link>
+                )}
               </button>
 
               <div className="flex min-w-48 flex-col items-center">
@@ -251,15 +263,20 @@ function HistoryYearPage() {
                 type="button"
                 className="rounded-lg p-3 text-gray-700 transition-all hover:bg-white hover:shadow-md disabled:pointer-events-none disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-600"
                 aria-label="Next year"
+                disabled={!canNavigateToNextYear}
               >
-                <Link
-                  to="/{-$lang}/history/$year"
-                  params={{
-                    year: dateTimeStartAt.plus({ year: 1 }).year.toString(),
-                  }}
-                >
+                {canNavigateToNextYear ? (
+                  <Link
+                    to="/{-$lang}/history/$year"
+                    params={{
+                      year: nextYear.toString(),
+                    }}
+                  >
+                    <ArrowRightIcon className="size-5" />
+                  </Link>
+                ) : (
                   <ArrowRightIcon className="size-5" />
-                </Link>
+                )}
               </button>
             </div>
           </div>
@@ -379,15 +396,20 @@ function HistoryYearPage() {
             type="button"
             className="rounded-lg p-3 text-gray-600 transition-all hover:bg-gray-100 hover:shadow-sm disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
             aria-label="Previous year"
+            disabled={!canNavigateToPreviousYear}
           >
-            <Link
-              to="/{-$lang}/history/$year"
-              params={{
-                year: dateTimeStartAt.minus({ year: 1 }).year.toString(),
-              }}
-            >
+            {canNavigateToPreviousYear ? (
+              <Link
+                to="/{-$lang}/history/$year"
+                params={{
+                  year: previousYear.toString(),
+                }}
+              >
+                <ArrowLeftIcon className="size-5" />
+              </Link>
+            ) : (
               <ArrowLeftIcon className="size-5" />
-            </Link>
+            )}
           </button>
 
           <div className="flex min-w-48 flex-col items-center">
@@ -443,15 +465,20 @@ function HistoryYearPage() {
             type="button"
             className="rounded-lg p-3 text-gray-600 transition-all hover:bg-gray-100 hover:shadow-sm disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
             aria-label="Next year"
+            disabled={!canNavigateToNextYear}
           >
-            <Link
-              to="/{-$lang}/history/$year"
-              params={{
-                year: dateTimeStartAt.plus({ year: 1 }).year.toString(),
-              }}
-            >
+            {canNavigateToNextYear ? (
+              <Link
+                to="/{-$lang}/history/$year"
+                params={{
+                  year: nextYear.toString(),
+                }}
+              >
+                <ArrowRightIcon className="size-5" />
+              </Link>
+            ) : (
               <ArrowRightIcon className="size-5" />
-            </Link>
+            )}
           </button>
         </div>
       </div>

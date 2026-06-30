@@ -117,6 +117,28 @@ describe('agent Markdown discovery', () => {
     expect(paths).not.toContain('/history/2025');
   });
 
+  it('keeps history sitemap URLs within route year bounds', () => {
+    const paths = buildSitemapPaths({
+      lineIds: [],
+      stationIds: [],
+      operatorIds: [],
+      issueIds: [],
+      monthEarliest: '2009-12-01',
+      monthLatest: '2027-01-01',
+      operationalFactCoverageDates: [
+        ...buildCoverageDates('2009-12'),
+        ...buildCoverageDates('2026-12'),
+        ...buildCoverageDates('2027-01'),
+      ],
+      operationalFactCoverageStartDate: '2009-12-01',
+      currentDate: '2026-06-21',
+    });
+
+    expect(paths).not.toContain('/history/2009/12');
+    expect(paths).toContain('/history/2026/12');
+    expect(paths).not.toContain('/history/2027/01');
+  });
+
   it('keeps sitemap generation alive when history date bounds are invalid', () => {
     const paths = buildSitemapPaths({
       lineIds: ['EWL'],

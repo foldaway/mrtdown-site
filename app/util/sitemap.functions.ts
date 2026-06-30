@@ -3,6 +3,10 @@ import type { Element, Root } from 'xast';
 import { toXml } from 'xast-util-to-xml';
 import { buildLocaleAlternates } from '~/helpers/seo';
 import { getSitemapData } from './db.queries';
+import {
+  HISTORY_YEAR_BOUNDS,
+  isHistoryYearInBounds,
+} from './historyYearBounds';
 
 interface SitemapPathData {
   lineIds: string[];
@@ -245,6 +249,16 @@ export function buildSitemapPaths({
   for (const monthInterval of interval.splitBy({ month: 1 })) {
     const monthDateTime = monthInterval.start;
     if (monthDateTime == null) {
+      continue;
+    }
+
+    if (
+      !isHistoryYearInBounds(
+        monthDateTime.year,
+        HISTORY_YEAR_BOUNDS,
+        currentDateTime,
+      )
+    ) {
       continue;
     }
 
