@@ -14,6 +14,17 @@ describe('history year bounds', () => {
     expect(getHistoryYearMax(HISTORY_YEAR_BOUNDS, now)).toBe(2026);
   });
 
+  it('uses Singapore time for the current-year boundary', () => {
+    const utcNewYearWindow = DateTime.fromISO('2026-12-31T16:30:00Z', {
+      zone: 'utc',
+    });
+
+    expect(getHistoryYearMax(HISTORY_YEAR_BOUNDS, utcNewYearWindow)).toBe(2027);
+    expect(
+      isHistoryYearInBounds(2027, HISTORY_YEAR_BOUNDS, utcNewYearWindow),
+    ).toBe(true);
+  });
+
   it('checks years against the supplied bounds', () => {
     expect(isHistoryYearInBounds(2010, HISTORY_YEAR_BOUNDS, now)).toBe(true);
     expect(isHistoryYearInBounds(2009, HISTORY_YEAR_BOUNDS, now)).toBe(false);
