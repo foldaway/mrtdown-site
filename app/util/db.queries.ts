@@ -1855,15 +1855,57 @@ async function getOverviewIssueIds(
   const database = db ?? (await getDefaultDb());
   const rangeStart = referenceNow.startOf('day').minus({ days: days - 1 });
   const rangeEnd = referenceNow.startOf('day').plus({ days: 1 });
-  const periodEventRows = await timeDbQuery('overview_q_period_events', () =>
-    database
-      .select({
-        id: impactEventsTable.id,
-        issue_id: impactEventsTable.issue_id,
-        ts: impactEventsTable.ts,
-      })
-      .from(impactEventsTable)
-      .where(eq(impactEventsTable.type, 'periods.set')),
+  const overlappingPeriodRows = await timeDbQuery(
+    'overview_q_overlapping_periods',
+    () =>
+      database
+        .select({
+          impact_event_id: impactEventPeriodsTable.impact_event_id,
+        })
+        .from(impactEventPeriodsTable)
+        .where(
+          sql`${impactEventPeriodsTable.start_at} < ${isoDateTime(rangeEnd)} and (${impactEventPeriodsTable.end_at} is null or ${impactEventPeriodsTable.end_at} > ${isoDateTime(rangeStart)})`,
+        ),
+  );
+  const overlappingPeriodEventIds = [
+    ...new Set(overlappingPeriodRows.map((row) => row.impact_event_id)),
+  ];
+  const overlappingPeriodEventRows = await timeDbQuery(
+    'overview_q_period_events_for_overlap',
+    () =>
+      selectByIdChunks(overlappingPeriodEventIds, (ids) =>
+        database
+          .select({
+            id: impactEventsTable.id,
+            issue_id: impactEventsTable.issue_id,
+            ts: impactEventsTable.ts,
+          })
+          .from(impactEventsTable)
+          .where(inArray(impactEventsTable.id, ids)),
+      ),
+  );
+  const overlappingPeriodEventIdSet = new Set(overlappingPeriodEventIds);
+  const candidateIssueIds = [
+    ...new Set(overlappingPeriodEventRows.map((event) => event.issue_id)),
+  ];
+  const periodEventRows = await timeDbQuery(
+    'overview_q_period_events_for_issues',
+    () =>
+      selectByIdChunks(candidateIssueIds, (ids) =>
+        database
+          .select({
+            id: impactEventsTable.id,
+            issue_id: impactEventsTable.issue_id,
+            ts: impactEventsTable.ts,
+          })
+          .from(impactEventsTable)
+          .where(
+            and(
+              eq(impactEventsTable.type, 'periods.set'),
+              inArray(impactEventsTable.issue_id, ids),
+            ),
+          ),
+      ),
   );
   const latestPeriodEventByIssueId = periodEventRows.reduce<
     Record<string, (typeof periodEventRows)[number]>
@@ -1881,41 +1923,10 @@ async function getOverviewIssueIds(
     }
     return acc;
   }, {});
-  const latestPeriodEventIds = Object.values(latestPeriodEventByIssueId).map(
-    (event) => event.id,
-  );
-  const issueIdByPeriodEventId = Object.fromEntries(
-    Object.values(latestPeriodEventByIssueId).map((event) => [
-      event.id,
-      event.issue_id,
-    ]),
-  );
-  const periodRows = await timeDbQuery('overview_q_periods', () =>
-    selectByIdChunks(latestPeriodEventIds, (ids) =>
-      database
-        .select({
-          impact_event_id: impactEventPeriodsTable.impact_event_id,
-          start_at: impactEventPeriodsTable.start_at,
-          end_at: impactEventPeriodsTable.end_at,
-        })
-        .from(impactEventPeriodsTable)
-        .where(inArray(impactEventPeriodsTable.impact_event_id, ids)),
-    ),
-  );
   const issueIds = new Set<string>();
-  for (const period of periodRows) {
-    const periodStart = parseDateTime(period.start_at);
-    const periodEnd =
-      period.end_at != null ? parseDateTime(period.end_at) : null;
-    const overlapsOverviewRange =
-      periodStart < rangeEnd && (periodEnd == null || periodEnd > rangeStart);
-    if (!overlapsOverviewRange) {
-      continue;
-    }
-
-    const issueId = issueIdByPeriodEventId[period.impact_event_id];
-    if (issueId != null) {
-      issueIds.add(issueId);
+  for (const event of Object.values(latestPeriodEventByIssueId)) {
+    if (overlappingPeriodEventIdSet.has(event.id)) {
+      issueIds.add(event.issue_id);
     }
   }
 
