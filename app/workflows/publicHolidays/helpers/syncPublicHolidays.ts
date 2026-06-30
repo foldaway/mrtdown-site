@@ -1,7 +1,7 @@
-import { and, gte, inArray, lte } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AppDb } from '../../../db/index.js';
-import { publicHolidaysTable } from '../../../db/schema.js';
+import { metadataTable, publicHolidaysTable } from '../../../db/schema.js';
 import { runDbOrderedStatements } from '../../../db/orderedStatements.js';
 import { withDbDiagnostics } from '../../../util/dbDiagnostics.js';
 
@@ -12,6 +12,8 @@ const DATA_GOV_DATASTORE_SEARCH_URL =
 const DATA_GOV_PAGE_LIMIT = 500;
 const D1_DELETE_BATCH = 50;
 const D1_WRITE_BATCH = 10;
+const PENDING_PUBLIC_HOLIDAY_REBUILD_DATES_KEY =
+  'public_holidays_pending_rebuild_dates';
 
 type Db = AppDb;
 
@@ -89,6 +91,77 @@ function slug(value: string): string {
 
 function publicHolidayHash(date: string, holidayName: string): string {
   return JSON.stringify([date, holidayName]);
+}
+
+function parsePendingPublicHolidayRebuildDates(value: string | null): string[] {
+  if (value == null) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((date): date is string => typeof date === 'string')
+      .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+async function readPendingPublicHolidayRebuildDates(db: Db): Promise<string[]> {
+  const rows = await db
+    .select({ value: metadataTable.value })
+    .from(metadataTable)
+    .where(eq(metadataTable.key, PENDING_PUBLIC_HOLIDAY_REBUILD_DATES_KEY))
+    .limit(1);
+
+  return parsePendingPublicHolidayRebuildDates(rows[0]?.value ?? null);
+}
+
+async function writePendingPublicHolidayRebuildDates(
+  tx: Pick<Db, 'insert'>,
+  dates: readonly string[],
+): Promise<void> {
+  const value = JSON.stringify([...new Set(dates)].sort());
+  await tx
+    .insert(metadataTable)
+    .values({
+      key: PENDING_PUBLIC_HOLIDAY_REBUILD_DATES_KEY,
+      value,
+    })
+    .onConflictDoUpdate({
+      target: [metadataTable.key],
+      set: { value },
+    });
+}
+
+export async function clearPendingPublicHolidayRebuildDates(
+  db: Db,
+  rebuiltDates: readonly string[],
+): Promise<void> {
+  if (rebuiltDates.length === 0) {
+    return;
+  }
+
+  const rebuilt = new Set(rebuiltDates);
+  const remaining = (await readPendingPublicHolidayRebuildDates(db)).filter(
+    (date) => !rebuilt.has(date),
+  );
+
+  await runDbOrderedStatements(db, async (tx) => {
+    if (remaining.length === 0) {
+      await tx
+        .delete(metadataTable)
+        .where(eq(metadataTable.key, PENDING_PUBLIC_HOLIDAY_REBUILD_DATES_KEY));
+      return;
+    }
+
+    await writePendingPublicHolidayRebuildDates(tx, remaining);
+  });
 }
 
 async function withPublicHolidayDbDiagnostics<T>(
@@ -215,6 +288,9 @@ export async function syncPublicHolidays(
   for (const row of staleRows) {
     changedDates.add(row.date);
   }
+  for (const date of await readPendingPublicHolidayRebuildDates(db)) {
+    changedDates.add(date);
+  }
 
   await withPublicHolidayDbDiagnostics(sortedRows, () =>
     runDbOrderedStatements(db, async (tx) => {
@@ -225,6 +301,10 @@ export async function syncPublicHolidays(
         holiday_name: row.holidayName,
         hash: row.hash,
       }));
+      if (changedDates.size > 0) {
+        await writePendingPublicHolidayRebuildDates(tx, [...changedDates]);
+      }
+
       for (const rows of chunk(upsertRows, D1_WRITE_BATCH)) {
         for (const row of rows) {
           await tx
