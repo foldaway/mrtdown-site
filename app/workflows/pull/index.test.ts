@@ -31,9 +31,18 @@ describe('pull workflow promotion order', () => {
     }
   });
 
-  it('keeps changed issue promotion batches small for Worker subrequest limits', () => {
+  it('uses larger issue promotion batches for paid-tier D1 subrequest limits', () => {
     const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
 
-    expect(source).toContain('const ISSUE_SYNC_BATCH_SIZE = 10;');
+    expect(source).toContain('const ISSUE_SYNC_BATCH_SIZE = 50;');
+  });
+
+  it('raises Worker subrequest limits for larger issue promotion batches', () => {
+    const source = readFileSync(
+      new URL('../../../wrangler.jsonc', import.meta.url),
+      'utf8',
+    );
+
+    expect(source).toContain('"subrequests": 20000');
   });
 });

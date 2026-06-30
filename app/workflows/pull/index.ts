@@ -56,8 +56,8 @@ const syncStepConfig = {
   },
 };
 
-/** Keep each changed-issue step comfortably below D1 per-invocation subrequest limits. */
-const ISSUE_SYNC_BATCH_SIZE = 10;
+/** Paid-tier D1 can tolerate larger issue steps; SQL statement batches stay capped separately. */
+const ISSUE_SYNC_BATCH_SIZE = 50;
 const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
 
 const factsStepConfig = {

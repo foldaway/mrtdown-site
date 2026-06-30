@@ -13,7 +13,8 @@
     }
   },
   "limits": {
-    "cpu_ms": 300000
+    "cpu_ms": 300000,
+    "subrequests": 20000
   },
   "vars": {
     "TIER": "production",
@@ -215,7 +216,8 @@
         }
       },
       "limits": {
-        "cpu_ms": 300000
+        "cpu_ms": 300000,
+        "subrequests": 20000
       },
       "d1_databases": [
         {
