@@ -84,6 +84,7 @@ const BATCH = 10;
 const IMPACT_EVENT_PERIOD_INSERT_BATCH = 25;
 /** Max ids per `IN (...)` cleanup query. Keep below proxy/driver bind limits. */
 const DELETE_BATCH = 50;
+const PENDING_LIVE_HASH_PREFIX = '__pending_pull__:';
 
 type Db = AppDb;
 type DeleteDb = Pick<AppDb, 'delete'>;
@@ -100,6 +101,10 @@ function serviceRevisionStartAt(revision: ServiceRevision): string {
 
 function assertUnreachable(value: never, message: string): never {
   throw new Error(`${message}: ${String(value)}`);
+}
+
+function pendingLiveHash(hash: string): string {
+  return `${PENDING_LIVE_HASH_PREFIX}${hash}`;
 }
 
 async function withDbDiagnostics<T>(
@@ -613,7 +618,7 @@ export async function syncLines(db: Db): Promise<void> {
           .insert(linesTable)
           .values({
             id: row.id,
-            hash: row.hash,
+            hash: pendingLiveHash(row.hash),
             name: row.name,
             type: row.type,
             color: row.color,
@@ -624,7 +629,7 @@ export async function syncLines(db: Db): Promise<void> {
           .onConflictDoUpdate({
             target: [linesTable.id],
             set: {
-              hash: row.hash,
+              hash: pendingLiveHash(row.hash),
               name: row.name,
               type: row.type,
               color: row.color,
@@ -652,6 +657,13 @@ export async function syncLines(db: Db): Promise<void> {
             }),
           );
         }
+        await tx
+          .update(linesTable)
+          .set({
+            hash: row.hash,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(linesTable.id, row.id));
       }
     }
   });
@@ -758,7 +770,7 @@ export async function syncStations(db: Db): Promise<void> {
           .insert(stationsTable)
           .values({
             id: row.id,
-            hash: row.hash,
+            hash: pendingLiveHash(row.hash),
             name: row.name,
             latitude: row.latitude,
             longitude: row.longitude,
@@ -767,11 +779,12 @@ export async function syncStations(db: Db): Promise<void> {
           .onConflictDoUpdate({
             target: [stationsTable.id],
             set: {
-              hash: row.hash,
+              hash: pendingLiveHash(row.hash),
               name: row.name,
               latitude: row.latitude,
               longitude: row.longitude,
               townId: row.town_id,
+              updated_at: new Date().toISOString(),
             },
           });
       }
@@ -806,6 +819,13 @@ export async function syncStations(db: Db): Promise<void> {
             }),
           );
         }
+        await tx
+          .update(stationsTable)
+          .set({
+            hash: row.hash,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(stationsTable.id, row.id));
       }
     }
   });
@@ -1002,16 +1022,6 @@ export async function syncServices(db: Db): Promise<void> {
 
     for (const ch of chunk(changedIds, BATCH)) {
       if (ch.length === 0) continue;
-      await tx
-        .delete(serviceRevisionPathStationEntriesTable)
-        .where(inArray(serviceRevisionPathStationEntriesTable.service_id, ch));
-      await tx
-        .delete(serviceRevisionsTable)
-        .where(inArray(serviceRevisionsTable.service_id, ch));
-      await tx
-        .delete(lineServicesTable)
-        .where(inArray(lineServicesTable.service_id, ch));
-
       const full = await tx
         .select()
         .from(servicesNextTable)
@@ -1021,18 +1031,28 @@ export async function syncServices(db: Db): Promise<void> {
           .insert(servicesTable)
           .values({
             id: row.id,
-            hash: row.hash,
+            hash: pendingLiveHash(row.hash),
             name: row.name,
             line_id: row.line_id,
           })
           .onConflictDoUpdate({
             target: [servicesTable.id],
             set: {
-              hash: row.hash,
+              hash: pendingLiveHash(row.hash),
               name: row.name,
               line_id: row.line_id,
+              updated_at: new Date().toISOString(),
             },
           });
+        await tx
+          .delete(serviceRevisionPathStationEntriesTable)
+          .where(eq(serviceRevisionPathStationEntriesTable.service_id, row.id));
+        await tx
+          .delete(serviceRevisionsTable)
+          .where(eq(serviceRevisionsTable.service_id, row.id));
+        await tx
+          .delete(lineServicesTable)
+          .where(eq(lineServicesTable.service_id, row.id));
         await tx
           .insert(lineServicesTable)
           .values({
@@ -1099,6 +1119,13 @@ export async function syncServices(db: Db): Promise<void> {
               });
           }
         }
+        await tx
+          .update(servicesTable)
+          .set({
+            hash: row.hash,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(servicesTable.id, row.id));
       }
     }
   });
@@ -1388,11 +1415,14 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
       for (const row of rows) {
         await tx
           .insert(issuesTable)
-          .values(row)
+          .values({
+            ...row,
+            hash: pendingLiveHash(row.hash),
+          })
           .onConflictDoUpdate({
             target: [issuesTable.id],
             set: {
-              hash: row.hash,
+              hash: pendingLiveHash(row.hash),
               type: row.type,
               title: row.title,
               title_meta: row.title_meta,
@@ -1644,6 +1674,17 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
           },
           () => tx.insert(impactEventFacilityEffectsTable).values(rows),
         );
+      }
+    }
+    for (const rows of chunk(issueRows, BATCH)) {
+      for (const row of rows) {
+        await tx
+          .update(issuesTable)
+          .set({
+            hash: row.hash,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(issuesTable.id, row.id));
       }
     }
   }

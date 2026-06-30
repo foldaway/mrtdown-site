@@ -260,4 +260,18 @@ describe('pull staging inserts', () => {
     expect(source).toContain('.values(rows)');
     expect(source).not.toContain('for (const pathEntryRow of rows)');
   });
+
+  it('finalizes compound entity hashes after child rows are rebuilt', () => {
+    const source = readFileSync(
+      new URL('./stagingSync.ts', import.meta.url),
+      'utf8',
+    );
+
+    expect(source).toContain('const PENDING_LIVE_HASH_PREFIX');
+    expect(source).toContain('hash: pendingLiveHash(row.hash)');
+    expect(source).toContain('.where(eq(linesTable.id, row.id))');
+    expect(source).toContain('.where(eq(stationsTable.id, row.id))');
+    expect(source).toContain('.where(eq(servicesTable.id, row.id))');
+    expect(source).toContain('.where(eq(issuesTable.id, row.id))');
+  });
 });
