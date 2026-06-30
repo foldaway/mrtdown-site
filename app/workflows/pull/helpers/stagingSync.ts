@@ -27,6 +27,7 @@ import {
   ne,
   notExists,
   or,
+  sql,
 } from 'drizzle-orm';
 import type { AppDb } from '../../../db/index.js';
 import {
@@ -1077,23 +1078,25 @@ export async function syncServices(db: Db): Promise<void> {
             },
           );
           for (const rows of chunk(pathEntryRows, BATCH)) {
-            for (const pathEntryRow of rows) {
-              await tx
-                .insert(serviceRevisionPathStationEntriesTable)
-                .values(pathEntryRow)
-                .onConflictDoUpdate({
-                  target: [
-                    serviceRevisionPathStationEntriesTable.service_revision_id,
-                    serviceRevisionPathStationEntriesTable.service_id,
-                    serviceRevisionPathStationEntriesTable.station_id,
-                    serviceRevisionPathStationEntriesTable.path_index,
-                  ],
-                  set: {
-                    display_code: pathEntryRow.display_code,
-                    path_index: pathEntryRow.path_index,
-                  },
-                });
+            if (rows.length === 0) {
+              continue;
             }
+
+            await tx
+              .insert(serviceRevisionPathStationEntriesTable)
+              .values(rows)
+              .onConflictDoUpdate({
+                target: [
+                  serviceRevisionPathStationEntriesTable.service_revision_id,
+                  serviceRevisionPathStationEntriesTable.service_id,
+                  serviceRevisionPathStationEntriesTable.station_id,
+                  serviceRevisionPathStationEntriesTable.path_index,
+                ],
+                set: {
+                  display_code: sql.raw('excluded.display_code'),
+                  path_index: sql.raw('excluded.path_index'),
+                },
+              });
           }
         }
       }

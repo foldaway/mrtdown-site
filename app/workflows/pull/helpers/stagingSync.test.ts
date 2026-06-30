@@ -249,4 +249,15 @@ describe('pull staging inserts', () => {
       'chunk(dedupedRows, IMPACT_EVENT_PERIOD_INSERT_BATCH)',
     );
   });
+
+  it('batches service revision path station entry upserts', () => {
+    const source = readFileSync(
+      new URL('./stagingSync.ts', import.meta.url),
+      'utf8',
+    );
+
+    expect(source).toContain('chunk(pathEntryRows, BATCH)');
+    expect(source).toContain('.values(rows)');
+    expect(source).not.toContain('for (const pathEntryRow of rows)');
+  });
 });
