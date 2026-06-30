@@ -22,6 +22,11 @@ import {
   getIssuesHistoryYearMonthFn,
   parseHistoryYearMonthParams,
 } from '~/util/history.functions';
+import {
+  getHistoryNavigationYearOptions,
+  HISTORY_YEAR_BOUNDS,
+  isHistoryYearInBounds,
+} from '~/util/historyYearBounds';
 
 export const Route = createFileRoute('/{-$lang}/history/$year/$month')({
   component: HistoryMonthPage,
@@ -127,15 +132,17 @@ function HistoryMonthPage() {
     return DateTime.fromISO(startAt).setZone('Asia/Singapore');
   }, [startAt]);
 
-  const yearOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const startYear = 2010;
-    const years = [];
-    for (let y = currentYear; y >= startYear; y--) {
-      years.push(y);
-    }
-    return years;
-  }, []);
+  const yearOptions = getHistoryNavigationYearOptions();
+  const previousMonthDateTime = dateTimeStartAt.minus({ month: 1 });
+  const nextMonthDateTime = dateTimeStartAt.plus({ month: 1 });
+  const canNavigateToPreviousMonth = isHistoryYearInBounds(
+    previousMonthDateTime.year,
+    HISTORY_YEAR_BOUNDS,
+  );
+  const canNavigateToNextMonth = isHistoryYearInBounds(
+    nextMonthDateTime.year,
+    HISTORY_YEAR_BOUNDS,
+  );
 
   const monthOptions = useMemo(() => {
     return Array.from({ length: 12 }, (_, i) => i + 1);
@@ -201,16 +208,21 @@ function HistoryMonthPage() {
               <button
                 type="button"
                 className="rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-800"
+                disabled={!canNavigateToPreviousMonth}
               >
-                <Link
-                  to="/{-$lang}/history/$year/$month"
-                  params={{
-                    year: dateTimeStartAt.minus({ month: 1 }).year.toString(),
-                    month: dateTimeStartAt.minus({ month: 1 }).toFormat('MM'),
-                  }}
-                >
+                {canNavigateToPreviousMonth ? (
+                  <Link
+                    to="/{-$lang}/history/$year/$month"
+                    params={{
+                      year: previousMonthDateTime.year.toString(),
+                      month: previousMonthDateTime.toFormat('MM'),
+                    }}
+                  >
+                    <ArrowLeftIcon className="size-4" />
+                  </Link>
+                ) : (
                   <ArrowLeftIcon className="size-4" />
-                </Link>
+                )}
               </button>
 
               <div className="flex items-center justify-center gap-x-2 sm:min-w-64">
@@ -317,16 +329,21 @@ function HistoryMonthPage() {
               <button
                 type="button"
                 className="rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-50 dark:hover:bg-gray-800"
+                disabled={!canNavigateToNextMonth}
               >
-                <Link
-                  to="/{-$lang}/history/$year/$month"
-                  params={{
-                    year: dateTimeStartAt.plus({ month: 1 }).year.toString(),
-                    month: dateTimeStartAt.plus({ month: 1 }).toFormat('MM'),
-                  }}
-                >
+                {canNavigateToNextMonth ? (
+                  <Link
+                    to="/{-$lang}/history/$year/$month"
+                    params={{
+                      year: nextMonthDateTime.year.toString(),
+                      month: nextMonthDateTime.toFormat('MM'),
+                    }}
+                  >
+                    <ArrowRightIcon className="size-4" />
+                  </Link>
+                ) : (
                   <ArrowRightIcon className="size-4" />
-                </Link>
+                )}
               </button>
             </div>
           </div>
@@ -383,16 +400,21 @@ function HistoryMonthPage() {
           <button
             type="button"
             className="rounded p-1.5 text-gray-600 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+            disabled={!canNavigateToPreviousMonth}
           >
-            <Link
-              to="/{-$lang}/history/$year/$month"
-              params={{
-                year: dateTimeStartAt.minus({ month: 1 }).year.toString(),
-                month: dateTimeStartAt.minus({ month: 1 }).toFormat('MM'),
-              }}
-            >
+            {canNavigateToPreviousMonth ? (
+              <Link
+                to="/{-$lang}/history/$year/$month"
+                params={{
+                  year: previousMonthDateTime.year.toString(),
+                  month: previousMonthDateTime.toFormat('MM'),
+                }}
+              >
+                <ArrowLeftIcon className="size-4" />
+              </Link>
+            ) : (
               <ArrowLeftIcon className="size-4" />
-            </Link>
+            )}
           </button>
 
           <div className="flex min-w-52 items-center justify-center gap-x-2">
@@ -499,16 +521,21 @@ function HistoryMonthPage() {
           <button
             type="button"
             className="rounded p-1.5 text-gray-600 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+            disabled={!canNavigateToNextMonth}
           >
-            <Link
-              to="/{-$lang}/history/$year/$month"
-              params={{
-                year: dateTimeStartAt.plus({ month: 1 }).year.toString(),
-                month: dateTimeStartAt.plus({ month: 1 }).toFormat('MM'),
-              }}
-            >
+            {canNavigateToNextMonth ? (
+              <Link
+                to="/{-$lang}/history/$year/$month"
+                params={{
+                  year: nextMonthDateTime.year.toString(),
+                  month: nextMonthDateTime.toFormat('MM'),
+                }}
+              >
+                <ArrowRightIcon className="size-4" />
+              </Link>
+            ) : (
               <ArrowRightIcon className="size-4" />
-            </Link>
+            )}
           </button>
         </div>
       </div>

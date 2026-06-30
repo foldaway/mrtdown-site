@@ -1,9 +1,9 @@
-import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
 import {
   parseHistoryYearMonthParams,
   parseHistoryYearParam,
 } from './history.functions';
+import { getHistoryYearMax, HISTORY_YEAR_BOUNDS } from './historyYearBounds';
 
 describe('parseHistoryYearParam', () => {
   it('coerces valid year route params', () => {
@@ -11,11 +11,11 @@ describe('parseHistoryYearParam', () => {
   });
 
   it('rejects invalid year route params', () => {
-    const maxYear = DateTime.now().year + 10;
+    const maxYear = getHistoryYearMax(HISTORY_YEAR_BOUNDS);
 
     expect(parseHistoryYearParam('not-a-year')).toBeNull();
     expect(parseHistoryYearParam('2025.5')).toBeNull();
-    expect(parseHistoryYearParam('1979')).toBeNull();
+    expect(parseHistoryYearParam('2009')).toBeNull();
     expect(parseHistoryYearParam((maxYear + 1).toString())).toBeNull();
   });
 });

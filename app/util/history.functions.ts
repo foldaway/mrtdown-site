@@ -1,15 +1,16 @@
 import { createServerFn } from '@tanstack/react-start';
-import { DateTime } from 'luxon';
 import z from 'zod';
 import {
   getHistoryYearMonthData,
   getHistoryYearSummaryData,
 } from './db.queries';
+import {
+  HISTORY_YEAR_BOUNDS,
+  isHistoryYearInBounds,
+} from './historyYearBounds';
 
 function isHistoryYearInRange(year: number) {
-  const minYear = 1980;
-  const maxYear = DateTime.now().year + 10;
-  return year >= minYear && year <= maxYear;
+  return isHistoryYearInBounds(year, HISTORY_YEAR_BOUNDS);
 }
 
 function isHistoryMonthInRange(month: number) {
