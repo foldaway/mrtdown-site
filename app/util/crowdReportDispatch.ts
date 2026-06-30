@@ -29,7 +29,7 @@ const DEFAULT_DISPATCH_TIMEOUT_MS = 15_000;
 const DEFAULT_DISPATCH_MIN_ONGOING_REPORTS = 3;
 const DEFAULT_DISPATCH_MIN_DISTINCT_IP_HASHES = 2;
 const MAX_DISPATCH_LIMIT = 50;
-const D1_REPORT_UPDATE_BATCH = 90;
+const D1_REPORT_UPDATE_BATCH = 80;
 const DISPATCH_LOCK_STALE_AFTER_MS = 10 * 60 * 1000;
 const DISPATCH_LOCK_ERROR = 'Dispatch in progress';
 const STALE_DISPATCH_SUCCESS_ERROR =
@@ -637,7 +637,10 @@ async function markCrowdReportDispatchSuccessInTransaction(
           eq(crowdReportClustersTable.id, candidate.id),
           eq(crowdReportClustersTable.status, 'accepted'),
           getCrowdReportClusterLockCondition(candidate),
-          hasCrowdReportClusterDispatchPayloadReportCount(candidate),
+          hasCrowdReportClusterDispatchedPayloadReportCount(
+            candidate,
+            dispatchedAt,
+          ),
         ),
       )
       .returning({ id: crowdReportClustersTable.id });
@@ -771,6 +774,24 @@ function hasCrowdReportClusterDispatchPayloadReportCount(
     where ${crowdReportsTable.cluster_id} = ${candidate.id}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
       and ${crowdReportsTable.still_happening} is true
+  ) = ${candidate.reportIds.length}`;
+}
+
+function hasCrowdReportClusterDispatchedPayloadReportCount(
+  candidate: CrowdReportDispatchCandidate,
+  dispatchedAt: string,
+) {
+  if (candidate.reportIds.length === 0) {
+    return sql`false`;
+  }
+
+  return sql`(
+    select count(*)
+    from ${crowdReportsTable}
+    where ${crowdReportsTable.cluster_id} = ${candidate.id}
+      and ${inArray(crowdReportsTable.id, candidate.reportIds)}
+      and ${crowdReportsTable.status} = 'dispatched'
+      and ${crowdReportsTable.dispatched_at} = ${dispatchedAt}
   ) = ${candidate.reportIds.length}`;
 }
 

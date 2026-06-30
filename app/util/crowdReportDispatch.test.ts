@@ -470,11 +470,16 @@ describe('getDispatchableCrowdReportCandidates', () => {
       fake.whereCalls[2] as SQL,
     ).sql;
 
-    expect(clusterUpdateWhereSql).toContain('"still_happening" is true');
+    expect(clusterUpdateWhereSql).toContain('"crowd_reports"."id" in');
+    expect(clusterUpdateWhereSql).toContain(
+      '"crowd_reports"."status" = \'dispatched\'',
+    );
+    expect(clusterUpdateWhereSql).toContain(
+      '"crowd_reports"."dispatched_at" =',
+    );
     expect(clusterUpdateWhereSql).toContain('count(*)');
     expect(clusterUpdateWhereSql).not.toContain('::int');
     expect(clusterUpdateWhereSql).not.toContain('"crowd_reports"."id" not in');
-    expect(clusterUpdateWhereSql).not.toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).toContain('"crowd_reports"."id" in');
     expect(reportUpdateWhereSql).toContain('"crowd_reports"."cluster_id" =');
     expect(reportUpdateWhereSql).toContain('"crowd_reports"."dispatch_error"');
