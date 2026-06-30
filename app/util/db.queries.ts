@@ -7,6 +7,8 @@ import {
 } from '@mrtdown/core';
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
+import type { AppDb } from '~/db';
+import { runDbOrderedStatements } from '~/db/orderedStatements';
 import {
   evidencesTable,
   impactEventCausesTable,
@@ -205,7 +207,11 @@ type BaseDataset = {
 };
 
 const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
+const D1_SELECT_IN_BATCH = 90;
+const CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX =
+  'crowd_report_duplicate_lock:';
 const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 30;
+const OPERATIONAL_FACTS_WRITE_BATCH = 10;
 let cachedBaseDataset:
   | {
       expiresAt: number;
@@ -215,8 +221,6 @@ let cachedBaseDataset:
 let pendingBaseDataset: Promise<BaseDataset> | undefined;
 const dateTimeCache = new Map<string, DateTime>();
 const issueBoundsCache = new WeakMap<Issue, IssueIntervalBounds[]>();
-
-type AppDb = ReturnType<typeof import('~/db').getDb>;
 
 type IssueIntervalBounds = {
   start: DateTime;
@@ -296,6 +300,15 @@ type OperationalFactRowsForDate = {
   issueRows: (typeof issueDayFactsTable.$inferInsert)[];
   lineRows: (typeof lineDayFactsTable.$inferInsert)[];
 };
+
+type OperationalFactCoverageStart =
+  | {
+      status: 'available';
+      startDate: string;
+    }
+  | {
+      status: 'missing_table';
+    };
 
 function nowSg() {
   return DateTime.now().setZone(SG_TIMEZONE);
@@ -913,7 +926,7 @@ async function buildDataset(
   ] = await timeServerSpan('dataset_base_queries', () =>
     Promise.all([
       timeDbQuery('dataset_q_metadata', () =>
-        database.select().from(metadataTable),
+        database.select().from(metadataTable).where(publicMetadataKeySql()),
       ),
       timeDbQuery('dataset_q_lines', () => database.select().from(linesTable)),
       timeDbQuery('dataset_q_line_operators', () =>
@@ -932,8 +945,8 @@ async function buildDataset(
             id: stationsTable.id,
             name: stationsTable.name,
             townId: stationsTable.townId,
-            latitude: sql<number>`ST_Y(${stationsTable.geo})`,
-            longitude: sql<number>`ST_X(${stationsTable.geo})`,
+            latitude: stationsTable.latitude,
+            longitude: stationsTable.longitude,
           })
           .from(stationsTable),
       ),
@@ -956,14 +969,14 @@ async function buildDataset(
         ? timeDbQuery('dataset_q_issues', () =>
             database.select().from(issuesTable),
           )
-        : selectedIssueIds.length > 0
-          ? timeDbQuery('dataset_q_issues', () =>
+        : timeDbQuery('dataset_q_issues', () =>
+            selectByIdChunks(selectedIssueIds, (ids) =>
               database
                 .select()
                 .from(issuesTable)
-                .where(inArray(issuesTable.id, selectedIssueIds)),
-            )
-          : [],
+                .where(inArray(issuesTable.id, ids)),
+            ),
+          ),
       selectedIssueIds == null
         ? timeDbQuery('dataset_q_latest_evidence', () =>
             database
@@ -974,30 +987,30 @@ async function buildDataset(
               .from(evidencesTable)
               .groupBy(evidencesTable.issue_id),
           )
-        : selectedIssueIds.length > 0
-          ? timeDbQuery('dataset_q_latest_evidence', () =>
+        : timeDbQuery('dataset_q_latest_evidence', () =>
+            selectByIdChunks(selectedIssueIds, (ids) =>
               database
                 .select({
                   issue_id: evidencesTable.issue_id,
                   latest_ts: sql<string>`max(${evidencesTable.ts})`,
                 })
                 .from(evidencesTable)
-                .where(inArray(evidencesTable.issue_id, selectedIssueIds))
+                .where(inArray(evidencesTable.issue_id, ids))
                 .groupBy(evidencesTable.issue_id),
-            )
-          : [],
+            ),
+          ),
       selectedIssueIds == null
         ? timeDbQuery('dataset_q_impact_events', () =>
             database.select().from(impactEventsTable),
           )
-        : selectedIssueIds.length > 0
-          ? timeDbQuery('dataset_q_impact_events', () =>
+        : timeDbQuery('dataset_q_impact_events', () =>
+            selectByIdChunks(selectedIssueIds, (ids) =>
               database
                 .select()
                 .from(impactEventsTable)
-                .where(inArray(impactEventsTable.issue_id, selectedIssueIds)),
-            )
-          : [],
+                .where(inArray(impactEventsTable.issue_id, ids)),
+            ),
+          ),
     ]),
   );
 
@@ -1061,97 +1074,70 @@ async function buildDataset(
     impactEventFacilityEffectRows,
   ] = await timeServerSpan('dataset_issue_detail_queries', () =>
     Promise.all([
-      periodImpactEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_periods', () =>
-            database
-              .select()
-              .from(impactEventPeriodsTable)
-              .where(
-                inArray(
-                  impactEventPeriodsTable.impact_event_id,
-                  periodImpactEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventPeriodsTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_services', () =>
-            database
-              .select()
-              .from(impactEventEntityServicesTable)
-              .where(
-                inArray(
-                  impactEventEntityServicesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventEntityServicesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_facilities', () =>
-            database
-              .select()
-              .from(impactEventEntityFacilitiesTable)
-              .where(
-                inArray(
-                  impactEventEntityFacilitiesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventEntityFacilitiesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_causes', () =>
-            database
-              .select()
-              .from(impactEventCausesTable)
-              .where(
-                inArray(
-                  impactEventCausesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventCausesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_service_scopes', () =>
-            database
-              .select()
-              .from(impactEventServiceScopesTable)
-              .where(
-                inArray(
-                  impactEventServiceScopesTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventServiceScopesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_service_effects', () =>
-            database
-              .select()
-              .from(impactEventServiceEffectsTable)
-              .where(
-                inArray(
-                  impactEventServiceEffectsTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventServiceEffectsTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
-        ? timeDbQuery('dataset_q_impact_event_facility_effects', () =>
-            database
-              .select()
-              .from(impactEventFacilityEffectsTable)
-              .where(
-                inArray(
-                  impactEventFacilityEffectsTable.impact_event_id,
-                  selectedStateEventIds,
-                ),
-              ),
-          )
-        : ([] as (typeof impactEventFacilityEffectsTable.$inferSelect)[]),
+      timeDbQuery('dataset_q_impact_event_periods', () =>
+        selectByIdChunks(periodImpactEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventPeriodsTable)
+            .where(inArray(impactEventPeriodsTable.impact_event_id, ids)),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_services', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventEntityServicesTable)
+            .where(
+              inArray(impactEventEntityServicesTable.impact_event_id, ids),
+            ),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_facilities', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventEntityFacilitiesTable)
+            .where(
+              inArray(impactEventEntityFacilitiesTable.impact_event_id, ids),
+            ),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_causes', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventCausesTable)
+            .where(inArray(impactEventCausesTable.impact_event_id, ids)),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_service_scopes', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventServiceScopesTable)
+            .where(inArray(impactEventServiceScopesTable.impact_event_id, ids)),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_service_effects', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventServiceEffectsTable)
+            .where(
+              inArray(impactEventServiceEffectsTable.impact_event_id, ids),
+            ),
+        ),
+      ),
+      timeDbQuery('dataset_q_impact_event_facility_effects', () =>
+        selectByIdChunks(selectedStateEventIds, (ids) =>
+          database
+            .select()
+            .from(impactEventFacilityEffectsTable)
+            .where(
+              inArray(impactEventFacilityEffectsTable.impact_event_id, ids),
+            ),
+        ),
+      ),
     ]),
   );
 
@@ -1263,17 +1249,17 @@ async function buildDataset(
   const servicePathRows = await timeServerSpan(
     'dataset_service_path_query',
     () =>
-      allRevisionIds.length > 0
-        ? database
-            .select()
-            .from(serviceRevisionPathStationEntriesTable)
-            .where(
-              inArray(
-                serviceRevisionPathStationEntriesTable.service_revision_id,
-                allRevisionIds,
-              ),
-            )
-        : Promise.resolve([]),
+      selectByIdChunks(allRevisionIds, (ids) =>
+        database
+          .select()
+          .from(serviceRevisionPathStationEntriesTable)
+          .where(
+            inArray(
+              serviceRevisionPathStationEntriesTable.service_revision_id,
+              ids,
+            ),
+          ),
+      ),
   );
   const assemblyStartedAt = performance.now();
 
@@ -2689,12 +2675,27 @@ function buildIssueDurationGraphs(issues: Issue[]) {
   });
 }
 
-function chunk<T>(items: T[], size: number) {
+function chunk<T>(items: readonly T[], size: number) {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+async function selectByIdChunks<T>(
+  ids: readonly string[],
+  selectBatch: (ids: string[]) => Promise<T[]>,
+) {
+  const rows: T[] = [];
+  for (const batch of chunk(ids, D1_SELECT_IN_BATCH)) {
+    rows.push(...(await selectBatch(batch)));
+  }
+  return rows;
+}
+
+function publicMetadataKeySql() {
+  return sql`${metadataTable.key} not like ${`${CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX}%`}`;
 }
 
 function buildIssuesByLineId(issues: Iterable<IssueWithOperationalEffects>) {
@@ -2789,13 +2790,48 @@ function buildDurationChartsFromIssueFacts(rows: IssueDayFactRow[]) {
   });
 }
 
-function isUndefinedTableError(error: unknown) {
-  return (
-    error != null &&
-    typeof error === 'object' &&
-    'code' in error &&
-    error.code === '42P01'
-  );
+function readStringField(value: unknown, field: string) {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const fieldValue = value[field];
+  return typeof fieldValue === 'string' ? fieldValue : null;
+}
+
+export function isMissingTableError(error: unknown) {
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+
+  for (let depth = 0; current != null && depth < 6; depth++) {
+    if (seen.has(current)) {
+      break;
+    }
+    seen.add(current);
+
+    const code = readStringField(current, 'code');
+    if (code === '42P01') {
+      return true;
+    }
+
+    const message =
+      current instanceof Error
+        ? current.message
+        : readStringField(current, 'message');
+    if (
+      message != null &&
+      /\bno such table\b/i.test(message) &&
+      (message.includes('D1_ERROR') ||
+        message.includes('SQLITE_ERROR') ||
+        code === 'SQLITE_ERROR')
+    ) {
+      return true;
+    }
+
+    current = isRecord(current) ? current.cause : null;
+  }
+
+  return false;
 }
 
 async function getIssueDayFactsInRange(
@@ -2823,7 +2859,7 @@ async function getIssueDayFactsInRange(
         ),
     );
   } catch (error) {
-    if (isUndefinedTableError(error)) {
+    if (isMissingTableError(error)) {
       return [];
     }
     throw error;
@@ -2852,14 +2888,14 @@ async function getOperationalFactCoverageDatesInRange(
         .groupBy(lineDayFactsTable.date),
     );
   } catch (error) {
-    if (isUndefinedTableError(error)) {
+    if (isMissingTableError(error)) {
       return [];
     }
     throw error;
   }
 }
 
-async function getOperationalFactCoverageStartDate() {
+async function getOperationalFactCoverageStart(): Promise<OperationalFactCoverageStart> {
   const db = await getDefaultDb();
   try {
     const [row] = await timeServerSpan('fact_coverage_start_query', () =>
@@ -2869,10 +2905,20 @@ async function getOperationalFactCoverageStartDate() {
         })
         .from(lineDayFactsTable),
     );
-    return row?.startDate ?? null;
+    if (row?.startDate == null) {
+      return {
+        status: 'missing_table',
+      };
+    }
+    return {
+      status: 'available',
+      startDate: row.startDate,
+    };
   } catch (error) {
-    if (isUndefinedTableError(error)) {
-      return null;
+    if (isMissingTableError(error)) {
+      return {
+        status: 'missing_table',
+      };
     }
     throw error;
   }
@@ -2893,6 +2939,44 @@ function hasFullDateCoverage(
   return dates.size === expectedDays;
 }
 
+export function selectLegacyHistoryFallback(
+  start: DateTime,
+  end: DateTime,
+  today: DateTime,
+  coverageRows: Array<{ date: string }>,
+  coverageStart: OperationalFactCoverageStart,
+  context: string,
+) {
+  if (end.startOf('day') >= today) {
+    return true;
+  }
+
+  const coverageEnd = end.startOf('day') < today ? end.startOf('day') : today;
+  if (coverageEnd < start.startOf('day')) {
+    return false;
+  }
+
+  if (hasFullDateCoverage(coverageRows, start, coverageEnd)) {
+    return false;
+  }
+
+  if (coverageStart.status === 'missing_table') {
+    return true;
+  }
+
+  if (
+    coverageStart.startDate != null &&
+    start.startOf('day') <
+      DateTime.fromISO(coverageStart.startDate, { zone: SG_TIMEZONE })
+  ) {
+    return true;
+  }
+
+  throw new Error(
+    `Missing operational fact coverage for ${context}: ${start.toISODate()} to ${coverageEnd.toISODate()}`,
+  );
+}
+
 async function shouldUseLegacyHistoryFallback(
   start: DateTime,
   end: DateTime,
@@ -2904,29 +2988,19 @@ async function shouldUseLegacyHistoryFallback(
   }
 
   const coverageEnd = end.startOf('day') < today ? end.startOf('day') : today;
-  if (coverageEnd < start.startOf('day')) {
-    return false;
-  }
+  const coverageRows =
+    coverageEnd < start.startOf('day')
+      ? []
+      : await getOperationalFactCoverageDatesInRange(start, coverageEnd);
+  const coverageStart = await getOperationalFactCoverageStart();
 
-  const coverageRows = await getOperationalFactCoverageDatesInRange(
+  return selectLegacyHistoryFallback(
     start,
-    coverageEnd,
-  );
-  if (hasFullDateCoverage(coverageRows, start, coverageEnd)) {
-    return false;
-  }
-
-  const coverageStart = await getOperationalFactCoverageStartDate();
-  if (
-    coverageStart != null &&
-    start.startOf('day') <
-      DateTime.fromISO(coverageStart, { zone: SG_TIMEZONE })
-  ) {
-    return true;
-  }
-
-  throw new Error(
-    `Missing operational fact coverage for ${context}: ${start.toISODate()} to ${coverageEnd.toISODate()}`,
+    end,
+    today,
+    coverageRows,
+    coverageStart,
+    context,
   );
 }
 
@@ -3093,7 +3167,7 @@ async function replaceOperationalFactRows(
   const issueRows = rowsByDate.flatMap((rows) => rows.issueRows);
   const lineRows = rowsByDate.flatMap((rows) => rows.lineRows);
 
-  await database.transaction(async (tx) => {
+  await runDbOrderedStatements(database, async (tx) => {
     for (const batch of chunk(dates, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
       if (batch.length === 0) {
         continue;
@@ -3106,12 +3180,12 @@ async function replaceOperationalFactRows(
         .where(inArray(lineDayFactsTable.date, batch));
     }
 
-    for (const batch of chunk(issueRows, 500)) {
+    for (const batch of chunk(issueRows, OPERATIONAL_FACTS_WRITE_BATCH)) {
       if (batch.length > 0) {
         await tx.insert(issueDayFactsTable).values(batch);
       }
     }
-    for (const batch of chunk(lineRows, 500)) {
+    for (const batch of chunk(lineRows, OPERATIONAL_FACTS_WRITE_BATCH)) {
       if (batch.length > 0) {
         await tx.insert(lineDayFactsTable).values(batch);
       }
@@ -3249,7 +3323,11 @@ export async function getRootData() {
               .orderBy(asc(linesTable.id)),
           ),
           timeDbQuery('root_q_metadata', () =>
-            db.select().from(metadataTable).orderBy(asc(metadataTable.key)),
+            db
+              .select()
+              .from(metadataTable)
+              .where(publicMetadataKeySql())
+              .orderBy(asc(metadataTable.key)),
           ),
           timeDbQuery('root_q_operators', () =>
             db
@@ -4041,7 +4119,7 @@ async function getLatestStatisticsSnapshot(db?: AppDb) {
     );
     return parseStatisticsSnapshotPayload(snapshot?.data);
   } catch (error) {
-    if (isUndefinedTableError(error)) {
+    if (isMissingTableError(error)) {
       return null;
     }
     throw error;
@@ -4274,7 +4352,7 @@ export async function rebuildStatisticsSnapshot(db?: AppDb) {
           set: {
             as_of: asOf,
             data: snapshotPayload,
-            updated_at: sql`now()`,
+            updated_at: asOf,
           },
         }),
     );
@@ -4360,8 +4438,11 @@ export async function getSitemapData() {
     monthEarliestDateTime,
     monthLatestDateTime.endOf('month'),
   );
+  const operationalFactCoverageStart = await getOperationalFactCoverageStart();
   const operationalFactCoverageStartDate =
-    await getOperationalFactCoverageStartDate();
+    operationalFactCoverageStart.status === 'available'
+      ? operationalFactCoverageStart.startDate
+      : null;
 
   if (skippedIssueIds.length > 0) {
     console.warn('[SITEMAP] Skipped issues with invalid first interval dates', {
@@ -4378,6 +4459,8 @@ export async function getSitemapData() {
     monthEarliest,
     monthLatest,
     operationalFactCoverageDates: coverageRows.map((row) => row.date),
+    operationalFactCoverageMissing:
+      operationalFactCoverageStart.status === 'missing_table',
     operationalFactCoverageStartDate,
     currentDate: isoDate(nowSg()),
   };

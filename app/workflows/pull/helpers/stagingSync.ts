@@ -17,17 +17,23 @@ import {
   type Town,
 } from '@mrtdown/core';
 import {
+  and,
   asc,
   eq,
   type InferInsertModel,
   inArray,
+  isNotNull,
   isNull,
   ne,
   notExists,
   or,
   sql,
 } from 'drizzle-orm';
-import type { getDb } from '../../../db/index.js';
+import type { AppDb } from '../../../db/index.js';
+import {
+  type AppDbStatementRunner,
+  runDbOrderedStatements,
+} from '../../../db/orderedStatements.js';
 import {
   evidencesTable,
   impactEventBasisEvidencesTable,
@@ -68,13 +74,21 @@ import {
   withDbDiagnostics as withSharedDbDiagnostics,
 } from '../../../util/dbDiagnostics.js';
 
-/** Max rows per `insert().values()` batch to stay within driver/param limits. */
-const BATCH = 500;
+/**
+ * Max rows per batched statement. D1 caps bound parameters per statement, and
+ * the widest inserts in this workflow currently bind at most 10 values per row,
+ * so 10 rows keeps each statement within the 100-parameter ceiling.
+ */
+const BATCH = 10;
+/** `impact_event_periods` binds 4 values per row, so 25 rows hits D1's 100-parameter ceiling. */
+const IMPACT_EVENT_PERIOD_INSERT_BATCH = 25;
 /** Max ids per `IN (...)` cleanup query. Keep below proxy/driver bind limits. */
 const DELETE_BATCH = 50;
+const PENDING_LIVE_HASH_PREFIX = '__pending_pull__:';
 
-type Db = ReturnType<typeof getDb>;
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+type Db = AppDb;
+type DeleteDb = Pick<AppDb, 'delete'>;
+type Tx = AppDbStatementRunner;
 type ServiceRevision = Service['revisions'][number];
 
 function serviceRevisionEndAt(revision: ServiceRevision): string | null {
@@ -87,6 +101,10 @@ function serviceRevisionStartAt(revision: ServiceRevision): string {
 
 function assertUnreachable(value: never, message: string): never {
   throw new Error(`${message}: ${String(value)}`);
+}
+
+function pendingLiveHash(hash: string): string {
+  return `${PENDING_LIVE_HASH_PREFIX}${hash}`;
 }
 
 async function withDbDiagnostics<T>(
@@ -117,11 +135,19 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 /** Clears all pull staging tables before a new parse run. */
-export async function truncateStagingTables(db: Db): Promise<void> {
-  // Multi-table TRUNCATE is DDL; Drizzle has no builder — use `sql` with table refs.
-  await db.execute(
-    sql`TRUNCATE ${operatorsNextTable}, ${townsNextTable}, ${landmarksNextTable}, ${linesNextTable}, ${stationsNextTable}, ${servicesNextTable}, ${issuesNextTable} RESTART IDENTITY`,
-  );
+async function deleteStagingTables(db: DeleteDb): Promise<void> {
+  await db.delete(operatorsNextTable);
+  await db.delete(townsNextTable);
+  await db.delete(landmarksNextTable);
+  await db.delete(linesNextTable);
+  await db.delete(stationsNextTable);
+  await db.delete(servicesNextTable);
+  await db.delete(issuesNextTable);
+}
+
+/** Clears all pull staging tables before a new parse run. */
+export async function clearStagingTables(db: Db): Promise<void> {
+  await deleteStagingTables(db);
 }
 
 export async function insertOperatorsStaging(
@@ -223,8 +249,8 @@ export async function insertStationsStaging(
     id: s.id,
     hash: s.hash,
     name: s.name,
-    // Drizzle/PostGIS: [longitude, latitude] tuple for SRID 4326 point
-    geo: [s.geo.longitude, s.geo.latitude] as [number, number],
+    latitude: s.geo.latitude,
+    longitude: s.geo.longitude,
     town_id: s.townId,
     station_codes: s.stationCodes,
     landmark_ids: s.landmarkIds,
@@ -354,9 +380,7 @@ function uniqueBy<T>(rows: T[], keyForRow: (row: T) => string): T[] {
 }
 
 /** Hash diff staging vs live; upsert changed rows. */
-async function upsertChangedOperators(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function upsertChangedOperators(tx: Tx): Promise<void> {
   const rows = await tx
     .select({
       id: operatorsNextTable.id,
@@ -365,7 +389,6 @@ async function upsertChangedOperators(
     })
     .from(operatorsNextTable)
     .leftJoin(operatorsTable, eq(operatorsNextTable.id, operatorsTable.id));
-
   const toUpsert = rows.filter(
     (r) => r.liveHash == null || r.liveHash !== r.nextHash,
   );
@@ -378,33 +401,31 @@ async function upsertChangedOperators(
       .from(operatorsNextTable)
       .where(inArray(operatorsNextTable.id, ids));
     if (full.length === 0) continue;
-    await tx
-      .insert(operatorsTable)
-      .values(
-        full.map((row) => ({
+    for (const row of full) {
+      await tx
+        .insert(operatorsTable)
+        .values({
           id: row.id,
           hash: row.hash,
           name: row.name,
           founded_at: row.founded_at,
           url: row.url,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: [operatorsTable.id],
-        set: {
-          hash: sql.raw(`excluded.${operatorsTable.hash.name}`),
-          name: sql.raw(`excluded.${operatorsTable.name.name}`),
-          founded_at: sql.raw(`excluded.${operatorsTable.founded_at.name}`),
-          url: sql.raw(`excluded.${operatorsTable.url.name}`),
-          updated_at: new Date(),
-        },
-      });
+        })
+        .onConflictDoUpdate({
+          target: [operatorsTable.id],
+          set: {
+            hash: row.hash,
+            name: row.name,
+            founded_at: row.founded_at,
+            url: row.url,
+            updated_at: new Date().toISOString(),
+          },
+        });
+    }
   }
 }
 
-async function deleteOrphanOperators(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function deleteOrphanOperators(tx: Tx): Promise<void> {
   await tx
     .delete(lineOperatorsTable)
     .where(
@@ -428,9 +449,7 @@ async function deleteOrphanOperators(
 }
 
 /** @see upsertChangedOperators */
-async function upsertChangedTowns(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function upsertChangedTowns(tx: Tx): Promise<void> {
   const rows = await tx
     .select({
       id: townsNextTable.id,
@@ -460,16 +479,14 @@ async function upsertChangedTowns(
           set: {
             hash: row.hash,
             name: row.name,
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         });
     }
   }
 }
 
-async function deleteOrphanTowns(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function deleteOrphanTowns(tx: Tx): Promise<void> {
   await tx
     .delete(townsTable)
     .where(
@@ -483,9 +500,7 @@ async function deleteOrphanTowns(
 }
 
 /** @see upsertChangedOperators */
-async function upsertChangedLandmarks(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function upsertChangedLandmarks(tx: Tx): Promise<void> {
   const rows = await tx
     .select({
       id: landmarksNextTable.id,
@@ -515,16 +530,14 @@ async function upsertChangedLandmarks(
           set: {
             hash: row.hash,
             name: row.name,
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         });
     }
   }
 }
 
-async function deleteOrphanLandmarks(
-  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-): Promise<void> {
+async function deleteOrphanLandmarks(tx: Tx): Promise<void> {
   await tx
     .delete(stationLandmarksTable)
     .where(
@@ -551,7 +564,7 @@ async function deleteOrphanLandmarks(
 export async function syncOperatorsTownsLandmarksUpserts(
   db: Db,
 ): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     await upsertChangedOperators(tx);
     await upsertChangedTowns(tx);
     await upsertChangedLandmarks(tx);
@@ -562,7 +575,7 @@ export async function syncOperatorsTownsLandmarksUpserts(
 export async function deleteOperatorsTownsLandmarksOrphans(
   db: Db,
 ): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     await deleteOrphanOperators(tx);
     await deleteOrphanTowns(tx);
     await deleteOrphanLandmarks(tx);
@@ -580,7 +593,7 @@ export async function syncOperatorsTownsLandmarks(db: Db): Promise<void> {
  * line ids. Orphan deletes run later after services/stations/issues are reconciled.
  */
 export async function syncLines(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     const rows = await tx
       .select({
         id: linesNextTable.id,
@@ -605,7 +618,7 @@ export async function syncLines(db: Db): Promise<void> {
           .insert(linesTable)
           .values({
             id: row.id,
-            hash: row.hash,
+            hash: pendingLiveHash(row.hash),
             name: row.name,
             type: row.type,
             color: row.color,
@@ -616,14 +629,14 @@ export async function syncLines(db: Db): Promise<void> {
           .onConflictDoUpdate({
             target: [linesTable.id],
             set: {
-              hash: row.hash,
+              hash: pendingLiveHash(row.hash),
               name: row.name,
               type: row.type,
               color: row.color,
               started_at: row.started_at,
               ended_at: row.ended_at,
               operating_hours: row.operating_hours,
-              updated_at: new Date(),
+              updated_at: new Date().toISOString(),
             },
           });
       }
@@ -644,13 +657,20 @@ export async function syncLines(db: Db): Promise<void> {
             }),
           );
         }
+        await tx
+          .update(linesTable)
+          .set({
+            hash: row.hash,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(linesTable.id, row.id));
       }
     }
   });
 }
 
 export async function deleteLineOrphans(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     await tx
       .delete(lineOperatorsTable)
       .where(
@@ -694,13 +714,19 @@ export async function deleteLineOrphans(db: Db): Promise<void> {
     await tx
       .update(impactEventEntityFacilitiesTable)
       .set({ line_id: null })
-      .where(sql`
-        ${impactEventEntityFacilitiesTable.line_id} IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM ${linesNextTable}
-          WHERE ${linesNextTable.id} = ${impactEventEntityFacilitiesTable.line_id}
-        )
-      `);
+      .where(
+        and(
+          isNotNull(impactEventEntityFacilitiesTable.line_id),
+          notExists(
+            tx
+              .select()
+              .from(linesNextTable)
+              .where(
+                eq(linesNextTable.id, impactEventEntityFacilitiesTable.line_id),
+              ),
+          ),
+        ),
+      );
     await tx
       .delete(linesTable)
       .where(
@@ -719,7 +745,7 @@ export async function deleteLineOrphans(db: Db): Promise<void> {
  * child rows are removed and reinserted from staging JSON.
  */
 export async function syncStations(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     const rows = await tx
       .select({
         id: stationsNextTable.id,
@@ -744,18 +770,21 @@ export async function syncStations(db: Db): Promise<void> {
           .insert(stationsTable)
           .values({
             id: row.id,
-            hash: row.hash,
+            hash: pendingLiveHash(row.hash),
             name: row.name,
-            geo: row.geo,
+            latitude: row.latitude,
+            longitude: row.longitude,
             townId: row.town_id,
           })
           .onConflictDoUpdate({
             target: [stationsTable.id],
             set: {
-              hash: row.hash,
+              hash: pendingLiveHash(row.hash),
               name: row.name,
-              geo: row.geo,
+              latitude: row.latitude,
+              longitude: row.longitude,
               townId: row.town_id,
+              updated_at: new Date().toISOString(),
             },
           });
       }
@@ -790,13 +819,20 @@ export async function syncStations(db: Db): Promise<void> {
             }),
           );
         }
+        await tx
+          .update(stationsTable)
+          .set({
+            hash: row.hash,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(stationsTable.id, row.id));
       }
     }
   });
 }
 
 export async function deleteStationOrphans(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     await tx
       .delete(stationCodesTable)
       .where(
@@ -832,20 +868,54 @@ export async function deleteStationOrphans(db: Db): Promise<void> {
             ),
         ),
       );
-    await tx.delete(impactEventServiceScopesTable).where(sql`
-        (${impactEventServiceScopesTable.station_id} IS NOT NULL AND NOT EXISTS (
-          SELECT 1 FROM ${stationsNextTable}
-          WHERE ${stationsNextTable.id} = ${impactEventServiceScopesTable.station_id}
-        ))
-        OR (${impactEventServiceScopesTable.from_station_id} IS NOT NULL AND NOT EXISTS (
-          SELECT 1 FROM ${stationsNextTable}
-          WHERE ${stationsNextTable.id} = ${impactEventServiceScopesTable.from_station_id}
-        ))
-        OR (${impactEventServiceScopesTable.to_station_id} IS NOT NULL AND NOT EXISTS (
-          SELECT 1 FROM ${stationsNextTable}
-          WHERE ${stationsNextTable.id} = ${impactEventServiceScopesTable.to_station_id}
-        ))
-      `);
+    await tx
+      .delete(impactEventServiceScopesTable)
+      .where(
+        or(
+          and(
+            isNotNull(impactEventServiceScopesTable.station_id),
+            notExists(
+              tx
+                .select()
+                .from(stationsNextTable)
+                .where(
+                  eq(
+                    stationsNextTable.id,
+                    impactEventServiceScopesTable.station_id,
+                  ),
+                ),
+            ),
+          ),
+          and(
+            isNotNull(impactEventServiceScopesTable.from_station_id),
+            notExists(
+              tx
+                .select()
+                .from(stationsNextTable)
+                .where(
+                  eq(
+                    stationsNextTable.id,
+                    impactEventServiceScopesTable.from_station_id,
+                  ),
+                ),
+            ),
+          ),
+          and(
+            isNotNull(impactEventServiceScopesTable.to_station_id),
+            notExists(
+              tx
+                .select()
+                .from(stationsNextTable)
+                .where(
+                  eq(
+                    stationsNextTable.id,
+                    impactEventServiceScopesTable.to_station_id,
+                  ),
+                ),
+            ),
+          ),
+        ),
+      );
     await tx
       .delete(impactEventEntityFacilitiesTable)
       .where(
@@ -879,7 +949,7 @@ export async function deleteStationOrphans(db: Db): Promise<void> {
  * get revisions/path wiped before reinsert (FK order: path entries → revisions → line_services).
  */
 export async function syncServices(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     const rows = await tx
       .select({
         id: servicesNextTable.id,
@@ -952,16 +1022,6 @@ export async function syncServices(db: Db): Promise<void> {
 
     for (const ch of chunk(changedIds, BATCH)) {
       if (ch.length === 0) continue;
-      await tx
-        .delete(serviceRevisionPathStationEntriesTable)
-        .where(inArray(serviceRevisionPathStationEntriesTable.service_id, ch));
-      await tx
-        .delete(serviceRevisionsTable)
-        .where(inArray(serviceRevisionsTable.service_id, ch));
-      await tx
-        .delete(lineServicesTable)
-        .where(inArray(lineServicesTable.service_id, ch));
-
       const full = await tx
         .select()
         .from(servicesNextTable)
@@ -971,18 +1031,28 @@ export async function syncServices(db: Db): Promise<void> {
           .insert(servicesTable)
           .values({
             id: row.id,
-            hash: row.hash,
+            hash: pendingLiveHash(row.hash),
             name: row.name,
             line_id: row.line_id,
           })
           .onConflictDoUpdate({
             target: [servicesTable.id],
             set: {
-              hash: row.hash,
+              hash: pendingLiveHash(row.hash),
               name: row.name,
               line_id: row.line_id,
+              updated_at: new Date().toISOString(),
             },
           });
+        await tx
+          .delete(serviceRevisionPathStationEntriesTable)
+          .where(eq(serviceRevisionPathStationEntriesTable.service_id, row.id));
+        await tx
+          .delete(serviceRevisionsTable)
+          .where(eq(serviceRevisionsTable.service_id, row.id));
+        await tx
+          .delete(lineServicesTable)
+          .where(eq(lineServicesTable.service_id, row.id));
         await tx
           .insert(lineServicesTable)
           .values({
@@ -1010,50 +1080,59 @@ export async function syncServices(db: Db): Promise<void> {
                 start_at: serviceRevisionStartAt(revisionData),
                 end_at: serviceRevisionEndAt(revisionData),
                 operating_hours: revisionData.operatingHours,
-                updated_at: new Date(),
+                updated_at: new Date().toISOString(),
               },
             });
 
-          await tx
-            .insert(serviceRevisionPathStationEntriesTable)
-            .values(
-              revisionData.path.stations.map((station, index) => {
-                return {
-                  service_revision_id: revisionData.id,
-                  service_id: row.id,
-                  station_id: station.stationId,
-                  display_code: station.displayCode,
-                  path_index: index,
-                } satisfies InferInsertModel<
-                  typeof serviceRevisionPathStationEntriesTable
-                >;
-              }),
-            )
-            // Postgres `excluded.*` — update display_code/path_index on conflict
-            .onConflictDoUpdate({
-              target: [
-                serviceRevisionPathStationEntriesTable.service_revision_id,
-                serviceRevisionPathStationEntriesTable.service_id,
-                serviceRevisionPathStationEntriesTable.station_id,
-                serviceRevisionPathStationEntriesTable.path_index,
-              ],
-              set: {
-                display_code: sql.raw(
-                  `excluded.${serviceRevisionPathStationEntriesTable.display_code.name}`,
-                ),
-                path_index: sql.raw(
-                  `excluded.${serviceRevisionPathStationEntriesTable.path_index.name}`,
-                ),
-              },
-            });
+          const pathEntryRows = revisionData.path.stations.map(
+            (station, index) => {
+              return {
+                service_revision_id: revisionData.id,
+                service_id: row.id,
+                station_id: station.stationId,
+                display_code: station.displayCode,
+                path_index: index,
+              } satisfies InferInsertModel<
+                typeof serviceRevisionPathStationEntriesTable
+              >;
+            },
+          );
+          for (const rows of chunk(pathEntryRows, BATCH)) {
+            if (rows.length === 0) {
+              continue;
+            }
+
+            await tx
+              .insert(serviceRevisionPathStationEntriesTable)
+              .values(rows)
+              .onConflictDoUpdate({
+                target: [
+                  serviceRevisionPathStationEntriesTable.service_revision_id,
+                  serviceRevisionPathStationEntriesTable.service_id,
+                  serviceRevisionPathStationEntriesTable.station_id,
+                  serviceRevisionPathStationEntriesTable.path_index,
+                ],
+                set: {
+                  display_code: sql.raw('excluded.display_code'),
+                  path_index: sql.raw('excluded.path_index'),
+                },
+              });
+          }
         }
+        await tx
+          .update(servicesTable)
+          .set({
+            hash: row.hash,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(servicesTable.id, row.id));
       }
     }
   });
 }
 
 export async function deleteServiceOrphans(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
+  await runDbOrderedStatements(db, async (tx) => {
     await tx
       .delete(impactEventEntityServicesTable)
       .where(
@@ -1332,20 +1411,25 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
       }
     }
 
-    if (issueRows.length > 0) {
-      await tx
-        .insert(issuesTable)
-        .values(issueRows)
-        .onConflictDoUpdate({
-          target: [issuesTable.id],
-          set: {
-            hash: sql.raw(`excluded.${issuesTable.hash.name}`),
-            type: sql.raw(`excluded.${issuesTable.type.name}`),
-            title: sql.raw(`excluded.${issuesTable.title.name}`),
-            title_meta: sql.raw(`excluded.${issuesTable.title_meta.name}`),
-            updated_at: new Date(),
-          },
-        });
+    for (const rows of chunk(issueRows, BATCH)) {
+      for (const row of rows) {
+        await tx
+          .insert(issuesTable)
+          .values({
+            ...row,
+            hash: pendingLiveHash(row.hash),
+          })
+          .onConflictDoUpdate({
+            target: [issuesTable.id],
+            set: {
+              hash: pendingLiveHash(row.hash),
+              type: row.type,
+              title: row.title,
+              title_meta: row.title_meta,
+              updated_at: new Date().toISOString(),
+            },
+          });
+      }
     }
     if (evidenceRows.length > 0) {
       const dedupedEvidenceRows = uniqueBy(
@@ -1495,7 +1579,7 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         periodRows,
         (row) => `${row.impact_event_id}\0${row.index}`,
       );
-      for (const rows of chunk(dedupedRows, BATCH)) {
+      for (const rows of chunk(dedupedRows, IMPACT_EVENT_PERIOD_INSERT_BATCH)) {
         await withDbDiagnostics(
           {
             operation: 'insert impact-event periods',
@@ -1592,6 +1676,17 @@ async function syncIssueIds(tx: Tx, issueIds: string[]): Promise<void> {
         );
       }
     }
+    for (const rows of chunk(issueRows, BATCH)) {
+      for (const row of rows) {
+        await tx
+          .update(issuesTable)
+          .set({
+            hash: row.hash,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(issuesTable.id, row.id));
+      }
+    }
   }
 }
 
@@ -1624,7 +1719,9 @@ export async function syncChangedIssuesBatch(
   db: Db,
   limit = BATCH,
 ): Promise<number> {
-  return db.transaction((tx) => syncChangedIssuesBatchTx(tx, limit));
+  return runDbOrderedStatements(db, (tx) =>
+    syncChangedIssuesBatchTx(tx, limit),
+  );
 }
 
 async function syncChangedIssuesBatchTx(
@@ -1654,7 +1751,9 @@ export async function deleteOrphanIssuesBatch(
   db: Db,
   limit = BATCH,
 ): Promise<number> {
-  return db.transaction((tx) => deleteOrphanIssuesBatchTx(tx, limit));
+  return runDbOrderedStatements(db, (tx) =>
+    deleteOrphanIssuesBatchTx(tx, limit),
+  );
 }
 
 async function deleteOrphanIssuesBatchTx(
@@ -1692,12 +1791,10 @@ export async function syncIssues(db: Db): Promise<void> {
   }
 }
 
-/** Truncates staging tables and records `manifest_last_pulled_at` in one transaction. */
+/** Clears staging tables and records `manifest_last_pulled_at`. */
 export async function finalizePull(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx.execute(
-      sql`TRUNCATE ${operatorsNextTable}, ${townsNextTable}, ${landmarksNextTable}, ${linesNextTable}, ${stationsNextTable}, ${servicesNextTable}, ${issuesNextTable} RESTART IDENTITY`,
-    );
+  await runDbOrderedStatements(db, async (tx) => {
+    await deleteStagingTables(tx);
     await tx
       .insert(metadataTable)
       .values({

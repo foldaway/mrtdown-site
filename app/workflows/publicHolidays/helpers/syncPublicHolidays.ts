@@ -1,7 +1,8 @@
-import { and, gte, lte, notInArray, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
-import type { getDb } from '../../../db/index.js';
-import { publicHolidaysTable } from '../../../db/schema.js';
+import type { AppDb } from '../../../db/index.js';
+import { metadataTable, publicHolidaysTable } from '../../../db/schema.js';
+import { runDbOrderedStatements } from '../../../db/orderedStatements.js';
 import { withDbDiagnostics } from '../../../util/dbDiagnostics.js';
 
 const DATA_GOV_PUBLIC_HOLIDAYS_DATASET_ID =
@@ -9,8 +10,12 @@ const DATA_GOV_PUBLIC_HOLIDAYS_DATASET_ID =
 const DATA_GOV_DATASTORE_SEARCH_URL =
   'https://data.gov.sg/api/action/datastore_search';
 const DATA_GOV_PAGE_LIMIT = 500;
+const D1_DELETE_BATCH = 50;
+const D1_WRITE_BATCH = 10;
+const PENDING_PUBLIC_HOLIDAY_REBUILD_DATES_KEY =
+  'public_holidays_pending_rebuild_dates';
 
-type Db = ReturnType<typeof getDb>;
+type Db = AppDb;
 
 export type PublicHolidaySyncRow = {
   id: string;
@@ -29,6 +34,14 @@ export type PublicHolidaySyncResult = {
     end: string;
   } | null;
 };
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
 
 const DataGovResponseSchema = z
   .object({
@@ -78,6 +91,77 @@ function slug(value: string): string {
 
 function publicHolidayHash(date: string, holidayName: string): string {
   return JSON.stringify([date, holidayName]);
+}
+
+function parsePendingPublicHolidayRebuildDates(value: string | null): string[] {
+  if (value == null) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((date): date is string => typeof date === 'string')
+      .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+async function readPendingPublicHolidayRebuildDates(db: Db): Promise<string[]> {
+  const rows = await db
+    .select({ value: metadataTable.value })
+    .from(metadataTable)
+    .where(eq(metadataTable.key, PENDING_PUBLIC_HOLIDAY_REBUILD_DATES_KEY))
+    .limit(1);
+
+  return parsePendingPublicHolidayRebuildDates(rows[0]?.value ?? null);
+}
+
+async function writePendingPublicHolidayRebuildDates(
+  tx: Pick<Db, 'insert'>,
+  dates: readonly string[],
+): Promise<void> {
+  const value = JSON.stringify([...new Set(dates)].sort());
+  await tx
+    .insert(metadataTable)
+    .values({
+      key: PENDING_PUBLIC_HOLIDAY_REBUILD_DATES_KEY,
+      value,
+    })
+    .onConflictDoUpdate({
+      target: [metadataTable.key],
+      set: { value },
+    });
+}
+
+export async function clearPendingPublicHolidayRebuildDates(
+  db: Db,
+  rebuiltDates: readonly string[],
+): Promise<void> {
+  if (rebuiltDates.length === 0) {
+    return;
+  }
+
+  const rebuilt = new Set(rebuiltDates);
+  const remaining = (await readPendingPublicHolidayRebuildDates(db)).filter(
+    (date) => !rebuilt.has(date),
+  );
+
+  await runDbOrderedStatements(db, async (tx) => {
+    if (remaining.length === 0) {
+      await tx
+        .delete(metadataTable)
+        .where(eq(metadataTable.key, PENDING_PUBLIC_HOLIDAY_REBUILD_DATES_KEY));
+      return;
+    }
+
+    await writePendingPublicHolidayRebuildDates(tx, remaining);
+  });
 }
 
 async function withPublicHolidayDbDiagnostics<T>(
@@ -204,41 +288,48 @@ export async function syncPublicHolidays(
   for (const row of staleRows) {
     changedDates.add(row.date);
   }
+  for (const date of await readPendingPublicHolidayRebuildDates(db)) {
+    changedDates.add(date);
+  }
 
   await withPublicHolidayDbDiagnostics(sortedRows, () =>
-    db.transaction(async (tx) => {
-      const now = new Date();
-      await tx
-        .insert(publicHolidaysTable)
-        .values(
-          sortedRows.map((row) => ({
-            id: row.id,
-            date: row.date,
-            holiday_name: row.holidayName,
-            hash: row.hash,
-          })),
-        )
-        .onConflictDoUpdate({
-          target: publicHolidaysTable.id,
-          set: {
-            date: sql.raw(`excluded.${publicHolidaysTable.date.name}`),
-            holiday_name: sql.raw(
-              `excluded.${publicHolidaysTable.holiday_name.name}`,
-            ),
-            hash: sql.raw(`excluded.${publicHolidaysTable.hash.name}`),
-            updated_at: now,
-          },
-        });
+    runDbOrderedStatements(db, async (tx) => {
+      const now = new Date().toISOString();
+      const upsertRows = sortedRows.map((row) => ({
+        id: row.id,
+        date: row.date,
+        holiday_name: row.holidayName,
+        hash: row.hash,
+      }));
+      if (changedDates.size > 0) {
+        await writePendingPublicHolidayRebuildDates(tx, [...changedDates]);
+      }
 
-      await tx
-        .delete(publicHolidaysTable)
-        .where(
-          and(
-            gte(publicHolidaysTable.date, start),
-            lte(publicHolidaysTable.date, end),
-            notInArray(publicHolidaysTable.id, [...incomingIds]),
-          ),
-        );
+      for (const rows of chunk(upsertRows, D1_WRITE_BATCH)) {
+        for (const row of rows) {
+          await tx
+            .insert(publicHolidaysTable)
+            .values(row)
+            .onConflictDoUpdate({
+              target: publicHolidaysTable.id,
+              set: {
+                date: row.date,
+                holiday_name: row.holiday_name,
+                hash: row.hash,
+                updated_at: now,
+              },
+            });
+        }
+      }
+
+      for (const ids of chunk(
+        staleRows.map((row) => row.id),
+        D1_DELETE_BATCH,
+      )) {
+        await tx
+          .delete(publicHolidaysTable)
+          .where(inArray(publicHolidaysTable.id, ids));
+      }
     }),
   );
 

@@ -1,5 +1,5 @@
 import type { SQL } from 'drizzle-orm';
-import { PgDialect } from 'drizzle-orm/pg-core';
+import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { DateTime } from 'luxon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -12,6 +12,7 @@ import {
   crowdReportRateLimitsTable,
   crowdReportsTable,
   crowdReportStationsTable,
+  metadataTable,
 } from '~/db/schema';
 import {
   assessCrowdReportAutomationPolicy,
@@ -73,7 +74,6 @@ function makeFakeDb(
   const conflictUpdates: unknown[] = [];
   const updates: Array<{ table: unknown; values: unknown }> = [];
   const executes: unknown[] = [];
-  let transactions = 0;
   const nextSelectResult = () => selectResults.shift() ?? [];
   const selectBuilder = {
     from() {
@@ -93,7 +93,7 @@ function makeFakeDb(
     },
   };
   const tx = {
-    execute(query: unknown) {
+    run(query: unknown) {
       executes.push(query);
       return Promise.resolve();
     },
@@ -119,6 +119,15 @@ function makeFakeDb(
     insert(table: unknown) {
       return {
         values(values: unknown) {
+          if (table === metadataTable) {
+            return {
+              onConflictDoUpdate(config: unknown) {
+                conflictUpdates.push(config);
+                return Promise.resolve();
+              },
+            };
+          }
+
           inserts.push({ table, values });
 
           if (table === crowdReportRateLimitsTable) {
@@ -147,15 +156,7 @@ function makeFakeDb(
     conflictUpdates,
     updates,
     executes,
-    get transactions() {
-      return transactions;
-    },
-    db: {
-      transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
-        transactions += 1;
-        return callback(tx);
-      },
-    },
+    db: tx,
   };
 }
 
@@ -190,7 +191,7 @@ function makeFakeAutomoderationDb(
   };
 
   const tx = {
-    execute(query: unknown) {
+    run(query: unknown) {
       executes.push(query);
       return Promise.resolve();
     },
@@ -216,6 +217,14 @@ function makeFakeAutomoderationDb(
     insert(table: unknown) {
       return {
         values(values: unknown) {
+          if (table === metadataTable) {
+            return {
+              onConflictDoUpdate() {
+                return Promise.resolve();
+              },
+            };
+          }
+
           inserts.push({ table, values });
           return Promise.resolve();
         },
@@ -227,11 +236,7 @@ function makeFakeAutomoderationDb(
     inserts,
     updates,
     executes,
-    db: {
-      transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
-        return callback(tx);
-      },
-    },
+    db: tx,
   };
 }
 
@@ -1078,7 +1083,7 @@ describe('findMissingCrowdReportReferences', () => {
       directionStationIds: [],
     });
 
-    const dialect = new PgDialect();
+    const dialect = new SQLiteSyncDialect();
     const lineWhereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL);
     const stationCodeWhereSql = dialect.sqlToQuery(fake.whereCalls[2] as SQL);
     const countReferenceDateParams = (params: unknown[]) =>
@@ -1120,7 +1125,7 @@ describe('persistCrowdReport', () => {
     ]);
     expect(fake.inserts[1]?.values).toMatchObject({
       id: 'fixed-id',
-      observed_at: VALID_SUBMISSION.observedAt,
+      observed_at: '2026-05-24T04:30:00.000Z',
       status: 'pending',
       still_happening: true,
       text: 'Structured community report. Scope: train. Effect: delay. Lines: BPLRT. Stations: BP6. Direction station: BP6. Delay: 10 minutes. Still happening: yes.',
@@ -1186,7 +1191,7 @@ describe('persistCrowdReport', () => {
 });
 
 describe('persistAutomoderatedCrowdReport', () => {
-  it('persists and automoderates a report in one transaction', async () => {
+  it('persists and automoderates a report in one ordered write sequence', async () => {
     const fake = makeFakeDb(1, [[]], {
       id: 'fixed-id',
       status: 'accepted',
@@ -1213,7 +1218,6 @@ describe('persistAutomoderatedCrowdReport', () => {
       duplicateOfId: null,
     });
 
-    expect(fake.transactions).toBe(1);
     expect(fake.inserts.map((insert) => insert.table)).toEqual([
       crowdReportRateLimitsTable,
       crowdReportsTable,
@@ -1240,7 +1244,6 @@ describe('persistAutomoderatedCrowdReport', () => {
         cluster_id: 'fixed-id',
       },
     });
-    expect(fake.executes).toHaveLength(1);
   });
 });
 
@@ -1302,7 +1305,6 @@ describe('automoderateCrowdReport', () => {
         cluster_id: 'event-1',
       },
     });
-    expect(fake.executes).toHaveLength(1);
   });
 
   it('only accepts a first-report cluster when configured source thresholds are met', async () => {
@@ -1411,7 +1413,6 @@ describe('automoderateCrowdReport', () => {
         },
       },
     ]);
-    expect(fake.executes).toHaveLength(1);
   });
 
   it('marks a same-context report in the duplicate window as duplicate', async () => {
@@ -1446,13 +1447,17 @@ describe('automoderateCrowdReport', () => {
       duplicateOfId: 'existing-report',
     });
 
-    expect(fake.updates[0]).toMatchObject({
-      table: crowdReportsTable,
-      values: {
-        status: 'duplicate',
-        duplicate_of_id: 'existing-report',
-      },
-    });
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: crowdReportsTable,
+          values: expect.objectContaining({
+            status: 'duplicate',
+            duplicate_of_id: 'existing-report',
+          }),
+        }),
+      ]),
+    );
     expect(fake.inserts[0]).toMatchObject({
       table: crowdReportModerationEventsTable,
       values: {
@@ -1460,21 +1465,18 @@ describe('automoderateCrowdReport', () => {
         note: 'Report automatically marked as duplicate of existing-report',
       },
     });
-    expect(fake.updates[1]).toMatchObject({
-      table: crowdReportsTable,
-      values: {
-        cluster_id: 'cluster-1',
-      },
-    });
-    expect(fake.updates[2]).toMatchObject({
-      table: crowdReportClustersTable,
-    });
-
-    const dialect = new PgDialect();
-    const clusterLockSql = dialect.sqlToQuery(fake.executes[1] as SQL);
-    expect(clusterLockSql.sql).toContain('pg_advisory_xact_lock');
-    expect(clusterLockSql.params).toContain(
-      'crowd-report-dispatch:cluster:cluster-1',
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: crowdReportsTable,
+          values: expect.objectContaining({
+            cluster_id: 'cluster-1',
+          }),
+        }),
+        expect.objectContaining({
+          table: crowdReportClustersTable,
+        }),
+      ]),
     );
   });
 
@@ -1511,30 +1513,35 @@ describe('automoderateCrowdReport', () => {
       duplicateOfId: null,
     });
 
-    expect(fake.updates[0]).toMatchObject({
-      table: crowdReportsTable,
-      values: {
-        status: 'accepted',
-        duplicate_of_id: null,
-      },
-    });
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: crowdReportsTable,
+          values: expect.objectContaining({
+            status: 'accepted',
+            duplicate_of_id: null,
+          }),
+        }),
+      ]),
+    );
     expect(fake.inserts[1]).toMatchObject({
       table: crowdReportClustersTable,
       values: {
         id: 'cluster-2',
       },
     });
-    expect(fake.updates[1]).toMatchObject({
-      table: crowdReportsTable,
-      values: {
-        cluster_id: 'cluster-2',
-      },
-    });
-
-    const dialect = new PgDialect();
-    const clusterLockSql = dialect.sqlToQuery(fake.executes[1] as SQL);
-    expect(clusterLockSql.params).toContain(
-      'crowd-report-dispatch:cluster:cluster-1',
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: crowdReportsTable,
+          values: expect.objectContaining({
+            cluster_id: 'cluster-2',
+          }),
+        }),
+        expect.objectContaining({
+          table: crowdReportClustersTable,
+        }),
+      ]),
     );
   });
 
@@ -1580,10 +1587,15 @@ describe('automoderateCrowdReport', () => {
       },
     });
 
-    const dialect = new PgDialect();
-    const reportLockSql = dialect.sqlToQuery(fake.executes[1] as SQL);
-    expect(reportLockSql.params).toContain(
-      'crowd-report-dispatch:report:existing-report',
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: crowdReportsTable,
+          values: expect.objectContaining({
+            updated_at: expect.anything(),
+          }),
+        }),
+      ]),
     );
   });
 
@@ -1621,13 +1633,17 @@ describe('automoderateCrowdReport', () => {
       duplicateOfId: null,
     });
 
-    expect(fake.updates[0]).toMatchObject({
-      table: crowdReportsTable,
-      values: {
-        status: 'accepted',
-        duplicate_of_id: null,
-      },
-    });
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: crowdReportsTable,
+          values: expect.objectContaining({
+            status: 'accepted',
+            duplicate_of_id: null,
+          }),
+        }),
+      ]),
+    );
     expect(fake.inserts[1]).toMatchObject({
       table: crowdReportClustersTable,
       values: {
@@ -1637,10 +1653,15 @@ describe('automoderateCrowdReport', () => {
       },
     });
 
-    const dialect = new PgDialect();
-    const reportLockSql = dialect.sqlToQuery(fake.executes[1] as SQL);
-    expect(reportLockSql.params).toContain(
-      'crowd-report-dispatch:report:existing-report',
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: crowdReportsTable,
+          values: expect.objectContaining({
+            updated_at: expect.anything(),
+          }),
+        }),
+      ]),
     );
   });
 
@@ -1722,13 +1743,17 @@ describe('automoderateCrowdReport', () => {
       duplicateOfId: 'existing-report',
     });
 
-    expect(fake.updates[0]).toMatchObject({
-      table: crowdReportsTable,
-      values: {
-        status: 'duplicate',
-        duplicate_of_id: 'existing-report',
-      },
-    });
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: crowdReportsTable,
+          values: expect.objectContaining({
+            status: 'duplicate',
+            duplicate_of_id: 'existing-report',
+          }),
+        }),
+      ]),
+    );
   });
 });
 
@@ -1738,7 +1763,7 @@ describe('getPublicCrowdReportSignals', () => {
 
     await getPublicCrowdReportSignals(fake.db as never);
 
-    const dialect = new PgDialect();
+    const dialect = new SQLiteSyncDialect();
     const whereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
 
     expect(whereSql).toContain('crowd_report_cluster_lines');

@@ -1,6 +1,7 @@
 # Data Pipeline
 
-The overhaul introduces a local read model for canonical mrtdown data.
+The app stores its local canonical read model and site-local writable state in
+Cloudflare D1.
 
 ## Pull Workflow
 
@@ -45,10 +46,21 @@ The existing six-hourly scheduled cron also invokes the same dispatch path when
 `CROWD_REPORT_DISPATCH_LIMIT` to tune the maximum number of dispatch candidates
 processed per scheduled run.
 
+## Site-Local Cutover
+
+D1 cutover does not import rows from Postgres. Canonical transit rows are
+rebuilt from `mrtdown-data`, and public holidays are refreshed through the
+public-holiday workflow. During the production freeze, confirm the old Postgres
+crowd-report tables are empty before enabling D1 traffic. If they are not empty,
+pause cutover and decide whether those reports can be discarded, manually
+recreated through the D1-backed UI, or handled by a separate one-off migration.
+See `docs/runbooks/d1-cutover.md`.
+
 ## Staging Tables
 
 Staging tables are named with a `_next` suffix. They are the durable handoff between workflow steps and avoid returning large parsed payloads between Cloudflare Workflow steps.
 
 ## Live Reads
 
-Server functions call `app/util/db.queries.ts`, which reads normalized live tables and returns the source-owned shapes in `app/types.ts`.
+Server functions call `app/util/db.queries.ts`, which reads normalized live
+tables from D1 and returns the source-owned shapes in `app/types.ts`.

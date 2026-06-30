@@ -6,7 +6,10 @@ import {
 import * as Sentry from '@sentry/cloudflare';
 import { getDb } from '~/db/index.js';
 import { rebuildOperationalFactsForDates } from '~/util/db.queries.js';
-import { syncPublicHolidaysFromDataGov } from './helpers/syncPublicHolidays.js';
+import {
+  clearPendingPublicHolidayRebuildDates,
+  syncPublicHolidaysFromDataGov,
+} from './helpers/syncPublicHolidays.js';
 
 type Params = Record<string, never>;
 
@@ -46,7 +49,15 @@ class PublicHolidaysWorkflowBase extends WorkflowEntrypoint<Env, Params> {
         if (syncResult.changedDates.length === 0) {
           return [];
         }
-        return rebuildOperationalFactsForDates(syncResult.changedDates);
+        const rebuilt = await rebuildOperationalFactsForDates(
+          syncResult.changedDates,
+        );
+        const db = getDb();
+        await clearPendingPublicHolidayRebuildDates(
+          db,
+          rebuilt.map((result) => result.date),
+        );
+        return rebuilt;
       },
     );
 

@@ -17,6 +17,7 @@ interface SitemapPathData {
   monthLatest: string;
   operationalFactCoverageDates: string[];
   operationalFactCoverageStartDate: string | null;
+  operationalFactCoverageMissing?: boolean;
   currentDate: string;
 }
 
@@ -192,6 +193,7 @@ export function buildSitemapPaths({
   monthEarliest,
   monthLatest,
   operationalFactCoverageDates,
+  operationalFactCoverageMissing = false,
   operationalFactCoverageStartDate,
   currentDate,
 }: SitemapPathData) {
@@ -265,6 +267,7 @@ export function buildSitemapPaths({
     if (
       !isHistoryMonthRenderable({
         coverageDates,
+        operationalFactCoverageMissing,
         coverageStartDateTime,
         currentDateTime,
         monthDateTime,
@@ -278,6 +281,7 @@ export function buildSitemapPaths({
       !paths.includes(yearPath) &&
       isHistoryYearRenderable({
         coverageDates,
+        operationalFactCoverageMissing,
         coverageStartDateTime,
         currentDateTime,
         yearDateTime: monthDateTime.startOf('year'),
@@ -295,11 +299,13 @@ export function buildSitemapPaths({
 
 function isHistoryMonthRenderable({
   coverageDates,
+  operationalFactCoverageMissing,
   coverageStartDateTime,
   currentDateTime,
   monthDateTime,
 }: {
   coverageDates: Set<string>;
+  operationalFactCoverageMissing: boolean;
   coverageStartDateTime: DateTime | null;
   currentDateTime: DateTime;
   monthDateTime: DateTime;
@@ -309,6 +315,7 @@ function isHistoryMonthRenderable({
 
   return isHistoryDateRangeRenderable({
     coverageDates,
+    operationalFactCoverageMissing,
     coverageStartDateTime,
     currentDateTime,
     rangeStart: monthStart,
@@ -318,11 +325,13 @@ function isHistoryMonthRenderable({
 
 function isHistoryYearRenderable({
   coverageDates,
+  operationalFactCoverageMissing,
   coverageStartDateTime,
   currentDateTime,
   yearDateTime,
 }: {
   coverageDates: Set<string>;
+  operationalFactCoverageMissing: boolean;
   coverageStartDateTime: DateTime | null;
   currentDateTime: DateTime;
   yearDateTime: DateTime;
@@ -332,6 +341,7 @@ function isHistoryYearRenderable({
 
   return isHistoryDateRangeRenderable({
     coverageDates,
+    operationalFactCoverageMissing,
     coverageStartDateTime,
     currentDateTime,
     rangeStart: yearStart,
@@ -341,12 +351,14 @@ function isHistoryYearRenderable({
 
 function isHistoryDateRangeRenderable({
   coverageDates,
+  operationalFactCoverageMissing,
   coverageStartDateTime,
   currentDateTime,
   rangeStart,
   rangeEnd,
 }: {
   coverageDates: Set<string>;
+  operationalFactCoverageMissing: boolean;
   coverageStartDateTime: DateTime | null;
   currentDateTime: DateTime;
   rangeStart: DateTime;
@@ -357,6 +369,10 @@ function isHistoryDateRangeRenderable({
   const today = currentDateTime.startOf('day');
 
   if (end >= today) {
+    return true;
+  }
+
+  if (operationalFactCoverageMissing) {
     return true;
   }
 

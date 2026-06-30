@@ -1,10 +1,14 @@
-type ProbeGroup = 'html' | 'markdown';
+import { fileURLToPath } from 'node:url';
+
+type ProbeGroup = 'html' | 'markdown' | 'xml';
 
 type RouteProbe = {
   group: ProbeGroup;
   label: string;
   route: string;
   accept: string;
+  expectedContentTypes?: readonly string[];
+  expectedStatuses?: readonly number[];
 };
 
 const HTML_PROBES = [
@@ -12,7 +16,12 @@ const HTML_PROBES = [
   '/?viewport=md',
   '/?viewport=lg',
   '/statistics',
+  '/history',
   '/about',
+  '/lines/BPLRT',
+  '/stations/BKP',
+  '/operators/SMRT_TRAINS',
+  '/issues/2026-06-15-ccl-minor-delay-lorong-chuan-to-bishan',
 ].map(
   (route) =>
     ({
@@ -20,6 +29,7 @@ const HTML_PROBES = [
       label: route,
       route,
       accept: 'text/html',
+      expectedContentTypes: ['text/html'],
     }) satisfies RouteProbe,
 );
 
@@ -28,41 +38,49 @@ const MARKDOWN_PROBES = [
     label: 'llms.txt',
     route: '/llms.txt',
     accept: 'text/plain, text/markdown;q=0.9, */*;q=0.1',
+    expectedContentTypes: ['text/plain', 'text/markdown'],
   },
   {
     label: 'overview index.md',
     route: '/index.md',
     accept: 'text/markdown',
+    expectedContentTypes: ['text/markdown', 'text/plain'],
   },
   {
     label: 'line index.md',
     route: '/lines/BPLRT/index.md',
     accept: 'text/markdown',
+    expectedContentTypes: ['text/markdown', 'text/plain'],
   },
   {
     label: 'station index.md',
     route: '/stations/BKP/index.md',
     accept: 'text/markdown',
+    expectedContentTypes: ['text/markdown', 'text/plain'],
   },
   {
     label: 'operator index.md',
     route: '/operators/SMRT_TRAINS/index.md',
     accept: 'text/markdown',
+    expectedContentTypes: ['text/markdown', 'text/plain'],
   },
   {
     label: 'line .md alias attempt',
     route: '/lines/BPLRT.md',
     accept: 'text/markdown',
+    expectedStatuses: [404],
   },
   {
     label: 'station .md alias attempt',
     route: '/stations/BKP.md',
     accept: 'text/markdown',
+    expectedStatuses: [404],
   },
   {
     label: 'HTML route with Markdown Accept',
     route: '/lines/BPLRT',
     accept: 'text/markdown',
+    expectedStatuses: [406],
   },
 ].map(
   (probe) =>
@@ -72,12 +90,24 @@ const MARKDOWN_PROBES = [
     }) satisfies RouteProbe,
 );
 
-const DEFAULT_PROBES = [...HTML_PROBES, ...MARKDOWN_PROBES] as const;
+const XML_PROBES = [
+  {
+    group: 'xml',
+    label: 'sitemap.xml',
+    route: '/sitemap.xml',
+    accept: 'application/xml, text/xml;q=0.9, */*;q=0.1',
+    expectedContentTypes: ['application/xml', 'text/xml'],
+  },
+] satisfies RouteProbe[];
+
+const DEFAULT_PROBES = [...HTML_PROBES, ...MARKDOWN_PROBES, ...XML_PROBES];
 
 type ProbeTiming = {
   group: ProbeGroup;
   label: string;
   route: string;
+  expectedStatuses: readonly number[];
+  expectedContentTypes: readonly string[];
   status: number;
   ttfbMs: number;
   totalMs: number;
@@ -112,14 +142,14 @@ function getProbeGroups() {
     .filter((group) => group !== '');
 
   if (groups.includes('all')) {
-    return new Set<ProbeGroup>(['html', 'markdown']);
+    return new Set<ProbeGroup>(['html', 'markdown', 'xml']);
   }
 
   const selectedGroups = new Set<ProbeGroup>();
   for (const group of groups) {
-    if (group !== 'html' && group !== 'markdown') {
+    if (group !== 'html' && group !== 'markdown' && group !== 'xml') {
       throw new Error(
-        'PROBES must be "all", "html", "markdown", or a comma list.',
+        'PROBES must be "all", "html", "markdown", "xml", or a comma list.',
       );
     }
     selectedGroups.add(group);
@@ -157,6 +187,8 @@ async function timeRoute(
     group: probe.group,
     label: probe.label,
     route: probe.route,
+    expectedStatuses: probe.expectedStatuses ?? [200],
+    expectedContentTypes: probe.expectedContentTypes ?? [],
     status: response.status,
     ttfbMs: Number(ttfbMs.toFixed(1)),
     totalMs: Number(totalMs.toFixed(1)),
@@ -168,6 +200,48 @@ async function timeRoute(
     serverTiming: response.headers.get('server-timing') ?? '',
     render: response.headers.get('x-mrtdown-render') ?? '',
   };
+}
+
+function normalizeContentType(contentType: string) {
+  return contentType.split(';')[0]?.trim().toLowerCase() ?? '';
+}
+
+export function getRouteCheckFailures(results: TimingResult[]) {
+  const failures: string[] = [];
+
+  for (const result of results) {
+    if (!result.expectedStatuses.includes(result.status)) {
+      failures.push(
+        `${result.label} sample ${result.sample} returned ${result.status}; expected ${result.expectedStatuses.join(
+          ' or ',
+        )}`,
+      );
+      continue;
+    }
+
+    if (result.status >= 200 && result.status < 300 && result.bytes === 0) {
+      failures.push(`${result.label} sample ${result.sample} returned 0 bytes`);
+    }
+
+    if (
+      result.status >= 200 &&
+      result.status < 300 &&
+      result.expectedContentTypes.length > 0
+    ) {
+      const actualContentType = normalizeContentType(result.contentType);
+      const expectedContentTypes =
+        result.expectedContentTypes.map(normalizeContentType);
+      if (!expectedContentTypes.includes(actualContentType)) {
+        failures.push(
+          `${result.label} sample ${result.sample} returned ${result.contentType || 'no content type'}; expected ${result.expectedContentTypes.join(
+            ' or ',
+          )}`,
+        );
+      }
+    }
+  }
+
+  return failures;
 }
 
 async function main() {
@@ -195,6 +269,8 @@ async function main() {
       group: result.group,
       label: result.label,
       route: result.route,
+      expected: result.expectedStatuses.join('/'),
+      contentTypeExpected: result.expectedContentTypes.join('/'),
       status: result.status,
       ttfbMs: result.ttfbMs,
       totalMs: result.totalMs,
@@ -207,9 +283,22 @@ async function main() {
       serverTiming: result.serverTiming,
     })),
   );
+
+  const failures = getRouteCheckFailures(results);
+  if (failures.length > 0) {
+    console.error(
+      [
+        'Route smoke checks failed:',
+        ...failures.map((failure) => `- ${failure}`),
+      ].join('\n'),
+    );
+    process.exitCode = 1;
+  }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

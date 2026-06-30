@@ -4,8 +4,10 @@ import type { Issue, Line, Station } from '~/types';
 import {
   buildLineSummary,
   deriveServiceScopeStationIds,
+  isMissingTableError,
   parseStatisticsSnapshotPayload,
   selectIncludedEntities,
+  selectLegacyHistoryFallback,
   selectServiceBranchSourceEvents,
   type SystemAnalytics,
 } from './db.queries';
@@ -397,6 +399,76 @@ describe('parseStatisticsSnapshotPayload', () => {
       }),
     ).toBeNull();
     expect(parseStatisticsSnapshotPayload({})).toBeNull();
+  });
+});
+
+describe('isMissingTableError', () => {
+  it('recognizes Postgres undefined-table errors', () => {
+    expect(isMissingTableError({ code: '42P01' })).toBe(true);
+  });
+
+  it('recognizes D1 missing-table errors', () => {
+    expect(
+      isMissingTableError(
+        new Error(
+          'D1_ERROR: no such table: statistics_snapshots: SQLITE_ERROR',
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it('recognizes wrapped SQLite missing-table causes', () => {
+    expect(
+      isMissingTableError(
+        new Error('Failed query', {
+          cause: {
+            code: 'SQLITE_ERROR',
+            message: 'no such table: line_day_facts',
+          },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('ignores unrelated database errors', () => {
+    expect(
+      isMissingTableError({
+        code: 'SQLITE_CONSTRAINT',
+        message: 'FOREIGN KEY constraint failed',
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('selectLegacyHistoryFallback', () => {
+  const TODAY = DateTime.fromISO('2026-06-25T00:00:00+08:00');
+  const PAST_START = DateTime.fromISO('2026-05-01T00:00:00+08:00');
+  const PAST_END = DateTime.fromISO('2026-05-31T00:00:00+08:00');
+
+  it('uses the legacy fallback when operational fact tables are absent', () => {
+    expect(
+      selectLegacyHistoryFallback(
+        PAST_START,
+        PAST_END,
+        TODAY,
+        [],
+        { status: 'missing_table' },
+        'history month 2026-05',
+      ),
+    ).toBe(true);
+  });
+
+  it('uses the legacy fallback when operational fact tables are empty', () => {
+    expect(
+      selectLegacyHistoryFallback(
+        PAST_START,
+        PAST_END,
+        TODAY,
+        [],
+        { status: 'missing_table' },
+        'history month 2026-05',
+      ),
+    ).toBe(true);
   });
 });
 

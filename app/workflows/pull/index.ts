@@ -32,7 +32,7 @@ import {
   syncOperatorsTownsLandmarksUpserts,
   syncServices,
   syncStations,
-  truncateStagingTables,
+  clearStagingTables,
 } from './helpers/stagingSync.js';
 
 type Params = Record<string, never>;
@@ -47,7 +47,7 @@ const parseStepConfig = {
   timeout: '5 minutes' as const,
 };
 
-/** DB promotion steps: retries for transient Hyperdrive / Postgres errors. */
+/** DB promotion steps: retry transient D1 or Worker runtime failures. */
 const syncStepConfig = {
   retries: {
     limit: 3,
@@ -56,7 +56,8 @@ const syncStepConfig = {
   },
 };
 
-const ISSUE_SYNC_BATCH_SIZE = 500;
+/** Keep each changed-issue step comfortably below D1 per-invocation subrequest limits. */
+const ISSUE_SYNC_BATCH_SIZE = 10;
 const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
 
 const factsStepConfig = {
@@ -70,7 +71,7 @@ const factsStepConfig = {
 
 /**
  * Durable pull pipeline: manifest → parse into staging → promote by domain →
- * truncate staging + metadata. Staging is the handoff between steps (no large step returns).
+ * clear staging + metadata. Staging is the handoff between steps (no large step returns).
  */
 class PullWorkflowBase extends WorkflowEntrypoint<Env, Params> {
   async run(_event: WorkflowEvent<Params>, step: WorkflowStep) {
@@ -88,7 +89,7 @@ class PullWorkflowBase extends WorkflowEntrypoint<Env, Params> {
 
       const repo = new MRTDownRepository({ store });
       const db = getDb();
-      await truncateStagingTables(db);
+      await clearStagingTables(db);
 
       // Stage one repository domain at a time so the workflow does not retain
       // the full parsed dataset in memory between inserts.

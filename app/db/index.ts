@@ -1,11 +1,17 @@
 import { env } from 'cloudflare:workers';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { relations } from './relations';
+import { drizzle } from 'drizzle-orm/d1';
+import { relations, schema } from './relations';
 
-export function getDb() {
-  const connectionString = env.HYPERDRIVE?.connectionString;
-  if (!connectionString) {
-    throw new Error('Missing HYPERDRIVE binding/connectionString');
+function createDb(database: D1Database) {
+  return drizzle(database, { relations, schema });
+}
+
+export type AppDb = ReturnType<typeof createDb>;
+
+export function getDb(): AppDb {
+  const database = env.DB;
+  if (!database) {
+    throw new Error('Missing DB D1 binding');
   }
-  return drizzle(connectionString, { relations });
+  return createDb(database);
 }

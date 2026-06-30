@@ -30,4 +30,10 @@ describe('pull workflow promotion order', () => {
       previousIndex = index;
     }
   });
+
+  it('keeps changed issue promotion batches small for Worker subrequest limits', () => {
+    const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
+
+    expect(source).toContain('const ISSUE_SYNC_BATCH_SIZE = 10;');
+  });
 });

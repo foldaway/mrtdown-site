@@ -1,5 +1,5 @@
 import type { SQL } from 'drizzle-orm';
-import { PgDialect } from 'drizzle-orm/pg-core';
+import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { describe, expect, it, vi } from 'vitest';
 import { getCrowdReportSource } from './crowdReportSource.functions';
 
@@ -146,7 +146,7 @@ describe('getCrowdReportSource', () => {
       stillHappening: true,
     });
 
-    const dialect = new PgDialect();
+    const dialect = new SQLiteSyncDialect();
     const reportWhereSql = dialect.sqlToQuery(fake.whereCalls[3] as SQL).sql;
 
     expect(reportWhereSql).toContain('"crowd_reports"."still_happening" =');
@@ -202,7 +202,7 @@ describe('getCrowdReportSource', () => {
 
     expect(source).toBeNull();
 
-    const dialect = new PgDialect();
+    const dialect = new SQLiteSyncDialect();
     const reportWhereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
 
     expect(reportWhereSql).toContain('"crowd_reports"."cluster_id" is null');

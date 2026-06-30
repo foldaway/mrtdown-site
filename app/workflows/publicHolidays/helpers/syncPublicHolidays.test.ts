@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   fetchDataGovPublicHolidays,
@@ -20,7 +21,7 @@ describe('normalizeDataGovPublicHolidayRecord', () => {
     });
   });
 
-  it('uses a Postgres text-safe hash', () => {
+  it('uses a database text-safe hash', () => {
     const row = normalizeDataGovPublicHolidayRecord({
       date: '2026-01-01',
       day: 'Thursday',
@@ -77,5 +78,23 @@ describe('fetchDataGovPublicHolidays', () => {
     expect(fetches).toHaveLength(2);
     expect(new URL(fetches[1]).searchParams.get('offset')).toBe('1');
     expect(rows.map((row) => row.date)).toEqual(['2026-01-01', '2026-05-01']);
+  });
+});
+
+describe('syncPublicHolidays retry markers', () => {
+  it('persists pending rebuild dates before non-transactional D1 writes', () => {
+    const source = readFileSync(
+      new URL('./syncPublicHolidays.ts', import.meta.url),
+      'utf8',
+    );
+
+    expect(source).toContain('PENDING_PUBLIC_HOLIDAY_REBUILD_DATES_KEY');
+    expect(source).toContain('readPendingPublicHolidayRebuildDates(db)');
+    expect(source).toContain('writePendingPublicHolidayRebuildDates(tx');
+    expect(
+      source.indexOf('writePendingPublicHolidayRebuildDates(tx'),
+    ).toBeLessThan(
+      source.indexOf('for (const rows of chunk(upsertRows, D1_WRITE_BATCH))'),
+    );
   });
 });

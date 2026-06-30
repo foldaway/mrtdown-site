@@ -16,6 +16,11 @@ import {
 } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
+import type { AppDb } from '~/db';
+import {
+  type AppDbStatementRunner,
+  runDbOrderedStatements,
+} from '~/db/orderedStatements';
 import {
   crowdReportAbuseEventsTable,
   crowdReportClusterLinesTable,
@@ -32,8 +37,8 @@ import {
   stationCodesTable,
   stationsTable,
   crowdReportStationsTable,
+  metadataTable,
 } from '~/db/schema';
-import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
 import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
 const SG_TIMEZONE = 'Asia/Singapore';
@@ -48,7 +53,7 @@ const DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES = 90;
 const DEFAULT_PUBLIC_SIGNAL_LIMIT = 20;
 const AUTO_REJECT_RESOLVED_STALE_HOURS = 6;
 const AUTO_REJECT_UNCONFIRMED_STALE_HOURS = 12;
-const DUPLICATE_CANDIDATE_PAGE_SIZE = 100;
+const DUPLICATE_CANDIDATE_PAGE_SIZE = 90;
 export const MAX_CROWD_REPORT_REQUEST_BYTES = 10_000;
 
 export const CrowdReportEffectSchema = IngestContentCrowdReportEffectSchema;
@@ -112,10 +117,7 @@ export type CrowdReportJsonBodyResult =
   | { success: true; body: unknown }
   | { success: false; status: 400 | 413; error: string };
 
-type AppDb = ReturnType<typeof import('~/db').getDb>;
-type CrowdReportTransaction = Parameters<
-  Parameters<AppDb['transaction']>[0]
->[0];
+type CrowdReportTransaction = AppDbStatementRunner;
 type CrowdReportReadableDb = Pick<CrowdReportTransaction, 'select'>;
 
 type PersistCrowdReportOptions = {
@@ -129,6 +131,7 @@ type PersistCrowdReportTransactionContext = {
   idFactory: () => string;
   bucketStartAt: string;
   reportId: string;
+  nowIso: string;
 };
 
 type AutomoderateCrowdReportOptions = ClusterCrowdReportOptions & {
@@ -198,31 +201,24 @@ function areSameIdSets(left: string[], right: string[]) {
   );
 }
 
-function buildDuplicateLockKey(submission: CrowdReportSubmission) {
-  return JSON.stringify({
-    effect: submission.effect ?? null,
-    directionText: normalizeComparableText(submission.directionText),
-    lineIds: normalizeIdSet(submission.lineIds),
-    stationIds: normalizeIdSet(submission.stationIds),
-  });
-}
-
 async function lockCrowdReportClusterDispatchInTransaction(
-  tx: Pick<CrowdReportTransaction, 'execute'>,
+  tx: Pick<CrowdReportTransaction, 'update'>,
   clusterId: string,
 ) {
-  await tx.execute(
-    sql`select pg_advisory_xact_lock(hashtextextended(${buildCrowdReportDispatchLockKey('cluster', clusterId)}, 0::bigint))`,
-  );
+  await tx
+    .update(crowdReportClustersTable)
+    .set({ updated_at: sql`${crowdReportClustersTable.updated_at}` })
+    .where(eq(crowdReportClustersTable.id, clusterId));
 }
 
 async function lockCrowdReportDispatchInTransaction(
-  tx: Pick<CrowdReportTransaction, 'execute'>,
+  tx: Pick<CrowdReportTransaction, 'update'>,
   reportId: string,
 ) {
-  await tx.execute(
-    sql`select pg_advisory_xact_lock(hashtextextended(${buildCrowdReportDispatchLockKey('report', reportId)}, 0::bigint))`,
-  );
+  await tx
+    .update(crowdReportsTable)
+    .set({ updated_at: sql`${crowdReportsTable.updated_at}` })
+    .where(eq(crowdReportsTable.id, reportId));
 }
 
 async function isCrowdReportClusterAvailableForDuplicateInTransaction(
@@ -287,7 +283,7 @@ function getCrowdReportClusterOngoingReportCountSql(
   clusterId: string | typeof crowdReportClustersTable.id,
 ) {
   return sql<number>`(
-    select count(*)::int
+    select count(*)
     from ${crowdReportsTable}
     where ${crowdReportsTable.cluster_id} = ${clusterId}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
@@ -299,7 +295,7 @@ function getCrowdReportClusterOngoingDistinctIpHashCountSql(
   clusterId: string | typeof crowdReportClustersTable.id,
 ) {
   return sql<number>`(
-    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})::int
+    select count(distinct ${crowdReportAbuseEventsTable.ip_hash})
     from ${crowdReportAbuseEventsTable}
     inner join ${crowdReportsTable}
       on ${crowdReportsTable.id} = ${crowdReportAbuseEventsTable.report_id}
@@ -568,6 +564,37 @@ export function buildCrowdReportStorageText(
     );
   }
   return summary.join(' ');
+}
+
+function normalizeCrowdReportObservedAt(value: string) {
+  const observedAt = DateTime.fromISO(value, { setZone: true });
+  return observedAt.isValid ? (observedAt.toUTC().toISO() ?? value) : value;
+}
+
+function buildDuplicateLockKey(submission: CrowdReportSubmission) {
+  return `crowd_report_duplicate_lock:${JSON.stringify({
+    effect: submission.effect ?? null,
+    directionText: normalizeComparableText(submission.directionText),
+    lineIds: normalizeIdSet(submission.lineIds),
+    stationIds: normalizeIdSet(submission.stationIds),
+  })}`;
+}
+
+async function lockCrowdReportDuplicateContextInTransaction(
+  tx: Pick<CrowdReportTransaction, 'insert'>,
+  submission: CrowdReportSubmission,
+  nowIso: string,
+) {
+  await tx
+    .insert(metadataTable)
+    .values({
+      key: buildDuplicateLockKey(submission),
+      value: nowIso,
+    })
+    .onConflictDoUpdate({
+      target: [metadataTable.key],
+      set: { value: nowIso },
+    });
 }
 
 export async function parseCrowdReportJsonBody(
@@ -1168,7 +1195,7 @@ export async function automoderateCrowdReport(
     options.duplicateWindowMinutes ?? DEFAULT_DUPLICATE_WINDOW_MINUTES;
   const now = options.now ?? DateTime.now().setZone(SG_TIMEZONE);
 
-  return db.transaction((tx) =>
+  return runDbOrderedStatements(db, (tx) =>
     automoderateCrowdReportInTransaction(
       tx,
       reportId,
@@ -1194,10 +1221,7 @@ async function automoderateCrowdReportInTransaction(
   publicSignalMinReports = DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
   publicSignalMinDistinctIpHashes = DEFAULT_PUBLIC_SIGNAL_MIN_DISTINCT_IP_HASHES,
 ) {
-  await tx.execute(
-    sql`select pg_advisory_xact_lock(hashtextextended(${buildDuplicateLockKey(submission)}, 0::bigint))`,
-  );
-
+  const nowIso = now.toUTC().toISO() ?? new Date().toISOString();
   const policy = assessCrowdReportAutomationPolicy(submission, now);
   if (policy.action === 'reject') {
     const [updatedReport] = await tx
@@ -1205,7 +1229,7 @@ async function automoderateCrowdReportInTransaction(
       .set({
         status: 'rejected',
         duplicate_of_id: null,
-        updated_at: sql`now()`,
+        updated_at: nowIso,
       })
       .where(eq(crowdReportsTable.id, reportId))
       .returning({
@@ -1230,6 +1254,8 @@ async function automoderateCrowdReportInTransaction(
       }
     );
   }
+
+  await lockCrowdReportDuplicateContextInTransaction(tx, submission, nowIso);
 
   let duplicate = await findDuplicateCrowdReport(
     tx,
@@ -1265,7 +1291,7 @@ async function automoderateCrowdReportInTransaction(
     .set({
       status,
       duplicate_of_id: duplicate?.id ?? null,
-      updated_at: sql`now()`,
+      updated_at: nowIso,
     })
     .where(eq(crowdReportsTable.id, reportId))
     .returning({
@@ -1294,6 +1320,7 @@ async function automoderateCrowdReportInTransaction(
     publicSignalMinReports,
     publicSignalMinDistinctIpHashes,
     idFactory,
+    nowIso,
   );
 
   return (
@@ -1313,6 +1340,7 @@ async function createCrowdReportClusterInTransaction(
   idFactory: () => string,
   publicSignalMinReports: number,
   publicSignalMinDistinctIpHashes: number,
+  nowIso: string,
 ) {
   const clusterId = idFactory();
   const { windowStartAt, windowEndAt } = getCrowdReportClusterWindow(
@@ -1356,7 +1384,7 @@ async function createCrowdReportClusterInTransaction(
     .update(crowdReportsTable)
     .set({
       cluster_id: clusterId,
-      updated_at: sql`now()`,
+      updated_at: nowIso,
     })
     .where(eq(crowdReportsTable.id, reportId))
     .returning({ id: crowdReportsTable.id });
@@ -1373,6 +1401,7 @@ async function clusterModeratedCrowdReportInTransaction(
   publicSignalMinReports: number,
   publicSignalMinDistinctIpHashes: number,
   idFactory: () => string,
+  nowIso: string,
 ) {
   if (duplicate == null) {
     await createCrowdReportClusterInTransaction(
@@ -1383,6 +1412,7 @@ async function clusterModeratedCrowdReportInTransaction(
       idFactory,
       publicSignalMinReports,
       publicSignalMinDistinctIpHashes,
+      nowIso,
     );
     return;
   }
@@ -1397,6 +1427,7 @@ async function clusterModeratedCrowdReportInTransaction(
       idFactory,
       publicSignalMinReports,
       publicSignalMinDistinctIpHashes,
+      nowIso,
     ));
   const { windowStartAt, windowEndAt } = getCrowdReportClusterWindow(
     submission.observedAt,
@@ -1407,7 +1438,7 @@ async function clusterModeratedCrowdReportInTransaction(
     .update(crowdReportsTable)
     .set({
       cluster_id: clusterId,
-      updated_at: sql`now()`,
+      updated_at: nowIso,
     })
     .where(eq(crowdReportsTable.id, reportId))
     .returning({ id: crowdReportsTable.id });
@@ -1416,10 +1447,10 @@ async function clusterModeratedCrowdReportInTransaction(
     .update(crowdReportClustersTable)
     .set({
       report_count: sql`${crowdReportClustersTable.report_count} + 1`,
-      status: sql`case when ${crowdReportClustersTable.status} = 'pending' and ${getCrowdReportClusterOngoingReportCountSql(clusterId)} >= ${publicSignalMinReports} and ${getCrowdReportClusterOngoingDistinctIpHashCountSql(clusterId)} >= ${publicSignalMinDistinctIpHashes} then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`,
-      window_start_at: sql`least(${crowdReportClustersTable.window_start_at}, ${windowStartAt}::timestamptz)`,
-      window_end_at: sql`greatest(${crowdReportClustersTable.window_end_at}, ${windowEndAt}::timestamptz)`,
-      updated_at: sql`now()`,
+      status: sql`case when ${crowdReportClustersTable.status} = 'pending' and ${getCrowdReportClusterOngoingReportCountSql(clusterId)} >= ${publicSignalMinReports} and ${getCrowdReportClusterOngoingDistinctIpHashCountSql(clusterId)} >= ${publicSignalMinDistinctIpHashes} then 'accepted' else ${crowdReportClustersTable.status} end`,
+      window_start_at: sql`case when ${crowdReportClustersTable.window_start_at} <= ${windowStartAt} then ${crowdReportClustersTable.window_start_at} else ${windowStartAt} end`,
+      window_end_at: sql`case when ${crowdReportClustersTable.window_end_at} >= ${windowEndAt} then ${crowdReportClustersTable.window_end_at} else ${windowEndAt} end`,
+      updated_at: nowIso,
     })
     .where(eq(crowdReportClustersTable.id, clusterId))
     .returning({ id: crowdReportClustersTable.id });
@@ -1449,7 +1480,7 @@ async function persistCrowdReportInTransaction(
         client_fingerprint_hash:
           abuseContext.clientFingerprintHash ??
           crowdReportRateLimitsTable.client_fingerprint_hash,
-        updated_at: sql`now()`,
+        updated_at: context.nowIso,
       },
     })
     .returning({
@@ -1465,7 +1496,7 @@ async function persistCrowdReportInTransaction(
 
   await tx.insert(crowdReportsTable).values({
     id: context.reportId,
-    observed_at: submission.observedAt,
+    observed_at: normalizeCrowdReportObservedAt(submission.observedAt),
     direction_text: submission.directionText,
     effect: submission.effect,
     delay_minutes: submission.delayMinutes,
@@ -1526,12 +1557,13 @@ export async function persistCrowdReport(
   const idFactory = options.idFactory ?? (() => crypto.randomUUID());
   const reportId = idFactory();
 
-  return db.transaction((tx) =>
+  return runDbOrderedStatements(db, (tx) =>
     persistCrowdReportInTransaction(tx, submission, abuseContext, {
       rateLimitPerHour: limit,
       idFactory,
       bucketStartAt,
       reportId,
+      nowIso: now.toUTC().toISO() ?? new Date().toISOString(),
     }),
   );
 }
@@ -1551,7 +1583,7 @@ export async function persistAutomoderatedCrowdReport(
   const idFactory = options.idFactory ?? (() => crypto.randomUUID());
   const reportId = idFactory();
 
-  return db.transaction(async (tx) => {
+  return runDbOrderedStatements(db, async (tx) => {
     const report = await persistCrowdReportInTransaction(
       tx,
       submission,
@@ -1561,6 +1593,7 @@ export async function persistAutomoderatedCrowdReport(
         idFactory,
         bucketStartAt,
         reportId,
+        nowIso: now.toUTC().toISO() ?? new Date().toISOString(),
       },
     );
 
@@ -1688,10 +1721,7 @@ export async function getPublicCrowdReportSignals(
         stationIds,
         windowStartAt: cluster.windowStartAt,
         windowEndAt: cluster.windowEndAt,
-        updatedAt:
-          cluster.updatedAt instanceof Date
-            ? cluster.updatedAt.toISOString()
-            : cluster.updatedAt,
+        updatedAt: cluster.updatedAt,
       };
     })
     .filter((signal) => {
