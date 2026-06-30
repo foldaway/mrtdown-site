@@ -37,6 +37,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build staging preflight
+        run: npm run build
+        env:
+          CLOUDFLARE_ENV: staging
+          GIT_SHA: ${{ github.sha }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_RELEASE: ${{ github.sha }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          TIER: staging
+          VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY }}
+          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
+          VITE_ROOT_URL: "https://www.mrtdown.org"
+
+      - name: Validate staging deploy bundle
+        run: npx wrangler deploy --env staging --dry-run
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Apply D1 migrations
         run: npm run db:migrate -- --env staging
         env:

@@ -30,12 +30,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Apply D1 migrations
-        run: npm run db:migrate -- --env preview
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
       - name: Build
         run: npm run build
         env:
@@ -53,6 +47,12 @@ jobs:
           command: deploy --env preview
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Apply D1 migrations
+        run: npm run db:migrate -- --env preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Run preview public holidays workflow
         timeout-minutes: 15
