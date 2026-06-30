@@ -43,6 +43,7 @@ describe('getDb', () => {
       mocks.database,
       expect.objectContaining({
         relations: expect.any(Object),
+        schema: expect.any(Object),
       }),
     );
     expect(db).toBe(mocks.drizzleDb);

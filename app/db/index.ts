@@ -1,9 +1,9 @@
 import { env } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/d1';
-import { relations } from './relations';
+import { relations, schema } from './relations';
 
 function createDb(database: D1Database) {
-  return drizzle(database, { relations });
+  return drizzle(database, { relations, schema });
 }
 
 export type AppDb = ReturnType<typeof createDb>;

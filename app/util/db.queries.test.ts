@@ -458,17 +458,17 @@ describe('selectLegacyHistoryFallback', () => {
     ).toBe(true);
   });
 
-  it('keeps throwing for missing coverage from an existing empty fact table', () => {
-    expect(() =>
+  it('uses the legacy fallback when operational fact tables are empty', () => {
+    expect(
       selectLegacyHistoryFallback(
         PAST_START,
         PAST_END,
         TODAY,
         [],
-        { status: 'available', startDate: null },
+        { status: 'missing_table' },
         'history month 2026-05',
       ),
-    ).toThrow('Missing operational fact coverage for history month 2026-05');
+    ).toBe(true);
   });
 });
 

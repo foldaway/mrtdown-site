@@ -304,7 +304,7 @@ type OperationalFactRowsForDate = {
 type OperationalFactCoverageStart =
   | {
       status: 'available';
-      startDate: string | null;
+      startDate: string;
     }
   | {
       status: 'missing_table';
@@ -2905,9 +2905,14 @@ async function getOperationalFactCoverageStart(): Promise<OperationalFactCoverag
         })
         .from(lineDayFactsTable),
     );
+    if (row?.startDate == null) {
+      return {
+        status: 'missing_table',
+      };
+    }
     return {
       status: 'available',
-      startDate: row?.startDate ?? null,
+      startDate: row.startDate,
     };
   } catch (error) {
     if (isMissingTableError(error)) {

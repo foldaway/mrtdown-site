@@ -36,7 +36,7 @@ import {
   townsTable,
 } from './schema';
 
-const schema = {
+export const schema = {
   crowdReportAbuseEvents: crowdReportAbuseEventsTable,
   crowdReportClusterLines: crowdReportClusterLinesTable,
   crowdReportClusters: crowdReportClustersTable,
