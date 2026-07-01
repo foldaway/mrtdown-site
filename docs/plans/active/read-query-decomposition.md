@@ -130,6 +130,25 @@ Rules for the new package:
   should stay separate from public read queries.
 - Keep type exports stable for route components while implementation files move.
 
+## Current Base Dataset Callers
+
+As of 2026-07-01, `buildDataset` and `getBaseDataset` are implementation-only
+helpers in `app/util/db/queries/index.ts`. The remaining callers are:
+
+- `buildBaseDataset`: cache wrapper for the legacy full dataset.
+- `buildOverviewDataset`: overview/home candidate issue subset fallback.
+- `getIncludedForIssueIds`: history fact-path included-entity hydration.
+- `getLineProfileData`
+- `getIssueData`
+- `getStationProfileData`
+- `getOperatorProfileData`
+- `getHistoryYearSummaryData`: legacy fallback when fact coverage is missing.
+- `getHistoryYearMonthData`: legacy fallback when fact coverage is missing.
+- `getHistoryDayData`: legacy fallback when fact coverage is missing.
+- `rebuildStatisticsSnapshot`: maintenance/workflow snapshot generation.
+- `getStatisticsData`: legacy snapshot-included and missing-snapshot fallbacks.
+- `getSitemapData`
+
 ## Phases
 
 ### Phase 0: Baseline And Guardrails
@@ -310,6 +329,15 @@ done
 
 ## Progress Log
 
+- 2026-07-01: Started Phase 1 by moving the existing `db.queries.ts`
+  implementation intact to `app/util/db/queries/index.ts`, leaving
+  `app/util/db.queries.ts` as a temporary compatibility barrel. Added
+  migration-only comments to `buildDataset` and `getBaseDataset`, and recorded
+  the current base-dataset caller list above.
+- 2026-07-01: Started Phase 2 by moving `getRootData` to
+  `app/util/db/queries/root.ts` and changing the root metadata read to fetch
+  only `manifest_last_pulled_at`, which is the only metadata key currently used
+  by the root layout.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.
