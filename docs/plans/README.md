@@ -24,6 +24,8 @@ Use plans for:
   Postgres/Hyperdrive read model and site-local state to D1.
 - [Production performance](active/production-performance.md): public route
   latency and payload reduction plan.
+- [Read query decomposition](active/read-query-decomposition.md): remove base
+  dataset request-path reads and split the DB query monolith.
 - [SEO remediation](active/seo-remediation.md): crawl-clean sitemap output,
   canonical metadata, locale alternates, and metadata quality fixes.
 
