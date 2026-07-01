@@ -363,6 +363,10 @@ done
   helpers and issue-interval clipping/activity helpers from `legacy.ts` into
   focused `temporal.ts` and `issueIntervals.ts` query-package modules, keeping
   the legacy public exports and route behavior unchanged.
+- 2026-07-02: Continued Phase 1 by extracting line service-window helpers,
+  issue-type aggregation helpers, chart time-scale builders, and shared D1
+  batching/public-metadata helpers out of `legacy.ts`, keeping the temporary
+  compatibility barrel and route behavior unchanged.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.

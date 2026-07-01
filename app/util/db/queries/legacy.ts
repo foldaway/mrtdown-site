@@ -44,7 +44,6 @@ import type {
   IssueAffectedBranch,
   Line,
   LineSummary,
-  LineSummaryDayType,
   LineSummaryStatus,
   Station,
   TimeScaleChart,
@@ -68,7 +67,12 @@ import {
   serviceRevisionHasEnded,
 } from '~/util/serviceRevisions';
 import { selectIncludedEntities } from './included';
-import { isMissingTableError } from './shared';
+import {
+  chunk,
+  isMissingTableError,
+  publicMetadataKeySql,
+  selectByIdChunks,
+} from './shared';
 import {
   deriveServiceScopeStationIds,
   selectServiceBranchSourceEvents,
@@ -90,6 +94,30 @@ import {
   sumIntervalSeconds,
   type IssueIntervalBounds,
 } from './issueIntervals';
+import { buildCountChart, makeTimeScale, type TimeScale } from './chartHelpers';
+import {
+  isLineFuture,
+  isLineOperatingNow,
+  lineDayType,
+  serviceWindowAfterLineStart,
+  serviceWindowForDate,
+} from './lineService';
+import {
+  addIssueTypeCount,
+  createIssueTypeBreakdown,
+  createIssueTypeCounts,
+  createIssueTypeIntervalGroups,
+  emptyIssueTypePayload,
+  groupIssueFactCountsByDate,
+  groupIssueFactRowsByDate,
+  ISSUE_TYPES,
+  pickIssueDurationByType,
+  pickIssueTypes,
+  sumIssueTypeIntervalGroups,
+  type IssueDayFactRow,
+  type IssueTypeBreakdown,
+  type IssueTypeCounts,
+} from './issueTypeStats';
 import { parseStatisticsSnapshotPayload } from './statisticsPayload';
 import {
   isoDate,
@@ -100,11 +128,6 @@ import {
 } from './temporal';
 import type { StatisticsSnapshotPayload, SystemAnalytics } from './types';
 
-const ISSUE_TYPES = [
-  'disruption',
-  'maintenance',
-  'infra',
-] as const satisfies readonly IssueType[];
 type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
 
 type DatasetLineBranch = {
@@ -163,9 +186,6 @@ type OverviewDataset = Pick<
 >;
 
 const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
-const D1_SELECT_IN_BATCH = 90;
-const CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX =
-  'crowd_report_duplicate_lock:';
 const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 30;
 const OPERATIONAL_FACTS_WRITE_BATCH = 10;
 let cachedBaseDataset:
@@ -183,8 +203,6 @@ const cachedOverviewDatasets = new Map<
   }
 >();
 const pendingOverviewDatasets = new Map<number, Promise<OverviewDataset>>();
-
-type TimeScale = TimeScaleChart['dataTimeScale'];
 
 type StatisticsTimeWindow = {
   title: string;
@@ -207,20 +225,6 @@ const STATISTICS_TIME_WINDOWS: StatisticsTimeWindow[] = [
   { title: '10y', dataTimeScale: makeTimeScale('year', 10) },
   { title: '20y', dataTimeScale: makeTimeScale('year', 20) },
 ];
-
-type IssueTypeCounts = Record<IssueType, number>;
-
-type IssueTypeBreakdown = IssueTypeCounts & {
-  totalIssues: number;
-};
-
-type IssueDayFactRow = {
-  date: string;
-  issue_id: string;
-  issue_type: IssueType;
-  active_anytime: boolean;
-  duration_seconds: number;
-};
 
 type OperationalFactsRebuildContext = {
   issues: IssueWithOperationalEffects[];
@@ -272,256 +276,6 @@ function parseTranslations(value: unknown): Line['name'] {
     'zh-Hans': rawTranslations['zh-Hans'] ?? null,
     ms: rawTranslations.ms ?? null,
     ta: rawTranslations.ta ?? null,
-  };
-}
-
-function lineDayType(
-  date: DateTime,
-  publicHolidaySet: Set<string>,
-): LineSummaryDayType {
-  if (publicHolidaySet.has(isoDate(date))) {
-    return 'public_holiday';
-  }
-  return date.weekday >= 6 ? 'weekend' : 'weekday';
-}
-
-function serviceWindowForDate(
-  line: Line,
-  date: DateTime,
-  publicHolidaySet: Set<string>,
-) {
-  const dayType = lineDayType(date, publicHolidaySet);
-  const hours =
-    dayType === 'weekday'
-      ? line.operatingHours.weekdays
-      : line.operatingHours.weekends;
-
-  const [startHour, startMinute] = hours.start.split(':').map(Number);
-  const [endHour, endMinute] = hours.end.split(':').map(Number);
-
-  const windowStart = date.startOf('day').set({
-    hour: startHour,
-    minute: startMinute,
-  });
-  let windowEnd = date.startOf('day').set({
-    hour: endHour,
-    minute: endMinute,
-  });
-  if (windowEnd <= windowStart) {
-    windowEnd = windowEnd.plus({ day: 1 });
-  }
-
-  return {
-    start: windowStart,
-    end: windowEnd,
-    seconds: Math.max(0, windowEnd.diff(windowStart, 'seconds').seconds),
-  };
-}
-
-function serviceWindowContains(
-  serviceWindow: ReturnType<typeof serviceWindowForDate>,
-  date: DateTime,
-) {
-  return date >= serviceWindow.start && date <= serviceWindow.end;
-}
-
-function serviceWindowIsAfterLineStart(
-  line: Line,
-  serviceWindow: ReturnType<typeof serviceWindowForDate>,
-) {
-  if (line.startedAt == null) {
-    return true;
-  }
-
-  return serviceWindow.start.startOf('day') >= parseDateTime(line.startedAt);
-}
-
-function serviceWindowAfterLineStart(
-  line: Line,
-  serviceWindow: ReturnType<typeof serviceWindowForDate>,
-) {
-  const windowStart =
-    line.startedAt == null
-      ? serviceWindow.start
-      : DateTime.max(serviceWindow.start, parseDateTime(line.startedAt));
-  const seconds = Math.max(
-    0,
-    serviceWindow.end.diff(windowStart, 'seconds').seconds,
-  );
-  return {
-    start: windowStart,
-    end: serviceWindow.end,
-    seconds,
-  };
-}
-
-function isLineFuture(line: Line, referenceNow = nowSg()) {
-  if (line.startedAt == null) {
-    return false;
-  }
-  return parseDateTime(line.startedAt) > referenceNow;
-}
-
-function isLineOperatingNow(
-  line: Line,
-  publicHolidaySet: Set<string>,
-  referenceNow = nowSg(),
-) {
-  if (isLineFuture(line, referenceNow)) {
-    return false;
-  }
-
-  if (line.startedAt != null) {
-    const start = parseDateTime(line.startedAt);
-    if (referenceNow < start) {
-      return false;
-    }
-  }
-
-  const window = serviceWindowForDate(line, referenceNow, publicHolidaySet);
-  if (serviceWindowContains(window, referenceNow)) {
-    return true;
-  }
-
-  const previousWindow = serviceWindowForDate(
-    line,
-    referenceNow.minus({ day: 1 }),
-    publicHolidaySet,
-  );
-  return (
-    serviceWindowIsAfterLineStart(line, previousWindow) &&
-    serviceWindowContains(previousWindow, referenceNow)
-  );
-}
-
-function pickIssueTypes<T extends { type: IssueType }>(items: T[]) {
-  const counts: Partial<Record<IssueType, number>> = {};
-  for (const item of items) {
-    counts[item.type] = (counts[item.type] ?? 0) + 1;
-  }
-  return counts;
-}
-
-function emptyIssueTypePayload(): Record<IssueType, number> {
-  return { disruption: 0, maintenance: 0, infra: 0 };
-}
-
-function groupIssueFactRowsByDate<T extends { date: string }>(rows: T[]) {
-  const rowsByDate = new Map<string, T[]>();
-  for (const row of rows) {
-    const dayRows = rowsByDate.get(row.date);
-    if (dayRows == null) {
-      rowsByDate.set(row.date, [row]);
-      continue;
-    }
-    dayRows.push(row);
-  }
-  return rowsByDate;
-}
-
-function pickIssueDurationByType<
-  T extends { type: IssueType; durationSeconds: number },
->(items: T[]) {
-  const counts: Partial<Record<IssueType, number>> = {};
-  for (const item of items) {
-    counts[item.type] = (counts[item.type] ?? 0) + item.durationSeconds;
-  }
-  return counts;
-}
-
-function createIssueTypeCounts(): IssueTypeCounts {
-  return {
-    disruption: 0,
-    maintenance: 0,
-    infra: 0,
-  };
-}
-
-function createIssueTypeIntervalGroups(): Record<
-  IssueType,
-  IssueIntervalBounds[]
-> {
-  return {
-    disruption: [],
-    maintenance: [],
-    infra: [],
-  };
-}
-
-function sumIssueTypeIntervalGroups(
-  intervalGroups: Record<IssueType, IssueIntervalBounds[]>,
-  referenceNow = nowSg(),
-) {
-  const counts = createIssueTypeCounts();
-  for (const issueType of ISSUE_TYPES) {
-    counts[issueType] = sumIntervalSeconds(
-      intervalGroups[issueType],
-      referenceNow,
-    );
-  }
-  return counts;
-}
-
-function createIssueTypeBreakdown(): IssueTypeBreakdown {
-  return {
-    ...createIssueTypeCounts(),
-    totalIssues: 0,
-  };
-}
-
-function addIssueTypeCount(
-  counts: IssueTypeCounts,
-  issueType: IssueType,
-  amount: number,
-) {
-  counts[issueType] += amount;
-}
-
-function groupIssueFactCountsByDate(
-  rows: IssueDayFactRow[],
-  durationMode = false,
-) {
-  const countsByDate = new Map<string, IssueTypeCounts>();
-
-  for (const row of rows) {
-    const amount = durationMode
-      ? row.duration_seconds
-      : row.active_anytime
-        ? 1
-        : 0;
-    if (amount === 0) {
-      continue;
-    }
-
-    let counts = countsByDate.get(row.date);
-    if (counts == null) {
-      counts = createIssueTypeCounts();
-      countsByDate.set(row.date, counts);
-    }
-
-    addIssueTypeCount(counts, row.issue_type, amount);
-  }
-
-  return countsByDate;
-}
-
-function makeTimeScale(granularity: Granularity, count: number): TimeScale {
-  return { granularity, count };
-}
-
-function buildCountChart(
-  title: string,
-  entries: ChartEntry[],
-  cumulative: ChartEntry[],
-  dataTimeScale: TimeScale,
-  displayTimeScale?: TimeScale,
-): TimeScaleChart {
-  return {
-    title,
-    data: entries,
-    dataCumulative: cumulative,
-    dataTimeScale,
-    displayTimeScale,
   };
 }
 
@@ -2320,29 +2074,6 @@ function buildIssueDurationGraphs(issues: Issue[]) {
       window.displayTimeScale,
     );
   });
-}
-
-function chunk<T>(items: readonly T[], size: number) {
-  const chunks: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    chunks.push(items.slice(index, index + size));
-  }
-  return chunks;
-}
-
-async function selectByIdChunks<T>(
-  ids: readonly string[],
-  selectBatch: (ids: string[]) => Promise<T[]>,
-) {
-  const rows: T[] = [];
-  for (const batch of chunk(ids, D1_SELECT_IN_BATCH)) {
-    rows.push(...(await selectBatch(batch)));
-  }
-  return rows;
-}
-
-function publicMetadataKeySql() {
-  return sql`${metadataTable.key} not like ${`${CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX}%`}`;
 }
 
 function buildIssuesByLineId(issues: Iterable<IssueWithOperationalEffects>) {

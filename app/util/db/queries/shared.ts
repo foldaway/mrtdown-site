@@ -1,3 +1,10 @@
+import { sql } from 'drizzle-orm';
+import { metadataTable } from '~/db/schema';
+
+const D1_SELECT_IN_BATCH = 90;
+const CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX =
+  'crowd_report_duplicate_lock:';
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -44,4 +51,27 @@ export function isMissingTableError(error: unknown) {
   }
 
   return false;
+}
+
+export function chunk<T>(items: readonly T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+export async function selectByIdChunks<T>(
+  ids: readonly string[],
+  selectBatch: (ids: string[]) => Promise<T[]>,
+) {
+  const rows: T[] = [];
+  for (const batch of chunk(ids, D1_SELECT_IN_BATCH)) {
+    rows.push(...(await selectBatch(batch)));
+  }
+  return rows;
+}
+
+export function publicMetadataKeySql() {
+  return sql`${metadataTable.key} not like ${`${CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX}%`}`;
 }
