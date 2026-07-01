@@ -20,6 +20,9 @@ const sentryConfig: SentryTanstackStartOptions = {
   },
   telemetry: false,
   debug: true,
+  sourcemaps: {
+    filesToDeleteAfterUpload: ['dist/**/*.map'],
+  },
 };
 
 // https://vite.dev/config/
