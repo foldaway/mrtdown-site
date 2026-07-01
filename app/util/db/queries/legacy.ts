@@ -1,9 +1,4 @@
-import type {
-  FacilityEffectKind,
-  IssueType,
-  Service as CoreService,
-  ServiceEffectKind,
-} from '@mrtdown/core';
+import type { IssueType } from '@mrtdown/core';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import type { AppDb } from '~/db';
@@ -46,10 +41,7 @@ import type {
   Station,
 } from '~/types';
 import { getPublicCrowdReportSignals } from '~/util/crowdReports';
-import {
-  issueContributesToLineDowntime,
-  issueContributesToLineStatus,
-} from '~/util/issueOperationalEffects';
+import { issueContributesToLineDowntime } from '~/util/issueOperationalEffects';
 import {
   deriveLineStartedAtFromBranches,
   sortLineBranchesForCurrentView,
@@ -91,27 +83,25 @@ import {
   resolveOperationalIssueIntervals,
   sortIssuesByLatestActivity,
   sumIntervalSeconds,
-  type IssueIntervalBounds,
 } from './issueIntervals';
-import {
-  isLineFuture,
-  isLineOperatingNow,
-  lineDayType,
-  serviceWindowForDate,
-} from './lineService';
+import { isLineFuture, serviceWindowForDate } from './lineService';
 import {
   addIssueTypeCount,
   createIssueTypeBreakdown,
   createIssueTypeCounts,
   createIssueTypeIntervalGroups,
   groupIssueFactCountsByDate,
-  ISSUE_TYPES,
   pickIssueDurationByType,
   pickIssueTypes,
   sumIssueTypeIntervalGroups,
   type IssueTypeBreakdown,
   type IssueTypeCounts,
 } from './issueTypeStats';
+import {
+  buildIssuesByLineId,
+  buildLineSummary,
+  rankLineSummaries,
+} from './lineSummaries';
 import { parseStatisticsSnapshotPayload } from './statisticsPayload';
 import {
   getIssueDayFactsInRange,
@@ -135,64 +125,17 @@ import {
   buildUptimeGraph,
   getStatisticsFactStart,
 } from './timeScaleGraphs';
-import type { StatisticsSnapshotPayload, SystemAnalytics } from './types';
-
-type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
-
-type DatasetLineBranch = {
-  id: CoreService['id'];
-  name: CoreService['name'];
-  startedAt: CoreService['revisions'][number]['startAt'] | null;
-  endedAt: CoreService['revisions'][number]['endAt'];
-  stationIds: Array<
-    CoreService['revisions'][number]['path']['stations'][number]['stationId']
-  >;
-};
-
-type OperatorOperationalStatus =
-  | 'all_operational'
-  | 'some_lines_disrupted'
-  | 'some_lines_under_maintenance'
-  | 'all_lines_closed_for_day';
-
-type OperatorLinePerformance = {
-  lineId: string;
-  status: LineSummaryStatus;
-  uptimeRatio: number | null;
-  issueCount: number;
-};
-
-type IssueWithOperationalEffects = Issue & {
-  serviceEffectKinds: ServiceEffectKind[];
-  facilityEffectKinds: FacilityEffectKind[];
-};
-
-type BranchWithEntries = DatasetLineBranch & {
-  entries: Array<{
-    stationId: string;
-    displayCode: string;
-    pathIndex: number;
-  }>;
-};
-
-type CommunitySignalOptions = {
-  includeCommunitySignals?: boolean;
-};
-
-type BaseDataset = {
-  included: BaseIncludedEntities;
-  branchesByLineId: Record<string, BranchWithEntries[]>;
-  branchByServiceId: Record<string, BranchWithEntries>;
-  metadata: Record<string, string>;
-  publicHolidaySet: Set<string>;
-  allIssues: Record<string, IssueWithOperationalEffects>;
-  issuesByLineId: Record<string, IssueWithOperationalEffects[]>;
-};
-
-type OverviewDataset = Pick<
+import type {
   BaseDataset,
-  'included' | 'publicHolidaySet' | 'allIssues' | 'issuesByLineId'
->;
+  BranchWithEntries,
+  CommunitySignalOptions,
+  IssueWithOperationalEffects,
+  OperatorLinePerformance,
+  OperatorOperationalStatus,
+  OverviewDataset,
+  StatisticsSnapshotPayload,
+  SystemAnalytics,
+} from './types';
 
 const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
 const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 30;
@@ -1339,177 +1282,6 @@ async function getIncludedForIssueIds(issueIds: readonly string[]) {
     issueIds,
     includeStationMembershipLines: true,
   });
-}
-
-export function buildLineSummary(
-  line: Line,
-  issues: IssueWithOperationalEffects[],
-  days: number,
-  publicHolidaySet: Set<string>,
-  referenceNow = nowSg(),
-): LineSummary {
-  const startDate = referenceNow.startOf('day').minus({ days: days - 1 });
-  const breakdownByDates: LineSummary['breakdownByDates'] = {};
-  const downtimeIntervalsByIssueType = createIssueTypeIntervalGroups();
-
-  let totalServiceSeconds = 0;
-  let totalDowntimeSeconds = 0;
-
-  for (let offset = 0; offset < days; offset++) {
-    const date = startDate.plus({ days: offset });
-    const dayWindow = serviceWindowForDate(line, date, publicHolidaySet);
-    const dayBreakdown: LineSummary['breakdownByDates'][string] = {
-      breakdownByIssueTypes: {},
-      dayType: lineDayType(date, publicHolidaySet),
-    };
-
-    if (!isLineFuture(line, date.endOf('day'))) {
-      totalServiceSeconds += dayWindow.seconds;
-    }
-
-    const dailyDowntimeIntervals: IssueIntervalBounds[] = [];
-    const dailyIntervalsByIssueType = createIssueTypeIntervalGroups();
-
-    for (const issue of issues) {
-      const contributingBounds = clipIssueIntervalsToRange(
-        issue,
-        dayWindow.start,
-        dayWindow.end,
-        referenceNow,
-      );
-      const dayOverlap = sumIntervalSeconds(contributingBounds, referenceNow);
-
-      if (dayOverlap <= 0) {
-        continue;
-      }
-
-      dailyIntervalsByIssueType[issue.type].push(...contributingBounds);
-
-      if (issueContributesToLineDowntime(issue)) {
-        dailyDowntimeIntervals.push(...contributingBounds);
-        downtimeIntervalsByIssueType[issue.type].push(...contributingBounds);
-      }
-
-      const current = dayBreakdown.breakdownByIssueTypes[issue.type] ?? {
-        totalDurationSeconds: 0,
-        issueIds: [],
-      };
-      if (!current.issueIds.includes(issue.id)) {
-        current.issueIds.push(issue.id);
-      }
-      dayBreakdown.breakdownByIssueTypes[issue.type] = current;
-    }
-
-    const dailyDurationSecondsByIssueType = sumIssueTypeIntervalGroups(
-      dailyIntervalsByIssueType,
-      referenceNow,
-    );
-    for (const issueType of ISSUE_TYPES) {
-      const current = dayBreakdown.breakdownByIssueTypes[issueType];
-      if (current != null) {
-        current.totalDurationSeconds =
-          dailyDurationSecondsByIssueType[issueType];
-      }
-    }
-
-    totalDowntimeSeconds += sumIntervalSeconds(
-      dailyDowntimeIntervals,
-      referenceNow,
-    );
-
-    breakdownByDates[isoDate(date)] = dayBreakdown;
-  }
-
-  const activeNow = issues.filter((issue) =>
-    issueActiveNow(issue, referenceNow),
-  );
-  let status: LineSummaryStatus = 'normal';
-  if (isLineFuture(line, referenceNow)) {
-    status = 'future_service';
-  } else if (!isLineOperatingNow(line, publicHolidaySet, referenceNow)) {
-    status = 'closed_for_day';
-  } else if (
-    activeNow.some(
-      (issue) =>
-        issue.type === 'disruption' && issueContributesToLineStatus(issue),
-    )
-  ) {
-    status = 'ongoing_disruption';
-  } else if (
-    activeNow.some(
-      (issue) =>
-        issue.type === 'maintenance' && issueContributesToLineStatus(issue),
-    )
-  ) {
-    status = 'ongoing_maintenance';
-  } else if (
-    activeNow.some(
-      (issue) => issue.type === 'infra' && issueContributesToLineStatus(issue),
-    )
-  ) {
-    status = 'ongoing_infra';
-  }
-
-  const durationSecondsByIssueType = sumIssueTypeIntervalGroups(
-    downtimeIntervalsByIssueType,
-    referenceNow,
-  );
-
-  return {
-    lineId: line.id,
-    status,
-    durationSecondsByIssueType,
-    durationSecondsTotalForIssues: Object.values(
-      durationSecondsByIssueType,
-    ).reduce((sum, value) => sum + (value ?? 0), 0),
-    breakdownByDates,
-    uptimeRatio:
-      totalServiceSeconds > 0
-        ? Math.max(0, 1 - totalDowntimeSeconds / totalServiceSeconds)
-        : null,
-    totalServiceSeconds: totalServiceSeconds > 0 ? totalServiceSeconds : null,
-    totalDowntimeSeconds: totalServiceSeconds > 0 ? totalDowntimeSeconds : null,
-    downtimeBreakdown:
-      totalServiceSeconds > 0
-        ? (['disruption', 'maintenance', 'infra'] as IssueType[]).map(
-            (type) => ({
-              type,
-              downtimeSeconds: durationSecondsByIssueType[type] ?? 0,
-            }),
-          )
-        : null,
-    uptimeRank: null,
-    totalLines: null,
-  };
-}
-
-function rankLineSummaries(lineSummaries: LineSummary[]) {
-  const ranked = lineSummaries
-    .filter((summary) => summary.uptimeRatio != null)
-    .sort((a, b) => (b.uptimeRatio ?? 0) - (a.uptimeRatio ?? 0));
-
-  return lineSummaries.map((summary) => {
-    const rank = ranked.findIndex((item) => item.lineId === summary.lineId);
-    return {
-      ...summary,
-      uptimeRank: summary.uptimeRatio != null ? rank + 1 : null,
-      totalLines: ranked.length > 0 ? ranked.length : null,
-    };
-  });
-}
-
-function buildIssuesByLineId(issues: Iterable<IssueWithOperationalEffects>) {
-  const issuesByLineId: Record<string, IssueWithOperationalEffects[]> = {};
-
-  for (const issue of issues) {
-    for (const lineId of new Set(issue.lineIds)) {
-      const lineIssues = issuesByLineId[lineId] ?? [];
-      lineIssues.push(issue);
-      issuesByLineId[lineId] = lineIssues;
-    }
-  }
-
-  return issuesByLineId;
 }
 
 function buildOperationalFactsRebuildContext(

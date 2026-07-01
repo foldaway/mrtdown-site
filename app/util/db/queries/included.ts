@@ -1,12 +1,8 @@
-import type { FacilityEffectKind, ServiceEffectKind } from '@mrtdown/core';
 import type { IncludedEntities, Issue } from '~/types';
-
-type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
-
-type IssueWithOperationalEffects = Issue & {
-  serviceEffectKinds: ServiceEffectKind[];
-  facilityEffectKinds: FacilityEffectKind[];
-};
+import type {
+  BaseIncludedEntities,
+  IssueWithOperationalEffects,
+} from './types';
 
 type IncludedEntitySelection = {
   issueIds?: readonly string[];

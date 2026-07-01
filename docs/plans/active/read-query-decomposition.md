@@ -375,6 +375,11 @@ done
   period state, and operational fact coverage. Extracted fact coverage helpers
   to `app/util/db/queries/operationalFacts.ts` and moved the small
   `getSystemMapData` wrapper out of `legacy.ts`.
+- 2026-07-02: Continued Phase 1 by moving legacy dataset/profile helper types
+  into `app/util/db/queries/types.ts` and extracting line summary ranking,
+  uptime, and issue grouping helpers into
+  `app/util/db/queries/lineSummaries.ts`, keeping public `lines.ts` exports and
+  route behavior unchanged.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.
