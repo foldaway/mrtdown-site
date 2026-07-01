@@ -4,7 +4,7 @@ import type {
   getOperatorProfileData,
   getOverviewData,
   getStationProfileData,
-} from '../db.queries';
+} from '../db/queries';
 
 export const DEFAULT_ROOT_URL = 'https://www.mrtdown.org';
 

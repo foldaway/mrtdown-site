@@ -5,7 +5,7 @@ import {
 } from 'cloudflare:workers';
 import * as Sentry from '@sentry/cloudflare';
 import { getDb } from '~/db/index.js';
-import { rebuildOperationalFactsForDates } from '~/util/db.queries.js';
+import { rebuildOperationalFactsForDates } from '~/util/db/queries/index.js';
 import {
   clearPendingPublicHolidayRebuildDates,
   syncPublicHolidaysFromDataGov,

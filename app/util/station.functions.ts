@@ -5,7 +5,7 @@ import {
   type CrowdReportFeatureEnv,
   isCrowdReportsFeatureEnabled,
 } from './crowdReportFeatureFlag';
-import { getStationProfileData } from './db.queries';
+import { getStationProfileData } from './db/queries';
 
 const InputSchema = z.object({
   stationId: z.string(),

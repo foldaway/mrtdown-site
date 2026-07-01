@@ -1,6 +1,6 @@
 import classNames from 'classnames';
 import { FormattedMessage } from 'react-intl';
-import type { OperatorProfile } from '~/util/db.queries';
+import type { OperatorProfile } from '~/util/db/queries';
 
 interface Props {
   currentOperationalStatus: OperatorProfile['currentOperationalStatus'];
