@@ -5,7 +5,7 @@ import {
   type CrowdReportFeatureEnv,
   isCrowdReportsFeatureEnabled,
 } from './crowdReportFeatureFlag';
-import { getRootData } from './db.queries';
+import { getRootData } from './db/queries/root';
 import { timeServerSpan } from './serverTiming';
 
 const InputSchema = z.object({
