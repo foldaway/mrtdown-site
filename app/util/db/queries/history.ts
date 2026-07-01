@@ -2,5 +2,8 @@ export {
   getHistoryDayData,
   getHistoryYearMonthData,
   getHistoryYearSummaryData,
-  selectLegacyHistoryFallback,
 } from './legacy';
+export {
+  hasFullDateCoverage,
+  selectLegacyHistoryFallback,
+} from './historyFallback';

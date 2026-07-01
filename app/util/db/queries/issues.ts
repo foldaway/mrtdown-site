@@ -1,6 +1,6 @@
+export { getIssueData } from './legacy';
+export { selectIncludedEntities } from './included';
 export {
   deriveServiceScopeStationIds,
-  getIssueData,
-  selectIncludedEntities,
   selectServiceBranchSourceEvents,
-} from './legacy';
+} from './serviceScopes';

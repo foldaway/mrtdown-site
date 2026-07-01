@@ -355,6 +355,10 @@ done
   detector, statistics snapshot payload parser, and `SystemAnalytics` snapshot
   types out of `legacy.ts` into focused query-package modules while preserving
   the public `statistics.ts` and compatibility-barrel exports.
+- 2026-07-02: Continued Phase 1 by extracting pure included-entity selection,
+  service-scope station derivation, service-scope event selection, and history
+  fallback coverage helpers from `legacy.ts` into focused query-package modules
+  while keeping the existing area/barrel exports stable.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.
