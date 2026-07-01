@@ -69,6 +69,9 @@ import {
   selectServiceRevisionForReferenceDate,
   serviceRevisionHasEnded,
 } from '~/util/serviceRevisions';
+import { isMissingTableError } from './shared';
+import { parseStatisticsSnapshotPayload } from './statisticsPayload';
+import type { StatisticsSnapshotPayload, SystemAnalytics } from './types';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 const ISSUE_TYPES = [
@@ -240,30 +243,6 @@ type IssueIntervalBounds = {
 };
 
 type TimeScale = TimeScaleChart['dataTimeScale'];
-
-export type SystemAnalytics = {
-  timeScaleChartsIssueCount: TimeScaleChart[];
-  timeScaleChartsIssueDuration: TimeScaleChart[];
-  chartTotalIssueCountByLine: {
-    title: string;
-    data: ChartEntry[];
-  };
-  chartTotalIssueCountByStation: {
-    title: string;
-    data: ChartEntry[];
-  };
-  chartRollingYearHeatmap: {
-    title: string;
-    data: ChartEntry[];
-  };
-  issueIdsDisruptionLongest: string[];
-};
-
-type StatisticsSnapshotPayload = {
-  kind: 'statistics_snapshot.v1';
-  data: SystemAnalytics;
-  included: IncludedEntities;
-};
 
 type StatisticsTimeWindow = {
   title: string;
@@ -2949,50 +2928,6 @@ function buildDurationChartsFromIssueFacts(rows: IssueDayFactRow[]) {
   });
 }
 
-function readStringField(value: unknown, field: string) {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  const fieldValue = value[field];
-  return typeof fieldValue === 'string' ? fieldValue : null;
-}
-
-export function isMissingTableError(error: unknown) {
-  let current: unknown = error;
-  const seen = new Set<unknown>();
-
-  for (let depth = 0; current != null && depth < 6; depth++) {
-    if (seen.has(current)) {
-      break;
-    }
-    seen.add(current);
-
-    const code = readStringField(current, 'code');
-    if (code === '42P01') {
-      return true;
-    }
-
-    const message =
-      current instanceof Error
-        ? current.message
-        : readStringField(current, 'message');
-    if (
-      message != null &&
-      /\bno such table\b/i.test(message) &&
-      (message.includes('D1_ERROR') ||
-        message.includes('SQLITE_ERROR') ||
-        code === 'SQLITE_ERROR')
-    ) {
-      return true;
-    }
-
-    current = isRecord(current) ? current.cause : null;
-  }
-
-  return false;
-}
-
 async function getIssueDayFactsInRange(
   start: DateTime,
   end: DateTime,
@@ -4146,79 +4081,6 @@ export async function getHistoryDayData(
 }
 
 const STATISTICS_SNAPSHOT_ID = 'latest';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isSystemAnalytics(value: unknown): value is SystemAnalytics {
-  return (
-    isRecord(value) &&
-    Array.isArray(
-      (value as Partial<SystemAnalytics>).timeScaleChartsIssueCount,
-    ) &&
-    Array.isArray(
-      (value as Partial<SystemAnalytics>).timeScaleChartsIssueDuration,
-    ) &&
-    Array.isArray(
-      (value as Partial<SystemAnalytics>).chartTotalIssueCountByLine?.data,
-    ) &&
-    Array.isArray(
-      (value as Partial<SystemAnalytics>).chartTotalIssueCountByStation?.data,
-    ) &&
-    Array.isArray(
-      (value as Partial<SystemAnalytics>).chartRollingYearHeatmap?.data,
-    ) &&
-    Array.isArray((value as Partial<SystemAnalytics>).issueIdsDisruptionLongest)
-  );
-}
-
-function isIncludedEntities(value: unknown): value is IncludedEntities {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return (
-    isRecord(value.issues) &&
-    isRecord(value.lines) &&
-    isRecord(value.stations) &&
-    isRecord(value.operators) &&
-    isRecord(value.towns) &&
-    isRecord(value.landmarks)
-  );
-}
-
-function isStatisticsSnapshotPayload(
-  value: unknown,
-): value is StatisticsSnapshotPayload {
-  return (
-    isRecord(value) &&
-    value.kind === 'statistics_snapshot.v1' &&
-    isSystemAnalytics(value.data) &&
-    isIncludedEntities(value.included)
-  );
-}
-
-export function parseStatisticsSnapshotPayload(value: unknown): {
-  data: SystemAnalytics;
-  included: IncludedEntities | null;
-} | null {
-  if (isStatisticsSnapshotPayload(value)) {
-    return {
-      data: value.data,
-      included: value.included,
-    };
-  }
-
-  if (isSystemAnalytics(value)) {
-    return {
-      data: value,
-      included: null,
-    };
-  }
-
-  return null;
-}
 
 async function getLatestStatisticsSnapshot(db?: AppDb) {
   const database = db ?? (await getDefaultDb());

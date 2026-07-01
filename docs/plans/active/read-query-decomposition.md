@@ -132,8 +132,8 @@ Rules for the new package:
 
 ## Current Base Dataset Callers
 
-As of 2026-07-01, `buildDataset` and `getBaseDataset` are implementation-only
-helpers in `app/util/db/queries/index.ts`. The remaining callers are:
+As of 2026-07-02, `buildDataset` and `getBaseDataset` are implementation-only
+helpers in `app/util/db/queries/legacy.ts`. The remaining callers are:
 
 - `buildBaseDataset`: cache wrapper for the legacy full dataset.
 - `buildOverviewDataset`: overview/home candidate issue subset fallback.
@@ -351,6 +351,10 @@ done
   `system-map`, `sitemap`, and `facts` entry points. Updated production callers
   to import from the matching area modules, leaving only the temporary
   `app/util/db.queries.ts` compatibility barrel on the broad package path.
+- 2026-07-02: Continued Phase 1 by extracting the shared missing-table error
+  detector, statistics snapshot payload parser, and `SystemAnalytics` snapshot
+  types out of `legacy.ts` into focused query-package modules while preserving
+  the public `statistics.ts` and compatibility-barrel exports.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.

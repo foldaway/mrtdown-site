@@ -1,6 +1,4 @@
-export {
-  getStatisticsData,
-  isMissingTableError,
-  parseStatisticsSnapshotPayload,
-  type SystemAnalytics,
-} from './legacy';
+export { getStatisticsData } from './legacy';
+export { isMissingTableError } from './shared';
+export { parseStatisticsSnapshotPayload } from './statisticsPayload';
+export type { SystemAnalytics } from './types';
