@@ -3,7 +3,7 @@ import { z } from 'zod';
 import {
   rebuildOperationalFactsRange,
   rebuildStatisticsSnapshot,
-} from '~/util/db/queries';
+} from '~/util/db/queries/facts';
 import { internalMiddleware } from '~/util/internal.middleware';
 
 const RequestSchema = z.object({

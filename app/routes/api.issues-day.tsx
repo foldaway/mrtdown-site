@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { getHistoryDayData } from '../util/db/queries';
+import { getHistoryDayData } from '../util/db/queries/history';
 
 function parseDatePart(value: string) {
   const parsed = Number(value);

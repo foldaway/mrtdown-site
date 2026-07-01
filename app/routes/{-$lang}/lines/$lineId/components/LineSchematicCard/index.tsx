@@ -6,7 +6,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import type { LineBranch } from '~/util/db/queries';
+import type { LineBranch } from '~/util/db/queries/lines';
 import type { Line } from '~/types';
 import { BranchItem } from './components/BranchItem';
 

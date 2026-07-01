@@ -1,0 +1,1 @@
+export { getStationProfileData } from './legacy';

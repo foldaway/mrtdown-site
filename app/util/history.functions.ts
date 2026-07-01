@@ -3,7 +3,7 @@ import z from 'zod';
 import {
   getHistoryYearMonthData,
   getHistoryYearSummaryData,
-} from './db/queries';
+} from './db/queries/history';
 import {
   HISTORY_YEAR_BOUNDS,
   isHistoryYearInBounds,

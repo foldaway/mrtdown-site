@@ -1,6 +1,6 @@
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import type { LineBranch } from '~/util/db/queries';
+import type { LineBranch } from '~/util/db/queries/lines';
 
 interface Props {
   branch: LineBranch;

@@ -344,6 +344,13 @@ done
   the old path. Added `getRootDataFromDb` and a focused
   `app/util/db/queries/root.test.ts` guard for the compact root navigation query
   shape.
+- 2026-07-02: Continued Phase 1 by moving the remaining legacy implementation
+  from `app/util/db/queries/index.ts` to `app/util/db/queries/legacy.ts`,
+  turning `index.ts` into an area-module barrel, and adding thin `overview`,
+  `history`, `issues`, `lines`, `stations`, `operators`, `statistics`,
+  `system-map`, `sitemap`, and `facts` entry points. Updated production callers
+  to import from the matching area modules, leaving only the temporary
+  `app/util/db.queries.ts` compatibility barrel on the broad package path.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.

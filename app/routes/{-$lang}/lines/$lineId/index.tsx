@@ -23,7 +23,7 @@ import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildSeoMetadata } from '~/helpers/seo';
 import type { Station } from '~/types';
 import { assert } from '~/util/assert';
-import type { LineBranch } from '~/util/db/queries';
+import type { LineBranch } from '~/util/db/queries/lines';
 import { getLineProfileFn } from '~/util/lines.functions';
 import { CurrentStatusCard } from './components/CurrentStatusCard';
 import { LineSchematicCard } from './components/LineSchematicCard';

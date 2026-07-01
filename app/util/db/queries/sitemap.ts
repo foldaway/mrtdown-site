@@ -1,0 +1,1 @@
+export { getSitemapData } from './legacy';

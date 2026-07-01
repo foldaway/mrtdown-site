@@ -2,7 +2,7 @@ import { DateTime, Interval } from 'luxon';
 import type { Element, Root } from 'xast';
 import { toXml } from 'xast-util-to-xml';
 import { buildLocaleAlternates } from '~/helpers/seo';
-import { getSitemapData } from './db/queries';
+import { getSitemapData } from './db/queries/sitemap';
 import {
   HISTORY_YEAR_BOUNDS,
   isHistoryYearInBounds,

@@ -4,7 +4,7 @@ import { FormattedMessage, FormattedNumber, useIntl } from 'react-intl';
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import type { OperatorProfile } from '~/util/db/queries';
+import type { OperatorProfile } from '~/util/db/queries/operators';
 
 interface Props {
   linePerformanceComparison: OperatorProfile['linePerformanceComparison'];

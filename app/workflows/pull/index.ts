@@ -9,7 +9,7 @@ import { ZipStore } from '~/helpers/ZipStore.js';
 import {
   rebuildOperationalFactsRange,
   rebuildStatisticsSnapshot,
-} from '~/util/db/queries/index.js';
+} from '~/util/db/queries/facts.js';
 import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';

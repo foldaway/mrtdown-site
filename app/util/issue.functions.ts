@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { getIssueData } from './db/queries';
+import { getIssueData } from './db/queries/issues';
 
 const InputSchema = z.object({
   issueId: z.string(),

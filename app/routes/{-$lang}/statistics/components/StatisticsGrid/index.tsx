@@ -1,6 +1,6 @@
 import { lazy } from 'react';
 import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
-import type { SystemAnalytics } from '~/util/db/queries';
+import type { SystemAnalytics } from '~/util/db/queries/statistics';
 import {
   BarChartCardSkeleton,
   HeatmapCardSkeleton,
