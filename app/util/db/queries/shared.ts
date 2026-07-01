@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { metadataTable } from '~/db/schema';
+import { timeServerSpan } from '~/util/serverTiming';
 
 const D1_SELECT_IN_BATCH = 90;
 const CROWD_REPORT_DUPLICATE_LOCK_METADATA_PREFIX =
@@ -70,6 +71,15 @@ export async function selectByIdChunks<T>(
     rows.push(...(await selectBatch(batch)));
   }
   return rows;
+}
+
+export async function getDefaultDb() {
+  const { getDb } = await import('~/db');
+  return getDb();
+}
+
+export async function timeDbQuery<T>(name: string, query: () => Promise<T>) {
+  return timeServerSpan(name, query);
 }
 
 export function publicMetadataKeySql() {

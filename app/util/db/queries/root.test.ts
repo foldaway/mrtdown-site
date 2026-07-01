@@ -1,57 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { linesTable, metadataTable, operatorsTable } from '~/db/schema';
 import {
   getRootDataFromDb,
   ROOT_LAST_UPDATED_METADATA_KEY,
   type RootDataDb,
 } from './root';
-
-type QueryCall = {
-  selectionKeys: string[];
-  table: unknown;
-  whereCalls: number;
-  orderByCalls: number;
-};
-
-function createDbStub(rowsByTable: Map<unknown, unknown[]>) {
-  const calls: QueryCall[] = [];
-  const select = vi.fn((selection: Record<string, unknown>) => {
-    const call: QueryCall = {
-      selectionKeys: Object.keys(selection),
-      table: undefined,
-      whereCalls: 0,
-      orderByCalls: 0,
-    };
-    calls.push(call);
-
-    const builder = {
-      from: vi.fn(),
-      where: vi.fn(),
-      orderBy: vi.fn(),
-    };
-
-    builder.from.mockImplementation((table: unknown) => {
-      call.table = table;
-      return builder;
-    });
-    builder.where.mockImplementation(() => {
-      call.whereCalls += 1;
-      return builder;
-    });
-    builder.orderBy.mockImplementation(() => {
-      call.orderByCalls += 1;
-      return Promise.resolve(rowsByTable.get(call.table) ?? []);
-    });
-
-    return builder;
-  });
-
-  return {
-    calls,
-    db: { select } as unknown as RootDataDb,
-    select,
-  };
-}
+import { createDbStub } from './testDbStub';
 
 describe('getRootDataFromDb', () => {
   it('fetches only the compact root navigation data shape', async () => {
@@ -69,13 +23,23 @@ describe('getRootDataFromDb', () => {
       },
     ];
     const operatorRows = [{ id: 'SMRT', name: 'SMRT' }];
-    const { calls, db, select } = createDbStub(
-      new Map<unknown, unknown[]>([
-        [linesTable, lineRows],
-        [metadataTable, metadataRows],
-        [operatorsTable, operatorRows],
-      ]),
-    );
+    const { calls, db, select } = createDbStub<RootDataDb>([
+      {
+        table: linesTable,
+        rows: lineRows,
+        terminalMethod: 'orderBy',
+      },
+      {
+        table: metadataTable,
+        rows: metadataRows,
+        terminalMethod: 'orderBy',
+      },
+      {
+        table: operatorsTable,
+        rows: operatorRows,
+        terminalMethod: 'orderBy',
+      },
+    ]);
 
     await expect(getRootDataFromDb(db)).resolves.toEqual({
       lineNavItems: lineRows,
@@ -90,18 +54,21 @@ describe('getRootDataFromDb', () => {
         table: linesTable,
         whereCalls: 0,
         orderByCalls: 1,
+        groupByCalls: 0,
       },
       {
         selectionKeys: ['key', 'value'],
         table: metadataTable,
         whereCalls: 1,
         orderByCalls: 1,
+        groupByCalls: 0,
       },
       {
         selectionKeys: ['id', 'name'],
         table: operatorsTable,
         whereCalls: 0,
         orderByCalls: 1,
+        groupByCalls: 0,
       },
     ]);
   });

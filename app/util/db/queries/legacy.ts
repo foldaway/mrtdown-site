@@ -4,7 +4,7 @@ import type {
   Service as CoreService,
   ServiceEffectKind,
 } from '@mrtdown/core';
-import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import type { AppDb } from '~/db';
 import { runDbOrderedStatements } from '~/db/orderedStatements';
@@ -66,9 +66,11 @@ import {
 import { selectIncludedEntities } from './included';
 import {
   chunk,
+  getDefaultDb,
   isMissingTableError,
   publicMetadataKeySql,
   selectByIdChunks,
+  timeDbQuery,
 } from './shared';
 import {
   deriveServiceScopeStationIds,
@@ -111,6 +113,11 @@ import {
   type IssueTypeCounts,
 } from './issueTypeStats';
 import { parseStatisticsSnapshotPayload } from './statisticsPayload';
+import {
+  getIssueDayFactsInRange,
+  getOperationalFactCoverageDatesInRange,
+  getOperationalFactCoverageStart,
+} from './operationalFacts';
 import {
   isoDate,
   isoDateTime,
@@ -217,24 +224,6 @@ type OperationalFactRowsForDate = {
   issueRows: (typeof issueDayFactsTable.$inferInsert)[];
   lineRows: (typeof lineDayFactsTable.$inferInsert)[];
 };
-
-type OperationalFactCoverageStart =
-  | {
-      status: 'available';
-      startDate: string;
-    }
-  | {
-      status: 'missing_table';
-    };
-
-async function getDefaultDb() {
-  const { getDb } = await import('~/db');
-  return getDb();
-}
-
-async function timeDbQuery<T>(name: string, query: () => Promise<T>) {
-  return timeServerSpan(name, query);
-}
 
 function parseTranslations(value: unknown): Line['name'] {
   const isNonEmptyTranslation = (
@@ -1535,96 +1524,6 @@ function buildOperationalFactsRebuildContext(
   };
 }
 
-async function getIssueDayFactsInRange(
-  start: DateTime,
-  end: DateTime,
-  db?: AppDb,
-) {
-  const database = db ?? (await getDefaultDb());
-  try {
-    return await timeServerSpan('fact_issue_day_query', () =>
-      database
-        .select({
-          date: issueDayFactsTable.date,
-          issue_id: issueDayFactsTable.issue_id,
-          issue_type: issueDayFactsTable.issue_type,
-          active_anytime: issueDayFactsTable.active_anytime,
-          duration_seconds: issueDayFactsTable.duration_seconds,
-        })
-        .from(issueDayFactsTable)
-        .where(
-          and(
-            gte(issueDayFactsTable.date, isoDate(start)),
-            lte(issueDayFactsTable.date, isoDate(end)),
-          ),
-        ),
-    );
-  } catch (error) {
-    if (isMissingTableError(error)) {
-      return [];
-    }
-    throw error;
-  }
-}
-
-async function getOperationalFactCoverageDatesInRange(
-  start: DateTime,
-  end: DateTime,
-  db?: AppDb,
-) {
-  const database = db ?? (await getDefaultDb());
-  try {
-    return await timeServerSpan('fact_coverage_query', () =>
-      database
-        .select({
-          date: lineDayFactsTable.date,
-        })
-        .from(lineDayFactsTable)
-        .where(
-          and(
-            gte(lineDayFactsTable.date, isoDate(start)),
-            lte(lineDayFactsTable.date, isoDate(end)),
-          ),
-        )
-        .groupBy(lineDayFactsTable.date),
-    );
-  } catch (error) {
-    if (isMissingTableError(error)) {
-      return [];
-    }
-    throw error;
-  }
-}
-
-async function getOperationalFactCoverageStart(): Promise<OperationalFactCoverageStart> {
-  const db = await getDefaultDb();
-  try {
-    const [row] = await timeServerSpan('fact_coverage_start_query', () =>
-      db
-        .select({
-          startDate: sql<string | null>`min(${lineDayFactsTable.date})`,
-        })
-        .from(lineDayFactsTable),
-    );
-    if (row?.startDate == null) {
-      return {
-        status: 'missing_table',
-      };
-    }
-    return {
-      status: 'available',
-      startDate: row.startDate,
-    };
-  } catch (error) {
-    if (isMissingTableError(error)) {
-      return {
-        status: 'missing_table',
-      };
-    }
-    throw error;
-  }
-}
-
 async function shouldUseLegacyHistoryFallback(
   start: DateTime,
   end: DateTime,
@@ -2389,14 +2288,6 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
   };
 }
 
-export async function getSystemMapData() {
-  const overview = await getOverviewData(30);
-  return {
-    overview: overview.data,
-    included: overview.included,
-  };
-}
-
 export async function getHistoryYearSummaryData(year: number) {
   const yearStart = DateTime.fromObject(
     { year, month: 1, day: 1 },
@@ -2930,71 +2821,6 @@ export async function getStatisticsData() {
       ),
     };
   });
-}
-
-export async function getSitemapData() {
-  const dataset = await getBaseDataset();
-  const skippedIssueIds: string[] = [];
-  const issuesWithFirstDates = Object.values(dataset.allIssues).flatMap(
-    (issue) => {
-      const firstInterval = issue.intervals[0];
-      if (firstInterval == null) {
-        return [];
-      }
-
-      const firstDate = parseDateTime(firstInterval.startAt);
-      if (!firstDate.isValid) {
-        skippedIssueIds.push(issue.id);
-        return [];
-      }
-
-      return [{ firstDate, issue }];
-    },
-  );
-  const firstDates = issuesWithFirstDates.map(({ firstDate }) => firstDate);
-  const earliest = firstDates.sort((a, b) => a.toMillis() - b.toMillis())[0];
-  const latest = firstDates.sort((a, b) => b.toMillis() - a.toMillis())[0];
-
-  const monthEarliest =
-    earliest != null ? isoDate(earliest.startOf('month')) : isoDate(nowSg());
-  const monthLatest =
-    latest != null ? isoDate(latest.startOf('month')) : isoDate(nowSg());
-  const monthEarliestDateTime = DateTime.fromISO(monthEarliest, {
-    zone: SG_TIMEZONE,
-  });
-  const monthLatestDateTime = DateTime.fromISO(monthLatest, {
-    zone: SG_TIMEZONE,
-  });
-  const coverageRows = await getOperationalFactCoverageDatesInRange(
-    monthEarliestDateTime,
-    monthLatestDateTime.endOf('month'),
-  );
-  const operationalFactCoverageStart = await getOperationalFactCoverageStart();
-  const operationalFactCoverageStartDate =
-    operationalFactCoverageStart.status === 'available'
-      ? operationalFactCoverageStart.startDate
-      : null;
-
-  if (skippedIssueIds.length > 0) {
-    console.warn('[SITEMAP] Skipped issues with invalid first interval dates', {
-      count: skippedIssueIds.length,
-      issueIds: skippedIssueIds.slice(0, 20),
-    });
-  }
-
-  return {
-    lineIds: Object.keys(dataset.included.lines).sort(),
-    stationIds: Object.keys(dataset.included.stations).sort(),
-    operatorIds: Object.keys(dataset.included.operators).sort(),
-    issueIds: issuesWithFirstDates.map(({ issue }) => issue.id),
-    monthEarliest,
-    monthLatest,
-    operationalFactCoverageDates: coverageRows.map((row) => row.date),
-    operationalFactCoverageMissing:
-      operationalFactCoverageStart.status === 'missing_table',
-    operationalFactCoverageStartDate,
-    currentDate: isoDate(nowSg()),
-  };
 }
 
 export type LineBranch = Awaited<

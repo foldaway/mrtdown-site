@@ -147,7 +147,6 @@ helpers in `app/util/db/queries/legacy.ts`. The remaining callers are:
 - `getHistoryDayData`: legacy fallback when fact coverage is missing.
 - `rebuildStatisticsSnapshot`: maintenance/workflow snapshot generation.
 - `getStatisticsData`: legacy snapshot-included and missing-snapshot fallbacks.
-- `getSitemapData`
 
 ## Phases
 
@@ -371,6 +370,11 @@ done
   route issue-count graphs, statistics time-window graphs, and fact-backed
   statistics chart builders into `app/util/db/queries/timeScaleGraphs.ts`,
   keeping the legacy public exports and route behavior unchanged.
+- 2026-07-02: Continued Phase 6 by replacing `getSitemapData`'s full
+  base-dataset read with route-shaped sitemap queries over entity IDs, latest
+  period state, and operational fact coverage. Extracted fact coverage helpers
+  to `app/util/db/queries/operationalFacts.ts` and moved the small
+  `getSystemMapData` wrapper out of `legacy.ts`.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.
