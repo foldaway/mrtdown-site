@@ -5,7 +5,7 @@ import {
   type CrowdReportFeatureEnv,
   isCrowdReportsFeatureEnabled,
 } from './crowdReportFeatureFlag';
-import { getLineProfileData } from './db.queries';
+import { getLineProfileData } from './db/queries';
 
 const InputSchema = z.object({
   lineId: z.string(),

@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import { FormattedMessage } from 'react-intl';
 import { StationMap } from '~/components/StationMap';
-import type { LineBranch } from '~/util/db.queries';
+import type { LineBranch } from '~/util/db/queries';
 import type { Line } from '~/types';
 
 interface Props {

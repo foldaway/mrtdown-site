@@ -11,7 +11,7 @@ import {
 } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import type { LineBranch } from '~/util/db.queries';
+import type { LineBranch } from '~/util/db/queries';
 import type { Line } from '~/types';
 
 interface Props {

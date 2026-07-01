@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { getOperatorProfileData } from './db.queries';
+import { getOperatorProfileData } from './db/queries';
 
 const InputSchema = z.object({
   operatorId: z.string(),

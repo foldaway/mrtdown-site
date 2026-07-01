@@ -338,6 +338,12 @@ done
   `app/util/db/queries/root.ts` and changing the root metadata read to fetch
   only `manifest_last_pulled_at`, which is the only metadata key currently used
   by the root layout.
+- 2026-07-01: Continued Phase 1/2 by moving production callers from the
+  temporary `app/util/db.queries.ts` compatibility barrel to
+  `~/util/db/queries`, keeping only compatibility tests and the barrel itself on
+  the old path. Added `getRootDataFromDb` and a focused
+  `app/util/db/queries/root.test.ts` guard for the compact root navigation query
+  shape.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.
