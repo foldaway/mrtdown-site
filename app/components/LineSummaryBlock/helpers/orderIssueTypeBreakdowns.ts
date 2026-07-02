@@ -23,7 +23,7 @@ export function getOrderedIssueTypeBreakdowns(
 
   for (const issueType of LINE_SUMMARY_ISSUE_TYPE_ORDER) {
     const breakdown = breakdownByIssueTypes[issueType];
-    if (breakdown != null) {
+    if (breakdown != null && breakdown.totalDurationSeconds > 0) {
       entries.push([issueType, breakdown]);
     }
   }

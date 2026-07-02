@@ -26,4 +26,12 @@ describe('getOrderedIssueTypeBreakdowns', () => {
       ['infra', breakdownByIssueTypes.infra],
     ]);
   });
+
+  it('skips issue types with no allocated duration', () => {
+    const breakdownByIssueTypes = {
+      maintenance: { totalDurationSeconds: 0, issueIds: [] },
+    } satisfies LineSummaryDateRecord['breakdownByIssueTypes'];
+
+    expect(getOrderedIssueTypeBreakdowns(breakdownByIssueTypes)).toEqual([]);
+  });
 });

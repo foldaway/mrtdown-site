@@ -136,7 +136,11 @@ As of 2026-07-02, `buildDataset` and `getBaseDataset` are implementation-only
 helpers in `app/util/db/queries/legacy.ts`. The remaining callers are:
 
 - `buildBaseDataset`: cache wrapper for the legacy full dataset.
-- `buildOverviewDataset`: overview/home candidate issue subset fallback.
+- `buildOverviewDataset`: legacy overview/home candidate issue subset fallback;
+  no longer used by the route-facing `getOverviewData`.
+- `getOverviewData`: still uses `buildDataset` for selected overview-range
+  issue card/date-card/community signal station hydration under the
+  `overview_active_issue_hydration` span.
 - `getIncludedForIssueIds`: history fact-path included-entity hydration.
 - `getLineProfileData`
 - `getIssueData`
@@ -400,6 +404,14 @@ done
   entities. The full base-dataset statistics fallback remains available only
   when `import.meta.env.PROD` is false or a caller explicitly disables the
   snapshot requirement.
+- 2026-07-02: Continued Phase 4 by moving route-facing `getOverviewData` out of
+  `legacy.ts` and composing home line summaries from compact line, line-operator,
+  public-holiday, and `line_day_facts` reads. Updated the home/system-map UI
+  consumers to guard against missing issue refs while preserving date-card issue
+  links from selected overview-range issue hydration. Active advisory issue
+  cards, date-card related links, and community-signal station hydration still
+  use a selected-issue `buildDataset` compatibility path under
+  `overview_active_issue_hydration`.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.

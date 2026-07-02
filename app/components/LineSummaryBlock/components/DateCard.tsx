@@ -161,6 +161,9 @@ export const DateCardDetails: React.FC<
   const orderedIssueTypeBreakdowns = getOrderedIssueTypeBreakdowns(
     breakdownByIssueTypes,
   );
+  const relatedIssueIds = orderedIssueTypeBreakdowns.flatMap(
+    ([, entry]) => entry.issueIds,
+  );
   const { operatingHours, notInServiceDuration } = useDateBreakdown(
     line,
     dateTime,
@@ -232,7 +235,7 @@ export const DateCardDetails: React.FC<
           </span>
           <div className="mt-2 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
             {notInServiceDuration.as('seconds') === 0 &&
-              Object.keys(breakdownByIssueTypes).length === 0 && (
+              orderedIssueTypeBreakdowns.length === 0 && (
                 <p className="py-2 text-gray-600 italic dark:text-gray-300">
                   <FormattedMessage
                     id="general.no_downtime_on_this_day"
@@ -323,7 +326,7 @@ export const DateCardDetails: React.FC<
           <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
             <FormattedMessage id="general.related" defaultMessage="Related" />
           </span>
-          {Object.keys(breakdownByIssueTypes).length === 0 && (
+          {relatedIssueIds.length === 0 && (
             <p className="mt-2 text-gray-600 italic dark:text-gray-300">
               <FormattedMessage
                 id="general.no_related_issues"
@@ -336,6 +339,9 @@ export const DateCardDetails: React.FC<
               <Fragment key={issueType}>
                 {entry.issueIds.map((issueId) => {
                   const issueRef = issues[issueId];
+                  if (issueRef == null) {
+                    return null;
+                  }
                   return (
                     <Link
                       key={issueRef.id}

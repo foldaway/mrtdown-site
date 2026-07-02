@@ -266,6 +266,76 @@ describe('buildLineSummary', () => {
     ).toBe(18 * 60 * 60);
   });
 
+  it('bounds daily issue breakdowns to the calendar day service allocation', () => {
+    const summary = buildLineSummary(
+      {
+        ...TEST_LINE,
+        operatingHours: {
+          weekdays: { start: '05:38', end: '00:35' },
+          weekends: { start: '05:38', end: '00:35' },
+        },
+      },
+      [
+        buildIssue('maintenance-1', 'maintenance', [
+          {
+            startAt: '2026-02-23T00:00:00+08:00',
+            endAt: '2026-02-24T00:00:00+08:00',
+            status: 'ended',
+          },
+        ]),
+      ],
+      1,
+      new Set(),
+      REFERENCE_NOW,
+    );
+
+    expect(summary.totalDowntimeSeconds).toBe(0);
+    expect(
+      summary.breakdownByDates['2026-02-23'].breakdownByIssueTypes.maintenance
+        ?.totalDurationSeconds,
+    ).toBe(18 * 60 * 60 + 22 * 60);
+  });
+
+  it('keeps overlapping issue type durations independent in daily breakdowns', () => {
+    const summary = buildLineSummary(
+      {
+        ...TEST_LINE,
+        operatingHours: {
+          weekdays: { start: '05:05', end: '23:30' },
+          weekends: { start: '05:05', end: '23:30' },
+        },
+      },
+      [
+        buildIssue('disruption-1', 'disruption', [
+          {
+            startAt: '2026-02-23T09:00:00+08:00',
+            endAt: '2026-02-23T13:13:00+08:00',
+            status: 'ended',
+          },
+        ]),
+        buildIssue('infra-1', 'infra', [
+          {
+            startAt: '2026-02-23T00:00:00+08:00',
+            endAt: '2026-02-24T00:00:00+08:00',
+            status: 'ended',
+          },
+        ]),
+      ],
+      1,
+      new Set(),
+      REFERENCE_NOW,
+    );
+
+    expect(
+      summary.breakdownByDates['2026-02-23'].breakdownByIssueTypes.disruption
+        ?.totalDurationSeconds,
+    ).toBe(4 * 60 * 60 + 13 * 60);
+    expect(
+      summary.breakdownByDates['2026-02-23'].breakdownByIssueTypes.infra
+        ?.totalDurationSeconds,
+    ).toBe(18 * 60 * 60 + 25 * 60);
+  });
+
   it('merges overlapping disruption windows before calculating downtime', () => {
     const summary = buildLineSummary(
       TEST_LINE,

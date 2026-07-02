@@ -13,6 +13,7 @@ import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { buildSeoMetadata } from '~/helpers/seo';
 import { useViewport } from '~/hooks/useViewport';
+import type { Issue } from '~/types';
 import { getOverviewFn } from '~/util/overview.functions';
 import { CurrentAdvisoriesSection } from '../../components/CurrentAdvisoriesSection';
 import { countOperationalLineSummaries } from '../../components/CurrentAdvisoriesSection/helpers';
@@ -153,11 +154,15 @@ function HomePage() {
   }, [dateCount]);
 
   const issuesActiveNow = useMemo(() => {
-    return overview.issueIdsActiveNow.map((issueId) => issues[issueId]);
+    return overview.issueIdsActiveNow
+      .map((issueId) => issues[issueId])
+      .filter((issue): issue is Issue => issue != null);
   }, [overview.issueIdsActiveNow, issues]);
 
   const issuesActiveToday = useMemo(() => {
-    return overview.issueIdsActiveToday.map((issueId) => issues[issueId]);
+    return overview.issueIdsActiveToday
+      .map((issueId) => issues[issueId])
+      .filter((issue): issue is Issue => issue != null);
   }, [overview.issueIdsActiveToday, issues]);
 
   const lineOperationalCount = useMemo(() => {

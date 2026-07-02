@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
 import { createIntl, FormattedMessage, useIntl } from 'react-intl';
-import type { IssueAffectedBranch } from '~/types';
+import type { Issue, IssueAffectedBranch } from '~/types';
 import { CurrentAdvisoriesSection } from '~/components/CurrentAdvisoriesSection';
 import { countOperationalLineSummaries } from '~/components/CurrentAdvisoriesSection/helpers';
 import {
@@ -103,15 +103,15 @@ function SystemMapPage() {
   const intl = useIntl();
 
   const issuesActiveNow = useMemo(() => {
-    return overview.issueIdsActiveNow.map(
-      (issueId) => included.issues[issueId],
-    );
+    return overview.issueIdsActiveNow
+      .map((issueId) => included.issues[issueId])
+      .filter((issue): issue is Issue => issue != null);
   }, [overview.issueIdsActiveNow, included.issues]);
 
   const issuesActiveToday = useMemo(() => {
-    return overview.issueIdsActiveToday.map(
-      (issueId) => included.issues[issueId],
-    );
+    return overview.issueIdsActiveToday
+      .map((issueId) => included.issues[issueId])
+      .filter((issue): issue is Issue => issue != null);
   }, [overview.issueIdsActiveToday, included.issues]);
 
   const lineOperationalCount = useMemo(() => {

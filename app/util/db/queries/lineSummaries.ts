@@ -1,4 +1,5 @@
 import type { IssueType } from '@mrtdown/core';
+import type { DateTime } from 'luxon';
 import type { Line, LineSummary, LineSummaryStatus } from '~/types';
 import {
   issueContributesToLineDowntime,
@@ -41,8 +42,20 @@ export function buildLineSummary(
   for (let offset = 0; offset < days; offset++) {
     const date = startDate.plus({ days: offset });
     const dayWindow = serviceWindowForDate(line, date, publicHolidaySet);
+    const calendarDayStart = date.startOf('day');
+    const calendarDayEnd = calendarDayStart.plus({ days: 1 });
+    const allocationWindow = {
+      start:
+        dayWindow.start > calendarDayStart ? dayWindow.start : calendarDayStart,
+      end: dayWindow.end < calendarDayEnd ? dayWindow.end : calendarDayEnd,
+    };
     const dayBreakdown: LineSummary['breakdownByDates'][string] = {
-      breakdownByIssueTypes: {},
+      breakdownByIssueTypes: buildIssueTypeBreakdownForDate(
+        issues,
+        date,
+        referenceNow,
+        allocationWindow,
+      ),
       dayType: lineDayType(date, publicHolidaySet),
     };
 
@@ -51,8 +64,6 @@ export function buildLineSummary(
     }
 
     const dailyDowntimeIntervals: IssueIntervalBounds[] = [];
-    const dailyIntervalsByIssueType = createIssueTypeIntervalGroups();
-
     for (const issue of issues) {
       const contributingBounds = clipIssueIntervalsToRange(
         issue,
@@ -66,32 +77,9 @@ export function buildLineSummary(
         continue;
       }
 
-      dailyIntervalsByIssueType[issue.type].push(...contributingBounds);
-
       if (issueContributesToLineDowntime(issue)) {
         dailyDowntimeIntervals.push(...contributingBounds);
         downtimeIntervalsByIssueType[issue.type].push(...contributingBounds);
-      }
-
-      const current = dayBreakdown.breakdownByIssueTypes[issue.type] ?? {
-        totalDurationSeconds: 0,
-        issueIds: [],
-      };
-      if (!current.issueIds.includes(issue.id)) {
-        current.issueIds.push(issue.id);
-      }
-      dayBreakdown.breakdownByIssueTypes[issue.type] = current;
-    }
-
-    const dailyDurationSecondsByIssueType = sumIssueTypeIntervalGroups(
-      dailyIntervalsByIssueType,
-      referenceNow,
-    );
-    for (const issueType of ISSUE_TYPES) {
-      const current = dayBreakdown.breakdownByIssueTypes[issueType];
-      if (current != null) {
-        current.totalDurationSeconds =
-          dailyDurationSecondsByIssueType[issueType];
       }
     }
 
@@ -164,6 +152,57 @@ export function buildLineSummary(
     uptimeRank: null,
     totalLines: null,
   };
+}
+
+export function buildIssueTypeBreakdownForDate(
+  issues: IssueWithOperationalEffects[],
+  date: DateTime,
+  referenceNow = nowSg(),
+  allocationWindow = {
+    start: date.startOf('day'),
+    end: date.startOf('day').plus({ days: 1 }),
+  },
+): LineSummary['breakdownByDates'][string]['breakdownByIssueTypes'] {
+  const breakdownByIssueTypes: LineSummary['breakdownByDates'][string]['breakdownByIssueTypes'] =
+    {};
+  const dailyIntervalsByIssueType = createIssueTypeIntervalGroups();
+
+  for (const issueType of ISSUE_TYPES) {
+    for (const issue of issues.filter((item) => item.type === issueType)) {
+      const issueBounds = clipIssueIntervalsToRange(
+        issue,
+        allocationWindow.start,
+        allocationWindow.end,
+        referenceNow,
+      );
+      if (sumIntervalSeconds(issueBounds, referenceNow) <= 0) {
+        continue;
+      }
+
+      dailyIntervalsByIssueType[issue.type].push(...issueBounds);
+      const current = breakdownByIssueTypes[issue.type] ?? {
+        totalDurationSeconds: 0,
+        issueIds: [],
+      };
+      if (!current.issueIds.includes(issue.id)) {
+        current.issueIds.push(issue.id);
+      }
+      breakdownByIssueTypes[issue.type] = current;
+    }
+  }
+
+  const dailyDurationSecondsByIssueType = sumIssueTypeIntervalGroups(
+    dailyIntervalsByIssueType,
+    referenceNow,
+  );
+  for (const issueType of ISSUE_TYPES) {
+    const current = breakdownByIssueTypes[issueType];
+    if (current != null) {
+      current.totalDurationSeconds = dailyDurationSecondsByIssueType[issueType];
+    }
+  }
+
+  return breakdownByIssueTypes;
 }
 
 export function rankLineSummaries(lineSummaries: LineSummary[]) {
