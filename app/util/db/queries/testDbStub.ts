@@ -6,13 +6,14 @@ export type QueryCall = {
   whereCalls: number;
   orderByCalls: number;
   groupByCalls: number;
+  limitCalls?: number;
 };
 
 export type QueryRowHandler = {
   table: unknown;
   selectionKeys?: string[];
   rows: unknown[];
-  terminalMethod: 'from' | 'where' | 'orderBy' | 'groupBy';
+  terminalMethod: 'from' | 'where' | 'orderBy' | 'groupBy' | 'limit';
 };
 
 export function createDbStub<TDb>(rowHandlers: QueryRowHandler[]) {
@@ -68,6 +69,10 @@ export function createDbStub<TDb>(rowHandlers: QueryRowHandler[]) {
       groupBy: vi.fn(() => {
         call.groupByCalls += 1;
         return resolveOrContinue('groupBy');
+      }),
+      limit: vi.fn(() => {
+        call.limitCalls = (call.limitCalls ?? 0) + 1;
+        return resolveOrContinue('limit');
       }),
     };
 

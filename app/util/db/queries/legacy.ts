@@ -11,7 +11,7 @@ import {
   timeSyncServerSpan,
 } from '~/util/serverTiming';
 import { selectIncludedEntities } from './included';
-import { getDefaultDb, isMissingTableError } from './shared';
+import { getDefaultDb } from './shared';
 import {
   hasFullDateCoverage,
   selectLegacyHistoryFallback,
@@ -41,12 +41,15 @@ import {
   getIncludedForIssueIds,
   getOverviewDataset,
 } from './baseDataset';
-import { parseStatisticsSnapshotPayload } from './statisticsPayload';
 import {
   getIssueDayFactsInRange,
   getOperationalFactCoverageDatesInRange,
   getOperationalFactCoverageStart,
 } from './operationalFacts';
+import {
+  getLatestStatisticsSnapshot,
+  STATISTICS_SNAPSHOT_ID,
+} from './statisticsSnapshots';
 import {
   isoDate,
   isoDateTime,
@@ -818,29 +821,6 @@ export async function getHistoryDayData(
     },
     included,
   };
-}
-
-const STATISTICS_SNAPSHOT_ID = 'latest';
-
-async function getLatestStatisticsSnapshot(db?: AppDb) {
-  const database = db ?? (await getDefaultDb());
-  try {
-    const [snapshot] = await timeServerSpan('statistics_snapshot_query', () =>
-      database
-        .select({
-          data: statisticsSnapshotsTable.data,
-        })
-        .from(statisticsSnapshotsTable)
-        .where(eq(statisticsSnapshotsTable.id, STATISTICS_SNAPSHOT_ID))
-        .limit(1),
-    );
-    return parseStatisticsSnapshotPayload(snapshot?.data);
-  } catch (error) {
-    if (isMissingTableError(error)) {
-      return null;
-    }
-    throw error;
-  }
 }
 
 function getStatisticsIncluded(

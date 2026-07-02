@@ -386,6 +386,11 @@ done
   The remaining route helpers still import the base-dataset surface as a
   migration-only dependency until later route-shaped query phases replace those
   callers.
+- 2026-07-02: Continued Phase 3 preparation by extracting the statistics
+  snapshot lookup into `app/util/db/queries/statisticsSnapshots.ts`, exporting a
+  testable `getLatestStatisticsSnapshotFromDb` query boundary, and adding a
+  focused compact-query-shape test. Runtime fallback behavior is intentionally
+  unchanged until the production missing-snapshot policy is implemented.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.
