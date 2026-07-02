@@ -143,7 +143,6 @@ helpers in `app/util/db/queries/legacy.ts`. The remaining callers are:
   issue, event detail, service branch, and station membership queries under the
   `overview_active_issue_hydration` span.
 - `getIncludedForIssueIds`: history fact-path included-entity hydration.
-- `getOperatorProfileData`
 - `getHistoryYearSummaryData`: legacy fallback when fact coverage is missing.
 - `getHistoryYearMonthData`: legacy fallback when fact coverage is missing.
 - `getHistoryDayData`: legacy fallback when fact coverage is missing.
@@ -432,6 +431,18 @@ done
   community signals without calling the legacy base dataset. Removed the stale
   legacy line/station profile implementations and added a focused missing-line
   query-shape test.
+- 2026-07-03: Continued Phase 5 by moving route-facing
+  `getOperatorProfileData` out of `legacy.ts`. Operator profiles now compose a
+  scoped operator row, operated line memberships, current service-path station
+  coverage, line-day facts, and candidate issue hydration without calling the
+  legacy base dataset. Removed the stale legacy operator implementation and
+  added a focused missing-operator query-shape test.
+- 2026-07-03: Followed up on Phase 5 operator profile performance by replacing
+  the event-id candidate issue fanout with direct issue-id joins and bounding
+  full issue hydration to the rendered status/recent/trend windows. Local
+  uncached `/operators/SMRT_TRAINS` samples improved from the reported roughly
+  596 ms `operator_profile_data` span to about 285 ms and then 177 ms on warmed
+  dev renders.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.

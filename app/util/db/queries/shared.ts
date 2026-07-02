@@ -4,9 +4,10 @@ import {
   type lineOperatorsTable,
   type linesTable,
   metadataTable,
+  type operatorsTable,
   publicHolidaysTable,
 } from '~/db/schema';
-import type { Line } from '~/types';
+import type { IncludedEntities, Line } from '~/types';
 import { timeServerSpan } from '~/util/serverTiming';
 import type {
   BaseIncludedEntities,
@@ -166,6 +167,29 @@ export function buildLines(
         operatingHours: row.operating_hours,
         operators: operatorsByLineId[row.id] ?? [],
       } satisfies Line,
+    ]),
+  );
+}
+
+export type OperatorRowForIncluded = Pick<
+  typeof operatorsTable.$inferSelect,
+  'id' | 'name' | 'founded_at' | 'url'
+>;
+
+/**
+ * Builds included operator entities from compact operator rows.
+ * Query modules should use this to keep canonical field naming consistent.
+ */
+export function buildOperators(operatorRows: OperatorRowForIncluded[]) {
+  return Object.fromEntries(
+    operatorRows.map((row) => [
+      row.id,
+      {
+        id: row.id,
+        name: parseTranslations(row.name),
+        foundedAt: row.founded_at,
+        url: row.url,
+      } satisfies IncludedEntities['operators'][string],
     ]),
   );
 }
