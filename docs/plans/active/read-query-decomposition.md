@@ -380,6 +380,12 @@ done
   uptime, and issue grouping helpers into
   `app/util/db/queries/lineSummaries.ts`, keeping public `lines.ts` exports and
   route behavior unchanged.
+- 2026-07-02: Continued Phase 1 by extracting the legacy base-dataset and
+  overview-dataset cache assembly into `app/util/db/queries/baseDataset.ts` and
+  moving operational fact rebuild helpers into `app/util/db/queries/facts.ts`.
+  The remaining route helpers still import the base-dataset surface as a
+  migration-only dependency until later route-shaped query phases replace those
+  callers.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.
