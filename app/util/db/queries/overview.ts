@@ -14,10 +14,7 @@ import { getPublicCrowdReportSignals } from '~/util/crowdReports';
 import { timeServerSpan, timeSyncServerSpan } from '~/util/serverTiming';
 import { selectIncludedEntities } from './included';
 import { getScopedIssueHydrationFromDb } from './issues';
-import {
-  issueActiveNow,
-  issueActiveToday,
-} from './issueIntervals';
+import { issueActiveNow, issueActiveToday } from './issueIntervals';
 import {
   buildIssueTypeBreakdownForDate,
   rankLineSummaries,
