@@ -26,7 +26,13 @@ import {
   serviceWindowForDate,
 } from './lineService';
 import { getDefaultDb, selectByIdChunks, timeDbQuery } from './shared';
-import { isoDate, isoDateTime, nowSg, parseDateTime } from './temporal';
+import {
+  isoDate,
+  isoDateTime,
+  nowSg,
+  parseDateTime,
+  SG_TIMEZONE,
+} from './temporal';
 import type {
   BaseIncludedEntities,
   CommunitySignalOptions,
@@ -278,7 +284,8 @@ export function buildFactBackedLineSummaries({
   issuesByLineId: Record<string, IssueWithOperationalEffects[]>;
   referenceNow: DateTime;
 }) {
-  const rangeStart = referenceNow.startOf('day').minus({ days: days - 1 });
+  const referenceDateTime = referenceNow.setZone(SG_TIMEZONE);
+  const rangeStart = referenceDateTime.startOf('day').minus({ days: days - 1 });
   const factsByLineDate = new Map<string, LineDayFactRow>();
   for (const fact of facts) {
     factsByLineDate.set(`${fact.line_id}::${fact.date}`, fact);
@@ -329,7 +336,7 @@ export function buildFactBackedLineSummaries({
       const breakdownByIssueTypes = buildIssueTypeBreakdownForDate(
         lineIssues,
         date,
-        referenceNow,
+        referenceDateTime,
         allocationWindow,
       );
       if (breakdownByIssueTypes.disruption == null && disruptionSeconds > 0) {
@@ -358,13 +365,13 @@ export function buildFactBackedLineSummaries({
     }
 
     const activeNowIssues = lineIssues.filter((issue) =>
-      issueActiveNow(issue, referenceNow),
+      issueActiveNow(issue, referenceDateTime),
     );
     const status = (() => {
-      if (isLineFuture(line, referenceNow)) {
+      if (isLineFuture(line, referenceDateTime)) {
         return 'future_service';
       }
-      if (!isLineOperatingNow(line, publicHolidaySet, referenceNow)) {
+      if (!isLineOperatingNow(line, publicHolidaySet, referenceDateTime)) {
         return 'closed_for_day';
       }
       if (activeNowIssues.some((issue) => issue.type === 'disruption')) {
@@ -436,9 +443,10 @@ export async function getOverviewDataFromDb(
   options: CommunitySignalOptions = {},
   referenceNow = nowSg(),
 ) {
-  const rangeStart = referenceNow.startOf('day').minus({ days: days - 1 });
-  const rangeEnd = referenceNow.startOf('day');
-  const todayStart = referenceNow.startOf('day');
+  const referenceDateTime = referenceNow.setZone(SG_TIMEZONE);
+  const rangeStart = referenceDateTime.startOf('day').minus({ days: days - 1 });
+  const rangeEnd = referenceDateTime.startOf('day');
+  const todayStart = referenceDateTime.startOf('day');
   const todayEnd = todayStart.plus({ days: 1 });
 
   const [
@@ -468,7 +476,7 @@ export async function getOverviewDataFromDb(
           db,
           issueIds: candidateIssueIds,
           lines,
-          referenceNow,
+          referenceNow: referenceDateTime,
           spanPrefix: 'overview',
           stationIds: communitySignalStationIds,
         }),
@@ -479,14 +487,14 @@ export async function getOverviewDataFromDb(
   const issueIdsActiveNow = issues
     .filter(
       (issue) =>
-        issue.type === 'disruption' && issueActiveNow(issue, referenceNow),
+        issue.type === 'disruption' && issueActiveNow(issue, referenceDateTime),
     )
     .map((issue) => issue.id);
   const issueIdsActiveToday = issues
     .filter(
       (issue) =>
         (issue.type === 'maintenance' || issue.type === 'infra') &&
-        issueActiveToday(issue, referenceNow),
+        issueActiveToday(issue, referenceDateTime),
     )
     .map((issue) => issue.id);
   const issuesByLineId = groupIssuesByLineId(issues);
@@ -497,7 +505,7 @@ export async function getOverviewDataFromDb(
       lines,
       publicHolidaySet,
       issuesByLineId,
-      referenceNow,
+      referenceNow: referenceDateTime,
     }),
   );
   const lineSummaryIssueIds = [
