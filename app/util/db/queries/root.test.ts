@@ -5,7 +5,7 @@ import {
   ROOT_LAST_UPDATED_METADATA_KEY,
   type RootDataDb,
 } from './root';
-import { createDbStub } from './testDbStub';
+import { createDbBatchStub } from './testDbStub';
 
 describe('getRootDataFromDb', () => {
   it('fetches only the compact root navigation data shape', async () => {
@@ -23,22 +23,10 @@ describe('getRootDataFromDb', () => {
       },
     ];
     const operatorRows = [{ id: 'SMRT', name: 'SMRT' }];
-    const { calls, db, select } = createDbStub<RootDataDb>([
-      {
-        table: linesTable,
-        rows: lineRows,
-        terminalMethod: 'orderBy',
-      },
-      {
-        table: metadataTable,
-        rows: metadataRows,
-        terminalMethod: 'orderBy',
-      },
-      {
-        table: operatorsTable,
-        rows: operatorRows,
-        terminalMethod: 'orderBy',
-      },
+    const { batch, calls, db, select } = createDbBatchStub<RootDataDb>([
+      lineRows,
+      metadataRows,
+      operatorRows,
     ]);
 
     await expect(getRootDataFromDb(db)).resolves.toEqual({
@@ -48,6 +36,7 @@ describe('getRootDataFromDb', () => {
     });
 
     expect(select).toHaveBeenCalledTimes(3);
+    expect(batch).toHaveBeenCalledTimes(1);
     expect(calls).toEqual([
       {
         selectionKeys: ['id', 'name', 'color'],
@@ -60,8 +49,9 @@ describe('getRootDataFromDb', () => {
         selectionKeys: ['key', 'value'],
         table: metadataTable,
         whereCalls: 1,
-        orderByCalls: 1,
+        orderByCalls: 0,
         groupByCalls: 0,
+        limitCalls: 1,
       },
       {
         selectionKeys: ['id', 'name'],
