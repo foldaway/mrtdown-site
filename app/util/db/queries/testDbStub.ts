@@ -82,10 +82,14 @@ export function createDbStub<TDb>(rowHandlers: QueryRowHandler[]) {
 
     return builder;
   });
+  const batch = vi.fn((queryBatch: readonly Promise<unknown[]>[]) =>
+    Promise.all(queryBatch),
+  );
 
   return {
+    batch,
     calls,
-    db: { select } as unknown as TDb,
+    db: { batch, select } as unknown as TDb,
     select,
   };
 }

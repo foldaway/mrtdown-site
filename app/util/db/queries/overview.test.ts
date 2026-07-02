@@ -32,7 +32,7 @@ import type { IssueWithOperationalEffects } from './types';
 
 describe('getOverviewDataFromDb', () => {
   it('builds home line summaries from compact line-day facts', async () => {
-    const { calls, db, select } = createDbStub<AppDb>([
+    const { batch, calls, db, select } = createDbStub<AppDb>([
       {
         table: linesTable,
         rows: [
@@ -156,6 +156,7 @@ describe('getOverviewDataFromDb', () => {
     });
 
     expect(select).toHaveBeenCalledTimes(5);
+    expect(batch).toHaveBeenCalledTimes(1);
     expect(calls).toEqual([
       {
         selectionKeys: [

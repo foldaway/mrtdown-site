@@ -7,6 +7,7 @@ import {
   lineDayFactsTable,
   lineOperatorsTable,
   linesTable,
+  publicHolidaysTable,
 } from '~/db/schema';
 import type { IncludedEntities, Line, LineSummary } from '~/types';
 import { getPublicCrowdReportSignals } from '~/util/crowdReports';
@@ -27,7 +28,6 @@ import {
 import {
   buildLines,
   getDefaultDb,
-  getPublicHolidaySetFromDb,
   groupIssuesByLineId,
   selectByIdChunks,
   timeDbQuery,
@@ -47,88 +47,27 @@ import type {
 
 type LineDayFactRow = typeof lineDayFactsTable.$inferSelect;
 type OverviewDb = AppDb;
+type OverviewLineRow = Pick<
+  typeof linesTable.$inferSelect,
+  'id' | 'name' | 'type' | 'color' | 'started_at' | 'operating_hours'
+>;
+type OverviewLineOperatorRow = Pick<
+  typeof lineOperatorsTable.$inferSelect,
+  'line_id' | 'operator_id' | 'started_at' | 'ended_at'
+>;
+type OverviewPublicHolidayRow = Pick<
+  typeof publicHolidaysTable.$inferSelect,
+  'date'
+>;
+type OverlappingPeriodRow = Pick<
+  typeof impactEventPeriodsTable.$inferSelect,
+  'impact_event_id'
+>;
 
-async function getLinesFromDb(db: OverviewDb) {
-  const [lineRows, lineOperatorRows] = await timeServerSpan(
-    'overview_line_queries',
-    () =>
-      Promise.all([
-        timeDbQuery('overview_q_lines', () =>
-          db
-            .select({
-              id: linesTable.id,
-              name: linesTable.name,
-              type: linesTable.type,
-              color: linesTable.color,
-              started_at: linesTable.started_at,
-              operating_hours: linesTable.operating_hours,
-            })
-            .from(linesTable)
-            .orderBy(asc(linesTable.id)),
-        ),
-        timeDbQuery('overview_q_line_operators', () =>
-          db
-            .select({
-              line_id: lineOperatorsTable.line_id,
-              operator_id: lineOperatorsTable.operator_id,
-              started_at: lineOperatorsTable.started_at,
-              ended_at: lineOperatorsTable.ended_at,
-            })
-            .from(lineOperatorsTable),
-        ),
-      ]),
-  );
-
-  return buildLines(lineRows, lineOperatorRows);
-}
-
-async function getLineDayFactsFromDb(
+async function getIssueIdsForOverlappingPeriods(
   db: OverviewDb,
-  start: DateTime,
-  end: DateTime,
+  overlappingPeriodRows: OverlappingPeriodRow[],
 ) {
-  return timeDbQuery('overview_q_line_day_facts', () =>
-    db
-      .select({
-        date: lineDayFactsTable.date,
-        line_id: lineDayFactsTable.line_id,
-        service_seconds: lineDayFactsTable.service_seconds,
-        downtime_disruption_seconds:
-          lineDayFactsTable.downtime_disruption_seconds,
-        downtime_maintenance_seconds:
-          lineDayFactsTable.downtime_maintenance_seconds,
-        downtime_infra_seconds: lineDayFactsTable.downtime_infra_seconds,
-        issue_count_disruption: lineDayFactsTable.issue_count_disruption,
-        issue_count_maintenance: lineDayFactsTable.issue_count_maintenance,
-        issue_count_infra: lineDayFactsTable.issue_count_infra,
-      })
-      .from(lineDayFactsTable)
-      .where(
-        and(
-          gte(lineDayFactsTable.date, isoDate(start)),
-          lte(lineDayFactsTable.date, isoDate(end)),
-        ),
-      ),
-  );
-}
-
-async function getIssueIdsOverlappingRange(
-  db: OverviewDb,
-  start: DateTime,
-  end: DateTime,
-) {
-  const overlappingPeriodRows = await timeDbQuery(
-    'overview_q_overlapping_periods',
-    () =>
-      db
-        .select({
-          impact_event_id: impactEventPeriodsTable.impact_event_id,
-        })
-        .from(impactEventPeriodsTable)
-        .where(
-          sql`${impactEventPeriodsTable.start_at} < ${isoDateTime(end)} and (${impactEventPeriodsTable.end_at} is null or ${impactEventPeriodsTable.end_at} > ${isoDateTime(start)})`,
-        ),
-  );
   const overlappingPeriodEventIds = [
     ...new Set(overlappingPeriodRows.map((row) => row.impact_event_id)),
   ];
@@ -188,6 +127,95 @@ async function getIssueIdsOverlappingRange(
   return Object.values(latestPeriodEventByIssueId)
     .filter((event) => overlappingPeriodEventIdSet.has(event.id))
     .map((event) => event.issue_id);
+}
+
+async function getOverviewInitialRows(
+  db: OverviewDb,
+  start: DateTime,
+  end: DateTime,
+  overlapEnd: DateTime,
+) {
+  const lineQuery = db
+    .select({
+      id: linesTable.id,
+      name: linesTable.name,
+      type: linesTable.type,
+      color: linesTable.color,
+      started_at: linesTable.started_at,
+      operating_hours: linesTable.operating_hours,
+    })
+    .from(linesTable)
+    .orderBy(asc(linesTable.id));
+  const lineOperatorQuery = db
+    .select({
+      line_id: lineOperatorsTable.line_id,
+      operator_id: lineOperatorsTable.operator_id,
+      started_at: lineOperatorsTable.started_at,
+      ended_at: lineOperatorsTable.ended_at,
+    })
+    .from(lineOperatorsTable);
+  const publicHolidayQuery = db
+    .select({
+      date: publicHolidaysTable.date,
+    })
+    .from(publicHolidaysTable);
+  const lineDayFactQuery = db
+    .select({
+      date: lineDayFactsTable.date,
+      line_id: lineDayFactsTable.line_id,
+      service_seconds: lineDayFactsTable.service_seconds,
+      downtime_disruption_seconds:
+        lineDayFactsTable.downtime_disruption_seconds,
+      downtime_maintenance_seconds:
+        lineDayFactsTable.downtime_maintenance_seconds,
+      downtime_infra_seconds: lineDayFactsTable.downtime_infra_seconds,
+      issue_count_disruption: lineDayFactsTable.issue_count_disruption,
+      issue_count_maintenance: lineDayFactsTable.issue_count_maintenance,
+      issue_count_infra: lineDayFactsTable.issue_count_infra,
+    })
+    .from(lineDayFactsTable)
+    .where(
+      and(
+        gte(lineDayFactsTable.date, isoDate(start)),
+        lte(lineDayFactsTable.date, isoDate(end)),
+      ),
+    );
+  const overlappingPeriodQuery = db
+    .select({
+      impact_event_id: impactEventPeriodsTable.impact_event_id,
+    })
+    .from(impactEventPeriodsTable)
+    .where(
+      sql`${impactEventPeriodsTable.start_at} < ${isoDateTime(overlapEnd)} and (${impactEventPeriodsTable.end_at} is null or ${impactEventPeriodsTable.end_at} > ${isoDateTime(start)})`,
+    );
+
+  const [
+    lineRows,
+    lineOperatorRows,
+    publicHolidayRows,
+    lineDayFacts,
+    overlappingPeriodRows,
+  ] = await timeServerSpan('overview_initial_batch', () =>
+    db.batch([
+      lineQuery,
+      lineOperatorQuery,
+      publicHolidayQuery,
+      lineDayFactQuery,
+      overlappingPeriodQuery,
+    ]),
+  );
+
+  return {
+    lineDayFacts: lineDayFacts as LineDayFactRow[],
+    lines: buildLines(
+      lineRows as OverviewLineRow[],
+      lineOperatorRows as OverviewLineOperatorRow[],
+    ),
+    overlappingPeriodRows: overlappingPeriodRows as OverlappingPeriodRow[],
+    publicHolidaySet: new Set(
+      (publicHolidayRows as OverviewPublicHolidayRow[]).map((row) => row.date),
+    ),
+  };
 }
 
 function emptyIncluded(lines: Record<string, Line>): BaseIncludedEntities {
@@ -384,21 +412,15 @@ export async function getOverviewDataFromDb(
   const rangeEnd = referenceDateTime.startOf('day');
   const todayStart = referenceDateTime.startOf('day');
   const todayEnd = todayStart.plus({ days: 1 });
+  const communitySignalsPromise = options.includeCommunitySignals
+    ? getPublicCrowdReportSignals(db, {})
+    : Promise.resolve([]);
 
-  const [
-    lines,
-    publicHolidaySet,
-    lineDayFacts,
-    candidateIssueIdsInRange,
-    communitySignals,
-  ] = await Promise.all([
-    getLinesFromDb(db),
-    getPublicHolidaySetFromDb(db, 'overview_q_public_holidays'),
-    getLineDayFactsFromDb(db, rangeStart, rangeEnd),
-    getIssueIdsOverlappingRange(db, rangeStart, todayEnd),
-    options.includeCommunitySignals
-      ? getPublicCrowdReportSignals(db, {})
-      : Promise.resolve([]),
+  const { lineDayFacts, lines, overlappingPeriodRows, publicHolidaySet } =
+    await getOverviewInitialRows(db, rangeStart, rangeEnd, todayEnd);
+  const [candidateIssueIdsInRange, communitySignals] = await Promise.all([
+    getIssueIdsForOverlappingPeriods(db, overlappingPeriodRows),
+    communitySignalsPromise,
   ]);
   const candidateIssueIds = [...new Set(candidateIssueIdsInRange)];
   const communitySignalStationIds = [
