@@ -6,6 +6,7 @@ import {
   isCrowdReportsFeatureEnabled,
 } from './crowdReportFeatureFlag';
 import { getRootData } from './db/queries/root';
+import { getLocaleMessages } from './localeMessages';
 import { timeServerSpan } from './serverTiming';
 
 const InputSchema = z.object({
@@ -16,16 +17,15 @@ export const getRootFn = createServerFn({ method: 'GET' })
   .inputValidator((val) => InputSchema.parse(val))
   .handler(async (val) => {
     const { lang } = val.data;
-    const { lineNavItems, metadata, operatorNavItems } = await timeServerSpan(
-      'root_loader',
-      () => getRootData(),
-    );
+    const rootDataPromise = timeServerSpan('root_loader', () => getRootData());
 
-    const { default: messages } = await timeServerSpan(
+    const messagesPromise = timeServerSpan(
       'root_messages',
-      () => import(`../../lang/${lang}.json`),
+      () => getLocaleMessages(lang),
       lang,
     );
+    const { lineNavItems, metadata, operatorNavItems } = await rootDataPromise;
+    const messages = await messagesPromise;
 
     return {
       crowdReportsEnabled: isCrowdReportsFeatureEnabled(
