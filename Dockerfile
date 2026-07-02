@@ -1,14 +1,14 @@
-FROM node:24-bookworm-slim AS development-dependencies-env
+FROM node:26-bookworm-slim AS development-dependencies-env
 COPY . /app
 WORKDIR /app
 RUN npm ci
 
-FROM node:24-bookworm-slim AS production-dependencies-env
+FROM node:26-bookworm-slim AS production-dependencies-env
 COPY ./package.json package-lock.json /app/
 WORKDIR /app
 RUN npm ci --omit=dev
 
-FROM node:24-bookworm-slim AS build-env
+FROM node:26-bookworm-slim AS build-env
 ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 ARG SENTRY_RELEASE
@@ -35,7 +35,7 @@ WORKDIR /app
 RUN --mount=type=secret,id=SENTRY_AUTH_TOKEN \
     SENTRY_AUTH_TOKEN=$(cat /run/secrets/SENTRY_AUTH_TOKEN) NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
-FROM node:24-bookworm-slim
+FROM node:26-bookworm-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
