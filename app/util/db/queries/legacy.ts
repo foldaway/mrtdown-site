@@ -5,11 +5,7 @@ import type { AppDb } from '~/db';
 import { evidencesTable, statisticsSnapshotsTable } from '~/db/schema';
 import type { Issue, LineSummary, LineSummaryStatus } from '~/types';
 import { getPublicCrowdReportSignals } from '~/util/crowdReports';
-import {
-  recordServerTiming,
-  timeServerSpan,
-  timeSyncServerSpan,
-} from '~/util/serverTiming';
+import { timeServerSpan, timeSyncServerSpan } from '~/util/serverTiming';
 import { selectIncludedEntities } from './included';
 import { getDefaultDb } from './shared';
 import {
@@ -46,10 +42,7 @@ import {
   getOperationalFactCoverageDatesInRange,
   getOperationalFactCoverageStart,
 } from './operationalFacts';
-import {
-  getLatestStatisticsSnapshot,
-  STATISTICS_SNAPSHOT_ID,
-} from './statisticsSnapshots';
+import { STATISTICS_SNAPSHOT_ID } from './statisticsSnapshots';
 import {
   isoDate,
   isoDateTime,
@@ -823,7 +816,7 @@ export async function getHistoryDayData(
   };
 }
 
-function getStatisticsIncluded(
+export function getStatisticsIncluded(
   dataset: BaseDataset,
   statistics: SystemAnalytics,
 ) {
@@ -839,7 +832,7 @@ function getStatisticsIncluded(
   });
 }
 
-async function buildStatisticsDataFromDataset(
+export async function buildStatisticsDataFromDataset(
   dataset: BaseDataset,
   db?: AppDb,
 ) {
@@ -1056,44 +1049,6 @@ export async function rebuildStatisticsSnapshot(db?: AppDb) {
     return {
       asOf,
       issueIdsDisruptionLongest: data.issueIdsDisruptionLongest,
-    };
-  });
-}
-
-export async function getStatisticsData() {
-  return timeServerSpan('statistics_data', async () => {
-    const snapshot = await getLatestStatisticsSnapshot();
-    if (snapshot != null) {
-      if (snapshot.included != null) {
-        recordServerTiming('statistics_included', 0, 'source=snapshot');
-        return {
-          data: snapshot.data,
-          included: snapshot.included,
-        };
-      }
-
-      const dataset = await timeServerSpan('statistics_included_dataset', () =>
-        buildDataset(
-          nowSg(),
-          undefined,
-          snapshot.data.issueIdsDisruptionLongest,
-        ),
-      );
-      return {
-        data: snapshot.data,
-        included: timeSyncServerSpan('statistics_included', () =>
-          getStatisticsIncluded(dataset, snapshot.data),
-        ),
-      };
-    }
-
-    const dataset = await getBaseDataset();
-    const statistics = await buildStatisticsDataFromDataset(dataset);
-    return {
-      data: statistics,
-      included: timeSyncServerSpan('statistics_included', () =>
-        getStatisticsIncluded(dataset, statistics),
-      ),
     };
   });
 }

@@ -146,7 +146,10 @@ helpers in `app/util/db/queries/legacy.ts`. The remaining callers are:
 - `getHistoryYearMonthData`: legacy fallback when fact coverage is missing.
 - `getHistoryDayData`: legacy fallback when fact coverage is missing.
 - `rebuildStatisticsSnapshot`: maintenance/workflow snapshot generation.
-- `getStatisticsData`: legacy snapshot-included and missing-snapshot fallbacks.
+- `getStatisticsData`: development/test fallback for legacy snapshots without
+  included entities or missing snapshots. Production statistics requests now
+  require a precomputed snapshot with included entities and fail loudly before
+  falling back to the base dataset.
 
 ## Phases
 
@@ -391,6 +394,12 @@ done
   testable `getLatestStatisticsSnapshotFromDb` query boundary, and adding a
   focused compact-query-shape test. Runtime fallback behavior is intentionally
   unchanged until the production missing-snapshot policy is implemented.
+- 2026-07-02: Continued Phase 3 by moving route-facing `getStatisticsData` out
+  of `legacy.ts` into `app/util/db/queries/statistics.ts` and making production
+  statistics requests require a current snapshot with precomputed included
+  entities. The full base-dataset statistics fallback remains available only
+  when `import.meta.env.PROD` is false or a caller explicitly disables the
+  snapshot requirement.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.
