@@ -138,8 +138,9 @@ helpers in `app/util/db/queries/legacy.ts`. The remaining callers are:
 - `buildBaseDataset`: cache wrapper for the legacy full dataset.
 - `buildOverviewDataset`: legacy overview/home candidate issue subset fallback;
   no longer used by the route-facing `getOverviewData`.
-- `getOverviewData`: still uses `buildDataset` for selected overview-range
-  issue card/date-card/community signal station hydration under the
+- `getOverviewData`: no longer uses `buildDataset`; selected overview-range
+  issue card/date-card/community signal station hydration now uses scoped
+  issue, event detail, service branch, and station membership queries under the
   `overview_active_issue_hydration` span.
 - `getIncludedForIssueIds`: history fact-path included-entity hydration.
 - `getLineProfileData`
@@ -412,6 +413,12 @@ done
   cards, date-card related links, and community-signal station hydration still
   use a selected-issue `buildDataset` compatibility path under
   `overview_active_issue_hydration`.
+- 2026-07-02: Continued Phase 4 by replacing the home overview selected-issue
+  `buildDataset` hydration with scoped issue, latest-event, event-detail,
+  service-branch, station, and station-code queries. Overview active advisory
+  cards, date-card related issue links, and community-signal station names now
+  hydrate without calling the legacy base dataset. Added a focused overview
+  query test for active issue and station hydration.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.

@@ -2,11 +2,25 @@ import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
 import type { AppDb } from '~/db';
 import {
+  evidencesTable,
+  impactEventCausesTable,
+  impactEventEntityFacilitiesTable,
+  impactEventEntityServicesTable,
+  impactEventFacilityEffectsTable,
   impactEventPeriodsTable,
+  impactEventServiceEffectsTable,
+  impactEventServiceScopesTable,
+  impactEventsTable,
+  issuesTable,
   lineDayFactsTable,
   lineOperatorsTable,
   linesTable,
   publicHolidaysTable,
+  serviceRevisionPathStationEntriesTable,
+  serviceRevisionsTable,
+  servicesTable,
+  stationCodesTable,
+  stationsTable,
 } from '~/db/schema';
 import type { Line } from '~/types';
 import {
@@ -196,6 +210,234 @@ describe('getOverviewDataFromDb', () => {
         groupByCalls: 0,
       },
     ]);
+  });
+
+  it('hydrates overview issue cards with scoped issue queries', async () => {
+    const referenceNow = DateTime.fromISO('2026-07-02T08:05:00+08:00');
+    const { calls, db } = createDbStub<AppDb>([
+      {
+        table: linesTable,
+        rows: [
+          {
+            id: 'BPLRT',
+            name: {
+              'en-SG': 'Bukit Panjang LRT',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
+            type: 'lrt',
+            color: '#748274',
+            started_at: '1999-11-06',
+            operating_hours: {
+              weekdays: { start: '05:30', end: '23:30' },
+              weekends: { start: '05:30', end: '23:30' },
+            },
+          },
+        ],
+        terminalMethod: 'orderBy',
+      },
+      {
+        table: lineOperatorsTable,
+        rows: [],
+        terminalMethod: 'from',
+      },
+      {
+        table: publicHolidaysTable,
+        rows: [],
+        terminalMethod: 'from',
+      },
+      {
+        table: lineDayFactsTable,
+        rows: [
+          {
+            date: '2026-07-02',
+            line_id: 'BPLRT',
+            service_seconds: 60,
+            downtime_disruption_seconds: 10,
+            downtime_maintenance_seconds: 0,
+            downtime_infra_seconds: 0,
+            issue_count_disruption: 1,
+            issue_count_maintenance: 0,
+            issue_count_infra: 0,
+          },
+        ],
+        terminalMethod: 'where',
+      },
+      {
+        table: impactEventPeriodsTable,
+        selectionKeys: ['impact_event_id'],
+        rows: [{ impact_event_id: 'period-event' }],
+        terminalMethod: 'where',
+      },
+      {
+        table: impactEventsTable,
+        selectionKeys: ['id', 'issue_id'],
+        rows: [{ id: 'period-event', issue_id: 'issue-1' }],
+        terminalMethod: 'where',
+      },
+      {
+        table: impactEventsTable,
+        selectionKeys: ['id', 'issue_id', 'ts'],
+        rows: [
+          {
+            id: 'period-event',
+            issue_id: 'issue-1',
+            ts: '2026-07-02T08:00:00+08:00',
+          },
+        ],
+        terminalMethod: 'where',
+      },
+      {
+        table: issuesTable,
+        rows: [
+          {
+            id: 'issue-1',
+            type: 'disruption',
+            title: {
+              'en-SG': 'Signal fault',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
+          },
+        ],
+        terminalMethod: 'where',
+      },
+      {
+        table: impactEventsTable,
+        selectionKeys: ['id', 'ts', 'issue_id', 'type'],
+        rows: [
+          {
+            id: 'period-event',
+            ts: '2026-07-02T08:00:00+08:00',
+            issue_id: 'issue-1',
+            type: 'periods.set',
+          },
+        ],
+        terminalMethod: 'where',
+      },
+      {
+        table: evidencesTable,
+        rows: [],
+        terminalMethod: 'groupBy',
+      },
+      {
+        table: impactEventPeriodsTable,
+        selectionKeys: ['impact_event_id', 'start_at', 'end_at'],
+        rows: [
+          {
+            impact_event_id: 'period-event',
+            start_at: '2026-07-02T08:00:00+08:00',
+            end_at: '2026-07-02T08:10:00+08:00',
+          },
+        ],
+        terminalMethod: 'where',
+      },
+      {
+        table: impactEventEntityServicesTable,
+        rows: [],
+        terminalMethod: 'where',
+      },
+      {
+        table: impactEventEntityFacilitiesTable,
+        rows: [
+          {
+            impact_event_id: 'period-event',
+            station_id: 'BP6',
+            line_id: 'BPLRT',
+          },
+        ],
+        terminalMethod: 'where',
+      },
+      {
+        table: impactEventCausesTable,
+        rows: [{ impact_event_id: 'period-event', type: 'track_fault' }],
+        terminalMethod: 'where',
+      },
+      {
+        table: impactEventServiceScopesTable,
+        rows: [],
+        terminalMethod: 'where',
+      },
+      {
+        table: impactEventServiceEffectsTable,
+        rows: [],
+        terminalMethod: 'where',
+      },
+      {
+        table: impactEventFacilityEffectsTable,
+        rows: [],
+        terminalMethod: 'where',
+      },
+      {
+        table: stationsTable,
+        rows: [
+          {
+            id: 'BP6',
+            name: {
+              'en-SG': 'Bukit Panjang',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
+            townId: 'bukit-panjang',
+            latitude: 1.379,
+            longitude: 103.761,
+          },
+        ],
+        terminalMethod: 'where',
+      },
+      {
+        table: stationCodesTable,
+        rows: [
+          {
+            station_id: 'BP6',
+            line_id: 'BPLRT',
+            code: 'BP6',
+            started_at: '1999-11-06',
+            ended_at: null,
+            structure_type: 'elevated',
+          },
+        ],
+        terminalMethod: 'where',
+      },
+    ]);
+
+    const result = await getOverviewDataFromDb(db, 1, {}, referenceNow);
+
+    expect(result.data.issueIdsActiveNow).toEqual(['issue-1']);
+    expect(result.included.issues['issue-1']).toMatchObject({
+      id: 'issue-1',
+      lineIds: ['BPLRT'],
+      branchesAffected: [
+        {
+          lineId: 'BPLRT',
+          branchId: 'BPLRT:BP6',
+          stationIds: ['BP6'],
+        },
+      ],
+    });
+    expect(result.included.stations.BP6).toMatchObject({
+      id: 'BP6',
+      memberships: [
+        {
+          lineId: 'BPLRT',
+          code: 'BP6',
+        },
+      ],
+    });
+    expect(
+      result.data.lineSummaries[0]?.breakdownByDates['2026-07-02']
+        .breakdownByIssueTypes.disruption?.issueIds,
+    ).toEqual(['issue-1']);
+    expect(calls.map((call) => call.table)).not.toContain(servicesTable);
+    expect(calls.map((call) => call.table)).not.toContain(
+      serviceRevisionsTable,
+    );
+    expect(calls.map((call) => call.table)).not.toContain(
+      serviceRevisionPathStationEntriesTable,
+    );
   });
 
   it('keeps issue ids on fact-backed date cells for hover details', () => {
