@@ -18,6 +18,7 @@ import {
   serviceRevisionsTable,
   servicesTable,
   stationCodesTable,
+  type stationLandmarksTable,
   stationsTable,
 } from '~/db/schema';
 import type { IssueAffectedBranch, Line, Station } from '~/types';
@@ -160,11 +161,24 @@ export function buildStationIncluded(
     >
   >,
   referenceDate: string,
+  stationLandmarkRows: Array<
+    Pick<
+      typeof stationLandmarksTable.$inferSelect,
+      'station_id' | 'landmark_id'
+    >
+  > = [],
 ) {
   const membershipsByStationId = stationMembershipsFromCodes(
     stationCodeRows,
     referenceDate,
   );
+  const landmarkIdsByStationId = stationLandmarkRows.reduce<
+    Record<string, string[]>
+  >((acc, row) => {
+    acc[row.station_id] ??= [];
+    acc[row.station_id].push(row.landmark_id);
+    return acc;
+  }, {});
   return Object.fromEntries(
     stationRows.map((row) => [
       row.id,
@@ -182,7 +196,7 @@ export function buildStationIncluded(
           return a.code.localeCompare(b.code);
         }),
         townId: row.townId,
-        landmarkIds: [],
+        landmarkIds: landmarkIdsByStationId[row.id] ?? [],
       } satisfies Station,
     ]),
   );

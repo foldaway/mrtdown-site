@@ -144,7 +144,6 @@ helpers in `app/util/db/queries/legacy.ts`. The remaining callers are:
   `overview_active_issue_hydration` span.
 - `getIncludedForIssueIds`: history fact-path included-entity hydration.
 - `getLineProfileData`
-- `getStationProfileData`
 - `getOperatorProfileData`
 - `getHistoryYearSummaryData`: legacy fallback when fact coverage is missing.
 - `getHistoryYearMonthData`: legacy fallback when fact coverage is missing.
@@ -423,6 +422,11 @@ done
   off the legacy base dataset. Issue detail now composes compact line, evidence,
   issue, event, service-branch, and station-membership reads, with a focused
   missing-issue query-shape test.
+- 2026-07-02: Continued Phase 5 by moving route-facing
+  `getStationProfileData` out of `legacy.ts`. Station profiles now compose
+  scoped station detail, membership line, town/landmark, candidate issue, and
+  community signal reads without calling the legacy base dataset, with a focused
+  missing-station query-shape test.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.

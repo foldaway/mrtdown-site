@@ -695,6 +695,47 @@ describe('selectIncludedEntities', () => {
     expect(included.issues).toEqual({});
   });
 
+  it('does not emit station memberships without matching included lines', () => {
+    const station = {
+      ...TEST_STATION,
+      memberships: [
+        ...TEST_STATION.memberships,
+        {
+          branchId: 'MISSING:XX1',
+          code: 'XX1',
+          lineId: 'MISSING',
+          sequenceOrder: 99,
+          startedAt: '2026-01-01',
+          structureType: 'underground' as const,
+        },
+      ],
+    };
+    const included = selectIncludedEntities(
+      {
+        lines: {
+          [TEST_LINE.id]: TEST_LINE,
+          [TEST_FEEDER_LINE.id]: TEST_FEEDER_LINE,
+        },
+        stations: {
+          [station.id]: station,
+        },
+        operators: {},
+        towns: {},
+        landmarks: {},
+      },
+      {},
+      {
+        issueIds: [],
+        stationIds: [station.id],
+        includeStationMembershipLines: true,
+      },
+    );
+
+    expect(
+      included.stations[station.id].memberships.map((m) => m.lineId),
+    ).toEqual([TEST_LINE.id, TEST_FEEDER_LINE.id]);
+  });
+
   it('keeps operators for requested lines when requested', () => {
     const line = {
       ...TEST_LINE,

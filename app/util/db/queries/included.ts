@@ -102,16 +102,29 @@ export function selectIncludedEntities(
     }
   }
 
+  const selectedLines = Object.fromEntries(
+    [...lineIds]
+      .filter((lineId) => baseIncluded.lines[lineId] != null)
+      .map((lineId) => [lineId, baseIncluded.lines[lineId]]),
+  );
+
   return {
-    lines: Object.fromEntries(
-      [...lineIds]
-        .filter((lineId) => baseIncluded.lines[lineId] != null)
-        .map((lineId) => [lineId, baseIncluded.lines[lineId]]),
-    ),
+    lines: selectedLines,
     stations: Object.fromEntries(
       [...stationIds]
         .filter((stationId) => baseIncluded.stations[stationId] != null)
-        .map((stationId) => [stationId, baseIncluded.stations[stationId]]),
+        .map((stationId) => {
+          const station = baseIncluded.stations[stationId];
+          return [
+            stationId,
+            {
+              ...station,
+              memberships: station.memberships.filter(
+                (membership) => selectedLines[membership.lineId] != null,
+              ),
+            },
+          ];
+        }),
     ),
     issues: stripOperationalEffects(selectedIssuesWithEffects),
     landmarks: Object.fromEntries(
