@@ -1,8 +1,7 @@
 import type { IssueType } from '@mrtdown/core';
-import { desc, eq } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import type { AppDb } from '~/db';
-import { evidencesTable, statisticsSnapshotsTable } from '~/db/schema';
+import { statisticsSnapshotsTable } from '~/db/schema';
 import type { Issue, LineSummary, LineSummaryStatus } from '~/types';
 import { getPublicCrowdReportSignals } from '~/util/crowdReports';
 import { timeServerSpan, timeSyncServerSpan } from '~/util/serverTiming';
@@ -341,42 +340,6 @@ export async function getLineProfileData(
       lineIds: [lineId],
       stationIds: Object.keys(dataset.included.stations),
       operatorIds: line.operators.map((operator) => operator.operatorId),
-      includeStationMembershipLines: true,
-    }),
-  };
-}
-
-export async function getIssueData(issueId: string) {
-  const db = await getDefaultDb();
-  const [dataset, evidenceRows] = await Promise.all([
-    getBaseDataset(),
-    db
-      .select()
-      .from(evidencesTable)
-      .where(eq(evidencesTable.issue_id, issueId))
-      .orderBy(desc(evidencesTable.ts)),
-  ]);
-  const issue = dataset.allIssues[issueId];
-  if (issue == null) {
-    throw new Response('Issue not found', {
-      status: 404,
-      statusText: 'Not Found',
-    });
-  }
-
-  return {
-    data: {
-      id: issueId,
-      updates: evidenceRows.map((evidence) => ({
-        type: evidence.type,
-        text: evidence.text,
-        textTranslations: evidence.render?.text ?? null,
-        sourceUrl: evidence.source_url,
-        createdAt: evidence.ts,
-      })),
-    },
-    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
-      issueIds: [issueId],
       includeStationMembershipLines: true,
     }),
   };
