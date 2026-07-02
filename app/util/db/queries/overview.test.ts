@@ -30,6 +30,9 @@ import {
 import { createDbStub } from './testDbStub';
 import type { IssueWithOperationalEffects } from './types';
 
+const singaporeDateTime = (value: string) =>
+  DateTime.fromISO(value, { setZone: true });
+
 describe('getOverviewDataFromDb', () => {
   it('builds home line summaries from compact line-day facts', async () => {
     const { calls, db, select } = createDbStub<AppDb>([
@@ -111,7 +114,7 @@ describe('getOverviewDataFromDb', () => {
       db,
       2,
       {},
-      DateTime.fromISO('2026-07-02T12:00:00+08:00'),
+      singaporeDateTime('2026-07-02T12:00:00+08:00'),
     );
 
     expect(result.data.issueIdsActiveNow).toEqual([]);
@@ -213,7 +216,7 @@ describe('getOverviewDataFromDb', () => {
   });
 
   it('hydrates overview issue cards with scoped issue queries', async () => {
-    const referenceNow = DateTime.fromISO('2026-07-02T08:05:00+08:00');
+    const referenceNow = singaporeDateTime('2026-07-02T08:05:00+08:00');
     const { calls, db } = createDbStub<AppDb>([
       {
         table: linesTable,
@@ -508,7 +511,7 @@ describe('getOverviewDataFromDb', () => {
       issuesByLineId: {
         BPLRT: [issue],
       },
-      referenceNow: DateTime.fromISO('2026-07-02T12:00:00+08:00'),
+      referenceNow: singaporeDateTime('2026-07-02T12:00:00+08:00'),
     });
 
     expect(
