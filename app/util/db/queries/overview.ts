@@ -7,7 +7,6 @@ import {
   lineDayFactsTable,
   lineOperatorsTable,
   linesTable,
-  publicHolidaysTable,
 } from '~/db/schema';
 import type { IncludedEntities, Line, LineSummary } from '~/types';
 import { getPublicCrowdReportSignals } from '~/util/crowdReports';
@@ -25,7 +24,14 @@ import {
   lineDayType,
   serviceWindowForDate,
 } from './lineService';
-import { getDefaultDb, selectByIdChunks, timeDbQuery } from './shared';
+import {
+  buildLines,
+  getDefaultDb,
+  getPublicHolidaySetFromDb,
+  groupIssuesByLineId,
+  selectByIdChunks,
+  timeDbQuery,
+} from './shared';
 import {
   isoDate,
   isoDateTime,
@@ -41,29 +47,6 @@ import type {
 
 type LineDayFactRow = typeof lineDayFactsTable.$inferSelect;
 type OverviewDb = AppDb;
-
-function parseTranslations(value: unknown): Line['name'] {
-  const isNonEmptyTranslation = (
-    translation: string | null | undefined,
-  ): translation is string =>
-    typeof translation === 'string' && translation.trim().length > 0;
-  const rawTranslations =
-    value != null && typeof value === 'object'
-      ? (value as Record<string, string | null | undefined>)
-      : {};
-  const fallback =
-    [rawTranslations['en-SG'], rawTranslations.en].find(
-      isNonEmptyTranslation,
-    ) ??
-    Object.values(rawTranslations).find(isNonEmptyTranslation) ??
-    '';
-  return {
-    'en-SG': fallback,
-    'zh-Hans': rawTranslations['zh-Hans'] ?? null,
-    ms: rawTranslations.ms ?? null,
-    ta: rawTranslations.ta ?? null,
-  };
-}
 
 async function getLinesFromDb(db: OverviewDb) {
   const [lineRows, lineOperatorRows] = await timeServerSpan(
@@ -96,43 +79,7 @@ async function getLinesFromDb(db: OverviewDb) {
       ]),
   );
 
-  const operatorsByLineId = lineOperatorRows.reduce<
-    Record<string, Line['operators']>
-  >((acc, row) => {
-    acc[row.line_id] ??= [];
-    acc[row.line_id].push({
-      operatorId: row.operator_id,
-      startedAt: row.started_at,
-      endedAt: row.ended_at,
-    });
-    return acc;
-  }, {});
-
-  return Object.fromEntries(
-    lineRows.map((row) => [
-      row.id,
-      {
-        id: row.id,
-        name: parseTranslations(row.name),
-        type: row.type,
-        color: row.color,
-        startedAt: row.started_at,
-        operatingHours: row.operating_hours,
-        operators: operatorsByLineId[row.id] ?? [],
-      } satisfies Line,
-    ]),
-  );
-}
-
-async function getPublicHolidaySetFromDb(db: OverviewDb) {
-  const rows = await timeDbQuery('overview_q_public_holidays', () =>
-    db
-      .select({
-        date: publicHolidaysTable.date,
-      })
-      .from(publicHolidaysTable),
-  );
-  return new Set(rows.map((row) => row.date));
+  return buildLines(lineRows, lineOperatorRows);
 }
 
 async function getLineDayFactsFromDb(
@@ -416,17 +363,6 @@ export function buildFactBackedLineSummaries({
   return rankLineSummaries(lineSummaries);
 }
 
-function groupIssuesByLineId(issues: Iterable<IssueWithOperationalEffects>) {
-  const grouped: Record<string, IssueWithOperationalEffects[]> = {};
-  for (const issue of issues) {
-    for (const lineId of issue.lineIds) {
-      grouped[lineId] ??= [];
-      grouped[lineId].push(issue);
-    }
-  }
-  return grouped;
-}
-
 export async function getOverviewData(
   days: number,
   options: CommunitySignalOptions = {},
@@ -457,7 +393,7 @@ export async function getOverviewDataFromDb(
     communitySignals,
   ] = await Promise.all([
     getLinesFromDb(db),
-    getPublicHolidaySetFromDb(db),
+    getPublicHolidaySetFromDb(db, 'overview_q_public_holidays'),
     getLineDayFactsFromDb(db, rangeStart, rangeEnd),
     getIssueIdsOverlappingRange(db, rangeStart, todayEnd),
     options.includeCommunitySignals

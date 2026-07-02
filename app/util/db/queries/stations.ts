@@ -15,104 +15,26 @@ import {
   stationsTable,
   townsTable,
 } from '~/db/schema';
-import type { Line } from '~/types';
 import { getPublicCrowdReportSignals } from '~/util/crowdReports';
 import { timeServerSpan } from '~/util/serverTiming';
 import { selectIncludedEntities } from './included';
 import { buildStationIncluded, getScopedIssueHydrationFromDb } from './issues';
 import { issueActiveNow, sortIssuesByLatestActivity } from './issueIntervals';
 import { pickIssueTypes } from './issueTypeStats';
-import { getDefaultDb, selectByIdChunks, timeDbQuery } from './shared';
+import {
+  buildLines,
+  buildNamedEntities,
+  getDefaultDb,
+  mergeBaseIncluded,
+  selectByIdChunks,
+  timeDbQuery,
+} from './shared';
 import { isoDate, nowSg } from './temporal';
 import type {
   BaseIncludedEntities,
   CommunitySignalOptions,
   IssueWithOperationalEffects,
 } from './types';
-
-type NamedEntity = {
-  id: string;
-  name: Line['name'];
-};
-
-function parseTranslations(value: unknown): Line['name'] {
-  const isNonEmptyTranslation = (
-    translation: string | null | undefined,
-  ): translation is string =>
-    typeof translation === 'string' && translation.trim().length > 0;
-  const rawTranslations =
-    value != null && typeof value === 'object'
-      ? (value as Record<string, string | null | undefined>)
-      : {};
-  const fallback =
-    [rawTranslations['en-SG'], rawTranslations.en].find(
-      isNonEmptyTranslation,
-    ) ??
-    Object.values(rawTranslations).find(isNonEmptyTranslation) ??
-    '';
-  return {
-    'en-SG': fallback,
-    'zh-Hans': rawTranslations['zh-Hans'] ?? null,
-    ms: rawTranslations.ms ?? null,
-    ta: rawTranslations.ta ?? null,
-  };
-}
-
-function buildNamedEntities<T extends { id: string; name: unknown }>(
-  rows: T[],
-) {
-  return Object.fromEntries(
-    rows.map((row) => [
-      row.id,
-      {
-        id: row.id,
-        name: parseTranslations(row.name),
-      } satisfies NamedEntity,
-    ]),
-  );
-}
-
-function buildLines(
-  lineRows: Array<
-    Pick<
-      typeof linesTable.$inferSelect,
-      'id' | 'name' | 'type' | 'color' | 'started_at' | 'operating_hours'
-    >
-  >,
-  lineOperatorRows: Array<
-    Pick<
-      typeof lineOperatorsTable.$inferSelect,
-      'line_id' | 'operator_id' | 'started_at' | 'ended_at'
-    >
-  >,
-) {
-  const operatorsByLineId = lineOperatorRows.reduce<
-    Record<string, Line['operators']>
-  >((acc, row) => {
-    acc[row.line_id] ??= [];
-    acc[row.line_id].push({
-      operatorId: row.operator_id,
-      startedAt: row.started_at,
-      endedAt: row.ended_at,
-    });
-    return acc;
-  }, {});
-
-  return Object.fromEntries(
-    lineRows.map((row) => [
-      row.id,
-      {
-        id: row.id,
-        name: parseTranslations(row.name),
-        type: row.type,
-        color: row.color,
-        startedAt: row.started_at,
-        operatingHours: row.operating_hours,
-        operators: operatorsByLineId[row.id] ?? [],
-      } satisfies Line,
-    ]),
-  );
-}
 
 async function getStationBaseIncludedFromDb(
   db: AppDb,
@@ -306,34 +228,6 @@ async function getCandidateIssueIdsForStationFromDb(
     ),
   );
   return [...new Set(issueRows.map((row) => row.issue_id))];
-}
-
-function mergeBaseIncluded(
-  stationIncluded: BaseIncludedEntities,
-  issueIncluded: BaseIncludedEntities,
-) {
-  return {
-    lines: {
-      ...stationIncluded.lines,
-      ...issueIncluded.lines,
-    },
-    stations: {
-      ...issueIncluded.stations,
-      ...stationIncluded.stations,
-    },
-    operators: {
-      ...issueIncluded.operators,
-      ...stationIncluded.operators,
-    },
-    towns: {
-      ...issueIncluded.towns,
-      ...stationIncluded.towns,
-    },
-    landmarks: {
-      ...issueIncluded.landmarks,
-      ...stationIncluded.landmarks,
-    },
-  } satisfies BaseIncludedEntities;
 }
 
 function issuesAffectingStation(

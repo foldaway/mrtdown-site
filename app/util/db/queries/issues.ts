@@ -32,7 +32,12 @@ import {
   deriveServiceScopeStationIds,
   selectServiceBranchSourceEvents,
 } from './serviceScopes';
-import { getDefaultDb, selectByIdChunks, timeDbQuery } from './shared';
+import {
+  getDefaultDb,
+  parseTranslations,
+  selectByIdChunks,
+  timeDbQuery,
+} from './shared';
 import { isoDate, nowSg, parseDateTime } from './temporal';
 import type {
   BaseIncludedEntities,
@@ -50,29 +55,6 @@ type ImpactEventSummary = Pick<
   typeof impactEventsTable.$inferSelect,
   'id' | 'issue_id' | 'ts' | 'type'
 >;
-
-function parseTranslations(value: unknown): Line['name'] {
-  const isNonEmptyTranslation = (
-    translation: string | null | undefined,
-  ): translation is string =>
-    typeof translation === 'string' && translation.trim().length > 0;
-  const rawTranslations =
-    value != null && typeof value === 'object'
-      ? (value as Record<string, string | null | undefined>)
-      : {};
-  const fallback =
-    [rawTranslations['en-SG'], rawTranslations.en].find(
-      isNonEmptyTranslation,
-    ) ??
-    Object.values(rawTranslations).find(isNonEmptyTranslation) ??
-    '';
-  return {
-    'en-SG': fallback,
-    'zh-Hans': rawTranslations['zh-Hans'] ?? null,
-    ms: rawTranslations.ms ?? null,
-    ta: rawTranslations.ta ?? null,
-  };
-}
 
 function latestByIssueIdAndType(events: ImpactEventSummary[]) {
   return events.reduce<

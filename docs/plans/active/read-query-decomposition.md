@@ -132,7 +132,7 @@ Rules for the new package:
 
 ## Current Base Dataset Callers
 
-As of 2026-07-02, `buildDataset` and `getBaseDataset` are implementation-only
+As of 2026-07-03, `buildDataset` and `getBaseDataset` are implementation-only
 helpers in `app/util/db/queries/legacy.ts`. The remaining callers are:
 
 - `buildBaseDataset`: cache wrapper for the legacy full dataset.
@@ -143,7 +143,6 @@ helpers in `app/util/db/queries/legacy.ts`. The remaining callers are:
   issue, event detail, service branch, and station membership queries under the
   `overview_active_issue_hydration` span.
 - `getIncludedForIssueIds`: history fact-path included-entity hydration.
-- `getLineProfileData`
 - `getOperatorProfileData`
 - `getHistoryYearSummaryData`: legacy fallback when fact coverage is missing.
 - `getHistoryYearMonthData`: legacy fallback when fact coverage is missing.
@@ -427,6 +426,12 @@ done
   scoped station detail, membership line, town/landmark, candidate issue, and
   community signal reads without calling the legacy base dataset, with a focused
   missing-station query-shape test.
+- 2026-07-03: Continued Phase 5 by moving route-facing `getLineProfileData`
+  out of `legacy.ts`. Line profiles now compose compact all-line rank inputs,
+  scoped line branches, station memberships, candidate issue hydration, and
+  community signals without calling the legacy base dataset. Removed the stale
+  legacy line/station profile implementations and added a focused missing-line
+  query-shape test.
 - 2026-06-30: Drafted plan after identifying `buildDataset` as the broad base
   dataset assembly path and confirming this container cannot reach the preview
   deployment because the outbound proxy returns `403 Forbidden`.

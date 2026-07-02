@@ -54,6 +54,7 @@ import {
 } from './serviceScopes';
 import {
   getDefaultDb,
+  parseTranslations,
   publicMetadataKeySql,
   selectByIdChunks,
   timeDbQuery,
@@ -82,29 +83,6 @@ const cachedOverviewDatasets = new Map<
   }
 >();
 const pendingOverviewDatasets = new Map<number, Promise<OverviewDataset>>();
-
-function parseTranslations(value: unknown): Line['name'] {
-  const isNonEmptyTranslation = (
-    translation: string | null | undefined,
-  ): translation is string =>
-    typeof translation === 'string' && translation.trim().length > 0;
-  const rawTranslations =
-    value != null && typeof value === 'object'
-      ? (value as Record<string, string | null | undefined>)
-      : {};
-  const fallback =
-    [rawTranslations['en-SG'], rawTranslations.en].find(
-      isNonEmptyTranslation,
-    ) ??
-    Object.values(rawTranslations).find(isNonEmptyTranslation) ??
-    '';
-  return {
-    'en-SG': fallback,
-    'zh-Hans': rawTranslations['zh-Hans'] ?? null,
-    ms: rawTranslations.ms ?? null,
-    ta: rawTranslations.ta ?? null,
-  };
-}
 
 export async function buildDataset(
   referenceNow = nowSg(),
