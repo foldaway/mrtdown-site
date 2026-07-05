@@ -5,6 +5,7 @@ import {
 } from '@heroicons/react/16/solid';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
+import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { DropdownMenu } from 'radix-ui';
 import { useMemo } from 'react';
@@ -191,11 +192,11 @@ function HistoryMonthPage() {
             )}
           </span>
         </nav>
-        <header className="space-y-2 text-center">
-          <h1 className="font-bold text-2xl text-gray-900 leading-tight sm:text-3xl dark:text-gray-100">
+        <header className="flex flex-col items-center gap-1 text-center">
+          <h1 className="font-bold text-gray-900 text-xl leading-tight sm:text-2xl dark:text-gray-100">
             <FormattedMessage id="general.history" defaultMessage="History" />
           </h1>
-          <p className="mx-auto max-w-2xl text-base text-gray-600 leading-normal dark:text-gray-400">
+          <p className="mx-auto max-w-2xl text-gray-600 text-xs leading-4 sm:text-sm sm:leading-5 dark:text-gray-400">
             <FormattedMessage
               id="site.history.subtitle"
               defaultMessage="Past service disruptions and maintenance events"
@@ -350,13 +351,19 @@ function HistoryMonthPage() {
 
           {issuesByWeek.map((issueGroup) => (
             <div key={issueGroup.week} className="flex flex-col gap-y-4">
-              <h2 className="mb-4 border-gray-200 border-b pb-3 font-semibold text-gray-900 text-lg tracking-tight dark:border-gray-700 dark:text-gray-100">
-                <FormattedDateTimeRange
-                  from={DateTime.fromISO(issueGroup.week).toMillis()}
-                  to={DateTime.fromISO(issueGroup.week)
-                    .plus({ week: 1 })
-                    .toMillis()}
-                  dateStyle="long"
+              <h2 className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2 border-gray-200 border-b pb-3 font-semibold text-gray-900 text-lg tracking-tight dark:border-gray-700 dark:text-gray-100">
+                <span>
+                  <FormattedDateTimeRange
+                    from={DateTime.fromISO(issueGroup.week).toMillis()}
+                    to={DateTime.fromISO(issueGroup.week)
+                      .plus({ week: 1 })
+                      .toMillis()}
+                    dateStyle="long"
+                  />
+                </span>
+                <HistoryWeekRelativeIndicator
+                  isHydrated={isHydrated}
+                  week={issueGroup.week}
                 />
               </h2>
 
@@ -541,4 +548,83 @@ function HistoryMonthPage() {
       </div>
     </IncludedEntitiesContext.Provider>
   );
+}
+
+function HistoryWeekRelativeIndicator({
+  isHydrated,
+  week,
+}: {
+  isHydrated: boolean;
+  week: string;
+}) {
+  if (!isHydrated) {
+    return null;
+  }
+
+  const weekOffset = getHistoryWeekOffsetFromCurrentWeek(week);
+
+  if (weekOffset == null) {
+    return null;
+  }
+
+  return (
+    <span
+      className={classNames(
+        'shrink-0 rounded-full px-2.5 py-1 font-medium text-xs tracking-normal',
+        {
+          'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300':
+            weekOffset < 0,
+          'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200':
+            weekOffset === 0,
+          'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200':
+            weekOffset > 0,
+        },
+      )}
+    >
+      {weekOffset === 0 ? (
+        <FormattedMessage
+          id="history.week_relative_this"
+          defaultMessage="This Week"
+        />
+      ) : weekOffset === -1 ? (
+        <FormattedMessage
+          id="history.week_relative_last"
+          defaultMessage="Last Week"
+        />
+      ) : weekOffset === 1 ? (
+        <FormattedMessage
+          id="history.week_relative_next"
+          defaultMessage="Next Week"
+        />
+      ) : weekOffset < 0 ? (
+        <FormattedMessage
+          id="history.week_relative_ago"
+          defaultMessage="{count, plural, one {# week ago} other {# weeks ago}}"
+          values={{ count: Math.abs(weekOffset) }}
+        />
+      ) : (
+        <FormattedMessage
+          id="history.week_relative_later"
+          defaultMessage="in {count, plural, one {# week} other {# weeks}}"
+          values={{ count: weekOffset }}
+        />
+      )}
+    </span>
+  );
+}
+
+function getHistoryWeekOffsetFromCurrentWeek(week: string) {
+  const weekStart = DateTime.fromISO(week, {
+    zone: 'Asia/Singapore',
+  }).startOf('week');
+
+  if (!weekStart.isValid) {
+    return null;
+  }
+
+  const currentWeekStart = DateTime.now()
+    .setZone('Asia/Singapore')
+    .startOf('week');
+
+  return Math.round(weekStart.diff(currentWeekStart, 'weeks').weeks);
 }

@@ -17,7 +17,7 @@ const StatusLabels: Record<
   },
   all_lines_closed_for_day: {
     id: 'status.service_ended',
-    defaultMessage: 'Outside Service Hours',
+    defaultMessage: 'Off Hours',
   },
   some_lines_disrupted: {
     id: 'operator.status.some_lines_disrupted',

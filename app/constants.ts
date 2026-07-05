@@ -33,7 +33,7 @@ export const LineSummaryStatusLabels: Record<
   }),
   closed_for_day: defineMessage({
     id: 'status.service_ended',
-    defaultMessage: 'Outside Service Hours',
+    defaultMessage: 'Off Hours',
   }),
   future_service: defineMessage({
     id: 'status.future_service',

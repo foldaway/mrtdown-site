@@ -246,7 +246,7 @@ export const DateCardDetails: React.FC<
                 <span className="font-medium text-gray-700 capitalize dark:text-gray-200">
                   <FormattedMessage
                     id="status.service_ended"
-                    defaultMessage="Outside Service Hours"
+                    defaultMessage="Off Hours"
                   />
                 </span>
                 <span className="text-gray-600 dark:text-gray-300">

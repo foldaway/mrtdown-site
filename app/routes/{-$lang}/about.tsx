@@ -65,11 +65,11 @@ export const Route = createFileRoute('/{-$lang}/about')({
 function AboutPage() {
   return (
     <div className="flex flex-col space-y-8">
-      <header className="space-y-2 text-center">
-        <h1 className="font-bold text-2xl text-gray-900 leading-tight sm:text-3xl dark:text-gray-100">
+      <header className="flex flex-col items-center gap-1 text-center">
+        <h1 className="font-bold text-gray-900 text-xl leading-tight sm:text-2xl dark:text-gray-100">
           <FormattedMessage id="general.about" defaultMessage="About" />
         </h1>
-        <p className="mx-auto max-w-2xl text-base text-gray-600 leading-normal dark:text-gray-400">
+        <p className="mx-auto max-w-2xl text-gray-600 text-xs leading-4 sm:text-sm sm:leading-5 dark:text-gray-400">
           <FormattedMessage
             id="site.about.subtitle"
             defaultMessage="Learn more about our mission, data collection methods, and frequently asked questions"

@@ -172,18 +172,18 @@ function HomePage() {
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
-      <div className="flex flex-col space-y-6 sm:space-y-8">
-        <header className="flex flex-col items-center space-y-2 text-center">
-          <h1 className="max-w-72 font-bold text-2xl text-gray-900 leading-tight sm:max-w-none sm:text-3xl dark:text-gray-100">
+      <div className="flex flex-col space-y-5 sm:space-y-7">
+        <header className="flex flex-col items-center gap-1 text-center">
+          <h1 className="font-bold text-gray-900 text-xl leading-tight sm:text-2xl dark:text-gray-100">
             <FormattedMessage
               id="site.landing.title"
-              defaultMessage="Singapore MRT & LRT Service Status"
+              defaultMessage="Singapore MRT & LRT status"
             />
           </h1>
-          <p className="mx-auto max-w-64 text-base text-gray-600 leading-normal sm:max-w-none dark:text-gray-400">
+          <p className="max-w-64 text-gray-600 text-xs leading-4 sm:max-w-none sm:text-sm sm:leading-5 dark:text-gray-400">
             <FormattedMessage
               id="site.landing.subtitle"
-              defaultMessage="Real-time service updates and current disruptions"
+              defaultMessage="Live updates and disruptions"
             />
           </p>
         </header>
@@ -204,10 +204,10 @@ function HomePage() {
         )}
 
         {crowdReportsEnabled && (
-          <section className="flex flex-col gap-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-sky-900 dark:bg-sky-950/30">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-semibold text-base text-gray-900 dark:text-gray-100">
+          <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 sm:flex sm:justify-between sm:gap-4 sm:rounded-2xl sm:p-4 dark:border-sky-900 dark:bg-sky-950/30">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h2 className="font-semibold text-gray-900 text-sm leading-5 sm:text-base dark:text-gray-100">
                   <FormattedMessage
                     id="home.report_cta_title"
                     defaultMessage="Seeing a train delay?"
@@ -215,7 +215,7 @@ function HomePage() {
                 </h2>
                 <BetaBadge />
               </div>
-              <p className="mt-1 text-gray-600 text-sm leading-5 dark:text-gray-300">
+              <p className="mt-1 hidden text-gray-600 text-sm leading-5 sm:block dark:text-gray-300">
                 <FormattedMessage
                   id="home.report_cta_body"
                   defaultMessage="Share a community report for review. It stays separate from official service status."
@@ -224,7 +224,7 @@ function HomePage() {
             </div>
             <Link
               to="/{-$lang}/report"
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
+              className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-accent-light px-3 py-1.5 font-semibold text-sm text-white transition-colors hover:bg-accent-dark sm:min-h-10 sm:px-4 sm:py-2"
             >
               <FormattedMessage
                 id="home.report_cta"
@@ -295,7 +295,7 @@ function HomePage() {
               <span className="font-medium text-gray-600 text-sm dark:text-gray-400">
                 <FormattedMessage
                   id="status.service_ended"
-                  defaultMessage="Outside Service Hours"
+                  defaultMessage="Off Hours"
                 />
                 {' / '}
                 <FormattedMessage
@@ -313,10 +313,10 @@ function HomePage() {
 
 function HomePagePending() {
   return (
-    <div className="flex flex-col space-y-6 sm:space-y-8">
-      <header className="flex flex-col items-center space-y-2 text-center">
-        <div className="h-9 w-72 max-w-full animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
-        <div className="h-6 w-80 max-w-full animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+    <div className="flex flex-col space-y-5 sm:space-y-7">
+      <header className="flex flex-col items-center gap-1 text-center">
+        <div className="h-7 w-44 max-w-full animate-pulse rounded-md bg-gray-200 sm:h-8 dark:bg-gray-800" />
+        <div className="h-4 w-56 max-w-full animate-pulse rounded-md bg-gray-200 sm:h-5 sm:w-72 dark:bg-gray-800" />
       </header>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">

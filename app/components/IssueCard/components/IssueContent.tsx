@@ -1,8 +1,8 @@
 import { Link } from '@tanstack/react-router';
 import { useIntl } from 'react-intl';
-import type { Issue, IssueInterval } from '~/types';
 import { IssueSubtypeBadge } from '~/components/IssueSubtypeBadge';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import type { Issue, IssueInterval } from '~/types';
 import { IssueAffectedBranchPill } from '../../IssueAffectedBranchPill';
 import { IssueTimestamp } from './IssueTimestamp';
 
@@ -16,7 +16,7 @@ export const IssueContent: React.FC<Props> = (props) => {
   const intl = useIntl();
 
   return (
-    <div className="mt-2 flex flex-col sm:mt-2">
+    <div className="mt-0.5 flex flex-col">
       <Link
         className="mt-1.5 block hover:underline"
         to="/{-$lang}/issues/$issueId"
@@ -39,10 +39,13 @@ export const IssueContent: React.FC<Props> = (props) => {
         </div>
       </div>
 
-      <hr className="my-2 border-gray-100 dark:border-gray-700" />
+      <hr
+        className="my-2 border-gray-100 data-[has-subtypes=true]:block sm:hidden dark:border-gray-700"
+        data-has-subtypes={issue.subtypes.length > 0}
+      />
 
-      <div className="flex text-gray-500 text-xs dark:text-gray-400">
-        {issue.subtypes.length > 0 && (
+      {issue.subtypes.length > 0 && (
+        <div className="flex text-gray-500 text-xs dark:text-gray-400">
           <div className="flex flex-wrap items-center gap-1 text-gray-500 text-xs dark:text-gray-400">
             {issue.subtypes.map((subtype) => (
               <IssueSubtypeBadge
@@ -52,10 +55,13 @@ export const IssueContent: React.FC<Props> = (props) => {
               />
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="mt-2 flex text-gray-500 text-xs sm:mt-3 sm:hidden sm:pt-2 dark:text-gray-400">
+      <div
+        className="mt-2 flex text-gray-500 text-xs data-[has-subtypes=false]:mt-0 sm:mt-3 sm:hidden sm:pt-2 dark:text-gray-400"
+        data-has-subtypes={issue.subtypes.length > 0}
+      >
         <IssueTimestamp interval={interval} className="shrink-0" />
       </div>
     </div>

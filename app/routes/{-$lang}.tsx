@@ -77,23 +77,23 @@ function RouteComponent() {
     <QueryClientProvider client={queryClient}>
       <IntlProvider locale={lang ?? 'en-SG'} messages={messages}>
         <header className="sticky top-0 z-50 w-full border-gray-200/20 border-b bg-white/80 shadow-black/5 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-white/70 dark:border-gray-800/30 dark:bg-gray-950/80 dark:shadow-white/5 dark:supports-[backdrop-filter]:bg-gray-950/70">
-          <div className="mx-4 max-w-5xl lg:mx-auto">
-            <div className="flex h-18 items-center justify-between">
+          <div className="mx-3 max-w-5xl sm:mx-4 lg:mx-auto">
+            <div className="flex h-14 items-center justify-between sm:h-18">
               <div className="flex items-center space-x-6">
                 <Link
                   to="/{-$lang}"
-                  className="group flex items-center space-x-3 transition-transform duration-200 hover:scale-105"
+                  className="group flex items-center space-x-2 transition-transform duration-200 hover:scale-105 sm:space-x-3"
                 >
                   <div className="relative">
                     <img
                       src="/android-chrome-192x192.png"
                       alt="mrtdown logo"
-                      className="size-10 drop-shadow-sm"
+                      className="size-8 drop-shadow-sm sm:size-10"
                     />
                     <div className="-inset-1 absolute rounded-lg bg-gradient-to-r from-blue-500 to-green-500 opacity-0 blur transition-opacity group-hover:opacity-20" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="font-bold text-2xl text-gray-900 italic leading-tight transition-colors group-hover:text-accent-light dark:text-gray-100 dark:group-hover:text-accent-light">
+                    <span className="font-bold text-gray-900 text-xl italic leading-tight transition-colors group-hover:text-accent-light sm:text-2xl dark:text-gray-100 dark:group-hover:text-accent-light">
                       mrtdown
                     </span>
                   </div>
@@ -140,11 +140,11 @@ function RouteComponent() {
                     <DropdownMenu.Trigger asChild>
                       <button
                         type="button"
-                        className="group relative inline-flex items-center justify-center rounded-xl bg-gray-50/50 p-3 text-gray-600 transition-all duration-200 hover:bg-accent-light/10 hover:text-accent-light hover:shadow-accent-light/20 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-2 active:scale-95 dark:bg-gray-800/50 dark:text-gray-400 dark:hover:bg-accent-light/20 dark:hover:text-accent-light"
+                        className="group relative inline-flex size-10 items-center justify-center rounded-lg bg-gray-50/50 text-gray-600 transition-all duration-200 hover:bg-accent-light/10 hover:text-accent-light hover:shadow-accent-light/20 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-2 active:scale-95 sm:size-12 sm:rounded-xl dark:bg-gray-800/50 dark:text-gray-400 dark:hover:bg-accent-light/20 dark:hover:text-accent-light"
                       >
                         <span className="sr-only">Open main menu</span>
                         <div className="relative">
-                          <Bars3Icon className="size-6 transition-transform duration-200 group-hover:scale-110" />
+                          <Bars3Icon className="size-5 transition-transform duration-200 group-hover:scale-110 sm:size-6" />
                         </div>
                       </button>
                     </DropdownMenu.Trigger>

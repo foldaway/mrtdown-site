@@ -117,36 +117,39 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
         role={hasActivePanel ? 'group' : undefined}
         aria-label={line.id}
       >
-        <div className="mb-1.5 flex items-center">
+        <div className="mb-1.5 grid min-w-0 grid-cols-[minmax(0,_1fr)_auto] items-center gap-x-2">
           <Link
-            className="group flex items-center gap-x-1.5 overflow-hidden truncate font-bold text-base text-gray-700 dark:text-gray-200"
+            className="group flex min-w-0 items-center gap-x-1.5 overflow-hidden font-bold text-base text-gray-700 dark:text-gray-200"
             to="/{-$lang}/lines/$lineId"
             params={{ lineId: line.id }}
           >
             <span
-              className="rounded-sm px-2 py-0.5 font-semibold text-white text-xs"
+              className="shrink-0 rounded-sm px-2 py-0.5 font-semibold text-white text-xs"
               style={{ backgroundColor: line.color }}
             >
               {line.id}
             </span>
-            <span className="group-hover:underline">
+            <span className="min-w-0 truncate group-hover:underline">
               {getLocalizedTranslation(line.name, intl.locale)}
             </span>
           </Link>
-          <div className="flex grow justify-end truncate">
+          <div className="flex min-w-0 justify-end">
             <span
-              className={classNames('ms-auto truncate text-sm capitalize', {
-                'text-disruption-light dark:text-disruption-dark':
-                  status === 'ongoing_disruption',
-                'text-maintenance-light dark:text-maintenance-dark':
-                  status === 'ongoing_maintenance',
-                'text-infra-light dark:text-infra-dark':
-                  status === 'ongoing_infra',
-                'text-operational-light dark:text-operational-dark':
-                  status === 'normal',
-                'text-gray-400 dark:text-gray-500':
-                  status === 'closed_for_day' || status === 'future_service',
-              })}
+              className={classNames(
+                'whitespace-nowrap text-right text-sm capitalize leading-tight sm:truncate',
+                {
+                  'text-disruption-light dark:text-disruption-dark':
+                    status === 'ongoing_disruption',
+                  'text-maintenance-light dark:text-maintenance-dark':
+                    status === 'ongoing_maintenance',
+                  'text-infra-light dark:text-infra-dark':
+                    status === 'ongoing_infra',
+                  'text-operational-light dark:text-operational-dark':
+                    status === 'normal',
+                  'text-gray-400 dark:text-gray-500':
+                    status === 'closed_for_day' || status === 'future_service',
+                },
+              )}
             >
               <FormattedMessage {...LineSummaryStatusLabels[status]} />
             </span>

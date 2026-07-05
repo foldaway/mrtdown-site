@@ -28,7 +28,7 @@ export const IssueCard: React.FC<Props> = (props) => {
   return (
     <div
       className={classNames(
-        'flex shrink-0 flex-col rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-800 shadow-sm transition-all hover:border-gray-400 hover:shadow-md sm:px-6 sm:py-4 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500',
+        'flex shrink-0 flex-col rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-800 shadow-sm transition-all hover:border-gray-400 hover:shadow-md sm:px-6 sm:py-3.5 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500',
         className,
       )}
     >
