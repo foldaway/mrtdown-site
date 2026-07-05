@@ -6,6 +6,7 @@ import {
   createIntl,
   FormattedDate,
   FormattedMessage,
+  FormattedNumber,
   useIntl,
 } from 'react-intl';
 import { BetaBadge } from '~/components/BetaBadge';
@@ -24,6 +25,7 @@ import { buildSeoMetadata } from '~/helpers/seo';
 import type { Station } from '~/types';
 import { assert } from '~/util/assert';
 import type { LineBranch } from '~/util/db.queries';
+import { lineBranchHasEnded, lineBranchIsActiveOn } from '~/util/lineBranches';
 import { getLineProfileFn } from '~/util/lines.functions';
 import { CurrentStatusCard } from './components/CurrentStatusCard';
 import { LineSchematicCard } from './components/LineSchematicCard';
@@ -74,15 +76,15 @@ function countLineStations(
   included: { stations: Record<string, Station> },
   includePlanned: boolean,
 ) {
+  const referenceDate =
+    DateTime.now().setZone('Asia/Singapore').toISODate() ??
+    new Date().toISOString().slice(0, 10);
   const stationIds = new Set<string>();
   for (const branch of branches) {
-    if (
-      !includePlanned &&
-      (branch.startedAt == null || branch.endedAt != null)
-    ) {
+    if (!includePlanned && !lineBranchIsActiveOn(branch, referenceDate)) {
       continue;
     }
-    if (includePlanned && branch.endedAt != null) {
+    if (includePlanned && lineBranchHasEnded(branch, referenceDate)) {
       continue;
     }
 
@@ -94,7 +96,11 @@ function countLineStations(
       if (branchMembership == null) {
         continue;
       }
-      if (!includePlanned && branchMembership.endedAt != null) {
+      if (
+        !includePlanned &&
+        branchMembership.endedAt != null &&
+        branchMembership.endedAt < referenceDate
+      ) {
         continue;
       }
       stationIds.add(stationId);
@@ -257,91 +263,210 @@ function ComponentPage() {
     );
   }, [issueCountByType, intl]);
 
+  const totalIssueCount = useMemo(() => {
+    return Object.values(issueCountByType as Record<IssueType, number>).reduce(
+      (total, count) => total + count,
+      0,
+    );
+  }, [issueCountByType]);
+
   return (
     <IncludedEntitiesContext.Provider value={included}>
       <div className="grid grid-cols-1 gap-x-3 gap-y-5 md:grid-cols-12">
-        <div className="mb-8 overflow-hidden rounded-3xl border border-gray-600/60 bg-gradient-to-br from-gray-800 to-gray-900 shadow-2xl md:col-span-12">
-          <div className="relative p-4 md:p-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-            <div className="relative flex items-center gap-4">
-              <div className="flex-shrink-0">
-                <span
-                  className="inline-flex items-center justify-center rounded-xl px-3 py-2 font-bold text-sm text-white shadow-lg ring-2 ring-white/20"
-                  style={{ backgroundColor: line.color }}
-                >
-                  {line.id}
-                </span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="font-black text-2xl text-white leading-tight md:text-3xl">
-                  <FormattedMessage
-                    id="general.component_status.heading"
-                    defaultMessage="{componentName} outages in the last {dateCount} days"
-                    values={{
-                      componentName,
-                      dateCount: DATE_COUNT,
-                    }}
-                  />
-                </h1>
-                <div className="mt-4 rounded-lg bg-white/10 p-4 backdrop-blur-sm">
-                  <p className="text-gray-200 text-sm leading-relaxed">
-                    {line.startedAt != null &&
-                    DateTime.fromISO(line.startedAt).diffNow().as('days') <
-                      0 ? (
-                      <FormattedMessage
-                        id="general.component_description"
-                        defaultMessage="The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}, with {issueTypeCountString} reported to date."
-                        values={{
-                          stationCount,
-                          componentName,
-                          startDate: (
-                            <FormattedDate
-                              value={line.startedAt}
-                              day="numeric"
-                              month="long"
-                              year="numeric"
-                            />
-                          ),
-                          issueTypeCountString,
-                        }}
-                      />
-                    ) : (
-                      <FormattedMessage
-                        id="general.component_description_future"
-                        defaultMessage="The {componentName} will begin operations in the future. It has {stationCount, plural, one {# station} other {# stations}} planned, with {issueTypeCountString} reported to date."
-                        values={{
-                          stationCount,
-                          componentName,
-                          issueTypeCountString,
-                        }}
-                      />
-                    )}
-                  </p>
-                </div>
-                {crowdReportsEnabled && (
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <Link
-                      to="/{-$lang}/report"
-                      search={{ lineId }}
-                      className="inline-flex min-h-10 items-center justify-center rounded-lg bg-white px-4 py-2 font-semibold text-gray-900 text-sm transition-colors hover:bg-gray-100"
+        <div className="flex flex-col gap-3 md:col-span-12">
+          <header className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5 dark:border-gray-700 dark:bg-gray-800">
+            <div>
+              <div className="min-w-0">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="shrink-0 pt-0.5">
+                    <span
+                      className="inline-flex min-h-8 items-center justify-center rounded-md px-2.5 font-bold text-sm text-white shadow-sm"
+                      style={{ backgroundColor: line.color }}
                     >
-                      <FormattedMessage
-                        id="line.report_cta"
-                        defaultMessage="Report an issue on this line"
-                      />
-                    </Link>
-                    <span className="max-w-md text-gray-300 text-xs leading-5">
-                      <BetaBadge />{' '}
-                      <FormattedMessage
-                        id="line.report_cta_note"
-                        defaultMessage="Community reports are reviewed separately from official operator advisories."
-                      />
+                      {line.id}
                     </span>
                   </div>
-                )}
+                  <div className="min-w-0 flex-1">
+                    <h1 className="font-bold text-gray-900 text-xl leading-tight sm:text-2xl dark:text-gray-100">
+                      {componentName}
+                    </h1>
+                    <p className="mt-1 font-medium text-gray-700 text-sm leading-5 dark:text-gray-300">
+                      <FormattedMessage
+                        id="line.status_window.heading"
+                        defaultMessage="Outages in the last {dateCount} days"
+                        values={{
+                          dateCount: DATE_COUNT,
+                        }}
+                      />
+                    </p>
+                  </div>
+                </div>
+
+                <p className="mt-4 border-gray-200 border-t pt-3 text-gray-700 text-sm leading-6 dark:border-gray-700 dark:text-gray-300">
+                  {line.startedAt != null &&
+                  DateTime.fromISO(line.startedAt).diffNow().as('days') < 0 ? (
+                    <FormattedMessage
+                      id="general.component_description"
+                      defaultMessage="The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}, with {issueTypeCountString} reported to date."
+                      values={{
+                        stationCount,
+                        componentName,
+                        startDate: (
+                          <FormattedDate
+                            value={line.startedAt}
+                            day="numeric"
+                            month="long"
+                            year="numeric"
+                          />
+                        ),
+                        issueTypeCountString,
+                      }}
+                    />
+                  ) : (
+                    <FormattedMessage
+                      id="general.component_description_future"
+                      defaultMessage="The {componentName} will begin operations in the future. It has {stationCount, plural, one {# station} other {# stations}} planned, with {issueTypeCountString} reported to date."
+                      values={{
+                        stationCount,
+                        componentName,
+                        issueTypeCountString,
+                      }}
+                    />
+                  )}
+                </p>
+
+                <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-900/40">
+                  <p className="text-gray-700 text-sm sm:hidden dark:text-gray-300">
+                    <FormattedMessage
+                      id="line.summary.mobile_started"
+                      defaultMessage="Service began {startDate}"
+                      values={{
+                        startDate:
+                          line.startedAt != null ? (
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">
+                              <FormattedDate
+                                value={line.startedAt}
+                                day="numeric"
+                                month="long"
+                                year="numeric"
+                              />
+                            </span>
+                          ) : (
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">
+                              <FormattedMessage
+                                id="line.summary.future_service"
+                                defaultMessage="Future service"
+                              />
+                            </span>
+                          ),
+                      }}
+                    />
+                  </p>
+                  <p className="mt-1 text-gray-500 text-xs sm:hidden dark:text-gray-400">
+                    <FormattedMessage
+                      id="line.summary.mobile_counts"
+                      defaultMessage="{stationCount, plural, one {# station tracked} other {# stations tracked}} · {totalIssueCount, plural, one {# issue} other {# issues}} to date"
+                      values={{
+                        stationCount,
+                        totalIssueCount,
+                      }}
+                    />
+                  </p>
+
+                  <div className="hidden flex-col gap-2 sm:flex sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div className="inline-flex min-w-0 items-baseline gap-1.5 text-sm">
+                      <span className="shrink-0 font-medium text-gray-500 text-xs dark:text-gray-400">
+                        <FormattedMessage
+                          id="line.summary.started"
+                          defaultMessage="Started"
+                        />
+                      </span>
+                      <span className="truncate font-semibold text-gray-900 dark:text-gray-100">
+                        {line.startedAt != null ? (
+                          <FormattedDate
+                            value={line.startedAt}
+                            day="numeric"
+                            month="long"
+                            year="numeric"
+                          />
+                        ) : (
+                          <FormattedMessage
+                            id="line.summary.future_service"
+                            defaultMessage="Future service"
+                          />
+                        )}
+                      </span>
+                    </div>
+
+                    <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                      <div className="inline-flex items-baseline gap-1.5">
+                        <dt className="font-medium text-gray-500 dark:text-gray-400">
+                          <FormattedMessage
+                            id="line.summary.stations"
+                            defaultMessage="Stations"
+                          />
+                        </dt>
+                        <dd className="font-semibold text-gray-800 dark:text-gray-200">
+                          <FormattedNumber value={stationCount} />
+                        </dd>
+                      </div>
+                      <div className="inline-flex items-baseline gap-1.5">
+                        <dt className="font-medium text-gray-500 dark:text-gray-400">
+                          <FormattedMessage
+                            id="line.summary.reported"
+                            defaultMessage="Reported to date"
+                          />
+                        </dt>
+                        <dd className="font-semibold text-gray-800 dark:text-gray-200">
+                          <FormattedNumber value={totalIssueCount} />
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </header>
+
+          {crowdReportsEnabled && (
+            <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 sm:gap-4 sm:rounded-2xl sm:p-4 dark:border-sky-900 dark:bg-sky-950/30">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <h2 className="font-semibold text-gray-900 text-sm leading-5 sm:text-base dark:text-gray-100">
+                    <FormattedMessage
+                      id="line.report_cta_title"
+                      defaultMessage="Seeing an issue on this line?"
+                    />
+                  </h2>
+                  <BetaBadge />
+                </div>
+                <p className="mt-1 hidden text-gray-600 text-sm leading-5 sm:block dark:text-gray-300">
+                  <FormattedMessage
+                    id="line.report_cta_note"
+                    defaultMessage="Community reports are reviewed separately from official operator advisories."
+                  />
+                </p>
+              </div>
+              <Link
+                to="/{-$lang}/report"
+                search={{ lineId }}
+                className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-accent-light px-3 py-1.5 font-semibold text-sm text-white transition-colors hover:bg-accent-dark sm:min-h-10 sm:px-4 sm:py-2"
+              >
+                <span className="sm:hidden">
+                  <FormattedMessage
+                    id="line.report_cta_mobile"
+                    defaultMessage="Report issue"
+                  />
+                </span>
+                <span className="hidden sm:inline">
+                  <FormattedMessage
+                    id="line.report_cta"
+                    defaultMessage="Report an issue on this line"
+                  />
+                </span>
+              </Link>
+            </section>
+          )}
         </div>
 
         <UptimeCard

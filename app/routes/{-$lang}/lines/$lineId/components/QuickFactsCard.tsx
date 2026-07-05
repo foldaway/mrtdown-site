@@ -12,6 +12,7 @@ import {
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import type { LineBranch } from '~/util/db.queries';
+import { lineBranchHasEnded, lineBranchIsActiveOn } from '~/util/lineBranches';
 import type { Line } from '~/types';
 
 interface Props {
@@ -31,18 +32,18 @@ export const QuickFactsCard: React.FC<Props> = (props) => {
   }, []);
 
   const stationsCount = useMemo(() => {
+    const referenceDate =
+      DateTime.now().setZone('Asia/Singapore').toISODate() ??
+      new Date().toISOString().slice(0, 10);
     const stationIds = new Set<string>();
     const includePlanned =
       line.startedAt == null ||
       DateTime.fromISO(line.startedAt).diffNow().as('days') >= 0;
     for (const branch of branches) {
-      if (
-        !includePlanned &&
-        (branch.startedAt == null || branch.endedAt != null)
-      ) {
+      if (!includePlanned && !lineBranchIsActiveOn(branch, referenceDate)) {
         continue;
       }
-      if (includePlanned && branch.endedAt != null) {
+      if (includePlanned && lineBranchHasEnded(branch, referenceDate)) {
         continue;
       }
       for (const stationId of branch.stationIds) {

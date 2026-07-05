@@ -74,7 +74,7 @@ const ISSUE_TYPES = [
   'maintenance',
   'infra',
 ] as const satisfies readonly IssueType[];
-
+const SELECT_IN_BATCH_SIZE = 100;
 type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
 
 type DatasetLineBranch = {
@@ -204,6 +204,11 @@ type BaseDataset = {
   issuesByLineId: Record<string, IssueWithOperationalEffects[]>;
 };
 
+type OverviewDataset = Pick<
+  BaseDataset,
+  'included' | 'publicHolidaySet' | 'allIssues' | 'issuesByLineId'
+>;
+
 const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
 const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 30;
 let cachedBaseDataset:
@@ -213,6 +218,14 @@ let cachedBaseDataset:
     }
   | undefined;
 let pendingBaseDataset: Promise<BaseDataset> | undefined;
+const cachedOverviewDatasets = new Map<
+  number,
+  {
+    expiresAt: number;
+    value: OverviewDataset;
+  }
+>();
+const pendingOverviewDatasets = new Map<number, Promise<OverviewDataset>>();
 const dateTimeCache = new Map<string, DateTime>();
 const issueBoundsCache = new WeakMap<Issue, IssueIntervalBounds[]>();
 
@@ -1427,13 +1440,17 @@ async function buildDataset(
   const membershipByStationId: Record<string, Station['memberships']> = {};
 
   for (const [lineId, branches] of Object.entries(branchesByLineId)) {
-    const sortedBranches = sortLineBranchesForCurrentView(branches);
+    const sortedBranches = sortLineBranchesForCurrentView(
+      branches,
+      referenceDate,
+    );
     branchesByLineId[lineId] = sortedBranches;
     const line = linesById[lineId];
     if (line != null) {
       line.startedAt = deriveLineStartedAtFromBranches(
         line.startedAt,
         sortedBranches,
+        referenceDate,
       );
     }
 
@@ -1849,6 +1866,150 @@ async function getBaseDataset() {
   }
 }
 
+async function getOverviewIssueIds(
+  days: number,
+  referenceNow = nowSg(),
+  db?: AppDb,
+) {
+  const database = db ?? (await getDefaultDb());
+  const referenceDateTime = referenceNow.setZone(SG_TIMEZONE);
+  const rangeStart = referenceDateTime.startOf('day').minus({ days: days - 1 });
+  const rangeEnd = referenceDateTime.startOf('day').plus({ days: 1 });
+  const overlappingPeriodRows = await timeDbQuery(
+    'overview_q_overlapping_periods',
+    () =>
+      database
+        .select({
+          impact_event_id: impactEventPeriodsTable.impact_event_id,
+        })
+        .from(impactEventPeriodsTable)
+        .where(
+          sql`${impactEventPeriodsTable.start_at} < ${isoDateTime(rangeEnd)} and (${impactEventPeriodsTable.end_at} is null or ${impactEventPeriodsTable.end_at} > ${isoDateTime(rangeStart)})`,
+        ),
+  );
+  const overlappingPeriodEventIds = [
+    ...new Set(overlappingPeriodRows.map((row) => row.impact_event_id)),
+  ];
+  const overlappingPeriodEventRows = await timeDbQuery(
+    'overview_q_period_events_for_overlap',
+    () =>
+      selectByIdChunks(overlappingPeriodEventIds, (ids) =>
+        database
+          .select({
+            id: impactEventsTable.id,
+            issue_id: impactEventsTable.issue_id,
+            ts: impactEventsTable.ts,
+          })
+          .from(impactEventsTable)
+          .where(inArray(impactEventsTable.id, ids)),
+      ),
+  );
+  const overlappingPeriodEventIdSet = new Set(overlappingPeriodEventIds);
+  const candidateIssueIds = [
+    ...new Set(overlappingPeriodEventRows.map((event) => event.issue_id)),
+  ];
+  const periodEventRows = await timeDbQuery(
+    'overview_q_period_events_for_issues',
+    () =>
+      selectByIdChunks(candidateIssueIds, (ids) =>
+        database
+          .select({
+            id: impactEventsTable.id,
+            issue_id: impactEventsTable.issue_id,
+            ts: impactEventsTable.ts,
+          })
+          .from(impactEventsTable)
+          .where(
+            and(
+              eq(impactEventsTable.type, 'periods.set'),
+              inArray(impactEventsTable.issue_id, ids),
+            ),
+          ),
+      ),
+  );
+  const latestPeriodEventByIssueId = periodEventRows.reduce<
+    Record<string, (typeof periodEventRows)[number]>
+  >((acc, event) => {
+    const current = acc[event.issue_id];
+    if (current == null) {
+      acc[event.issue_id] = event;
+      return acc;
+    }
+
+    const tsDiff =
+      parseDateTime(event.ts).toMillis() - parseDateTime(current.ts).toMillis();
+    if (tsDiff > 0 || (tsDiff === 0 && event.id > current.id)) {
+      acc[event.issue_id] = event;
+    }
+    return acc;
+  }, {});
+  const issueIds = new Set<string>();
+  for (const event of Object.values(latestPeriodEventByIssueId)) {
+    if (overlappingPeriodEventIdSet.has(event.id)) {
+      issueIds.add(event.issue_id);
+    }
+  }
+
+  return [...issueIds];
+}
+
+async function buildOverviewDataset(
+  days: number,
+  referenceNow = nowSg(),
+  db?: AppDb,
+): Promise<OverviewDataset> {
+  return timeServerSpan('build_overview_dataset', async () => {
+    const database = db ?? (await getDefaultDb());
+    const issueIds = await timeServerSpan('overview_issue_candidates', () =>
+      getOverviewIssueIds(days, referenceNow, database),
+    );
+    const dataset = await buildDataset(referenceNow, database, issueIds);
+    return {
+      included: dataset.included,
+      publicHolidaySet: dataset.publicHolidaySet,
+      allIssues: dataset.allIssues,
+      issuesByLineId: dataset.issuesByLineId,
+    };
+  });
+}
+
+async function getOverviewDataset(days: number) {
+  const now = Date.now();
+  const cached = cachedOverviewDatasets.get(days);
+  if (cached != null && cached.expiresAt > now) {
+    recordServerTiming('overview_dataset', 0, 'cache=hit');
+    return cached.value;
+  }
+
+  const startedAt = performance.now();
+  const cacheState = pendingOverviewDatasets.has(days) ? 'pending' : 'miss';
+  let pending = pendingOverviewDatasets.get(days);
+  if (pending == null) {
+    pending = buildOverviewDataset(days)
+      .then((dataset) => {
+        cachedOverviewDatasets.set(days, {
+          expiresAt: Date.now() + BASE_DATASET_CACHE_TTL_MS,
+          value: dataset,
+        });
+        return dataset;
+      })
+      .finally(() => {
+        pendingOverviewDatasets.delete(days);
+      });
+    pendingOverviewDatasets.set(days, pending);
+  }
+
+  try {
+    return await pending;
+  } finally {
+    recordServerTiming(
+      'overview_dataset',
+      performance.now() - startedAt,
+      `cache=${cacheState}`,
+    );
+  }
+}
+
 async function getIncludedForIssueIds(issueIds: readonly string[]) {
   const dataset = await buildDataset(nowSg(), undefined, issueIds);
   return selectIncludedEntities(dataset.included, dataset.allIssues, {
@@ -1992,7 +2153,8 @@ export function buildLineSummary(
   publicHolidaySet: Set<string>,
   referenceNow = nowSg(),
 ): LineSummary {
-  const startDate = referenceNow.startOf('day').minus({ days: days - 1 });
+  const referenceDateTime = referenceNow.setZone(SG_TIMEZONE);
+  const startDate = referenceDateTime.startOf('day').minus({ days: days - 1 });
   const breakdownByDates: LineSummary['breakdownByDates'] = {};
   const downtimeIntervalsByIssueType = createIssueTypeIntervalGroups();
 
@@ -2019,9 +2181,12 @@ export function buildLineSummary(
         issue,
         dayWindow.start,
         dayWindow.end,
-        referenceNow,
+        referenceDateTime,
       );
-      const dayOverlap = sumIntervalSeconds(contributingBounds, referenceNow);
+      const dayOverlap = sumIntervalSeconds(
+        contributingBounds,
+        referenceDateTime,
+      );
 
       if (dayOverlap <= 0) {
         continue;
@@ -2046,7 +2211,7 @@ export function buildLineSummary(
 
     const dailyDurationSecondsByIssueType = sumIssueTypeIntervalGroups(
       dailyIntervalsByIssueType,
-      referenceNow,
+      referenceDateTime,
     );
     for (const issueType of ISSUE_TYPES) {
       const current = dayBreakdown.breakdownByIssueTypes[issueType];
@@ -2058,19 +2223,19 @@ export function buildLineSummary(
 
     totalDowntimeSeconds += sumIntervalSeconds(
       dailyDowntimeIntervals,
-      referenceNow,
+      referenceDateTime,
     );
 
     breakdownByDates[isoDate(date)] = dayBreakdown;
   }
 
   const activeNow = issues.filter((issue) =>
-    issueActiveNow(issue, referenceNow),
+    issueActiveNow(issue, referenceDateTime),
   );
   let status: LineSummaryStatus = 'normal';
-  if (isLineFuture(line, referenceNow)) {
+  if (isLineFuture(line, referenceDateTime)) {
     status = 'future_service';
-  } else if (!isLineOperatingNow(line, publicHolidaySet, referenceNow)) {
+  } else if (!isLineOperatingNow(line, publicHolidaySet, referenceDateTime)) {
     status = 'closed_for_day';
   } else if (
     activeNow.some(
@@ -2096,7 +2261,7 @@ export function buildLineSummary(
 
   const durationSecondsByIssueType = sumIssueTypeIntervalGroups(
     downtimeIntervalsByIssueType,
-    referenceNow,
+    referenceDateTime,
   );
 
   return {
@@ -2689,12 +2854,23 @@ function buildIssueDurationGraphs(issues: Issue[]) {
   });
 }
 
-function chunk<T>(items: T[], size: number) {
+function chunk<T>(items: readonly T[], size: number) {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+async function selectByIdChunks<T>(
+  ids: readonly string[],
+  selectBatch: (ids: string[]) => Promise<T[]>,
+) {
+  const rows: T[] = [];
+  for (const batch of chunk(ids, SELECT_IN_BATCH_SIZE)) {
+    rows.push(...(await selectBatch(batch)));
+  }
+  return rows;
 }
 
 function buildIssuesByLineId(issues: Iterable<IssueWithOperationalEffects>) {
@@ -3288,7 +3464,7 @@ export async function getOverviewData(
   options: CommunitySignalOptions = {},
 ) {
   return timeServerSpan('overview_data', async () => {
-    const dataset = await getBaseDataset();
+    const dataset = await getOverviewDataset(days);
     const issues = Object.values(dataset.allIssues);
     const lineSummaries = timeSyncServerSpan('overview_line_summaries', () =>
       rankLineSummaries(
