@@ -57,6 +57,7 @@ import {
   issueContributesToLineStatus,
 } from '~/util/issueOperationalEffects';
 import {
+  countLineStations,
   deriveLineStartedAtFromBranches,
   sortLineBranchesForCurrentView,
 } from '~/util/lineBranches';
@@ -3858,6 +3859,8 @@ export async function getLineProfileData(
   options: CommunitySignalOptions = {},
 ) {
   const dataset = await getBaseDataset();
+  const referenceNow = nowSg();
+  const referenceDate = isoDate(referenceNow);
   const line = dataset.included.lines[lineId];
   if (line == null) {
     throw new Response('Line not found', {
@@ -3922,6 +3925,13 @@ export async function getLineProfileData(
         parseDateTime(a.startAt).toMillis() -
         parseDateTime(b.startAt).toMillis(),
     )[0];
+  const includePlannedStations =
+    line.startedAt == null || parseDateTime(line.startedAt) > referenceNow;
+  const branches = dataset.branchesByLineId[lineId] ?? [];
+  const stationCount = countLineStations(dataset.included.stations, lineId, {
+    includePlanned: includePlannedStations,
+    referenceDate,
+  });
 
   const stationIdsInterchanges = [
     ...new Set(
@@ -3945,7 +3955,8 @@ export async function getLineProfileData(
   const profile = {
     lineId,
     lineSummary: rankedSummary,
-    branches: dataset.branchesByLineId[lineId] ?? [],
+    branches,
+    stationCount,
     issueIdNextMaintenance: futureMaintenance?.issueId ?? null,
     issueIdsRecent,
     issueCountByType: pickIssueTypes(lineIssues),

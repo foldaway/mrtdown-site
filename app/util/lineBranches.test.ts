@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  countLineStations,
   deriveLineStartedAtFromBranches,
   lineBranchHasEnded,
   lineBranchIsActiveOn,
@@ -100,5 +101,98 @@ describe('deriveLineStartedAtFromBranches', () => {
         '2026-07-04',
       ),
     ).toBe('2027-01-01');
+  });
+});
+
+describe('countLineStations', () => {
+  const stations = {
+    TE1: {
+      memberships: [{ lineId: 'TEL', startedAt: '2024-06-23' }],
+    },
+    TE2: {
+      memberships: [{ lineId: 'TEL', startedAt: '2024-06-23' }],
+    },
+    TE3: {
+      memberships: [{ lineId: 'TEL', startedAt: '2027-01-01' }],
+    },
+    TE4: {
+      memberships: [
+        {
+          lineId: 'TEL',
+          startedAt: '2010-01-01',
+          endedAt: '2024-01-01',
+        },
+      ],
+    },
+    EW1: {
+      memberships: [{ lineId: 'EWL', startedAt: '1987-12-12' }],
+    },
+  };
+
+  it('counts only active station memberships for lines already in service', () => {
+    expect(
+      countLineStations(stations, 'TEL', {
+        includePlanned: false,
+        referenceDate: '2026-07-04',
+      }),
+    ).toBe(2);
+  });
+
+  it('counts planned station memberships for future lines without including retired stations', () => {
+    expect(
+      countLineStations(stations, 'TEL', {
+        includePlanned: true,
+        referenceDate: '2026-07-04',
+      }),
+    ).toBe(3);
+  });
+
+  it('counts all planned line-code stations when selected future service paths are staged', () => {
+    const jrlStations = Object.fromEntries(
+      [
+        'JS1',
+        'JS2',
+        'JS2A',
+        'JS3',
+        'JS4',
+        'JS5',
+        'JS6',
+        'JS7',
+        'JS8',
+        'JS9',
+        'JS10',
+        'JS11',
+        'JS12',
+        'JE1',
+        'JE2',
+        'JE3',
+        'JE4',
+        'JE5',
+        'JE6',
+        'JE7',
+        'JW1',
+        'JW2',
+        'JW3',
+        'JW4',
+        'JW5',
+      ].map((code) => [
+        code,
+        {
+          memberships: [
+            {
+              lineId: 'JRL',
+              startedAt: code === 'JS2A' ? '2035-01-01' : '2028-06-30',
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(
+      countLineStations(jrlStations, 'JRL', {
+        includePlanned: true,
+        referenceDate: '2026-07-04',
+      }),
+    ).toBe(25);
   });
 });

@@ -3,6 +3,14 @@ type LineBranchLifecycleFields = {
   endedAt: string | null;
 };
 
+type LineStationCountStation = {
+  memberships: readonly {
+    lineId: string;
+    startedAt: string;
+    endedAt?: string | null;
+  }[];
+};
+
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -74,4 +82,28 @@ export function deriveLineStartedAtFromBranches(
   }
 
   return lineStartedAt;
+}
+
+export function countLineStations(
+  stationsById: Record<string, LineStationCountStation>,
+  lineId: string,
+  {
+    includePlanned,
+    referenceDate = todayIsoDate(),
+  }: {
+    includePlanned: boolean;
+    referenceDate?: string;
+  },
+) {
+  return Object.values(stationsById).filter((station) =>
+    station.memberships.some((membership) => {
+      if (membership.lineId !== lineId) {
+        return false;
+      }
+      if (membership.endedAt != null && membership.endedAt < referenceDate) {
+        return false;
+      }
+      return includePlanned || membership.startedAt <= referenceDate;
+    }),
+  ).length;
 }

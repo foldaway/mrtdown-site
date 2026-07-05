@@ -22,10 +22,7 @@ import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildSeoMetadata } from '~/helpers/seo';
-import type { Station } from '~/types';
 import { assert } from '~/util/assert';
-import type { LineBranch } from '~/util/db.queries';
-import { lineBranchHasEnded, lineBranchIsActiveOn } from '~/util/lineBranches';
 import { getLineProfileFn } from '~/util/lines.functions';
 import { CurrentStatusCard } from './components/CurrentStatusCard';
 import { LineSchematicCard } from './components/LineSchematicCard';
@@ -71,44 +68,6 @@ function lineHasStarted<T extends { startedAt: string | null }>(
   );
 }
 
-function countLineStations(
-  branches: LineBranch[],
-  included: { stations: Record<string, Station> },
-  includePlanned: boolean,
-) {
-  const referenceDate =
-    DateTime.now().setZone('Asia/Singapore').toISODate() ??
-    new Date().toISOString().slice(0, 10);
-  const stationIds = new Set<string>();
-  for (const branch of branches) {
-    if (!includePlanned && !lineBranchIsActiveOn(branch, referenceDate)) {
-      continue;
-    }
-    if (includePlanned && lineBranchHasEnded(branch, referenceDate)) {
-      continue;
-    }
-
-    for (const stationId of branch.stationIds) {
-      const station = included.stations[stationId];
-      const branchMembership = station?.memberships.find(
-        (membership) => membership.branchId === branch.id,
-      );
-      if (branchMembership == null) {
-        continue;
-      }
-      if (
-        !includePlanned &&
-        branchMembership.endedAt != null &&
-        branchMembership.endedAt < referenceDate
-      ) {
-        continue;
-      }
-      stationIds.add(stationId);
-    }
-  }
-  return stationIds.size;
-}
-
 export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
   component: ComponentPage,
   loader: ({ params }) =>
@@ -117,7 +76,7 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
     const { lineId, lang = 'en-SG' } = ctx.params;
     assert(ctx.loaderData != null);
     const { data: lineProfile, included } = ctx.loaderData;
-    const { branches, issueCountByType } = lineProfile;
+    const { branches, issueCountByType, stationCount } = lineProfile;
     const line = included.lines[lineId];
     const componentName = getLocalizedTranslation(line.name, lang);
 
@@ -152,7 +111,7 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
               'The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}, with {issueTypeCountString} reported to date.',
           },
           {
-            stationCount: countLineStations(branches, included, false),
+            stationCount,
             componentName,
             startDate: intl.formatDate(line.startedAt, {
               day: 'numeric',
@@ -169,7 +128,7 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
               'The {componentName} will begin operations in the future. It has {stationCount, plural, one {# station} other {# stations}} planned, with {issueTypeCountString} reported to date.',
           },
           {
-            stationCount: countLineStations(branches, included, true),
+            stationCount,
             componentName,
             issueTypeCountString,
           },
@@ -245,16 +204,12 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
 function ComponentPage() {
   const loaderData = Route.useLoaderData();
   const { data: lineProfile, included } = loaderData;
-  const { lineId, branches, issueCountByType } = lineProfile;
+  const { lineId, branches, issueCountByType, stationCount } = lineProfile;
   const line = included.lines[lineId];
 
   const intl = useIntl();
   const crowdReportsEnabled = useCrowdReportsFeatureEnabled();
   const componentName = getLocalizedTranslation(line.name, intl.locale);
-
-  const stationCount = useMemo(() => {
-    return countLineStations(branches, included, !lineHasStarted(line));
-  }, [branches, included, line]);
 
   const issueTypeCountString = useMemo(() => {
     return buildIssueTypeCountString(
@@ -492,7 +447,7 @@ function ComponentPage() {
 
         <LineSchematicCard line={line} branches={branches} />
 
-        <QuickFactsCard line={line} branches={branches} />
+        <QuickFactsCard line={line} stationCount={stationCount} />
 
         <DeferredViewportWidget
           className="md:col-span-4"
