@@ -57,6 +57,25 @@ export type IncludedEntities = {
   operators: Record<string, CoreOperator>;
 };
 
+export type AdvisorySummaryBucketId =
+  | 'now'
+  | 'later_today'
+  | 'this_week'
+  | 'background';
+
+export type AdvisorySummaryBucket = {
+  id: AdvisorySummaryBucketId;
+  issueIds: string[];
+  count: number;
+};
+
+export type AdvisorySummary = {
+  generatedAt: string;
+  windowStart: string;
+  windowEnd: string;
+  buckets: AdvisorySummaryBucket[];
+};
+
 export type LineSummaryStatus =
   | 'future_service'
   | 'closed_for_day'

@@ -152,14 +152,6 @@ function HomePage() {
     return results;
   }, [dateCount]);
 
-  const issuesActiveNow = useMemo(() => {
-    return overview.issueIdsActiveNow.map((issueId) => issues[issueId]);
-  }, [overview.issueIdsActiveNow, issues]);
-
-  const issuesActiveToday = useMemo(() => {
-    return overview.issueIdsActiveToday.map((issueId) => issues[issueId]);
-  }, [overview.issueIdsActiveToday, issues]);
-
   const lineOperationalCount = useMemo(() => {
     return countOperationalLineSummaries({
       lineSummaries: overview.lineSummaries,
@@ -189,8 +181,8 @@ function HomePage() {
         </header>
 
         <CurrentAdvisoriesSection
-          issuesActiveNow={issuesActiveNow}
-          issuesActiveToday={issuesActiveToday}
+          advisorySummary={overview.advisorySummary}
+          issuesById={issues}
           lineOperationalCount={lineOperationalCount}
         />
 

@@ -158,8 +158,8 @@ function SystemMapPage() {
           </p>
         </header>
         <CurrentAdvisoriesSection
-          issuesActiveNow={issuesActiveNow}
-          issuesActiveToday={issuesActiveToday}
+          advisorySummary={overview.advisorySummary}
+          issuesById={included.issues}
           lineOperationalCount={lineOperationalCount}
         />
 
