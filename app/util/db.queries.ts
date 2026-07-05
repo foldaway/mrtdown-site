@@ -130,6 +130,7 @@ const ADVISORY_SUMMARY_BUCKET_IDS: AdvisorySummaryBucketId[] = [
 const LONG_RUNNING_ADVISORY_INTERVAL_DAYS = 14;
 const LONG_RUNNING_ADVISORY_SPAN_DAYS = 30;
 const SOON_ADVISORY_HOURS = 48;
+const ROOT_LAST_UPDATED_METADATA_KEY = 'manifest_last_pulled_at';
 const ACTIONABLE_SERVICE_EFFECTS = new Set<ServiceEffectKind>([
   'no-service',
   'reduced-service',
@@ -3744,7 +3745,14 @@ export async function getRootData() {
               .orderBy(asc(linesTable.id)),
           ),
           timeDbQuery('root_q_metadata', () =>
-            db.select().from(metadataTable).orderBy(asc(metadataTable.key)),
+            db
+              .select({
+                key: metadataTable.key,
+                value: metadataTable.value,
+              })
+              .from(metadataTable)
+              .where(eq(metadataTable.key, ROOT_LAST_UPDATED_METADATA_KEY))
+              .limit(1),
           ),
           timeDbQuery('root_q_operators', () =>
             db
