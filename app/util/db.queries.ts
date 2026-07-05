@@ -2146,6 +2146,34 @@ export function selectIncludedEntities(
   };
 }
 
+export function resolveStationProfileStationId(
+  included: { stations: Record<string, Pick<Station, 'id' | 'memberships'>> },
+  stationIdOrCode: string,
+) {
+  if (included.stations[stationIdOrCode] != null) {
+    return stationIdOrCode;
+  }
+
+  const aliasMatches = Object.values(included.stations)
+    .flatMap((station) =>
+      station.memberships
+        .filter((membership) => membership.code === stationIdOrCode)
+        .map((membership) => ({
+          lineId: membership.lineId,
+          stationId: station.id,
+        })),
+    )
+    .sort((a, b) => {
+      const lineDiff = a.lineId.localeCompare(b.lineId);
+      if (lineDiff !== 0) {
+        return lineDiff;
+      }
+      return a.stationId.localeCompare(b.stationId);
+    });
+
+  return aliasMatches[0]?.stationId ?? null;
+}
+
 export function buildLineSummary(
   line: Line,
   issues: IssueWithOperationalEffects[],
@@ -3691,7 +3719,18 @@ export async function getStationProfileData(
   options: CommunitySignalOptions = {},
 ) {
   const dataset = await getBaseDataset();
-  const station = dataset.included.stations[stationId];
+  const resolvedStationId = resolveStationProfileStationId(
+    dataset.included,
+    stationId,
+  );
+  if (resolvedStationId == null) {
+    throw new Response('Station not found', {
+      status: 404,
+      statusText: 'Not Found',
+    });
+  }
+
+  const station = dataset.included.stations[resolvedStationId];
   if (station == null) {
     throw new Response('Station not found', {
       status: 404,
@@ -3701,7 +3740,7 @@ export async function getStationProfileData(
 
   const issues = Object.values(dataset.allIssues).filter((issue) =>
     issue.branchesAffected.some((branch) =>
-      branch.stationIds.includes(stationId),
+      branch.stationIds.includes(resolvedStationId),
     ),
   );
   const activeNow = issues.filter((issue) => issueActiveNow(issue));
@@ -3720,12 +3759,12 @@ export async function getStationProfileData(
     dataset.allIssues,
   ).slice(0, 15);
   const communitySignals = await getPageCommunitySignals(options, {
-    stationId,
+    stationId: resolvedStationId,
   });
 
   return {
     data: {
-      stationId,
+      stationId: resolvedStationId,
       status,
       issueIdsRecent,
       issueCountByType: pickIssueTypes(issues),
@@ -3737,7 +3776,7 @@ export async function getStationProfileData(
         ...new Set(communitySignals.flatMap((signal) => signal.lineIds)),
       ],
       stationIds: [
-        stationId,
+        resolvedStationId,
         ...new Set(communitySignals.flatMap((signal) => signal.stationIds)),
       ],
       includeStationDetailEntities: true,
