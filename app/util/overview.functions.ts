@@ -1,11 +1,6 @@
-import { env } from 'cloudflare:workers';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
 import { HOME_OVERVIEW_INITIAL_DATE_COUNT } from '~/constants';
-import {
-  type CrowdReportFeatureEnv,
-  isCrowdReportsFeatureEnabled,
-} from './crowdReportFeatureFlag';
 import { getOverviewData } from './db.queries';
 import { timeServerSpan } from './serverTiming';
 
@@ -21,10 +16,7 @@ export const getOverviewFn = createServerFn({ method: 'GET' })
       'overview_loader',
       () =>
         getOverviewData(days, {
-          includeCommunitySignals: isCrowdReportsFeatureEnabled(
-            env as CrowdReportFeatureEnv,
-            { isLocalDev: import.meta.env.DEV },
-          ),
+          includeCommunitySignals: true,
         }),
       `days=${days}`,
     );

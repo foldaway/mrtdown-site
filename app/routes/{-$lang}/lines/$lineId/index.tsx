@@ -18,7 +18,6 @@ import {
   ProfileSystemMapCardSkeleton,
   ProfileTrendCardSkeleton,
 } from '~/components/ProfileWidgetSkeletons';
-import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildSeoMetadata } from '~/helpers/seo';
@@ -208,7 +207,6 @@ function ComponentPage() {
   const line = included.lines[lineId];
 
   const intl = useIntl();
-  const crowdReportsEnabled = useCrowdReportsFeatureEnabled();
   const componentName = getLocalizedTranslation(line.name, intl.locale);
 
   const issueTypeCountString = useMemo(() => {
@@ -383,45 +381,43 @@ function ComponentPage() {
             </div>
           </header>
 
-          {crowdReportsEnabled && (
-            <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 sm:gap-4 sm:rounded-2xl sm:p-4 dark:border-sky-900 dark:bg-sky-950/30">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <h2 className="font-semibold text-gray-900 text-sm leading-5 sm:text-base dark:text-gray-100">
-                    <FormattedMessage
-                      id="line.report_cta_title"
-                      defaultMessage="Seeing an issue on this line?"
-                    />
-                  </h2>
-                  <BetaBadge />
-                </div>
-                <p className="mt-1 hidden text-gray-600 text-sm leading-5 sm:block dark:text-gray-300">
+          <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 sm:gap-4 sm:rounded-2xl sm:p-4 dark:border-sky-900 dark:bg-sky-950/30">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h2 className="font-semibold text-gray-900 text-sm leading-5 sm:text-base dark:text-gray-100">
                   <FormattedMessage
-                    id="line.report_cta_note"
-                    defaultMessage="Community reports are reviewed separately from official operator advisories."
+                    id="line.report_cta_title"
+                    defaultMessage="Seeing an issue on this line?"
                   />
-                </p>
+                </h2>
+                <BetaBadge />
               </div>
-              <Link
-                to="/{-$lang}/report"
-                search={{ lineId }}
-                className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-accent-light px-3 py-1.5 font-semibold text-sm text-white transition-colors hover:bg-accent-dark sm:min-h-10 sm:px-4 sm:py-2"
-              >
-                <span className="sm:hidden">
-                  <FormattedMessage
-                    id="line.report_cta_mobile"
-                    defaultMessage="Report issue"
-                  />
-                </span>
-                <span className="hidden sm:inline">
-                  <FormattedMessage
-                    id="line.report_cta"
-                    defaultMessage="Report an issue on this line"
-                  />
-                </span>
-              </Link>
-            </section>
-          )}
+              <p className="mt-1 hidden text-gray-600 text-sm leading-5 sm:block dark:text-gray-300">
+                <FormattedMessage
+                  id="line.report_cta_note"
+                  defaultMessage="Community reports are reviewed separately from official operator advisories."
+                />
+              </p>
+            </div>
+            <Link
+              to="/{-$lang}/report"
+              search={{ lineId }}
+              className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-accent-light px-3 py-1.5 font-semibold text-sm text-white transition-colors hover:bg-accent-dark sm:min-h-10 sm:px-4 sm:py-2"
+            >
+              <span className="sm:hidden">
+                <FormattedMessage
+                  id="line.report_cta_mobile"
+                  defaultMessage="Report issue"
+                />
+              </span>
+              <span className="hidden sm:inline">
+                <FormattedMessage
+                  id="line.report_cta"
+                  defaultMessage="Report an issue on this line"
+                />
+              </span>
+            </Link>
+          </section>
         </div>
 
         <UptimeCard
@@ -431,7 +427,7 @@ function ComponentPage() {
 
         <CurrentStatusCard lineSummary={lineProfile.lineSummary} />
 
-        {crowdReportsEnabled && lineProfile.communitySignals.length > 0 && (
+        {lineProfile.communitySignals.length > 0 && (
           <DeferredViewportWidget
             className="md:col-span-12"
             fallback={<CommunitySignalsSectionSkeleton />}

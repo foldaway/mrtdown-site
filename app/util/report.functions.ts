@@ -1,4 +1,3 @@
-import { env } from 'cloudflare:workers';
 import type { Translations } from '@mrtdown/core';
 import { createServerFn } from '@tanstack/react-start';
 import { and, asc, eq } from 'drizzle-orm';
@@ -12,10 +11,6 @@ import {
   stationCodesTable,
   stationsTable,
 } from '~/db/schema';
-import {
-  type CrowdReportFeatureEnv,
-  isCrowdReportsFeatureEnabled,
-} from './crowdReportFeatureFlag';
 import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
 const SG_TIMEZONE = 'Asia/Singapore';
@@ -286,17 +281,6 @@ export function buildCrowdReportFormOptions({
 export const getCrowdReportFormOptionsFn = createServerFn({
   method: 'GET',
 }).handler(async () => {
-  if (
-    !isCrowdReportsFeatureEnabled(env as CrowdReportFeatureEnv, {
-      isLocalDev: import.meta.env.DEV,
-    })
-  ) {
-    throw new Response('Not Found', {
-      status: 404,
-      statusText: 'Not Found',
-    });
-  }
-
   const db = getDb();
   const referenceDate =
     DateTime.now().setZone(SG_TIMEZONE).toISODate() ??

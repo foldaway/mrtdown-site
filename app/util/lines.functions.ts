@@ -1,10 +1,5 @@
-import { env } from 'cloudflare:workers';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
-import {
-  type CrowdReportFeatureEnv,
-  isCrowdReportsFeatureEnabled,
-} from './crowdReportFeatureFlag';
 import { getLineProfileData } from './db.queries';
 
 const InputSchema = z.object({
@@ -16,9 +11,6 @@ export const getLineProfileFn = createServerFn({ method: 'GET' })
   .inputValidator((val) => InputSchema.parse(val))
   .handler(async (val) => {
     return getLineProfileData(val.data.lineId, val.data.days, {
-      includeCommunitySignals: isCrowdReportsFeatureEnabled(
-        env as CrowdReportFeatureEnv,
-        { isLocalDev: import.meta.env.DEV },
-      ),
+      includeCommunitySignals: true,
     });
   });

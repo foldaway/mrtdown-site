@@ -9,7 +9,6 @@ import { LineSummaryBlock } from '~/components/LineSummaryBlock';
 import { CommunitySignalsSectionSkeleton } from '~/components/ProfileWidgetSkeletons';
 import { HOME_OVERVIEW_INITIAL_DATE_COUNT, LANGUAGES } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
-import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { buildSeoMetadata } from '~/helpers/seo';
 import { useViewport } from '~/hooks/useViewport';
@@ -139,7 +138,6 @@ function HomePage() {
       : loaderData;
   const { overview, included, dateCount } = activeData;
   const { issues } = included;
-  const crowdReportsEnabled = useCrowdReportsFeatureEnabled();
 
   const dateTimes = useMemo(() => {
     const dateRangeEnd = DateTime.now()
@@ -186,7 +184,7 @@ function HomePage() {
           lineOperationalCount={lineOperationalCount}
         />
 
-        {crowdReportsEnabled && overview.communitySignals.length > 0 && (
+        {overview.communitySignals.length > 0 && (
           <DeferredViewportWidget
             className="block"
             fallback={<CommunitySignalsSectionSkeleton />}
@@ -195,36 +193,34 @@ function HomePage() {
           </DeferredViewportWidget>
         )}
 
-        {crowdReportsEnabled && (
-          <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 sm:flex sm:justify-between sm:gap-4 sm:rounded-2xl sm:p-4 dark:border-sky-900 dark:bg-sky-950/30">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <h2 className="font-semibold text-gray-900 text-sm leading-5 sm:text-base dark:text-gray-100">
-                  <FormattedMessage
-                    id="home.report_cta_title"
-                    defaultMessage="Seeing a train delay?"
-                  />
-                </h2>
-                <BetaBadge />
-              </div>
-              <p className="mt-1 hidden text-gray-600 text-sm leading-5 sm:block dark:text-gray-300">
+        <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 sm:flex sm:justify-between sm:gap-4 sm:rounded-2xl sm:p-4 dark:border-sky-900 dark:bg-sky-950/30">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 className="font-semibold text-gray-900 text-sm leading-5 sm:text-base dark:text-gray-100">
                 <FormattedMessage
-                  id="home.report_cta_body"
-                  defaultMessage="Share a community report for review. It stays separate from official service status."
+                  id="home.report_cta_title"
+                  defaultMessage="Seeing a train delay?"
                 />
-              </p>
+              </h2>
+              <BetaBadge />
             </div>
-            <Link
-              to="/{-$lang}/report"
-              className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-accent-light px-3 py-1.5 font-semibold text-sm text-white transition-colors hover:bg-accent-dark sm:min-h-10 sm:px-4 sm:py-2"
-            >
+            <p className="mt-1 hidden text-gray-600 text-sm leading-5 sm:block dark:text-gray-300">
               <FormattedMessage
-                id="home.report_cta"
-                defaultMessage="Submit report"
+                id="home.report_cta_body"
+                defaultMessage="Share a community report for review. It stays separate from official service status."
               />
-            </Link>
-          </section>
-        )}
+            </p>
+          </div>
+          <Link
+            to="/{-$lang}/report"
+            className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-accent-light px-3 py-1.5 font-semibold text-sm text-white transition-colors hover:bg-accent-dark sm:min-h-10 sm:px-4 sm:py-2"
+          >
+            <FormattedMessage
+              id="home.report_cta"
+              defaultMessage="Submit report"
+            />
+          </Link>
+        </section>
 
         <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div className="flex flex-col gap-y-4 px-2 py-2 sm:gap-y-6 sm:px-3 sm:py-4">

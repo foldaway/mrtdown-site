@@ -18,7 +18,6 @@ import {
 } from '~/components/ProfileWidgetSkeletons';
 import { StationBar } from '~/components/StationBar';
 import { LineTypeLabels, StationStructureTypeLabels } from '~/constants';
-import { useCrowdReportsFeatureEnabled } from '~/contexts/CrowdReportsFeature';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
@@ -214,7 +213,6 @@ function StationPage() {
   const { data: stationProfile, included } = loaderData;
   const station = included.stations[stationProfile.stationId];
   const intl = useIntl();
-  const crowdReportsEnabled = useCrowdReportsFeatureEnabled();
   const stationName = getLocalizedTranslation(station.name, intl.locale);
   const stationDefaultName = getLocalizedTranslation(station.name, 'en-SG');
   const isHydrated = useHydrated();
@@ -317,25 +315,23 @@ function StationPage() {
                     />
                   </span>
                 </div>
-                {crowdReportsEnabled && (
-                  <Link
-                    to="/{-$lang}/report"
-                    search={{ stationId: station.id }}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
-                  >
-                    <FormattedMessage
-                      id="station.report_cta"
-                      defaultMessage="Report issue here"
-                    />
-                    <BetaBadge />
-                  </Link>
-                )}
+                <Link
+                  to="/{-$lang}/report"
+                  search={{ stationId: station.id }}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
+                >
+                  <FormattedMessage
+                    id="station.report_cta"
+                    defaultMessage="Report issue here"
+                  />
+                  <BetaBadge />
+                </Link>
               </div>
             </div>
           </div>
         </div>
 
-        {crowdReportsEnabled && stationProfile.communitySignals.length > 0 && (
+        {stationProfile.communitySignals.length > 0 && (
           <DeferredViewportWidget
             className="block"
             fallback={<CommunitySignalsSectionSkeleton />}

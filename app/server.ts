@@ -10,10 +10,6 @@ import {
   shouldCachePublicHtml,
   storePublicHtmlResponse,
 } from './util/publicHtmlCache';
-import {
-  type CrowdReportFeatureEnv,
-  isCrowdReportsFeatureEnabled,
-} from './util/crowdReportFeatureFlag';
 import { getUnsupportedAgentMarkdownResponse } from './util/agentMarkdown';
 import {
   addSentryAnonymousUserCookie,
@@ -43,10 +39,8 @@ async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
     );
   }
 
-  const shouldUsePublicHtmlCache = !shouldBypassPublicHtmlCacheForCrowdReports(
-    request,
-    _env,
-  );
+  const shouldUsePublicHtmlCache =
+    !shouldBypassPublicHtmlCacheForCrowdReports(request);
   const cachedResponse = shouldUsePublicHtmlCache
     ? await getCachedPublicHtmlResponse(request)
     : null;
@@ -179,14 +173,8 @@ function sanitizeDiagnosticHeader(value: string) {
   return value.replace(/[\r\n]/g, ' ').slice(0, 180);
 }
 
-function shouldBypassPublicHtmlCacheForCrowdReports(
-  request: Request,
-  env: CrowdReportFeatureEnv,
-) {
-  return (
-    isCrowdReportsFeatureEnabled(env, { isLocalDev: import.meta.env.DEV }) &&
-    isCommunitySignalPublicPath(new URL(request.url).pathname)
-  );
+function shouldBypassPublicHtmlCacheForCrowdReports(request: Request) {
+  return isCommunitySignalPublicPath(new URL(request.url).pathname);
 }
 
 function addResponseInstrumentationHeaders(
