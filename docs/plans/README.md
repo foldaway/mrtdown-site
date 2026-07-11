@@ -29,6 +29,8 @@ Use plans for:
 
 - [Crowdsourced reports](completed/crowdsourced-reports.md): site-local public
   report collection, moderation, clustering, and canonical ingest dispatch.
+- [Fly.io migration](completed/fly-migration.md): migration from Cloudflare
+  Workers to a Fly-hosted Node runtime with Upstash workflows and Redis.
 - [Markdown for agents](completed/markdown-for-agents.md): `llms.txt` and
   app-owned Markdown alternatives for agents and scrapers.
 - [Overhaul read model](completed/overhaul-read-model.md): local
