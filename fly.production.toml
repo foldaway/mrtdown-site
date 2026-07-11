@@ -1,0 +1,32 @@
+# fly.toml app configuration file generated for mrtdown-site on 2026-07-06T23:38:29+08:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'mrtdown-site'
+primary_region = 'sin'
+swap_size_mb = 512
+
+[build]
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '15s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/healthz'
+    protocol = 'http'
+
+[[vm]]
+  size = 'shared-cpu-2x'
+  memory = '512mb'
+  cpus = 2
+  memory_mb = 512
