@@ -110,6 +110,15 @@ export const metadataTable = pgTable('metadata', {
   value: text('value').notNull(),
 });
 
+export const workflowLeasesTable = pgTable('workflow_leases', {
+  key: text('key').primaryKey(),
+  owner: text('owner').notNull(),
+  expires_at: timestamp('expires_at', {
+    withTimezone: true,
+    mode: 'string',
+  }).notNull(),
+});
+
 /** Staging for pull workflow — no FKs; JSONB holds nested child data. */
 export const operatorsNextTable = pgTable('operators_next', {
   id: text('id').primaryKey(),

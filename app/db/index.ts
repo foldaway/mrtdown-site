@@ -14,6 +14,9 @@ export function getDb() {
       max: 5,
       connectionString: DATABASE_URL,
     });
+    pool.on('error', (error) => {
+      console.error('Unexpected error from an idle Postgres client', error);
+    });
     db = drizzle({ client: pool, relations });
   }
   return db;

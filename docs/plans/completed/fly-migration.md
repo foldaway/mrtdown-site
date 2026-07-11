@@ -167,11 +167,10 @@ evidence.
 
 ## Known Follow-Ups
 
-- QStash `parallelism: 1` constrains workflow step delivery but does not provide
-  a whole-workflow critical section. Two pull runs could still interleave
-  between durable steps while sharing the `*_next` staging tables. Add an
-  application-level lease or equivalent whole-run exclusion before treating
-  concurrent manual and scheduled pulls as fully safe.
+- Concurrent pull exclusion was added after review: every trigger acquires the
+  same database-backed workflow lease, renews it before each durable step, and
+  releases it on completion or terminal failure. The expiring lease prevents
+  abandoned runs from blocking future pulls indefinitely.
 - Reassess whether public HTML needs an upstream cache after collecting Fly
   production timings; do not reintroduce caching without explicit invalidation
   and cache-status telemetry.

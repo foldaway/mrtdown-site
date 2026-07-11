@@ -154,9 +154,10 @@ Fly.io migration. It is retained here as history, not as current implementation
 guidance. Any renewed caching work should start with the current Fly topology
 and explicit invalidation/observability requirements.
 
-Add short edge caching for cacheable public pages while preserving correctness.
+The retired implementation added short edge caching for cacheable public pages
+while preserving correctness.
 
-Tasks:
+Historical tasks completed for that implementation:
 
 - Set public cache headers for non-personalized SSR routes:
   - `s-maxage=60`
@@ -178,7 +179,7 @@ Candidate routes:
 - `/system-map`
 - `/about`
 
-Exit criteria:
+Historical exit criteria were:
 
 - Repeated requests for `/statistics` return from edge cache or equivalent
   platform cache.

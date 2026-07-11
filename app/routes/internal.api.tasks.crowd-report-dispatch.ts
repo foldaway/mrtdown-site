@@ -11,9 +11,14 @@ const RequestSchema = z
   .object({
     dryRun: z.boolean().default(false),
     kind: z.enum(['any', 'cluster', 'report']).default('any'),
-    limit: z.number().int().min(1).max(50).default(10),
+    limit: z.number().int().min(1).max(50).optional(),
   })
   .strict();
+
+function getDefaultDispatchLimit() {
+  const parsed = Number(process.env.CROWD_REPORT_DISPATCH_LIMIT ?? 10);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 50 ? parsed : 10;
+}
 
 async function parseOptionalJsonBody(request: Request) {
   if (request.headers.get('content-length') === '0') {
@@ -75,10 +80,11 @@ export const Route = createFileRoute(
         }
 
         const db = getDb();
+        const limit = parsed.data.limit ?? getDefaultDispatchLimit();
         if (parsed.data.dryRun) {
           const candidates = await getDispatchableCrowdReportCandidates(db, {
             kind: parsed.data.kind,
-            limit: parsed.data.limit,
+            limit,
             rootUrl,
           });
           return Response.json({
@@ -102,7 +108,7 @@ export const Route = createFileRoute(
 
         const result = await dispatchPendingCrowdReports(db, {
           kind: parsed.data.kind,
-          limit: parsed.data.limit,
+          limit,
           rootUrl,
           token,
           owner: process.env.CROWD_REPORT_DISPATCH_GITHUB_OWNER,

@@ -1,4 +1,4 @@
-import { scheduler } from 'node:timers/promises';
+import { setImmediate as setImmediatePromise } from 'node:timers/promises';
 import {
   type Service as CoreService,
   type FacilityEffectKind,
@@ -3590,7 +3590,7 @@ async function buildOperationalFactRowsForDates(
   const rowsByDate: OperationalFactRowsForDate[] = [];
   for (const date of dates) {
     rowsByDate.push(buildOperationalFactRowsForDate(date, dataset, context));
-    await scheduler.yield();
+    await setImmediatePromise();
   }
   return rowsByDate;
 }

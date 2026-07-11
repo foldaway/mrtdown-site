@@ -1,4 +1,8 @@
 import { MRTDownRepository } from '@mrtdown/fs';
+import {
+  type WorkflowContext,
+  WorkflowNonRetryableError,
+} from '@upstash/workflow';
 import { createWorkflow } from '@upstash/workflow/tanstack';
 import { ZipStore } from '~/helpers/ZipStore.js';
 import { assert } from '~/util/assert.js';
@@ -9,6 +13,10 @@ import {
 import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
+import {
+  acquireOrRenewPullWorkflowLease,
+  releasePullWorkflowLease,
+} from './helpers/workflowLease.js';
 import {
   deleteLineOrphans,
   deleteOperatorsTownsLandmarksOrphans,
@@ -36,19 +44,38 @@ type Params = Record<string, never>;
 const ISSUE_SYNC_BATCH_SIZE = 500;
 const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
 
+async function runPullStep<T>(
+  context: WorkflowContext<Params>,
+  name: string,
+  callback: () => Promise<T>,
+) {
+  return context.run(name, async () => {
+    const acquired = await acquireOrRenewPullWorkflowLease(
+      getDb(),
+      context.workflowRunId,
+    );
+    if (!acquired) {
+      throw new WorkflowNonRetryableError(
+        'Another canonical data pull holds the workflow lease',
+      );
+    }
+    return callback();
+  });
+}
+
 /**
  * Durable pull pipeline: manifest → parse into staging → promote by domain →
  * truncate staging + metadata. Staging is the handoff between steps (no large step returns).
  */
-export const pullWorkflow = createWorkflow<Params, void>(async (context) => {
+async function executePull(context: WorkflowContext<Params>) {
   const dataUrl = process.env.MRTDOWN_DATA_URL;
   assert(dataUrl != null, 'MRTDOWN_DATA_URL not set');
 
-  const manifest = await context.run('manifest', async () =>
+  const manifest = await runPullStep(context, 'manifest', async () =>
     fetchManifest(dataUrl),
   );
 
-  const counts = await context.run('parse', async () => {
+  const counts = await runPullStep(context, 'parse', async () => {
     const archiveBuffer = await fetchArchive(dataUrl);
     console.log('[PULL] Fetched archive', archiveBuffer.length);
     const store = new ZipStore(archiveBuffer);
@@ -157,31 +184,36 @@ export const pullWorkflow = createWorkflow<Params, void>(async (context) => {
     };
   });
 
-  await context.run('sync-operators-towns-landmarks-upserts', async () => {
-    const db = getDb();
-    await syncOperatorsTownsLandmarksUpserts(db);
-  });
+  await runPullStep(
+    context,
+    'sync-operators-towns-landmarks-upserts',
+    async () => {
+      const db = getDb();
+      await syncOperatorsTownsLandmarksUpserts(db);
+    },
+  );
 
-  await context.run('sync-lines', async () => {
+  await runPullStep(context, 'sync-lines', async () => {
     const db = getDb();
     console.log('Syncing lines...');
     await syncLines(db);
   });
 
-  await context.run('sync-stations', async () => {
+  await runPullStep(context, 'sync-stations', async () => {
     const db = getDb();
     console.log('Syncing stations...');
     await syncStations(db);
   });
 
-  await context.run('sync-services', async () => {
+  await runPullStep(context, 'sync-services', async () => {
     const db = getDb();
     console.log('Syncing services...');
     await syncServices(db);
   });
 
   for (let batch = 1; ; batch++) {
-    const processed = await context.run(
+    const processed = await runPullStep(
+      context,
       `sync-issues-changed-${batch}`,
       async () => {
         const db = getDb();
@@ -198,7 +230,8 @@ export const pullWorkflow = createWorkflow<Params, void>(async (context) => {
   }
 
   for (let batch = 1; ; batch++) {
-    const processed = await context.run(
+    const processed = await runPullStep(
+      context,
       `sync-issues-orphans-${batch}`,
       async () => {
         const db = getDb();
@@ -214,46 +247,55 @@ export const pullWorkflow = createWorkflow<Params, void>(async (context) => {
     if (processed === 0) break;
   }
 
-  await context.run('delete-service-orphans', async () => {
+  await runPullStep(context, 'delete-service-orphans', async () => {
     const db = getDb();
     console.log('Deleting service orphans...');
     await deleteServiceOrphans(db);
   });
 
-  await context.run('delete-station-orphans', async () => {
+  await runPullStep(context, 'delete-station-orphans', async () => {
     const db = getDb();
     console.log('Deleting station orphans...');
     await deleteStationOrphans(db);
   });
 
-  await context.run('delete-line-orphans', async () => {
+  await runPullStep(context, 'delete-line-orphans', async () => {
     const db = getDb();
     console.log('Deleting line orphans...');
     await deleteLineOrphans(db);
   });
 
-  await context.run('delete-operators-towns-landmarks-orphans', async () => {
-    const db = getDb();
-    console.log('Deleting operators, towns and landmarks orphans...');
-    await deleteOperatorsTownsLandmarksOrphans(db);
-  });
+  await runPullStep(
+    context,
+    'delete-operators-towns-landmarks-orphans',
+    async () => {
+      const db = getDb();
+      console.log('Deleting operators, towns and landmarks orphans...');
+      await deleteOperatorsTownsLandmarksOrphans(db);
+    },
+  );
 
-  await context.run('finalize', async () => {
+  await runPullStep(context, 'finalize', async () => {
     const db = getDb();
     console.log('Finalizing pull...');
     await finalizePull(db);
   });
 
-  const facts = await context.run('rebuild-operational-facts', async () => {
-    console.log(
-      `Rebuilding operational facts for ${OPERATIONAL_FACTS_REBUILD_DAYS} days...`,
-    );
-    return rebuildOperationalFactsRange(OPERATIONAL_FACTS_REBUILD_DAYS);
-  });
+  const facts = await runPullStep(
+    context,
+    'rebuild-operational-facts',
+    async () => {
+      console.log(
+        `Rebuilding operational facts for ${OPERATIONAL_FACTS_REBUILD_DAYS} days...`,
+      );
+      return rebuildOperationalFactsRange(OPERATIONAL_FACTS_REBUILD_DAYS);
+    },
+  );
 
   console.log(`[PULL] Rebuilt operational facts for ${facts.length} days`);
 
-  const statistics = await context.run(
+  const statistics = await runPullStep(
+    context,
     'rebuild-statistics-snapshot',
     async () => {
       console.log('[PULL] Rebuilding statistics snapshot...');
@@ -265,4 +307,27 @@ export const pullWorkflow = createWorkflow<Params, void>(async (context) => {
     `[PULL] Rebuilt statistics snapshot ${statistics.asOf} with ${statistics.issueIdsDisruptionLongest.length} longest disruptions`,
   );
   console.log('[PULL] Pull complete', counts);
-});
+}
+
+export const pullWorkflow = createWorkflow<Params, void>(
+  async (context) => {
+    const acquired = await context.run('acquire-pull-lease', async () =>
+      acquireOrRenewPullWorkflowLease(getDb(), context.workflowRunId),
+    );
+    if (!acquired) {
+      throw new WorkflowNonRetryableError(
+        'Another canonical data pull is already running',
+      );
+    }
+
+    await executePull(context);
+    await context.run('release-pull-lease', async () =>
+      releasePullWorkflowLease(getDb(), context.workflowRunId),
+    );
+  },
+  {
+    failureFunction: async ({ context }) => {
+      await releasePullWorkflowLease(getDb(), context.workflowRunId);
+    },
+  },
+);

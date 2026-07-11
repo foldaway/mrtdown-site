@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { RateLimiterRes } from 'rate-limiter-flexible';
 import { getDb } from '~/db';
 import { getCrowdReportRateLimiter } from '~/limiters/crowdReport';
 import {
@@ -87,20 +88,25 @@ export const Route = createFileRoute('/api/reports')({
         try {
           await rateLimiter.consume(abuseContext.ipHash, 1);
         } catch (error) {
-          console.warn('Native crowd report rate limiter failed', { error });
-
-          return Response.json(
-            {
-              success: false,
-              error: 'Too many reports submitted from this network',
-            },
-            {
-              status: 429,
-              headers: {
-                'retry-after': String(60),
+          if (!(error instanceof RateLimiterRes)) {
+            console.error('Crowd report rate limiter store failed', error);
+          } else {
+            return Response.json(
+              {
+                success: false,
+                error: 'Too many reports submitted from this network',
               },
-            },
-          );
+              {
+                status: 429,
+                headers: {
+                  'retry-after': String(Math.ceil(error.msBeforeNext / 1000)),
+                },
+              },
+            );
+          }
+
+          // The database-backed limiter below still protects this endpoint if
+          // Redis is temporarily unavailable.
         }
 
         const db = getDb();
