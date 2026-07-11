@@ -183,19 +183,22 @@ describe('agent Markdown request negotiation', () => {
     },
   );
 
-  it('returns 406 when Markdown is explicitly preferred for an HTML route', async () => {
-    const response = getUnsupportedAgentMarkdownResponse(
-      request('/lines/BPLRT', { headers: { accept: 'text/markdown' } }),
-    );
+  it.each(['/lines/BPLRT', '/zh-Hans/statistics'])(
+    'returns 406 when Markdown is explicitly preferred for HTML route %s',
+    async (pathname) => {
+      const response = getUnsupportedAgentMarkdownResponse(
+        request(pathname, { headers: { accept: 'text/markdown' } }),
+      );
 
-    expect(response?.status).toBe(406);
-    expect(response?.headers.get('content-type')).toBe(
-      'text/plain; charset=utf-8',
-    );
-    await expect(response?.text()).resolves.toBe(
-      'Markdown is not available for this route',
-    );
-  });
+      expect(response?.status).toBe(406);
+      expect(response?.headers.get('content-type')).toBe(
+        'text/plain; charset=utf-8',
+      );
+      await expect(response?.text()).resolves.toBe(
+        'Markdown is not available for this route',
+      );
+    },
+  );
 
   it('respects specific Accept ranges before wildcard fallbacks', async () => {
     const response = getUnsupportedAgentMarkdownResponse(

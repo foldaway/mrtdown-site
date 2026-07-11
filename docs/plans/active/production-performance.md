@@ -276,6 +276,11 @@ underlying compute and payload costs so uncached requests are also fast.
 
 ## Progress Notes
 
+- 2026-07-11: Removed the Worker Cache API-backed public HTML cache and its
+  shared-cache response headers ahead of the move to Fly.io. Public HTML now
+  always passes through SSR; the public-route classification still used by
+  agent Markdown negotiation lives with that feature instead of in a cache
+  utility.
 - 2026-05-25: Implemented Phase 1 Worker-side public HTML caching for
   successful public `GET` responses on the planned cacheable route set, plus
   origin cache headers for matching `GET`/`HEAD` responses. Cacheable pages now
