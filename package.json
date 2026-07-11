@@ -40,7 +40,6 @@
     "@mrtdown/fs": "^2.0.0-alpha.26",
     "@mrtdown/ingest-contracts": "^2.0.0-alpha.29",
     "@posthog/react": "^1.8.3",
-    "@sentry/cloudflare": "^10.47.0",
     "@sentry/tanstackstart-react": "^10.47.0",
     "@tanstack/react-query": "^5.66.11",
     "@tanstack/react-router": "1.170.15",
