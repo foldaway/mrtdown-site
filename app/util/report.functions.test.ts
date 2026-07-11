@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildCrowdReportFormOptions } from './report.functions';
 
-vi.mock('cloudflare:workers', () => ({
-  env: {},
-}));
-
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({
     handler: (handler: unknown) => handler,

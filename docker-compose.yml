@@ -10,6 +10,10 @@ services:
       - 5432:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
+  valkey:
+    image: valkey:9-alpine
+    ports:
+      - "6379:6379"
 
 volumes:
   postgres_data:

@@ -1,24 +1,15 @@
-import * as Sentry from '@sentry/cloudflare';
-import handler from '@tanstack/react-start/server-entry';
+import * as Sentry from '@sentry/tanstackstart-react';
+import { wrapFetchWithSentry } from '@sentry/tanstackstart-react';
+import handler, { createServerEntry } from '@tanstack/react-start/server-entry';
 import type { Root } from 'xast';
 import { toXml } from 'xast-util-to-xml';
-import {
-  applyPublicHtmlCacheHeaders,
-  getCachedPublicHtmlResponse,
-  isCommunitySignalPublicPath,
-  isPublicHtmlCacheLookupRequest,
-  shouldCachePublicHtml,
-  storePublicHtmlResponse,
-} from './util/publicHtmlCache';
 import { getUnsupportedAgentMarkdownResponse } from './util/agentMarkdown';
 import {
   addSentryAnonymousUserCookie,
   getSentryAnonymousUser,
-  stripSentryUserIpAddress,
 } from './util/sentryAnonymousUser';
-import { handleScheduledWorkflows } from './workflows/scheduled';
 
-async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
+async function appFetch(request: Request) {
   const startedAt = performance.now();
   const sentryAnonymousUser = getSentryAnonymousUser(request);
   Sentry.setUser({
@@ -30,28 +21,7 @@ async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
   if (unsupportedMarkdownResponse != null) {
     const elapsedMs = performance.now() - startedAt;
     return addSentryAnonymousUserCookie(
-      addResponseInstrumentationHeaders(
-        unsupportedMarkdownResponse,
-        elapsedMs,
-        'worker',
-      ),
-      sentryAnonymousUser,
-    );
-  }
-
-  const shouldUsePublicHtmlCache =
-    !shouldBypassPublicHtmlCacheForCrowdReports(request);
-  const cachedResponse = shouldUsePublicHtmlCache
-    ? await getCachedPublicHtmlResponse(request)
-    : null;
-  if (cachedResponse != null) {
-    const elapsedMs = performance.now() - startedAt;
-    return addSentryAnonymousUserCookie(
-      addResponseInstrumentationHeaders(
-        cachedResponse,
-        elapsedMs,
-        'public-html-cache',
-      ),
+      addResponseInstrumentationHeaders(unsupportedMarkdownResponse, elapsedMs),
       sentryAnonymousUser,
     );
   }
@@ -65,28 +35,14 @@ async function appFetch(request: Request, _env: Env, ctx: ExecutionContext) {
       return addResponseInstrumentationHeaders(
         createWorkerSitemapErrorResponse(request, error),
         elapsedMs,
-        'worker',
       );
     }
     throw error;
   }
   const elapsedMs = performance.now() - startedAt;
-  const shouldStorePublicHtml =
-    shouldUsePublicHtmlCache && shouldCachePublicHtml(request, response);
-  const responseWithCacheHeaders = shouldUsePublicHtmlCache
-    ? applyPublicHtmlCacheHeaders(request, response)
-    : response;
-
-  if (shouldStorePublicHtml && isPublicHtmlCacheLookupRequest(request)) {
-    ctx.waitUntil(
-      storePublicHtmlResponse(request, responseWithCacheHeaders.clone()),
-    );
-  }
-
   const responseWithHeaders = addResponseInstrumentationHeaders(
-    responseWithCacheHeaders,
+    response,
     elapsedMs,
-    'worker',
   );
 
   if (import.meta.env.DEV && responseWithHeaders.status !== 101) {
@@ -173,18 +129,13 @@ function sanitizeDiagnosticHeader(value: string) {
   return value.replace(/[\r\n]/g, ' ').slice(0, 180);
 }
 
-function shouldBypassPublicHtmlCacheForCrowdReports(request: Request) {
-  return isCommunitySignalPublicPath(new URL(request.url).pathname);
-}
-
 function addResponseInstrumentationHeaders(
   response: Response,
   elapsedMs: number,
-  render: 'public-html-cache' | 'worker',
 ) {
   const workerTiming = `worker_request;dur=${elapsedMs.toFixed(1)}`;
   try {
-    appendInstrumentationHeaders(response.headers, workerTiming, render);
+    appendInstrumentationHeaders(response.headers, workerTiming);
     return response;
   } catch {
     if (response.status === 101) {
@@ -192,7 +143,7 @@ function addResponseInstrumentationHeaders(
     }
 
     const headers = new Headers(response.headers);
-    appendInstrumentationHeaders(headers, workerTiming, render);
+    appendInstrumentationHeaders(headers, workerTiming);
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -201,11 +152,7 @@ function addResponseInstrumentationHeaders(
   }
 }
 
-function appendInstrumentationHeaders(
-  headers: Headers,
-  workerTiming: string,
-  render: 'public-html-cache' | 'worker',
-) {
+function appendInstrumentationHeaders(headers: Headers, workerTiming: string) {
   const currentServerTiming = headers.get('Server-Timing');
   headers.set(
     'Server-Timing',
@@ -213,7 +160,7 @@ function appendInstrumentationHeaders(
       ? `${currentServerTiming}, ${workerTiming}`
       : workerTiming,
   );
-  headers.set('X-MRTDown-Render', render);
+  headers.set('X-MRTDown-Render', 'worker');
 }
 
 function shouldPreservePublicMarkdownCache(response: Response) {
@@ -247,21 +194,8 @@ async function logResponseByteEstimate(
   }
 }
 
-export { PullWorkflow } from './workflows/pull';
-export { PublicHolidaysWorkflow } from './workflows/publicHolidays';
-
-export default Sentry.withSentry(
-  (env) => {
-    return {
-      dsn: env.SENTRY_DSN ?? '',
-      environment: env.TIER ?? 'development',
-      beforeSend: stripSentryUserIpAddress,
-    };
-  },
-  {
+export default createServerEntry(
+  wrapFetchWithSentry({
     fetch: appFetch,
-    async scheduled(event, env, ctx) {
-      await handleScheduledWorkflows(event, env, ctx);
-    },
-  } satisfies ExportedHandler<Env>,
+  }),
 );

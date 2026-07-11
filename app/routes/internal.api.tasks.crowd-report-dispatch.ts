@@ -1,4 +1,3 @@
-import { env } from 'cloudflare:workers';
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 import { getDb } from '~/db';
@@ -7,13 +6,6 @@ import {
   getDispatchableCrowdReportCandidates,
 } from '~/util/crowdReportDispatch';
 import { internalMiddleware } from '~/util/internal.middleware';
-
-type CrowdReportDispatchRuntimeEnv = typeof env & {
-  CROWD_REPORT_DISPATCH_GITHUB_TOKEN?: string;
-  CROWD_REPORT_DISPATCH_GITHUB_OWNER?: string;
-  CROWD_REPORT_DISPATCH_GITHUB_REPO?: string;
-  CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE?: string;
-};
 
 const RequestSchema = z
   .object({
@@ -45,10 +37,6 @@ async function parseOptionalJsonBody(request: Request) {
   }
 }
 
-function getRuntimeEnv() {
-  return env as CrowdReportDispatchRuntimeEnv;
-}
-
 export const Route = createFileRoute(
   '/internal/api/tasks/crowd-report-dispatch',
 )({
@@ -78,8 +66,7 @@ export const Route = createFileRoute(
           );
         }
 
-        const runtimeEnv = getRuntimeEnv();
-        const rootUrl = runtimeEnv.VITE_ROOT_URL;
+        const rootUrl = process.env.VITE_ROOT_URL;
         if (!rootUrl) {
           return Response.json(
             { success: false, error: 'VITE_ROOT_URL is missing' },
@@ -102,7 +89,7 @@ export const Route = createFileRoute(
           });
         }
 
-        const token = runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_TOKEN;
+        const token = process.env.CROWD_REPORT_DISPATCH_GITHUB_TOKEN;
         if (!token) {
           return Response.json(
             {
@@ -118,9 +105,9 @@ export const Route = createFileRoute(
           limit: parsed.data.limit,
           rootUrl,
           token,
-          owner: runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_OWNER,
-          repo: runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_REPO,
-          eventType: runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE,
+          owner: process.env.CROWD_REPORT_DISPATCH_GITHUB_OWNER,
+          repo: process.env.CROWD_REPORT_DISPATCH_GITHUB_REPO,
+          eventType: process.env.CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE,
         });
         for (const failure of result.results.filter((item) => !item.success)) {
           console.error('Crowd report dispatch failed', failure);
