@@ -1,3 +1,4 @@
+import { scheduler } from 'node:timers/promises';
 import {
   type Service as CoreService,
   type FacilityEffectKind,
@@ -236,7 +237,7 @@ type OverviewDataset = Pick<
 >;
 
 const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
-const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 30;
+const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 5;
 let cachedBaseDataset:
   | {
       expiresAt: number;
@@ -3581,6 +3582,19 @@ function buildOperationalFactRowsForDate(
   };
 }
 
+async function buildOperationalFactRowsForDates(
+  dates: readonly DateTime[],
+  dataset: BaseDataset,
+  context: OperationalFactsRebuildContext,
+) {
+  const rowsByDate: OperationalFactRowsForDate[] = [];
+  for (const date of dates) {
+    rowsByDate.push(buildOperationalFactRowsForDate(date, dataset, context));
+    await scheduler.yield();
+  }
+  return rowsByDate;
+}
+
 async function replaceOperationalFactRows(
   database: AppDb,
   rowsByDate: OperationalFactRowsForDate[],
@@ -3677,8 +3691,10 @@ export async function rebuildOperationalFactsForDates(
   }> = [];
 
   for (const batch of chunk(dateTimes, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
-    const rowsByDate = batch.map((date) =>
-      buildOperationalFactRowsForDate(date, dataset, context),
+    const rowsByDate = await buildOperationalFactRowsForDates(
+      batch,
+      dataset,
+      context,
     );
     await replaceOperationalFactRows(database, rowsByDate);
     results.push(
@@ -3712,8 +3728,10 @@ export async function rebuildOperationalFactsRange(
     normalizedEnd.minus({ days: days - 1 - index }),
   );
   for (const batch of chunk(dates, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
-    const rowsByDate = batch.map((date) =>
-      buildOperationalFactRowsForDate(date, dataset, context),
+    const rowsByDate = await buildOperationalFactRowsForDates(
+      batch,
+      dataset,
+      context,
     );
     await replaceOperationalFactRows(database, rowsByDate);
     results.push(
