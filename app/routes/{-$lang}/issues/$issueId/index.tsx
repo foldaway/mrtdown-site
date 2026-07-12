@@ -1,6 +1,6 @@
 import {
   BuildingOfficeIcon,
-  CogIcon,
+  Cog8ToothIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/16/solid';
 import { createFileRoute } from '@tanstack/react-router';
@@ -230,7 +230,7 @@ function IssuePage() {
                 <ExclamationTriangleIcon className="size-4 shrink-0 text-disruption-light dark:text-disruption-dark" />
               )}
               {issue.type === 'maintenance' && (
-                <CogIcon className="size-4 shrink-0 text-maintenance-light dark:text-maintenance-dark" />
+                <Cog8ToothIcon className="size-4 shrink-0 text-maintenance-light dark:text-maintenance-dark" />
               )}
               {issue.type === 'infra' && (
                 <BuildingOfficeIcon className="size-4 shrink-0 text-infra-light dark:text-infra-dark" />

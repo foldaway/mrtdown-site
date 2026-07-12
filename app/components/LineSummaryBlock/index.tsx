@@ -1,6 +1,15 @@
+import {
+  BuildingOffice2Icon,
+  CheckCircleIcon,
+  Cog8ToothIcon,
+  CubeIcon,
+  ExclamationTriangleIcon,
+  MoonIcon,
+} from '@heroicons/react/24/solid';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
+import { Tooltip } from 'radix-ui';
 import { DismissableLayer } from 'radix-ui/internal';
 import { useMemo, useState } from 'react';
 import {
@@ -12,7 +21,7 @@ import {
 import { LineSummaryStatusLabels } from '~/constants';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import type { LineSummary } from '~/types';
+import type { LineSummary, LineSummaryStatus } from '~/types';
 import { useHydrated } from '../../hooks/useHydrated';
 import { DateCard, DateCardDetails } from './components/DateCard';
 import { NonOperationalDateCard } from './components/NonOperationalDateCard';
@@ -35,6 +44,36 @@ type ActiveDateCard =
 const DATE_CARD_DETAILS_PANEL_CLASS_NAME =
   'absolute inset-x-0 top-full z-30 mt-2 flex flex-col rounded-lg border border-gray-200 border-t-4 bg-white px-4 py-3 shadow-gray-900/10 shadow-xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/30 dark:ring-white/10';
 
+const STATUS_ICON_CONFIG = {
+  ongoing_disruption: {
+    Icon: ExclamationTriangleIcon,
+    className: classNames('text-disruption-light dark:text-disruption-dark'),
+  },
+  ongoing_maintenance: {
+    Icon: Cog8ToothIcon,
+    className: classNames('text-maintenance-light dark:text-maintenance-dark'),
+  },
+  ongoing_infra: {
+    Icon: BuildingOffice2Icon,
+    className: classNames('text-infra-light dark:text-infra-dark'),
+  },
+  normal: {
+    Icon: CheckCircleIcon,
+    className: classNames('text-operational-light dark:text-operational-dark'),
+  },
+  closed_for_day: {
+    Icon: MoonIcon,
+    className: classNames('text-gray-400 dark:text-gray-500'),
+  },
+  future_service: {
+    Icon: CubeIcon,
+    className: classNames('text-gray-400 dark:text-gray-500'),
+  },
+} satisfies Record<
+  LineSummaryStatus,
+  { Icon: React.ComponentType<{ className?: string }>; className: string }
+>;
+
 export const LineSummaryBlock: React.FC<Props> = (props) => {
   const { data, dateTimes } = props;
   const { lineId, status, breakdownByDates } = data;
@@ -43,6 +82,9 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
   );
 
   const intl = useIntl();
+  const statusLabel = intl.formatMessage(LineSummaryStatusLabels[status]);
+  const { Icon: StatusIcon, className: statusIconClassName } =
+    STATUS_ICON_CONFIG[status];
 
   const { lines, issues } = useIncludedEntities();
   const line = lines[lineId];
@@ -134,25 +176,31 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
             </span>
           </Link>
           <div className="flex min-w-0 justify-end">
-            <span
-              className={classNames(
-                'whitespace-nowrap text-right text-sm capitalize leading-tight sm:truncate',
-                {
-                  'text-disruption-light dark:text-disruption-dark':
-                    status === 'ongoing_disruption',
-                  'text-maintenance-light dark:text-maintenance-dark':
-                    status === 'ongoing_maintenance',
-                  'text-infra-light dark:text-infra-dark':
-                    status === 'ongoing_infra',
-                  'text-operational-light dark:text-operational-dark':
-                    status === 'normal',
-                  'text-gray-400 dark:text-gray-500':
-                    status === 'closed_for_day' || status === 'future_service',
-                },
-              )}
-            >
-              <FormattedMessage {...LineSummaryStatusLabels[status]} />
-            </span>
+            <Tooltip.Provider delayDuration={100}>
+              <Tooltip.Root>
+                <Tooltip.Trigger asChild>
+                  <button
+                    type="button"
+                    aria-label={statusLabel}
+                    className={classNames(
+                      '-m-1 inline-flex shrink-0 items-center justify-center rounded-md p-1 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                      statusIconClassName,
+                    )}
+                  >
+                    <StatusIcon aria-hidden="true" className="size-5" />
+                  </button>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content
+                    className="z-50 rounded-md bg-gray-900 px-3 py-2 font-medium text-white text-xs shadow-lg dark:bg-gray-700"
+                    sideOffset={4}
+                  >
+                    <FormattedMessage {...LineSummaryStatusLabels[status]} />
+                    <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
+                  </Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip.Root>
+            </Tooltip.Provider>
           </div>
         </div>
 

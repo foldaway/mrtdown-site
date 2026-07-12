@@ -1,8 +1,8 @@
 import {
   BuildingOfficeIcon,
-  CogIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
+import { Cog8ToothIcon } from '@heroicons/react/24/solid';
 import classNames from 'classnames';
 import { FormattedMessage } from 'react-intl';
 import type { Issue, IssueInterval } from '~/types';
@@ -36,7 +36,7 @@ export const IssueHeader: React.FC<Props> = ({ issue, interval }) => {
             <ExclamationTriangleIcon className="size-3 text-disruption-light dark:text-disruption-dark" />
           )}
           {issue.type === 'maintenance' && (
-            <CogIcon className="size-3 text-maintenance-light dark:text-maintenance-dark" />
+            <Cog8ToothIcon className="size-3 text-maintenance-light dark:text-maintenance-dark" />
           )}
           {issue.type === 'infra' && (
             <BuildingOfficeIcon className="size-3 text-infra-light dark:text-infra-dark" />
