@@ -20,7 +20,7 @@ import {
 } from '~/components/ProfileWidgetSkeletons';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import { buildSeoMetadata } from '~/helpers/seo';
+import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import { assert } from '~/util/assert';
 import { getLineProfileFn } from '~/util/lines.functions';
 import { CurrentStatusCard } from './components/CurrentStatusCard';
@@ -127,6 +127,10 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
             componentName,
           },
         );
+    const stationIds = Array.from(
+      new Set(branches.flatMap((branch) => branch.stationIds)),
+    );
+    const homeUrl = buildLocalizedAbsoluteUrl('/', lang, rootUrl);
 
     return {
       links: seo.links,
@@ -161,33 +165,65 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
         {
           'script:ld+json': {
             '@context': 'https://schema.org',
-            '@type': 'WebPage',
-            name: title,
-            mainEntity: {
-              '@type': 'Place',
-              name: componentName,
-              identifier: line.id,
-              containsPlace: branches.flatMap((branch) => {
-                return branch.stationIds.map((stationId) => {
-                  const station = included.stations[stationId];
-                  const stationName = getLocalizedTranslation(
-                    station.name,
-                    lang,
-                  );
+            '@graph': [
+              {
+                '@type': 'WebPage',
+                name: title,
+                description,
+                image: seo.ogImage,
+                inLanguage: lang,
+                mainEntity: {
+                  '@type': 'Place',
+                  name: componentName,
+                  identifier: line.id,
+                  url: seo.ogUrl,
+                  containsPlace: stationIds.map((stationId) => {
+                    const station = included.stations[stationId];
+                    const stationName = getLocalizedTranslation(
+                      station.name,
+                      lang,
+                    );
 
-                  const alternateName = station.memberships
-                    .map((membership) => membership.code)
-                    .join(' / ');
+                    const alternateName = station.memberships
+                      .map((membership) => membership.code)
+                      .join(' / ');
 
-                  return {
-                    '@type': 'TrainStation',
-                    name: stationName,
-                    alternateName,
-                  };
-                });
-              }),
-            },
-            url: seo.ogUrl,
+                    return {
+                      '@type': 'TrainStation',
+                      name: stationName,
+                      alternateName,
+                      identifier: stationId,
+                      url: buildLocalizedAbsoluteUrl(
+                        `/stations/${stationId}`,
+                        lang,
+                        rootUrl,
+                      ),
+                    };
+                  }),
+                },
+                url: seo.ogUrl,
+              },
+              {
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                  {
+                    '@type': 'ListItem',
+                    position: 1,
+                    name: intl.formatMessage({
+                      id: 'general.home',
+                      defaultMessage: 'Home',
+                    }),
+                    item: homeUrl,
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 2,
+                    name: componentName,
+                    item: seo.ogUrl,
+                  },
+                ],
+              },
+            ],
           },
         },
       ],
