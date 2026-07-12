@@ -1,6 +1,6 @@
 import { InformationCircleIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import type { IssueType } from '@mrtdown/core';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { lazy, useMemo } from 'react';
 import {
@@ -20,8 +20,10 @@ import { StationBar } from '~/components/StationBar';
 import { LineTypeLabels, StationStructureTypeLabels } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
+import { getCanonicalStationPath } from '~/helpers/getCanonicalStationPath';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import { buildSeoMetadata } from '~/helpers/seo';
+import { getSeoStationCodes } from '~/helpers/getSeoStationCodes';
+import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import { useHydrated } from '~/hooks/useHydrated';
 import type { IncludedEntities, Station } from '~/types';
 import { getStationProfileFn } from '~/util/station.functions';
@@ -54,15 +56,16 @@ function computeStationStrings(
   const operationalMemberSet = new Set<string>();
   const _componentTypeStrings = new Set<string>();
   const _stationStructureTypes = new Set<string>();
-  const stationCodes = new Set<string>();
+  const _transitTypeStrings = new Set<string>();
+  const stationCodes = getSeoStationCodes(station.memberships);
   for (const membership of station.memberships) {
     const line = included.lines[membership.lineId];
     _componentTypeStrings.add(intl.formatMessage(LineTypeLabels[line.type]));
+    _transitTypeStrings.add(line.type === 'lrt' ? 'LRT' : 'MRT');
 
     _stationStructureTypes.add(
       intl.formatMessage(StationStructureTypeLabels[membership.structureType]),
     );
-    stationCodes.add(membership.code);
     const startedAt = DateTime.fromISO(membership.startedAt).setZone(
       'Asia/Singapore',
     );
@@ -75,15 +78,66 @@ function computeStationStrings(
     landmarkNames,
     stationCodes,
     componentTypeStrings: Array.from(_componentTypeStrings),
+    transitTypeStrings: Array.from(_transitTypeStrings),
     stationStructureTypes: Array.from(_stationStructureTypes),
     isInterchange: operationalMemberSet.size > 1,
   };
 }
 
+function formatStationHeading({
+  intl,
+  stationCodeString,
+  stationName,
+  transitTypeStrings,
+}: {
+  intl: IntlShape;
+  stationCodeString: string;
+  stationName: string;
+  transitTypeStrings: string[];
+}) {
+  const values = {
+    stationName,
+    stationCodes: stationCodeString,
+    transitTypes: intl.formatList(transitTypeStrings),
+  };
+
+  if (stationCodeString === '') {
+    return intl.formatMessage(
+      {
+        id: 'station.heading_without_codes',
+        defaultMessage: '{stationName} {transitTypes} Station',
+      },
+      values,
+    );
+  }
+
+  return intl.formatMessage(
+    {
+      id: 'station.heading',
+      defaultMessage: '{stationName} {transitTypes} Station ({stationCodes})',
+    },
+    values,
+  );
+}
+
 export const Route = createFileRoute('/{-$lang}/stations/$stationId')({
   component: StationPage,
-  loader: ({ params }) =>
-    getStationProfileFn({ data: { stationId: params.stationId } }),
+  async loader({ params }) {
+    const stationProfile = await getStationProfileFn({
+      data: { stationId: params.stationId },
+    });
+    const canonicalPath = getCanonicalStationPath({
+      lang: params.lang,
+      requestedStationId: params.stationId,
+      resolvedStationId: stationProfile.data.stationId,
+    });
+
+    if (canonicalPath != null) {
+      throw redirect({ href: canonicalPath, statusCode: 308 });
+    }
+
+    return stationProfile;
+  },
   async head(ctx) {
     const { stationId, lang = 'en-SG' } = ctx.params;
     assert(ctx.loaderData != null);
@@ -99,58 +153,80 @@ export const Route = createFileRoute('/{-$lang}/stations/$stationId')({
 
     const stationName = getLocalizedTranslation(station.name, lang);
 
-    const title = intl.formatMessage(
-      {
-        id: 'general.station_title',
-        defaultMessage: '{stationName} Station',
-      },
-      { stationName },
-    );
-
     const {
       townName,
       landmarkNames,
       stationCodes,
-      componentTypeStrings,
       stationStructureTypes,
+      transitTypeStrings,
       isInterchange,
     } = computeStationStrings(intl, station, included);
-
-    const issueTypeCountString = buildIssueTypeCountString(
-      stationProfile.issueCountByType as Record<IssueType, number>,
+    const stationCodeString = stationCodes.join(' / ');
+    const stationHeading = formatStationHeading({
       intl,
+      stationCodeString,
+      stationName,
+      transitTypeStrings,
+    });
+    const title = intl.formatMessage(
+      {
+        id: 'station.seo_title',
+        defaultMessage: '{stationHeading} – Status & Disruptions | mrtdown',
+      },
+      { stationHeading },
     );
 
     const description = isInterchange
-      ? intl.formatMessage(
-          {
-            id: 'station.description.interchange',
-            defaultMessage:
-              '{stationName} station is a {componentTypes} interchange station, located in {area} near {landmarks}. There have been {issueTypeCountString}.',
-          },
-          {
-            stationName,
-            componentTypes: intl.formatList(componentTypeStrings),
-            area: townName,
-            landmarks: intl.formatList(landmarkNames),
-            issueTypeCountString,
-          },
-        )
-      : intl.formatMessage(
-          {
-            id: 'station.description.non_interchange',
-            defaultMessage:
-              '{stationName} station is an {structureTypes} {componentTypes} station, located in {area} near {landmarks}. There have been {issueTypeCountString}.',
-          },
-          {
-            stationName,
-            area: townName,
-            landmarks: intl.formatList(landmarkNames),
-            structureTypes: intl.formatList(stationStructureTypes),
-            componentTypes: intl.formatList(componentTypeStrings),
-            issueTypeCountString,
-          },
-        );
+      ? landmarkNames.length > 0
+        ? intl.formatMessage(
+            {
+              id: 'station.description.interchange',
+              defaultMessage:
+                'Check live status and recent issues for {stationHeading}, an interchange in {area} near {landmarks}.',
+            },
+            {
+              stationHeading,
+              area: townName,
+              landmarks: intl.formatList(landmarkNames),
+            },
+          )
+        : intl.formatMessage(
+            {
+              id: 'station.description.interchange_without_landmarks',
+              defaultMessage:
+                'Check live status and recent issues for {stationHeading}, an interchange in {area}.',
+            },
+            {
+              stationHeading,
+              area: townName,
+            },
+          )
+      : landmarkNames.length > 0
+        ? intl.formatMessage(
+            {
+              id: 'station.description.non_interchange',
+              defaultMessage:
+                'Check live status and recent issues for {stationHeading}, an {structureTypes} station in {area} near {landmarks}.',
+            },
+            {
+              stationHeading,
+              area: townName,
+              landmarks: intl.formatList(landmarkNames),
+              structureTypes: intl.formatList(stationStructureTypes),
+            },
+          )
+        : intl.formatMessage(
+            {
+              id: 'station.description.non_interchange_without_landmarks',
+              defaultMessage:
+                'Check live status and recent issues for {stationHeading}, an {structureTypes} station in {area}.',
+            },
+            {
+              stationHeading,
+              area: townName,
+              structureTypes: intl.formatList(stationStructureTypes),
+            },
+          );
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
     const seo = buildSeoMetadata({
@@ -158,6 +234,7 @@ export const Route = createFileRoute('/{-$lang}/stations/$stationId')({
       path: `/stations/${stationId}`,
       rootUrl,
     });
+    const homeUrl = buildLocalizedAbsoluteUrl('/', lang, rootUrl);
 
     return {
       links: seo.links,
@@ -192,16 +269,56 @@ export const Route = createFileRoute('/{-$lang}/stations/$stationId')({
         {
           'script:ld+json': {
             '@context': 'https://schema.org',
-            '@type': 'WebPage',
-            name: title,
-            mainEntity: {
-              '@type': 'TrainStation',
-              name: stationName,
-              alternateName: Array.from(stationCodes).join(' / '),
-              description,
-            },
-            url: seo.ogUrl,
-            image: seo.ogImage,
+            '@graph': [
+              {
+                '@type': 'WebPage',
+                name: title,
+                description,
+                inLanguage: lang,
+                mainEntity: {
+                  '@type': 'TrainStation',
+                  name: stationName,
+                  ...(stationCodeString === ''
+                    ? {}
+                    : { alternateName: stationCodeString }),
+                  identifier: station.id,
+                  description,
+                  url: seo.ogUrl,
+                  geo: {
+                    '@type': 'GeoCoordinates',
+                    latitude: station.geo.latitude,
+                    longitude: station.geo.longitude,
+                  },
+                  address: {
+                    '@type': 'PostalAddress',
+                    addressLocality: townName,
+                    addressCountry: 'SG',
+                  },
+                },
+                url: seo.ogUrl,
+                image: seo.ogImage,
+              },
+              {
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                  {
+                    '@type': 'ListItem',
+                    position: 1,
+                    name: intl.formatMessage({
+                      id: 'general.home',
+                      defaultMessage: 'Home',
+                    }),
+                    item: homeUrl,
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 2,
+                    name: stationHeading,
+                    item: seo.ogUrl,
+                  },
+                ],
+              },
+            ],
           },
         },
       ],
@@ -218,10 +335,23 @@ function StationPage() {
   const stationDefaultName = getLocalizedTranslation(station.name, 'en-SG');
   const isHydrated = useHydrated();
 
-  const { townName, landmarkNames, componentTypeStrings, isInterchange } =
-    useMemo(() => {
-      return computeStationStrings(intl, station, included);
-    }, [station, intl, included]);
+  const {
+    townName,
+    landmarkNames,
+    stationCodes,
+    componentTypeStrings,
+    transitTypeStrings,
+    isInterchange,
+  } = useMemo(() => {
+    return computeStationStrings(intl, station, included);
+  }, [station, intl, included]);
+  const stationCodeString = stationCodes.join(' / ');
+  const stationHeading = formatStationHeading({
+    intl,
+    stationCodeString,
+    stationName,
+    transitTypeStrings,
+  });
 
   const issueTypeCountString = useMemo(() => {
     return buildIssueTypeCountString(
@@ -267,10 +397,11 @@ function StationPage() {
                 </div>
 
                 <h1 className="mb-2 font-bold text-3xl text-gray-900 dark:text-white">
-                  {stationName}
+                  {stationHeading}
                   {stationDefaultName !== stationName && (
                     <span className="ml-2 text-gray-600 text-xl dark:text-gray-300">
-                      {stationDefaultName}
+                      {' '}
+                      ({stationDefaultName})
                     </span>
                   )}
                 </h1>
