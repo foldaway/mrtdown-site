@@ -1,4 +1,3 @@
-import type { IssueType } from '@mrtdown/core';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, notFound } from '@tanstack/react-router';
 import { lazy } from 'react';
@@ -14,10 +13,9 @@ import {
   ProfileRecentIssuesSectionSkeleton,
   ProfileTrendCardSkeleton,
 } from '~/components/ProfileWidgetSkeletons';
-import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import { buildSeoMetadata } from '~/helpers/seo';
+import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import { useHydrated } from '~/hooks/useHydrated';
 import { useViewport } from '~/hooks/useViewport';
 import { getOperatorProfileFn } from '~/util/operator.functions';
@@ -72,7 +70,7 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
     const { lang = 'en-SG' } = ctx.params;
 
     assert(ctx.loaderData != null);
-    const { data: operatorProfile, included, dateCount } = ctx.loaderData;
+    const { data: operatorProfile, included } = ctx.loaderData;
 
     const operator = included.operators[operatorProfile.operatorId];
     const operatorName = getLocalizedTranslation(operator.name, lang);
@@ -89,27 +87,20 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
     const title = intl.formatMessage(
       {
         id: 'general.operator_title',
-        defaultMessage: '{operatorName}',
+        defaultMessage: '{operatorName} Status, Disruptions & Uptime | mrtdown',
       },
       { operatorName },
-    );
-
-    const issueTypeCountString = buildIssueTypeCountString(
-      operatorProfile.totalIssuesByType as Record<IssueType, number>,
-      intl,
     );
 
     const description = intl.formatMessage(
       {
         id: 'operator.description',
         defaultMessage:
-          '{operatorName} operates {lineCount, plural, one {# line} other {# lines}} in the Singapore MRT network, with {issueTypeCountString} reported in the last {dateCount} days.',
+          'Check {operatorName} service status, uptime, disruptions, planned maintenance and performance across {lineCount, plural, one {# line} other {# lines}} in Singapore.',
       },
       {
         operatorName,
         lineCount: operatorProfile.lineIds.length,
-        issueTypeCountString,
-        dateCount,
       },
     );
 
@@ -121,8 +112,12 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
       rootUrl,
     });
 
-    // Build enhanced Organization structured data
+    const homeUrl = buildLocalizedAbsoluteUrl('/', lang, rootUrl);
+    const webPageId = `${seo.canonicalUrl}#webpage`;
+    const organizationId = `${seo.canonicalUrl}#organization`;
+
     const organizationData: Record<string, unknown> = {
+      '@id': organizationId,
       '@type': 'Organization',
       name: operatorName,
       description,
@@ -134,6 +129,7 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
 
     if (operator.url != null) {
       organizationData.url = operator.url;
+      organizationData.sameAs = [operator.url];
     }
 
     return {
@@ -197,13 +193,41 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
         {
           'script:ld+json': {
             '@context': 'https://schema.org',
-            '@type': 'WebPage',
-            name: title,
-            description,
-            mainEntity: organizationData,
-            url: seo.ogUrl,
-            image: seo.ogImage,
-            inLanguage: lang,
+            '@graph': [
+              {
+                '@id': webPageId,
+                '@type': 'WebPage',
+                name: title,
+                description,
+                mainEntity: {
+                  '@id': organizationId,
+                },
+                url: seo.ogUrl,
+                image: seo.ogImage,
+                inLanguage: lang,
+              },
+              organizationData,
+              {
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                  {
+                    '@type': 'ListItem',
+                    position: 1,
+                    name: intl.formatMessage({
+                      id: 'general.home',
+                      defaultMessage: 'Home',
+                    }),
+                    item: homeUrl,
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 2,
+                    name: operatorName,
+                    item: seo.canonicalUrl,
+                  },
+                ],
+              },
+            ],
           },
         },
       ],
