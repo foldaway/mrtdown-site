@@ -73,6 +73,8 @@ export const Route = createFileRoute('/{-$lang}/')({
     assert(rootUrl != null, 'VITE_ROOT_URL is not set');
 
     const seo = buildSeoMetadata({ lang, path: '/', rootUrl });
+    const websiteUrl = new URL('/', rootUrl).toString();
+    const websiteId = `${websiteUrl}#website`;
 
     return {
       links: seo.links,
@@ -87,6 +89,10 @@ export const Route = createFileRoute('/{-$lang}/')({
         {
           property: 'og:title',
           content: title,
+        },
+        {
+          property: 'og:description',
+          content: description,
         },
         {
           property: 'og:type',
@@ -105,11 +111,37 @@ export const Route = createFileRoute('/{-$lang}/')({
           content: 'mrtdown',
         },
         {
+          name: 'twitter:title',
+          content: title,
+        },
+        {
+          name: 'twitter:description',
+          content: description,
+        },
+        {
           'script:ld+json': {
             '@context': 'https://schema.org',
-            '@type': 'WebSite',
-            name: 'mrtdown',
-            url: rootUrl,
+            '@graph': [
+              {
+                '@type': 'WebSite',
+                '@id': websiteId,
+                name: 'mrtdown',
+                url: websiteUrl,
+                inLanguage: LANGUAGES,
+              },
+              {
+                '@type': 'WebPage',
+                '@id': `${seo.canonicalUrl}#webpage`,
+                name: title,
+                description,
+                url: seo.canonicalUrl,
+                image: seo.ogImage,
+                inLanguage: lang,
+                isPartOf: {
+                  '@id': websiteId,
+                },
+              },
+            ],
           },
         },
       ],
