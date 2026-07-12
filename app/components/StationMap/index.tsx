@@ -282,6 +282,13 @@ export const StationMap: React.FC<Props> = (props) => {
       for (const labelElement of labelElements) {
         const stationId = labelElement.id.replace(/^label_/, '').toUpperCase();
         const tspans = [...labelElement.querySelectorAll('tspan')];
+
+        // Snapshot labels have a hard-coded dark fill. Normalize every label,
+        // including stations omitted from the page's trimmed data payload, so
+        // they remain legible in dark mode.
+        labelElement.removeAttribute('fill');
+        labelElement.classList.add('fill-gray-800', 'dark:fill-gray-300');
+
         if (!(stationId in included.stations)) {
           continue;
         }
@@ -314,12 +321,7 @@ export const StationMap: React.FC<Props> = (props) => {
             }
           }
         }
-        labelElement.removeAttribute('fill');
-        labelElement.classList.add(
-          'fill-gray-800',
-          'dark:fill-gray-300',
-          'hover:underline',
-        );
+        labelElement.classList.add('hover:underline');
 
         // Automatically move into parent <a> tag
         const parentElement = labelElement.parentElement;
