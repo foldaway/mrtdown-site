@@ -36,9 +36,9 @@
   "dependencies": {
     "@fontsource-variable/radio-canada-big": "^5.2.7",
     "@heroicons/react": "^2.2.0",
-    "@mrtdown/core": "^2.0.0-alpha.26",
-    "@mrtdown/fs": "^2.0.0-alpha.26",
-    "@mrtdown/ingest-contracts": "^2.0.0-alpha.29",
+    "@mrtdown/core": "^2.0.0-alpha.28",
+    "@mrtdown/fs": "^2.0.0-alpha.28",
+    "@mrtdown/ingest-contracts": "^2.0.0-alpha.31",
     "@posthog/react": "^1.8.3",
     "@sentry/tanstackstart-react": "^10.47.0",
     "@tanstack/react-query": "^5.66.11",
