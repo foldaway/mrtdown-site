@@ -288,11 +288,20 @@ export const StationMap: React.FC<Props> = (props) => {
         const stationId = labelElement.id.replace(/^label_/, '').toUpperCase();
         const tspans = [...labelElement.querySelectorAll('tspan')];
 
-        // Snapshot labels have a hard-coded dark fill. Normalize every label,
-        // including stations omitted from the page's trimmed data payload, so
-        // they remain legible in dark mode.
-        labelElement.removeAttribute('fill');
-        labelElement.classList.add('fill-gray-800', 'dark:fill-gray-300');
+        // Snapshot labels have a hard-coded dark fill. Apply the theme color to
+        // the text nodes because multi-line labels can be wrapped in a <g>, with
+        // each child <text> carrying its own fill.
+        const labelTextElements = labelElement.matches('text, tspan')
+          ? [labelElement]
+          : [
+              ...labelElement.querySelectorAll<SVGGraphicsElement>(
+                'text, tspan',
+              ),
+            ];
+        for (const labelTextElement of labelTextElements) {
+          labelTextElement.removeAttribute('fill');
+          labelTextElement.classList.add('fill-gray-800', 'dark:fill-gray-300');
+        }
 
         const stationNameTranslations =
           stationNames?.[stationId] ?? included.stations[stationId]?.name;
