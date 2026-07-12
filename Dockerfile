@@ -13,6 +13,7 @@ ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 ARG SENTRY_RELEASE
 ARG SENTRY_DSN
+ARG TIER
 ARG VITE_PUBLIC_POSTHOG_KEY
 ARG VITE_PUBLIC_POSTHOG_HOST
 ARG VITE_ROOT_URL
@@ -20,6 +21,7 @@ ENV SENTRY_ORG=$SENTRY_ORG \
     SENTRY_PROJECT=$SENTRY_PROJECT \
     GIT_SHA=$SENTRY_RELEASE \
     SENTRY_DSN=$SENTRY_DSN \
+    TIER=$TIER \
     VITE_PUBLIC_POSTHOG_KEY=$VITE_PUBLIC_POSTHOG_KEY \
     VITE_PUBLIC_POSTHOG_HOST=$VITE_PUBLIC_POSTHOG_HOST \
     VITE_ROOT_URL=$VITE_ROOT_URL
@@ -43,9 +45,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY ./package.json package-lock.json /app/
+COPY ./package.json package-lock.json instrument.server.mjs /app/
 COPY --from=production-dependencies-env /app/node_modules /app/node_modules
-COPY --from=build-env /app/.output /app/.output
+COPY --from=build-env /app/dist /app/dist
 WORKDIR /app
 
 CMD ["npm", "run", "start"]

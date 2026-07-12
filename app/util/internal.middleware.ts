@@ -1,4 +1,3 @@
-import { env } from 'cloudflare:workers';
 import { createMiddleware } from '@tanstack/react-start';
 
 export const internalMiddleware = createMiddleware().server(
@@ -13,7 +12,7 @@ export const internalMiddleware = createMiddleware().server(
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const permittedTokens =
-      env.INTERNAL_API_TOKENS?.split(',')
+      process.env.INTERNAL_API_TOKENS?.split(',')
         .map((t) => t.trim())
         .filter(Boolean) ?? [];
     if (!permittedTokens.includes(token)) {

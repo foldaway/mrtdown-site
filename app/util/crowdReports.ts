@@ -519,6 +519,7 @@ export function getCrowdReportRateLimitBucketStart(
 export function getClientIp(request: Request) {
   const forwardedFor = request.headers.get('x-forwarded-for');
   return (
+    request.headers.get('fly-client-ip') ??
     request.headers.get('cf-connecting-ip') ??
     request.headers.get('x-real-ip') ??
     forwardedFor?.split(',')[0]?.trim() ??

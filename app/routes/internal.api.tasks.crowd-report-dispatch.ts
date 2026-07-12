@@ -1,4 +1,3 @@
-import { env } from 'cloudflare:workers';
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 import { getDb } from '~/db';
@@ -8,20 +7,18 @@ import {
 } from '~/util/crowdReportDispatch';
 import { internalMiddleware } from '~/util/internal.middleware';
 
-type CrowdReportDispatchRuntimeEnv = typeof env & {
-  CROWD_REPORT_DISPATCH_GITHUB_TOKEN?: string;
-  CROWD_REPORT_DISPATCH_GITHUB_OWNER?: string;
-  CROWD_REPORT_DISPATCH_GITHUB_REPO?: string;
-  CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE?: string;
-};
-
 const RequestSchema = z
   .object({
     dryRun: z.boolean().default(false),
     kind: z.enum(['any', 'cluster', 'report']).default('any'),
-    limit: z.number().int().min(1).max(50).default(10),
+    limit: z.number().int().min(1).max(50).optional(),
   })
   .strict();
+
+function getDefaultDispatchLimit() {
+  const parsed = Number(process.env.CROWD_REPORT_DISPATCH_LIMIT ?? 10);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 50 ? parsed : 10;
+}
 
 async function parseOptionalJsonBody(request: Request) {
   if (request.headers.get('content-length') === '0') {
@@ -43,10 +40,6 @@ async function parseOptionalJsonBody(request: Request) {
       },
     );
   }
-}
-
-function getRuntimeEnv() {
-  return env as CrowdReportDispatchRuntimeEnv;
 }
 
 export const Route = createFileRoute(
@@ -78,8 +71,7 @@ export const Route = createFileRoute(
           );
         }
 
-        const runtimeEnv = getRuntimeEnv();
-        const rootUrl = runtimeEnv.VITE_ROOT_URL;
+        const rootUrl = process.env.VITE_ROOT_URL;
         if (!rootUrl) {
           return Response.json(
             { success: false, error: 'VITE_ROOT_URL is missing' },
@@ -88,10 +80,11 @@ export const Route = createFileRoute(
         }
 
         const db = getDb();
+        const limit = parsed.data.limit ?? getDefaultDispatchLimit();
         if (parsed.data.dryRun) {
           const candidates = await getDispatchableCrowdReportCandidates(db, {
             kind: parsed.data.kind,
-            limit: parsed.data.limit,
+            limit,
             rootUrl,
           });
           return Response.json({
@@ -102,7 +95,7 @@ export const Route = createFileRoute(
           });
         }
 
-        const token = runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_TOKEN;
+        const token = process.env.CROWD_REPORT_DISPATCH_GITHUB_TOKEN;
         if (!token) {
           return Response.json(
             {
@@ -115,12 +108,12 @@ export const Route = createFileRoute(
 
         const result = await dispatchPendingCrowdReports(db, {
           kind: parsed.data.kind,
-          limit: parsed.data.limit,
+          limit,
           rootUrl,
           token,
-          owner: runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_OWNER,
-          repo: runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_REPO,
-          eventType: runtimeEnv.CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE,
+          owner: process.env.CROWD_REPORT_DISPATCH_GITHUB_OWNER,
+          repo: process.env.CROWD_REPORT_DISPATCH_GITHUB_REPO,
+          eventType: process.env.CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE,
         });
         for (const failure of result.results.filter((item) => !item.success)) {
           console.error('Crowd report dispatch failed', failure);

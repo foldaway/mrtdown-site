@@ -1,5 +1,9 @@
 # Overhaul Read Model Plan
 
+> Historical note: this completed plan predates the move from Cloudflare
+> Workers to Fly.io and Upstash Workflow. See `docs/ARCHITECTURE.md` and
+> `docs/DATA_PIPELINE.md` for the current platform architecture.
+
 ## Context
 
 `mrtdown-site` moved data reads from the retired generated MRTDown API client to

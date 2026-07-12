@@ -2,15 +2,18 @@
 
 Community-run transit monitoring for Singapore MRT/LRT disruptions.
 
-`mrtdown-site` is a TanStack Start React app deployed to Cloudflare Workers. The
-app reads canonical mrtdown data through a Postgres/PostGIS-backed read model
-populated from data archives.
+`mrtdown-site` is a TanStack Start React app deployed to Fly.io. The Node server
+reads canonical mrtdown data through a Postgres/PostGIS-backed read model
+populated from data archives by durable Upstash Workflows.
 
 ## Stack
 
 - React 19, TanStack Start, TanStack Router, and Vite.
-- Cloudflare Workers, Workflows, Hyperdrive, and Wrangler.
+- Node.js and `srvx`, packaged as a container and deployed to Fly.io.
+- Upstash Workflow and QStash for durable jobs and recurring schedules.
 - Postgres/PostGIS with Drizzle ORM and Drizzle Kit migrations.
+- Redis-compatible Valkey locally and Redis in deployed environments for
+  short-window rate limiting.
 - Biome, TypeScript, and Vitest for quality checks.
 
 ## Local Development
@@ -18,7 +21,7 @@ populated from data archives.
 1. Install dependencies:
 
    ```sh
-   npm install
+   npm ci
    ```
 
 2. Create local environment variables:
@@ -27,18 +30,15 @@ populated from data archives.
    cp .env.example .env
    ```
 
-   Keep `VITE_ROOT_URL=http://localhost:3000` for local work. Add
-   `DATABASE_URL` for database scripts; the local Wrangler Hyperdrive binding
-   points at the same connection string:
+   The example points `VITE_ROOT_URL`, `DATABASE_URL`, and `REDIS_URL` at the
+   local services. `QSTASH_DEV=true` enables the local QStash development
+   server used by Upstash Workflow.
 
-   ```sh
-   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/mrtdown-db
-   ```
-
-3. Start a local Postgres database with PostGIS enabled, then run migrations and
+3. Start local Postgres/PostGIS and Valkey services, then run migrations and
    seed fixture data:
 
    ```sh
+   docker compose up -d postgres valkey
    npm run db:migrate
    npm run db:seed:fixtures
    ```
@@ -55,7 +55,7 @@ populated from data archives.
 
 - `npm run dev`: start the Vite dev server.
 - `npm run build`: build the app.
-- `npm run deploy`: build and deploy with Wrangler.
+- `npm run start`: serve an existing production build with `srvx`.
 - `npm run typecheck`: run TypeScript without emitting files.
 - `npm run lint`: run Biome linting.
 - `npm run format:check`: check formatting across the repository.
@@ -67,6 +67,9 @@ populated from data archives.
   migration.
 - `npm run dev:pull`: trigger the local pull workflow endpoint while the dev
   server is running.
+- `npm run dev:public-holidays`: trigger the local public-holiday workflow.
+- `npm run qstash:schedules:sync`: create or update the three managed QStash
+  schedules. Deployment workflows normally own this command.
 
 ## Project Layout
 
@@ -75,8 +78,12 @@ populated from data archives.
   client code.
 - `app/util/db.queries.ts`: DB-backed read model queries.
 - `app/db`: Drizzle schema, enum helpers, and database connection setup.
-- `app/workflows/pull`: Cloudflare Workflow code that stages and promotes
-  canonical data.
+- `app/workflows`: Upstash Workflow definitions that synchronize canonical data
+  and public holidays.
+- `app/server.ts`: Node server entry, request instrumentation, and Markdown
+  request negotiation.
+- `.github/scripts/syncQstashSchedules.mjs`: idempotent QStash schedule
+  provisioning used by deployment workflows.
 - `app/components`: reusable UI and page-level components.
 - `docs`: architecture, data pipeline, quality, and generated-file notes.
 

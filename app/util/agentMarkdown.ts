@@ -2,7 +2,6 @@ import { DateTime } from 'luxon';
 import { gfmToMarkdown } from 'mdast-util-gfm';
 import { toMarkdown } from 'mdast-util-to-markdown';
 import type { Root, RootContent, Table, TableCell, TableRow } from 'mdast';
-import { isCacheablePublicHtmlPath } from './publicHtmlCache';
 
 export const PUBLIC_MARKDOWN_CACHE_CONTROL =
   'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
@@ -19,6 +18,21 @@ const CANONICAL_MARKDOWN_PATH_PATTERNS = [
   /^\/operators\/[^/]+\/index\.md$/,
   /^\/stations\/[^/]+\/index\.md$/,
 ];
+const PUBLIC_HTML_ROUTE_PREFIXES = [
+  '/community-reports/',
+  '/history/',
+  '/lines/',
+  '/operators/',
+  '/stations/',
+];
+const PUBLIC_HTML_ROUTES = new Set([
+  '/',
+  '/about',
+  '/history',
+  '/statistics',
+  '/system-map',
+]);
+const LOCALE_SEGMENTS = new Set(['en-SG', 'zh-Hans', 'ms', 'ta']);
 
 type MarkdownDateInput = Date | DateTime | string;
 
@@ -152,7 +166,7 @@ export function getUnsupportedAgentMarkdownResponse(request: Request) {
   }
 
   if (
-    isCacheablePublicHtmlPath(pathname) &&
+    isPublicHtmlPath(pathname) &&
     prefersMarkdown(request.headers.get('accept'))
   ) {
     return new Response('Markdown is not available for this route', {
@@ -162,6 +176,20 @@ export function getUnsupportedAgentMarkdownResponse(request: Request) {
   }
 
   return null;
+}
+
+function isPublicHtmlPath(pathname: string) {
+  const [firstSegment = '', ...rest] = pathname.split('/').filter(Boolean);
+  const publicPath = LOCALE_SEGMENTS.has(firstSegment)
+    ? rest.length > 0
+      ? `/${rest.join('/')}`
+      : '/'
+    : pathname;
+
+  return (
+    PUBLIC_HTML_ROUTES.has(publicPath) ||
+    PUBLIC_HTML_ROUTE_PREFIXES.some((prefix) => publicPath.startsWith(prefix))
+  );
 }
 
 function tableRow(cells: string[]): TableRow {

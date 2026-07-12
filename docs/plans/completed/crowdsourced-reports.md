@@ -1,5 +1,10 @@
 # Crowdsourced Reports Site Plan
 
+> Historical note: platform references in this completed plan describe the
+> Cloudflare deployment used when the feature was implemented. The current app
+> runs on Fly.io with Redis rate limiting and QStash scheduling; see
+> `docs/ARCHITECTURE.md` and `docs/DATA_PIPELINE.md`.
+
 ## Context
 
 `mrtdown-site` is the runtime web app. It runs on Cloudflare Workers, stores its

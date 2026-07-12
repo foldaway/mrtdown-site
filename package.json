@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "NODE_OPTIONS='--import ./instrument.server.mjs' vite dev",
+    "start": "NODE_OPTIONS='--import ./instrument.server.mjs' srvx --prod -s ../client dist/server/server.js",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler deploy",
     "i18n:extract": "formatjs extract 'app/**/*.{ts,tsx}' --ignore '**/*.d.ts' --out-file lang/en-SG.json --format simple",
     "build": "vite build",
     "test": "vitest",
@@ -16,6 +16,7 @@
     "format:check": "biome format .",
     "seo:check": "tsx app/scripts/checkSeo.ts",
     "perf:routes": "tsx app/scripts/checkRouteTimings.ts",
+    "qstash:schedules:sync": "node .github/scripts/syncQstashSchedules.mjs",
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run db:generate:check && npm run test:run",
     "verify:strict": "npm run typecheck && npm run lint && npm run format:check && npm run db:generate:check && npm run test:run",
     "dev:pull": "curl -i -X POST http://localhost:3000/internal/api/tasks/pull",
@@ -30,8 +31,7 @@
     "db:seed:fixtures": "tsx app/scripts/seedFixtures.ts",
     "db:seed:crowd-report-fixtures": "tsx app/scripts/seedCrowdReportFixtures.ts",
     "db:preview:prepare": "npm run db:reset && npm run db:migrate:debug",
-    "db:studio": "drizzle-kit studio",
-    "cf-typegen": "wrangler types"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@fontsource-variable/radio-canada-big": "^5.2.7",
@@ -40,15 +40,16 @@
     "@mrtdown/fs": "^2.0.0-alpha.26",
     "@mrtdown/ingest-contracts": "^2.0.0-alpha.29",
     "@posthog/react": "^1.8.3",
-    "@sentry/cloudflare": "^10.47.0",
     "@sentry/tanstackstart-react": "^10.47.0",
     "@tanstack/react-query": "^5.66.11",
     "@tanstack/react-router": "1.170.15",
     "@tanstack/react-start": "1.168.25",
+    "@upstash/workflow": "1.3.2",
     "classnames": "^2.5.1",
     "drizzle-orm": "^1.0.0-beta.22",
     "fflate": "^0.8.2",
     "html-entities": "^2.6.0",
+    "ioredis": "^5.11.1",
     "isbot": "^5",
     "json-nd": "^1.0.0",
     "luxon": "^3.5.0",
@@ -57,11 +58,13 @@
     "pg": "^8.20.0",
     "posthog-js": "^1.391.2",
     "radix-ui": "^1.4.3",
+    "rate-limiter-flexible": "^11.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-intl": "^7.1.10",
     "recharts": "^2.15.1",
     "rrule": "^2.8.1",
+    "srvx": "^0.11.20",
     "tailwindcss": "^4.0.9",
     "use-debounce": "^10.0.4",
     "xast-util-to-xml": "^4.0.0",
@@ -69,7 +72,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.0.0",
-    "@cloudflare/vite-plugin": "^1.31.1",
     "@formatjs/cli": "^6.6.3",
     "@tailwindcss/vite": "^4.2.2",
     "@types/luxon": "^3.4.2",
@@ -85,7 +87,6 @@
     "typescript": "~5.7.2",
     "vite": "^8.0.16",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.1.9",
-    "wrangler": "^4.81.0"
+    "vitest": "^4.1.9"
   }
 }

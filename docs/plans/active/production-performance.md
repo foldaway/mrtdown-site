@@ -2,10 +2,15 @@
 
 ## Context
 
-Production checks on 2026-05-22 show that heavier pages are slow mainly because
-the Worker spends several seconds preparing SSR HTML before it sends the first
-byte. Static assets are served quickly from Cloudflare, so asset delivery is not
-the primary bottleneck.
+Production checks on 2026-05-22 showed that heavier pages were slow mainly
+because the then-current Cloudflare Worker spent several seconds preparing SSR
+HTML before it sent the first byte. Static assets were fast, so asset delivery
+was not the primary bottleneck.
+
+Since those measurements, the application runtime has moved to a containerized
+Node.js service on Fly.io. The request-path, payload-size, and hydration goals
+remain relevant, but Worker-specific cache and observability tasks are
+historical unless explicitly carried forward below.
 
 This plan follows the investigation in
 `docs/investigations/2026-05-21-site-slowness.md`.
@@ -85,10 +90,10 @@ Relevant code:
 - `app/hooks/useViewport.ts`
 - `app/helpers/getDateCountForViewport.ts`
 
-### 4. Base dataset cache is local to the Worker instance
+### 4. Base dataset cache is local to the server process
 
 `getBaseDataset` caches for five minutes in memory. That helps only for warm
-requests handled by the same isolate or process. Cold starts, different isolates,
+requests handled by the same process. Machine restarts, different processes,
 and cache expiry still rebuild the complete read model from many tables.
 
 Relevant code:
@@ -96,11 +101,11 @@ Relevant code:
 - `app/util/db.queries.ts#getBaseDataset`
 - `app/util/db.queries.ts#buildDataset`
 
-### 5. Public SSR HTML does not appear to be edge cached
+### 5. Public SSR HTML is not application-cached
 
-The sampled HTML responses did not include a visible `cf-cache-status` header or
-useful public cache headers. Even cacheable public pages like `/statistics` are
-therefore likely paying origin SSR cost per request.
+The former Worker Cache API implementation was removed before the Fly.io
+migration. Public HTML currently passes through SSR, so repeated requests still
+pay the application render cost unless a separate upstream cache is configured.
 
 ## Plan
 
@@ -131,7 +136,8 @@ Tasks:
   - representative entity `index.md` routes
   - `.md` alias attempts
   - `Accept: text/markdown` requests
-- Capture whether each response was Worker-rendered or edge-cached.
+- Capture whether each response was application-rendered or served by an
+  upstream cache.
 
 Exit criteria:
 
@@ -141,18 +147,25 @@ Exit criteria:
 - Markdown route traffic can inform whether XML sitemap inclusion or `.md`
   aliases are worth adding later.
 
-### Phase 1: Cache Public HTML Safely
+### Phase 1: Cache Public HTML Safely (Retired)
 
-Add short edge caching for cacheable public pages while preserving correctness.
+This phase was implemented on Cloudflare Workers and later removed before the
+Fly.io migration. It is retained here as history, not as current implementation
+guidance. Any renewed caching work should start with the current Fly topology
+and explicit invalidation/observability requirements.
 
-Tasks:
+The retired implementation added short edge caching for cacheable public pages
+while preserving correctness.
+
+Historical tasks completed for that implementation:
 
 - Set public cache headers for non-personalized SSR routes:
   - `s-maxage=60`
   - `stale-while-revalidate=300`
 - Exclude internal task routes and any future personalized routes.
 - Include route parameters and locale in the cache key.
-- Verify Cloudflare emits cache status on repeated requests.
+- Verify the selected cache layer emits observable cache status on repeated
+  requests.
 
 Candidate routes:
 
@@ -166,7 +179,7 @@ Candidate routes:
 - `/system-map`
 - `/about`
 
-Exit criteria:
+Historical exit criteria were:
 
 - Repeated requests for `/statistics` return from edge cache or equivalent
   platform cache.
@@ -238,7 +251,7 @@ Tasks:
 Exit criteria:
 
 - `getStatisticsData` no longer scans all issues on normal production requests.
-- `/statistics` remains fast even after Worker cold starts.
+- `/statistics` remains fast after server cold starts or Machine restarts.
 - Statistics updates after data pulls remain correct.
 
 ### Phase 5: Bundle and Hydration Cleanup
@@ -261,7 +274,7 @@ Exit criteria:
 - Chart-heavy statistics code is loaded only when needed.
 - Route-level Web Vitals are visible in production telemetry.
 
-## Suggested Implementation Order
+## Historical Implementation Order
 
 1. Add `Server-Timing` and route timing logs.
 2. Add short public HTML edge caching.
@@ -271,11 +284,16 @@ Exit criteria:
 6. Persist precomputed statistics payloads.
 7. Clean up preloads and chart hydration.
 
-This order gives quick production relief through caching, then reduces the
-underlying compute and payload costs so uncached requests are also fast.
+This was the original order. Phase 1 caching has since been retired; use the
+progress notes and current measurements before planning new work.
 
 ## Progress Notes
 
+- 2026-07-11: Removed the Worker Cache API-backed public HTML cache and its
+  shared-cache response headers ahead of the move to Fly.io. Public HTML now
+  always passes through SSR; the public-route classification still used by
+  agent Markdown negotiation lives with that feature instead of in a cache
+  utility.
 - 2026-05-25: Implemented Phase 1 Worker-side public HTML caching for
   successful public `GET` responses on the planned cacheable route set, plus
   origin cache headers for matching `GET`/`HEAD` responses. Cacheable pages now
@@ -441,11 +459,12 @@ SAMPLES=2 PROBES=all npm run perf:routes -- https://www.mrtdown.org
 
 ## Open Questions
 
-- Does Cloudflare Workers currently support the desired cache API or should this
-  be implemented through response headers and Cloudflare cache rules?
+- Should public HTML remain uncached on Fly.io, or should a separate reverse
+  proxy/CDN cache be introduced with explicit invalidation and cache-status
+  telemetry?
 - Are statistics allowed to be stale by 1-5 minutes, or should they update
   immediately after each successful data pull?
 - Which production telemetry target should own route timing data: Sentry,
-  PostHog, Cloudflare logs, or structured application logs?
-- Should precomputed statistics live in Postgres, KV/R2, or a generated artifact
-  deployed with the Worker?
+  PostHog, Fly logs, or structured application logs?
+- Should precomputed statistics remain in Postgres or move to a generated
+  artifact deployed with the application?

@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: staging
-      url: ${{ steps.deploy.outputs.deployment-url }}
+      url: https://staging.mrtdown.org
     concurrency:
       group: deploy-staging-${{ github.ref }}
       cancel-in-progress: true
@@ -57,38 +57,34 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
 
-      - name: Build
-        run: npm run build
+      - run: |-
+          flyctl deploy \
+            --config fly.staging.toml \
+            --local-only \
+            --image-label=${{ github.sha }} \
+            --build-arg TIER=staging \
+            --build-arg SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
+            --build-arg SENTRY_ORG=${{ secrets.SENTRY_ORG }} \
+            --build-arg SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }} \
+            --build-secret SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }} \
+            --build-arg SENTRY_RELEASE=${{ github.sha }} \
+            --build-arg VITE_PUBLIC_POSTHOG_KEY=${{ secrets.VITE_PUBLIC_POSTHOG_KEY }} \
+            --build-arg VITE_PUBLIC_POSTHOG_HOST=${{ secrets.VITE_PUBLIC_POSTHOG_HOST }} \
+            --build-arg VITE_ROOT_URL=https://staging.mrtdown.org
         env:
-          CLOUDFLARE_ENV: staging
-          GIT_SHA: ${{ github.sha }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-          SENTRY_RELEASE: ${{ github.sha }}
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Sync staging QStash schedules
+        run: npm run qstash:schedules:sync
+        env:
+          INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          QSTASH_URL: ${{ secrets.QSTASH_URL }}
           TIER: staging
-          VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY }}
-          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
-          VITE_ROOT_URL: "https://www.mrtdown.org"
-
-      - name: Deploy to Cloudflare Workers
-        id: deploy
-        uses: cloudflare/wrangler-action@v4
-        with:
-          command: deploy --env staging
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Print deployment URL
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
-        run: echo $DEPLOYMENT_URL
+          VITE_ROOT_URL: https://staging.mrtdown.org
 
   migrate-production:
     if: github.ref == 'refs/heads/production'
@@ -127,7 +123,7 @@ jobs:
       cancel-in-progress: true
     environment:
       name: production
-      url: ${{ steps.deploy.outputs.deployment-url }}
+      url: https://www.mrtdown.org
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -136,31 +132,31 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
 
-      - name: Build
-        run: npm run build
+      - run: |-
+          flyctl deploy \
+            --config fly.production.toml \
+            --local-only \
+            --build-arg TIER=production \
+            --build-arg SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
+            --image-label=${{ github.sha }} \
+            --build-arg SENTRY_ORG=${{ vars.SENTRY_ORG }} \
+            --build-arg SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }} \
+            --build-secret SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }} \
+            --build-arg SENTRY_RELEASE=${{ github.sha }} \
+            --build-arg VITE_PUBLIC_POSTHOG_KEY=${{ secrets.VITE_PUBLIC_POSTHOG_KEY }} \
+            --build-arg VITE_PUBLIC_POSTHOG_HOST=${{ secrets.VITE_PUBLIC_POSTHOG_HOST }} \
+            --build-arg VITE_ROOT_URL=https://www.mrtdown.org
         env:
-          # Used by the Cloudflare Vite plugin for wrangler env key https://developers.cloudflare.com/workers/vite-plugin/reference/cloudflare-environments/
-          CLOUDFLARE_ENV: production
-          GIT_SHA: ${{ github.sha }}
-          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
-          SENTRY_RELEASE: ${{ github.sha }}
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          TIER: production
-          VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY }}
-          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
-          VITE_ROOT_URL: "https://www.mrtdown.org"
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-      - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v4
-        id: deploy
-        with:
-          command: deploy --env production
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Sync production QStash schedules
+        run: npm run qstash:schedules:sync
+        env:
+          INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          QSTASH_URL: ${{ secrets.QSTASH_URL }}
+          TIER: production
+          VITE_ROOT_URL: https://www.mrtdown.org

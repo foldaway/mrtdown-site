@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as Char123LangChar125RouteImport } from './routes/{-$lang}'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as IndexDotmdRouteImport } from './routes/index[.]md'
+import { Route as HealthzRouteImport } from './routes/healthz'
 import { Route as Char123LangChar125IndexRouteImport } from './routes/{-$lang}/index'
 import { Route as Char123LangChar125SystemMapRouteImport } from './routes/{-$lang}/system-map'
 import { Route as Char123LangChar125SitemapDotxmlRouteImport } from './routes/{-$lang}/sitemap[.]xml'
@@ -35,6 +36,7 @@ import { Route as Char123LangChar125HistoryYearIndexRouteImport } from './routes
 import { Route as Char123LangChar125HistoryPagePageNumRouteImport } from './routes/{-$lang}/history/page.$pageNum'
 import { Route as Char123LangChar125HistoryYearMonthRouteImport } from './routes/{-$lang}/history/$year/$month'
 import { Route as Char123LangChar125CommunityReportsKindSourceIdRouteImport } from './routes/{-$lang}/community-reports/$kind/$sourceId'
+import { Route as InternalApiWorkflowsWorkflowNameRouteImport } from './routes/internal.api.workflows.$workflowName'
 import { Route as InternalApiTasksPullRouteImport } from './routes/internal.api.tasks.pull'
 import { Route as InternalApiTasksPublicHolidaysRouteImport } from './routes/internal.api.tasks.public-holidays'
 import { Route as InternalApiTasksFactsRouteImport } from './routes/internal.api.tasks.facts'
@@ -53,6 +55,11 @@ const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
 const IndexDotmdRoute = IndexDotmdRouteImport.update({
   id: '/index.md',
   path: '/index.md',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HealthzRoute = HealthzRouteImport.update({
+  id: '/healthz',
+  path: '/healthz',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char123LangChar125IndexRoute = Char123LangChar125IndexRouteImport.update({
@@ -186,6 +193,12 @@ const Char123LangChar125CommunityReportsKindSourceIdRoute =
     path: '/community-reports/$kind/$sourceId',
     getParentRoute: () => Char123LangChar125Route,
   } as any)
+const InternalApiWorkflowsWorkflowNameRoute =
+  InternalApiWorkflowsWorkflowNameRouteImport.update({
+    id: '/internal/api/workflows/$workflowName',
+    path: '/internal/api/workflows/$workflowName',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const InternalApiTasksPullRoute = InternalApiTasksPullRouteImport.update({
   id: '/internal/api/tasks/pull',
   path: '/internal/api/tasks/pull',
@@ -210,6 +223,7 @@ const InternalApiTasksCrowdReportDispatchRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/healthz': typeof HealthzRoute
   '/index.md': typeof IndexDotmdRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
@@ -233,6 +247,7 @@ export interface FileRoutesByFullPath {
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
+  '/internal/api/workflows/$workflowName': typeof InternalApiWorkflowsWorkflowNameRoute
   '/{-$lang}/community-reports/$kind/$sourceId': typeof Char123LangChar125CommunityReportsKindSourceIdRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
@@ -242,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/operators/$operatorId/': typeof Char123LangChar125OperatorsOperatorIdIndexRoute
 }
 export interface FileRoutesByTo {
+  '/healthz': typeof HealthzRoute
   '/index.md': typeof IndexDotmdRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/api/issues-day': typeof ApiIssuesDayRoute
@@ -264,6 +280,7 @@ export interface FileRoutesByTo {
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
+  '/internal/api/workflows/$workflowName': typeof InternalApiWorkflowsWorkflowNameRoute
   '/{-$lang}/community-reports/$kind/$sourceId': typeof Char123LangChar125CommunityReportsKindSourceIdRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
@@ -274,6 +291,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/healthz': typeof HealthzRoute
   '/index.md': typeof IndexDotmdRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
@@ -297,6 +315,7 @@ export interface FileRoutesById {
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
+  '/internal/api/workflows/$workflowName': typeof InternalApiWorkflowsWorkflowNameRoute
   '/{-$lang}/community-reports/$kind/$sourceId': typeof Char123LangChar125CommunityReportsKindSourceIdRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumRoute
@@ -308,6 +327,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/healthz'
     | '/index.md'
     | '/llms.txt'
     | '/{-$lang}'
@@ -331,6 +351,7 @@ export interface FileRouteTypes {
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
+    | '/internal/api/workflows/$workflowName'
     | '/{-$lang}/community-reports/$kind/$sourceId'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
@@ -340,6 +361,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/operators/$operatorId/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/healthz'
     | '/index.md'
     | '/llms.txt'
     | '/api/issues-day'
@@ -362,6 +384,7 @@ export interface FileRouteTypes {
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
+    | '/internal/api/workflows/$workflowName'
     | '/{-$lang}/community-reports/$kind/$sourceId'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
@@ -371,6 +394,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/operators/$operatorId'
   id:
     | '__root__'
+    | '/healthz'
     | '/index.md'
     | '/llms.txt'
     | '/{-$lang}'
@@ -394,6 +418,7 @@ export interface FileRouteTypes {
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
+    | '/internal/api/workflows/$workflowName'
     | '/{-$lang}/community-reports/$kind/$sourceId'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
@@ -404,6 +429,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  HealthzRoute: typeof HealthzRoute
   IndexDotmdRoute: typeof IndexDotmdRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
   Char123LangChar125Route: typeof Char123LangChar125RouteWithChildren
@@ -418,6 +444,7 @@ export interface RootRouteChildren {
   InternalApiTasksFactsRoute: typeof InternalApiTasksFactsRoute
   InternalApiTasksPublicHolidaysRoute: typeof InternalApiTasksPublicHolidaysRoute
   InternalApiTasksPullRoute: typeof InternalApiTasksPullRoute
+  InternalApiWorkflowsWorkflowNameRoute: typeof InternalApiWorkflowsWorkflowNameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -441,6 +468,13 @@ declare module '@tanstack/react-router' {
       path: '/index.md'
       fullPath: '/index.md'
       preLoaderRoute: typeof IndexDotmdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/healthz': {
+      id: '/healthz'
+      path: '/healthz'
+      fullPath: '/healthz'
+      preLoaderRoute: typeof HealthzRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/{-$lang}/': {
@@ -604,6 +638,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char123LangChar125CommunityReportsKindSourceIdRouteImport
       parentRoute: typeof Char123LangChar125Route
     }
+    '/internal/api/workflows/$workflowName': {
+      id: '/internal/api/workflows/$workflowName'
+      path: '/internal/api/workflows/$workflowName'
+      fullPath: '/internal/api/workflows/$workflowName'
+      preLoaderRoute: typeof InternalApiWorkflowsWorkflowNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/internal/api/tasks/pull': {
       id: '/internal/api/tasks/pull'
       path: '/internal/api/tasks/pull'
@@ -686,6 +727,7 @@ const Char123LangChar125RouteWithChildren =
   Char123LangChar125Route._addFileChildren(Char123LangChar125RouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  HealthzRoute: HealthzRoute,
   IndexDotmdRoute: IndexDotmdRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
   Char123LangChar125Route: Char123LangChar125RouteWithChildren,
@@ -701,6 +743,7 @@ const rootRouteChildren: RootRouteChildren = {
   InternalApiTasksFactsRoute: InternalApiTasksFactsRoute,
   InternalApiTasksPublicHolidaysRoute: InternalApiTasksPublicHolidaysRoute,
   InternalApiTasksPullRoute: InternalApiTasksPullRoute,
+  InternalApiWorkflowsWorkflowNameRoute: InternalApiWorkflowsWorkflowNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

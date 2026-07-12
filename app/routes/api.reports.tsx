@@ -1,6 +1,7 @@
-import { env } from 'cloudflare:workers';
 import { createFileRoute } from '@tanstack/react-router';
+import { RateLimiterRes } from 'rate-limiter-flexible';
 import { getDb } from '~/db';
+import { getCrowdReportRateLimiter } from '~/limiters/crowdReport';
 import {
   buildCrowdReportAbuseContext,
   CrowdReportRateLimitError,
@@ -11,20 +12,6 @@ import {
   validateCrowdReportSubmission,
   verifyTurnstileToken,
 } from '~/util/crowdReports';
-
-type CrowdReportRuntimeEnv = typeof env & {
-  CROWD_REPORT_HASH_SALT?: string;
-  CROWD_REPORT_RATE_LIMIT_PER_HOUR?: string;
-  CROWD_REPORT_TURNSTILE_SECRET_KEY?: string;
-  CROWD_REPORT_TURNSTILE_HOSTNAME?: string;
-  CROWD_REPORT_TURNSTILE_ACTION?: string;
-  CROWD_REPORT_RATE_LIMITER?: RateLimit;
-  TURNSTILE_SECRET_KEY?: string;
-};
-
-function getRuntimeEnv() {
-  return env as CrowdReportRuntimeEnv;
-}
 
 function getRateLimitPerHour(value: string | undefined) {
   if (!value) {
@@ -38,9 +25,8 @@ export const Route = createFileRoute('/api/reports')({
   server: {
     handlers: {
       async POST({ request }) {
-        const runtimeEnv = getRuntimeEnv();
         const hashSalt =
-          runtimeEnv.CROWD_REPORT_HASH_SALT ??
+          process.env.CROWD_REPORT_HASH_SALT ??
           (import.meta.env.DEV ? 'development-crowd-report-salt' : undefined);
         if (!hashSalt) {
           return Response.json(
@@ -70,15 +56,15 @@ export const Route = createFileRoute('/api/reports')({
         }
 
         const turnstile = await verifyTurnstileToken(
-          runtimeEnv.CROWD_REPORT_TURNSTILE_SECRET_KEY ??
-            runtimeEnv.TURNSTILE_SECRET_KEY,
+          process.env.CROWD_REPORT_TURNSTILE_SECRET_KEY ??
+            process.env.TURNSTILE_SECRET_KEY,
           validation.data.turnstileToken,
           getClientIp(request),
           {
             expectedHostname:
-              runtimeEnv.CROWD_REPORT_TURNSTILE_HOSTNAME ??
+              process.env.CROWD_REPORT_TURNSTILE_HOSTNAME ??
               new URL(request.url).hostname,
-            expectedAction: runtimeEnv.CROWD_REPORT_TURNSTILE_ACTION,
+            expectedAction: process.env.CROWD_REPORT_TURNSTILE_ACTION,
           },
         );
         if (!turnstile.success) {
@@ -98,29 +84,29 @@ export const Route = createFileRoute('/api/reports')({
           turnstile.outcome,
         );
 
-        const nativeRateLimiter = runtimeEnv.CROWD_REPORT_RATE_LIMITER;
-        if (nativeRateLimiter) {
-          try {
-            const { success } = await nativeRateLimiter.limit({
-              key: abuseContext.ipHash,
-            });
-            if (!success) {
-              return Response.json(
-                {
-                  success: false,
-                  error: 'Too many reports submitted from this network',
+        const rateLimiter = getCrowdReportRateLimiter();
+        try {
+          await rateLimiter.consume(abuseContext.ipHash, 1);
+        } catch (error) {
+          if (!(error instanceof RateLimiterRes)) {
+            console.error('Crowd report rate limiter store failed', error);
+          } else {
+            return Response.json(
+              {
+                success: false,
+                error: 'Too many reports submitted from this network',
+              },
+              {
+                status: 429,
+                headers: {
+                  'retry-after': String(Math.ceil(error.msBeforeNext / 1000)),
                 },
-                {
-                  status: 429,
-                  headers: {
-                    'retry-after': String(60),
-                  },
-                },
-              );
-            }
-          } catch (error) {
-            console.warn('Native crowd report rate limiter failed', { error });
+              },
+            );
           }
+
+          // The database-backed limiter below still protects this endpoint if
+          // Redis is temporarily unavailable.
         }
 
         const db = getDb();
@@ -150,7 +136,7 @@ export const Route = createFileRoute('/api/reports')({
             abuseContext,
             {
               rateLimitPerHour: getRateLimitPerHour(
-                runtimeEnv.CROWD_REPORT_RATE_LIMIT_PER_HOUR,
+                process.env.CROWD_REPORT_RATE_LIMIT_PER_HOUR,
               ),
             },
           );

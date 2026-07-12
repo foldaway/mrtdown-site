@@ -1,44 +1,29 @@
-import { env } from 'cloudflare:workers';
 import { createFileRoute } from '@tanstack/react-router';
 import { internalMiddleware } from '~/util/internal.middleware';
+import { getClient } from '~/workflows/client';
+
+const { VITE_ROOT_URL } = process.env;
 
 export const Route = createFileRoute('/internal/api/tasks/pull')({
   server: {
     middleware: [internalMiddleware],
     handlers: {
       async POST() {
-        if (!env.PULL_WORKFLOW) {
-          return Response.json(
-            { success: false, error: 'PULL_WORKFLOW binding is missing' },
-            { status: 503 },
-          );
-        }
-
-        try {
-          const workflow = await env.PULL_WORKFLOW.create();
-          if (!workflow?.id) {
-            return Response.json(
-              { success: false, error: 'PULL_WORKFLOW creation failed' },
-              { status: 500 },
-            );
-          }
-
-          return Response.json(
-            { success: true, workflowId: workflow.id },
-            {
-              status: 202,
-            },
-          );
-        } catch (error) {
-          console.error('PULL_WORKFLOW creation failed', { error });
-          return Response.json(
-            {
-              success: false,
-              error: 'PULL_WORKFLOW creation failed',
-            },
-            { status: 500 },
-          );
-        }
+        const client = getClient();
+        const { workflowRunId } = await client.trigger({
+          url: new URL(
+            '/internal/api/workflows/pull',
+            VITE_ROOT_URL,
+          ).toString(),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          flowControl: {
+            key: 'internal-api',
+            parallelism: 1,
+          },
+        });
+        return Response.json({ workflowRunId }, { status: 202 });
       },
     },
   },
