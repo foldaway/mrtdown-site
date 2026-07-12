@@ -34,8 +34,11 @@ the environments can share one QStash account without overwriting each other.
 Configure `QSTASH_URL`, `QSTASH_TOKEN`, and `INTERNAL_API_TOKEN` as secrets in
 each GitHub deployment environment. The deployment workflow supplies `TIER`
 and `VITE_ROOT_URL`; `INTERNAL_API_TOKEN` must match one of the target app's
-`INTERNAL_API_TOKENS`. To inspect the configuration locally without calling
-QStash, set those five variables and run:
+`INTERNAL_API_TOKENS`. Configure `QSTASH_CURRENT_SIGNING_KEY` and
+`QSTASH_NEXT_SIGNING_KEY` on each Fly app; workflow endpoints reject requests
+when either key is missing outside local `QSTASH_DEV` mode. To inspect the
+configuration locally without calling QStash, set the schedule variables and
+run:
 
 ```sh
 npm run qstash:schedules:sync -- --dry-run

@@ -58,6 +58,9 @@ branch rather than per-PR preview deploys.
 Each environment uses its own `fly.<environment>.toml`. GitHub deployment
 environments provide the Fly deployment token, migration database URL, Sentry
 build credentials, QStash credentials, and internal API token. Runtime values
-such as `DATABASE_URL`, `REDIS_URL`, `SENTRY_DSN`, and signing keys are
-configured on the corresponding Fly app. The deployed image contains only
-production dependencies and the `dist` client/server build output.
+such as `DATABASE_URL`, `REDIS_URL`, `SENTRY_DSN`,
+`QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`, and other signing keys
+are configured on the corresponding Fly app. Both QStash signing keys are
+required outside local `QSTASH_DEV` mode so public workflow requests are
+verified. The deployed image contains only production dependencies and the
+`dist` client/server build output.
