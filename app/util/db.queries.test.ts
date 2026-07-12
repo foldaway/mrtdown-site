@@ -5,11 +5,26 @@ import {
   buildLineSummary,
   deriveServiceScopeStationIds,
   parseStatisticsSnapshotPayload,
+  resolveStationMembershipEndedAt,
   resolveStationProfileStationId,
   selectIncludedEntities,
   selectServiceBranchSourceEvents,
   type SystemAnalytics,
 } from './db.queries';
+
+describe('resolveStationMembershipEndedAt', () => {
+  it('exposes an end date on its exclusive boundary', () => {
+    expect(resolveStationMembershipEndedAt('2026-07-12', '2026-07-12')).toBe(
+      '2026-07-12',
+    );
+  });
+
+  it('does not expose a future end date as a closure', () => {
+    expect(
+      resolveStationMembershipEndedAt('2026-07-13', '2026-07-12'),
+    ).toBeUndefined();
+  });
+});
 
 const REFERENCE_NOW = DateTime.fromISO('2026-02-23T23:59:00', {
   zone: 'Asia/Singapore',

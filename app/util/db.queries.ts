@@ -200,6 +200,13 @@ export function deriveServiceScopeStationIds(
   return scopedStationIds.length > 0 ? scopedStationIds : [...branchStationIds];
 }
 
+export function resolveStationMembershipEndedAt(
+  endedAt: string | null,
+  referenceDate: string,
+) {
+  return endedAt != null && endedAt <= referenceDate ? endedAt : undefined;
+}
+
 type ImpactEventStateRow = Pick<
   typeof impactEventsTable.$inferSelect,
   'id' | 'type'
@@ -1684,7 +1691,7 @@ async function buildDataset(
             : null;
         if (
           endedAtByStationCode != null &&
-          endedAtByStationCode < referenceDate
+          endedAtByStationCode <= referenceDate
         ) {
           return endedAtByStationCode;
         }
@@ -1753,10 +1760,10 @@ async function buildDataset(
             codeInfo?.started_at ??
             linesById[lineId]?.startedAt ??
             '1970-01-01',
-          endedAt:
-            codeInfo?.ended_at != null && codeInfo.ended_at < referenceDate
-              ? codeInfo.ended_at
-              : undefined,
+          endedAt: resolveStationMembershipEndedAt(
+            codeInfo?.ended_at ?? null,
+            referenceDate,
+          ),
           structureType: codeInfo?.structure_type ?? 'underground',
           sequenceOrder: index,
         };
@@ -1792,10 +1799,7 @@ async function buildDataset(
       branchId: `${code.line_id}:${code.code}`,
       code: code.code,
       startedAt: code.started_at,
-      endedAt:
-        code.ended_at != null && code.ended_at < referenceDate
-          ? code.ended_at
-          : undefined,
+      endedAt: resolveStationMembershipEndedAt(code.ended_at, referenceDate),
       structureType: code.structure_type,
       sequenceOrder: 0,
     });
