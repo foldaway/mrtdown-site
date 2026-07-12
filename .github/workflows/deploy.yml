@@ -142,8 +142,8 @@ jobs:
             --build-arg TIER=production \
             --build-arg SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
             --image-label=${{ github.sha }} \
-            --build-arg SENTRY_ORG=${{ secrets.SENTRY_ORG }} \
-            --build-arg SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }} \
+            --build-arg SENTRY_ORG=${{ vars.SENTRY_ORG }} \
+            --build-arg SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }} \
             --build-secret SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }} \
             --build-arg SENTRY_RELEASE=${{ github.sha }} \
             --build-arg VITE_PUBLIC_POSTHOG_KEY=${{ secrets.VITE_PUBLIC_POSTHOG_KEY }} \
