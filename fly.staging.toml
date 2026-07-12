@@ -10,6 +10,7 @@ swap_size_mb = 512
 [build]
 
 [env]
+  MRTDOWN_DATA_URL = 'https://data.mrtdown.org/mrtdown-data'
   TIER = 'staging'
   VITE_ROOT_URL = 'https://staging.mrtdown.org'
 
