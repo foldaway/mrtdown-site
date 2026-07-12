@@ -211,6 +211,8 @@
   "issue.subtype.weather": "Weather",
   "line.branch.closed": "Closed on {date}",
   "line.branch.in_service": "In Service",
+  "line.page_description": "Check {componentName} service status, 90-day uptime, disruptions, planned maintenance, operating hours and {stationCount, plural, one {its station} other {all # stations}}.",
+  "line.page_description_future": "Explore {componentName} plans, future service status, planned stations, operators and maintenance updates for Singapore's rail network.",
   "line.page_title": "{componentName} Status, Disruptions & Stations | mrtdown",
   "line.report_cta": "Report an issue on this line",
   "line.report_cta_mobile": "Report issue",

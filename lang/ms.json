@@ -211,6 +211,8 @@
   "issue.subtype.weather": "Cuaca Buruk",
   "line.branch.closed": "Ditutup pada {date}",
   "line.branch.in_service": "Dalam Perkhidmatan",
+  "line.page_description": "Semak status perkhidmatan {componentName}, kadar operasi 90 hari, gangguan, penyelenggaraan berjadual, waktu operasi dan kesemua {stationCount} stesen.",
+  "line.page_description_future": "Terokai rancangan {componentName}, status perkhidmatan masa hadapan, stesen terancang, pengendali dan kemas kini penyelenggaraan rangkaian rel Singapura.",
   "line.page_title": "Status, Gangguan dan Stesen {componentName} | mrtdown",
   "line.report_cta": "Laporkan isu pada laluan ini",
   "line.report_cta_mobile": "Lapor isu",

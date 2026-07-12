@@ -75,7 +75,7 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
     const { lineId, lang = 'en-SG' } = ctx.params;
     assert(ctx.loaderData != null);
     const { data: lineProfile, included } = ctx.loaderData;
-    const { branches, issueCountByType, stationCount } = lineProfile;
+    const { branches, stationCount } = lineProfile;
     const line = included.lines[lineId];
     const componentName = getLocalizedTranslation(line.name, lang);
 
@@ -105,39 +105,26 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
       { componentName },
     );
 
-    const issueTypeCountString = buildIssueTypeCountString(
-      issueCountByType as Record<IssueType, number>,
-      intl,
-    );
-
     const description = lineHasStarted(line)
       ? intl.formatMessage(
           {
-            id: 'general.component_description',
+            id: 'line.page_description',
             defaultMessage:
-              'The {componentName} began operations on {startDate}. It currently has {stationCount, plural, one {# station} other {# stations}}, with {issueTypeCountString} reported to date.',
+              'Check {componentName} service status, 90-day uptime, disruptions, planned maintenance, operating hours and {stationCount, plural, one {its station} other {all # stations}}.',
           },
           {
             stationCount,
             componentName,
-            startDate: intl.formatDate(line.startedAt, {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            }),
-            issueTypeCountString,
           },
         )
       : intl.formatMessage(
           {
-            id: 'general.component_description_future',
+            id: 'line.page_description_future',
             defaultMessage:
-              'The {componentName} will begin operations in the future. It has {stationCount, plural, one {# station} other {# stations}} planned, with {issueTypeCountString} reported to date.',
+              "Explore {componentName} plans, future service status, planned stations, operators and maintenance updates for Singapore's rail network.",
           },
           {
-            stationCount,
             componentName,
-            issueTypeCountString,
           },
         );
 

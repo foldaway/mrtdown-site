@@ -211,6 +211,8 @@
   "issue.subtype.weather": "天气影响",
   "line.branch.closed": "于{date}关闭",
   "line.branch.in_service": "正在服务",
+  "line.page_description": "查看{componentName}的服务状态、90天正常运行率、服务中断、计划维护、运营时间及全部{stationCount, plural, other {# 个车站}}。",
+  "line.page_description_future": "了解{componentName}规划、未来服务状态、计划车站、运营商及新加坡轨道交通网络的维护更新。",
   "line.page_title": "{componentName}服务状态、中断和车站 | mrtdown",
   "line.report_cta": "报告此线路的问题",
   "line.report_cta_mobile": "报告问题",

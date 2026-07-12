@@ -211,6 +211,8 @@
   "issue.subtype.weather": "வானிலை பாதிப்பு",
   "line.branch.closed": "{date} அன்று மூடப்பட்டது",
   "line.branch.in_service": "சேவையில் உள்ளது",
+  "line.page_description": "{componentName} சேவை நிலை, 90 நாள் இயக்க விகிதம், தடைகள், திட்டமிட்ட பராமரிப்பு, இயக்க நேரங்கள் மற்றும் அனைத்து {stationCount} நிலையங்களையும் பார்க்கவும்.",
+  "line.page_description_future": "{componentName} திட்டங்கள், எதிர்கால சேவை நிலை, திட்டமிட்ட நிலையங்கள், இயக்குநர்கள் மற்றும் சிங்கப்பூர் ரயில் வலையமைப்பின் பராமரிப்பு புதுப்பிப்புகளைப் பார்க்கவும்.",
   "line.page_title": "{componentName} நிலை, தடைகள் மற்றும் நிலையங்கள் | mrtdown",
   "line.report_cta": "இந்த வழித்தடத்தில் உள்ள சிக்கலைத் தெரிவிக்கவும்",
   "line.report_cta_mobile": "சிக்கலை தெரிவிக்கவும்",
