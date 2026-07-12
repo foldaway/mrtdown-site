@@ -11,5 +11,7 @@
   "editor.codeActionsOnSave": {
     "quickfix.biome": "explicit",
     "source.organizeImports.biome": "explicit"
-  }
+  },
+  "tailwindCSS.classFunctions": ["classNames"],
+  "tailwindCSS.experimental.configFile": "app/index.css"
 }

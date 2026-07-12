@@ -9,6 +9,14 @@
       "settings": {
         "require_config_file": true
       }
+    },
+    "tailwindcss-language-server": {
+      "settings": {
+        "classFunctions": ["classNames"],
+        "experimental": {
+          "configFile": "app/index.css"
+        }
+      }
     }
   },
   "code_actions_on_format": {
