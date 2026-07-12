@@ -10,17 +10,6 @@ export function ProfileTrendCardSkeleton() {
   );
 }
 
-export function ProfileSystemMapCardSkeleton() {
-  return (
-    <div className="flex min-h-96 flex-col rounded-lg border border-gray-300 p-6 shadow-lg dark:border-gray-700">
-      <div className="mb-2 h-6 w-28 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
-      <div className="min-h-0 flex-1 bg-gray-100 p-3 dark:bg-gray-800">
-        <div className="h-full min-h-80 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
-      </div>
-    </div>
-  );
-}
-
 export function CommunitySignalsSectionSkeleton() {
   return (
     <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/70 dark:bg-amber-950/30">

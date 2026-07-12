@@ -15,7 +15,6 @@ import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import {
   CommunitySignalsSectionSkeleton,
   ProfileRecentIssuesSectionSkeleton,
-  ProfileSystemMapCardSkeleton,
   ProfileTrendCardSkeleton,
 } from '~/components/ProfileWidgetSkeletons';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
@@ -33,11 +32,6 @@ import { UptimeCard } from './components/UptimeCard';
 const CountTrendCards = lazy(() =>
   import('./components/CountTrendCards').then((module) => ({
     default: module.CountTrendCards,
-  })),
-);
-const LineSystemMapCard = lazy(() =>
-  import('./components/LineSystemMapCard').then((module) => ({
-    default: module.LineSystemMapCard,
   })),
 );
 const UptimeRatioTrendCards = lazy(() =>
@@ -475,13 +469,6 @@ function ComponentPage() {
         <LineSchematicCard line={line} branches={branches} />
 
         <QuickFactsCard line={line} stationCount={stationCount} />
-
-        <DeferredViewportWidget
-          className="md:col-span-4"
-          fallback={<ProfileSystemMapCardSkeleton />}
-        >
-          <LineSystemMapCard line={line} branches={branches} />
-        </DeferredViewportWidget>
 
         {lineProfile.lineSummary.status !== 'future_service' && (
           <DeferredViewportWidget
