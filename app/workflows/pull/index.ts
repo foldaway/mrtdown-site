@@ -5,7 +5,6 @@ import {
 } from '@upstash/workflow';
 import { createWorkflow } from '@upstash/workflow/tanstack';
 import { ZipStore } from '~/helpers/ZipStore.js';
-import { assert } from '~/util/assert.js';
 import {
   rebuildOperationalFactsRange,
   rebuildStatisticsSnapshot,
@@ -69,7 +68,9 @@ async function runPullStep<T>(
  */
 async function executePull(context: WorkflowContext<Params>) {
   const dataUrl = process.env.MRTDOWN_DATA_URL;
-  assert(dataUrl != null, 'MRTDOWN_DATA_URL not set');
+  if (dataUrl == null) {
+    throw new WorkflowNonRetryableError('MRTDOWN_DATA_URL not set');
+  }
 
   const manifest = await runPullStep(context, 'manifest', async () =>
     fetchManifest(dataUrl),
