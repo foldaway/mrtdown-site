@@ -1,4 +1,4 @@
-import { InformationCircleIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { InformationCircleIcon, MapPinIcon } from '@heroicons/react/24/solid';
 import type { IssueType } from '@mrtdown/core';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
@@ -28,6 +28,7 @@ import { useHydrated } from '~/hooks/useHydrated';
 import type { IncludedEntities, Station } from '~/types';
 import { getStationProfileFn } from '~/util/station.functions';
 import { assert } from '../../../util/assert';
+import { useRotatingLineColors } from './$stationId/hooks/useRotatingLineColors';
 
 const CommunitySignalsSection = lazy(() =>
   import('~/components/CommunitySignalsSection').then((module) => ({
@@ -339,6 +340,7 @@ function StationPage() {
     townName,
     landmarkNames,
     stationCodes,
+    stationStructureTypes,
     componentTypeStrings,
     transitTypeStrings,
     isInterchange,
@@ -359,6 +361,9 @@ function StationPage() {
       intl,
     );
   }, [stationProfile.issueCountByType, intl]);
+  const hasReportedIssues = Object.values(stationProfile.issueCountByType).some(
+    (count) => count > 0,
+  );
 
   /**
    * Filter memberships to unique lineId-code pairs only.
@@ -376,92 +381,197 @@ function StationPage() {
     });
   }, [station.memberships]);
 
+  const membershipsUniqueActive = useMemo(() => {
+    return membershipsUnique.filter((membership) => {
+      return membership.endedAt == null;
+    });
+  }, [membershipsUnique]);
+
+  const lineColorsUnique = useMemo(() => {
+    const colors = new Set<string>();
+    for (const membership of membershipsUniqueActive) {
+      const line = included.lines[membership.lineId];
+      colors.add(line.color);
+    }
+    return Array.from(colors);
+  }, [included.lines, membershipsUniqueActive]);
+
+  const rotatedLineColor = useRotatingLineColors(lineColorsUnique);
+
   return (
     <IncludedEntitiesContext.Provider value={included}>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
         {/* Station Header Section */}
-        <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-lg dark:border-gray-600/60 dark:bg-gray-800">
-          <div className="p-4 sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex-1">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <StationBar memberships={membershipsUnique} />
-                  {isInterchange && (
-                    <span className="rounded-full bg-amber-500/10 px-3 py-0.5 font-medium text-amber-500 text-xs dark:text-amber-300">
-                      <FormattedMessage
-                        id="station.interchange_badge"
-                        defaultMessage="Interchange"
-                      />
-                    </span>
-                  )}
-                </div>
-
-                <h1 className="mb-2 font-bold text-3xl text-gray-900 dark:text-white">
-                  {stationHeading}
-                  {stationDefaultName !== stationName && (
-                    <span className="ml-2 text-gray-600 text-xl dark:text-gray-300">
-                      {' '}
-                      ({stationDefaultName})
-                    </span>
-                  )}
+        <header className="flex flex-col">
+          <div className="grid grid-cols-1 grid-rows-[3fr_1fr_1fr] gap-x-1 bg-gray-400 [grid-template-areas:'main''aside1''aside2'] md:grid-cols-[3fr_6fr_3fr] md:grid-rows-1 dark:bg-gray-500 md:[grid-template-areas:'aside1_main_aside2']">
+            {/* Aside 1 pane */}
+            <div
+              className="flex items-center justify-center bg-white transition-colors duration-500 [grid-area:aside1] md:border-b-8 dark:bg-gray-200"
+              style={{ borderBottomColor: rotatedLineColor }}
+            >
+              <div className="inline-flex min-w-0 items-center gap-1 text-xs">
+                <MapPinIcon className="size-4 text-gray-500" />
+                <span className="font-medium">{townName}</span>
+              </div>
+            </div>
+            {/* Main pane */}
+            <div
+              className="flex items-center justify-center gap-x-4 border-b-8 bg-zinc-800 py-3 transition-colors duration-500 [grid-area:'main']"
+              style={{ borderBottomColor: rotatedLineColor }}
+            >
+              <div
+                className="grid overflow-hidden rounded-2xl border-[3px] border-white"
+                style={{
+                  gridTemplateColumns: `repeat(${membershipsUniqueActive.length},1fr)`,
+                }}
+              >
+                {membershipsUniqueActive.map((membership) => (
+                  <span
+                    key={membership.code}
+                    className="inline-flex min-h-8 items-center justify-center px-1.5 py-0.5 font-bold text-lg text-white shadow-sm transition-colors md:px-2.5 md:py-1 md:text-xl"
+                    style={{
+                      backgroundColor: included.lines[membership.lineId].color,
+                    }}
+                  >
+                    {membership.code}
+                  </span>
+                ))}
+              </div>
+              <div className="flex flex-col items-start">
+                <h1 className="font-bold text-gray-100 text-xl leading-tight md:text-2xl">
+                  {stationName}
                 </h1>
-
-                <div className="text-gray-700 dark:text-gray-200">
-                  <div className="mb-2 flex flex-wrap items-center gap-1 text-sm">
-                    <MapPinIcon className="h-4 w-4 text-gray-600 dark:text-gray-300" />
-                    <span className="font-medium">{townName}</span>
-                    {landmarkNames.length > 0 && (
-                      <>
-                        <span className="text-gray-500 dark:text-gray-400">
-                          •
-                        </span>
-                        <span>
-                          <FormattedMessage
-                            id="general.near_landmarks"
-                            defaultMessage="Near {landmarkNames}"
-                            values={{
-                              landmarkNames: intl.formatList(landmarkNames),
-                            }}
-                          />
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-1 text-sm">
-                    <InformationCircleIcon className="h-4 w-4 text-gray-600 dark:text-gray-300" />
-                    <span>{issueTypeCountString}</span>
-                  </div>
+                <div className="flex items-center gap-x-2">
+                  {Object.entries(station.name)
+                    .filter(([lang]) => lang !== intl.locale)
+                    .map(([lang, translatedText]) => (
+                      <p
+                        key={lang}
+                        className="font-medium text-gray-300 text-sm leading-5"
+                      >
+                        {translatedText}
+                      </p>
+                    ))}
                 </div>
               </div>
-
-              <div className="flex flex-col gap-2 text-right">
-                <div className="text-gray-600 text-sm dark:text-gray-300">
-                  <span className="inline-flex items-center gap-1">
-                    <FormattedMessage
-                      id="station.line_types_station"
-                      defaultMessage="{lineTypes} station"
-                      values={{
-                        lineTypes: intl.formatList(componentTypeStrings),
-                      }}
-                    />
-                  </span>
-                </div>
-                <Link
-                  to="/{-$lang}/report"
-                  search={{ stationId: station.id }}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
-                >
+            </div>
+            {/* Aside 2 pane */}
+            <div
+              className="flex items-center justify-center bg-white transition-colors duration-500 [grid-area:'aside2'] md:border-b-8 dark:bg-gray-200"
+              style={{ borderBottomColor: rotatedLineColor }}
+            >
+              <div className="inline-flex min-w-0 items-center gap-1.5 text-xs">
+                <span className="mx-2 text-center">
                   <FormattedMessage
-                    id="station.report_cta"
-                    defaultMessage="Report issue here"
+                    id="station.line_types_station"
+                    defaultMessage="{lineTypes} station"
+                    values={{
+                      lineTypes: intl.formatList(componentTypeStrings),
+                    }}
                   />
-                  <BetaBadge />
-                </Link>
+                </span>
               </div>
             </div>
           </div>
+        </header>
+
+        <div className="mt-2 min-w-0 md:mt-0">
+          <p className="border-gray-200 text-gray-700 text-sm leading-6 dark:border-gray-700 dark:text-gray-300">
+            {isInterchange ? (
+              landmarkNames.length > 0 ? (
+                <FormattedMessage
+                  id="station.display_description.interchange"
+                  defaultMessage="{stationHeading} is an interchange in {area} near {landmarks}."
+                  values={{
+                    stationHeading,
+                    area: townName,
+                    landmarks: intl.formatList(landmarkNames),
+                  }}
+                />
+              ) : (
+                <FormattedMessage
+                  id="station.display_description.interchange_without_landmarks"
+                  defaultMessage="{stationHeading} is an interchange in {area}."
+                  values={{
+                    stationHeading,
+                    area: townName,
+                  }}
+                />
+              )
+            ) : landmarkNames.length > 0 ? (
+              <FormattedMessage
+                id="station.display_description.non_interchange"
+                defaultMessage="{stationHeading} is an {structureTypes} station in {area} near {landmarks}."
+                values={{
+                  stationHeading,
+                  area: townName,
+                  landmarks: intl.formatList(landmarkNames),
+                  structureTypes: intl.formatList(stationStructureTypes),
+                }}
+              />
+            ) : (
+              <FormattedMessage
+                id="station.display_description.non_interchange_without_landmarks"
+                defaultMessage="{stationHeading} is an {structureTypes} station in {area}."
+                values={{
+                  stationHeading,
+                  area: townName,
+                  structureTypes: intl.formatList(stationStructureTypes),
+                }}
+              />
+            )}{' '}
+            {hasReportedIssues ? (
+              <FormattedMessage
+                id="station.display_description.issues_reported"
+                defaultMessage="{issueTypeCountString} reported to date."
+                values={{ issueTypeCountString }}
+              />
+            ) : (
+              <FormattedMessage
+                id="station.display_description.no_issues_reported"
+                defaultMessage="No issues have been reported to date."
+              />
+            )}
+          </p>
         </div>
+
+        <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 sm:gap-4 sm:rounded-2xl sm:p-4 dark:border-sky-900 dark:bg-sky-950/30">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
+                <FormattedMessage
+                  id="station.report_cta_title"
+                  defaultMessage="Seeing an issue at this station?"
+                />
+              </h2>
+              <BetaBadge />
+            </div>
+            <p className="mt-1 hidden text-gray-600 text-xs leading-5 sm:block dark:text-gray-300">
+              <FormattedMessage
+                id="station.report_cta_note"
+                defaultMessage="Community reports are reviewed separately from official operator advisories."
+              />
+            </p>
+          </div>
+          <Link
+            to="/{-$lang}/report"
+            search={{ stationId: station.id }}
+            className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-accent-light px-3 py-1.5 font-semibold text-white text-xs transition-colors hover:bg-accent-dark sm:min-h-10 sm:px-3 sm:py-1"
+          >
+            <span className="sm:hidden">
+              <FormattedMessage
+                id="station.report_cta_mobile"
+                defaultMessage="Report issue"
+              />
+            </span>
+            <span className="hidden sm:inline">
+              <FormattedMessage
+                id="station.report_cta"
+                defaultMessage="Report issue here"
+              />
+            </span>
+          </Link>
+        </section>
 
         {stationProfile.communitySignals.length > 0 && (
           <DeferredViewportWidget
