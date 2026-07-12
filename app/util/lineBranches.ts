@@ -19,7 +19,7 @@ export function lineBranchHasEnded(
   branch: LineBranchLifecycleFields,
   referenceDate = todayIsoDate(),
 ) {
-  return branch.endedAt != null && branch.endedAt < referenceDate;
+  return branch.endedAt != null && branch.endedAt <= referenceDate;
 }
 
 export function lineBranchHasStarted(

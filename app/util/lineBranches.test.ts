@@ -60,6 +60,13 @@ describe('line branch lifecycle helpers', () => {
     expect(lineBranchIsActiveOn(branch, '2028-01-01')).toBe(true);
     expect(lineBranchHasEnded(branch, '2030-01-01')).toBe(true);
   });
+
+  it('treats the end date as an exclusive boundary', () => {
+    const branch = { startedAt: '2009-05-28', endedAt: '2026-07-01' };
+
+    expect(lineBranchIsActiveOn(branch, '2026-07-01')).toBe(false);
+    expect(lineBranchHasEnded(branch, '2026-07-01')).toBe(true);
+  });
 });
 
 describe('deriveLineStartedAtFromBranches', () => {

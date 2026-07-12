@@ -67,7 +67,7 @@ export function serviceRevisionHasEnded(
   revision: Pick<ServiceRevisionRecencyFields, 'end_at'>,
   referenceDate: string,
 ) {
-  return revision.end_at != null && revision.end_at < referenceDate;
+  return revision.end_at != null && revision.end_at <= referenceDate;
 }
 
 export function serviceRevisionHasStarted(

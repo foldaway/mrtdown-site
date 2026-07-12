@@ -113,6 +113,18 @@ describe('selectServiceRevisionForReferenceDate', () => {
     ).toBe(true);
   });
 
+  it('treats the end date as an exclusive boundary', () => {
+    expect(
+      serviceRevisionIsActiveOn(
+        {
+          start_at: '2009-05-28',
+          end_at: '2026-07-01',
+        },
+        '2026-07-01',
+      ),
+    ).toBe(false);
+  });
+
   it('returns the nearest future revision when no service is active yet', () => {
     const revisions = [
       {
