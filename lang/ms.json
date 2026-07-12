@@ -211,6 +211,7 @@
   "issue.subtype.weather": "Cuaca Buruk",
   "line.branch.closed": "Ditutup pada {date}",
   "line.branch.in_service": "Dalam Perkhidmatan",
+  "line.page_title": "Status, Gangguan dan Stesen {componentName} | mrtdown",
   "line.report_cta": "Laporkan isu pada laluan ini",
   "line.report_cta_mobile": "Lapor isu",
   "line.report_cta_note": "Laporan komuniti disemak secara berasingan daripada nasihat rasmi pengendali.",

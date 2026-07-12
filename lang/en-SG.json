@@ -211,6 +211,7 @@
   "issue.subtype.weather": "Weather",
   "line.branch.closed": "Closed on {date}",
   "line.branch.in_service": "In Service",
+  "line.page_title": "{componentName} Status, Disruptions & Stations | mrtdown",
   "line.report_cta": "Report an issue on this line",
   "line.report_cta_mobile": "Report issue",
   "line.report_cta_note": "Community reports are reviewed separately from official operator advisories.",

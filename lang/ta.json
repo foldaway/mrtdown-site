@@ -211,6 +211,7 @@
   "issue.subtype.weather": "வானிலை பாதிப்பு",
   "line.branch.closed": "{date} அன்று மூடப்பட்டது",
   "line.branch.in_service": "சேவையில் உள்ளது",
+  "line.page_title": "{componentName} நிலை, தடைகள் மற்றும் நிலையங்கள் | mrtdown",
   "line.report_cta": "இந்த வழித்தடத்தில் உள்ள சிக்கலைத் தெரிவிக்கவும்",
   "line.report_cta_mobile": "சிக்கலை தெரிவிக்கவும்",
   "line.report_cta_note": "சமூகத் தகவல்கள் அதிகாரப்பூர்வ இயக்குநர் அறிவிப்புகளிலிருந்து தனியாக மதிப்பாய்வு செய்யப்படும்.",

@@ -211,6 +211,7 @@
   "issue.subtype.weather": "天气影响",
   "line.branch.closed": "于{date}关闭",
   "line.branch.in_service": "正在服务",
+  "line.page_title": "{componentName}服务状态、中断和车站 | mrtdown",
   "line.report_cta": "报告此线路的问题",
   "line.report_cta_mobile": "报告问题",
   "line.report_cta_note": "社区报告将与官方运营商通告分开审核。",

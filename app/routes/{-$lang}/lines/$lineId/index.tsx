@@ -96,7 +96,14 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
       messages,
     });
 
-    const title = componentName;
+    const title = intl.formatMessage(
+      {
+        id: 'line.page_title',
+        defaultMessage:
+          '{componentName} Status, Disruptions & Stations | mrtdown',
+      },
+      { componentName },
+    );
 
     const issueTypeCountString = buildIssueTypeCountString(
       issueCountByType as Record<IssueType, number>,
