@@ -82,6 +82,7 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
     const seo = buildSeoMetadata({
+      lang,
       path: `/lines/${lineId}`,
       rootUrl,
     });

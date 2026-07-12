@@ -93,6 +93,7 @@ export const Route = createFileRoute(
       { count: source.reportCount },
     );
     const seo = buildSeoMetadata({
+      lang,
       path: `/community-reports/${encodeURIComponent(kind)}/${encodeURIComponent(
         sourceId,
       )}`,

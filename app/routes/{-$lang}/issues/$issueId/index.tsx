@@ -105,6 +105,7 @@ export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
     const seo = buildSeoMetadata({
+      lang,
       path: `/issues/${issueId}`,
       rootUrl,
     });

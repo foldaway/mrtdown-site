@@ -106,6 +106,7 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
     const seo = buildSeoMetadata({
+      lang,
       path: `/operators/${ctx.params.operatorId}`,
       rootUrl,
     });

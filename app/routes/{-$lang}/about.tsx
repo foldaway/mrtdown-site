@@ -10,7 +10,7 @@ export const Route = createFileRoute('/{-$lang}/about')({
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
-    const seo = buildSeoMetadata({ path: '/about', rootUrl });
+    const seo = buildSeoMetadata({ lang, path: '/about', rootUrl });
 
     const intl = createIntl({
       locale: lang,

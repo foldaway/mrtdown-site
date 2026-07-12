@@ -72,7 +72,7 @@ export const Route = createFileRoute('/{-$lang}/')({
     const rootUrl = import.meta.env.VITE_ROOT_URL;
     assert(rootUrl != null, 'VITE_ROOT_URL is not set');
 
-    const seo = buildSeoMetadata({ path: '/', rootUrl });
+    const seo = buildSeoMetadata({ lang, path: '/', rootUrl });
 
     return {
       links: seo.links,

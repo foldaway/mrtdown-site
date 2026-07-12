@@ -257,7 +257,7 @@ export const Route = createFileRoute('/{-$lang}/report')({
       defaultMessage:
         'Share a concise community report about MRT or LRT delays, crowding, skipped stops, or service issues.',
     });
-    const seo = buildSeoMetadata({ path: '/report', rootUrl });
+    const seo = buildSeoMetadata({ lang, path: '/report', rootUrl });
 
     return {
       links: seo.links,

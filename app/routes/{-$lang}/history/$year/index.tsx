@@ -53,6 +53,7 @@ export const Route = createFileRoute('/{-$lang}/history/$year/')({
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 
     const seo = buildSeoMetadata({
+      lang,
       path: `/history/${ctx.params.year}`,
       rootUrl,
     });

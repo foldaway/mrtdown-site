@@ -38,13 +38,16 @@ describe('SEO helpers', () => {
     ]);
   });
 
-  it('uses the en-SG URL for canonical and og:url', () => {
+  it('uses the requested locale for canonical and og:url', () => {
     const metadata = buildSeoMetadata({
+      lang: 'zh-Hans',
       path: '/history/2026/',
       rootUrl: ROOT_URL,
     });
 
-    expect(metadata.canonicalUrl).toBe('https://www.mrtdown.org/history/2026');
+    expect(metadata.canonicalUrl).toBe(
+      'https://www.mrtdown.org/zh-Hans/history/2026',
+    );
     expect(metadata.ogUrl).toBe(metadata.canonicalUrl);
     expect(metadata.ogImage).toBe('https://www.mrtdown.org/og_image.png');
     expect(metadata.links).toContainEqual({
@@ -58,8 +61,9 @@ describe('SEO helpers', () => {
     });
   });
 
-  it('keeps locale alternates when canonicalizing to en-SG', () => {
+  it('keeps locale alternates when self-canonicalizing', () => {
     const metadata = buildSeoMetadata({
+      lang: 'en-SG',
       path: '/lines/BPLRT/',
       rootUrl: ROOT_URL,
     });
