@@ -209,7 +209,7 @@
   "issue.subtype.track_work": "Track Work",
   "issue.subtype.train_fault": "Train Fault",
   "issue.subtype.weather": "Weather",
-  "line.branch.closed": "Closed in {year}",
+  "line.branch.closed": "Closed on {date}",
   "line.branch.in_service": "In Service",
   "line.report_cta": "Report an issue on this line",
   "line.report_cta_mobile": "Report issue",

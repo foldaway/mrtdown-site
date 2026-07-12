@@ -209,7 +209,7 @@
   "issue.subtype.track_work": "轨道施工",
   "issue.subtype.train_fault": "列车故障",
   "issue.subtype.weather": "天气影响",
-  "line.branch.closed": "于{year}关闭",
+  "line.branch.closed": "于{date}关闭",
   "line.branch.in_service": "正在服务",
   "line.report_cta": "报告此线路的问题",
   "line.report_cta_mobile": "报告问题",

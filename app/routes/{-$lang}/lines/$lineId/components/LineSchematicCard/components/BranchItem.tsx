@@ -33,10 +33,12 @@ export const BranchItem: React.FC<Props> = (props) => {
         <span className="text-gray-500 text-xs dark:text-gray-400">
           <FormattedMessage
             id="line.branch.closed"
-            defaultMessage="Closed in {year}"
+            defaultMessage="Closed on {date}"
             values={{
-              year: (
+              date: (
                 <FormattedDate
+                  day="numeric"
+                  month="long"
                   year="numeric"
                   value={branch.endedAt ?? undefined}
                 />

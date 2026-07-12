@@ -209,7 +209,7 @@
   "issue.subtype.track_work": "Kerja Penyelenggaraan Landasan",
   "issue.subtype.train_fault": "Kerosakan Kereta Api",
   "issue.subtype.weather": "Cuaca Buruk",
-  "line.branch.closed": "Ditutup {year}",
+  "line.branch.closed": "Ditutup pada {date}",
   "line.branch.in_service": "Dalam Perkhidmatan",
   "line.report_cta": "Laporkan isu pada laluan ini",
   "line.report_cta_mobile": "Lapor isu",

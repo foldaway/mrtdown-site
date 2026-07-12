@@ -209,7 +209,7 @@
   "issue.subtype.track_work": "தடங்களில் பராமரிப்பு வேலை",
   "issue.subtype.train_fault": "ரயில் கோளாறு",
   "issue.subtype.weather": "வானிலை பாதிப்பு",
-  "line.branch.closed": "{year} இல் மூடப்பட்டது",
+  "line.branch.closed": "{date} அன்று மூடப்பட்டது",
   "line.branch.in_service": "சேவையில் உள்ளது",
   "line.report_cta": "இந்த வழித்தடத்தில் உள்ள சிக்கலைத் தெரிவிக்கவும்",
   "line.report_cta_mobile": "சிக்கலை தெரிவிக்கவும்",
