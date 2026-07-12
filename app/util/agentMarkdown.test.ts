@@ -132,8 +132,12 @@ describe('createPublicMarkdownResponse', () => {
       'text/markdown; charset=utf-8',
     );
     expect(response.headers.get('cache-control')).toBe(
-      'public, max-age=0, s-maxage=60, stale-while-revalidate=300',
+      'public, max-age=0, must-revalidate',
     );
+    expect(response.headers.get('cloudflare-cdn-cache-control')).toBe(
+      'public, max-age=900, stale-while-revalidate=300, stale-if-error=86400',
+    );
+    expect(response.headers.get('cache-tag')).toContain('mrtdown-');
     expect(response.headers.get('x-mrtdown-cache')).toBe('public-markdown');
   });
 

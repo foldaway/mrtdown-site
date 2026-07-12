@@ -115,6 +115,8 @@ See `docs/GENERATED_FILES.md` for more detail.
 - `docs/ARCHITECTURE.md`: current app architecture and deployment branch
   mapping.
 - `docs/DATA_PIPELINE.md`: canonical data pull and read model flow.
+- `docs/CACHING.md`: Cloudflare edge-cache policy, invalidation, and required
+  deployment configuration.
 - `docs/QUALITY.md`: verification harness and current test gaps.
 - `docs/OVERHAUL_BASELINE.md`: historical baseline for the read-model
   migration.

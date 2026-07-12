@@ -84,7 +84,9 @@ type ProbeTiming = {
   bytes: number;
   contentType: string;
   cacheControl: string;
+  cloudflareCacheControl: string;
   cfCacheStatus: string;
+  age: string;
   appCache: string;
   serverTiming: string;
   render: string;
@@ -163,7 +165,10 @@ async function timeRoute(
     bytes,
     contentType: response.headers.get('content-type') ?? '',
     cacheControl: response.headers.get('cache-control') ?? '',
+    cloudflareCacheControl:
+      response.headers.get('cloudflare-cdn-cache-control') ?? '',
     cfCacheStatus: response.headers.get('cf-cache-status') ?? '',
+    age: response.headers.get('age') ?? '',
     appCache: response.headers.get('x-mrtdown-cache') ?? '',
     serverTiming: response.headers.get('server-timing') ?? '',
     render: response.headers.get('x-mrtdown-render') ?? '',
@@ -201,9 +206,11 @@ async function main() {
       bytes: result.bytes,
       contentType: result.contentType,
       cfCache: result.cfCacheStatus,
+      age: result.age,
       appCache: result.appCache,
       render: result.render,
       cacheControl: result.cacheControl,
+      cloudflareCacheControl: result.cloudflareCacheControl,
       serverTiming: result.serverTiming,
     })),
   );

@@ -74,6 +74,7 @@ export function createSitemapErrorResponse(error: unknown, rootUrl: string) {
   return new Response(toXml(fallbackRoot), {
     status: 200,
     headers: {
+      'cache-control': 'no-store',
       'content-type': 'application/xml',
       'x-sitemap-status': 'fallback',
       'x-sitemap-error-stage': sanitizeHeaderValue(stage),

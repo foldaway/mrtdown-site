@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { RateLimiterRes } from 'rate-limiter-flexible';
 import { getDb } from '~/db';
 import { getCrowdReportRateLimiter } from '~/limiters/crowdReport';
+import { purgePublicDataCache } from '~/util/cloudflareCache';
 import {
   buildCrowdReportAbuseContext,
   CrowdReportRateLimitError,
@@ -140,6 +141,18 @@ export const Route = createFileRoute('/api/reports')({
               ),
             },
           );
+
+          try {
+            await purgePublicDataCache();
+          } catch (error) {
+            // The report is already committed. Do not turn a successful write
+            // into a retryable client error; the bounded edge TTL is the
+            // fallback while this operational failure is investigated.
+            console.error(
+              'Failed to purge public cache after crowd report submission',
+              { error },
+            );
+          }
 
           return Response.json(
             {

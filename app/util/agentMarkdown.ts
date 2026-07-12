@@ -2,9 +2,12 @@ import { DateTime } from 'luxon';
 import { gfmToMarkdown } from 'mdast-util-gfm';
 import { toMarkdown } from 'mdast-util-to-markdown';
 import type { Root, RootContent, Table, TableCell, TableRow } from 'mdast';
+import {
+  PUBLIC_BROWSER_CACHE_CONTROL,
+  setPublicDataCacheHeaders,
+} from './publicResponseCache';
 
-export const PUBLIC_MARKDOWN_CACHE_CONTROL =
-  'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
+export const PUBLIC_MARKDOWN_CACHE_CONTROL = PUBLIC_BROWSER_CACHE_CONTROL;
 
 export const MARKDOWN_CONTENT_TYPE = 'text/markdown; charset=utf-8';
 
@@ -138,8 +141,7 @@ export function createPublicMarkdownResponse(
   }
 
   if (status >= 200 && status < 300 && !headers.has('cache-control')) {
-    headers.set('cache-control', PUBLIC_MARKDOWN_CACHE_CONTROL);
-    headers.set('x-mrtdown-cache', 'public-markdown');
+    setPublicDataCacheHeaders(headers, 'markdown');
   }
 
   return new Response(body, {

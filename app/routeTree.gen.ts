@@ -18,6 +18,7 @@ import { Route as Char123LangChar125SystemMapRouteImport } from './routes/{-$lan
 import { Route as Char123LangChar125SitemapDotxmlRouteImport } from './routes/{-$lang}/sitemap[.]xml'
 import { Route as Char123LangChar125ReportRouteImport } from './routes/{-$lang}/report'
 import { Route as Char123LangChar125AboutRouteImport } from './routes/{-$lang}/about'
+import { Route as ApiSentryAnonymousUserRouteImport } from './routes/api.sentry-anonymous-user'
 import { Route as ApiReportsRouteImport } from './routes/api.reports'
 import { Route as ApiIssuesDayRouteImport } from './routes/api.issues-day'
 import { Route as Char123LangChar125StatisticsIndexRouteImport } from './routes/{-$lang}/statistics/index'
@@ -89,6 +90,11 @@ const Char123LangChar125AboutRoute = Char123LangChar125AboutRouteImport.update({
   id: '/about',
   path: '/about',
   getParentRoute: () => Char123LangChar125Route,
+} as any)
+const ApiSentryAnonymousUserRoute = ApiSentryAnonymousUserRouteImport.update({
+  id: '/api/sentry-anonymous-user',
+  path: '/api/sentry-anonymous-user',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiReportsRoute = ApiReportsRouteImport.update({
   id: '/api/reports',
@@ -229,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
+  '/api/sentry-anonymous-user': typeof ApiSentryAnonymousUserRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutRoute
   '/{-$lang}/report': typeof Char123LangChar125ReportRoute
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
@@ -262,6 +269,7 @@ export interface FileRoutesByTo {
   '/llms.txt': typeof LlmsDottxtRoute
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
+  '/api/sentry-anonymous-user': typeof ApiSentryAnonymousUserRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutRoute
   '/{-$lang}/report': typeof Char123LangChar125ReportRoute
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
@@ -297,6 +305,7 @@ export interface FileRoutesById {
   '/{-$lang}': typeof Char123LangChar125RouteWithChildren
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
+  '/api/sentry-anonymous-user': typeof ApiSentryAnonymousUserRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutRoute
   '/{-$lang}/report': typeof Char123LangChar125ReportRoute
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
@@ -333,6 +342,7 @@ export interface FileRouteTypes {
     | '/{-$lang}'
     | '/api/issues-day'
     | '/api/reports'
+    | '/api/sentry-anonymous-user'
     | '/{-$lang}/about'
     | '/{-$lang}/report'
     | '/{-$lang}/sitemap.xml'
@@ -366,6 +376,7 @@ export interface FileRouteTypes {
     | '/llms.txt'
     | '/api/issues-day'
     | '/api/reports'
+    | '/api/sentry-anonymous-user'
     | '/{-$lang}/about'
     | '/{-$lang}/report'
     | '/{-$lang}/sitemap.xml'
@@ -400,6 +411,7 @@ export interface FileRouteTypes {
     | '/{-$lang}'
     | '/api/issues-day'
     | '/api/reports'
+    | '/api/sentry-anonymous-user'
     | '/{-$lang}/about'
     | '/{-$lang}/report'
     | '/{-$lang}/sitemap.xml'
@@ -435,6 +447,7 @@ export interface RootRouteChildren {
   Char123LangChar125Route: typeof Char123LangChar125RouteWithChildren
   ApiIssuesDayRoute: typeof ApiIssuesDayRoute
   ApiReportsRoute: typeof ApiReportsRoute
+  ApiSentryAnonymousUserRoute: typeof ApiSentryAnonymousUserRoute
   ApiPhSplatRoute: typeof ApiPhSplatRoute
   IssuesIssueIdIndexDotmdRoute: typeof IssuesIssueIdIndexDotmdRoute
   LinesLineIdIndexDotmdRoute: typeof LinesLineIdIndexDotmdRoute
@@ -511,6 +524,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/{-$lang}/about'
       preLoaderRoute: typeof Char123LangChar125AboutRouteImport
       parentRoute: typeof Char123LangChar125Route
+    }
+    '/api/sentry-anonymous-user': {
+      id: '/api/sentry-anonymous-user'
+      path: '/api/sentry-anonymous-user'
+      fullPath: '/api/sentry-anonymous-user'
+      preLoaderRoute: typeof ApiSentryAnonymousUserRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/reports': {
       id: '/api/reports'
@@ -733,6 +753,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char123LangChar125Route: Char123LangChar125RouteWithChildren,
   ApiIssuesDayRoute: ApiIssuesDayRoute,
   ApiReportsRoute: ApiReportsRoute,
+  ApiSentryAnonymousUserRoute: ApiSentryAnonymousUserRoute,
   ApiPhSplatRoute: ApiPhSplatRoute,
   IssuesIssueIdIndexDotmdRoute: IssuesIssueIdIndexDotmdRoute,
   LinesLineIdIndexDotmdRoute: LinesLineIdIndexDotmdRoute,

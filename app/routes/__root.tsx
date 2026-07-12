@@ -6,6 +6,7 @@ import {
   useRouterState,
 } from '@tanstack/react-router';
 import { RouteWebVitals } from '~/components/RouteWebVitals';
+import { SentryAnonymousUserBootstrap } from '~/components/SentryAnonymousUserBootstrap';
 import { LANGUAGES } from '~/constants';
 import { getPosthogOptions } from '~/helpers/getPosthogOptions';
 import { OptionalPostHogProvider } from '~/helpers/OptionalPostHogProvider';
@@ -57,6 +58,7 @@ function RootComponent() {
         apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
         options={posthogOptions}
       >
+        <SentryAnonymousUserBootstrap />
         <RouteWebVitals />
         <Outlet />
       </OptionalPostHogProvider>

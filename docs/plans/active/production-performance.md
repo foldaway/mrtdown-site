@@ -90,11 +90,12 @@ Relevant code:
 - `app/hooks/useViewport.ts`
 - `app/helpers/getDateCountForViewport.ts`
 
-### 4. Base dataset cache is local to the server process
+### 4. Public response caching depends on Cloudflare
 
-`getBaseDataset` caches for five minutes in memory. That helps only for warm
-requests handled by the same process. Machine restarts, different processes,
-and cache expiry still rebuild the complete read model from many tables.
+The former five-minute process-local base and overview dataset caches were
+removed when Cloudflare became the sole public response cache. This avoids
+refilling a freshly purged edge entry from stale Fly process memory, at the
+cost of heavier origin work on Cloudflare misses.
 
 Relevant code:
 
@@ -289,6 +290,16 @@ progress notes and current measurements before planning new work.
 
 ## Progress Notes
 
+- 2026-07-12: Reintroduced public response caching for the Fly.io topology via
+  origin-controlled browser and Cloudflare headers rather than the Worker
+  Cache API. Successful public SSR, canonical Markdown, and sitemap responses
+  now share an environment-scoped cache tag. Completed canonical pulls,
+  public-holiday changes, and crowd-report submissions purge that tag. The
+  process-local public read-model caches were removed so a post-purge MISS
+  cannot repopulate Cloudflare with stale process memory. The anonymous Sentry
+  cookie now bootstraps through a separate `no-store` endpoint so `Set-Cookie`
+  does not make cacheable documents ineligible. See `docs/CACHING.md` for the
+  required Cloudflare Cache Rule and Fly secrets.
 - 2026-07-11: Removed the Worker Cache API-backed public HTML cache and its
   shared-cache response headers ahead of the move to Fly.io. Public HTML now
   always passes through SSR; the public-route classification still used by

@@ -1,5 +1,6 @@
 import { createWorkflow } from '@upstash/workflow/tanstack';
 import { getDb } from '~/db/index.js';
+import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import { rebuildOperationalFactsForDates } from '~/util/db.queries.js';
 import { syncPublicHolidaysFromDataGov } from './helpers/syncPublicHolidays.js';
 
@@ -21,6 +22,12 @@ export const publicHolidaysWorkflow = createWorkflow<Params, void>(
         return rebuildOperationalFactsForDates(syncResult.changedDates);
       },
     );
+
+    if (syncResult.changedDates.length > 0) {
+      await context.run('publish-public-holiday-cache', () =>
+        purgePublicDataCache(),
+      );
+    }
 
     console.log('[PUBLIC_HOLIDAYS] Sync complete', {
       ...syncResult,

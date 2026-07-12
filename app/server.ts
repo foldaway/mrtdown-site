@@ -4,6 +4,7 @@ import handler, { createServerEntry } from '@tanstack/react-start/server-entry';
 import type { Root } from 'xast';
 import { toXml } from 'xast-util-to-xml';
 import { getUnsupportedAgentMarkdownResponse } from './util/agentMarkdown';
+import { applyPublicDataCacheHeaders } from './util/publicResponseCache';
 import {
   addSentryAnonymousUserCookie,
   getSentryAnonymousUser,
@@ -20,9 +21,9 @@ async function appFetch(request: Request) {
     getUnsupportedAgentMarkdownResponse(request);
   if (unsupportedMarkdownResponse != null) {
     const elapsedMs = performance.now() - startedAt;
-    return addSentryAnonymousUserCookie(
-      addResponseInstrumentationHeaders(unsupportedMarkdownResponse, elapsedMs),
-      sentryAnonymousUser,
+    return addResponseInstrumentationHeaders(
+      unsupportedMarkdownResponse,
+      elapsedMs,
     );
   }
 
@@ -40,20 +41,32 @@ async function appFetch(request: Request) {
     throw error;
   }
   const elapsedMs = performance.now() - startedAt;
-  const responseWithHeaders = addResponseInstrumentationHeaders(
-    response,
-    elapsedMs,
+  const responseWithHeaders = applyPublicDataCacheHeaders(
+    request,
+    addResponseInstrumentationHeaders(response, elapsedMs),
   );
 
   if (import.meta.env.DEV && responseWithHeaders.status !== 101) {
     logResponseByteEstimate(request, responseWithHeaders.clone(), elapsedMs);
   }
 
-  if (shouldPreservePublicMarkdownCache(responseWithHeaders)) {
-    return responseWithHeaders;
+  // Set the telemetry cookie only on the dedicated no-store bootstrap request.
+  // Adding it to SSR HTML would force Cloudflare to bypass the document cache.
+  if (isSentryAnonymousUserBootstrapRequest(request)) {
+    return addSentryAnonymousUserCookie(
+      responseWithHeaders,
+      sentryAnonymousUser,
+    );
   }
 
-  return addSentryAnonymousUserCookie(responseWithHeaders, sentryAnonymousUser);
+  return responseWithHeaders;
+}
+
+function isSentryAnonymousUserBootstrapRequest(request: Request) {
+  return (
+    request.method === 'GET' &&
+    new URL(request.url).pathname === '/api/sentry-anonymous-user'
+  );
 }
 
 function isSitemapRequest(request: Request) {
@@ -100,6 +113,7 @@ function createWorkerSitemapErrorResponse(request: Request, error: unknown) {
   return new Response(toXml(root), {
     status: 200,
     headers: {
+      'cache-control': 'no-store',
       'content-type': 'application/xml',
       'x-sitemap-status': 'worker-fallback',
       'x-sitemap-error-stage': 'handler_fetch',
@@ -161,10 +175,6 @@ function appendInstrumentationHeaders(headers: Headers, workerTiming: string) {
       : workerTiming,
   );
   headers.set('X-MRTDown-Render', 'worker');
-}
-
-function shouldPreservePublicMarkdownCache(response: Response) {
-  return response.headers.get('X-MRTDown-Cache') === 'public-markdown';
 }
 
 async function logResponseByteEstimate(

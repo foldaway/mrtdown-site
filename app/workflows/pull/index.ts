@@ -5,6 +5,7 @@ import {
 } from '@upstash/workflow';
 import { createWorkflow } from '@upstash/workflow/tanstack';
 import { ZipStore } from '~/helpers/ZipStore.js';
+import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import {
   rebuildOperationalFactsRange,
   rebuildStatisticsSnapshot,
@@ -307,6 +308,11 @@ async function executePull(context: WorkflowContext<Params>) {
   console.log(
     `[PULL] Rebuilt statistics snapshot ${statistics.asOf} with ${statistics.issueIdsDisruptionLongest.length} longest disruptions`,
   );
+
+  await runPullStep(context, 'publish-public-data-cache', () =>
+    purgePublicDataCache(),
+  );
+
   console.log('[PULL] Pull complete', counts);
 }
 

@@ -236,23 +236,7 @@ type OverviewDataset = Pick<
   'included' | 'publicHolidaySet' | 'allIssues' | 'issuesByLineId'
 >;
 
-const BASE_DATASET_CACHE_TTL_MS = 5 * 60_000;
 const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 5;
-let cachedBaseDataset:
-  | {
-      expiresAt: number;
-      value: BaseDataset;
-    }
-  | undefined;
-let pendingBaseDataset: Promise<BaseDataset> | undefined;
-const cachedOverviewDatasets = new Map<
-  number,
-  {
-    expiresAt: number;
-    value: OverviewDataset;
-  }
->();
-const pendingOverviewDatasets = new Map<number, Promise<OverviewDataset>>();
 const dateTimeCache = new Map<string, DateTime>();
 const issueBoundsCache = new WeakMap<Issue, IssueIntervalBounds[]>();
 
@@ -2128,35 +2112,7 @@ async function buildBaseDataset(
 }
 
 async function getBaseDataset() {
-  const now = Date.now();
-  if (cachedBaseDataset != null && cachedBaseDataset.expiresAt > now) {
-    recordServerTiming('base_dataset', 0, 'cache=hit');
-    return cachedBaseDataset.value;
-  }
-
-  const startedAt = performance.now();
-  const cacheState = pendingBaseDataset == null ? 'miss' : 'pending';
-  pendingBaseDataset ??= buildBaseDataset()
-    .then((dataset) => {
-      cachedBaseDataset = {
-        expiresAt: Date.now() + BASE_DATASET_CACHE_TTL_MS,
-        value: dataset,
-      };
-      return dataset;
-    })
-    .finally(() => {
-      pendingBaseDataset = undefined;
-    });
-
-  try {
-    return await pendingBaseDataset;
-  } finally {
-    recordServerTiming(
-      'base_dataset',
-      performance.now() - startedAt,
-      `cache=${cacheState}`,
-    );
-  }
+  return buildBaseDataset();
 }
 
 async function getOverviewIssueIds(
@@ -2267,40 +2223,7 @@ async function buildOverviewDataset(
 }
 
 async function getOverviewDataset(days: number) {
-  const now = Date.now();
-  const cached = cachedOverviewDatasets.get(days);
-  if (cached != null && cached.expiresAt > now) {
-    recordServerTiming('overview_dataset', 0, 'cache=hit');
-    return cached.value;
-  }
-
-  const startedAt = performance.now();
-  const cacheState = pendingOverviewDatasets.has(days) ? 'pending' : 'miss';
-  let pending = pendingOverviewDatasets.get(days);
-  if (pending == null) {
-    pending = buildOverviewDataset(days)
-      .then((dataset) => {
-        cachedOverviewDatasets.set(days, {
-          expiresAt: Date.now() + BASE_DATASET_CACHE_TTL_MS,
-          value: dataset,
-        });
-        return dataset;
-      })
-      .finally(() => {
-        pendingOverviewDatasets.delete(days);
-      });
-    pendingOverviewDatasets.set(days, pending);
-  }
-
-  try {
-    return await pending;
-  } finally {
-    recordServerTiming(
-      'overview_dataset',
-      performance.now() - startedAt,
-      `cache=${cacheState}`,
-    );
-  }
+  return buildOverviewDataset(days);
 }
 
 async function getIncludedForIssueIds(issueIds: readonly string[]) {
