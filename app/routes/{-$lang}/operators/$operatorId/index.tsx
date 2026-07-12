@@ -1,6 +1,6 @@
 import type { IssueType } from '@mrtdown/core';
 import { useQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, notFound } from '@tanstack/react-router';
 import { lazy } from 'react';
 import {
   createIntl,
@@ -29,6 +29,22 @@ import { OperatorUptimeCard } from './components/OperatorUptimeCard';
 
 const OPERATOR_PROFILE_INITIAL_DATE_COUNT = 30;
 
+async function loadOperatorProfile(operatorId: string) {
+  try {
+    return await getOperatorProfileFn({
+      data: {
+        operatorId,
+        days: OPERATOR_PROFILE_INITIAL_DATE_COUNT,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Response && error.status === 404) {
+      throw notFound();
+    }
+    throw error;
+  }
+}
+
 const CountTrendCards = lazy(() =>
   import('../../lines/$lineId/components/CountTrendCards').then((module) => ({
     default: module.CountTrendCards,
@@ -51,13 +67,7 @@ const RecentIssuesSection = lazy(() =>
 
 export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
   component: OperatorPage,
-  loader: ({ params }) =>
-    getOperatorProfileFn({
-      data: {
-        operatorId: params.operatorId,
-        days: OPERATOR_PROFILE_INITIAL_DATE_COUNT,
-      },
-    }),
+  loader: ({ params }) => loadOperatorProfile(params.operatorId),
   async head(ctx) {
     const { lang = 'en-SG' } = ctx.params;
 
