@@ -301,6 +301,15 @@ function HomePage() {
                 defaultMessage="Aggregated commuter reports shown separately from official operator advisories."
               />
             </p>
+            <Link
+              className="inline-flex font-semibold text-accent-light text-xs hover:text-accent-dark sm:text-sm dark:text-accent-dark dark:hover:text-accent-light"
+              to="/{-$lang}/about"
+            >
+              <FormattedMessage
+                id="home.service_overview_about_link"
+                defaultMessage="Learn about our data sources and methodology →"
+              />
+            </Link>
           </div>
         </section>
       </div>

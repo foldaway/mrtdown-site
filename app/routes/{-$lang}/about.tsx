@@ -18,13 +18,13 @@ export const Route = createFileRoute('/{-$lang}/about')({
     });
 
     const title = intl.formatMessage({
-      id: 'general.about',
-      defaultMessage: 'About',
+      id: 'site.about.page_title',
+      defaultMessage: 'About mrtdown: Data Sources and Methodology',
     });
     const description = intl.formatMessage({
-      id: 'site.about.subtitle',
+      id: 'site.about.page_description',
       defaultMessage:
-        'Learn more about our mission, data collection methods, and frequently asked questions',
+        'Learn how mrtdown processes canonical Singapore MRT and LRT data, separates community reports from official advisories, and maintains its independent service record.',
     });
 
     return {
@@ -57,6 +57,25 @@ export const Route = createFileRoute('/{-$lang}/about')({
           property: 'og:image',
           content: seo.ogImage,
         },
+        {
+          name: 'twitter:title',
+          content: title,
+        },
+        {
+          name: 'twitter:description',
+          content: description,
+        },
+        {
+          'script:ld+json': {
+            '@context': 'https://schema.org',
+            '@type': 'AboutPage',
+            name: title,
+            description,
+            url: seo.canonicalUrl,
+            image: seo.ogImage,
+            inLanguage: lang,
+          },
+        },
       ],
     };
   },
@@ -72,7 +91,7 @@ function AboutPage() {
         <p className="mx-auto max-w-2xl text-gray-600 text-xs leading-4 sm:text-sm sm:leading-5 dark:text-gray-400">
           <FormattedMessage
             id="site.about.subtitle"
-            defaultMessage="Learn more about our mission, data collection methods, and frequently asked questions"
+            defaultMessage="Independent, data-driven tracking of Singapore MRT and LRT service reliability."
           />
         </p>
       </header>
@@ -100,7 +119,7 @@ function AboutPage() {
         <h2 className="mt-4 mb-2 font-bold text-gray-800 text-xl dark:text-gray-200">
           <FormattedMessage
             id="about.how_we_collect_data"
-            defaultMessage="How We Collect Data"
+            defaultMessage="How the Data Works"
           />
         </h2>
 
@@ -114,7 +133,7 @@ function AboutPage() {
         <p className="mb-2 text-gray-600 text-sm dark:text-gray-400">
           <FormattedMessage
             id="about.data_sources_1"
-            defaultMessage="Our incident data is collected by monitoring official SMRT and SBS Transit Twitter accounts for service announcements and updates."
+            defaultMessage="mrtdown reads service status, disruption, maintenance, and rail-network data from canonical mrtdown data archives. Singapore public-holiday data from data.gov.sg is also used when calculating operating schedules."
           />
         </p>
 
@@ -128,7 +147,21 @@ function AboutPage() {
         <p className="mb-2 text-gray-600 text-sm dark:text-gray-400">
           <FormattedMessage
             id="about.processing_methodology_1"
-            defaultMessage="We employ a hybrid approach combining machine learning (GPT-4o mini) for initial data extraction and human verification to ensure accuracy. Every incident is reviewed before being published to our platform."
+            defaultMessage="Scheduled workflows fetch each archive, validate and stage its records, then promote changes into a normalized PostgreSQL/PostGIS read model. The site serves its pages from this local database."
+          />
+        </p>
+
+        <h3 className="mb-1 font-bold text-gray-600 text-lg dark:text-gray-400">
+          <FormattedMessage
+            id="about.community_reports"
+            defaultMessage="Community Reports"
+          />
+        </h3>
+
+        <p className="mb-2 text-gray-600 text-sm dark:text-gray-400">
+          <FormattedMessage
+            id="about.community_reports_1"
+            defaultMessage="Community reports remain separate from official operator advisories. Automated moderation may merge, accept, or reject submissions before eligible evidence is sent to the canonical data workflow."
           />
         </p>
 
@@ -164,7 +197,7 @@ function AboutPage() {
             <p className="ms-3 mt-1 mb-2 text-gray-600 text-sm dark:text-gray-400">
               <FormattedMessage
                 id="about.qn_2_answer"
-                defaultMessage="All incident data is sourced from official operator announcements and processed on a best-effort basis. While human verification is conducted, we cannot guarantee 100% accuracy or completeness of the information. Users may utilize our data for real-time planning, but we are not responsible for any inaccuracies or decisions made based on this information."
+                defaultMessage="Canonical incident records are maintained on a best-effort basis, and the site may lag behind source updates. Community reports are displayed separately and should not be treated as official alerts. We cannot guarantee accuracy or completeness; confirm time-sensitive travel decisions with the relevant operator."
               />
             </p>
           </details>
