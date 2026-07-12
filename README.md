@@ -132,5 +132,8 @@ Run `npm run verify` before publishing changes. Use narrower commands such as
 `npm run typecheck`, `npm run lint`, `npm run format:check`, and
 `npm run test:run` while iterating.
 
-Pull request titles should follow [Conventional Commits](https://www.conventionalcommits.org/), for example
+Commit subjects and pull request titles should follow
+[Conventional Commits](https://www.conventionalcommits.org/), for example
 `feat: add station history filters` or `fix: handle missing fact coverage`.
+Agent-created commits must include the appropriate co-author trailer; Codex
+commits use `Co-authored-by: Codex <codex@openai.com>`.

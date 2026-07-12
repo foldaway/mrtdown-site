@@ -24,9 +24,15 @@ Use narrower commands while iterating:
 - `npm run test:run`
 - `npm run verify:strict`
 
-## Pull Requests
+## Commits and Pull Requests
 
-PR titles must follow Conventional Commits, for example `chore: retire generated API client types`. Keep the title aligned with the commit scope so release tooling and changelog readers can classify the change without opening the PR.
+Commit subjects and PR titles must follow Conventional Commits, for example `chore: retire generated API client types`. Keep each subject aligned with the change scope so release tooling and changelog readers can classify the change without opening it.
+
+Commits created with an agent must include an agent co-author trailer. For Codex, add this exact trailer after a blank line at the end of the commit message:
+
+```text
+Co-authored-by: Codex <codex@openai.com>
+```
 
 ## Generated Files
 
