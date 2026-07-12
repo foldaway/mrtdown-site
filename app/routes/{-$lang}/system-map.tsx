@@ -2,7 +2,6 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useMemo } from 'react';
 import { createIntl, FormattedMessage, useIntl } from 'react-intl';
-import type { IssueAffectedBranch } from '~/types';
 import { CurrentAdvisoriesSection } from '~/components/CurrentAdvisoriesSection';
 import { countOperationalLineSummaries } from '~/components/CurrentAdvisoriesSection/helpers';
 import {
@@ -16,11 +15,13 @@ import { MapDec2029 } from '~/components/StationMap/components/MapDec2029';
 import { MapDec2030 } from '~/components/StationMap/components/MapDec2030';
 import { MapDec2032 } from '~/components/StationMap/components/MapDec2032';
 import { MapJan2012 } from '~/components/StationMap/components/MapJan2012';
+import { MapJul2026 } from '~/components/StationMap/components/MapJul2026';
 import { MapNov2017 } from '~/components/StationMap/components/MapNov2017';
 import { MapNov2024 } from '~/components/StationMap/components/MapNov2024';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildSeoMetadata } from '~/helpers/seo';
+import type { IssueAffectedBranch } from '~/types';
 import { getSystemMapFn } from '~/util/system-map.functions';
 
 const SYSTEM_MAP_SNAPSHOTS = {
@@ -29,6 +30,7 @@ const SYSTEM_MAP_SNAPSHOTS = {
   '2019-12': MapDec2019,
   '2024-11': MapNov2024,
   '2025-04': MapApr2025,
+  '2026-07': MapJul2026,
   '2027-12': MapDec2027,
   '2029-12': MapDec2029,
   '2030-12': MapDec2030,

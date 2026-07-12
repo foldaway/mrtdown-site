@@ -20,6 +20,7 @@ type MapSnapshotId =
   | '2019-12'
   | '2024-11'
   | '2025-04'
+  | '2026-07'
   | '2027-12'
   | '2029-12'
   | '2030-12'
@@ -452,6 +453,9 @@ export const StationMap: React.FC<Props> = (props) => {
     if (dateTime >= DateTime.fromObject({ year: 2027, month: 12 })) {
       return '2027-12';
     }
+    if (dateTime >= DateTime.fromObject({ year: 2026, month: 7 })) {
+      return '2026-07';
+    }
     if (dateTime >= DateTime.fromObject({ year: 2025, month: 4 })) {
       return '2025-04';
     }
@@ -481,7 +485,7 @@ export const StationMap: React.FC<Props> = (props) => {
       return <SnapshotComponent ref={setRef} />;
     }
 
-    if (snapshotId === '2025-04') {
+    if (snapshotId === '2026-07') {
       return <DefaultComponent ref={setRef} />;
     }
 
@@ -512,6 +516,9 @@ export const StationMap: React.FC<Props> = (props) => {
             </Tabs.Content>
             <Tabs.Content value="2027-12">
               {renderSnapshot('2027-12', MapDec2027)}
+            </Tabs.Content>
+            <Tabs.Content value="2026-07">
+              {renderSnapshot('2026-07', MapApr2025)}
             </Tabs.Content>
             <Tabs.Content value="2025-04">
               {renderSnapshot('2025-04', MapApr2025)}
