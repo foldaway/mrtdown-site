@@ -65,6 +65,7 @@ jobs:
             --config fly.staging.toml \
             --local-only \
             --image-label=${{ github.sha }} \
+            --env GIT_SHA=${{ github.sha }} \
             --build-arg TIER=staging \
             --build-arg SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
             --build-arg SENTRY_ORG=${{ secrets.SENTRY_ORG }} \
@@ -139,6 +140,7 @@ jobs:
           flyctl deploy \
             --config fly.production.toml \
             --local-only \
+            --env GIT_SHA=${{ github.sha }} \
             --build-arg TIER=production \
             --build-arg SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
             --image-label=${{ github.sha }} \

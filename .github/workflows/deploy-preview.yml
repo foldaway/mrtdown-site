@@ -42,6 +42,7 @@ jobs:
           flyctl deploy \
             --config fly.preview.toml \
             --local-only \
+            --env GIT_SHA=${{ github.sha }} \
             --build-arg TIER=preview \
             --build-arg SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
             --image-label=${{ github.sha }} \
