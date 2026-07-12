@@ -24,8 +24,19 @@
     --color-accent-dark: var(--color-blue-700);
 }
 
+/* Prefer platform-native Simplified Chinese UI fonts to avoid shipping a large CJK webfont. */
+html:lang(zh-Hans) {
+    font-family:
+        'Radio Canada Big Variable',
+        'PingFang SC',
+        'Microsoft YaHei',
+        'Noto Sans CJK SC',
+        'Noto Sans SC',
+        sans-serif;
+}
+
 html:lang(ta) {
-  --font-sans: 'Radio Canada Big Variable', 'Anek Tamil Variable', sans-serif;
+    --font-sans: 'Radio Canada Big Variable', 'Anek Tamil Variable', sans-serif;
 }
 
 body {
