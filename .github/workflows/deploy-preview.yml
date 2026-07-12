@@ -78,7 +78,8 @@ jobs:
 
       - name: Wait for preview pull workflow
         timeout-minutes: 30
-        run: node .github/scripts/waitForWorkflowRun.mjs '${{ steps.pull.outputs.workflow-run-id }}'
+        run: node .github/scripts/waitForWorkflowRun.mjs "$WORKFLOW_RUN_ID"
         env:
+          WORKFLOW_RUN_ID: ${{ steps.pull.outputs.workflow-run-id }}
           QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
           QSTASH_URL: ${{ secrets.QSTASH_URL }}
