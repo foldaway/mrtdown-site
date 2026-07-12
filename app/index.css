@@ -3,6 +3,7 @@
 
 @import '@fontsource-variable/radio-canada-big/wght.css';
 @import '@fontsource-variable/radio-canada-big/wght-italic.css';
+@import '@fontsource-variable/anek-tamil/wght.css';
 
 @theme {
     --font-sans: 'Radio Canada Big Variable', sans-serif;
@@ -21,6 +22,10 @@
 
     --color-accent-light: var(--color-blue-600);
     --color-accent-dark: var(--color-blue-700);
+}
+
+html:lang(ta) {
+  --font-sans: 'Radio Canada Big Variable', 'Anek Tamil Variable', sans-serif;
 }
 
 body {
