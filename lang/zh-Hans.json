@@ -234,6 +234,7 @@
   "operator.aggregate_uptime": "综合正常运行时间（{period}）",
   "operator.aggregate_uptime_description": "所有运营线路的加权平均值",
   "operator.description": "查看{operatorName}在新加坡运营的{lineCount, plural, one {# 条线路} other {# 条线路}}的服务状态、正常运行率、服务中断、计划维护和表现。",
+  "operator.status.all_operational": "所有线路正常运行",
   "operator.founded": "成立于{date}",
   "operator.line_issues_count": "问题（{period}）",
   "operator.line_performance": "线路性能比较",

@@ -234,6 +234,7 @@
   "operator.aggregate_uptime": "ஒட்டுமொத்த இயக்க நேரம் ({period})",
   "operator.aggregate_uptime_description": "அனைத்து இயக்கப்படும் வழித்தடங்களின் எடையிடப்பட்ட சராசரி",
   "operator.description": "சிங்கப்பூரில் {operatorName} இயக்கும் {lineCount, plural, one {# வழித்தடத்தின்} other {# வழித்தடங்களின்}} சேவை நிலை, இயக்க நேரம், தடைகள், திட்டமிட்ட பராமரிப்பு மற்றும் செயல்திறனைப் பார்க்கவும்.",
+  "operator.status.all_operational": "அனைத்து வழித்தடங்களும் இயங்குகின்றன",
   "operator.founded": "{date} அன்று நிறுவப்பட்டது",
   "operator.line_issues_count": "சிக்கல்கள் ({period})",
   "operator.line_performance": "வழித்தட செயல்திறன் ஒப்பீடு",

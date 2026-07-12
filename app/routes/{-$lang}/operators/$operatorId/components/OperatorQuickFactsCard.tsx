@@ -22,12 +22,12 @@ export const OperatorQuickFactsCard: React.FC<Props> = (props) => {
 
   return (
     <div className="flex flex-col rounded-lg border border-gray-300 p-6 text-gray-800 shadow-lg md:col-span-5 dark:border-gray-700 dark:text-gray-200">
-      <span className="mb-2 font-semibold text-base text-gray-900 dark:text-white">
+      <h2 className="mb-2 font-semibold text-base text-gray-900 dark:text-white">
         <FormattedMessage
           id="general.quick_facts"
           defaultMessage="Quick Facts"
         />
-      </span>
+      </h2>
       <div className="grid grid-cols-2 gap-2">
         <span className="text-sm">
           <FormattedMessage

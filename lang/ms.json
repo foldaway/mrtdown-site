@@ -234,6 +234,7 @@
   "operator.aggregate_uptime": "Masa Operasi Agregat ({period})",
   "operator.aggregate_uptime_description": "Purata wajaran merentas semua laluan yang dikendalikan",
   "operator.description": "Semak status perkhidmatan, masa operasi, gangguan, penyelenggaraan berjadual dan prestasi {lineCount, plural, one {# laluan} other {# laluan}} kendalian {operatorName} di Singapura.",
+  "operator.status.all_operational": "Semua Laluan Beroperasi",
   "operator.founded": "Ditubuhkan {date}",
   "operator.line_issues_count": "Isu ({period})",
   "operator.line_performance": "Perbandingan Prestasi Laluan",

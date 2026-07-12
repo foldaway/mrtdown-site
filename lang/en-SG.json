@@ -234,6 +234,7 @@
   "operator.aggregate_uptime": "Aggregate Uptime ({period})",
   "operator.aggregate_uptime_description": "Weighted average across all operated lines",
   "operator.description": "Check {operatorName} service status, uptime, disruptions, planned maintenance and performance across {lineCount, plural, one {# line} other {# lines}} in Singapore.",
+  "operator.status.all_operational": "All Lines Operational",
   "operator.founded": "Founded {date}",
   "operator.line_issues_count": "Issues ({period})",
   "operator.line_performance": "Line Performance Comparison",

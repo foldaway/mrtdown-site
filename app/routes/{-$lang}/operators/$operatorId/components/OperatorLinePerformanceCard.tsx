@@ -22,12 +22,12 @@ export const OperatorLinePerformanceCard: React.FC<Props> = (props) => {
 
   return (
     <div className="flex flex-col rounded-lg border border-gray-300 p-6 text-gray-800 shadow-lg md:col-span-12 dark:border-gray-700 dark:text-gray-200">
-      <span className="mb-4 font-semibold text-base text-gray-900 dark:text-white">
+      <h2 className="mb-4 font-semibold text-base text-gray-900 dark:text-white">
         <FormattedMessage
           id="operator.line_performance"
           defaultMessage="Line Performance Comparison"
         />
-      </span>
+      </h2>
       <div className="flex flex-col gap-3">
         {linePerformanceComparison.map((performance) => {
           const line = included.lines[performance.lineId];
