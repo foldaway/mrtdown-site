@@ -100,7 +100,7 @@ export const Route = createFileRoute('/{-$lang}/system-map')({
 
 function SystemMapPage() {
   const loaderData = Route.useLoaderData();
-  const { overview, included } = loaderData;
+  const { overview, included, stationNames } = loaderData;
 
   const intl = useIntl();
 
@@ -169,6 +169,7 @@ function SystemMapPage() {
           <StationMap
             currentDate={DateTime.now().toISODate()}
             snapshotComponents={SYSTEM_MAP_SNAPSHOTS}
+            stationNames={stationNames}
             mode={{
               type: 'network',
               branchesAffected,

@@ -221,6 +221,10 @@ type CommunitySignalOptions = {
   includeCommunitySignals?: boolean;
 };
 
+type OverviewDataOptions = CommunitySignalOptions & {
+  includeStationNames?: boolean;
+};
+
 type BaseDataset = {
   included: BaseIncludedEntities;
   branchesByLineId: Record<string, BranchWithEntries[]>;
@@ -3729,7 +3733,7 @@ async function getPageCommunitySignals(
 
 export async function getOverviewData(
   days: number,
-  options: CommunitySignalOptions = {},
+  options: OverviewDataOptions = {},
 ) {
   return timeServerSpan('overview_data', async () => {
     const referenceNow = nowSg();
@@ -3798,6 +3802,14 @@ export async function getOverviewData(
         stationIds: overviewCommunitySignalStationIds,
         includeStationMembershipLines: true,
       }),
+      stationNames: options.includeStationNames
+        ? Object.fromEntries(
+            Object.values(dataset.included.stations).map((station) => [
+              station.id,
+              station.name,
+            ]),
+          )
+        : undefined,
     };
   });
 }
@@ -4181,10 +4193,11 @@ export async function getOperatorProfileData(operatorId: string, days: number) {
 }
 
 export async function getSystemMapData() {
-  const overview = await getOverviewData(30);
+  const overview = await getOverviewData(30, { includeStationNames: true });
   return {
     overview: overview.data,
     included: overview.included,
+    stationNames: overview.stationNames ?? {},
   };
 }
 

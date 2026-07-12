@@ -4,7 +4,7 @@ import { Tabs } from 'radix-ui';
 import type React from 'react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { FormattedList, FormattedMessage, useIntl } from 'react-intl';
-import type { IssueAffectedBranch } from '~/types';
+import type { IssueAffectedBranch, Station } from '~/types';
 import { ZoomControls } from '~/components/ZoomControls';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
@@ -98,10 +98,11 @@ interface Props {
   currentDate?: string;
   mode: StationMapMode;
   snapshotComponents?: StationMapSnapshotComponents;
+  stationNames?: Record<string, Station['name']>;
 }
 
 export const StationMap: React.FC<Props> = (props) => {
-  const { currentDate, mode, snapshotComponents } = props;
+  const { currentDate, mode, snapshotComponents, stationNames } = props;
 
   const intl = useIntl();
   const navigate = useNavigate();
@@ -278,7 +279,11 @@ export const StationMap: React.FC<Props> = (props) => {
 
     const labelsElement: SVGGElement | null = ref.querySelector('#labels');
     if (labelsElement != null) {
-      const labelElements = [...labelsElement.querySelectorAll('text')];
+      const labelElements = [
+        ...labelsElement.querySelectorAll<SVGGraphicsElement>(
+          ":scope > [id^='label_']",
+        ),
+      ];
       for (const labelElement of labelElements) {
         const stationId = labelElement.id.replace(/^label_/, '').toUpperCase();
         const tspans = [...labelElement.querySelectorAll('tspan')];
@@ -289,11 +294,15 @@ export const StationMap: React.FC<Props> = (props) => {
         labelElement.removeAttribute('fill');
         labelElement.classList.add('fill-gray-800', 'dark:fill-gray-300');
 
-        if (!(stationId in included.stations)) {
+        const stationNameTranslations =
+          stationNames?.[stationId] ?? included.stations[stationId]?.name;
+        if (stationNameTranslations == null) {
           continue;
         }
-        const station = included.stations[stationId];
-        const stationName = getLocalizedTranslation(station.name, intl.locale);
+        const stationName = getLocalizedTranslation(
+          stationNameTranslations,
+          intl.locale,
+        );
         const segments = segmentText(stationName, intl.locale);
         for (let i = 0; i < tspans.length; i++) {
           const tspan = tspans[i];
@@ -425,7 +434,9 @@ export const StationMap: React.FC<Props> = (props) => {
 
       const labelsElement: SVGGElement | null = ref.querySelector('#labels');
       if (labelsElement != null) {
-        for (const labelElement of labelsElement.querySelectorAll('text')) {
+        for (const labelElement of labelsElement.querySelectorAll<SVGGraphicsElement>(
+          ":scope > [id^='label_']",
+        )) {
           const stationId = labelElement.id
             .replace(/^label_/, '')
             .toUpperCase();
@@ -435,7 +446,15 @@ export const StationMap: React.FC<Props> = (props) => {
         }
       }
     }
-  }, [ref, focusedStationIds, included.stations, intl.locale, mode, navigate]);
+  }, [
+    ref,
+    focusedStationIds,
+    included.stations,
+    intl.locale,
+    mode,
+    navigate,
+    stationNames,
+  ]);
 
   const defaultTab = useMemo(() => {
     if (currentDate == null) {
