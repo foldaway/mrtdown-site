@@ -182,7 +182,7 @@
   "home.service_overview_body": "mrtdown 显示新加坡地铁与轻轨线路的当前服务状态，包括服务中断、计划维护和基础设施问题。查看各线路页面，了解受影响的车站和近期服务记录。",
   "home.service_overview_eyebrow": "关于此页面",
   "home.service_overview_title": "新加坡地铁与轻轨服务更新",
-  "home.service_status_legend": "服务状态图例",
+  "home.service_status_legend": "状态说明",
   "interchanges.empty": "未找到换乘站",
   "issue.affected_stations_schematic": "受影响车站（{count}）",
   "issue.description": "此问题影响了{stationCount, plural, one { {stationCount} 个{lineNames}线的地铁站 } other { {stationCount} 个{lineNames}线的地铁站 }}，时间为{period}。",

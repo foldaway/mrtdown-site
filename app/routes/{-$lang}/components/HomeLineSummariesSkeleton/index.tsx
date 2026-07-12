@@ -57,6 +57,30 @@ export function HomeLineSummariesSkeleton(
           </div>
         ))}
       </div>
+      <div className="border-gray-200 border-t px-3 py-3 sm:px-4 sm:py-4 dark:border-gray-700">
+        <div className="flex animate-pulse flex-col items-center gap-3 sm:flex-row sm:justify-between">
+          <div className="h-3 w-16 rounded-sm bg-gray-200 dark:bg-gray-700" />
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 sm:justify-end">
+            {LEGEND_SKELETON_IDS.map((legendId) => (
+              <div
+                className="inline-flex items-center gap-x-1.5"
+                key={legendId}
+              >
+                <div className="size-2.5 rounded-full bg-gray-300 dark:bg-gray-700" />
+                <div className="h-3 w-16 rounded-sm bg-gray-200 dark:bg-gray-700" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
+
+const LEGEND_SKELETON_IDS = [
+  'operational',
+  'disruption',
+  'maintenance',
+  'infrastructure',
+  'closed',
+];

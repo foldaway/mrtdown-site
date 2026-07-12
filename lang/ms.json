@@ -182,7 +182,7 @@
   "home.service_overview_body": "mrtdown memaparkan status semasa laluan MRT dan LRT Singapura, termasuk gangguan, penyelenggaraan terancang dan isu infrastruktur. Semak setiap halaman laluan untuk melihat stesen yang terjejas dan sejarah perkhidmatan terkini.",
   "home.service_overview_eyebrow": "Tentang halaman ini",
   "home.service_overview_title": "Kemas kini perkhidmatan MRT dan LRT Singapura",
-  "home.service_status_legend": "Petunjuk Status Perkhidmatan",
+  "home.service_status_legend": "Petunjuk status",
   "interchanges.empty": "Tiada pertukaran dijumpai",
   "issue.affected_stations_schematic": "Stesen Terjejas ({count})",
   "issue.description": "Isu ini menjejaskan {stationCount, plural, one { {stationCount} stesen {lineNames} } other { {stationCount} stesen {lineNames} }} pada {period}.",

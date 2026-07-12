@@ -264,67 +264,7 @@ function HomePage() {
               />
             ))}
           </div>
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800/50">
-          <h3 className="mb-4 text-center font-semibold text-gray-700 text-sm dark:text-gray-300">
-            <FormattedMessage
-              id="home.service_status_legend"
-              defaultMessage="Service Status Legend"
-            />
-          </h3>
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-3">
-            <div className="inline-flex items-center gap-x-2">
-              <div className="size-3 rounded-full bg-operational-light shadow-sm dark:bg-operational-dark" />
-              <span className="font-medium text-gray-600 text-sm dark:text-gray-400">
-                <FormattedMessage
-                  id="status.operational"
-                  defaultMessage="Operational"
-                />
-              </span>
-            </div>
-            <div className="inline-flex items-center gap-x-2">
-              <div className="size-3 rounded-full bg-disruption-light shadow-sm dark:bg-disruption-dark" />
-              <span className="font-medium text-gray-600 text-sm dark:text-gray-400">
-                <FormattedMessage
-                  id="general.disruption"
-                  defaultMessage="Disruption"
-                />
-              </span>
-            </div>
-            <div className="inline-flex items-center gap-x-2">
-              <div className="size-3 rounded-full bg-maintenance-light shadow-sm dark:bg-maintenance-dark" />
-              <span className="font-medium text-gray-600 text-sm dark:text-gray-400">
-                <FormattedMessage
-                  id="general.maintenance"
-                  defaultMessage="Maintenance"
-                />
-              </span>
-            </div>
-            <div className="inline-flex items-center gap-x-2">
-              <div className="size-3 rounded-full bg-infra-light shadow-sm dark:bg-infra-dark" />
-              <span className="font-medium text-gray-600 text-sm dark:text-gray-400">
-                <FormattedMessage
-                  id="general.infrastructure"
-                  defaultMessage="Infrastructure"
-                />
-              </span>
-            </div>
-            <div className="inline-flex items-center gap-x-2">
-              <div className="size-3 rounded-full bg-gray-400 shadow-sm dark:bg-gray-600" />
-              <span className="font-medium text-gray-600 text-sm dark:text-gray-400">
-                <FormattedMessage
-                  id="status.service_ended"
-                  defaultMessage="Off Hours"
-                />
-                {' / '}
-                <FormattedMessage
-                  id="status.not_in_service"
-                  defaultMessage="Not in Service"
-                />
-              </span>
-            </div>
-          </div>
+          <ServiceStatusLegend />
         </div>
 
         <section
@@ -368,6 +308,73 @@ function HomePage() {
   );
 }
 
+function ServiceStatusLegend() {
+  return (
+    <div className="border-gray-200 border-t px-3 py-3 sm:px-4 sm:py-4 dark:border-gray-700">
+      <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+        <h3 className="shrink-0 font-semibold text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
+          <FormattedMessage
+            id="home.service_status_legend"
+            defaultMessage="Status key"
+          />
+        </h3>
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 sm:justify-end">
+          <div className="inline-flex items-center gap-x-1.5">
+            <div className="size-2.5 rounded-full bg-operational-light shadow-sm dark:bg-operational-dark" />
+            <span className="font-medium text-gray-500 text-xs dark:text-gray-400">
+              <FormattedMessage
+                id="status.operational"
+                defaultMessage="Operational"
+              />
+            </span>
+          </div>
+          <div className="inline-flex items-center gap-x-1.5">
+            <div className="size-2.5 rounded-full bg-disruption-light shadow-sm dark:bg-disruption-dark" />
+            <span className="font-medium text-gray-500 text-xs dark:text-gray-400">
+              <FormattedMessage
+                id="general.disruption"
+                defaultMessage="Disruption"
+              />
+            </span>
+          </div>
+          <div className="inline-flex items-center gap-x-1.5">
+            <div className="size-2.5 rounded-full bg-maintenance-light shadow-sm dark:bg-maintenance-dark" />
+            <span className="font-medium text-gray-500 text-xs dark:text-gray-400">
+              <FormattedMessage
+                id="general.maintenance"
+                defaultMessage="Maintenance"
+              />
+            </span>
+          </div>
+          <div className="inline-flex items-center gap-x-1.5">
+            <div className="size-2.5 rounded-full bg-infra-light shadow-sm dark:bg-infra-dark" />
+            <span className="font-medium text-gray-500 text-xs dark:text-gray-400">
+              <FormattedMessage
+                id="general.infrastructure"
+                defaultMessage="Infrastructure"
+              />
+            </span>
+          </div>
+          <div className="inline-flex items-center gap-x-1.5">
+            <div className="size-2.5 rounded-full bg-gray-400 shadow-sm dark:bg-gray-600" />
+            <span className="font-medium text-gray-500 text-xs dark:text-gray-400">
+              <FormattedMessage
+                id="status.service_ended"
+                defaultMessage="Off Hours"
+              />
+              {' / '}
+              <FormattedMessage
+                id="status.not_in_service"
+                defaultMessage="Not in Service"
+              />
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HomePagePending() {
   return (
     <div className="flex flex-col space-y-5 sm:space-y-7">
@@ -385,27 +392,8 @@ function HomePagePending() {
       </div>
 
       <HomeLineSummariesSkeleton lineIds={PENDING_LINE_IDS} />
-
-      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800/50">
-        <div className="mx-auto mb-4 h-5 w-36 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
-        <div className="flex flex-wrap justify-center gap-x-6 gap-y-3">
-          {PENDING_LEGEND_IDS.map((legendId) => (
-            <div className="inline-flex items-center gap-x-2" key={legendId}>
-              <div className="size-3 animate-pulse rounded-full bg-gray-300 dark:bg-gray-700" />
-              <div className="h-4 w-24 animate-pulse rounded-sm bg-gray-200 dark:bg-gray-700" />
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
 
 const PENDING_LINE_IDS = ['skeleton-line-1', 'skeleton-line-2'];
-const PENDING_LEGEND_IDS = [
-  'operational',
-  'disruption',
-  'maintenance',
-  'infrastructure',
-  'closed',
-];

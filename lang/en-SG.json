@@ -182,7 +182,7 @@
   "home.service_overview_body": "mrtdown shows the current service status of Singapore's MRT and LRT lines, including disruptions, planned maintenance, and infrastructure issues. Check each line for affected stations and recent service history.",
   "home.service_overview_eyebrow": "About this page",
   "home.service_overview_title": "Singapore MRT and LRT service updates",
-  "home.service_status_legend": "Service Status Legend",
+  "home.service_status_legend": "Status key",
   "interchanges.empty": "No interchanges found",
   "issue.affected_stations_schematic": "Affected Stations ({count})",
   "issue.description": "This issue affected {stationCount, plural, one { {stationCount} {lineNames} station } other { {stationCount} {lineNames} stations }} on {period}.",
