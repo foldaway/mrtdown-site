@@ -326,6 +326,43 @@ function HomePage() {
             </div>
           </div>
         </div>
+
+        <section
+          aria-labelledby="home-service-overview-title"
+          className="mx-auto grid w-full max-w-4xl gap-3 border-gray-200 border-t px-1 pt-5 pb-1 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] sm:gap-8 sm:px-2 sm:pt-6 sm:pb-2 dark:border-gray-700"
+        >
+          <div>
+            <p className="font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
+              <FormattedMessage
+                id="home.service_overview_eyebrow"
+                defaultMessage="About this page"
+              />
+            </p>
+            <h2
+              className="mt-1 font-semibold text-base text-gray-700 leading-6 sm:text-lg dark:text-gray-300"
+              id="home-service-overview-title"
+            >
+              <FormattedMessage
+                id="home.service_overview_title"
+                defaultMessage="Singapore MRT and LRT service updates"
+              />
+            </h2>
+          </div>
+          <div className="space-y-2 text-gray-500 text-xs leading-5 sm:text-sm sm:leading-6 dark:text-gray-400">
+            <p>
+              <FormattedMessage
+                id="home.service_overview_body"
+                defaultMessage="mrtdown shows the current service status of Singapore's MRT and LRT lines, including disruptions, planned maintenance, and infrastructure issues. Check each line for affected stations and recent service history."
+              />
+            </p>
+            <p>
+              <FormattedMessage
+                id="community_signals.description"
+                defaultMessage="Aggregated commuter reports shown separately from official operator advisories."
+              />
+            </p>
+          </div>
+        </section>
       </div>
     </IncludedEntitiesContext.Provider>
   );
