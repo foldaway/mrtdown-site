@@ -9,6 +9,34 @@ interface UseAffectedStationsReturn {
   allStations: Station[];
 }
 
+export function sortAffectedStationsByBranch(
+  affectedStations: readonly Station[],
+  branch: Pick<IssueAffectedBranch, 'branchId' | 'lineId'>,
+) {
+  return [...affectedStations].sort((first, second) => {
+    const findMembership = (station: Station) =>
+      station.memberships.find(
+        (membership) =>
+          membership.branchId === branch.branchId &&
+          membership.lineId === branch.lineId,
+      ) ??
+      station.memberships.find(
+        (membership) => membership.lineId === branch.lineId,
+      );
+
+    const firstMembership = findMembership(first);
+    const secondMembership = findMembership(second);
+
+    if (firstMembership == null || secondMembership == null) {
+      // Preserve the incoming order if the station is not mapped to this
+      // branch/line, which can happen for legacy or partially scoped data.
+      return 0;
+    }
+
+    return firstMembership.sequenceOrder - secondMembership.sequenceOrder;
+  });
+}
+
 export const useAffectedStations = (
   branch: IssueAffectedBranch,
 ): UseAffectedStationsReturn => {
@@ -18,29 +46,14 @@ export const useAffectedStations = (
   const stationsAffected = useMemo(() => {
     // Branch payloads identify the affected stations, while station memberships
     // carry the canonical sequence used to display a readable range.
-    return branch.stationIds
+    const resolvedStations = branch.stationIds
       .map((stationId) => stations[stationId])
-      .filter((station): station is Station => station != null)
-      .sort((first, second) => {
-        const firstMembership = first.memberships.find(
-          (membership) =>
-            membership.branchId === branch.branchId ||
-            membership.lineId === branch.lineId,
-        );
-        const secondMembership = second.memberships.find(
-          (membership) =>
-            membership.branchId === branch.branchId ||
-            membership.lineId === branch.lineId,
-        );
+      .filter((station): station is Station => station != null);
 
-        if (firstMembership == null || secondMembership == null) {
-          // Preserve the incoming order if the station is not mapped to this
-          // branch/line, which can happen for legacy or partially scoped data.
-          return 0;
-        }
-
-        return firstMembership.sequenceOrder - secondMembership.sequenceOrder;
-      });
+    return sortAffectedStationsByBranch(resolvedStations, {
+      branchId: branch.branchId,
+      lineId: branch.lineId,
+    });
   }, [branch.branchId, branch.lineId, branch.stationIds, stations]);
 
   const { source, destination } = useMemo(() => {
