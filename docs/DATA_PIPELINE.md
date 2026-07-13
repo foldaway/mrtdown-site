@@ -48,6 +48,14 @@ The sync only manages its three deterministic schedule IDs; it does not delete
 other QStash schedules. Cron expressions use UTC, matching the former
 Cloudflare schedules.
 
+## Operational Facts
+
+Daily fact rebuilds write aggregate service, downtime, and issue counts to
+`line_day_facts`. They also write each issue interval clipped to the applicable
+line service window to `line_day_issue_intervals`. The interval rows are derived,
+rebuildable data used when a read needs exact placement or overlapping impact
+lanes rather than aggregate durations alone.
+
 ## Crowd Report Dispatch
 
 Accepted crowdsourced reports and accepted report clusters stay site-local until

@@ -10,7 +10,6 @@ import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import { Tooltip } from 'radix-ui';
-import { DismissableLayer } from 'radix-ui/internal';
 import { useMemo, useState } from 'react';
 import {
   FormattedDate,
@@ -42,7 +41,7 @@ type ActiveDateCard =
   | { type: 'service-ended'; isoDate: string };
 
 const DATE_CARD_DETAILS_PANEL_CLASS_NAME =
-  'absolute inset-x-0 top-full z-30 mt-2 flex flex-col rounded-lg border border-gray-200 border-t-4 bg-white px-4 py-3 shadow-gray-900/10 shadow-xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/30 dark:ring-white/10';
+  'mt-3 flex flex-col rounded-lg border border-gray-200 border-t-4 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900';
 
 const STATUS_ICON_CONFIG = {
   ongoing_disruption: {
@@ -143,20 +142,8 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
 
   return (
     <>
-      {hasActivePanel && (
-        <div
-          aria-hidden="true"
-          className="fixed inset-0 z-20 cursor-default bg-transparent"
-        />
-      )}
       <fieldset
-        className={classNames(
-          'relative m-0 flex min-w-0 flex-col rounded-lg border-0 bg-gray-100 px-4 py-2 dark:bg-gray-800',
-          {
-            'z-30': hasActivePanel,
-          },
-        )}
-        role={hasActivePanel ? 'group' : undefined}
+        className="relative m-0 flex min-w-0 flex-col rounded-lg border-0 bg-gray-100 px-4 py-2 dark:bg-gray-800"
         aria-label={line.id}
       >
         <div className="mb-1.5 grid min-w-0 grid-cols-[minmax(0,_1fr)_auto] items-center gap-x-2">
@@ -310,12 +297,8 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
           activeDateCard != null &&
           activeDateTime != null &&
           (activeDateCard.type === 'date' && activeDateRecord != null ? (
-            <DismissableLayer.Root
+            <div
               className={DATE_CARD_DETAILS_PANEL_CLASS_NAME}
-              onDismiss={closeActiveDateCard}
-              onFocusOutside={(event) => {
-                event.preventDefault();
-              }}
               style={{ borderTopColor: line.color }}
             >
               <DateCardDetails
@@ -323,23 +306,21 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
                 data={activeDateRecord}
                 line={line}
                 issues={issues}
+                onClose={closeActiveDateCard}
               />
-            </DismissableLayer.Root>
+            </div>
           ) : activeDateCard.type === 'service-ended' ? (
-            <DismissableLayer.Root
+            <div
               className={DATE_CARD_DETAILS_PANEL_CLASS_NAME}
-              onDismiss={closeActiveDateCard}
-              onFocusOutside={(event) => {
-                event.preventDefault();
-              }}
               style={{ borderTopColor: line.color }}
             >
               <ServiceEndedDateCardDetails
                 dateTime={activeDateTime}
                 dayType={activeDateRecord?.dayType ?? 'weekday'}
                 componentRef={line}
+                onClose={closeActiveDateCard}
               />
-            </DismissableLayer.Root>
+            </div>
           ) : null)}
       </fieldset>
     </>

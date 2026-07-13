@@ -23,6 +23,7 @@ import {
   issuesTable,
   landmarksTable,
   lineDayFactsTable,
+  lineDayIssueIntervalsTable,
   lineOperatorsTable,
   linesTable,
   lineServicesTable,
@@ -60,6 +61,7 @@ const schema = {
   issues: issuesTable,
   landmarks: landmarksTable,
   lineDayFacts: lineDayFactsTable,
+  lineDayIssueIntervals: lineDayIssueIntervalsTable,
   lineOperators: lineOperatorsTable,
   lines: linesTable,
   lineServices: lineServicesTable,
@@ -181,6 +183,7 @@ export const relations = defineRelations(schema, (r) => ({
     evidences: r.many.evidences(),
     impactEvents: r.many.impactEvents(),
     issueDayFacts: r.many.issueDayFacts(),
+    lineDayIssueIntervals: r.many.lineDayIssueIntervals(),
   },
   impactEvents: {
     evidences: r.many.evidences(),
@@ -279,9 +282,20 @@ export const relations = defineRelations(schema, (r) => ({
     }),
   },
   lineDayFacts: {
+    issueIntervals: r.many.lineDayIssueIntervals(),
     line: r.one.lines({
       from: r.lineDayFacts.line_id,
       to: r.lines.id,
+    }),
+  },
+  lineDayIssueIntervals: {
+    issue: r.one.issues({
+      from: r.lineDayIssueIntervals.issue_id,
+      to: r.issues.id,
+    }),
+    lineDayFact: r.one.lineDayFacts({
+      from: [r.lineDayIssueIntervals.date, r.lineDayIssueIntervals.line_id],
+      to: [r.lineDayFacts.date, r.lineDayFacts.line_id],
     }),
   },
   operators: {

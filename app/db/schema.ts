@@ -888,6 +888,70 @@ export const lineDayFactsTable = pgTable(
   },
 );
 
+// Rebuildable issue intervals clipped to a line's service window for a given
+// day. These retain the timeline shape behind line_day_facts aggregates so UI
+// reads can represent overlapping issue types without treating them as a stack.
+export const lineDayIssueIntervalsTable = pgTable(
+  'line_day_issue_intervals',
+  {
+    date: date('date', { mode: 'string' }).notNull(),
+    line_id: text('line_id').notNull(),
+    issue_id: text('issue_id')
+      .references(() => issuesTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
+      .notNull(),
+    interval_index: integer('interval_index').notNull(),
+    issue_type: issueTypeEnum().notNull(),
+    start_at: timestamp('start_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    end_at: timestamp('end_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    as_of: timestamp('as_of', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      primaryKey({
+        columns: [
+          table.date,
+          table.line_id,
+          table.issue_id,
+          table.interval_index,
+        ],
+      }),
+      foreignKey({
+        name: 'line_day_issue_intervals_line_day_fact_fk',
+        columns: [table.date, table.line_id],
+        foreignColumns: [lineDayFactsTable.date, lineDayFactsTable.line_id],
+      })
+        .onDelete('cascade')
+        .onUpdate('cascade'),
+      index('line_day_issue_intervals_line_id_date_idx').on(
+        table.line_id,
+        table.date,
+      ),
+      index('line_day_issue_intervals_issue_id_idx').on(table.issue_id),
+      index('line_day_issue_intervals_date_issue_type_idx').on(
+        table.date,
+        table.issue_type,
+      ),
+      index('line_day_issue_intervals_as_of_idx').using(
+        'btree',
+        table.as_of.asc(),
+      ),
+    ];
+  },
+);
+
 // Precomputed public statistics payload. This keeps chart assembly off the SSR
 // request path while preserving a rebuildable fallback.
 export const statisticsSnapshotsTable = pgTable(
