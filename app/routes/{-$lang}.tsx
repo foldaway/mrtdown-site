@@ -237,7 +237,9 @@ function RouteComponent() {
                     className="size-8"
                   />
                   {/* <Train className="h-8 w-8 text-blue-400" /> */}
-                  <span className="font-bold text-2xl text-white">mrtdown</span>
+                  <span className="font-bold text-2xl text-white italic">
+                    mrtdown
+                  </span>
                 </div>
                 <p className="max-w-xs text-gray-400 text-sm">
                   <FormattedMessage
