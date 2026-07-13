@@ -51,7 +51,7 @@ const EFFECT_LABELS = {
 } satisfies Record<IngestContentCrowdReportEffect, MessageDescriptor>;
 
 export const Route = createFileRoute(
-  '/{-$lang}/community-reports/$kind/$sourceId',
+  '/{-$lang}/community-reports/$kind/$sourceId/',
 )({
   component: CommunityReportSourcePage,
   loader: ({ params }) => {
@@ -74,7 +74,7 @@ export const Route = createFileRoute(
     assert(ctx.loaderData != null);
     const source = ctx.loaderData;
     const { default: messages } = await import(
-      `../../../../../lang/${lang}.json`
+      `../../../../../../lang/${lang}.json`
     );
     const intl = createIntl({ locale: lang, messages });
     const rootUrl = import.meta.env.VITE_ROOT_URL;

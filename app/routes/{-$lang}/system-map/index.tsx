@@ -37,12 +37,12 @@ const SYSTEM_MAP_SNAPSHOTS = {
   '2032-12': MapDec2032,
 } satisfies StationMapSnapshotComponents;
 
-export const Route = createFileRoute('/{-$lang}/system-map')({
+export const Route = createFileRoute('/{-$lang}/system-map/')({
   component: SystemMapPage,
   loader: () => getSystemMapFn(),
   async head(ctx) {
     const { lang = 'en-SG' } = ctx.params;
-    const { default: messages } = await import(`../../../lang/${lang}.json`);
+    const { default: messages } = await import(`../../../../lang/${lang}.json`);
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 

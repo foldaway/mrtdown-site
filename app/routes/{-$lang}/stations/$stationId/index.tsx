@@ -27,8 +27,8 @@ import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import { useHydrated } from '~/hooks/useHydrated';
 import type { IncludedEntities, Station } from '~/types';
 import { getStationProfileFn } from '~/util/station.functions';
-import { assert } from '../../../util/assert';
-import { useRotatingLineColors } from './$stationId/hooks/useRotatingLineColors';
+import { assert } from '~/util/assert';
+import { useRotatingLineColors } from './hooks/useRotatingLineColors';
 
 const CommunitySignalsSection = lazy(() =>
   import('~/components/CommunitySignalsSection').then((module) => ({
@@ -36,7 +36,7 @@ const CommunitySignalsSection = lazy(() =>
   })),
 );
 const RecentIssuesSection = lazy(() =>
-  import('./$stationId/components/RecentIssuesSection').then((module) => ({
+  import('./components/RecentIssuesSection').then((module) => ({
     default: module.RecentIssuesSection,
   })),
 );
@@ -121,7 +121,7 @@ function formatStationHeading({
   );
 }
 
-export const Route = createFileRoute('/{-$lang}/stations/$stationId')({
+export const Route = createFileRoute('/{-$lang}/stations/$stationId/')({
   component: StationPage,
   async loader({ params }) {
     const stationProfile = await getStationProfileFn({
@@ -145,7 +145,9 @@ export const Route = createFileRoute('/{-$lang}/stations/$stationId')({
     const { data: stationProfile, included } = ctx.loaderData;
     const station = included.stations[stationProfile.stationId];
 
-    const { default: messages } = await import(`../../../../lang/${lang}.json`);
+    const { default: messages } = await import(
+      `../../../../../lang/${lang}.json`
+    );
 
     const intl = createIntl({
       locale: lang,

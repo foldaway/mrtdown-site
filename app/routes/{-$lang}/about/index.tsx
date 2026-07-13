@@ -2,11 +2,11 @@ import { createFileRoute } from '@tanstack/react-router';
 import { createIntl, FormattedMessage } from 'react-intl';
 import { buildSeoMetadata } from '~/helpers/seo';
 
-export const Route = createFileRoute('/{-$lang}/about')({
+export const Route = createFileRoute('/{-$lang}/about/')({
   component: AboutPage,
   async head(ctx) {
     const { lang = 'en-SG' } = ctx.params;
-    const { default: messages } = await import(`../../../lang/${lang}.json`);
+    const { default: messages } = await import(`../../../../lang/${lang}.json`);
 
     const rootUrl = import.meta.env.VITE_ROOT_URL;
 

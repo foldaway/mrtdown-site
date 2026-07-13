@@ -237,13 +237,13 @@ function loadTurnstileScript() {
   return turnstileScriptPromise;
 }
 
-export const Route = createFileRoute('/{-$lang}/report')({
+export const Route = createFileRoute('/{-$lang}/report/')({
   component: ReportPage,
   validateSearch: SearchParamsSchema,
   loader: () => getCrowdReportFormOptionsFn(),
   async head(ctx) {
     const { lang = 'en-SG' } = ctx.params;
-    const { default: messages } = await import(`../../../lang/${lang}.json`);
+    const { default: messages } = await import(`../../../../lang/${lang}.json`);
     const intl = createIntl({ locale: lang, messages });
     const rootUrl = import.meta.env.VITE_ROOT_URL;
     assert(rootUrl != null, 'VITE_ROOT_URL is not set');

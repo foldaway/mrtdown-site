@@ -29,7 +29,7 @@ import {
   isHistoryYearInBounds,
 } from '~/util/historyYearBounds';
 
-export const Route = createFileRoute('/{-$lang}/history/$year/$month')({
+export const Route = createFileRoute('/{-$lang}/history/$year/$month/')({
   component: HistoryMonthPage,
   loader: ({ params }) => {
     const parsedParams = parseHistoryYearMonthParams(params.year, params.month);
@@ -50,7 +50,7 @@ export const Route = createFileRoute('/{-$lang}/history/$year/$month')({
 
     const { lang = 'en-SG', year, month } = ctx.params;
     const { default: messages } = await import(
-      `../../../../../lang/${lang}.json`
+      `../../../../../../lang/${lang}.json`
     );
 
     const intl = createIntl({
