@@ -352,7 +352,7 @@ function HistoryMonthPage() {
 
           {issuesByWeek.map((issueGroup) => (
             <div key={issueGroup.week} className="flex flex-col gap-y-4">
-              <h2 className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2 border-gray-200 border-b pb-3 font-semibold text-gray-900 text-lg tracking-tight dark:border-gray-700 dark:text-gray-100">
+              <h2 className="sticky top-14 z-10 mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2 border-gray-200 border-b bg-gray-50/95 pt-3 pb-3 font-semibold text-gray-900 text-lg tracking-tight backdrop-blur-sm sm:top-18 dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-100">
                 <span>
                   <FormattedDateTimeRange
                     from={DateTime.fromISO(issueGroup.week).toMillis()}
