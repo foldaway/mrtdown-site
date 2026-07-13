@@ -8,11 +8,11 @@ import {
   useIntl,
 } from 'react-intl';
 import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
-import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import {
   ProfileRecentIssuesSectionSkeleton,
   ProfileTrendCardSkeleton,
 } from '~/components/ProfileWidgetSkeletons';
+import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
@@ -270,77 +270,66 @@ function OperatorPage() {
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
-      <div className="grid grid-cols-1 gap-x-3 gap-y-5 md:grid-cols-12">
-        {/* Operator Header Section */}
-        <div className="mb-8 overflow-hidden rounded-3xl border border-gray-600/60 bg-gradient-to-br from-gray-800 to-gray-900 shadow-2xl md:col-span-12">
-          <div className="relative p-4 md:p-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-            <div className="relative">
-              <h1 className="mb-2 font-black text-2xl text-white leading-tight md:text-3xl">
-                {operatorName}
-                {operatorDefaultName !== operatorName && (
-                  <span className="ml-2 text-gray-300 text-xl">
-                    {operatorDefaultName}
-                  </span>
-                )}
-              </h1>
-              <div className="mt-4 rounded-lg bg-white/10 p-4 backdrop-blur-sm">
-                <div className="text-gray-200 text-sm leading-relaxed">
-                  <div className="mb-2 flex flex-wrap items-center gap-1">
-                    <span>
-                      <FormattedMessage
-                        id="operator.founded"
-                        defaultMessage="Founded {date}"
-                        values={{
-                          date: isHydrated ? (
-                            <FormattedDate
-                              value={operator.foundedAt}
-                              day="numeric"
-                              month="long"
-                              year="numeric"
-                            />
-                          ) : (
-                            operator.foundedAt
-                          ),
-                        }}
-                      />
-                    </span>
-                    {operatorProfile.yearsOfOperation != null && (
-                      <>
-                        <span className="text-gray-400">•</span>
-                        <span>
-                          <FormattedMessage
-                            id="operator.years_of_operation_display"
-                            defaultMessage="{years, plural, one {# year} other {# years}} of operation"
-                            values={{
-                              years: operatorProfile.yearsOfOperation,
-                            }}
-                          />
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  {operator.url != null && (
-                    <div className="flex flex-wrap items-center gap-1">
-                      <a
-                        href={operator.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-300 hover:underline"
-                      >
-                        <FormattedMessage
-                          id="operator.website"
-                          defaultMessage="Visit website"
-                        />
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Operator Header Section */}
+      <header className="flex flex-col justify-center">
+        <h1 className="font-bold text-gray-900 text-xl leading-tight md:text-2xl dark:text-gray-100">
+          {operatorName}
+          {operatorDefaultName !== operatorName && (
+            <span className="ml-2 text-gray-600 text-lg dark:text-gray-300">
+              {operatorDefaultName}
+            </span>
+          )}
+        </h1>
 
+        <div className="flex items-center gap-x-2">
+          <span className="text-gray-500 text-sm dark:text-gray-400">
+            <FormattedMessage
+              id="operator.founded"
+              defaultMessage="Founded {date}"
+              values={{
+                date: isHydrated ? (
+                  <FormattedDate
+                    value={operator.foundedAt}
+                    day="numeric"
+                    month="long"
+                    year="numeric"
+                  />
+                ) : (
+                  operator.foundedAt
+                ),
+              }}
+            />
+          </span>
+          <span className="text-gray-500 text-lg dark:text-gray-400">•</span>
+          {operatorProfile.yearsOfOperation != null && (
+            <span className="text-gray-900 text-sm dark:text-gray-50">
+              <FormattedMessage
+                id="operator.years_of_operation_display"
+                defaultMessage="{years, plural, one {# year} other {# years}} of operation"
+                values={{
+                  years: operatorProfile.yearsOfOperation,
+                }}
+              />
+            </span>
+          )}
+        </div>
+        {operator.url != null && (
+          <div className="flex flex-wrap items-center gap-1">
+            <a
+              href={operator.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-300 text-sm hover:underline"
+            >
+              <FormattedMessage
+                id="operator.website"
+                defaultMessage="Visit website"
+              />
+            </a>
+          </div>
+        )}
+      </header>
+      <div className="mt-4 grid grid-cols-1 gap-x-3 gap-y-5 md:grid-cols-12">
         <OperatorUptimeCard
           aggregateUptimeRatio={operatorProfile.aggregateUptimeRatio}
           dateCount={dateCount}
