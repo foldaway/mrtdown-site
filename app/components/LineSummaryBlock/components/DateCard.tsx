@@ -9,6 +9,7 @@ import {
   FormattedMessage,
   FormattedNumber,
   FormattedTime,
+  type IntlShape,
   useIntl,
 } from 'react-intl';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
@@ -19,12 +20,12 @@ import type {
   LineSummaryDateRecord,
   LineSummaryStatus,
 } from '~/types';
-import { useHydrated } from '../../../hooks/useHydrated';
 import { DAY_TYPE_MESSAGE_DESCRIPTORS } from '../constants';
 import { getOrderedIssueTypeBreakdowns } from '../helpers/orderIssueTypeBreakdowns';
 import { useOperatingHours } from '../hooks/useOperatingHours';
 
 const DAY_IN_SECONDS = 24 * 60 * 60;
+const SINGAPORE_TIME_ZONE = 'Asia/Singapore';
 
 interface Segment {
   percentage: number;
@@ -92,6 +93,29 @@ function getTimelinePosition(
   );
 }
 
+function formatSingaporeTimeRange(
+  intl: IntlShape,
+  start: DateTime,
+  end: DateTime,
+) {
+  return intl.formatMessage(
+    {
+      id: 'component.service_hours_description',
+      defaultMessage: '{start} to {end}',
+    },
+    {
+      start: intl.formatTime(start.toJSDate(), {
+        timeStyle: 'short',
+        timeZone: SINGAPORE_TIME_ZONE,
+      }),
+      end: intl.formatTime(end.toJSDate(), {
+        timeStyle: 'short',
+        timeZone: SINGAPORE_TIME_ZONE,
+      }),
+    },
+  );
+}
+
 function TimelineLane(props: {
   intervals: TimelineInterval[];
   label: string;
@@ -141,15 +165,10 @@ function TimelineLane(props: {
               timelineStart,
               timelineEnd,
             );
-            const intervalTime = intl.formatMessage(
-              {
-                id: 'component.service_hours_description',
-                defaultMessage: '{start, time, short} to {end, time, short}',
-              },
-              {
-                start: interval.start.toMillis(),
-                end: interval.end.toMillis(),
-              },
+            const intervalTime = formatSingaporeTimeRange(
+              intl,
+              interval.start,
+              interval.end,
             );
 
             return (
@@ -308,7 +327,6 @@ export const DateCardDetails: React.FC<DetailsProps> = (props) => {
   const { line, dateTime, data, issues, onClose } = props;
   const { breakdownByIssueTypes, dayType } = data;
 
-  const isHydrated = useHydrated();
   const intl = useIntl();
   const orderedIssueTypeBreakdowns = getOrderedIssueTypeBreakdowns(
     breakdownByIssueTypes,
@@ -349,28 +367,23 @@ export const DateCardDetails: React.FC<DetailsProps> = (props) => {
           <CalendarDaysIcon className="mt-0.5 size-5 shrink-0 text-gray-500 dark:text-gray-400" />
           <div className="min-w-0">
             <p className="font-semibold text-gray-900 leading-tight dark:text-gray-100">
-              {isHydrated ? (
-                <FormattedDate
-                  value={dateTime.toJSDate()}
-                  day="numeric"
-                  month="long"
-                  year="numeric"
-                  weekday="long"
-                />
-              ) : (
-                dateTime.toISO()
-              )}
+              <FormattedDate
+                value={dateTime.toJSDate()}
+                day="numeric"
+                month="long"
+                year="numeric"
+                weekday="long"
+                timeZone={SINGAPORE_TIME_ZONE}
+              />
             </p>
             <p className="mt-1 text-gray-500 text-xs dark:text-gray-400">
-              <FormattedMessage
-                id="component.service_hours_description"
-                defaultMessage="{start, time, short} to {end, time, short}"
-                values={{
-                  start: operatingHours.start.toMillis(),
-                  end: operatingHours.end.toMillis(),
-                }}
-              />{' '}
-              · <FormattedMessage {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]} />
+              {formatSingaporeTimeRange(
+                intl,
+                operatingHours.start,
+                operatingHours.end,
+              )}{' '}
+              · <FormattedMessage {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]} />{' '}
+              · SGT (UTC+8)
             </p>
           </div>
         </div>
@@ -466,15 +479,12 @@ export const DateCardDetails: React.FC<DetailsProps> = (props) => {
                 'text-right': index === axisTimes.length - 1,
               })}
             >
-              {isHydrated ? (
-                <FormattedTime
-                  value={axisTime.toJSDate()}
-                  hour="numeric"
-                  minute={axisTime.minute === 0 ? undefined : '2-digit'}
-                />
-              ) : (
-                axisTime.toFormat('HH:mm')
-              )}
+              <FormattedTime
+                value={axisTime.toJSDate()}
+                hour="numeric"
+                minute={axisTime.minute === 0 ? undefined : '2-digit'}
+                timeZone={SINGAPORE_TIME_ZONE}
+              />
             </span>
           ))}
         </div>

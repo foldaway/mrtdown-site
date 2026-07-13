@@ -48,7 +48,7 @@
   "component.impact_durations_may_overlap": "Tempoh mungkin bertindih",
   "component.impact_timeline": "Garis masa kesan",
   "component.service_hours": "Waktu perkhidmatan",
-  "component.service_hours_description": "{start, time, short} hingga {end, time, short}",
+  "component.service_hours_description": "{start} hingga {end}",
   "component.service_hours_title": "Waktu operasi ({type})",
   "component.view_details_for_date": "Lihat butiran untuk {date}",
   "footer.contribute_data": "Sumbang Data",

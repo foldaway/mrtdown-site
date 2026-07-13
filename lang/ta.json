@@ -48,7 +48,7 @@
   "component.impact_durations_may_overlap": "கால அளவுகள் ஒன்றுடன் ஒன்று மேற்படலாம்",
   "component.impact_timeline": "பாதிப்பு காலவரிசை",
   "component.service_hours": "சேவை நேரங்கள்",
-  "component.service_hours_description": "{start, time, short} முதல் {end, time, short} வரை",
+  "component.service_hours_description": "{start} முதல் {end} வரை",
   "component.service_hours_title": "சேவை நேரங்கள் ({type})",
   "component.view_details_for_date": "{date}க்கான விவரங்களைப் பார்க்கவும்",
   "footer.contribute_data": "தரவுகளை வழங்கவும்",

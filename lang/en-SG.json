@@ -48,7 +48,7 @@
   "component.impact_durations_may_overlap": "Durations may overlap",
   "component.impact_timeline": "Impact timeline",
   "component.service_hours": "Service hours",
-  "component.service_hours_description": "{start, time, short} to {end, time, short}",
+  "component.service_hours_description": "{start} to {end}",
   "component.service_hours_title": "Service hours ({type})",
   "component.view_details_for_date": "View details for {date}",
   "footer.contribute_data": "Contribute Data",
