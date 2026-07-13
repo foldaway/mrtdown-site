@@ -3,10 +3,24 @@ import type { Line } from '~/types';
 
 interface Props {
   component: Line;
+  linked: boolean;
 }
 
 export const LinePill: React.FC<Props> = (props) => {
-  const { component } = props;
+  const { component, linked } = props;
+
+  const pill = (
+    <span
+      className="rounded-sm px-2 py-1 font-semibold text-white text-xs leading-none"
+      style={{ backgroundColor: component.color }}
+    >
+      {component.id}
+    </span>
+  );
+
+  if (!linked) {
+    return pill;
+  }
 
   return (
     <Link
@@ -14,12 +28,7 @@ export const LinePill: React.FC<Props> = (props) => {
       to="/{-$lang}/lines/$lineId"
       params={{ lineId: component.id }}
     >
-      <span
-        className="rounded-sm px-2 py-1 font-semibold text-white text-xs leading-none"
-        style={{ backgroundColor: component.color }}
-      >
-        {component.id}
-      </span>
+      {pill}
     </Link>
   );
 };

@@ -17,6 +17,7 @@ import type {
   AdvisorySummaryBucketId,
   Issue,
 } from '~/types';
+import { collectAdvisoryLineIds } from './CurrentAdvisoriesSection/helpers';
 
 const CurrentAdvisoriesBucketDetails = lazy(() =>
   import('./CurrentAdvisoriesSection/Details').then((module) => ({
@@ -90,114 +91,159 @@ interface Props {
 
 export const CurrentAdvisoriesSection: React.FC<Props> = (props) => {
   const { advisorySummary, issuesById, lineOperationalCount } = props;
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [expandedBucketIds, setExpandedBucketIds] = useState<
+    AdvisorySummaryBucketId[]
+  >([]);
+  const [plannedOpen, setPlannedOpen] = useState(false);
 
   const visibleBuckets = useMemo(() => {
     return advisorySummary.buckets.filter((bucket) => bucket.count > 0);
   }, [advisorySummary.buckets]);
-  const advisoryCount = visibleBuckets.reduce(
+  const currentBucket = visibleBuckets.find((bucket) => bucket.id === 'now');
+  const plannedBuckets = visibleBuckets.filter((bucket) => bucket.id !== 'now');
+  const plannedAdvisoryCount = plannedBuckets.reduce(
     (count, bucket) => count + bucket.count,
     0,
   );
-  const compactGridBuckets = visibleBuckets.filter(
-    (bucket) => bucket.id !== 'now',
-  );
-  const compactGridFullWidthBucketId =
-    compactGridBuckets.length % 2 === 1
-      ? compactGridBuckets.at(-1)?.id
-      : undefined;
+  const plannedLineIds = collectAdvisoryLineIds({
+    buckets: plannedBuckets,
+    issuesById,
+  });
+
+  function toggleBucket(bucketId: AdvisorySummaryBucketId) {
+    setExpandedBucketIds((currentIds) =>
+      currentIds.includes(bucketId)
+        ? currentIds.filter((currentId) => currentId !== bucketId)
+        : [...currentIds, bucketId],
+    );
+  }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm md:px-6 dark:border-gray-700 dark:bg-gray-800">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-1.5">
-          <h2 className="font-bold text-gray-900 text-lg sm:text-xl dark:text-gray-100">
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex items-start justify-between gap-3 px-4 py-2.5 sm:items-center sm:px-6 sm:py-3">
+        <div className="min-w-0">
+          <h2 className="font-bold text-base text-gray-900 leading-tight dark:text-gray-100">
             <FormattedMessage
               id="site.landing.service_advisories"
               defaultMessage="Service Advisories"
             />
           </h2>
-          {advisoryCount > 0 && (
-            <button
-              type="button"
-              aria-expanded={detailsOpen}
-              aria-controls="current-advisories-details"
-              className="shrink-0 rounded-lg bg-accent-light px-3 py-1.5 font-medium text-sm text-white transition-all duration-200 hover:bg-accent-light/80 hover:shadow-md dark:bg-accent-dark dark:hover:bg-accent-dark/80"
-              onClick={() => setDetailsOpen((isOpen) => !isOpen)}
-            >
-              <div className="flex items-center justify-center gap-x-2 sm:justify-between">
-                {detailsOpen ? (
-                  <>
-                    <FormattedMessage
-                      id="general.hide_details"
-                      defaultMessage="Hide details"
-                    />
-                    <ChevronUpIcon className="size-4" />
-                  </>
-                ) : (
-                  <>
-                    <FormattedMessage
-                      id="general.show_details"
-                      defaultMessage="Show details"
-                    />
-                    <ChevronDownIcon className="size-4" />
-                  </>
-                )}
-              </div>
-            </button>
-          )}
-        </div>
-        <div
-          id="current-advisories-details"
-          className={classNames(
-            'grid grid-cols-1 gap-1.5 text-gray-800 dark:text-gray-200',
-            {
-              'sm:grid-cols-2': !detailsOpen,
-            },
-          )}
-        >
-          {visibleBuckets.length > 0 ? (
-            visibleBuckets.map((bucket) => (
-              <AdvisoryBucketSection
-                key={bucket.id}
-                advisorySummary={advisorySummary}
-                bucket={bucket}
-                detailsOpen={detailsOpen}
-                issuesById={issuesById}
-                spansCompactGrid={
-                  bucket.id === 'now' ||
-                  bucket.id === compactGridFullWidthBucketId
-                }
-              />
-            ))
-          ) : (
-            <div className="flex min-w-0 flex-col items-start gap-1.5 rounded-lg bg-gray-50 p-2 text-xs sm:text-sm min-[360px]:flex-row min-[360px]:items-center min-[360px]:gap-x-2 dark:bg-gray-700/50">
-              <div className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-operational-light/20 text-operational-light shadow-sm ring-1 ring-operational-light/40 sm:size-7 dark:bg-operational-dark/30 dark:text-operational-dark dark:ring-operational-dark/60">
-                <CheckCircleIcon className="size-3.5 sm:size-5" />
-              </div>
-              <div className="flex min-w-0 items-center whitespace-pre-wrap leading-tight">
-                <FormattedMessage
-                  id="home.advisories.none_actionable"
-                  defaultMessage="No advisories needing attention"
-                />
-              </div>
-            </div>
-          )}
         </div>
         {lineOperationalCount > 0 && (
-          <div className="flex items-center justify-center gap-1 border-gray-200 border-t pt-1.5 text-gray-500 text-xs dark:border-gray-700 dark:text-gray-400">
-            <CheckCircleIcon className="size-4 shrink-0 text-operational-light dark:text-operational-dark" />
-            <FormattedMessage
-              id="general.count_line_operational"
-              defaultMessage="<bold>{count}</bold> {count, plural, one {Line} other {Lines}} Operational"
-              values={{
-                count: lineOperationalCount,
-                bold: (chunks) => (
-                  <span className="font-medium text-gray-700 dark:text-gray-200">
-                    {chunks}
+          <div className="inline-flex shrink-0 items-center gap-1 rounded-full bg-operational-light/10 px-2 py-1 font-medium text-[11px] text-operational-light ring-1 ring-operational-light/30 sm:py-0.5 dark:bg-operational-dark/15 dark:text-operational-dark dark:ring-operational-dark/40">
+            <CheckCircleIcon className="size-3.5 shrink-0" />
+            <span className="sm:hidden">
+              {lineOperationalCount}{' '}
+              <FormattedMessage
+                id="status.operational"
+                defaultMessage="Operational"
+              />
+            </span>
+            <span className="hidden sm:inline">
+              <FormattedMessage
+                id="general.count_line_operational"
+                defaultMessage="<bold>{count}</bold> {count, plural, one {Line} other {Lines}} Operational"
+                values={{
+                  count: lineOperationalCount,
+                  bold: (chunks) => chunks,
+                }}
+              />
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="border-gray-200 border-t dark:border-gray-700">
+        {visibleBuckets.length > 0 ? (
+          <>
+            {currentBucket && (
+              <AdvisoryBucketSection
+                advisorySummary={advisorySummary}
+                bucket={currentBucket}
+                detailsOpen={expandedBucketIds.includes(currentBucket.id)}
+                emphasis="current"
+                issuesById={issuesById}
+                onToggle={() => toggleBucket(currentBucket.id)}
+              />
+            )}
+
+            {plannedBuckets.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  aria-expanded={plannedOpen}
+                  aria-controls="planned-advisories"
+                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 px-4 py-2.5 text-left text-gray-800 text-sm transition-colors hover:bg-gray-50 sm:hidden dark:text-gray-200 dark:hover:bg-gray-700/40"
+                  onClick={() => setPlannedOpen((isOpen) => !isOpen)}
+                >
+                  <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600">
+                    <CalendarDaysIcon className="size-4" />
                   </span>
-                ),
-              }}
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate font-semibold leading-tight">
+                        <FormattedMessage
+                          id="general.planned"
+                          defaultMessage="Planned"
+                        />
+                        {' & '}
+                        <FormattedMessage
+                          id="general.ongoing"
+                          defaultMessage="Ongoing"
+                        />
+                      </span>
+                      <span className="rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                        {plannedAdvisoryCount}
+                      </span>
+                    </span>
+                    {plannedLineIds.length > 0 && (
+                      <span className="mt-1 block">
+                        <LineBar lineIds={plannedLineIds} linkLines={false} />
+                      </span>
+                    )}
+                  </span>
+                  {plannedOpen ? (
+                    <ChevronUpIcon className="size-4 shrink-0" />
+                  ) : (
+                    <ChevronDownIcon className="size-4 shrink-0" />
+                  )}
+                </button>
+
+                <div
+                  id="planned-advisories"
+                  className={classNames(
+                    plannedOpen ? 'block' : 'hidden sm:block',
+                  )}
+                >
+                  <div className="hidden border-gray-200 border-b bg-gray-50/60 px-6 py-1 font-medium text-[11px] text-gray-500 uppercase tracking-wide sm:block dark:border-gray-700 dark:bg-gray-900/20 dark:text-gray-400">
+                    <FormattedMessage
+                      id="home.advisories.coming_up"
+                      defaultMessage="Coming up"
+                    />
+                  </div>
+                  {plannedBuckets.map((bucket) => (
+                    <AdvisoryBucketSection
+                      key={bucket.id}
+                      advisorySummary={advisorySummary}
+                      bucket={bucket}
+                      detailsOpen={expandedBucketIds.includes(bucket.id)}
+                      emphasis="standard"
+                      issuesById={issuesById}
+                      onToggle={() => toggleBucket(bucket.id)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <div className="flex min-w-0 items-center gap-2 px-4 py-3 text-gray-800 text-xs sm:px-6 dark:text-gray-200">
+            <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-operational-light/10 text-operational-light ring-1 ring-operational-light/30 dark:bg-operational-dark/15 dark:text-operational-dark dark:ring-operational-dark/40">
+              <CheckCircleIcon className="size-4" />
+            </span>
+            <FormattedMessage
+              id="home.advisories.none_actionable"
+              defaultMessage="No advisories needing attention"
             />
           </div>
         )}
@@ -210,31 +256,97 @@ function AdvisoryBucketSection(props: {
   advisorySummary: AdvisorySummary;
   bucket: AdvisorySummaryBucket;
   detailsOpen: boolean;
+  emphasis: 'current' | 'standard';
   issuesById: Record<string, Issue>;
-  spansCompactGrid: boolean;
+  onToggle: () => void;
 }) {
-  const { advisorySummary, bucket, detailsOpen, issuesById, spansCompactGrid } =
-    props;
+  const {
+    advisorySummary,
+    bucket,
+    detailsOpen,
+    emphasis,
+    issuesById,
+    onToggle,
+  } = props;
+  const config = BUCKET_CONFIG[bucket.id];
+  const lineIds = collectAdvisoryLineIds({
+    buckets: [bucket],
+    issuesById,
+  });
   const hasDisruption = bucket.issueIds.some(
     (issueId) => issuesById[issueId]?.type === 'disruption',
   );
+  const detailId = `current-advisories-${bucket.id}-details`;
+  const { Icon } = config;
 
   return (
-    <section
-      className={classNames(
-        'flex min-w-0 flex-col gap-2 rounded-xl border bg-gray-50 p-1.5 dark:bg-gray-700/40',
-        {
-          'sm:col-span-2': !detailsOpen && spansCompactGrid,
-          'border-red-300/70 dark:border-red-500/50':
-            bucket.id === 'now' && hasDisruption,
-          'border-gray-200 dark:border-gray-700':
-            bucket.id !== 'now' || !hasDisruption,
-        },
-      )}
-    >
-      <AdvisoryBucketCard bucket={bucket} issuesById={issuesById} />
+    <section className="border-gray-200 border-b last:border-b-0 dark:border-gray-700">
+      <button
+        type="button"
+        aria-expanded={detailsOpen}
+        aria-controls={detailId}
+        className={classNames(
+          'grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 px-4 py-2.5 text-left text-gray-800 text-sm transition-colors sm:px-6 dark:text-gray-200',
+          {
+            'bg-red-50/70 hover:bg-red-50 dark:bg-red-950/20 dark:hover:bg-red-950/30':
+              emphasis === 'current' && hasDisruption,
+            'bg-blue-50/70 hover:bg-blue-50 dark:bg-blue-950/20 dark:hover:bg-blue-950/30':
+              emphasis === 'current' && !hasDisruption,
+            'hover:bg-gray-50 dark:hover:bg-gray-700/40':
+              emphasis === 'standard',
+          },
+        )}
+        onClick={onToggle}
+      >
+        <span
+          className={classNames(
+            'inline-flex size-7 shrink-0 items-center justify-center rounded-full ring-1 sm:size-6',
+            {
+              'bg-red-100 text-red-700 ring-red-200 dark:bg-red-950/60 dark:text-red-300 dark:ring-red-800':
+                emphasis === 'current' && hasDisruption,
+              'bg-blue-100 text-blue-700 ring-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:ring-blue-800':
+                emphasis === 'current' && !hasDisruption,
+              'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-700/60':
+                bucket.id === 'later_today',
+              'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-700/60':
+                bucket.id === 'this_week',
+              'bg-gray-100 text-gray-600 ring-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600':
+                bucket.id === 'background',
+            },
+          )}
+        >
+          <Icon className="size-4 sm:size-3.5" />
+        </span>
+        <span className="min-w-0">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="min-w-0 truncate font-semibold leading-tight">
+              <FormattedMessage {...config.label} />
+            </span>
+            <span className="shrink-0 rounded-md bg-white/70 px-1.5 py-0.5 font-medium text-[11px] text-gray-600 ring-1 ring-gray-200 dark:bg-gray-800/70 dark:text-gray-300 dark:ring-gray-600">
+              <FormattedMessage
+                {...config.countLabel}
+                values={{ count: bucket.count }}
+              />
+            </span>
+          </span>
+          {lineIds.length > 0 && (
+            <span className="mt-1 block sm:mt-0.5">
+              <LineBar lineIds={lineIds} linkLines={false} />
+            </span>
+          )}
+        </span>
+        {detailsOpen ? (
+          <ChevronUpIcon className="size-4 shrink-0" />
+        ) : (
+          <ChevronDownIcon className="size-4 shrink-0" />
+        )}
+      </button>
+
       {detailsOpen && (
-        <div className="border-gray-200 border-t pt-2 dark:border-gray-600">
+        <div
+          id={detailId}
+          className="border-gray-200 border-t bg-gray-50/60 px-3 py-3 dark:border-gray-700 dark:bg-gray-900/20"
+        >
           <Suspense
             fallback={
               <CurrentAdvisoriesDetailsSkeleton issueIds={bucket.issueIds} />
@@ -250,61 +362,6 @@ function AdvisoryBucketSection(props: {
         </div>
       )}
     </section>
-  );
-}
-
-function AdvisoryBucketCard(props: {
-  bucket: AdvisorySummaryBucket;
-  issuesById: Record<string, Issue>;
-}) {
-  const { bucket, issuesById } = props;
-  const config = BUCKET_CONFIG[bucket.id];
-  const lineIds = [
-    ...new Set(
-      bucket.issueIds.flatMap((issueId) => issuesById[issueId]?.lineIds ?? []),
-    ),
-  ].sort();
-  const hasDisruption = bucket.issueIds.some(
-    (issueId) => issuesById[issueId]?.type === 'disruption',
-  );
-  const { Icon } = config;
-
-  return (
-    <div className="grid min-w-0 grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-0.5 pb-0.5 text-sm">
-      <div
-        className={classNames(
-          'inline-flex size-5 shrink-0 items-center justify-center rounded-full ring-1',
-          {
-            'bg-red-50 text-red-600 ring-red-200 dark:bg-red-950/40 dark:text-red-300 dark:ring-red-700/60':
-              bucket.id === 'now' && hasDisruption,
-            'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:ring-blue-700/60':
-              bucket.id === 'now' && !hasDisruption,
-            'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-700/60':
-              bucket.id === 'later_today',
-            'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-700/60':
-              bucket.id === 'this_week',
-            'bg-gray-100 text-gray-600 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600':
-              bucket.id === 'background',
-          },
-        )}
-      >
-        <Icon className="size-3" />
-      </div>
-      <div className="min-w-0 truncate font-semibold text-gray-900 leading-tight dark:text-gray-100">
-        <FormattedMessage {...config.label} />
-      </div>
-      <div className="shrink-0 rounded-md bg-white px-1.5 py-0.5 font-medium text-gray-600 text-xs leading-5 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600">
-        <FormattedMessage
-          {...config.countLabel}
-          values={{ count: bucket.count }}
-        />
-      </div>
-      {lineIds.length > 0 && (
-        <div className="col-start-2 col-end-4 min-w-0">
-          <LineBar lineIds={lineIds} />
-        </div>
-      )}
-    </div>
   );
 }
 

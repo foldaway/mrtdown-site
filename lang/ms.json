@@ -176,6 +176,7 @@
   "home.advisories.bucket_now_count": "{count, plural, one {{count} nasihat} other {{count} nasihat}}",
   "home.advisories.bucket_this_week": "Minggu Ini",
   "home.advisories.bucket_this_week_count": "{count, plural, one {{count} nasihat} other {{count} nasihat}}",
+  "home.advisories.coming_up": "Akan Datang",
   "home.advisories.none_actionable": "Tiada nasihat yang memerlukan perhatian",
   "home.report_cta": "Hantar laporan",
   "home.report_cta_body": "Kongsi laporan komuniti untuk semakan. Ia kekal berasingan daripada status perkhidmatan rasmi.",

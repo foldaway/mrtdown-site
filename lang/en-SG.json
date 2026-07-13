@@ -176,6 +176,7 @@
   "home.advisories.bucket_now_count": "{count, plural, one {{count} advisory} other {{count} advisories}}",
   "home.advisories.bucket_this_week": "This Week",
   "home.advisories.bucket_this_week_count": "{count, plural, one {{count} advisory} other {{count} advisories}}",
+  "home.advisories.coming_up": "Coming up",
   "home.advisories.none_actionable": "No advisories needing attention",
   "home.report_cta": "Submit report",
   "home.report_cta_body": "Share a community report for review. It stays separate from official service status.",

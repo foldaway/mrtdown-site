@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { countOperationalLineSummaries } from './helpers';
+import {
+  collectAdvisoryLineIds,
+  countOperationalLineSummaries,
+} from './helpers';
 
 describe('countOperationalLineSummaries', () => {
   it('counts normal line summaries as operational', () => {
@@ -26,5 +29,34 @@ describe('countOperationalLineSummaries', () => {
         ],
       }),
     ).toBe(1);
+  });
+});
+
+describe('collectAdvisoryLineIds', () => {
+  it('collects unique sorted lines across advisory buckets', () => {
+    expect(
+      collectAdvisoryLineIds({
+        buckets: [
+          { issueIds: ['planned-dtl', 'background-ewl'] },
+          { issueIds: ['background-nsl', 'background-ewl'] },
+        ],
+        issuesById: {
+          'planned-dtl': { lineIds: ['DTL'] },
+          'background-ewl': { lineIds: ['EWL', 'NSL'] },
+          'background-nsl': { lineIds: ['NSL'] },
+        },
+      }),
+    ).toEqual(['DTL', 'EWL', 'NSL']);
+  });
+
+  it('ignores missing issue records', () => {
+    expect(
+      collectAdvisoryLineIds({
+        buckets: [{ issueIds: ['known', 'missing'] }],
+        issuesById: {
+          known: { lineIds: ['BPLRT'] },
+        },
+      }),
+    ).toEqual(['BPLRT']);
   });
 });

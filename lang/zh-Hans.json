@@ -176,6 +176,7 @@
   "home.advisories.bucket_now_count": "{count, plural, one {{count} 项建议} other {{count} 项建议}}",
   "home.advisories.bucket_this_week": "本周",
   "home.advisories.bucket_this_week_count": "{count, plural, one {{count} 项建议} other {{count} 项建议}}",
+  "home.advisories.coming_up": "即将进行",
   "home.advisories.none_actionable": "没有需要关注的服务建议",
   "home.report_cta": "提交报告",
   "home.report_cta_body": "提交社区报告以供审核。它会与官方服务状态分开显示。",

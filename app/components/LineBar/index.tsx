@@ -4,10 +4,11 @@ import { LinePill } from './component/LinePill';
 
 interface Props {
   lineIds: string[];
+  linkLines?: boolean;
 }
 
 export const LineBar: React.FC<Props> = (props) => {
-  const { lineIds } = props;
+  const { lineIds, linkLines = true } = props;
 
   const included = useIncludedEntities();
   const lines = useMemo(() => {
@@ -17,7 +18,7 @@ export const LineBar: React.FC<Props> = (props) => {
   return (
     <div className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
       {lines.map((component) => (
-        <LinePill key={component.id} component={component} />
+        <LinePill key={component.id} component={component} linked={linkLines} />
       ))}
     </div>
   );
