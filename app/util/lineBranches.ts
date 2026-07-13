@@ -1,3 +1,5 @@
+import { DateTime } from 'luxon';
+
 type LineBranchLifecycleFields = {
   startedAt: string | null;
   endedAt: string | null;
@@ -36,6 +38,34 @@ export function lineBranchIsActiveOn(
   return (
     lineBranchHasStarted(branch, referenceDate) &&
     !lineBranchHasEnded(branch, referenceDate)
+  );
+}
+
+/**
+ * Chooses the date used to resolve station memberships for a selected service.
+ * Current services use the page reference date, ended services use their final
+ * active day, and planned services use their first future membership date.
+ */
+export function deriveLineBranchMembershipReferenceDate(
+  branch: LineBranchLifecycleFields,
+  membershipStartedDates: readonly string[],
+  referenceDate = todayIsoDate(),
+) {
+  if (lineBranchIsActiveOn(branch, referenceDate)) {
+    return referenceDate;
+  }
+
+  if (lineBranchHasEnded(branch, referenceDate) && branch.endedAt != null) {
+    return (
+      DateTime.fromISO(branch.endedAt).minus({ days: 1 }).toISODate() ??
+      referenceDate
+    );
+  }
+
+  return (
+    [branch.startedAt, ...membershipStartedDates]
+      .filter((date): date is string => date != null && date >= referenceDate)
+      .sort((first, second) => first.localeCompare(second))[0] ?? referenceDate
   );
 }
 

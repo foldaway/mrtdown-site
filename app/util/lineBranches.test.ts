@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   countLineStations,
+  deriveLineBranchMembershipReferenceDate,
   deriveLineStartedAtFromBranches,
   lineBranchHasEnded,
   lineBranchIsActiveOn,
@@ -66,6 +67,38 @@ describe('line branch lifecycle helpers', () => {
 
     expect(lineBranchIsActiveOn(branch, '2026-07-01')).toBe(false);
     expect(lineBranchHasEnded(branch, '2026-07-01')).toBe(true);
+  });
+});
+
+describe('deriveLineBranchMembershipReferenceDate', () => {
+  it('uses the current reference date for an active service', () => {
+    expect(
+      deriveLineBranchMembershipReferenceDate(
+        { startedAt: '2020-01-01', endedAt: null },
+        ['2027-01-01'],
+        '2026-07-14',
+      ),
+    ).toBe('2026-07-14');
+  });
+
+  it('uses the final active day for an ended service', () => {
+    expect(
+      deriveLineBranchMembershipReferenceDate(
+        { startedAt: '2020-01-01', endedAt: '2025-01-01' },
+        [],
+        '2026-07-14',
+      ),
+    ).toBe('2024-12-31');
+  });
+
+  it('uses the first membership date for a planned service', () => {
+    expect(
+      deriveLineBranchMembershipReferenceDate(
+        { startedAt: null, endedAt: null },
+        ['2028-06-30', '2035-01-01'],
+        '2026-07-14',
+      ),
+    ).toBe('2028-06-30');
   });
 });
 

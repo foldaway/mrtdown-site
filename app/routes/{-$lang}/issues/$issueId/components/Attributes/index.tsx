@@ -31,6 +31,7 @@ export const Attributes: React.FC<Props> = (props) => {
             <IssueAffectedBranchPill
               key={`${branch.branchId}@${branch.lineId}`}
               branch={branch}
+              issue={issue}
             />
           ))}
         </dd>

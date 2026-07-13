@@ -4,21 +4,30 @@ import {
 } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
+import { DateTime } from 'luxon';
 import { DropdownMenu } from 'radix-ui';
 import { Fragment } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import type { IssueAffectedBranch } from '~/types';
+import type { Issue, IssueAffectedBranch, IssueInterval } from '~/types';
 import { useAffectedStations } from '~/components/IssueAffectedBranchPill/hooks/useAffectedStations';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { isStationMembershipVisibleAt } from '~/helpers/isStationMembershipVisibleAt';
 
 interface Props {
   branch: IssueAffectedBranch;
   className?: string;
+  issue: Pick<Issue, 'intervals'>;
+  interval?: IssueInterval;
 }
 
+/**
+ * Renders an affected branch and its station popup. Station codes are resolved
+ * at the selected issue interval, or at the issue's earliest interval when no
+ * specific interval is selected, so historical issues retain their valid codes.
+ */
 export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
-  const { branch, className } = props;
+  const { branch, className, interval, issue } = props;
 
   const intl = useIntl();
   const { lines } = useIncludedEntities();
@@ -26,6 +35,18 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
     useAffectedStations(branch);
 
   const hasMultipleStations = allStations.length > 2;
+  const membershipReferenceAt =
+    interval?.startAt ??
+    issue.intervals.reduce<string | null>((earliest, candidate) => {
+      if (earliest == null) {
+        return candidate.startAt;
+      }
+
+      return DateTime.fromISO(candidate.startAt).toMillis() <
+        DateTime.fromISO(earliest).toMillis()
+        ? candidate.startAt
+        : earliest;
+    }, null);
 
   const renderStationRange = () => {
     if (source == null) return null;
@@ -174,10 +195,21 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
                       <div className="flex items-center overflow-hidden rounded">
                         {Object.entries(
                           Object.fromEntries(
-                            station.memberships.map((membership) => {
-                              const key = `${membership.code}@${membership.lineId}`;
-                              return [key, membership];
-                            }),
+                            station.memberships
+                              .filter((membership) => {
+                                if (membershipReferenceAt == null) {
+                                  return false;
+                                }
+
+                                return isStationMembershipVisibleAt(
+                                  membership,
+                                  membershipReferenceAt,
+                                );
+                              })
+                              .map((membership) => {
+                                const key = `${membership.code}@${membership.lineId}`;
+                                return [key, membership];
+                              }),
                           ),
                         )
                           .sort((a, b) => {

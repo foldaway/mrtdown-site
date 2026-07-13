@@ -34,6 +34,8 @@ export const IssueContent: React.FC<Props> = (props) => {
               key={`${branch.branchId}@${branch.lineId}`}
               branch={branch}
               className="min-w-0"
+              issue={issue}
+              interval={interval}
             />
           ))}
         </div>

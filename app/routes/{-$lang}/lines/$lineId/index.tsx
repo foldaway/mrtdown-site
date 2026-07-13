@@ -435,7 +435,11 @@ function ComponentPage() {
           issueId={lineProfile.issueIdNextMaintenance}
         />
 
-        <LineSchematicCard line={line} branches={branches} />
+        <LineSchematicCard
+          line={line}
+          branches={branches}
+          referenceAt={lineProfile.referenceDate}
+        />
 
         <QuickFactsCard line={line} stationCount={stationCount} />
 
@@ -466,6 +470,7 @@ function ComponentPage() {
 
         <StationInterchangesCard
           lineId={lineId}
+          referenceAt={lineProfile.referenceDate}
           stationIds={lineProfile.stationIdsInterchanges}
         />
       </div>

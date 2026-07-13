@@ -55,6 +55,8 @@ const InternalContent: React.FC<InternalContentProps> = (props) => {
           <IssueAffectedBranchPill
             key={`${branch.branchId}@${branch.lineId}`}
             branch={branch}
+            issue={issue}
+            interval={interval ?? undefined}
           />
         ))}
       </div>

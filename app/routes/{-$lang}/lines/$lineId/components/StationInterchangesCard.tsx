@@ -3,14 +3,21 @@ import { Fragment } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { isStationMembershipVisibleAt } from '~/helpers/isStationMembershipVisibleAt';
 
 interface Props {
   lineId: string;
+  /** Point in time used to resolve historically valid station codes. */
+  referenceAt: string;
   stationIds: string[];
 }
 
+/**
+ * Lists interchange stations and the codes valid at the line profile's
+ * reference time.
+ */
 export const StationInterchangesCard: React.FC<Props> = (props) => {
-  const { lineId, stationIds } = props;
+  const { lineId, referenceAt, stationIds } = props;
 
   const intl = useIntl();
 
@@ -42,10 +49,17 @@ export const StationInterchangesCard: React.FC<Props> = (props) => {
                   <div className="flex items-center overflow-hidden rounded-md">
                     {Object.entries(
                       Object.fromEntries(
-                        stations[stationId].memberships.map((membership) => {
-                          const key = `${membership.code}@${membership.lineId}`;
-                          return [key, membership];
-                        }),
+                        stations[stationId].memberships
+                          .filter((membership) =>
+                            isStationMembershipVisibleAt(
+                              membership,
+                              referenceAt,
+                            ),
+                          )
+                          .map((membership) => {
+                            const key = `${membership.code}@${membership.lineId}`;
+                            return [key, membership];
+                          }),
                       ),
                     )
                       .sort((a, b) => {

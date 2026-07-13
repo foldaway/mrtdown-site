@@ -3963,6 +3963,7 @@ export async function getLineProfileData(
 
   const profile = {
     lineId,
+    referenceDate,
     lineSummary: rankedSummary,
     branches,
     stationCount,

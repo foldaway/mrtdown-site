@@ -6,17 +6,25 @@ import { Fragment, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { isStationMembershipVisibleAt } from '~/helpers/isStationMembershipVisibleAt';
 import type { LineBranch } from '~/util/db.queries';
+import { deriveLineBranchMembershipReferenceDate } from '~/util/lineBranches';
 import type { Line } from '~/types';
 import { BranchItem } from './components/BranchItem';
 
 interface Props {
   line: Line;
   branches: LineBranch[];
+  /** Current page reference used when the selected service is active. */
+  referenceAt: string;
 }
 
+/**
+ * Renders the selected service with station codes valid during that service's
+ * active or planned window.
+ */
 export const LineSchematicCard: React.FC<Props> = (props) => {
-  const { line, branches } = props;
+  const { line, branches, referenceAt } = props;
 
   const intl = useIntl();
   const { lines, stations } = useIncludedEntities();
@@ -28,6 +36,28 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
   const selectedBranch = useMemo(() => {
     return branches.find((branch) => branch.id === selectedBranchId) ?? null;
   }, [branches, selectedBranchId]);
+  const selectedBranchReferenceAt = useMemo(() => {
+    if (selectedBranch == null) {
+      return referenceAt;
+    }
+
+    const membershipStartedDates = selectedBranch.stationIds.flatMap(
+      (stationId) =>
+        stations[stationId].memberships
+          .filter(
+            (membership) =>
+              membership.branchId === selectedBranch.id &&
+              membership.lineId === line.id,
+          )
+          .map((membership) => membership.startedAt),
+    );
+
+    return deriveLineBranchMembershipReferenceDate(
+      selectedBranch,
+      membershipStartedDates,
+      referenceAt,
+    );
+  }, [line.id, referenceAt, selectedBranch, stations]);
 
   const loopColumns = useMemo(() => {
     if (selectedBranch == null) {
@@ -58,10 +88,17 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
     <div className="flex shrink-0 items-center overflow-hidden rounded-md">
       {Object.entries(
         Object.fromEntries(
-          stations[stationId].memberships.map((membership) => {
-            const key = `${membership.code}@${membership.lineId}`;
-            return [key, membership];
-          }),
+          stations[stationId].memberships
+            .filter((membership) =>
+              isStationMembershipVisibleAt(
+                membership,
+                selectedBranchReferenceAt,
+              ),
+            )
+            .map((membership) => {
+              const key = `${membership.code}@${membership.lineId}`;
+              return [key, membership];
+            }),
         ),
       )
         .sort((a, b) => {
