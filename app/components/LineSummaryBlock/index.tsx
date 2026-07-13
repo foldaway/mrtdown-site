@@ -1,10 +1,10 @@
 import {
   BuildingOffice2Icon,
   CheckCircleIcon,
+  ClockIcon,
   Cog8ToothIcon,
   CubeIcon,
   ExclamationTriangleIcon,
-  MoonIcon,
 } from '@heroicons/react/24/solid';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
@@ -62,7 +62,7 @@ const STATUS_ICON_CONFIG = {
     className: classNames('text-operational-light dark:text-operational-dark'),
   },
   closed_for_day: {
-    Icon: MoonIcon,
+    Icon: ClockIcon,
     className: classNames('text-gray-400 dark:text-gray-500'),
   },
   future_service: {
