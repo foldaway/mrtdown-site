@@ -117,6 +117,7 @@
   "general.no_related_issues": "没有相关问题。",
   "general.no_scheduled_maintenance": "此线路没有计划维护。",
   "general.no_upcoming_maintenance": "无即将进行的维护",
+  "general.of_service_hours": "占服务时长",
   "general.ongoing": "进行中",
   "general.ongoing_timestamp": "{start, date, medium} {start, time, short} 至今",
   "general.opened": "启用日期",

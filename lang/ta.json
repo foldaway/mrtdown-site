@@ -117,6 +117,7 @@
   "general.no_related_issues": "தொடர்புடைய சிக்கல்கள் இல்லை.",
   "general.no_scheduled_maintenance": "இந்த வழித்தடத்திற்கு எந்த திட்டமிடப்பட்ட பராமரிப்பும் இல்லை.",
   "general.no_upcoming_maintenance": "வரவிருக்கும் பராமரிப்பு இல்லை",
+  "general.of_service_hours": "சேவை நேரத்தில்",
   "general.ongoing": "நடைபெற்று கொண்டு உள்ளது",
   "general.ongoing_timestamp": "{start, date, medium}, {start, time, short} மணி முதல் தொடர்ந்து நடைபெறுகிறது",
   "general.opened": "திறந்த தேதி",

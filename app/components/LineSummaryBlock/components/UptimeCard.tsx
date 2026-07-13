@@ -4,8 +4,8 @@ import { Popover } from 'radix-ui';
 import { useState } from 'react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import { useDebounce } from 'use-debounce';
-import type { LineSummary } from '~/types';
 import { FormattedDuration } from '~/components/FormattedDuration';
+import type { LineSummary } from '~/types';
 import { assert } from '~/util/assert';
 
 interface Props {
@@ -31,6 +31,9 @@ export const UptimeCard: React.FC<Props> = (props) => {
     data.totalServiceSeconds != null && data.totalServiceSeconds > 0
       ? disruptionDowntimeSeconds / data.totalServiceSeconds
       : 0;
+  const disruptionDowntimeDuration = Duration.fromObject({
+    minutes: Math.floor(disruptionDowntimeSeconds / 60),
+  });
 
   return (
     <>
@@ -52,17 +55,28 @@ export const UptimeCard: React.FC<Props> = (props) => {
       {data.totalDowntimeSeconds != null && (
         <Popover.Root open={isOpenDebounced} onOpenChange={setIsOpen}>
           <Popover.Trigger
+            type="button"
             onMouseEnter={() => setIsOpen(true)}
             onMouseLeave={() => setIsOpen(false)}
-            className="ms-1 rounded-full p-0.5 transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-1 dark:focus:ring-accent-dark dark:hover:bg-gray-700"
+            className="ms-1 rounded-full p-0.5 transition-colors hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-accent-light focus-visible:outline-offset-2 dark:focus-visible:outline-accent-dark dark:hover:bg-gray-700"
           >
-            <InformationCircleIcon className="size-4 text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100" />
+            <InformationCircleIcon
+              aria-hidden="true"
+              className="size-4 text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
+            />
+            <span className="sr-only">
+              <FormattedMessage
+                id="general.disruption_downtime"
+                defaultMessage="Disruption downtime"
+              />
+            </span>
           </Popover.Trigger>
           <Popover.Portal>
             <Popover.Content
-              className="z-50 flex min-w-64 max-w-80 flex-col rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-lg outline-none ring-1 ring-black/5 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800 dark:ring-white/10"
+              className="z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-gray-900/15 shadow-xl outline-none ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30 dark:ring-white/10"
               onMouseEnter={() => setIsOpen(true)}
               onMouseLeave={() => setIsOpen(false)}
+              collisionPadding={16}
               side="top"
               sideOffset={8}
             >
@@ -75,70 +89,24 @@ export const UptimeCard: React.FC<Props> = (props) => {
                 />
               </span>
 
-              <div className="mt-3 flex items-end justify-between gap-x-4">
-                <span className="font-semibold text-2xl text-disruption-light tabular-nums dark:text-disruption-dark">
-                  <FormattedDuration
-                    duration={Duration.fromObject({
-                      seconds: disruptionDowntimeSeconds,
-                    })}
-                  />
+              <div className="mt-3 flex items-center justify-between gap-x-4">
+                <span className="font-semibold text-disruption-light text-xl tabular-nums leading-tight dark:text-disruption-dark">
+                  <FormattedDuration duration={disruptionDowntimeDuration} />
                 </span>
-                <span className="pb-1 text-gray-500 text-xs dark:text-gray-400">
-                  <FormattedMessage
-                    id="general.service_hours_share"
-                    defaultMessage="{percent} of service hours"
-                    values={{
-                      percent: (
-                        <FormattedNumber
-                          value={disruptionDowntimeRatio}
-                          style="percent"
-                          maximumFractionDigits={2}
-                        />
-                      ),
-                    }}
-                  />
-                </span>
-              </div>
-
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
-                <div
-                  className="h-full rounded-full bg-disruption-light dark:bg-disruption-dark"
-                  style={{
-                    width: `${Math.min(disruptionDowntimeRatio * 100, 100).toFixed(2)}%`,
-                  }}
-                />
-              </div>
-
-              <span className="mt-3 text-gray-600 text-xs leading-relaxed dark:text-gray-300">
-                {disruptionDowntimeSeconds > 0 ? (
-                  <FormattedMessage
-                    id="general.disruption_downtime_description"
-                    defaultMessage="Disruption time counted against uptime for this period."
-                  />
-                ) : (
-                  <FormattedMessage
-                    id="general.no_disruption_downtime_description"
-                    defaultMessage="No disruption downtime recorded in this period."
-                  />
-                )}
-              </span>
-
-              <div className="mt-3 flex items-center justify-between border-gray-100 border-t pt-3 text-xs dark:border-gray-700">
-                <div className="flex items-center">
-                  <div className="me-2 size-3 rounded-full bg-disruption-light dark:bg-disruption-dark" />
-                  <span className="font-medium text-gray-700 dark:text-gray-200">
-                    <FormattedMessage
-                      id="general.disruption"
-                      defaultMessage="Disruption"
+                <span className="flex shrink-0 flex-col items-end text-xs">
+                  <span className="font-semibold text-disruption-light tabular-nums dark:text-disruption-dark">
+                    <FormattedNumber
+                      value={disruptionDowntimeRatio}
+                      style="percent"
+                      maximumFractionDigits={2}
                     />
                   </span>
-                </div>
-                <span className="font-mono text-gray-600 dark:text-gray-300">
-                  <FormattedDuration
-                    duration={Duration.fromObject({
-                      seconds: disruptionDowntimeSeconds,
-                    })}
-                  />
+                  <span className="text-gray-500 dark:text-gray-400">
+                    <FormattedMessage
+                      id="general.of_service_hours"
+                      defaultMessage="of service hours"
+                    />
+                  </span>
                 </span>
               </div>
             </Popover.Content>
