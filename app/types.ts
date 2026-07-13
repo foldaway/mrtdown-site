@@ -91,6 +91,10 @@ export type LineSummaryDateRecord = {
     [key in IssueType]?: {
       totalDurationSeconds: number;
       issueIds: string[];
+      intervals: Array<{
+        startAt: string;
+        endAt: string;
+      }>;
     };
   };
   dayType: LineSummaryDayType;

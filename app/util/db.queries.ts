@@ -22,6 +22,7 @@ import {
   issuesTable,
   landmarksTable,
   lineDayFactsTable,
+  lineDayIssueIntervalsTable,
   lineOperatorsTable,
   linesTable,
   metadataTable,
@@ -330,6 +331,7 @@ type OperationalFactRowsForDate = {
   date: string;
   issueRows: (typeof issueDayFactsTable.$inferInsert)[];
   lineRows: (typeof lineDayFactsTable.$inferInsert)[];
+  lineIssueIntervalRows: (typeof lineDayIssueIntervalsTable.$inferInsert)[];
 };
 
 function nowSg() {
@@ -2454,6 +2456,7 @@ export function buildLineSummary(
       const current = dayBreakdown.breakdownByIssueTypes[issue.type] ?? {
         totalDurationSeconds: 0,
         issueIds: [],
+        intervals: [],
       };
       if (!current.issueIds.includes(issue.id)) {
         current.issueIds.push(issue.id);
@@ -2470,6 +2473,18 @@ export function buildLineSummary(
       if (current != null) {
         current.totalDurationSeconds =
           dailyDurationSecondsByIssueType[issueType];
+        current.intervals = mergeIntervals(
+          dailyIntervalsByIssueType[issueType],
+        ).flatMap((interval) =>
+          interval.end == null
+            ? []
+            : [
+                {
+                  startAt: isoDateTime(interval.start),
+                  endAt: isoDateTime(interval.end),
+                },
+              ],
+        );
       }
     }
 
@@ -3404,15 +3419,16 @@ function buildDailyIssueTypeCountsFromIssues(
   return countsByDate;
 }
 
-function buildLineOperationalFactRow(
+export function buildLineOperationalFactRows(
   line: Line,
   lineIssues: IssueWithOperationalEffects[],
   normalizedDate: DateTime,
   publicHolidaySet: Set<string>,
   asOf: DateTime,
-): typeof lineDayFactsTable.$inferInsert {
+) {
   const issueCounts = createIssueTypeCounts();
   const downtimeIntervalsByIssueType = createIssueTypeIntervalGroups();
+  const intervalRows: (typeof lineDayIssueIntervalsTable.$inferInsert)[] = [];
   const lineFuture = isLineFuture(line, normalizedDate.endOf('day'));
   const serviceWindow = serviceWindowForDate(
     line,
@@ -3425,18 +3441,34 @@ function buildLineOperationalFactRow(
       addIssueTypeCount(issueCounts, issue.type, 1);
     }
 
-    if (lineFuture || !issueContributesToLineDowntime(issue)) {
+    if (lineFuture) {
       continue;
     }
 
-    downtimeIntervalsByIssueType[issue.type].push(
-      ...clipIssueIntervalsToRange(
-        issue,
-        serviceWindow.start,
-        serviceWindow.end,
-        asOf,
-      ),
+    const clippedIntervals = clipIssueIntervalsToRange(
+      issue,
+      serviceWindow.start,
+      serviceWindow.end,
+      asOf,
     );
+    intervalRows.push(
+      ...clippedIntervals.map((interval, intervalIndex) => ({
+        date: isoDate(normalizedDate),
+        line_id: line.id,
+        issue_id: issue.id,
+        interval_index: intervalIndex,
+        issue_type: issue.type,
+        start_at: isoDateTime(interval.start),
+        end_at: isoDateTime(interval.end ?? asOf),
+        as_of: isoDateTime(asOf),
+      })),
+    );
+
+    if (!issueContributesToLineDowntime(issue)) {
+      continue;
+    }
+
+    downtimeIntervalsByIssueType[issue.type].push(...clippedIntervals);
   }
 
   const downtimeSeconds = sumIssueTypeIntervalGroups(
@@ -3445,16 +3477,19 @@ function buildLineOperationalFactRow(
   );
 
   return {
-    date: isoDate(normalizedDate),
-    line_id: line.id,
-    as_of: isoDateTime(asOf),
-    service_seconds: Math.round(lineFuture ? 0 : serviceWindow.seconds),
-    downtime_disruption_seconds: Math.round(downtimeSeconds.disruption),
-    downtime_maintenance_seconds: Math.round(downtimeSeconds.maintenance),
-    downtime_infra_seconds: Math.round(downtimeSeconds.infra),
-    issue_count_disruption: issueCounts.disruption,
-    issue_count_maintenance: issueCounts.maintenance,
-    issue_count_infra: issueCounts.infra,
+    lineRow: {
+      date: isoDate(normalizedDate),
+      line_id: line.id,
+      as_of: isoDateTime(asOf),
+      service_seconds: Math.round(lineFuture ? 0 : serviceWindow.seconds),
+      downtime_disruption_seconds: Math.round(downtimeSeconds.disruption),
+      downtime_maintenance_seconds: Math.round(downtimeSeconds.maintenance),
+      downtime_infra_seconds: Math.round(downtimeSeconds.infra),
+      issue_count_disruption: issueCounts.disruption,
+      issue_count_maintenance: issueCounts.maintenance,
+      issue_count_infra: issueCounts.infra,
+    } satisfies typeof lineDayFactsTable.$inferInsert,
+    intervalRows,
   };
 }
 
@@ -3496,8 +3531,8 @@ function buildOperationalFactRowsForDate(
     })
     .filter((row) => row.active_anytime || row.active_end_of_day);
 
-  const lineRows = context.lines.map((line) =>
-    buildLineOperationalFactRow(
+  const lineFacts = context.lines.map((line) =>
+    buildLineOperationalFactRows(
       line,
       context.issuesByLineId[line.id] ?? [],
       normalizedDate,
@@ -3509,7 +3544,8 @@ function buildOperationalFactRowsForDate(
   return {
     date: dateKey,
     issueRows,
-    lineRows,
+    lineRows: lineFacts.map((facts) => facts.lineRow),
+    lineIssueIntervalRows: lineFacts.flatMap((facts) => facts.intervalRows),
   };
 }
 
@@ -3533,6 +3569,9 @@ async function replaceOperationalFactRows(
   const dates = rowsByDate.map((rows) => rows.date);
   const issueRows = rowsByDate.flatMap((rows) => rows.issueRows);
   const lineRows = rowsByDate.flatMap((rows) => rows.lineRows);
+  const lineIssueIntervalRows = rowsByDate.flatMap(
+    (rows) => rows.lineIssueIntervalRows,
+  );
 
   await database.transaction(async (tx) => {
     for (const batch of chunk(dates, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
@@ -3555,6 +3594,11 @@ async function replaceOperationalFactRows(
     for (const batch of chunk(lineRows, 500)) {
       if (batch.length > 0) {
         await tx.insert(lineDayFactsTable).values(batch);
+      }
+    }
+    for (const batch of chunk(lineIssueIntervalRows, 500)) {
+      if (batch.length > 0) {
+        await tx.insert(lineDayIssueIntervalsTable).values(batch);
       }
     }
   });

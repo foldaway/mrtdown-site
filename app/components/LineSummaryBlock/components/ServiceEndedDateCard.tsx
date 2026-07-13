@@ -1,4 +1,8 @@
-import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
+import {
+  CalendarDaysIcon,
+  ClockIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 import classNames from 'classnames';
 import type { DateTime } from 'luxon';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
@@ -13,6 +17,10 @@ interface Props {
   dayType: LineSummaryDayType;
   isActive: boolean;
   onActivate: () => void;
+}
+
+interface DetailsProps extends Omit<Props, 'isActive' | 'onActivate'> {
+  onClose: () => void;
 }
 
 export const ServiceEndedDateCard: React.FC<Props> = (props) => {
@@ -53,10 +61,8 @@ export const ServiceEndedDateCard: React.FC<Props> = (props) => {
   );
 };
 
-export const ServiceEndedDateCardDetails: React.FC<
-  Omit<Props, 'isActive' | 'onActivate'>
-> = (props) => {
-  const { dateTime, dayType, componentRef } = props;
+export const ServiceEndedDateCardDetails: React.FC<DetailsProps> = (props) => {
+  const { dateTime, dayType, componentRef, onClose } = props;
 
   const isHydrated = useHydrated();
 
@@ -64,7 +70,7 @@ export const ServiceEndedDateCardDetails: React.FC<
 
   return (
     <div className="flex flex-col text-sm">
-      <div className="grid gap-3 pb-3 sm:grid-cols-[minmax(0,_1.35fr)_minmax(0,_1fr)]">
+      <div className="grid grid-cols-[minmax(0,_1fr)_auto] gap-3 pb-3">
         <div className="flex items-start gap-x-3">
           <CalendarDaysIcon className="mt-0.5 size-5 shrink-0 text-gray-500 dark:text-gray-400" />
           <div className="min-w-0">
@@ -96,38 +102,29 @@ export const ServiceEndedDateCardDetails: React.FC<
             </p>
           </div>
         </div>
-
-        <div className="grid grid-cols-[auto_1fr] gap-x-3 sm:border-gray-200 sm:border-l sm:pl-4 dark:sm:border-gray-700">
-          <ClockIcon className="mt-0.5 size-5 text-gray-500 dark:text-gray-400" />
-          <div className="min-w-0">
-            <span className="font-medium text-gray-500 text-xs uppercase dark:text-gray-400">
-              <FormattedMessage
-                id="component.service_hours"
-                defaultMessage="Service hours"
-              />
-            </span>
-            <p className="mt-1 font-semibold text-gray-900 dark:text-gray-100">
-              <FormattedMessage
-                id="component.service_hours_description"
-                defaultMessage="{start, time, short} to {end, time, short}"
-                values={{
-                  start: operatingHours.start.toMillis(),
-                  end: operatingHours.end.toMillis(),
-                }}
-              />
-            </p>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-x-1 rounded-md px-2 py-1 font-medium text-gray-600 text-xs hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-accent-light focus-visible:outline-offset-2 dark:text-gray-300 dark:focus-visible:outline-accent-dark dark:hover:bg-gray-800 dark:hover:text-gray-100"
+        >
+          <XMarkIcon aria-hidden="true" className="size-4" />
+          <FormattedMessage id="general.close" defaultMessage="Close" />
+        </button>
       </div>
 
       <div className="border-gray-200 border-t pt-3 dark:border-gray-700">
-        <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
-          <FormattedMessage id="general.status" defaultMessage="Status" />
-        </span>
-        <p className="mt-2 text-gray-700 dark:text-gray-200">
+        <p className="flex items-start gap-x-2 text-gray-700 dark:text-gray-200">
+          <ClockIcon
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-gray-500 dark:text-gray-400"
+          />
           <FormattedMessage
             id="general.service_not_started"
-            defaultMessage="Service on this day has not started."
+            defaultMessage="Service has not started. Scheduled for {start, time, short} to {end, time, short}."
+            values={{
+              start: operatingHours.start.toMillis(),
+              end: operatingHours.end.toMillis(),
+            }}
           />
         </p>
       </div>

@@ -1,10 +1,16 @@
-import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
-import { type DateTime, Duration } from 'luxon';
+import { DateTime, Duration } from 'luxon';
+import { Tooltip } from 'radix-ui';
 import { Fragment, useMemo } from 'react';
-import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
-import { FormattedDuration } from '~/components/FormattedDuration';
+import {
+  FormattedDate,
+  FormattedMessage,
+  FormattedNumber,
+  FormattedTime,
+  useIntl,
+} from 'react-intl';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import type {
@@ -32,6 +38,154 @@ interface Props {
   data: LineSummaryDateRecord;
   isActive: boolean;
   onActivate: () => void;
+}
+
+interface DetailsProps extends Omit<Props, 'isActive' | 'onActivate'> {
+  onClose: () => void;
+}
+
+interface TimelineInterval {
+  start: DateTime;
+  end: DateTime;
+}
+
+function CompactDuration(props: { duration: Duration }) {
+  const totalMinutes = Math.max(0, Math.round(props.duration.as('minutes')));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return (
+    <>
+      {hours > 0 && (
+        <FormattedNumber
+          value={hours}
+          style="unit"
+          unit="hour"
+          unitDisplay="narrow"
+        />
+      )}
+      {hours > 0 && minutes > 0 && ' '}
+      {(minutes > 0 || hours === 0) && (
+        <FormattedNumber
+          value={minutes}
+          style="unit"
+          unit="minute"
+          unitDisplay="narrow"
+        />
+      )}
+    </>
+  );
+}
+
+function getTimelinePosition(
+  value: DateTime,
+  timelineStart: DateTime,
+  timelineEnd: DateTime,
+) {
+  const timelineMillis = timelineEnd.toMillis() - timelineStart.toMillis();
+  if (timelineMillis <= 0) {
+    return 0;
+  }
+  return Math.min(
+    1,
+    Math.max(0, (value.toMillis() - timelineStart.toMillis()) / timelineMillis),
+  );
+}
+
+function TimelineLane(props: {
+  intervals: TimelineInterval[];
+  label: string;
+  duration: Duration;
+  type: LineSummaryStatus;
+  timelineStart: DateTime;
+  timelineEnd: DateTime;
+}) {
+  const { intervals, label, duration, type, timelineStart, timelineEnd } =
+    props;
+  const intl = useIntl();
+  const markerClassName = classNames({
+    'bg-gray-500 dark:bg-gray-400': type === 'closed_for_day',
+    'bg-disruption-light dark:bg-disruption-dark':
+      type === 'ongoing_disruption',
+    'bg-maintenance-light dark:bg-maintenance-dark':
+      type === 'ongoing_maintenance',
+    'bg-infra-light dark:bg-infra-dark': type === 'ongoing_infra',
+  });
+
+  return (
+    <div className="grid gap-1.5 sm:grid-cols-[minmax(10rem,_13rem)_minmax(0,_1fr)] sm:items-center sm:gap-x-4">
+      <div className="flex min-w-0 items-center justify-between gap-x-3">
+        <span className="flex min-w-0 items-center gap-x-2 font-medium text-gray-700 dark:text-gray-200">
+          <span
+            className={classNames(
+              'size-2.5 shrink-0 rounded-full',
+              markerClassName,
+            )}
+          />
+          <span className="truncate">{label}</span>
+        </span>
+        <span className="shrink-0 text-gray-500 text-xs tabular-nums dark:text-gray-400">
+          <CompactDuration duration={duration} />
+        </span>
+      </div>
+      <Tooltip.Provider delayDuration={100}>
+        <div className="relative h-4 overflow-hidden rounded-sm bg-gray-200 dark:bg-gray-700">
+          {intervals.map((interval) => {
+            const start = getTimelinePosition(
+              interval.start,
+              timelineStart,
+              timelineEnd,
+            );
+            const end = getTimelinePosition(
+              interval.end,
+              timelineStart,
+              timelineEnd,
+            );
+            const intervalTime = intl.formatMessage(
+              {
+                id: 'component.service_hours_description',
+                defaultMessage: '{start, time, short} to {end, time, short}',
+              },
+              {
+                start: interval.start.toMillis(),
+                end: interval.end.toMillis(),
+              },
+            );
+
+            return (
+              <Tooltip.Root
+                key={`${interval.start.toISO()}-${interval.end.toISO()}`}
+              >
+                <Tooltip.Trigger asChild>
+                  <button
+                    type="button"
+                    aria-label={`${label}: ${intervalTime}`}
+                    className={classNames(
+                      'absolute inset-y-0 min-w-px cursor-help border-0 p-0 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-[-2px]',
+                      markerClassName,
+                    )}
+                    style={{
+                      left: `${(start * 100).toFixed(3)}%`,
+                      width: `${(Math.max(0, end - start) * 100).toFixed(3)}%`,
+                    }}
+                  />
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content
+                    className="z-50 rounded-md bg-gray-900 px-3 py-2 font-medium text-white text-xs shadow-lg dark:bg-gray-700"
+                    sideOffset={4}
+                  >
+                    {intervalTime}
+                    <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
+                  </Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip.Root>
+            );
+          })}
+        </div>
+      </Tooltip.Provider>
+    </div>
+  );
 }
 
 function useDateBreakdown(
@@ -150,10 +304,8 @@ export const DateCard: React.FC<Props> = (props) => {
   );
 };
 
-export const DateCardDetails: React.FC<
-  Omit<Props, 'isActive' | 'onActivate'>
-> = (props) => {
-  const { line, dateTime, data, issues } = props;
+export const DateCardDetails: React.FC<DetailsProps> = (props) => {
+  const { line, dateTime, data, issues, onClose } = props;
   const { breakdownByIssueTypes, dayType } = data;
 
   const isHydrated = useHydrated();
@@ -166,11 +318,34 @@ export const DateCardDetails: React.FC<
     dateTime,
     data,
   );
+  const timelineStart = dateTime.startOf('day');
+  const timelineEnd = DateTime.max(
+    timelineStart.plus({ days: 1 }),
+    operatingHours.end,
+  );
+  const offHoursIntervals: TimelineInterval[] = [];
+  if (operatingHours.start > timelineStart) {
+    offHoursIntervals.push({
+      start: timelineStart,
+      end: DateTime.min(operatingHours.start, timelineEnd),
+    });
+  }
+  if (operatingHours.end < timelineEnd) {
+    offHoursIntervals.push({
+      start: DateTime.max(operatingHours.end, timelineStart),
+      end: timelineEnd,
+    });
+  }
+  const timelineMillis = timelineEnd.toMillis() - timelineStart.toMillis();
+  const axisTimes = Array.from({ length: 5 }, (_, index) =>
+    timelineStart.plus({ milliseconds: (timelineMillis * index) / 4 }),
+  );
+  const hasIssueBreakdowns = orderedIssueTypeBreakdowns.length > 0;
 
   return (
     <div className="flex flex-col text-sm">
-      <div className="grid gap-3 pb-3 sm:grid-cols-[minmax(0,_1.35fr)_minmax(0,_1fr)]">
-        <div className="flex items-start gap-x-3">
+      <div className="grid grid-cols-[minmax(0,_1fr)_auto] items-start gap-x-3 pb-3">
+        <div className="flex min-w-0 items-start gap-x-3">
           <CalendarDaysIcon className="mt-0.5 size-5 shrink-0 text-gray-500 dark:text-gray-400" />
           <div className="min-w-0">
             <p className="font-semibold text-gray-900 leading-tight dark:text-gray-100">
@@ -188,150 +363,129 @@ export const DateCardDetails: React.FC<
             </p>
             <p className="mt-1 text-gray-500 text-xs dark:text-gray-400">
               <FormattedMessage
-                id="component.service_hours_title"
-                defaultMessage="Service hours ({type})"
-                values={{
-                  type: (
-                    <FormattedMessage
-                      {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]}
-                    />
-                  ),
-                }}
-              />
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-[auto_1fr] gap-x-3 sm:border-gray-200 sm:border-l sm:pl-4 dark:sm:border-gray-700">
-          <ClockIcon className="mt-0.5 size-5 text-gray-500 dark:text-gray-400" />
-          <div className="min-w-0">
-            <span className="font-medium text-gray-500 text-xs uppercase dark:text-gray-400">
-              <FormattedMessage
-                id="component.service_hours"
-                defaultMessage="Service hours"
-              />
-            </span>
-            <p className="mt-1 font-semibold text-gray-900 dark:text-gray-100">
-              <FormattedMessage
                 id="component.service_hours_description"
                 defaultMessage="{start, time, short} to {end, time, short}"
                 values={{
                   start: operatingHours.start.toMillis(),
                   end: operatingHours.end.toMillis(),
                 }}
-              />
+              />{' '}
+              · <FormattedMessage {...DAY_TYPE_MESSAGE_DESCRIPTORS[dayType]} />
             </p>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-x-1 rounded-md px-2 py-1 font-medium text-gray-600 text-xs hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-accent-light focus-visible:outline-offset-2 dark:text-gray-300 dark:focus-visible:outline-accent-dark dark:hover:bg-gray-800 dark:hover:text-gray-100"
+        >
+          <XMarkIcon aria-hidden="true" className="size-4" />
+          <FormattedMessage id="general.close" defaultMessage="Close" />
+        </button>
       </div>
 
-      <div className="grid gap-4 border-gray-200 border-t pt-3 lg:grid-cols-[minmax(0,_1fr)_minmax(16rem,_0.55fr)] dark:border-gray-700">
-        <section>
-          <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
-            <FormattedMessage id="general.impact" defaultMessage="Impact" />
+      <section className="border-gray-200 border-t pt-3 dark:border-gray-700">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <span className="font-medium text-gray-700 dark:text-gray-200">
+            <FormattedMessage
+              id="component.impact_timeline"
+              defaultMessage="Impact timeline"
+            />
           </span>
-          <div className="mt-2 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
-            {notInServiceDuration.as('seconds') === 0 &&
-              Object.keys(breakdownByIssueTypes).length === 0 && (
-                <p className="py-2 text-gray-600 italic dark:text-gray-300">
-                  <FormattedMessage
-                    id="general.no_downtime_on_this_day"
-                    defaultMessage="No downtime recorded on this day."
-                  />
-                </p>
+          <span className="text-gray-500 text-xs dark:text-gray-400">
+            <FormattedMessage
+              id="component.impact_durations_may_overlap"
+              defaultMessage="Durations may overlap"
+            />
+          </span>
+        </div>
+
+        <div className="mt-3 flex flex-col gap-y-3">
+          {orderedIssueTypeBreakdowns.map(([issueType, entry]) => (
+            <TimelineLane
+              key={issueType}
+              type={`ongoing_${issueType}` as LineSummaryStatus}
+              label={intl.formatMessage(
+                issueType === 'disruption'
+                  ? {
+                      id: 'general.disruption',
+                      defaultMessage: 'Disruption',
+                    }
+                  : issueType === 'maintenance'
+                    ? {
+                        id: 'general.maintenance',
+                        defaultMessage: 'Maintenance',
+                      }
+                    : {
+                        id: 'general.infrastructure',
+                        defaultMessage: 'Infrastructure',
+                      },
               )}
-            {notInServiceDuration.as('seconds') > 0 && (
-              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 py-2">
-                <div className="size-2.5 rounded-full bg-gray-400 dark:bg-gray-600" />
-                <span className="font-medium text-gray-700 capitalize dark:text-gray-200">
-                  <FormattedMessage
-                    id="status.service_ended"
-                    defaultMessage="Off Hours"
-                  />
-                </span>
-                <span className="text-gray-600 dark:text-gray-300">
-                  {isHydrated ? (
-                    <FormattedDuration
-                      duration={notInServiceDuration.rescale()}
-                    />
-                  ) : (
-                    notInServiceDuration.toISO()
-                  )}
-                </span>
-              </div>
-            )}
+              duration={Duration.fromObject({
+                seconds: entry.totalDurationSeconds,
+              })}
+              intervals={entry.intervals.map((interval) => ({
+                start: DateTime.fromISO(interval.startAt),
+                end: DateTime.fromISO(interval.endAt),
+              }))}
+              timelineStart={timelineStart}
+              timelineEnd={timelineEnd}
+            />
+          ))}
 
-            {orderedIssueTypeBreakdowns.map(([issueType, entry]) => {
-              return (
-                <div
-                  key={issueType}
-                  className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 py-2"
-                >
-                  <div
-                    className={classNames('size-2.5 rounded-full', {
-                      'bg-disruption-light dark:bg-disruption-dark':
-                        issueType === 'disruption',
-                      'bg-maintenance-light dark:bg-maintenance-dark':
-                        issueType === 'maintenance',
-                      'bg-infra-light dark:bg-infra-dark':
-                        issueType === 'infra',
-                    })}
-                  />
-                  <span className="font-medium text-gray-700 capitalize dark:text-gray-200">
-                    {issueType === 'disruption' && (
-                      <FormattedMessage
-                        id="general.disruption"
-                        defaultMessage="Disruption"
-                      />
-                    )}
-                    {issueType === 'maintenance' && (
-                      <FormattedMessage
-                        id="general.maintenance"
-                        defaultMessage="Maintenance"
-                      />
-                    )}
-                    {issueType === 'infra' && (
-                      <FormattedMessage
-                        id="general.infrastructure"
-                        defaultMessage="Infrastructure"
-                      />
-                    )}
-                  </span>
-                  <span className="text-gray-600 dark:text-gray-300">
-                    {isHydrated ? (
-                      <FormattedDuration
-                        duration={Duration.fromObject({
-                          seconds: entry.totalDurationSeconds,
-                        })
-                          .rescale()
-                          .set({ seconds: 0 })
-                          .rescale()}
-                      />
-                    ) : (
-                      Duration.fromObject({
-                        seconds: entry.totalDurationSeconds,
-                      }).toISO()
-                    )}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+          {notInServiceDuration.as('seconds') > 0 && (
+            <TimelineLane
+              type="closed_for_day"
+              label={intl.formatMessage({
+                id: 'status.service_ended',
+                defaultMessage: 'Off Hours',
+              })}
+              duration={notInServiceDuration}
+              intervals={offHoursIntervals}
+              timelineStart={timelineStart}
+              timelineEnd={timelineEnd}
+            />
+          )}
 
-        <section className="border-gray-200 border-t pt-3 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-4 dark:border-gray-700">
-          <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
-            <FormattedMessage id="general.related" defaultMessage="Related" />
-          </span>
-          {Object.keys(breakdownByIssueTypes).length === 0 && (
-            <p className="mt-2 text-gray-600 italic dark:text-gray-300">
+          {!hasIssueBreakdowns && notInServiceDuration.as('seconds') === 0 && (
+            <p className="text-gray-600 italic dark:text-gray-300">
               <FormattedMessage
-                id="general.no_related_issues"
-                defaultMessage="No related issues."
+                id="general.no_downtime_on_this_day"
+                defaultMessage="No downtime recorded on this day."
               />
             </p>
           )}
-          <div className="mt-2 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
+        </div>
+
+        <div className="mt-1.5 hidden grid-cols-5 pl-[calc(13rem+1rem)] text-gray-500 text-xs tabular-nums sm:grid dark:text-gray-400">
+          {axisTimes.map((axisTime, index) => (
+            <span
+              key={axisTime.toMillis()}
+              className={classNames({
+                'text-center': index > 0 && index < axisTimes.length - 1,
+                'text-right': index === axisTimes.length - 1,
+              })}
+            >
+              {isHydrated ? (
+                <FormattedTime
+                  value={axisTime.toJSDate()}
+                  hour="numeric"
+                  minute={axisTime.minute === 0 ? undefined : '2-digit'}
+                />
+              ) : (
+                axisTime.toFormat('HH:mm')
+              )}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {hasIssueBreakdowns && (
+        <section className="mt-3 border-gray-200 border-t pt-3 dark:border-gray-700">
+          <span className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
+            <FormattedMessage id="general.related" defaultMessage="Related" />
+          </span>
+          <div className="mt-1 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
             {orderedIssueTypeBreakdowns.map(([issueType, entry]) => (
               <Fragment key={issueType}>
                 {entry.issueIds.map((issueId) => {
@@ -345,7 +499,7 @@ export const DateCardDetails: React.FC<
                       )}
                       className="flex items-center gap-x-2 py-2 text-gray-700 transition-colors hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-accent-light dark:text-gray-200 dark:focus:ring-accent-dark dark:hover:text-gray-100"
                     >
-                      <div
+                      <span
                         className={classNames(
                           'size-2.5 shrink-0 rounded-full',
                           {
@@ -368,7 +522,7 @@ export const DateCardDetails: React.FC<
             ))}
           </div>
         </section>
-      </div>
+      )}
     </div>
   );
 };

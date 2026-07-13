@@ -5,9 +5,21 @@ import { getOrderedIssueTypeBreakdowns } from './orderIssueTypeBreakdowns';
 describe('getOrderedIssueTypeBreakdowns', () => {
   it('orders issue breakdowns by display priority instead of insertion order', () => {
     const breakdownByIssueTypes = {
-      infra: { totalDurationSeconds: 120, issueIds: ['infra-1'] },
-      disruption: { totalDurationSeconds: 30, issueIds: ['disruption-1'] },
-      maintenance: { totalDurationSeconds: 60, issueIds: ['maintenance-1'] },
+      infra: {
+        totalDurationSeconds: 120,
+        issueIds: ['infra-1'],
+        intervals: [],
+      },
+      disruption: {
+        totalDurationSeconds: 30,
+        issueIds: ['disruption-1'],
+        intervals: [],
+      },
+      maintenance: {
+        totalDurationSeconds: 60,
+        issueIds: ['maintenance-1'],
+        intervals: [],
+      },
     } satisfies LineSummaryDateRecord['breakdownByIssueTypes'];
 
     expect(
@@ -19,7 +31,11 @@ describe('getOrderedIssueTypeBreakdowns', () => {
 
   it('skips issue types that are not present', () => {
     const breakdownByIssueTypes = {
-      infra: { totalDurationSeconds: 120, issueIds: ['infra-1'] },
+      infra: {
+        totalDurationSeconds: 120,
+        issueIds: ['infra-1'],
+        intervals: [],
+      },
     } satisfies LineSummaryDateRecord['breakdownByIssueTypes'];
 
     expect(getOrderedIssueTypeBreakdowns(breakdownByIssueTypes)).toEqual([
