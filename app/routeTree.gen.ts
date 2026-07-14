@@ -20,6 +20,7 @@ import { Route as ApiReportsRouteImport } from './routes/api.reports'
 import { Route as ApiIssuesDayRouteImport } from './routes/api.issues-day'
 import { Route as Char123LangChar125SystemMapIndexRouteImport } from './routes/{-$lang}/system-map/index'
 import { Route as Char123LangChar125StatisticsIndexRouteImport } from './routes/{-$lang}/statistics/index'
+import { Route as Char123LangChar125StationsIndexRouteImport } from './routes/{-$lang}/stations/index'
 import { Route as Char123LangChar125ReportIndexRouteImport } from './routes/{-$lang}/report/index'
 import { Route as Char123LangChar125HistoryIndexRouteImport } from './routes/{-$lang}/history/index'
 import { Route as Char123LangChar125AboutIndexRouteImport } from './routes/{-$lang}/about/index'
@@ -99,6 +100,12 @@ const Char123LangChar125StatisticsIndexRoute =
   Char123LangChar125StatisticsIndexRouteImport.update({
     id: '/statistics/',
     path: '/statistics/',
+    getParentRoute: () => Char123LangChar125RouteRoute,
+  } as any)
+const Char123LangChar125StationsIndexRoute =
+  Char123LangChar125StationsIndexRouteImport.update({
+    id: '/stations/',
+    path: '/stations/',
     getParentRoute: () => Char123LangChar125RouteRoute,
   } as any)
 const Char123LangChar125ReportIndexRoute =
@@ -247,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/about/': typeof Char123LangChar125AboutIndexRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/report/': typeof Char123LangChar125ReportIndexRoute
+  '/{-$lang}/stations/': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
@@ -281,6 +289,7 @@ export interface FileRoutesByTo {
   '/{-$lang}/about': typeof Char123LangChar125AboutIndexRoute
   '/{-$lang}/history': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/report': typeof Char123LangChar125ReportIndexRoute
+  '/{-$lang}/stations': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapIndexRoute
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
@@ -317,6 +326,7 @@ export interface FileRoutesById {
   '/{-$lang}/about/': typeof Char123LangChar125AboutIndexRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/report/': typeof Char123LangChar125ReportIndexRoute
+  '/{-$lang}/stations/': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
@@ -354,6 +364,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/about/'
     | '/{-$lang}/history/'
     | '/{-$lang}/report/'
+    | '/{-$lang}/stations/'
     | '/{-$lang}/statistics/'
     | '/{-$lang}/system-map/'
     | '/internal/api/tasks/crowd-report-dispatch'
@@ -388,6 +399,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/about'
     | '/{-$lang}/history'
     | '/{-$lang}/report'
+    | '/{-$lang}/stations'
     | '/{-$lang}/statistics'
     | '/{-$lang}/system-map'
     | '/internal/api/tasks/crowd-report-dispatch'
@@ -423,6 +435,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/about/'
     | '/{-$lang}/history/'
     | '/{-$lang}/report/'
+    | '/{-$lang}/stations/'
     | '/{-$lang}/statistics/'
     | '/{-$lang}/system-map/'
     | '/internal/api/tasks/crowd-report-dispatch'
@@ -538,6 +551,13 @@ declare module '@tanstack/react-router' {
       path: '/statistics'
       fullPath: '/{-$lang}/statistics/'
       preLoaderRoute: typeof Char123LangChar125StatisticsIndexRouteImport
+      parentRoute: typeof Char123LangChar125RouteRoute
+    }
+    '/{-$lang}/stations/': {
+      id: '/{-$lang}/stations/'
+      path: '/stations'
+      fullPath: '/{-$lang}/stations/'
+      preLoaderRoute: typeof Char123LangChar125StationsIndexRouteImport
       parentRoute: typeof Char123LangChar125RouteRoute
     }
     '/{-$lang}/report/': {
@@ -703,6 +723,7 @@ interface Char123LangChar125RouteRouteChildren {
   Char123LangChar125AboutIndexRoute: typeof Char123LangChar125AboutIndexRoute
   Char123LangChar125HistoryIndexRoute: typeof Char123LangChar125HistoryIndexRoute
   Char123LangChar125ReportIndexRoute: typeof Char123LangChar125ReportIndexRoute
+  Char123LangChar125StationsIndexRoute: typeof Char123LangChar125StationsIndexRoute
   Char123LangChar125StatisticsIndexRoute: typeof Char123LangChar125StatisticsIndexRoute
   Char123LangChar125SystemMapIndexRoute: typeof Char123LangChar125SystemMapIndexRoute
   Char123LangChar125HistoryYearIndexRoute: typeof Char123LangChar125HistoryYearIndexRoute
@@ -723,6 +744,7 @@ const Char123LangChar125RouteRouteChildren: Char123LangChar125RouteRouteChildren
     Char123LangChar125AboutIndexRoute: Char123LangChar125AboutIndexRoute,
     Char123LangChar125HistoryIndexRoute: Char123LangChar125HistoryIndexRoute,
     Char123LangChar125ReportIndexRoute: Char123LangChar125ReportIndexRoute,
+    Char123LangChar125StationsIndexRoute: Char123LangChar125StationsIndexRoute,
     Char123LangChar125StatisticsIndexRoute:
       Char123LangChar125StatisticsIndexRoute,
     Char123LangChar125SystemMapIndexRoute:

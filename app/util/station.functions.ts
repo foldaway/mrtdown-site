@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { getStationProfileData } from './db.queries';
+import { getStationProfileData, getStationsDirectoryData } from './db.queries';
+import { timeServerSpan } from './serverTiming';
 
 const InputSchema = z.object({
   stationId: z.string(),
@@ -13,3 +14,10 @@ export const getStationProfileFn = createServerFn({ method: 'GET' })
       includeCommunitySignals: true,
     }),
   );
+
+export const getStationsDirectoryFn = createServerFn({ method: 'GET' }).handler(
+  () =>
+    timeServerSpan('stations_directory_loader', () =>
+      getStationsDirectoryData(),
+    ),
+);
