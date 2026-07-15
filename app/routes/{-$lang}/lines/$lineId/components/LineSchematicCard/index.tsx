@@ -193,7 +193,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
   };
 
   const renderLoopRailMarker = (index: number, hasStation: boolean) => (
-    <div className="relative flex h-14 items-center justify-center">
+    <div className="relative flex h-11 items-center justify-center">
       <div
         className={classNames('-translate-x-1/2 absolute left-1/2 z-10 w-1', {
           'top-1/2 bottom-0': index === 0 && hasStation,
@@ -205,7 +205,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
       />
       {hasStation && (
         <div
-          className="z-20 size-4 rounded-full border-4 bg-white dark:bg-gray-900"
+          className="z-20 size-4 rounded-full border-4 bg-white dark:bg-gray-800"
           style={{
             borderColor: line.color,
           }}
@@ -215,9 +215,9 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
   );
 
   const renderStraightRailMarker = (index: number, total: number) => (
-    <div className="relative flex h-12 items-center justify-center">
+    <div className="relative flex h-10 items-center justify-center">
       <div
-        className="z-20 size-4 rounded-full border-4 bg-white dark:bg-gray-900"
+        className="z-20 size-4 rounded-full border-4 bg-white dark:bg-gray-800"
         style={{
           borderColor: line.color,
         }}
@@ -236,14 +236,14 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
   );
 
   return (
-    <div className="flex flex-col self-start rounded-lg border border-gray-300 p-6 text-gray-800 shadow-lg md:col-span-8 md:row-span-2 dark:border-gray-700 dark:text-gray-200">
-      <span className="mb-2 font-semibold text-base text-gray-900 dark:text-white">
+    <section className="flex flex-col self-start px-4 py-3 text-gray-800 sm:px-5 sm:py-4 md:col-span-8 dark:text-gray-200">
+      <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
         <FormattedMessage
           id="general.line_schematic"
           defaultMessage="Line Schematic"
         />
-      </span>
-      <div className="mt-2 min-w-64 md:self-start">
+      </h2>
+      <div className="mt-3 min-w-64 md:self-start">
         <DropdownMenu.Root>
           <DropdownMenu.Trigger className="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-1 text-left font-medium text-gray-900 text-sm shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700">
             <span>
@@ -285,7 +285,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
         <div className="flex flex-col">
           <div
             className={classNames(
-              'relative mt-4 overflow-hidden transition-all duration-300 md:overflow-visible',
+              'relative mt-3 overflow-hidden transition-all duration-300 md:overflow-visible',
               {
                 'max-h-96 md:max-h-none': !isExpanded,
                 'max-h-none': isExpanded,
@@ -349,8 +349,8 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                   loopColumns.bottomStationId != null) && (
                   <div
                     className={classNames('relative col-start-2 col-end-5', {
-                      'h-8': loopColumns.bottomStationId == null,
-                      'h-10': loopColumns.bottomStationId != null,
+                      'h-6': loopColumns.bottomStationId == null,
+                      'h-8': loopColumns.bottomStationId != null,
                     })}
                   >
                     <svg
@@ -370,7 +370,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                       />
                       {loopColumns.bottomStationId != null && (
                         <circle
-                          className="fill-white dark:fill-gray-900"
+                          className="fill-white dark:fill-gray-800"
                           cx="50"
                           cy="32"
                           r="6"
@@ -383,14 +383,14 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                   </div>
                 )}
                 {loopColumns.bottomStationId != null && (
-                  <div className="col-start-1 col-end-6 flex justify-center pt-6">
+                  <div className="col-start-1 col-end-6 flex justify-center pt-4">
                     {renderBottomStationLabel(loopColumns.bottomStationId)}
                   </div>
                 )}
               </div>
             </div>
             {!isExpanded && (
-              <div className="pointer-events-none absolute right-0 bottom-0 left-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent md:hidden dark:from-gray-900/95 dark:via-gray-900/60 dark:to-transparent" />
+              <div className="pointer-events-none absolute right-0 bottom-0 left-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent md:hidden dark:from-gray-800/95 dark:via-gray-800/60 dark:to-transparent" />
             )}
           </div>
           <button
@@ -418,6 +418,6 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
           </button>
         </div>
       )}
-    </div>
+    </section>
   );
 };

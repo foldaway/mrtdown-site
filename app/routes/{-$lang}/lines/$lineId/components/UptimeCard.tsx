@@ -13,8 +13,8 @@ export const UptimeCard: React.FC<Props> = (props) => {
     lineSummary.uptimeRank != null && lineSummary.totalLines != null;
 
   return (
-    <div className="flex flex-col rounded-lg border border-gray-300 p-6 text-gray-800 shadow-lg md:col-span-3 dark:border-gray-700 dark:text-gray-200">
-      <span className="mb-2 font-semibold text-base text-gray-900 dark:text-white">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-3 text-gray-800 sm:px-5 dark:text-gray-200">
+      <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
         <FormattedMessage
           id="general.uptime_this_period"
           defaultMessage="Uptime ({period})"
@@ -29,8 +29,8 @@ export const UptimeCard: React.FC<Props> = (props) => {
             ),
           }}
         />
-      </span>
-      <span className="font-bold text-4xl">
+      </h2>
+      <span className="col-start-2 row-span-2 row-start-1 font-bold text-2xl tracking-tight sm:text-3xl">
         {lineSummary.uptimeRatio != null ? (
           <FormattedNumber
             value={lineSummary.uptimeRatio}
@@ -42,7 +42,7 @@ export const UptimeCard: React.FC<Props> = (props) => {
         )}
       </span>
       {showRank && (
-        <span className="mt-2 text-gray-600 text-sm dark:text-gray-400">
+        <span className="col-start-1 row-start-2 text-gray-500 text-xs leading-4 dark:text-gray-400">
           <FormattedMessage
             id="general.uptime_rank"
             defaultMessage="Ranked #{rank} out of {total} {total, plural, one {line} other {lines}}"

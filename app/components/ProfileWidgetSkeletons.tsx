@@ -1,11 +1,11 @@
 export function ProfileTrendCardSkeleton() {
   return (
-    <div className="flex min-h-96 flex-col rounded-lg border border-gray-300 p-6 shadow-lg dark:border-gray-700">
-      <div className="h-6 w-56 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
-      <div className="mt-3 h-10 w-40 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
-      <div className="mt-3 h-5 w-32 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
-      <div className="mt-4 h-48 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
-      <div className="mt-4 h-10 w-60 animate-pulse rounded-md bg-gray-200 dark:bg-gray-800" />
+    <div className="flex min-h-80 flex-col rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm sm:px-5 sm:py-4 dark:border-gray-700 dark:bg-gray-800">
+      <div className="h-6 w-56 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
+      <div className="mt-3 h-10 w-40 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
+      <div className="mt-3 h-5 w-32 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
+      <div className="mt-4 h-48 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
+      <div className="mt-4 h-10 w-60 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
     </div>
   );
 }
@@ -30,7 +30,7 @@ export function CommunitySignalsSectionSkeleton() {
 
 export function ProfileRecentIssuesSectionSkeleton() {
   return (
-    <section className="rounded-lg border border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800/50">
+    <section className="rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm sm:px-5 sm:py-4 dark:border-gray-700 dark:bg-gray-800">
       <div className="h-6 w-36 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
       <div className="mt-4 space-y-3">
         <div className="h-24 animate-pulse rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800" />

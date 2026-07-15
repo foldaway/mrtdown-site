@@ -24,14 +24,14 @@ export const StationInterchangesCard: React.FC<Props> = (props) => {
   const { stations, lines } = useIncludedEntities();
 
   return (
-    <div className="flex flex-col rounded-lg border border-gray-300 p-6 text-gray-800 shadow-lg md:col-span-4 dark:border-gray-700 dark:text-gray-200">
-      <span className="mb-2 font-semibold text-base text-gray-900 dark:text-white">
+    <section className="flex flex-col px-4 py-3 text-gray-800 sm:px-5 sm:py-4 dark:text-gray-200">
+      <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
         <FormattedMessage
           id="general.interchanges"
           defaultMessage="Interchanges"
         />
-      </span>
-      <div className="card-body">
+      </h2>
+      <div className="mt-3">
         {stationIds.length === 0 ? (
           <div className="flex items-center justify-center rounded-lg border-2 border-gray-300 border-dashed py-12 dark:border-gray-600">
             <p className="text-gray-500 dark:text-gray-400">
@@ -45,7 +45,7 @@ export const StationInterchangesCard: React.FC<Props> = (props) => {
           <ul className="flex flex-col gap-y-2">
             {stationIds.map((stationId) => (
               <Fragment key={stationId}>
-                <div className="relative flex items-center gap-x-1.5">
+                <li className="relative flex items-center gap-x-2">
                   <div className="flex items-center overflow-hidden rounded-md">
                     {Object.entries(
                       Object.fromEntries(
@@ -99,12 +99,12 @@ export const StationInterchangesCard: React.FC<Props> = (props) => {
                       </span>
                     </Link>
                   </div>
-                </div>
+                </li>
               </Fragment>
             ))}
           </ul>
         )}
       </div>
-    </div>
+    </section>
   );
 };

@@ -250,7 +250,7 @@ function ComponentPage() {
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
-      <div className="grid grid-cols-1 gap-x-3 gap-y-5 md:grid-cols-12">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
         <div className="flex flex-col gap-3 md:col-span-12">
           <header className="grid grid-cols-1 grid-rows-[3fr_1fr_1fr] gap-x-1 bg-gray-400 [grid-template-areas:'main''aside1''aside2'] md:grid-cols-[3fr_6fr_3fr] md:grid-rows-1 dark:bg-gray-500 md:[grid-template-areas:'aside1_main_aside2']">
             {/* Aside 1 pane */}
@@ -414,12 +414,19 @@ function ComponentPage() {
           </section>
         </div>
 
-        <UptimeCard
-          dateCount={DATE_COUNT}
-          lineSummary={lineProfile.lineSummary}
-        />
+        <section className="grid divide-y divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm md:col-span-12 md:grid-cols-[4fr_4fr_5fr] md:divide-x md:divide-y-0 dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
+          <UptimeCard
+            dateCount={DATE_COUNT}
+            lineSummary={lineProfile.lineSummary}
+          />
 
-        <CurrentStatusCard lineSummary={lineProfile.lineSummary} />
+          <CurrentStatusCard lineSummary={lineProfile.lineSummary} />
+
+          <NextMaintenanceCard
+            lineId={lineId}
+            issueId={lineProfile.issueIdNextMaintenance}
+          />
+        </section>
 
         {lineProfile.communitySignals.length > 0 && (
           <DeferredViewportWidget
@@ -430,22 +437,26 @@ function ComponentPage() {
           </DeferredViewportWidget>
         )}
 
-        <NextMaintenanceCard
-          lineId={lineId}
-          issueId={lineProfile.issueIdNextMaintenance}
-        />
+        <section className="grid overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm md:col-span-12 md:grid-cols-12 md:divide-x md:divide-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:md:divide-gray-700">
+          <LineSchematicCard
+            line={line}
+            branches={branches}
+            referenceAt={lineProfile.referenceDate}
+          />
 
-        <LineSchematicCard
-          line={line}
-          branches={branches}
-          referenceAt={lineProfile.referenceDate}
-        />
-
-        <QuickFactsCard line={line} stationCount={stationCount} />
+          <div className="flex flex-col divide-y divide-gray-200 border-gray-200 border-t md:col-span-4 md:border-t-0 dark:divide-gray-700 dark:border-gray-700">
+            <QuickFactsCard line={line} stationCount={stationCount} />
+            <StationInterchangesCard
+              lineId={lineId}
+              referenceAt={lineProfile.referenceDate}
+              stationIds={lineProfile.stationIdsInterchanges}
+            />
+          </div>
+        </section>
 
         {lineProfile.lineSummary.status !== 'future_service' && (
           <DeferredViewportWidget
-            className="md:col-span-12 lg:col-span-8"
+            className="md:col-span-12"
             fallback={<ProfileTrendCardSkeleton />}
           >
             <UptimeRatioTrendCards
@@ -462,17 +473,11 @@ function ComponentPage() {
         </DeferredViewportWidget>
 
         <DeferredViewportWidget
-          className="md:col-span-12 lg:col-span-8"
+          className="md:col-span-12"
           fallback={<ProfileTrendCardSkeleton />}
         >
           <CountTrendCards graphs={lineProfile.timeScaleGraphsIssueCount} />
         </DeferredViewportWidget>
-
-        <StationInterchangesCard
-          lineId={lineId}
-          referenceAt={lineProfile.referenceDate}
-          stationIds={lineProfile.stationIdsInterchanges}
-        />
       </div>
     </IncludedEntitiesContext.Provider>
   );

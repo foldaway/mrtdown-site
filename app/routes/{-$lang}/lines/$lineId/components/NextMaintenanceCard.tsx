@@ -45,7 +45,7 @@ const InternalContent: React.FC<InternalContentProps> = (props) => {
         to="/{-$lang}/issues/$issueId"
         params={{ issueId: issue.id }}
       >
-        <span className="font-semibold text-base text-gray-800 leading-tight dark:text-gray-200">
+        <span className="font-medium text-gray-800 text-sm leading-5 dark:text-gray-200">
           {getLocalizedTranslation(issue.title, intl.locale)}
         </span>
       </Link>
@@ -104,17 +104,19 @@ export const NextMaintenanceCard: React.FC<Props> = (props) => {
   }, [issueId, issues]);
 
   return (
-    <div className="flex flex-col rounded-lg border border-gray-300 p-6 text-gray-800 shadow-lg md:col-span-5 dark:border-gray-700 dark:text-gray-200">
-      <h3 className="mb-2 font-semibold text-base text-gray-900 dark:text-white">
+    <div className="flex flex-col px-4 py-3 text-gray-800 sm:px-5 sm:py-4 dark:text-gray-200">
+      <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
         <FormattedMessage
           id="general.next_maintenance"
           defaultMessage="Next Maintenance"
         />
-      </h3>
+      </h2>
       {issue != null ? (
-        <InternalContent issue={issue} lineId={lineId} />
+        <div className="mt-2 flex flex-col">
+          <InternalContent issue={issue} lineId={lineId} />
+        </div>
       ) : (
-        <p className="text-gray-500 text-sm">
+        <p className="mt-2 text-gray-500 text-xs leading-4 dark:text-gray-400">
           <FormattedMessage
             id="general.no_scheduled_maintenance"
             defaultMessage="There is no scheduled maintenance for this line."
