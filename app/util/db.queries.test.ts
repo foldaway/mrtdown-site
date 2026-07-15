@@ -226,6 +226,15 @@ describe('town profile helpers', () => {
     expect(mapReferenceDate.toISODate()).toBe('2029-12-01');
   });
 
+  it('keeps active-only towns on the current map snapshot', () => {
+    const mapReferenceDate = deriveTownMapReferenceDate(
+      [{ memberships: TEST_STATION.memberships }],
+      REFERENCE_NOW,
+    );
+
+    expect(mapReferenceDate).toBe(REFERENCE_NOW);
+  });
+
   it('filters recent town issues to the same 90-day display window', () => {
     const recentIssue = buildIssue('recent', 'disruption', [
       {

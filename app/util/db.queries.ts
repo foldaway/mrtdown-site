@@ -4326,31 +4326,41 @@ export function deriveTownMapReferenceDate(
   stations: Array<Pick<Station, 'memberships'>>,
   referenceNow: DateTime,
 ) {
-  const latestTownStart = stations.reduce((latestStationStart, station) => {
-    const hasActiveMembership = station.memberships.some(
-      (membership) =>
-        parseDateTime(membership.startedAt) <= referenceNow &&
-        (membership.endedAt == null ||
-          parseDateTime(membership.endedAt) > referenceNow),
-    );
-    if (hasActiveMembership) {
-      return latestStationStart;
-    }
+  const latestFutureStart = stations.reduce<DateTime | null>(
+    (latestStationStart, station) => {
+      const hasActiveMembership = station.memberships.some(
+        (membership) =>
+          parseDateTime(membership.startedAt) <= referenceNow &&
+          (membership.endedAt == null ||
+            parseDateTime(membership.endedAt) > referenceNow),
+      );
+      if (hasActiveMembership) {
+        return latestStationStart;
+      }
 
-    const firstStationStart = station.memberships
-      .map((membership) => parseDateTime(membership.startedAt))
-      .filter((startedAt) => startedAt > referenceNow)
-      .sort((a, b) => a.toMillis() - b.toMillis())[0];
-    if (firstStationStart == null || firstStationStart <= latestStationStart) {
-      return latestStationStart;
-    }
-    return firstStationStart;
-  }, referenceNow);
+      const firstStationStart = station.memberships
+        .map((membership) => parseDateTime(membership.startedAt))
+        .filter((startedAt) => startedAt > referenceNow)
+        .sort((a, b) => a.toMillis() - b.toMillis())[0];
+      if (
+        firstStationStart == null ||
+        (latestStationStart != null && firstStationStart <= latestStationStart)
+      ) {
+        return latestStationStart;
+      }
+      return firstStationStart;
+    },
+    null,
+  );
+
+  if (latestFutureStart == null) {
+    return referenceNow;
+  }
 
   return (
     STATION_MAP_SNAPSHOT_DATES.map(parseDateTime).find(
-      (snapshotDate) => snapshotDate >= latestTownStart,
-    ) ?? latestTownStart
+      (snapshotDate) => snapshotDate >= latestFutureStart,
+    ) ?? latestFutureStart
   );
 }
 
