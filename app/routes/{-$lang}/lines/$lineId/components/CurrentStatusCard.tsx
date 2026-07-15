@@ -12,7 +12,7 @@ export const CurrentStatusCard: React.FC<Props> = (props) => {
   const { status } = lineSummary;
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-3 text-gray-800 sm:px-5 dark:text-gray-200">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] content-start items-center gap-x-3 gap-y-2 px-4 py-3 text-gray-800 sm:px-5 sm:py-4 dark:text-gray-200">
       <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
         <FormattedMessage
           id="general.current_status"
