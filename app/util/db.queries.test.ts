@@ -8,6 +8,7 @@ import {
   deriveTownMapReferenceDate,
   deriveTownStationStatus,
   deriveTownStatus,
+  getTownLineIds,
   getTownRecentIssueWindow,
   parseStatisticsSnapshotPayload,
   resolveStationMembershipEndedAt,
@@ -226,6 +227,21 @@ describe('town profile helpers', () => {
     expect(mapReferenceDate.toISODate()).toBe('2029-12-01');
   });
 
+  it('rounds future station openings to the matching snapshot month', () => {
+    const mapReferenceDate = deriveTownMapReferenceDate(
+      [
+        {
+          memberships: [
+            { ...TEST_STATION.memberships[0], startedAt: '2027-12-15' },
+          ],
+        },
+      ],
+      REFERENCE_NOW,
+    );
+
+    expect(mapReferenceDate.toISODate()).toBe('2027-12-01');
+  });
+
   it('keeps active-only towns on the current map snapshot', () => {
     const mapReferenceDate = deriveTownMapReferenceDate(
       [{ memberships: TEST_STATION.memberships }],
@@ -233,6 +249,19 @@ describe('town profile helpers', () => {
     );
 
     expect(mapReferenceDate).toBe(REFERENCE_NOW);
+  });
+
+  it('excludes ended memberships from town line IDs', () => {
+    expect(
+      getTownLineIds([
+        {
+          memberships: [
+            TEST_STATION.memberships[0],
+            { ...TEST_STATION.memberships[1], endedAt: '2025-01-01' },
+          ],
+        },
+      ]),
+    ).toEqual([TEST_LINE.id]);
   });
 
   it('filters recent town issues to the same 90-day display window', () => {

@@ -4245,6 +4245,18 @@ const STATION_MAP_SNAPSHOT_DATES = [
   '2032-12-01',
 ];
 
+export function getTownLineIds(stations: Array<Pick<Station, 'memberships'>>) {
+  return [
+    ...new Set(
+      stations.flatMap((station) =>
+        station.memberships
+          .filter((membership) => membership.endedAt == null)
+          .map((membership) => membership.lineId),
+      ),
+    ),
+  ].sort();
+}
+
 function getIssueStatus(issueTypes: readonly IssueType[]): LineSummaryStatus {
   if (issueTypes.includes('disruption')) {
     return 'ongoing_disruption';
@@ -4359,7 +4371,8 @@ export function deriveTownMapReferenceDate(
 
   return (
     STATION_MAP_SNAPSHOT_DATES.map(parseDateTime).find(
-      (snapshotDate) => snapshotDate >= latestFutureStart,
+      (snapshotDate) =>
+        snapshotDate.startOf('month') >= latestFutureStart.startOf('month'),
     ) ?? latestFutureStart
   );
 }
@@ -4395,18 +4408,11 @@ export async function getTownsData() {
   const dataset = await getBaseDataset();
   const stations = Object.values(dataset.included.stations);
   const towns = Object.values(dataset.included.towns).map((town) => {
-    const stationIds = stations
-      .filter((station) => station.townId === town.id)
-      .map((station) => station.id);
-    const lineIds = [
-      ...new Set(
-        stationIds.flatMap((stationId) =>
-          dataset.included.stations[stationId].memberships.map(
-            (membership) => membership.lineId,
-          ),
-        ),
-      ),
-    ].sort();
+    const townStations = stations.filter(
+      (station) => station.townId === town.id,
+    );
+    const stationIds = townStations.map((station) => station.id);
+    const lineIds = getTownLineIds(townStations);
 
     return {
       townId: town.id,
@@ -4440,13 +4446,7 @@ export async function getTownProfileData(townId: string) {
   );
   const stationIds = stations.map((station) => station.id);
   const stationIdSet = new Set(stationIds);
-  const lineIds = [
-    ...new Set(
-      stations.flatMap((station) =>
-        station.memberships.map((membership) => membership.lineId),
-      ),
-    ),
-  ].sort();
+  const lineIds = getTownLineIds(stations);
   const issues = Object.values(dataset.allIssues).filter((issue) =>
     issue.branchesAffected.some((branch) =>
       branch.stationIds.some((stationId) => stationIdSet.has(stationId)),
