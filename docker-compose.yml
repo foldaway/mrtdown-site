@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
   valkey:
-    image: valkey:9-alpine
+    image: valkey/valkey:9-alpine
     ports:
       - "6379:6379"
 
