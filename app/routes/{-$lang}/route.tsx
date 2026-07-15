@@ -108,6 +108,12 @@ function RouteComponent() {
                       defaultMessage="History"
                     />
                   </Link>
+                  <Link to="/{-$lang}/stations" className={linkClassName}>
+                    <FormattedMessage
+                      id="general.stations"
+                      defaultMessage="Stations"
+                    />
+                  </Link>
                   <Link to="/{-$lang}/statistics" className={linkClassName}>
                     <FormattedMessage
                       id="general.statistics"
@@ -169,6 +175,18 @@ function RouteComponent() {
                             <FormattedMessage
                               id="general.history"
                               defaultMessage="History"
+                            />
+                          </Link>
+                        </DropdownMenu.Item>
+
+                        <DropdownMenu.Item>
+                          <Link
+                            to="/{-$lang}/stations"
+                            className={linkClassNameMobile}
+                          >
+                            <FormattedMessage
+                              id="general.stations"
+                              defaultMessage="Stations"
                             />
                           </Link>
                         </DropdownMenu.Item>
@@ -300,6 +318,17 @@ function RouteComponent() {
                     />
                   </h3>
                   <ul className="space-y-3">
+                    <li>
+                      <Link
+                        to="/{-$lang}/stations"
+                        className="flex text-sm transition-colors hover:text-accent-light"
+                      >
+                        <FormattedMessage
+                          id="general.stations"
+                          defaultMessage="Stations"
+                        />
+                      </Link>
+                    </li>
                     <li>
                       <Link
                         to="/{-$lang}/history"

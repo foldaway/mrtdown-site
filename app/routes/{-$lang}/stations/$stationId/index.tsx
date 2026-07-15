@@ -1,4 +1,5 @@
-import { InformationCircleIcon, MapPinIcon } from '@heroicons/react/24/solid';
+import { ChevronRightIcon } from '@heroicons/react/16/solid';
+import { MapPinIcon } from '@heroicons/react/24/solid';
 import type { IssueType } from '@mrtdown/core';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
@@ -16,7 +17,6 @@ import {
   CommunitySignalsSectionSkeleton,
   ProfileRecentIssuesSectionSkeleton,
 } from '~/components/ProfileWidgetSkeletons';
-import { StationBar } from '~/components/StationBar';
 import { LineTypeLabels, StationStructureTypeLabels } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
@@ -238,6 +238,7 @@ export const Route = createFileRoute('/{-$lang}/stations/$stationId/')({
       rootUrl,
     });
     const homeUrl = buildLocalizedAbsoluteUrl('/', lang, rootUrl);
+    const stationsUrl = buildLocalizedAbsoluteUrl('/stations', lang, rootUrl);
 
     return {
       links: seo.links,
@@ -316,6 +317,15 @@ export const Route = createFileRoute('/{-$lang}/stations/$stationId/')({
                   {
                     '@type': 'ListItem',
                     position: 2,
+                    name: intl.formatMessage({
+                      id: 'general.stations',
+                      defaultMessage: 'Stations',
+                    }),
+                    item: stationsUrl,
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 3,
                     name: stationHeading,
                     item: seo.ogUrl,
                   },
@@ -335,7 +345,6 @@ function StationPage() {
   const station = included.stations[stationProfile.stationId];
   const intl = useIntl();
   const stationName = getLocalizedTranslation(station.name, intl.locale);
-  const stationDefaultName = getLocalizedTranslation(station.name, 'en-SG');
   const isHydrated = useHydrated();
 
   const {
@@ -403,6 +412,28 @@ function StationPage() {
   return (
     <IncludedEntitiesContext.Provider value={included}>
       <div className="flex flex-col gap-3">
+        <nav
+          aria-label="Breadcrumb"
+          className="flex items-center space-x-1 text-gray-500 text-sm dark:text-gray-400"
+        >
+          <Link
+            to="/{-$lang}"
+            className="hover:text-gray-700 dark:hover:text-gray-200"
+          >
+            <FormattedMessage id="general.home" defaultMessage="Home" />
+          </Link>
+          <ChevronRightIcon className="size-4" />
+          <Link
+            to="/{-$lang}/stations"
+            className="hover:text-gray-700 dark:hover:text-gray-200"
+          >
+            <FormattedMessage id="general.stations" defaultMessage="Stations" />
+          </Link>
+          <ChevronRightIcon className="size-4" />
+          <span className="truncate text-gray-900 dark:text-gray-100">
+            {stationName}
+          </span>
+        </nav>
         {/* Station Header Section */}
         <header className="flex flex-col">
           <div className="grid grid-cols-1 grid-rows-[3fr_1fr_1fr] gap-x-1 bg-gray-400 [grid-template-areas:'main''aside1''aside2'] md:grid-cols-[3fr_6fr_3fr] md:grid-rows-1 dark:bg-gray-500 md:[grid-template-areas:'aside1_main_aside2']">

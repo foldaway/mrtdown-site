@@ -196,7 +196,13 @@ export function buildSitemapPaths({
   operationalFactCoverageStartDate,
   currentDate,
 }: SitemapPathData) {
-  const paths: string[] = ['/', '/statistics', '/system-map', '/about'];
+  const paths: string[] = [
+    '/',
+    '/stations',
+    '/statistics',
+    '/system-map',
+    '/about',
+  ];
 
   for (const lineId of lineIds) {
     paths.push(`/lines/${lineId}`);

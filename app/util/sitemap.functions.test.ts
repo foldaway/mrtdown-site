@@ -49,6 +49,7 @@ describe('agent Markdown discovery', () => {
     expect(paths).toEqual(
       expect.arrayContaining([
         '/',
+        '/stations',
         '/lines/EWL',
         '/stations/EW1',
         '/operators/SMRT',
@@ -154,6 +155,7 @@ describe('agent Markdown discovery', () => {
 
     expect(paths).toEqual([
       '/',
+      '/stations',
       '/statistics',
       '/system-map',
       '/about',
