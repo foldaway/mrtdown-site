@@ -349,7 +349,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                   >
                     <svg
                       aria-hidden="true"
-                      className="absolute inset-y-0 right-[1.25rem] left-[1.25rem] overflow-visible"
+                      className="absolute inset-y-0 left-[1.25rem] h-full w-[calc(100%_-_2.5rem)] overflow-visible"
                       preserveAspectRatio="none"
                       viewBox="0 0 100 40"
                     >
@@ -362,18 +362,13 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                         strokeWidth="4"
                         vectorEffect="non-scaling-stroke"
                       />
-                      {loopColumns.bottomStationId != null && (
-                        <circle
-                          className="fill-white dark:fill-gray-800"
-                          cx="50"
-                          cy="32"
-                          r="6"
-                          stroke={line.color}
-                          strokeWidth="4"
-                          vectorEffect="non-scaling-stroke"
-                        />
-                      )}
                     </svg>
+                    {loopColumns.bottomStationId != null && (
+                      <div
+                        className="-translate-x-1/2 -translate-y-1/2 absolute top-[80%] left-1/2 z-20 size-4 rounded-full border-4 bg-white dark:bg-gray-800"
+                        style={{ borderColor: line.color }}
+                      />
+                    )}
                   </div>
                 )}
                 {loopColumns.bottomStationId != null && (
