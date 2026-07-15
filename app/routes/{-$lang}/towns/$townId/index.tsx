@@ -375,6 +375,7 @@ function TownPage() {
           </div>
           <div className="border-gray-200 border-t bg-gray-100 p-2 sm:p-3 dark:border-gray-700 dark:bg-gray-900">
             <StationMap
+              key={`${data.townId}:${data.mapReferenceDate}`}
               currentDate={data.mapReferenceDate}
               snapshotComponents={{ '2026-07': MapJul2026 }}
               stationNames={data.stationNames}
