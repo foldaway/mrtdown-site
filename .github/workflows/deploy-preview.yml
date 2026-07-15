@@ -50,6 +50,7 @@ jobs:
             --build-arg SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }} \
             --build-secret SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }} \
             --build-arg SENTRY_RELEASE=${{ github.sha }} \
+            --build-arg VITE_CROWD_REPORT_TURNSTILE_SITE_KEY=${{ secrets.CROWD_REPORT_TURNSTILE_SITE_KEY }} \
             --build-arg VITE_PUBLIC_POSTHOG_KEY=${{ secrets.VITE_PUBLIC_POSTHOG_KEY }} \
             --build-arg VITE_PUBLIC_POSTHOG_HOST=${{ secrets.VITE_PUBLIC_POSTHOG_HOST }} \
             --build-arg VITE_ROOT_URL=https://preview.mrtdown.org
