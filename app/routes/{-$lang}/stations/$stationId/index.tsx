@@ -23,6 +23,7 @@ import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { getCanonicalStationPath } from '~/helpers/getCanonicalStationPath';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { getSeoStationCodes } from '~/helpers/getSeoStationCodes';
+import { getVisibleStationMembershipsAt } from '~/helpers/isStationMembershipVisibleAt';
 import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import { useHydrated } from '~/hooks/useHydrated';
 import type { IncludedEntities, Station } from '~/types';
@@ -58,7 +59,13 @@ function computeStationStrings(
   const _componentTypeStrings = new Set<string>();
   const _stationStructureTypes = new Set<string>();
   const _transitTypeStrings = new Set<string>();
-  const stationCodes = getSeoStationCodes(station.memberships);
+  const referenceAt = now.toISO();
+  assert(referenceAt != null);
+  const membershipsVisible = getVisibleStationMembershipsAt(
+    station.memberships,
+    referenceAt,
+  );
+  const stationCodes = getSeoStationCodes(station.memberships, referenceAt);
   for (const membership of station.memberships) {
     const line = included.lines[membership.lineId];
     _componentTypeStrings.add(intl.formatMessage(LineTypeLabels[line.type]));
@@ -67,9 +74,11 @@ function computeStationStrings(
     _stationStructureTypes.add(
       intl.formatMessage(StationStructureTypeLabels[membership.structureType]),
     );
-    const startedAt = DateTime.fromISO(membership.startedAt).setZone(
-      'Asia/Singapore',
-    );
+  }
+  for (const membership of membershipsVisible) {
+    const startedAt = DateTime.fromISO(membership.startedAt, {
+      zone: 'Asia/Singapore',
+    });
     if (startedAt < now) {
       operationalMemberSet.add(membership.code);
     }
@@ -78,6 +87,7 @@ function computeStationStrings(
     townName,
     landmarkNames,
     stationCodes,
+    membershipsVisible,
     componentTypeStrings: Array.from(_componentTypeStrings),
     transitTypeStrings: Array.from(_transitTypeStrings),
     stationStructureTypes: Array.from(_stationStructureTypes),
@@ -355,6 +365,7 @@ function StationPage() {
     componentTypeStrings,
     transitTypeStrings,
     isInterchange,
+    membershipsVisible,
   } = useMemo(() => {
     return computeStationStrings(intl, station, included);
   }, [station, intl, included]);
@@ -392,20 +403,26 @@ function StationPage() {
     });
   }, [station.memberships]);
 
-  const membershipsUniqueActive = useMemo(() => {
-    return membershipsUnique.filter((membership) => {
-      return membership.endedAt == null;
+  const membershipsUniqueVisible = useMemo(() => {
+    const seenKeys = new Set<string>();
+    return membershipsVisible.filter((membership) => {
+      const key = `${membership.lineId}-${membership.code}`;
+      if (seenKeys.has(key)) {
+        return false;
+      }
+      seenKeys.add(key);
+      return true;
     });
-  }, [membershipsUnique]);
+  }, [membershipsVisible]);
 
   const lineColorsUnique = useMemo(() => {
     const colors = new Set<string>();
-    for (const membership of membershipsUniqueActive) {
+    for (const membership of membershipsUniqueVisible) {
       const line = included.lines[membership.lineId];
       colors.add(line.color);
     }
     return Array.from(colors);
-  }, [included.lines, membershipsUniqueActive]);
+  }, [included.lines, membershipsUniqueVisible]);
 
   const rotatedLineColor = useRotatingLineColors(lineColorsUnique);
 
@@ -461,10 +478,10 @@ function StationPage() {
               <div
                 className="grid overflow-hidden rounded-2xl border-[3px] border-white"
                 style={{
-                  gridTemplateColumns: `repeat(${membershipsUniqueActive.length},1fr)`,
+                  gridTemplateColumns: `repeat(${membershipsUniqueVisible.length},1fr)`,
                 }}
               >
-                {membershipsUniqueActive.map((membership) => (
+                {membershipsUniqueVisible.map((membership) => (
                   <span
                     key={membership.code}
                     className="inline-flex min-h-8 items-center justify-center px-1.5 py-0.5 font-bold text-lg text-white shadow-sm transition-colors md:px-2.5 md:py-1 md:text-xl"

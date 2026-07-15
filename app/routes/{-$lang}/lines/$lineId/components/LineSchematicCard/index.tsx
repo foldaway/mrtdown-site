@@ -6,11 +6,12 @@ import { Fragment, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import { isStationMembershipVisibleAt } from '~/helpers/isStationMembershipVisibleAt';
+import { getVisibleStationMembershipsAt } from '~/helpers/isStationMembershipVisibleAt';
 import type { LineBranch } from '~/util/db.queries';
 import { deriveLineBranchMembershipReferenceDate } from '~/util/lineBranches';
 import type { Line } from '~/types';
 import { BranchItem } from './components/BranchItem';
+import { orderStationMemberships } from './helpers/orderStationMemberships';
 
 interface Props {
   line: Line;
@@ -20,8 +21,8 @@ interface Props {
 }
 
 /**
- * Renders the selected service with station codes valid during that service's
- * active or planned window.
+ * Renders the selected service with current, planned, and relevant historical
+ * station codes for that service's active or planned window.
  */
 export const LineSchematicCard: React.FC<Props> = (props) => {
   const { line, branches, referenceAt } = props;
@@ -84,45 +85,38 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
     loopColumns.rightStationIds.length,
   );
 
-  const renderCodePills = (stationId: string) => (
+  const renderCodePills = (
+    stationId: string,
+    side: 'left' | 'right' = 'right',
+  ) => (
     <div className="flex shrink-0 items-center overflow-hidden rounded-md">
-      {Object.entries(
-        Object.fromEntries(
-          stations[stationId].memberships
-            .filter((membership) =>
-              isStationMembershipVisibleAt(
-                membership,
-                selectedBranchReferenceAt,
-              ),
-            )
-            .map((membership) => {
+      {orderStationMemberships(
+        Object.values(
+          Object.fromEntries(
+            getVisibleStationMembershipsAt(
+              stations[stationId].memberships,
+              selectedBranchReferenceAt,
+            ).map((membership) => {
               const key = `${membership.code}@${membership.lineId}`;
               return [key, membership];
             }),
+          ),
         ),
-      )
-        .sort((a, b) => {
-          if (a[1].lineId === line.id) {
-            return -1;
-          }
-          if (b[1].lineId === line.id) {
-            return 1;
-          }
-          return 0;
-        })
-        .map(([key, membership]) => (
-          <div
-            key={key}
-            className="z-10 flex h-4 w-10 items-center justify-center px-1.5"
-            style={{
-              backgroundColor: lines[membership.lineId].color,
-            }}
-          >
-            <span className="font-semibold text-white text-xs leading-none">
-              {membership.code}
-            </span>
-          </div>
-        ))}
+        line.id,
+        side,
+      ).map((membership) => (
+        <div
+          key={`${membership.code}@${membership.lineId}`}
+          className="z-10 flex h-4 w-10 items-center justify-center px-1.5"
+          style={{
+            backgroundColor: lines[membership.lineId].color,
+          }}
+        >
+          <span className="font-semibold text-white text-xs leading-none">
+            {membership.code}
+          </span>
+        </div>
+      ))}
     </div>
   );
 
@@ -149,7 +143,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                 {stationName}
               </span>
             </Link>
-            {renderCodePills(stationId)}
+            {renderCodePills(stationId, 'left')}
           </>
         )}
         {side === 'right' && (

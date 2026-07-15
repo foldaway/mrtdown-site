@@ -1,11 +1,19 @@
+import { getVisibleStationMembershipsAt } from './isStationMembershipVisibleAt';
+
 export function getSeoStationCodes(
-  memberships: ReadonlyArray<{ code: string; endedAt?: string }>,
+  memberships: ReadonlyArray<{
+    code: string;
+    endedAt?: string;
+    lineId: string;
+    startedAt: string;
+  }>,
+  referenceAt: string,
 ) {
   return [
     ...new Set(
-      memberships
-        .filter((membership) => membership.endedAt == null)
-        .map((membership) => membership.code),
+      getVisibleStationMembershipsAt(memberships, referenceAt).map(
+        (membership) => membership.code,
+      ),
     ),
   ];
 }

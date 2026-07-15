@@ -3,7 +3,7 @@ import { Fragment } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import { isStationMembershipVisibleAt } from '~/helpers/isStationMembershipVisibleAt';
+import { getVisibleStationMembershipsAt } from '~/helpers/isStationMembershipVisibleAt';
 
 interface Props {
   lineId: string;
@@ -13,8 +13,8 @@ interface Props {
 }
 
 /**
- * Lists interchange stations and the codes valid at the line profile's
- * reference time.
+ * Lists interchange stations and the current, planned, and relevant historical
+ * codes at the line profile's reference time.
  */
 export const StationInterchangesCard: React.FC<Props> = (props) => {
   const { lineId, referenceAt, stationIds } = props;
@@ -49,17 +49,13 @@ export const StationInterchangesCard: React.FC<Props> = (props) => {
                   <div className="flex items-center overflow-hidden rounded-md">
                     {Object.entries(
                       Object.fromEntries(
-                        stations[stationId].memberships
-                          .filter((membership) =>
-                            isStationMembershipVisibleAt(
-                              membership,
-                              referenceAt,
-                            ),
-                          )
-                          .map((membership) => {
-                            const key = `${membership.code}@${membership.lineId}`;
-                            return [key, membership];
-                          }),
+                        getVisibleStationMembershipsAt(
+                          stations[stationId].memberships,
+                          referenceAt,
+                        ).map((membership) => {
+                          const key = `${membership.code}@${membership.lineId}`;
+                          return [key, membership];
+                        }),
                       ),
                     )
                       .sort((a, b) => {
