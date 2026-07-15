@@ -146,6 +146,7 @@ describe('town profile helpers', () => {
       deriveTownStationStatus(
         [{ ...membership, startedAt: '2027-01-01' }],
         [],
+        new Set(),
         REFERENCE_NOW,
       ),
     ).toBe('future_service');
@@ -153,12 +154,34 @@ describe('town profile helpers', () => {
       deriveTownStationStatus(
         [{ ...membership, endedAt: '2025-01-01' }],
         [],
+        new Set(),
         REFERENCE_NOW,
       ),
     ).toBe('not_in_service');
     expect(
-      deriveTownStationStatus([membership], ['disruption'], REFERENCE_NOW),
+      deriveTownStationStatus(
+        [membership],
+        ['disruption'],
+        new Set(),
+        REFERENCE_NOW,
+      ),
     ).toBe('ongoing_disruption');
+  });
+
+  it('distinguishes stations inside and outside line operating hours', () => {
+    const membership = TEST_STATION.memberships[0];
+
+    expect(
+      deriveTownStationStatus(
+        [membership],
+        [],
+        new Set([membership.lineId]),
+        REFERENCE_NOW,
+      ),
+    ).toBe('normal');
+    expect(
+      deriveTownStationStatus([membership], [], new Set(), REFERENCE_NOW),
+    ).toBe('closed_for_day');
   });
 
   it('marks a future-only town as future service', () => {
@@ -181,7 +204,22 @@ describe('town profile helpers', () => {
           ],
         },
       ],
-      'future_service',
+      REFERENCE_NOW,
+    );
+
+    expect(mapReferenceDate.toISODate()).toBe('2029-12-01');
+  });
+
+  it('chooses a future map snapshot for mixed-service towns', () => {
+    const mapReferenceDate = deriveTownMapReferenceDate(
+      [
+        { memberships: [TEST_STATION.memberships[0]] },
+        {
+          memberships: [
+            { ...TEST_STATION.memberships[1], startedAt: '2029-06-01' },
+          ],
+        },
+      ],
       REFERENCE_NOW,
     );
 

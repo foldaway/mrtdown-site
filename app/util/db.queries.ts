@@ -4261,23 +4261,33 @@ function getIssueStatus(issueTypes: readonly IssueType[]): LineSummaryStatus {
 export function deriveTownStationStatus(
   memberships: Station['memberships'],
   activeIssueTypes: readonly IssueType[],
+  operatingLineIds: ReadonlySet<string>,
   referenceNow: DateTime,
 ): TownStationStatus {
-  const hasActiveMembership = memberships.some(
+  const activeMemberships = memberships.filter(
     (membership) =>
       parseDateTime(membership.startedAt) <= referenceNow &&
       (membership.endedAt == null ||
         parseDateTime(membership.endedAt) > referenceNow),
   );
 
-  if (!hasActiveMembership) {
+  if (activeMemberships.length === 0) {
     const hasFutureMembership = memberships.some(
       (membership) => parseDateTime(membership.startedAt) > referenceNow,
     );
     return hasFutureMembership ? 'future_service' : 'not_in_service';
   }
 
-  return getIssueStatus(activeIssueTypes);
+  const issueStatus = getIssueStatus(activeIssueTypes);
+  if (issueStatus !== 'normal') {
+    return issueStatus;
+  }
+
+  return activeMemberships.some((membership) =>
+    operatingLineIds.has(membership.lineId),
+  )
+    ? 'normal'
+    : 'closed_for_day';
 }
 
 export function deriveTownStatus(
@@ -4303,6 +4313,9 @@ export function deriveTownStatus(
   if (stationStatuses.includes('normal')) {
     return 'normal';
   }
+  if (stationStatuses.includes('closed_for_day')) {
+    return 'closed_for_day';
+  }
   if (stationStatuses.includes('future_service')) {
     return 'future_service';
   }
@@ -4311,14 +4324,19 @@ export function deriveTownStatus(
 
 export function deriveTownMapReferenceDate(
   stations: Array<Pick<Station, 'memberships'>>,
-  townStatus: TownStationStatus,
   referenceNow: DateTime,
 ) {
-  if (townStatus !== 'future_service') {
-    return referenceNow;
-  }
-
   const latestTownStart = stations.reduce((latestStationStart, station) => {
+    const hasActiveMembership = station.memberships.some(
+      (membership) =>
+        parseDateTime(membership.startedAt) <= referenceNow &&
+        (membership.endedAt == null ||
+          parseDateTime(membership.endedAt) > referenceNow),
+    );
+    if (hasActiveMembership) {
+      return latestStationStart;
+    }
+
     const firstStationStart = station.memberships
       .map((membership) => parseDateTime(membership.startedAt))
       .filter((startedAt) => startedAt > referenceNow)
@@ -4390,6 +4408,7 @@ export async function getTownsData() {
   return {
     data: { towns },
     included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+      issueIds: [],
       lineIds: towns.flatMap((town) => town.lineIds),
       townIds: towns.map((town) => town.townId),
     }),
@@ -4427,6 +4446,15 @@ export async function getTownProfileData(townId: string) {
   const activeIssues = issues.filter((issue) =>
     issueActiveNow(issue, referenceNow),
   );
+  const operatingLineIds = new Set(
+    lineIds.filter((lineId) =>
+      isLineOperatingNow(
+        dataset.included.lines[lineId],
+        dataset.publicHolidaySet,
+        referenceNow,
+      ),
+    ),
+  );
   const stationStatuses = Object.fromEntries(
     stationIds.map((stationId) => {
       const station = dataset.included.stations[stationId];
@@ -4440,6 +4468,7 @@ export async function getTownProfileData(townId: string) {
         deriveTownStationStatus(
           station.memberships,
           stationIssues.map((issue) => issue.type),
+          operatingLineIds,
           referenceNow,
         ),
       ];
@@ -4451,11 +4480,7 @@ export async function getTownProfileData(townId: string) {
     dataset.allIssues,
     referenceNow,
   );
-  const mapReferenceDate = deriveTownMapReferenceDate(
-    stations,
-    townStatus,
-    referenceNow,
-  );
+  const mapReferenceDate = deriveTownMapReferenceDate(stations, referenceNow);
 
   return {
     data: {
