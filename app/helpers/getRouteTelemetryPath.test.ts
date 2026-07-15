@@ -5,6 +5,7 @@ describe('getRouteTelemetryPath', () => {
   it('normalizes supported localized public routes', () => {
     expect(getRouteTelemetryPath('/en-SG')).toBe('/');
     expect(getRouteTelemetryPath('/zh-Hans/statistics')).toBe('/statistics');
+    expect(getRouteTelemetryPath('/ms/towns')).toBe('/towns');
     expect(getRouteTelemetryPath('/ms/history/2026/05')).toBe(
       '/history/:year/:month',
     );
@@ -19,6 +20,7 @@ describe('getRouteTelemetryPath', () => {
       '/operators/:operatorId',
     );
     expect(getRouteTelemetryPath('/stations/NS1')).toBe('/stations/:stationId');
+    expect(getRouteTelemetryPath('/towns/tampines')).toBe('/towns/:townId');
     expect(getRouteTelemetryPath('/issues/2026-05-31-example')).toBe(
       '/issues/:issueId',
     );

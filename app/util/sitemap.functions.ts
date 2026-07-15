@@ -11,6 +11,7 @@ import {
 interface SitemapPathData {
   lineIds: string[];
   stationIds: string[];
+  townIds: string[];
   operatorIds: string[];
   issueIds: string[];
   monthEarliest: string;
@@ -188,6 +189,7 @@ export async function getSitemapXml() {
 export function buildSitemapPaths({
   lineIds,
   stationIds,
+  townIds,
   operatorIds,
   issueIds,
   monthEarliest,
@@ -201,6 +203,7 @@ export function buildSitemapPaths({
     '/stations',
     '/statistics',
     '/system-map',
+    '/towns',
     '/about',
   ];
 
@@ -209,6 +212,9 @@ export function buildSitemapPaths({
   }
   for (const stationId of stationIds) {
     paths.push(`/stations/${stationId}`);
+  }
+  for (const townId of townIds) {
+    paths.push(`/towns/${townId}`);
   }
   for (const operatorId of operatorIds) {
     paths.push(`/operators/${operatorId}`);

@@ -4,11 +4,11 @@ import { Tabs } from 'radix-ui';
 import type React from 'react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { FormattedList, FormattedMessage, useIntl } from 'react-intl';
-import type { IssueAffectedBranch, Station } from '~/types';
 import { ZoomControls } from '~/components/ZoomControls';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import type { IssueAffectedBranch, Station } from '~/types';
 import { assert } from '~/util/assert';
 import { MapApr2025 } from './components/MapApr2025';
 import { Timeline } from './components/Timeline';
@@ -92,6 +92,11 @@ export type StationMapMode =
       branches: FocusedLineBranch[];
       lineId: string;
       showTimeline?: boolean;
+    }
+  | {
+      type: 'focused-stations';
+      stationIds: string[];
+      showTimeline?: boolean;
     };
 
 interface Props {
@@ -127,12 +132,14 @@ export const StationMap: React.FC<Props> = (props) => {
 
   const focusedStationIds = useMemo(() => {
     const result = new Set<string>();
-    if (mode.type !== 'focused-line') {
-      return result;
-    }
-
-    for (const entry of mode.branches) {
-      for (const stationId of entry.stationIds) {
+    if (mode.type === 'focused-line') {
+      for (const entry of mode.branches) {
+        for (const stationId of entry.stationIds) {
+          result.add(stationId);
+        }
+      }
+    } else if (mode.type === 'focused-stations') {
+      for (const stationId of mode.stationIds) {
         result.add(stationId);
       }
     }
@@ -280,9 +287,7 @@ export const StationMap: React.FC<Props> = (props) => {
     const labelsElement: SVGGElement | null = ref.querySelector('#labels');
     if (labelsElement != null) {
       const labelElements = [
-        ...labelsElement.querySelectorAll<SVGGraphicsElement>(
-          ":scope > [id^='label_']",
-        ),
+        ...labelsElement.querySelectorAll<SVGGraphicsElement>("[id^='label_']"),
       ];
       for (const labelElement of labelElements) {
         const stationId = labelElement.id.replace(/^label_/, '').toUpperCase();
@@ -343,26 +348,29 @@ export const StationMap: React.FC<Props> = (props) => {
 
         // Automatically move into parent <a> tag
         const parentElement = labelElement.parentElement;
-        if (parentElement != null && parentElement.tagName !== 'A') {
-          const newParentElement = document.createElementNS(
-            'http://www.w3.org/2000/svg',
-            'a',
-          );
+        if (parentElement != null) {
+          const isAlreadyLinked = parentElement.localName === 'a';
+          const linkElement: SVGAElement = isAlreadyLinked
+            ? (parentElement as unknown as SVGAElement)
+            : document.createElementNS('http://www.w3.org/2000/svg', 'a');
+          if (!isAlreadyLinked) {
+            parentElement.removeChild(labelElement);
+            linkElement.appendChild(labelElement);
+            parentElement.appendChild(linkElement);
+          }
+
           const href = buildLocaleAwareLink(
             `/stations/${stationId}`,
             intl.locale,
           );
-          newParentElement.setAttributeNS(null, 'href', href);
-          newParentElement.onclick = (e) => {
+          linkElement.setAttributeNS(null, 'href', href);
+          linkElement.onclick = (e) => {
             e.preventDefault();
             navigate({
               to: '/{-$lang}/stations/$stationId',
               params: { stationId },
             });
           };
-          parentElement.removeChild(labelElement);
-          newParentElement.appendChild(labelElement);
-          parentElement.appendChild(newParentElement);
         }
 
         // Add title label for native tooltip
@@ -444,7 +452,7 @@ export const StationMap: React.FC<Props> = (props) => {
       const labelsElement: SVGGElement | null = ref.querySelector('#labels');
       if (labelsElement != null) {
         for (const labelElement of labelsElement.querySelectorAll<SVGGraphicsElement>(
-          ":scope > [id^='label_']",
+          "[id^='label_']",
         )) {
           const stationId = labelElement.id
             .replace(/^label_/, '')
@@ -452,6 +460,46 @@ export const StationMap: React.FC<Props> = (props) => {
           labelElement.style.opacity = focusedStationIds.has(stationId)
             ? '1'
             : '0.18';
+        }
+      }
+    }
+
+    if (mode.type === 'focused-stations') {
+      const lineSegmentElements = [
+        ...ref.querySelectorAll<SVGElement>("[id^='line_']"),
+      ].filter((element) => element.id.includes(':'));
+
+      for (const lineSegmentElement of lineSegmentElements) {
+        const [fromStationId, toStationId] = lineSegmentElement.id
+          .replace(/^line_/, '')
+          .toUpperCase()
+          .split(':');
+        const isFocusedSegment =
+          focusedStationIds.has(fromStationId) &&
+          focusedStationIds.has(toStationId);
+        lineSegmentElement.style.opacity = isFocusedSegment ? '1' : '0.15';
+      }
+
+      for (const nodeElement of ref.querySelectorAll<SVGGElement>(
+        "g[id^='node_']",
+      )) {
+        const stationId = nodeElement.id.replace(/^node_/, '').toUpperCase();
+        nodeElement.style.opacity = focusedStationIds.has(stationId)
+          ? '1'
+          : '0.16';
+      }
+
+      const labelsElement: SVGGElement | null = ref.querySelector('#labels');
+      if (labelsElement != null) {
+        for (const labelElement of labelsElement.querySelectorAll<SVGGraphicsElement>(
+          "[id^='label_']",
+        )) {
+          const stationId = labelElement.id
+            .replace(/^label_/, '')
+            .toUpperCase();
+          labelElement.style.opacity = focusedStationIds.has(stationId)
+            ? '1'
+            : '0.12';
         }
       }
     }

@@ -18,6 +18,7 @@ import { Route as Char123LangChar125SitemapDotxmlRouteImport } from './routes/{-
 import { Route as ApiSentryAnonymousUserRouteImport } from './routes/api.sentry-anonymous-user'
 import { Route as ApiReportsRouteImport } from './routes/api.reports'
 import { Route as ApiIssuesDayRouteImport } from './routes/api.issues-day'
+import { Route as Char123LangChar125TownsIndexRouteImport } from './routes/{-$lang}/towns/index'
 import { Route as Char123LangChar125SystemMapIndexRouteImport } from './routes/{-$lang}/system-map/index'
 import { Route as Char123LangChar125StatisticsIndexRouteImport } from './routes/{-$lang}/statistics/index'
 import { Route as Char123LangChar125StationsIndexRouteImport } from './routes/{-$lang}/stations/index'
@@ -29,6 +30,7 @@ import { Route as OperatorsOperatorIdIndexDotmdRouteImport } from './routes/oper
 import { Route as LinesLineIdIndexDotmdRouteImport } from './routes/lines/$lineId/index[.]md'
 import { Route as IssuesIssueIdIndexDotmdRouteImport } from './routes/issues/$issueId/index[.]md'
 import { Route as ApiPhSplatRouteImport } from './routes/api.ph.$'
+import { Route as Char123LangChar125TownsTownIdIndexRouteImport } from './routes/{-$lang}/towns/$townId/index'
 import { Route as Char123LangChar125StatusLineIdIndexRouteImport } from './routes/{-$lang}/status/$lineId/index'
 import { Route as Char123LangChar125StationsStationIdIndexRouteImport } from './routes/{-$lang}/stations/$stationId/index'
 import { Route as Char123LangChar125OperatorsOperatorIdIndexRouteImport } from './routes/{-$lang}/operators/$operatorId/index'
@@ -90,6 +92,12 @@ const ApiIssuesDayRoute = ApiIssuesDayRouteImport.update({
   path: '/api/issues-day',
   getParentRoute: () => rootRouteImport,
 } as any)
+const Char123LangChar125TownsIndexRoute =
+  Char123LangChar125TownsIndexRouteImport.update({
+    id: '/towns/',
+    path: '/towns/',
+    getParentRoute: () => Char123LangChar125RouteRoute,
+  } as any)
 const Char123LangChar125SystemMapIndexRoute =
   Char123LangChar125SystemMapIndexRouteImport.update({
     id: '/system-map/',
@@ -153,6 +161,12 @@ const ApiPhSplatRoute = ApiPhSplatRouteImport.update({
   path: '/api/ph/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const Char123LangChar125TownsTownIdIndexRoute =
+  Char123LangChar125TownsTownIdIndexRouteImport.update({
+    id: '/towns/$townId/',
+    path: '/towns/$townId/',
+    getParentRoute: () => Char123LangChar125RouteRoute,
+  } as any)
 const Char123LangChar125StatusLineIdIndexRoute =
   Char123LangChar125StatusLineIdIndexRouteImport.update({
     id: '/status/$lineId/',
@@ -257,6 +271,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/stations/': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
+  '/{-$lang}/towns/': typeof Char123LangChar125TownsIndexRoute
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
@@ -268,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/operators/$operatorId/': typeof Char123LangChar125OperatorsOperatorIdIndexRoute
   '/{-$lang}/stations/$stationId/': typeof Char123LangChar125StationsStationIdIndexRoute
   '/{-$lang}/status/$lineId/': typeof Char123LangChar125StatusLineIdIndexRoute
+  '/{-$lang}/towns/$townId/': typeof Char123LangChar125TownsTownIdIndexRoute
   '/{-$lang}/community-reports/$kind/$sourceId/': typeof Char123LangChar125CommunityReportsKindSourceIdIndexRoute
   '/{-$lang}/history/$year/$month/': typeof Char123LangChar125HistoryYearMonthIndexRoute
   '/{-$lang}/history/page/$pageNum/': typeof Char123LangChar125HistoryPagePageNumIndexRoute
@@ -292,6 +308,7 @@ export interface FileRoutesByTo {
   '/{-$lang}/stations': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapIndexRoute
+  '/{-$lang}/towns': typeof Char123LangChar125TownsIndexRoute
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
@@ -303,6 +320,7 @@ export interface FileRoutesByTo {
   '/{-$lang}/operators/$operatorId': typeof Char123LangChar125OperatorsOperatorIdIndexRoute
   '/{-$lang}/stations/$stationId': typeof Char123LangChar125StationsStationIdIndexRoute
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdIndexRoute
+  '/{-$lang}/towns/$townId': typeof Char123LangChar125TownsTownIdIndexRoute
   '/{-$lang}/community-reports/$kind/$sourceId': typeof Char123LangChar125CommunityReportsKindSourceIdIndexRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthIndexRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumIndexRoute
@@ -329,6 +347,7 @@ export interface FileRoutesById {
   '/{-$lang}/stations/': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
+  '/{-$lang}/towns/': typeof Char123LangChar125TownsIndexRoute
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
@@ -340,6 +359,7 @@ export interface FileRoutesById {
   '/{-$lang}/operators/$operatorId/': typeof Char123LangChar125OperatorsOperatorIdIndexRoute
   '/{-$lang}/stations/$stationId/': typeof Char123LangChar125StationsStationIdIndexRoute
   '/{-$lang}/status/$lineId/': typeof Char123LangChar125StatusLineIdIndexRoute
+  '/{-$lang}/towns/$townId/': typeof Char123LangChar125TownsTownIdIndexRoute
   '/{-$lang}/community-reports/$kind/$sourceId/': typeof Char123LangChar125CommunityReportsKindSourceIdIndexRoute
   '/{-$lang}/history/$year/$month/': typeof Char123LangChar125HistoryYearMonthIndexRoute
   '/{-$lang}/history/page/$pageNum/': typeof Char123LangChar125HistoryPagePageNumIndexRoute
@@ -367,6 +387,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/stations/'
     | '/{-$lang}/statistics/'
     | '/{-$lang}/system-map/'
+    | '/{-$lang}/towns/'
     | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
@@ -378,6 +399,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/operators/$operatorId/'
     | '/{-$lang}/stations/$stationId/'
     | '/{-$lang}/status/$lineId/'
+    | '/{-$lang}/towns/$townId/'
     | '/{-$lang}/community-reports/$kind/$sourceId/'
     | '/{-$lang}/history/$year/$month/'
     | '/{-$lang}/history/page/$pageNum/'
@@ -402,6 +424,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/stations'
     | '/{-$lang}/statistics'
     | '/{-$lang}/system-map'
+    | '/{-$lang}/towns'
     | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
@@ -413,6 +436,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/operators/$operatorId'
     | '/{-$lang}/stations/$stationId'
     | '/{-$lang}/status/$lineId'
+    | '/{-$lang}/towns/$townId'
     | '/{-$lang}/community-reports/$kind/$sourceId'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
@@ -438,6 +462,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/stations/'
     | '/{-$lang}/statistics/'
     | '/{-$lang}/system-map/'
+    | '/{-$lang}/towns/'
     | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
@@ -449,6 +474,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/operators/$operatorId/'
     | '/{-$lang}/stations/$stationId/'
     | '/{-$lang}/status/$lineId/'
+    | '/{-$lang}/towns/$townId/'
     | '/{-$lang}/community-reports/$kind/$sourceId/'
     | '/{-$lang}/history/$year/$month/'
     | '/{-$lang}/history/page/$pageNum/'
@@ -539,6 +565,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIssuesDayRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/{-$lang}/towns/': {
+      id: '/{-$lang}/towns/'
+      path: '/towns'
+      fullPath: '/{-$lang}/towns/'
+      preLoaderRoute: typeof Char123LangChar125TownsIndexRouteImport
+      parentRoute: typeof Char123LangChar125RouteRoute
+    }
     '/{-$lang}/system-map/': {
       id: '/{-$lang}/system-map/'
       path: '/system-map'
@@ -615,6 +648,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/ph/$'
       preLoaderRoute: typeof ApiPhSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/{-$lang}/towns/$townId/': {
+      id: '/{-$lang}/towns/$townId/'
+      path: '/towns/$townId'
+      fullPath: '/{-$lang}/towns/$townId/'
+      preLoaderRoute: typeof Char123LangChar125TownsTownIdIndexRouteImport
+      parentRoute: typeof Char123LangChar125RouteRoute
     }
     '/{-$lang}/status/$lineId/': {
       id: '/{-$lang}/status/$lineId/'
@@ -726,12 +766,14 @@ interface Char123LangChar125RouteRouteChildren {
   Char123LangChar125StationsIndexRoute: typeof Char123LangChar125StationsIndexRoute
   Char123LangChar125StatisticsIndexRoute: typeof Char123LangChar125StatisticsIndexRoute
   Char123LangChar125SystemMapIndexRoute: typeof Char123LangChar125SystemMapIndexRoute
+  Char123LangChar125TownsIndexRoute: typeof Char123LangChar125TownsIndexRoute
   Char123LangChar125HistoryYearIndexRoute: typeof Char123LangChar125HistoryYearIndexRoute
   Char123LangChar125IssuesIssueIdIndexRoute: typeof Char123LangChar125IssuesIssueIdIndexRoute
   Char123LangChar125LinesLineIdIndexRoute: typeof Char123LangChar125LinesLineIdIndexRoute
   Char123LangChar125OperatorsOperatorIdIndexRoute: typeof Char123LangChar125OperatorsOperatorIdIndexRoute
   Char123LangChar125StationsStationIdIndexRoute: typeof Char123LangChar125StationsStationIdIndexRoute
   Char123LangChar125StatusLineIdIndexRoute: typeof Char123LangChar125StatusLineIdIndexRoute
+  Char123LangChar125TownsTownIdIndexRoute: typeof Char123LangChar125TownsTownIdIndexRoute
   Char123LangChar125CommunityReportsKindSourceIdIndexRoute: typeof Char123LangChar125CommunityReportsKindSourceIdIndexRoute
   Char123LangChar125HistoryYearMonthIndexRoute: typeof Char123LangChar125HistoryYearMonthIndexRoute
   Char123LangChar125HistoryPagePageNumIndexRoute: typeof Char123LangChar125HistoryPagePageNumIndexRoute
@@ -749,6 +791,7 @@ const Char123LangChar125RouteRouteChildren: Char123LangChar125RouteRouteChildren
       Char123LangChar125StatisticsIndexRoute,
     Char123LangChar125SystemMapIndexRoute:
       Char123LangChar125SystemMapIndexRoute,
+    Char123LangChar125TownsIndexRoute: Char123LangChar125TownsIndexRoute,
     Char123LangChar125HistoryYearIndexRoute:
       Char123LangChar125HistoryYearIndexRoute,
     Char123LangChar125IssuesIssueIdIndexRoute:
@@ -761,6 +804,8 @@ const Char123LangChar125RouteRouteChildren: Char123LangChar125RouteRouteChildren
       Char123LangChar125StationsStationIdIndexRoute,
     Char123LangChar125StatusLineIdIndexRoute:
       Char123LangChar125StatusLineIdIndexRoute,
+    Char123LangChar125TownsTownIdIndexRoute:
+      Char123LangChar125TownsTownIdIndexRoute,
     Char123LangChar125CommunityReportsKindSourceIdIndexRoute:
       Char123LangChar125CommunityReportsKindSourceIdIndexRoute,
     Char123LangChar125HistoryYearMonthIndexRoute:

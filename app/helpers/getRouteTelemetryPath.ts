@@ -37,6 +37,8 @@ export function getRouteTelemetryPath(pathname: string) {
       return '/operators/:operatorId';
     case 'stations':
       return '/stations/:stationId';
+    case 'towns':
+      return second == null ? '/towns' : '/towns/:townId';
     case 'status':
       return '/status/:lineId';
     default:
