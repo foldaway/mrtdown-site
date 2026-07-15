@@ -92,31 +92,38 @@ export const Route = createFileRoute('/{-$lang}/stations/')({
                 mainEntity: {
                   '@type': 'ItemList',
                   numberOfItems: stationCount,
-                  itemListElement: stations.map((station, index) => ({
-                    '@type': 'ListItem',
-                    position: index + 1,
-                    item: {
-                      '@type': 'TrainStation',
-                      name: getLocalizedTranslation(station.name, lang),
-                      alternateName: station.memberships
-                        .map((membership) => membership.code)
-                        .join(' / '),
-                      identifier: station.id,
-                      address: {
-                        '@type': 'PostalAddress',
-                        addressLocality: getLocalizedTranslation(
-                          towns[station.townId].name,
+                  itemListElement: stations.map((station, index) => {
+                    const town = towns[station.townId];
+                    return {
+                      '@type': 'ListItem',
+                      position: index + 1,
+                      item: {
+                        '@type': 'TrainStation',
+                        name: getLocalizedTranslation(station.name, lang),
+                        alternateName: station.memberships
+                          .map((membership) => membership.code)
+                          .join(' / '),
+                        identifier: station.id,
+                        ...(town == null
+                          ? {}
+                          : {
+                              address: {
+                                '@type': 'PostalAddress',
+                                addressLocality: getLocalizedTranslation(
+                                  town.name,
+                                  lang,
+                                ),
+                                addressCountry: 'SG',
+                              },
+                            }),
+                        url: buildLocalizedAbsoluteUrl(
+                          `/stations/${station.id}`,
                           lang,
+                          rootUrl,
                         ),
-                        addressCountry: 'SG',
                       },
-                      url: buildLocalizedAbsoluteUrl(
-                        `/stations/${station.id}`,
-                        lang,
-                        rootUrl,
-                      ),
-                    },
-                  })),
+                    };
+                  }),
                 },
               },
               {
@@ -220,11 +227,12 @@ function StationsPage() {
             : [membership.lineId, ...Object.values(line.name)];
         })
         .join(' ');
+      const town = towns[station.townId];
       const searchText = [
         station.id,
         ...Object.values(station.name),
         ...station.memberships.map((membership) => membership.code),
-        ...Object.values(towns[station.townId].name),
+        ...(town == null ? [] : Object.values(town.name)),
         lineSearchText,
       ]
         .join(' ')
@@ -472,17 +480,21 @@ function StationsPage() {
 
         {visibleStations.length > 0 ? (
           <div className="divide-y divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
-            {visibleStations.map((station) => (
-              <StationCard
-                key={station.id}
-                station={station}
-                lines={lines}
-                townName={getLocalizedTranslation(
-                  towns[station.townId].name,
-                  intl.locale,
-                )}
-              />
-            ))}
+            {visibleStations.map((station) => {
+              const town = towns[station.townId];
+              return (
+                <StationCard
+                  key={station.id}
+                  station={station}
+                  lines={lines}
+                  townName={
+                    town == null
+                      ? null
+                      : getLocalizedTranslation(town.name, intl.locale)
+                  }
+                />
+              );
+            })}
           </div>
         ) : (
           <div className="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center dark:border-gray-700 dark:bg-gray-800">
@@ -563,7 +575,7 @@ function StationCard({
 }: {
   station: StationDirectoryEntry;
   lines: StationsDirectoryPayload['lines'];
-  townName: string;
+  townName: string | null;
 }) {
   const intl = useIntl();
   const stationName = getLocalizedTranslation(station.name, intl.locale);
@@ -575,6 +587,10 @@ function StationCard({
           candidate.code === membership.code,
       ) === index,
   );
+  const resolvedMemberships = memberships.flatMap((membership) => {
+    const line = lines[membership.lineId];
+    return line == null ? [] : [{ line, membership }];
+  });
 
   return (
     <article className="group px-3 py-3 transition-colors hover:bg-gray-50 sm:px-4 dark:hover:bg-gray-900/30">
@@ -592,17 +608,19 @@ function StationCard({
           </div>
 
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-gray-500 text-xs dark:text-gray-400">
-            <span className="inline-flex items-center gap-1.5">
-              <MapPinIcon className="size-3.5 shrink-0" />
-              {townName}
-            </span>
+            {townName != null && (
+              <span className="inline-flex items-center gap-1.5">
+                <MapPinIcon className="size-3.5 shrink-0" />
+                {townName}
+              </span>
+            )}
             <StationDisruptionHistory station={station} />
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
           <div className="flex flex-col items-end gap-1.5">
-            {memberships.map((membership) => (
+            {resolvedMemberships.map(({ line, membership }) => (
               <Link
                 key={`${membership.lineId}:${membership.code}`}
                 to="/{-$lang}/lines/$lineId"
@@ -610,15 +628,12 @@ function StationCard({
                 className="inline-flex items-center justify-end gap-1.5 text-gray-500 text-xs transition-colors hover:text-accent-light dark:text-gray-400"
               >
                 <span className="hidden sm:inline">
-                  {getLocalizedTranslation(
-                    lines[membership.lineId].name,
-                    intl.locale,
-                  )}
+                  {getLocalizedTranslation(line.name, intl.locale)}
                 </span>
                 <span
                   className="min-w-8 rounded px-1.5 py-0.5 text-center font-bold text-[11px] text-white leading-none shadow-sm"
                   style={{
-                    backgroundColor: lines[membership.lineId].color,
+                    backgroundColor: line.color,
                   }}
                 >
                   {membership.code}

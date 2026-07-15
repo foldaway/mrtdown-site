@@ -231,6 +231,7 @@
   "operator.line_issues_count": "Isu ({period})",
   "operator.line_performance": "Perbandingan Prestasi Laluan",
   "operator.lines_affected": "{count, plural, one {# laluan terjejas} other {# laluan terjejas}}",
+  "operator.status.all_operational": "Semua Laluan Beroperasi",
   "operator.total_downtime": "Jumlah Masa Henti (90 hari)",
   "operator.total_stations": "Jumlah Stesen",
   "operator.website": "Lawati laman web",

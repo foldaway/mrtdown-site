@@ -231,6 +231,7 @@
   "operator.line_issues_count": "Issues ({period})",
   "operator.line_performance": "Line Performance Comparison",
   "operator.lines_affected": "{count, plural, one {# line affected} other {# lines affected}}",
+  "operator.status.all_operational": "All Lines Operational",
   "operator.total_downtime": "Total Downtime (90 days)",
   "operator.total_stations": "Total Stations",
   "operator.website": "Visit website",

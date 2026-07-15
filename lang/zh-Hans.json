@@ -231,6 +231,7 @@
   "operator.line_issues_count": "问题（{period}）",
   "operator.line_performance": "线路性能比较",
   "operator.lines_affected": "{count, plural, one {# 条线路受影响} other {# 条线路受影响}}",
+  "operator.status.all_operational": "所有线路正常运行",
   "operator.total_downtime": "总停机时间（90天）",
   "operator.total_stations": "总车站数",
   "operator.website": "访问网站",

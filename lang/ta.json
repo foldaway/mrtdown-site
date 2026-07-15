@@ -231,6 +231,7 @@
   "operator.line_issues_count": "சிக்கல்கள் ({period})",
   "operator.line_performance": "வழித்தட செயல்திறன் ஒப்பீடு",
   "operator.lines_affected": "{count, plural, one {# வழித்தடம் பாதிக்கப்பட்டது} other {# வழித்தடங்கள் பாதிக்கப்பட்டன}}",
+  "operator.status.all_operational": "அனைத்து வழித்தடங்களும் இயங்குகின்றன",
   "operator.total_downtime": "மொத்த செயலிழப்பு நேரம் (90 நாட்கள்)",
   "operator.total_stations": "மொத்த நிலையங்கள்",
   "operator.website": "வலைத்தளத்தைப் பார்வையிடவும்",
