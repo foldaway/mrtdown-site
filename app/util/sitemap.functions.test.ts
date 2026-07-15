@@ -34,6 +34,7 @@ describe('agent Markdown discovery', () => {
     const paths = buildSitemapPaths({
       lineIds: ['EWL'],
       stationIds: ['EW1'],
+      townIds: ['pasir-ris'],
       operatorIds: ['SMRT'],
       issueIds: ['issue-1'],
       monthEarliest: '2026-04-01',
@@ -52,6 +53,8 @@ describe('agent Markdown discovery', () => {
         '/stations',
         '/lines/EWL',
         '/stations/EW1',
+        '/towns',
+        '/towns/pasir-ris',
         '/operators/SMRT',
         '/issues/issue-1',
         '/history/2026/04',
@@ -71,6 +74,7 @@ describe('agent Markdown discovery', () => {
     const paths = buildSitemapPaths({
       lineIds: [],
       stationIds: [],
+      townIds: [],
       operatorIds: [],
       issueIds: [],
       monthEarliest: '2026-06-01',
@@ -87,6 +91,7 @@ describe('agent Markdown discovery', () => {
     const paths = buildSitemapPaths({
       lineIds: [],
       stationIds: [],
+      townIds: [],
       operatorIds: [],
       issueIds: [],
       monthEarliest: '2026-04-01',
@@ -105,6 +110,7 @@ describe('agent Markdown discovery', () => {
     const paths = buildSitemapPaths({
       lineIds: [],
       stationIds: [],
+      townIds: [],
       operatorIds: [],
       issueIds: [],
       monthEarliest: '2025-01-01',
@@ -122,6 +128,7 @@ describe('agent Markdown discovery', () => {
     const paths = buildSitemapPaths({
       lineIds: [],
       stationIds: [],
+      townIds: [],
       operatorIds: [],
       issueIds: [],
       monthEarliest: '2009-12-01',
@@ -144,6 +151,7 @@ describe('agent Markdown discovery', () => {
     const paths = buildSitemapPaths({
       lineIds: ['EWL'],
       stationIds: ['EW1'],
+      townIds: ['pasir-ris'],
       operatorIds: ['SMRT'],
       issueIds: ['issue-1'],
       monthEarliest: 'not-a-date',
@@ -158,9 +166,11 @@ describe('agent Markdown discovery', () => {
       '/stations',
       '/statistics',
       '/system-map',
+      '/towns',
       '/about',
       '/lines/EWL',
       '/stations/EW1',
+      '/towns/pasir-ris',
       '/operators/SMRT',
       '/issues/issue-1',
     ]);

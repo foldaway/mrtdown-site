@@ -444,7 +444,13 @@ function StationPage() {
             >
               <div className="inline-flex min-w-0 items-center gap-1 text-xs">
                 <MapPinIcon className="size-4 text-gray-500" />
-                <span className="font-medium">{townName}</span>
+                <Link
+                  to="/{-$lang}/towns/$townId"
+                  params={{ townId: station.townId }}
+                  className="font-medium hover:underline"
+                >
+                  {townName}
+                </Link>
               </div>
             </div>
             {/* Main pane */}

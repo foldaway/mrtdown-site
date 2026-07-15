@@ -114,6 +114,12 @@ function RouteComponent() {
                       defaultMessage="Stations"
                     />
                   </Link>
+                  <Link to="/{-$lang}/towns" className={linkClassName}>
+                    <FormattedMessage
+                      id="general.towns"
+                      defaultMessage="Towns"
+                    />
+                  </Link>
                   <Link to="/{-$lang}/statistics" className={linkClassName}>
                     <FormattedMessage
                       id="general.statistics"
@@ -187,6 +193,18 @@ function RouteComponent() {
                             <FormattedMessage
                               id="general.stations"
                               defaultMessage="Stations"
+                            />
+                          </Link>
+                        </DropdownMenu.Item>
+
+                        <DropdownMenu.Item>
+                          <Link
+                            to="/{-$lang}/towns"
+                            className={linkClassNameMobile}
+                          >
+                            <FormattedMessage
+                              id="general.towns"
+                              defaultMessage="Towns"
                             />
                           </Link>
                         </DropdownMenu.Item>
@@ -337,6 +355,17 @@ function RouteComponent() {
                         <FormattedMessage
                           id="general.history"
                           defaultMessage="History"
+                        />
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        to="/{-$lang}/towns"
+                        className="flex text-sm transition-colors hover:text-accent-light"
+                      >
+                        <FormattedMessage
+                          id="general.towns"
+                          defaultMessage="Towns"
                         />
                       </Link>
                     </li>

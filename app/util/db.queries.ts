@@ -4220,6 +4220,134 @@ export async function getStationsDirectoryData() {
     ),
   };
 }
+export async function getTownsData() {
+  const dataset = await getBaseDataset();
+  const stations = Object.values(dataset.included.stations);
+  const towns = Object.values(dataset.included.towns).map((town) => {
+    const stationIds = stations
+      .filter((station) => station.townId === town.id)
+      .map((station) => station.id);
+    const lineIds = [
+      ...new Set(
+        stationIds.flatMap((stationId) =>
+          dataset.included.stations[stationId].memberships.map(
+            (membership) => membership.lineId,
+          ),
+        ),
+      ),
+    ].sort();
+
+    return {
+      townId: town.id,
+      stationIds,
+      lineIds,
+    };
+  });
+
+  return {
+    data: { towns },
+    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+      stationIds: towns.flatMap((town) => town.stationIds),
+      townIds: towns.map((town) => town.townId),
+      includeStationMembershipLines: true,
+    }),
+  };
+}
+
+export async function getTownProfileData(townId: string) {
+  const dataset = await getBaseDataset();
+  const town = dataset.included.towns[townId];
+  if (town == null) {
+    throw new Response('Town not found', {
+      status: 404,
+      statusText: 'Not Found',
+    });
+  }
+
+  const stations = Object.values(dataset.included.stations).filter(
+    (station) => station.townId === townId,
+  );
+  const stationIds = stations.map((station) => station.id);
+  const stationIdSet = new Set(stationIds);
+  const lineIds = [
+    ...new Set(
+      stations.flatMap((station) =>
+        station.memberships.map((membership) => membership.lineId),
+      ),
+    ),
+  ].sort();
+  const issues = Object.values(dataset.allIssues).filter((issue) =>
+    issue.branchesAffected.some((branch) =>
+      branch.stationIds.some((stationId) => stationIdSet.has(stationId)),
+    ),
+  );
+  const referenceNow = nowSg();
+  const activeIssues = issues.filter((issue) =>
+    issueActiveNow(issue, referenceNow),
+  );
+  const getStatus = (matchingIssues: IssueWithOperationalEffects[]) => {
+    if (matchingIssues.some((issue) => issue.type === 'disruption')) {
+      return 'ongoing_disruption' as const;
+    }
+    if (matchingIssues.some((issue) => issue.type === 'maintenance')) {
+      return 'ongoing_maintenance' as const;
+    }
+    if (matchingIssues.some((issue) => issue.type === 'infra')) {
+      return 'ongoing_infra' as const;
+    }
+    return 'normal' as const;
+  };
+  const stationStatuses = Object.fromEntries(
+    stationIds.map((stationId) => {
+      const station = dataset.included.stations[stationId];
+      const stationIssues = activeIssues.filter((issue) =>
+        issue.branchesAffected.some((branch) =>
+          branch.stationIds.includes(stationId),
+        ),
+      );
+      if (
+        stationIssues.length === 0 &&
+        station.memberships.length > 0 &&
+        station.memberships.every(
+          (membership) => parseDateTime(membership.startedAt) > referenceNow,
+        )
+      ) {
+        return [stationId, 'future_service'];
+      }
+      return [stationId, getStatus(stationIssues)];
+    }),
+  ) as Record<string, LineSummaryStatus>;
+  const issueIdsRecent = sortIssuesByLatestActivity(
+    issues.map((issue) => issue.id),
+    dataset.allIssues,
+  ).slice(0, 10);
+
+  return {
+    data: {
+      townId,
+      stationIds,
+      lineIds,
+      status: getStatus(activeIssues),
+      stationStatuses,
+      issueIdsRecent,
+      issueCountByType: pickIssueTypes(issues),
+      referenceDate: isoDate(referenceNow),
+      stationNames: Object.fromEntries(
+        Object.values(dataset.included.stations).map((station) => [
+          station.id,
+          station.name,
+        ]),
+      ),
+    },
+    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+      issueIds: issueIdsRecent,
+      lineIds,
+      stationIds,
+      townIds: [townId],
+      includeStationMembershipLines: true,
+    }),
+  };
+}
 
 export async function getOperatorProfileData(operatorId: string, days: number) {
   const dataset = await getBaseDataset();
@@ -5025,6 +5153,7 @@ export async function getSitemapData() {
   return {
     lineIds: Object.keys(dataset.included.lines).sort(),
     stationIds: Object.keys(dataset.included.stations).sort(),
+    townIds: Object.keys(dataset.included.towns).sort(),
     operatorIds: Object.keys(dataset.included.operators).sort(),
     issueIds: issuesWithFirstDates.map(({ issue }) => issue.id),
     monthEarliest,
