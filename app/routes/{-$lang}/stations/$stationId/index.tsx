@@ -629,55 +629,134 @@ function StationPage() {
           </Link>
         </section>
 
-        {stationProfile.communitySignals.length > 0 && (
-          <DeferredViewportWidget
-            className="block"
-            fallback={<CommunitySignalsSectionSkeleton />}
-          >
-            <CommunitySignalsSection
-              signals={stationProfile.communitySignals}
-            />
-          </DeferredViewportWidget>
-        )}
-
-        {/* Station Details Section */}
-        <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-lg dark:border-gray-600/60 dark:bg-gray-800">
-          <div className="p-4 sm:p-6">
-            <h2 className="font-semibold text-base text-gray-900 dark:text-gray-100">
-              <FormattedMessage
-                id="general.station_details"
-                defaultMessage="Station Details"
+        <div className="flex flex-col gap-4 pt-1 sm:gap-5 sm:pt-2">
+          {stationProfile.communitySignals.length > 0 && (
+            <DeferredViewportWidget
+              className="block"
+              fallback={<CommunitySignalsSectionSkeleton />}
+            >
+              <CommunitySignalsSection
+                signals={stationProfile.communitySignals}
               />
-            </h2>
-            <div className="mt-4 flex flex-col overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800">
-              <table className="table-auto">
+            </DeferredViewportWidget>
+          )}
+
+          <section
+            aria-labelledby="station-details-title"
+            className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
+          >
+            <div className="px-4 py-2.5 sm:px-6 sm:py-3">
+              <h2
+                id="station-details-title"
+                className="font-bold text-base text-gray-900 leading-tight dark:text-gray-100"
+              >
+                <FormattedMessage
+                  id="general.station_details"
+                  defaultMessage="Station Details"
+                />
+              </h2>
+            </div>
+
+            <div className="border-gray-200 border-t sm:hidden dark:border-gray-700">
+              <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                {membershipsUnique.map((membership) => (
+                  <li key={membership.code} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <LineMembershipLink
+                        lineColor={included.lines[membership.lineId].color}
+                        lineId={membership.lineId}
+                        lineName={getLocalizedTranslation(
+                          included.lines[membership.lineId].name,
+                          intl.locale,
+                        )}
+                      />
+                      <StationCode code={membership.code} />
+                    </div>
+
+                    <dl className="mt-2 grid grid-cols-3 gap-2">
+                      <div>
+                        <dt className="font-semibold text-[10px] text-gray-400 uppercase tracking-wide dark:text-gray-500">
+                          <FormattedMessage
+                            id="general.structure"
+                            defaultMessage="Structure"
+                          />
+                        </dt>
+                        <dd className="mt-0.5 text-gray-600 text-xs leading-4 dark:text-gray-300">
+                          <FormattedMessage
+                            {...StationStructureTypeLabels[
+                              membership.structureType
+                            ]}
+                          />
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold text-[10px] text-gray-400 uppercase tracking-wide dark:text-gray-500">
+                          <FormattedMessage
+                            id="general.opened"
+                            defaultMessage="Opened"
+                          />
+                        </dt>
+                        <dd className="mt-0.5 text-gray-600 text-xs leading-4 dark:text-gray-300">
+                          <MembershipDate
+                            compact
+                            intl={intl}
+                            isHydrated={isHydrated}
+                            suppressFuture
+                            value={membership.startedAt}
+                          />
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold text-[10px] text-gray-400 uppercase tracking-wide dark:text-gray-500">
+                          <FormattedMessage
+                            id="general.closed"
+                            defaultMessage="Closed"
+                          />
+                        </dt>
+                        <dd className="mt-0.5 text-gray-600 text-xs leading-4 dark:text-gray-300">
+                          <MembershipDate
+                            compact
+                            intl={intl}
+                            isHydrated={isHydrated}
+                            value={membership.endedAt}
+                          />
+                        </dd>
+                      </div>
+                    </dl>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="hidden border-gray-200 border-t sm:block dark:border-gray-700">
+              <table className="w-full table-auto text-left">
                 <thead>
-                  <tr className="border-gray-300 border-b bg-gray-100 text-gray-500 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                    <th className="p-2 text-start">
+                  <tr className="bg-gray-50/80 font-semibold text-[11px] text-gray-500 uppercase tracking-wide dark:bg-gray-900/20 dark:text-gray-400">
+                    <th className="px-6 py-2">
                       <FormattedMessage
                         id="general.line"
                         defaultMessage="Line"
                       />
                     </th>
-                    <th className="p-2 text-start">
+                    <th className="px-4 py-2">
                       <FormattedMessage
                         id="general.station_code"
                         defaultMessage="Station Code"
                       />
                     </th>
-                    <th className="sm:!table-cell hidden p-2 text-start">
+                    <th className="px-4 py-2">
                       <FormattedMessage
                         id="general.structure"
                         defaultMessage="Structure"
                       />
                     </th>
-                    <th className="p-2 text-start">
+                    <th className="px-4 py-2">
                       <FormattedMessage
                         id="general.opened"
                         defaultMessage="Opened"
                       />
                     </th>
-                    <th className="p-2 text-start">
+                    <th className="px-6 py-2">
                       <FormattedMessage
                         id="general.closed"
                         defaultMessage="Closed"
@@ -685,119 +764,142 @@ function StationPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-300 dark:divide-gray-700">
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {membershipsUnique.map((membership) => (
                     <tr
                       key={membership.code}
-                      className="text-gray-900 dark:text-gray-200"
+                      className="text-gray-800 transition-colors hover:bg-gray-50/70 dark:text-gray-200 dark:hover:bg-gray-700/30"
                     >
-                      <td className="p-2 align-middle">
-                        <Link
-                          className="group flex flex-wrap items-center gap-x-1 gap-y-0.5"
-                          to="/{-$lang}/lines/$lineId"
-                          params={{ lineId: membership.lineId }}
-                        >
-                          <span
-                            className="rounded-md px-2 py-1 font-semibold text-white text-xs leading-none"
-                            style={{
-                              backgroundColor:
-                                included.lines[membership.lineId].color,
-                            }}
-                          >
-                            {membership.lineId}
-                          </span>
-                          <span className="text-sm group-hover:underline">
-                            {getLocalizedTranslation(
-                              included.lines[membership.lineId].name,
-                              intl.locale,
-                            )}
-                          </span>
-                        </Link>
-                      </td>
-
-                      <td className="p-2 align-middle">
-                        <div className="inline-flex items-center rounded-lg border border-gray-300 px-2 py-0.5 dark:border-gray-700">
-                          <span className="text-gray-500 text-sm leading-none dark:text-gray-400">
-                            {membership.code}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="sm:!table-cell hidden p-2 align-middle">
-                        <span className="text-gray-500 text-sm leading-none dark:text-gray-400">
-                          <FormattedMessage
-                            {...StationStructureTypeLabels[
-                              membership.structureType
-                            ]}
-                          />
-                        </span>
-                      </td>
-                      <td className="p-2 align-middle">
-                        <span className="inline-block text-sm">
-                          {isHydrated ? (
-                            DateTime.fromISO(membership.startedAt)
-                              .diffNow()
-                              .as('days') < 0 ? (
-                              <>
-                                <FormattedDate
-                                  value={membership.startedAt}
-                                  day="numeric"
-                                  month="long"
-                                  year="numeric"
-                                />{' '}
-                                (
-                                {DateTime.fromISO(membership.startedAt)
-                                  .reconfigure({ locale: intl.locale })
-                                  .toRelative()}
-                                )
-                              </>
-                            ) : (
-                              '-'
-                            )
-                          ) : (
-                            membership.startedAt
+                      <td className="px-6 py-2.5 align-middle">
+                        <LineMembershipLink
+                          lineColor={included.lines[membership.lineId].color}
+                          lineId={membership.lineId}
+                          lineName={getLocalizedTranslation(
+                            included.lines[membership.lineId].name,
+                            intl.locale,
                           )}
-                        </span>
+                        />
                       </td>
-                      <td className="p-2 align-middle">
-                        <span className="text-sm">
-                          {membership.endedAt != null ? (
-                            isHydrated ? (
-                              <>
-                                <FormattedDate
-                                  value={membership.endedAt}
-                                  day="numeric"
-                                  month="long"
-                                  year="numeric"
-                                />{' '}
-                                (
-                                {DateTime.fromISO(membership.endedAt)
-                                  .reconfigure({ locale: intl.locale })
-                                  .toRelative()}
-                                )
-                              </>
-                            ) : (
-                              membership.endedAt
-                            )
-                          ) : (
-                            '-'
-                          )}
-                        </span>
+                      <td className="px-4 py-2.5 align-middle">
+                        <StationCode code={membership.code} />
+                      </td>
+                      <td className="px-4 py-2.5 align-middle text-gray-500 text-xs leading-5 dark:text-gray-400">
+                        <FormattedMessage
+                          {...StationStructureTypeLabels[
+                            membership.structureType
+                          ]}
+                        />
+                      </td>
+                      <td className="px-4 py-2.5 align-middle text-xs leading-5">
+                        <MembershipDate
+                          intl={intl}
+                          isHydrated={isHydrated}
+                          suppressFuture
+                          value={membership.startedAt}
+                        />
+                      </td>
+                      <td className="px-6 py-2.5 align-middle text-xs leading-5">
+                        <MembershipDate
+                          intl={intl}
+                          isHydrated={isHydrated}
+                          value={membership.endedAt}
+                        />
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
+          </section>
 
-        <DeferredViewportWidget
-          className="block"
-          fallback={<ProfileRecentIssuesSectionSkeleton />}
-        >
-          <RecentIssuesSection issueIds={stationProfile.issueIdsRecent} />
-        </DeferredViewportWidget>
+          <DeferredViewportWidget
+            className="block"
+            fallback={<ProfileRecentIssuesSectionSkeleton />}
+          >
+            <RecentIssuesSection issueIds={stationProfile.issueIdsRecent} />
+          </DeferredViewportWidget>
+        </div>
       </div>
     </IncludedEntitiesContext.Provider>
+  );
+}
+
+function LineMembershipLink({
+  lineColor,
+  lineId,
+  lineName,
+}: {
+  lineColor: string;
+  lineId: string;
+  lineName: string;
+}) {
+  return (
+    <Link
+      className="group flex min-w-0 items-center gap-2"
+      to="/{-$lang}/lines/$lineId"
+      params={{ lineId }}
+    >
+      <span
+        className="shrink-0 rounded-md px-2 py-1 font-semibold text-white text-xs leading-none shadow-sm"
+        style={{ backgroundColor: lineColor }}
+      >
+        {lineId}
+      </span>
+      <span className="min-w-0 font-medium text-gray-800 text-sm leading-5 group-hover:underline dark:text-gray-200">
+        {lineName}
+      </span>
+    </Link>
+  );
+}
+
+function StationCode({ code }: { code: string }) {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-md bg-gray-100 px-2 py-1 font-semibold text-gray-600 text-xs leading-none ring-1 ring-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600">
+      {code}
+    </span>
+  );
+}
+
+function MembershipDate({
+  compact = false,
+  intl,
+  isHydrated,
+  suppressFuture = false,
+  value,
+}: {
+  compact?: boolean;
+  intl: IntlShape;
+  isHydrated: boolean;
+  suppressFuture?: boolean;
+  value: string | null | undefined;
+}) {
+  if (value == null) {
+    return '-';
+  }
+
+  if (!isHydrated) {
+    return value;
+  }
+
+  const dateTime = DateTime.fromISO(value);
+  if (suppressFuture && dateTime.diffNow().as('days') >= 0) {
+    return '-';
+  }
+
+  return (
+    <>
+      <FormattedDate
+        value={value}
+        day="numeric"
+        month={compact ? 'short' : 'long'}
+        year="numeric"
+      />
+      {!compact && (
+        <span className="text-gray-500 dark:text-gray-400">
+          {' '}
+          ({dateTime.reconfigure({ locale: intl.locale }).toRelative()})
+        </span>
+      )}
+    </>
   );
 }

@@ -23,16 +23,24 @@ export const RecentIssuesSection: React.FC<Props> = (props) => {
   }, []);
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-lg dark:border-gray-600/60 dark:bg-gray-800">
-      <div className="p-4 sm:p-6">
-        <h2 className="font-semibold text-base text-gray-900 dark:text-gray-100">
+    <section
+      aria-labelledby="station-recent-issues-title"
+      className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
+    >
+      <div className="px-4 py-2.5 sm:px-6 sm:py-3">
+        <h2
+          id="station-recent-issues-title"
+          className="font-bold text-base text-gray-900 leading-tight dark:text-gray-100"
+        >
           <FormattedMessage
             id="station.recent_issues"
             defaultMessage="Recent Issues"
           />
         </h2>
+      </div>
 
-        <div className="mt-4 space-y-3">
+      <div className="border-gray-200 border-t px-3 py-3 sm:px-4 dark:border-gray-700">
+        <div className="space-y-2.5">
           {issueIds.length > 0 ? (
             issueIds.map((issueId) => {
               const issue = issues[issueId];
@@ -41,15 +49,15 @@ export const RecentIssuesSection: React.FC<Props> = (props) => {
                 <IssueCard
                   key={issue.id}
                   issue={issue}
-                  className="!w-auto"
+                  className="!w-auto !border-gray-200 !px-3.5 !py-2.5 !shadow-none hover:!border-gray-300 hover:!shadow-sm sm:!px-4 sm:!py-3 dark:!border-gray-700 dark:hover:!border-gray-600"
                   context={issueCardContext}
                 />
               );
             })
           ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <InformationCircleIcon className="h-12 w-12 text-gray-400 dark:text-gray-500" />
-              <p className="mt-3 text-gray-600 dark:text-gray-400">
+            <div className="flex items-center justify-center gap-2 py-5 text-center">
+              <InformationCircleIcon className="size-5 shrink-0 text-gray-400 dark:text-gray-500" />
+              <p className="text-gray-500 text-sm leading-5 dark:text-gray-400">
                 <FormattedMessage
                   id="station.no_recent_issues"
                   defaultMessage="No recent issues reported for this station"
@@ -59,6 +67,6 @@ export const RecentIssuesSection: React.FC<Props> = (props) => {
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 };
