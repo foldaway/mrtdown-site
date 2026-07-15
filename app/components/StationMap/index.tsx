@@ -348,26 +348,29 @@ export const StationMap: React.FC<Props> = (props) => {
 
         // Automatically move into parent <a> tag
         const parentElement = labelElement.parentElement;
-        if (parentElement != null && parentElement.tagName !== 'A') {
-          const newParentElement = document.createElementNS(
-            'http://www.w3.org/2000/svg',
-            'a',
-          );
+        if (parentElement != null) {
+          const isAlreadyLinked = parentElement.localName === 'a';
+          const linkElement: SVGAElement = isAlreadyLinked
+            ? (parentElement as unknown as SVGAElement)
+            : document.createElementNS('http://www.w3.org/2000/svg', 'a');
+          if (!isAlreadyLinked) {
+            parentElement.removeChild(labelElement);
+            linkElement.appendChild(labelElement);
+            parentElement.appendChild(linkElement);
+          }
+
           const href = buildLocaleAwareLink(
             `/stations/${stationId}`,
             intl.locale,
           );
-          newParentElement.setAttributeNS(null, 'href', href);
-          newParentElement.onclick = (e) => {
+          linkElement.setAttributeNS(null, 'href', href);
+          linkElement.onclick = (e) => {
             e.preventDefault();
             navigate({
               to: '/{-$lang}/stations/$stationId',
               params: { stationId },
             });
           };
-          parentElement.removeChild(labelElement);
-          newParentElement.appendChild(labelElement);
-          parentElement.appendChild(newParentElement);
         }
 
         // Add title label for native tooltip

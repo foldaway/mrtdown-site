@@ -9,6 +9,7 @@ import {
   createIntl,
   FormattedMessage,
   FormattedNumber,
+  FormattedTime,
   useIntl,
 } from 'react-intl';
 import { IssueCard } from '~/components/IssueCard';
@@ -22,9 +23,12 @@ import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
-import type { LineSummaryStatus, Station } from '~/types';
+import type { Station } from '~/types';
 import { assert } from '~/util/assert';
+import type { TownStationStatus } from '~/util/db.queries';
 import { getTownProfileFn } from '~/util/town.functions';
+
+const SG_TIMEZONE = 'Asia/Singapore';
 
 export const Route = createFileRoute('/{-$lang}/towns/$townId/')({
   component: TownPage,
@@ -190,6 +194,13 @@ function TownPage() {
     (total, count) => total + count,
     0,
   );
+  const referenceNow = useMemo(() => {
+    const value = DateTime.fromISO(data.referenceNow, {
+      setZone: true,
+    }).setZone(SG_TIMEZONE);
+    assert(value.isValid, 'Invalid town profile reference timestamp');
+    return value;
+  }, [data.referenceNow]);
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
@@ -249,11 +260,14 @@ function TownPage() {
 
         <section
           className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
-          aria-label="Town summary"
+          aria-labelledby="town-summary-heading"
         >
           <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
-              <h2 className="font-semibold text-gray-900 text-sm sm:text-base dark:text-gray-100">
+              <h2
+                id="town-summary-heading"
+                className="font-semibold text-gray-900 text-sm sm:text-base dark:text-gray-100"
+              >
                 <FormattedMessage
                   id="general.current_status"
                   defaultMessage="Current Status"
@@ -262,8 +276,17 @@ function TownPage() {
               <p className="mt-0.5 text-gray-500 text-xs dark:text-gray-400">
                 <FormattedMessage
                   id="town.status.timestamp"
-                  defaultMessage="As of {timestamp, time, short}"
-                  values={{ timestamp: new Date() }}
+                  defaultMessage="As of {timestamp}"
+                  values={{
+                    timestamp: (
+                      <FormattedTime
+                        value={referenceNow.toJSDate()}
+                        hour="numeric"
+                        minute="2-digit"
+                        timeZone={SG_TIMEZONE}
+                      />
+                    ),
+                  }}
                 />
               </p>
             </div>
@@ -352,7 +375,7 @@ function TownPage() {
           </div>
           <div className="border-gray-200 border-t bg-gray-100 p-2 sm:p-3 dark:border-gray-700 dark:bg-gray-900">
             <StationMap
-              currentDate={data.referenceDate}
+              currentDate={data.mapReferenceDate}
               snapshotComponents={{ '2026-07': MapJul2026 }}
               stationNames={data.stationNames}
               mode={{
@@ -364,18 +387,23 @@ function TownPage() {
           </div>
         </section>
 
-        <RecentTownIssues issueIds={data.issueIdsRecent} townName={townName} />
+        <RecentTownIssues
+          issueIds={data.issueIdsRecent}
+          townName={townName}
+          referenceNow={data.referenceNow}
+          days={data.recentIssueDays}
+        />
       </div>
     </IncludedEntitiesContext.Provider>
   );
 }
 
-function TownStatus({ status }: { status: LineSummaryStatus }) {
+function TownStatus({ status }: { status: TownStationStatus }) {
   return (
     <div className="flex items-center gap-2">
       <StatusDot status={status} />
       <span className="font-medium text-gray-700 text-sm dark:text-gray-200">
-        <FormattedMessage {...LineSummaryStatusLabels[status]} />
+        <TownStationStatusLabel status={status} />
       </span>
     </div>
   );
@@ -403,7 +431,7 @@ function StationCard({
   status,
 }: {
   station: Station;
-  status: LineSummaryStatus;
+  status: TownStationStatus;
 }) {
   const intl = useIntl();
   const stationName = getLocalizedTranslation(station.name, intl.locale);
@@ -430,7 +458,7 @@ function StationCard({
         <div className="mt-1 flex items-center gap-1.5">
           <StatusDot status={status} />
           <span className="text-gray-500 text-xs dark:text-gray-400">
-            <FormattedMessage {...LineSummaryStatusLabels[status]} />
+            <TownStationStatusLabel status={status} />
           </span>
         </div>
       </div>
@@ -439,7 +467,19 @@ function StationCard({
   );
 }
 
-function StatusDot({ status }: { status: LineSummaryStatus }) {
+function TownStationStatusLabel({ status }: { status: TownStationStatus }) {
+  if (status === 'not_in_service') {
+    return (
+      <FormattedMessage
+        id="status.not_in_service"
+        defaultMessage="Not in Service"
+      />
+    );
+  }
+  return <FormattedMessage {...LineSummaryStatusLabels[status]} />;
+}
+
+function StatusDot({ status }: { status: TownStationStatus }) {
   return (
     <span
       className={classNames('size-2.5 shrink-0 rounded-full', {
@@ -450,7 +490,9 @@ function StatusDot({ status }: { status: LineSummaryStatus }) {
         'bg-infra-light dark:bg-infra-dark': status === 'ongoing_infra',
         'bg-operational-light dark:bg-operational-dark': status === 'normal',
         'bg-gray-400 dark:bg-gray-500':
-          status === 'closed_for_day' || status === 'future_service',
+          status === 'closed_for_day' ||
+          status === 'future_service' ||
+          status === 'not_in_service',
       })}
       aria-hidden="true"
     />
@@ -460,19 +502,31 @@ function StatusDot({ status }: { status: LineSummaryStatus }) {
 function RecentTownIssues({
   issueIds,
   townName,
+  referenceNow,
+  days,
 }: {
   issueIds: string[];
   townName: string;
+  referenceNow: string;
+  days: number;
 }) {
   const { issues } = Route.useLoaderData().included;
-  const context = useMemo<IssueCardContext>(
-    () => ({
+  const context = useMemo<IssueCardContext>(() => {
+    const timestamp = DateTime.fromISO(referenceNow, {
+      setZone: true,
+    }).setZone(SG_TIMEZONE);
+    assert(timestamp.isValid, 'Invalid town issue reference timestamp');
+    const date = timestamp
+      .startOf('day')
+      .minus({ days: days - 1 })
+      .toISODate();
+    assert(date != null, 'Invalid town issue window start');
+    return {
       type: 'history.days',
-      date: DateTime.now().startOf('day').minus({ days: 90 }).toISODate(),
-      days: 90,
-    }),
-    [],
-  );
+      date,
+      days,
+    };
+  }, [days, referenceNow]);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5 dark:border-gray-700 dark:bg-gray-800">
@@ -506,7 +560,7 @@ function RecentTownIssues({
             <p className="mt-3 text-gray-600 text-sm dark:text-gray-400">
               <FormattedMessage
                 id="town.recent_issues.empty"
-                defaultMessage="No service issues have been reported for this town."
+                defaultMessage="No service issues have been reported for this town in the last 90 days."
               />
             </p>
           </div>

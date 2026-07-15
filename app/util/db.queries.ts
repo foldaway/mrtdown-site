@@ -855,10 +855,17 @@ function issueOverlapsRange(
   issue: Issue,
   rangeStart: DateTime,
   rangeEnd: DateTime,
+  referenceNow = nowSg(),
 ) {
   return getIssueBounds(issue).some((interval) => {
     return (
-      overlapSeconds(interval.start, interval.end, rangeStart, rangeEnd) > 0
+      overlapSeconds(
+        interval.start,
+        interval.end,
+        rangeStart,
+        rangeEnd,
+        referenceNow,
+      ) > 0
     );
   });
 }
@@ -4220,6 +4227,142 @@ export async function getStationsDirectoryData() {
     ),
   };
 }
+
+export type TownStationStatus = LineSummaryStatus | 'not_in_service';
+
+export const TOWN_RECENT_ISSUE_DAYS = 90;
+
+const STATION_MAP_SNAPSHOT_DATES = [
+  '2012-01-01',
+  '2017-11-01',
+  '2019-12-01',
+  '2024-11-01',
+  '2025-04-01',
+  '2026-07-01',
+  '2027-12-01',
+  '2029-12-01',
+  '2030-12-01',
+  '2032-12-01',
+];
+
+function getIssueStatus(issueTypes: readonly IssueType[]): LineSummaryStatus {
+  if (issueTypes.includes('disruption')) {
+    return 'ongoing_disruption';
+  }
+  if (issueTypes.includes('maintenance')) {
+    return 'ongoing_maintenance';
+  }
+  if (issueTypes.includes('infra')) {
+    return 'ongoing_infra';
+  }
+  return 'normal';
+}
+
+export function deriveTownStationStatus(
+  memberships: Station['memberships'],
+  activeIssueTypes: readonly IssueType[],
+  referenceNow: DateTime,
+): TownStationStatus {
+  const hasActiveMembership = memberships.some(
+    (membership) =>
+      parseDateTime(membership.startedAt) <= referenceNow &&
+      (membership.endedAt == null ||
+        parseDateTime(membership.endedAt) > referenceNow),
+  );
+
+  if (!hasActiveMembership) {
+    const hasFutureMembership = memberships.some(
+      (membership) => parseDateTime(membership.startedAt) > referenceNow,
+    );
+    return hasFutureMembership ? 'future_service' : 'not_in_service';
+  }
+
+  return getIssueStatus(activeIssueTypes);
+}
+
+export function deriveTownStatus(
+  stationStatuses: readonly TownStationStatus[],
+): TownStationStatus {
+  const issueStatus = getIssueStatus(
+    stationStatuses.flatMap((status): IssueType[] => {
+      switch (status) {
+        case 'ongoing_disruption':
+          return ['disruption'];
+        case 'ongoing_maintenance':
+          return ['maintenance'];
+        case 'ongoing_infra':
+          return ['infra'];
+        default:
+          return [];
+      }
+    }),
+  );
+  if (issueStatus !== 'normal') {
+    return issueStatus;
+  }
+  if (stationStatuses.includes('normal')) {
+    return 'normal';
+  }
+  if (stationStatuses.includes('future_service')) {
+    return 'future_service';
+  }
+  return 'not_in_service';
+}
+
+export function deriveTownMapReferenceDate(
+  stations: Array<Pick<Station, 'memberships'>>,
+  townStatus: TownStationStatus,
+  referenceNow: DateTime,
+) {
+  if (townStatus !== 'future_service') {
+    return referenceNow;
+  }
+
+  const latestTownStart = stations.reduce((latestStationStart, station) => {
+    const firstStationStart = station.memberships
+      .map((membership) => parseDateTime(membership.startedAt))
+      .filter((startedAt) => startedAt > referenceNow)
+      .sort((a, b) => a.toMillis() - b.toMillis())[0];
+    if (firstStationStart == null || firstStationStart <= latestStationStart) {
+      return latestStationStart;
+    }
+    return firstStationStart;
+  }, referenceNow);
+
+  return (
+    STATION_MAP_SNAPSHOT_DATES.map(parseDateTime).find(
+      (snapshotDate) => snapshotDate >= latestTownStart,
+    ) ?? latestTownStart
+  );
+}
+
+export function getTownRecentIssueWindow(referenceNow: DateTime) {
+  const start = referenceNow
+    .startOf('day')
+    .minus({ days: TOWN_RECENT_ISSUE_DAYS - 1 });
+  return {
+    start,
+    end: start.plus({ days: TOWN_RECENT_ISSUE_DAYS }),
+  };
+}
+
+export function selectRecentTownIssueIds(
+  issues: readonly Issue[],
+  issuesById: Record<string, Issue>,
+  referenceNow: DateTime,
+  limit = 10,
+) {
+  const window = getTownRecentIssueWindow(referenceNow);
+  return sortIssuesByLatestActivity(
+    issues
+      .filter((issue) =>
+        issueOverlapsRange(issue, window.start, window.end, referenceNow),
+      )
+      .map((issue) => issue.id),
+    issuesById,
+  ).slice(0, limit);
+}
+
 export async function getTownsData() {
   const dataset = await getBaseDataset();
   const stations = Object.values(dataset.included.stations);
@@ -4247,9 +4390,8 @@ export async function getTownsData() {
   return {
     data: { towns },
     included: selectIncludedEntities(dataset.included, dataset.allIssues, {
-      stationIds: towns.flatMap((town) => town.stationIds),
+      lineIds: towns.flatMap((town) => town.lineIds),
       townIds: towns.map((town) => town.townId),
-      includeStationMembershipLines: true,
     }),
   };
 }
@@ -4285,18 +4427,6 @@ export async function getTownProfileData(townId: string) {
   const activeIssues = issues.filter((issue) =>
     issueActiveNow(issue, referenceNow),
   );
-  const getStatus = (matchingIssues: IssueWithOperationalEffects[]) => {
-    if (matchingIssues.some((issue) => issue.type === 'disruption')) {
-      return 'ongoing_disruption' as const;
-    }
-    if (matchingIssues.some((issue) => issue.type === 'maintenance')) {
-      return 'ongoing_maintenance' as const;
-    }
-    if (matchingIssues.some((issue) => issue.type === 'infra')) {
-      return 'ongoing_infra' as const;
-    }
-    return 'normal' as const;
-  };
   const stationStatuses = Object.fromEntries(
     stationIds.map((stationId) => {
       const station = dataset.included.stations[stationId];
@@ -4305,33 +4435,40 @@ export async function getTownProfileData(townId: string) {
           branch.stationIds.includes(stationId),
         ),
       );
-      if (
-        stationIssues.length === 0 &&
-        station.memberships.length > 0 &&
-        station.memberships.every(
-          (membership) => parseDateTime(membership.startedAt) > referenceNow,
-        )
-      ) {
-        return [stationId, 'future_service'];
-      }
-      return [stationId, getStatus(stationIssues)];
+      return [
+        stationId,
+        deriveTownStationStatus(
+          station.memberships,
+          stationIssues.map((issue) => issue.type),
+          referenceNow,
+        ),
+      ];
     }),
-  ) as Record<string, LineSummaryStatus>;
-  const issueIdsRecent = sortIssuesByLatestActivity(
-    issues.map((issue) => issue.id),
+  ) as Record<string, TownStationStatus>;
+  const townStatus = deriveTownStatus(Object.values(stationStatuses));
+  const issueIdsRecent = selectRecentTownIssueIds(
+    issues,
     dataset.allIssues,
-  ).slice(0, 10);
+    referenceNow,
+  );
+  const mapReferenceDate = deriveTownMapReferenceDate(
+    stations,
+    townStatus,
+    referenceNow,
+  );
 
   return {
     data: {
       townId,
       stationIds,
       lineIds,
-      status: getStatus(activeIssues),
+      status: townStatus,
       stationStatuses,
       issueIdsRecent,
       issueCountByType: pickIssueTypes(issues),
-      referenceDate: isoDate(referenceNow),
+      referenceNow: isoDateTime(referenceNow),
+      recentIssueDays: TOWN_RECENT_ISSUE_DAYS,
+      mapReferenceDate: isoDate(mapReferenceDate),
       stationNames: Object.fromEntries(
         Object.values(dataset.included.stations).map((station) => [
           station.id,

@@ -5,12 +5,17 @@ import {
   buildLineOperationalFactRows,
   buildLineSummary,
   deriveServiceScopeStationIds,
+  deriveTownMapReferenceDate,
+  deriveTownStationStatus,
+  deriveTownStatus,
+  getTownRecentIssueWindow,
   parseStatisticsSnapshotPayload,
   resolveStationMembershipEndedAt,
   resolveStationProfileStationId,
-  selectIncludedEntities,
-  selectServiceBranchSourceEvents,
   type SystemAnalytics,
+  selectIncludedEntities,
+  selectRecentTownIssueIds,
+  selectServiceBranchSourceEvents,
 } from './db.queries';
 
 describe('resolveStationMembershipEndedAt', () => {
@@ -30,6 +35,14 @@ describe('resolveStationMembershipEndedAt', () => {
 const REFERENCE_NOW = DateTime.fromISO('2026-02-23T23:59:00', {
   zone: 'Asia/Singapore',
 });
+
+function toIso(value: DateTime) {
+  const result = value.toISO();
+  if (result == null) {
+    throw new Error('Expected a valid ISO timestamp');
+  }
+  return result;
+}
 
 const TEST_LINE: Line = {
   id: 'BPLRT',
@@ -124,6 +137,88 @@ function buildIssue(
     facilityEffectKinds: [],
   } as Parameters<typeof buildLineSummary>[1][number];
 }
+
+describe('town profile helpers', () => {
+  it('distinguishes future, closed and active station memberships', () => {
+    const membership = TEST_STATION.memberships[0];
+
+    expect(
+      deriveTownStationStatus(
+        [{ ...membership, startedAt: '2027-01-01' }],
+        [],
+        REFERENCE_NOW,
+      ),
+    ).toBe('future_service');
+    expect(
+      deriveTownStationStatus(
+        [{ ...membership, endedAt: '2025-01-01' }],
+        [],
+        REFERENCE_NOW,
+      ),
+    ).toBe('not_in_service');
+    expect(
+      deriveTownStationStatus([membership], ['disruption'], REFERENCE_NOW),
+    ).toBe('ongoing_disruption');
+  });
+
+  it('marks a future-only town as future service', () => {
+    expect(deriveTownStatus(['future_service', 'future_service'])).toBe(
+      'future_service',
+    );
+  });
+
+  it('chooses the first map snapshot where every future station has started', () => {
+    const mapReferenceDate = deriveTownMapReferenceDate(
+      [
+        {
+          memberships: [
+            { ...TEST_STATION.memberships[0], startedAt: '2027-01-01' },
+          ],
+        },
+        {
+          memberships: [
+            { ...TEST_STATION.memberships[1], startedAt: '2029-06-01' },
+          ],
+        },
+      ],
+      'future_service',
+      REFERENCE_NOW,
+    );
+
+    expect(mapReferenceDate.toISODate()).toBe('2029-12-01');
+  });
+
+  it('filters recent town issues to the same 90-day display window', () => {
+    const recentIssue = buildIssue('recent', 'disruption', [
+      {
+        startAt: toIso(REFERENCE_NOW.minus({ days: 10 })),
+        endAt: toIso(REFERENCE_NOW.minus({ days: 9 })),
+        status: 'ended',
+      },
+    ]);
+    const oldIssue = buildIssue('old', 'maintenance', [
+      {
+        startAt: toIso(REFERENCE_NOW.minus({ days: 120 })),
+        endAt: toIso(REFERENCE_NOW.minus({ days: 119 })),
+        status: 'ended',
+      },
+    ]);
+    const issuesById = {
+      [recentIssue.id]: recentIssue,
+      [oldIssue.id]: oldIssue,
+    };
+
+    expect(
+      selectRecentTownIssueIds(
+        [oldIssue, recentIssue],
+        issuesById,
+        REFERENCE_NOW,
+      ),
+    ).toEqual(['recent']);
+    const window = getTownRecentIssueWindow(REFERENCE_NOW);
+    expect(window.end.diff(window.start, 'days').days).toBe(90);
+  });
+});
 
 function buildStatistics(): SystemAnalytics {
   return {
