@@ -137,9 +137,9 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
             <Link
               to="/{-$lang}/stations/$stationId"
               params={{ stationId }}
-              className="group min-w-0"
+              className="group min-w-0 flex-1"
             >
-              <span className="text-gray-800 text-sm group-hover:underline dark:text-gray-200">
+              <span className="block text-balance text-gray-800 text-sm leading-tight group-hover:underline dark:text-gray-200">
                 {stationName}
               </span>
             </Link>
@@ -152,9 +152,9 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
             <Link
               to="/{-$lang}/stations/$stationId"
               params={{ stationId }}
-              className="group min-w-0"
+              className="group min-w-0 flex-1"
             >
-              <span className="text-gray-800 text-sm group-hover:underline dark:text-gray-200">
+              <span className="block text-balance text-gray-800 text-sm leading-tight group-hover:underline dark:text-gray-200">
                 {stationName}
               </span>
             </Link>
