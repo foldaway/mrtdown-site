@@ -184,6 +184,10 @@ Exit criteria:
   `200` without redirects, and validates representative HTML pages for title,
   meta description, canonical link, `hreflang` alternates, `og:url`, and the
   known `WIP` description placeholder.
+- 2026-07-16: Decoupled year, month, and day history reads from operational
+  facts. History now selects issues from canonical period events, discards stale
+  superseded period revisions, and builds only the matching issue/entity
+  dataset. Sitemap history URLs no longer depend on rolling fact coverage.
 
 ## Decision Log
 
@@ -196,6 +200,10 @@ Exit criteria:
   is before today, lacks full operational fact coverage, and is not before the
   operational fact coverage start date. This mirrors the history route's
   degraded-render fallback and avoids advertising known `500` month pages.
+- 2026-07-16: Supersede the fact-coverage sitemap rule above. Incident history
+  is canonical issue data, while operational facts are a rolling statistics
+  read model; history availability and sitemap inclusion must not depend on the
+  operational-fact retention window.
 
 ## Validation
 

@@ -2132,17 +2132,14 @@ async function getBaseDataset() {
   return buildBaseDataset();
 }
 
-async function getOverviewIssueIds(
-  days: number,
-  referenceNow = nowSg(),
+async function getIssueIdsOverlappingRange(
+  rangeStart: DateTime,
+  rangeEnd: DateTime,
   db?: AppDb,
 ) {
   const database = db ?? (await getDefaultDb());
-  const referenceDateTime = referenceNow.setZone(SG_TIMEZONE);
-  const rangeStart = referenceDateTime.startOf('day').minus({ days: days - 1 });
-  const rangeEnd = referenceDateTime.startOf('day').plus({ days: 1 });
   const overlappingPeriodRows = await timeDbQuery(
-    'overview_q_overlapping_periods',
+    'issue_range_q_overlapping_periods',
     () =>
       database
         .select({
@@ -2157,7 +2154,7 @@ async function getOverviewIssueIds(
     ...new Set(overlappingPeriodRows.map((row) => row.impact_event_id)),
   ];
   const overlappingPeriodEventRows = await timeDbQuery(
-    'overview_q_period_events_for_overlap',
+    'issue_range_q_period_events_for_overlap',
     () =>
       selectByIdChunks(overlappingPeriodEventIds, (ids) =>
         database
@@ -2170,12 +2167,11 @@ async function getOverviewIssueIds(
           .where(inArray(impactEventsTable.id, ids)),
       ),
   );
-  const overlappingPeriodEventIdSet = new Set(overlappingPeriodEventIds);
   const candidateIssueIds = [
     ...new Set(overlappingPeriodEventRows.map((event) => event.issue_id)),
   ];
   const periodEventRows = await timeDbQuery(
-    'overview_q_period_events_for_issues',
+    'issue_range_q_period_events_for_issues',
     () =>
       selectByIdChunks(candidateIssueIds, (ids) =>
         database
@@ -2193,8 +2189,24 @@ async function getOverviewIssueIds(
           ),
       ),
   );
-  const latestPeriodEventByIssueId = periodEventRows.reduce<
-    Record<string, (typeof periodEventRows)[number]>
+  return selectIssueIdsWithLatestOverlappingPeriodEvents(
+    overlappingPeriodEventIds,
+    periodEventRows,
+  );
+}
+
+type PeriodEventCandidate = Pick<
+  typeof impactEventsTable.$inferSelect,
+  'id' | 'issue_id' | 'ts'
+>;
+
+export function selectIssueIdsWithLatestOverlappingPeriodEvents(
+  overlappingPeriodEventIds: Iterable<string>,
+  periodEvents: readonly PeriodEventCandidate[],
+) {
+  const overlappingPeriodEventIdSet = new Set(overlappingPeriodEventIds);
+  const latestPeriodEventByIssueId = periodEvents.reduce<
+    Record<string, PeriodEventCandidate>
   >((acc, event) => {
     const current = acc[event.issue_id];
     if (current == null) {
@@ -2209,14 +2221,31 @@ async function getOverviewIssueIds(
     }
     return acc;
   }, {});
-  const issueIds = new Set<string>();
-  for (const event of Object.values(latestPeriodEventByIssueId)) {
-    if (overlappingPeriodEventIdSet.has(event.id)) {
-      issueIds.add(event.issue_id);
-    }
-  }
 
-  return [...issueIds];
+  return Object.values(latestPeriodEventByIssueId)
+    .filter((event) => overlappingPeriodEventIdSet.has(event.id))
+    .map((event) => event.issue_id)
+    .sort();
+}
+
+async function getIssuesOverlappingRange(
+  rangeStart: DateTime,
+  rangeEnd: DateTime,
+  referenceNow = nowSg(),
+  db?: AppDb,
+) {
+  const database = db ?? (await getDefaultDb());
+  const issueIds = await getIssueIdsOverlappingRange(
+    rangeStart,
+    rangeEnd,
+    database,
+  );
+  const dataset = await buildDataset(referenceNow, database, issueIds);
+  const issues = Object.values(dataset.allIssues).filter((issue) =>
+    issueOverlapsRange(issue, rangeStart, rangeEnd, referenceNow),
+  );
+
+  return { dataset, issues };
 }
 
 async function buildOverviewDataset(
@@ -2226,10 +2255,16 @@ async function buildOverviewDataset(
 ): Promise<OverviewDataset> {
   return timeServerSpan('build_overview_dataset', async () => {
     const database = db ?? (await getDefaultDb());
-    const issueIds = await timeServerSpan('overview_issue_candidates', () =>
-      getOverviewIssueIds(days, referenceNow, database),
+    const referenceDateTime = referenceNow.setZone(SG_TIMEZONE);
+    const rangeStart = referenceDateTime
+      .startOf('day')
+      .minus({ days: days - 1 });
+    const rangeEnd = referenceDateTime.startOf('day').plus({ days: 1 });
+    const { dataset } = await timeServerSpan(
+      'overview_issue_range_dataset',
+      () =>
+        getIssuesOverlappingRange(rangeStart, rangeEnd, referenceNow, database),
     );
-    const dataset = await buildDataset(referenceNow, database, issueIds);
     return {
       included: dataset.included,
       publicHolidaySet: dataset.publicHolidaySet,
@@ -2241,14 +2276,6 @@ async function buildOverviewDataset(
 
 async function getOverviewDataset(days: number) {
   return buildOverviewDataset(days);
-}
-
-async function getIncludedForIssueIds(issueIds: readonly string[]) {
-  const dataset = await buildDataset(nowSg(), undefined, issueIds);
-  return selectIncludedEntities(dataset.included, dataset.allIssues, {
-    issueIds,
-    includeStationMembershipLines: true,
-  });
 }
 
 type IncludedEntitySelection = {
@@ -3309,25 +3336,6 @@ async function getOperationalFactCoverageDatesInRange(
   }
 }
 
-async function getOperationalFactCoverageStartDate() {
-  const db = await getDefaultDb();
-  try {
-    const [row] = await timeServerSpan('fact_coverage_start_query', () =>
-      db
-        .select({
-          startDate: sql<string | null>`min(${lineDayFactsTable.date})`,
-        })
-        .from(lineDayFactsTable),
-    );
-    return row?.startDate ?? null;
-  } catch (error) {
-    if (isUndefinedTableError(error)) {
-      return null;
-    }
-    throw error;
-  }
-}
-
 function hasFullDateCoverage(
   rows: Array<{ date: string }>,
   start: DateTime,
@@ -3341,43 +3349,6 @@ function hasFullDateCoverage(
 
   const dates = new Set(rows.map((row) => row.date));
   return dates.size === expectedDays;
-}
-
-async function shouldUseLegacyHistoryFallback(
-  start: DateTime,
-  end: DateTime,
-  context: string,
-) {
-  const today = nowSg().startOf('day');
-  if (end.startOf('day') >= today) {
-    return true;
-  }
-
-  const coverageEnd = end.startOf('day') < today ? end.startOf('day') : today;
-  if (coverageEnd < start.startOf('day')) {
-    return false;
-  }
-
-  const coverageRows = await getOperationalFactCoverageDatesInRange(
-    start,
-    coverageEnd,
-  );
-  if (hasFullDateCoverage(coverageRows, start, coverageEnd)) {
-    return false;
-  }
-
-  const coverageStart = await getOperationalFactCoverageStartDate();
-  if (
-    coverageStart != null &&
-    start.startOf('day') <
-      DateTime.fromISO(coverageStart, { zone: SG_TIMEZONE })
-  ) {
-    return true;
-  }
-
-  throw new Error(
-    `Missing operational fact coverage for ${context}: ${start.toISODate()} to ${coverageEnd.toISODate()}`,
-  );
 }
 
 function buildDailyIssueTypeCountsFromIssues(
@@ -4673,82 +4644,24 @@ export async function getHistoryYearSummaryData(year: number) {
     { zone: SG_TIMEZONE },
   ).startOf('day');
   const yearEnd = yearStart.plus({ years: 1 });
-  const factRows = await getIssueDayFactsInRange(
+  const { dataset, issues } = await getIssuesOverlappingRange(
     yearStart,
-    yearEnd.minus({ days: 1 }),
+    yearEnd,
   );
-  if (
-    await shouldUseLegacyHistoryFallback(
-      yearStart,
-      yearEnd.minus({ days: 1 }),
-      `history year ${year}`,
-    )
-  ) {
-    const dataset = await getBaseDataset();
-    const issues = Object.values(dataset.allIssues).filter((issue) =>
-      issueOverlapsRange(issue, yearStart, yearEnd),
-    );
-
-    const summaryByMonth = Array.from({ length: 12 }, (_, index) => {
-      const monthStart = DateTime.fromObject(
-        { year, month: index + 1, day: 1 },
-        { zone: SG_TIMEZONE },
-      ).startOf('day');
-      const monthEnd = monthStart.plus({ months: 1 });
-      const monthIssues = issues.filter((issue) =>
-        issueOverlapsRange(issue, monthStart, monthEnd),
-      );
-      return {
-        month: isoDate(monthStart),
-        issueCountsByType: pickIssueTypes(monthIssues),
-        totalCount: monthIssues.length,
-      };
-    }).reverse();
-
-    return {
-      data: {
-        startAt: isoDate(yearStart),
-        endAt: isoDate(yearEnd.minus({ day: 1 })),
-        summaryByMonth,
-      },
-      included: selectIncludedEntities(dataset.included, dataset.allIssues, {
-        issueIds: issues.map((issue) => issue.id),
-        includeStationMembershipLines: true,
-      }),
-    };
-  }
-  const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
-  const included = await getIncludedForIssueIds(issueIds);
-  const uniqueIssuesByMonth = Array.from(
-    { length: 12 },
-    () => new Map<string, IssueType>(),
-  );
-
-  for (const row of factRows) {
-    const date = parseDateTime(row.date);
-    uniqueIssuesByMonth[date.month - 1]?.set(
-      row.issue_id,
-      row.issue_type as IssueType,
-    );
-  }
 
   const summaryByMonth = Array.from({ length: 12 }, (_, index) => {
     const monthStart = DateTime.fromObject(
       { year, month: index + 1, day: 1 },
       { zone: SG_TIMEZONE },
     ).startOf('day');
-    const uniqueIssues =
-      uniqueIssuesByMonth[index] ?? new Map<string, IssueType>();
-    const issueCountsByType = [...uniqueIssues.values()].reduce<
-      Partial<Record<IssueType, number>>
-    >((acc, type) => {
-      acc[type] = (acc[type] ?? 0) + 1;
-      return acc;
-    }, {});
+    const monthEnd = monthStart.plus({ months: 1 });
+    const monthIssues = issues.filter((issue) =>
+      issueOverlapsRange(issue, monthStart, monthEnd),
+    );
     return {
       month: isoDate(monthStart),
-      issueCountsByType,
-      totalCount: uniqueIssues.size,
+      issueCountsByType: pickIssueTypes(monthIssues),
+      totalCount: monthIssues.length,
     };
   }).reverse();
 
@@ -4758,7 +4671,10 @@ export async function getHistoryYearSummaryData(year: number) {
       endAt: isoDate(yearEnd.minus({ day: 1 })),
       summaryByMonth,
     },
-    included,
+    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+      issueIds: issues.map((issue) => issue.id),
+      includeStationMembershipLines: true,
+    }),
   };
 }
 
@@ -4768,65 +4684,11 @@ export async function getHistoryYearMonthData(year: number, month: number) {
     { zone: SG_TIMEZONE },
   ).startOf('day');
   const monthEnd = monthStart.plus({ months: 1 });
-  const factRows = await getIssueDayFactsInRange(
+  const { dataset, issues } = await getIssuesOverlappingRange(
     monthStart,
-    monthEnd.minus({ days: 1 }),
+    monthEnd,
   );
-  if (
-    await shouldUseLegacyHistoryFallback(
-      monthStart,
-      monthEnd.minus({ days: 1 }),
-      `history month ${year}-${month.toString().padStart(2, '0')}`,
-    )
-  ) {
-    const dataset = await getBaseDataset();
-
-    const issues = Object.values(dataset.allIssues).filter((issue) =>
-      issueOverlapsRange(issue, monthStart, monthEnd),
-    );
-
-    const weeks = new Map<string, string[]>();
-    for (
-      let date = monthStart.startOf('week');
-      date < monthEnd.endOf('week');
-      date = date.plus({ week: 1 })
-    ) {
-      const key = `${date.weekYear}-W${date.weekNumber.toString().padStart(2, '0')}`;
-      const issueIds = issues
-        .filter((issue) =>
-          issueOverlapsRange(
-            issue,
-            date.startOf('week'),
-            date.startOf('week').plus({ week: 1 }),
-          ),
-        )
-        .map((issue) => issue.id)
-        .sort((a, b) => b.localeCompare(a));
-      if (issueIds.length > 0 || !weeks.has(key)) {
-        weeks.set(key, issueIds);
-      }
-    }
-
-    return {
-      data: {
-        startAt: isoDate(monthStart),
-        endAt: isoDate(monthEnd.minus({ day: 1 })),
-        issuesByWeek: [...weeks.entries()]
-          .sort(([a], [b]) => b.localeCompare(a))
-          .map(([week, issueIds]) => ({
-            week,
-            issueIds,
-          })),
-      },
-      included: selectIncludedEntities(dataset.included, dataset.allIssues, {
-        issueIds: issues.map((issue) => issue.id),
-        includeStationMembershipLines: true,
-      }),
-    };
-  }
-  const issueIds = [...new Set(factRows.map((row) => row.issue_id))];
-  const included = await getIncludedForIssueIds(issueIds);
-  const weeks = new Map<string, Set<string>>();
+  const weeks = new Map<string, string[]>();
 
   for (
     let date = monthStart.startOf('week');
@@ -4834,15 +4696,18 @@ export async function getHistoryYearMonthData(year: number, month: number) {
     date = date.plus({ week: 1 })
   ) {
     const key = `${date.weekYear}-W${date.weekNumber.toString().padStart(2, '0')}`;
-    weeks.set(key, new Set());
-  }
-
-  for (const row of factRows) {
-    const date = parseDateTime(row.date);
-    const key = `${date.weekYear}-W${date.weekNumber.toString().padStart(2, '0')}`;
-    const issueIdsForWeek = weeks.get(key);
-    if (issueIdsForWeek != null) {
-      issueIdsForWeek.add(row.issue_id);
+    const issueIds = issues
+      .filter((issue) =>
+        issueOverlapsRange(
+          issue,
+          date.startOf('week'),
+          date.startOf('week').plus({ week: 1 }),
+        ),
+      )
+      .map((issue) => issue.id)
+      .sort((a, b) => b.localeCompare(a));
+    if (issueIds.length > 0 || !weeks.has(key)) {
+      weeks.set(key, issueIds);
     }
   }
 
@@ -4852,12 +4717,15 @@ export async function getHistoryYearMonthData(year: number, month: number) {
       endAt: isoDate(monthEnd.minus({ day: 1 })),
       issuesByWeek: [...weeks.entries()]
         .sort(([a], [b]) => b.localeCompare(a))
-        .map(([week, ids]) => ({
+        .map(([week, issueIds]) => ({
           week,
-          issueIds: [...ids].sort((a, b) => b.localeCompare(a)),
+          issueIds,
         })),
     },
-    included,
+    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+      issueIds: issues.map((issue) => issue.id),
+      includeStationMembershipLines: true,
+    }),
   };
 }
 
@@ -4867,32 +4735,14 @@ export async function getHistoryDayData(
   day: number,
 ) {
   const date = DateTime.fromObject({ year, month, day }, { zone: SG_TIMEZONE });
-  const factRows = await getIssueDayFactsInRange(date, date);
-  if (await shouldUseLegacyHistoryFallback(date, date, `history day ${date}`)) {
-    const dataset = await getBaseDataset();
-    const issues = Object.values(dataset.allIssues).filter((issue) =>
-      issueTouchesDate(issue, date),
-    );
-    const issueIds = issues
-      .map((issue) => issue.id)
-      .sort((a, b) => b.localeCompare(a));
-
-    return {
-      data: {
-        startAt: isoDate(date),
-        endAt: isoDate(date),
-        issueIds,
-      },
-      included: selectIncludedEntities(dataset.included, dataset.allIssues, {
-        issueIds,
-        includeStationMembershipLines: true,
-      }),
-    };
-  }
-  const issueIds = [...new Set(factRows.map((row) => row.issue_id))].sort(
-    (a, b) => b.localeCompare(a),
+  const { dataset, issues } = await getIssuesOverlappingRange(
+    date.startOf('day'),
+    date.plus({ day: 1 }).startOf('day'),
   );
-  const included = await getIncludedForIssueIds(issueIds);
+  const issueIds = issues
+    .filter((issue) => issueTouchesDate(issue, date))
+    .map((issue) => issue.id)
+    .sort((a, b) => b.localeCompare(a));
 
   return {
     data: {
@@ -4900,7 +4750,10 @@ export async function getHistoryDayData(
       endAt: isoDate(date),
       issueIds,
     },
-    included,
+    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+      issueIds,
+      includeStationMembershipLines: true,
+    }),
   };
 }
 
@@ -5302,19 +5155,6 @@ export async function getSitemapData() {
     earliest != null ? isoDate(earliest.startOf('month')) : isoDate(nowSg());
   const monthLatest =
     latest != null ? isoDate(latest.startOf('month')) : isoDate(nowSg());
-  const monthEarliestDateTime = DateTime.fromISO(monthEarliest, {
-    zone: SG_TIMEZONE,
-  });
-  const monthLatestDateTime = DateTime.fromISO(monthLatest, {
-    zone: SG_TIMEZONE,
-  });
-  const coverageRows = await getOperationalFactCoverageDatesInRange(
-    monthEarliestDateTime,
-    monthLatestDateTime.endOf('month'),
-  );
-  const operationalFactCoverageStartDate =
-    await getOperationalFactCoverageStartDate();
-
   if (skippedIssueIds.length > 0) {
     console.warn('[SITEMAP] Skipped issues with invalid first interval dates', {
       count: skippedIssueIds.length,
@@ -5330,8 +5170,6 @@ export async function getSitemapData() {
     issueIds: issuesWithFirstDates.map(({ issue }) => issue.id),
     monthEarliest,
     monthLatest,
-    operationalFactCoverageDates: coverageRows.map((row) => row.date),
-    operationalFactCoverageStartDate,
     currentDate: isoDate(nowSg()),
   };
 }

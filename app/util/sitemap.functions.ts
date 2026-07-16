@@ -16,8 +16,6 @@ interface SitemapPathData {
   issueIds: string[];
   monthEarliest: string;
   monthLatest: string;
-  operationalFactCoverageDates: string[];
-  operationalFactCoverageStartDate: string | null;
   currentDate: string;
 }
 
@@ -153,10 +151,6 @@ export async function getSitemapXml() {
         .length,
       monthEarliest: sitemapData.monthEarliest,
       monthLatest: sitemapData.monthLatest,
-      operationalFactCoverageDateCount:
-        sitemapData.operationalFactCoverageDates.length,
-      operationalFactCoverageStartDate:
-        sitemapData.operationalFactCoverageStartDate,
       currentDate: sitemapData.currentDate,
     });
 
@@ -194,8 +188,6 @@ export function buildSitemapPaths({
   issueIds,
   monthEarliest,
   monthLatest,
-  operationalFactCoverageDates,
-  operationalFactCoverageStartDate,
   currentDate,
 }: SitemapPathData) {
   const paths: string[] = [
@@ -225,22 +217,15 @@ export function buildSitemapPaths({
 
   const monthEarliestDateTime = DateTime.fromISO(monthEarliest);
   const monthLatestDateTime = DateTime.fromISO(monthLatest);
-  const coverageDates = new Set(operationalFactCoverageDates);
-  const coverageStartDateTime =
-    operationalFactCoverageStartDate == null
-      ? null
-      : DateTime.fromISO(operationalFactCoverageStartDate);
   const currentDateTime = DateTime.fromISO(currentDate);
   if (
     !monthEarliestDateTime.isValid ||
     !monthLatestDateTime.isValid ||
-    !currentDateTime.isValid ||
-    (coverageStartDateTime != null && !coverageStartDateTime.isValid)
+    !currentDateTime.isValid
   ) {
     console.warn('[SITEMAP] Skipping history paths with invalid date bounds', {
       monthEarliest,
       monthLatest,
-      operationalFactCoverageStartDate,
       currentDate,
     });
     return paths;
@@ -275,27 +260,8 @@ export function buildSitemapPaths({
       continue;
     }
 
-    if (
-      !isHistoryMonthRenderable({
-        coverageDates,
-        coverageStartDateTime,
-        currentDateTime,
-        monthDateTime,
-      })
-    ) {
-      continue;
-    }
-
     const yearPath = `/history/${monthDateTime.toFormat('yyyy')}`;
-    if (
-      !paths.includes(yearPath) &&
-      isHistoryYearRenderable({
-        coverageDates,
-        coverageStartDateTime,
-        currentDateTime,
-        yearDateTime: monthDateTime.startOf('year'),
-      })
-    ) {
+    if (!paths.includes(yearPath)) {
       paths.push(yearPath);
     }
     paths.push(
@@ -304,88 +270,4 @@ export function buildSitemapPaths({
   }
 
   return paths;
-}
-
-function isHistoryMonthRenderable({
-  coverageDates,
-  coverageStartDateTime,
-  currentDateTime,
-  monthDateTime,
-}: {
-  coverageDates: Set<string>;
-  coverageStartDateTime: DateTime | null;
-  currentDateTime: DateTime;
-  monthDateTime: DateTime;
-}) {
-  const monthStart = monthDateTime.startOf('month');
-  const monthEnd = monthStart.endOf('month').startOf('day');
-
-  return isHistoryDateRangeRenderable({
-    coverageDates,
-    coverageStartDateTime,
-    currentDateTime,
-    rangeStart: monthStart,
-    rangeEnd: monthEnd,
-  });
-}
-
-function isHistoryYearRenderable({
-  coverageDates,
-  coverageStartDateTime,
-  currentDateTime,
-  yearDateTime,
-}: {
-  coverageDates: Set<string>;
-  coverageStartDateTime: DateTime | null;
-  currentDateTime: DateTime;
-  yearDateTime: DateTime;
-}) {
-  const yearStart = yearDateTime.startOf('year');
-  const yearEnd = yearStart.plus({ years: 1 }).minus({ days: 1 });
-
-  return isHistoryDateRangeRenderable({
-    coverageDates,
-    coverageStartDateTime,
-    currentDateTime,
-    rangeStart: yearStart,
-    rangeEnd: yearEnd,
-  });
-}
-
-function isHistoryDateRangeRenderable({
-  coverageDates,
-  coverageStartDateTime,
-  currentDateTime,
-  rangeStart,
-  rangeEnd,
-}: {
-  coverageDates: Set<string>;
-  coverageStartDateTime: DateTime | null;
-  currentDateTime: DateTime;
-  rangeStart: DateTime;
-  rangeEnd: DateTime;
-}) {
-  const start = rangeStart.startOf('day');
-  const end = rangeEnd.startOf('day');
-  const today = currentDateTime.startOf('day');
-
-  if (end >= today) {
-    return true;
-  }
-
-  if (
-    coverageStartDateTime != null &&
-    start < coverageStartDateTime.startOf('day')
-  ) {
-    return true;
-  }
-
-  for (let cursor = start; cursor <= end; cursor = cursor.plus({ day: 1 })) {
-    const date = cursor.toISODate();
-    if (date == null || !coverageDates.has(date)) {
-      return false;
-    }
-  }
-
-  return true;
 }
