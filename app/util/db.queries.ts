@@ -3900,6 +3900,75 @@ export async function getOverviewData(
   });
 }
 
+export async function getLinesDirectoryData(days: number) {
+  const dataset = await getBaseDataset();
+  const referenceNow = nowSg();
+  const referenceDate = isoDate(referenceNow);
+  const lines = Object.values(dataset.included.lines);
+  const summaries = rankLineSummaries(
+    lines.map((line) =>
+      buildLineSummary(
+        line,
+        dataset.issuesByLineId[line.id] ?? [],
+        days,
+        dataset.publicHolidaySet,
+        referenceNow,
+      ),
+    ),
+  );
+  const summariesByLineId = Object.fromEntries(
+    summaries.map((summary) => [summary.lineId, summary]),
+  );
+
+  const entries = lines.map((line) => {
+    const summary = summariesByLineId[line.id];
+    if (summary == null) {
+      throw new Error(`Line summary missing for ${line.id}`);
+    }
+    const operationalState =
+      line.startedAt == null || line.startedAt > referenceDate
+        ? 'future'
+        : 'current';
+
+    return {
+      lineId: line.id,
+      status: summary.status,
+      stationCount: countLineStations(dataset.included.stations, line.id, {
+        includePlanned: operationalState === 'future',
+        referenceDate,
+      }),
+      operatorIds: [
+        ...new Set(
+          line.operators
+            .filter(
+              (operator) =>
+                operator.endedAt == null || operator.endedAt > referenceDate,
+            )
+            .map((operator) => operator.operatorId),
+        ),
+      ],
+      openingDate: line.startedAt,
+      type: line.type,
+      uptimeRatio: summary.uptimeRatio,
+      uptimeRank: summary.uptimeRank,
+      operationalState,
+    };
+  });
+
+  return {
+    data: {
+      dateCount: days,
+      referenceDate,
+      lines: entries,
+    },
+    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
+      issueIds: [],
+      lineIds: entries.map((entry) => entry.lineId),
+      operatorIds: entries.flatMap((entry) => entry.operatorIds),
+    }),
+  };
+}
+
 export async function getLineProfileData(
   lineId: string,
   days: number,

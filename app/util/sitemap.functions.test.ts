@@ -45,6 +45,7 @@ describe('agent Markdown discovery', () => {
     expect(paths).toEqual(
       expect.arrayContaining([
         '/',
+        '/lines',
         '/stations',
         '/lines/EWL',
         '/stations/EW1',
@@ -78,6 +79,7 @@ describe('agent Markdown discovery', () => {
     });
 
     expect(paths).not.toContain('/history');
+    expect(paths).toContain('/lines');
   });
 
   it('includes historical months backed by canonical issue history', () => {
@@ -144,6 +146,7 @@ describe('agent Markdown discovery', () => {
 
     expect(paths).toEqual([
       '/',
+      '/lines',
       '/stations',
       '/statistics',
       '/system-map',

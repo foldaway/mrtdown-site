@@ -1,6 +1,12 @@
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
-import { getLineProfileData } from './db.queries';
+import { getLineProfileData, getLinesDirectoryData } from './db.queries';
+import { timeServerSpan } from './serverTiming';
+
+export const getLinesDirectoryFn = createServerFn({ method: 'GET' }).handler(
+  () =>
+    timeServerSpan('lines_directory_loader', () => getLinesDirectoryData(90)),
+);
 
 const InputSchema = z.object({
   lineId: z.string(),

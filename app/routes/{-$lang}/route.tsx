@@ -102,6 +102,12 @@ function RouteComponent() {
                   >
                     <FormattedMessage id="general.home" defaultMessage="Home" />
                   </Link>
+                  <Link to="/{-$lang}/lines" className={linkClassName}>
+                    <FormattedMessage
+                      id="general.lines"
+                      defaultMessage="Lines"
+                    />
+                  </Link>
                   <Link to="/{-$lang}/history" className={linkClassName}>
                     <FormattedMessage
                       id="general.history"
@@ -169,6 +175,18 @@ function RouteComponent() {
                             <FormattedMessage
                               id="general.home"
                               defaultMessage="Home"
+                            />
+                          </Link>
+                        </DropdownMenu.Item>
+
+                        <DropdownMenu.Item>
+                          <Link
+                            to="/{-$lang}/lines"
+                            className={linkClassNameMobile}
+                          >
+                            <FormattedMessage
+                              id="general.lines"
+                              defaultMessage="Lines"
                             />
                           </Link>
                         </DropdownMenu.Item>
@@ -336,6 +354,17 @@ function RouteComponent() {
                     />
                   </h3>
                   <ul className="space-y-3">
+                    <li>
+                      <Link
+                        to="/{-$lang}/lines"
+                        className="flex text-sm transition-colors hover:text-accent-light"
+                      >
+                        <FormattedMessage
+                          id="general.lines"
+                          defaultMessage="Lines"
+                        />
+                      </Link>
+                    </li>
                     <li>
                       <Link
                         to="/{-$lang}/stations"

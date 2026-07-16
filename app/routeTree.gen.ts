@@ -23,6 +23,7 @@ import { Route as Char123LangChar125SystemMapIndexRouteImport } from './routes/{
 import { Route as Char123LangChar125StatisticsIndexRouteImport } from './routes/{-$lang}/statistics/index'
 import { Route as Char123LangChar125StationsIndexRouteImport } from './routes/{-$lang}/stations/index'
 import { Route as Char123LangChar125ReportIndexRouteImport } from './routes/{-$lang}/report/index'
+import { Route as Char123LangChar125LinesIndexRouteImport } from './routes/{-$lang}/lines/index'
 import { Route as Char123LangChar125HistoryIndexRouteImport } from './routes/{-$lang}/history/index'
 import { Route as Char123LangChar125AboutIndexRouteImport } from './routes/{-$lang}/about/index'
 import { Route as StationsStationIdIndexDotmdRouteImport } from './routes/stations/$stationId/index[.]md'
@@ -120,6 +121,12 @@ const Char123LangChar125ReportIndexRoute =
   Char123LangChar125ReportIndexRouteImport.update({
     id: '/report/',
     path: '/report/',
+    getParentRoute: () => Char123LangChar125RouteRoute,
+  } as any)
+const Char123LangChar125LinesIndexRoute =
+  Char123LangChar125LinesIndexRouteImport.update({
+    id: '/lines/',
+    path: '/lines/',
     getParentRoute: () => Char123LangChar125RouteRoute,
   } as any)
 const Char123LangChar125HistoryIndexRoute =
@@ -267,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/stations/$stationId/index.md': typeof StationsStationIdIndexDotmdRoute
   '/{-$lang}/about/': typeof Char123LangChar125AboutIndexRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
+  '/{-$lang}/lines/': typeof Char123LangChar125LinesIndexRoute
   '/{-$lang}/report/': typeof Char123LangChar125ReportIndexRoute
   '/{-$lang}/stations/': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
@@ -304,6 +312,7 @@ export interface FileRoutesByTo {
   '/stations/$stationId/index.md': typeof StationsStationIdIndexDotmdRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutIndexRoute
   '/{-$lang}/history': typeof Char123LangChar125HistoryIndexRoute
+  '/{-$lang}/lines': typeof Char123LangChar125LinesIndexRoute
   '/{-$lang}/report': typeof Char123LangChar125ReportIndexRoute
   '/{-$lang}/stations': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics': typeof Char123LangChar125StatisticsIndexRoute
@@ -343,6 +352,7 @@ export interface FileRoutesById {
   '/stations/$stationId/index.md': typeof StationsStationIdIndexDotmdRoute
   '/{-$lang}/about/': typeof Char123LangChar125AboutIndexRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
+  '/{-$lang}/lines/': typeof Char123LangChar125LinesIndexRoute
   '/{-$lang}/report/': typeof Char123LangChar125ReportIndexRoute
   '/{-$lang}/stations/': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
@@ -383,6 +393,7 @@ export interface FileRouteTypes {
     | '/stations/$stationId/index.md'
     | '/{-$lang}/about/'
     | '/{-$lang}/history/'
+    | '/{-$lang}/lines/'
     | '/{-$lang}/report/'
     | '/{-$lang}/stations/'
     | '/{-$lang}/statistics/'
@@ -420,6 +431,7 @@ export interface FileRouteTypes {
     | '/stations/$stationId/index.md'
     | '/{-$lang}/about'
     | '/{-$lang}/history'
+    | '/{-$lang}/lines'
     | '/{-$lang}/report'
     | '/{-$lang}/stations'
     | '/{-$lang}/statistics'
@@ -458,6 +470,7 @@ export interface FileRouteTypes {
     | '/stations/$stationId/index.md'
     | '/{-$lang}/about/'
     | '/{-$lang}/history/'
+    | '/{-$lang}/lines/'
     | '/{-$lang}/report/'
     | '/{-$lang}/stations/'
     | '/{-$lang}/statistics/'
@@ -598,6 +611,13 @@ declare module '@tanstack/react-router' {
       path: '/report'
       fullPath: '/{-$lang}/report/'
       preLoaderRoute: typeof Char123LangChar125ReportIndexRouteImport
+      parentRoute: typeof Char123LangChar125RouteRoute
+    }
+    '/{-$lang}/lines/': {
+      id: '/{-$lang}/lines/'
+      path: '/lines'
+      fullPath: '/{-$lang}/lines/'
+      preLoaderRoute: typeof Char123LangChar125LinesIndexRouteImport
       parentRoute: typeof Char123LangChar125RouteRoute
     }
     '/{-$lang}/history/': {
@@ -762,6 +782,7 @@ interface Char123LangChar125RouteRouteChildren {
   Char123LangChar125IndexRoute: typeof Char123LangChar125IndexRoute
   Char123LangChar125AboutIndexRoute: typeof Char123LangChar125AboutIndexRoute
   Char123LangChar125HistoryIndexRoute: typeof Char123LangChar125HistoryIndexRoute
+  Char123LangChar125LinesIndexRoute: typeof Char123LangChar125LinesIndexRoute
   Char123LangChar125ReportIndexRoute: typeof Char123LangChar125ReportIndexRoute
   Char123LangChar125StationsIndexRoute: typeof Char123LangChar125StationsIndexRoute
   Char123LangChar125StatisticsIndexRoute: typeof Char123LangChar125StatisticsIndexRoute
@@ -785,6 +806,7 @@ const Char123LangChar125RouteRouteChildren: Char123LangChar125RouteRouteChildren
     Char123LangChar125IndexRoute: Char123LangChar125IndexRoute,
     Char123LangChar125AboutIndexRoute: Char123LangChar125AboutIndexRoute,
     Char123LangChar125HistoryIndexRoute: Char123LangChar125HistoryIndexRoute,
+    Char123LangChar125LinesIndexRoute: Char123LangChar125LinesIndexRoute,
     Char123LangChar125ReportIndexRoute: Char123LangChar125ReportIndexRoute,
     Char123LangChar125StationsIndexRoute: Char123LangChar125StationsIndexRoute,
     Char123LangChar125StatisticsIndexRoute:

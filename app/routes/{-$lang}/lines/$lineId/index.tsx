@@ -1,3 +1,4 @@
+import { ChevronRightIcon } from '@heroicons/react/24/outline';
 import type { IssueType } from '@mrtdown/core';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
@@ -125,6 +126,7 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
       new Set(branches.flatMap((branch) => branch.stationIds)),
     );
     const homeUrl = buildLocalizedAbsoluteUrl('/', lang, rootUrl);
+    const linesUrl = buildLocalizedAbsoluteUrl('/lines', lang, rootUrl);
 
     return {
       links: seo.links,
@@ -212,6 +214,15 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
                   {
                     '@type': 'ListItem',
                     position: 2,
+                    name: intl.formatMessage({
+                      id: 'general.lines',
+                      defaultMessage: 'Lines',
+                    }),
+                    item: linesUrl,
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 3,
                     name: componentName,
                     item: seo.ogUrl,
                   },
@@ -252,6 +263,29 @@ function ComponentPage() {
     <IncludedEntitiesContext.Provider value={included}>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
         <div className="flex flex-col gap-3 md:col-span-12">
+          <nav
+            aria-label="Breadcrumb"
+            className="flex items-center space-x-1 text-gray-500 text-sm dark:text-gray-400"
+          >
+            <Link
+              to="/{-$lang}"
+              className="hover:text-gray-700 dark:hover:text-gray-200"
+            >
+              <FormattedMessage id="general.home" defaultMessage="Home" />
+            </Link>
+            <ChevronRightIcon className="size-4" />
+            <Link
+              to="/{-$lang}/lines"
+              className="hover:text-gray-700 dark:hover:text-gray-200"
+            >
+              <FormattedMessage id="general.lines" defaultMessage="Lines" />
+            </Link>
+            <ChevronRightIcon className="size-4" />
+            <span className="truncate text-gray-900 dark:text-gray-100">
+              {componentName}
+            </span>
+          </nav>
+
           <header className="grid grid-cols-1 grid-rows-[3fr_1fr_1fr] gap-x-1 bg-gray-400 [grid-template-areas:'main''aside1''aside2'] md:grid-cols-[3fr_6fr_3fr] md:grid-rows-1 dark:bg-gray-500 md:[grid-template-areas:'aside1_main_aside2']">
             {/* Aside 1 pane */}
             <div

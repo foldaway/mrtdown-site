@@ -192,6 +192,7 @@ export function buildSitemapPaths({
 }: SitemapPathData) {
   const paths: string[] = [
     '/',
+    '/lines',
     '/stations',
     '/statistics',
     '/system-map',
