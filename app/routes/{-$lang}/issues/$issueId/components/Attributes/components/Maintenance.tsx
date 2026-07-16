@@ -52,13 +52,13 @@ export const Maintenance: React.FC<Props> = (props) => {
   return (
     <>
       <div>
-        <dt className="text-gray-500 text-xs uppercase dark:text-gray-400">
+        <dt className="font-medium text-[11px] text-gray-500 uppercase tracking-wide dark:text-gray-400">
           <FormattedMessage
             id="general.maintenance_period"
             defaultMessage="Maintenance Period"
           />
         </dt>
-        <dd className="font-medium text-base text-gray-800 dark:text-gray-200">
+        <dd className="mt-0.5 font-medium text-gray-800 text-sm leading-5 dark:text-gray-200">
           <FormattedDateTimeRange
             from={DateTime.fromISO(intervals[0].startAt).toMillis()}
             to={DateTime.fromISO(
@@ -70,13 +70,13 @@ export const Maintenance: React.FC<Props> = (props) => {
       </div>
 
       <div>
-        <dt className="text-gray-500 text-xs uppercase dark:text-gray-400">
+        <dt className="font-medium text-[11px] text-gray-500 uppercase tracking-wide dark:text-gray-400">
           <FormattedMessage
             id="general.next_maintenance"
             defaultMessage="Next Maintenance"
           />
         </dt>
-        <dd className="font-medium text-base text-gray-800 dark:text-gray-200">
+        <dd className="mt-0.5 font-medium text-gray-800 text-sm leading-5 dark:text-gray-200">
           {nextInterval != null ? (
             nextInterval.endAt != null ? (
               <FormattedDateTimeRange
@@ -104,10 +104,10 @@ export const Maintenance: React.FC<Props> = (props) => {
       </div>
 
       <div>
-        <dt className="text-gray-500 text-xs uppercase dark:text-gray-400">
+        <dt className="font-medium text-[11px] text-gray-500 uppercase tracking-wide dark:text-gray-400">
           <FormattedMessage id="general.sessions" defaultMessage="Sessions" />
         </dt>
-        <dd className="font-medium text-base text-gray-800 dark:text-gray-200">
+        <dd className="mt-0.5 font-medium text-gray-800 text-sm leading-5 dark:text-gray-200">
           <FormattedMessage
             id="general.maintenance_sessions_summary"
             defaultMessage="{endedIntervalCount} ended, {ongoingIntervalCount} ongoing, {futureIntervalCount} remaining"
@@ -119,7 +119,7 @@ export const Maintenance: React.FC<Props> = (props) => {
           />
 
           <Dialog.Root>
-            <Dialog.Trigger className="block text-blue-600 text-sm underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200">
+            <Dialog.Trigger className="mt-1 block font-semibold text-accent-light text-xs hover:text-accent-dark dark:text-accent-dark dark:hover:text-accent-light">
               <FormattedMessage
                 id="general.view_details"
                 defaultMessage="View Details"

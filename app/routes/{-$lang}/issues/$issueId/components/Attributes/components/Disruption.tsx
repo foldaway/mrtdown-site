@@ -14,10 +14,10 @@ export const Disruption: React.FC<Props> = (props) => {
   return (
     <>
       <div>
-        <dt className="text-gray-500 text-xs uppercase dark:text-gray-400">
+        <dt className="font-medium text-[11px] text-gray-500 uppercase tracking-wide dark:text-gray-400">
           <FormattedMessage id="general.started" defaultMessage="Started" />
         </dt>
-        <dd className="font-medium text-base text-gray-800 dark:text-gray-200">
+        <dd className="mt-0.5 font-medium text-gray-800 text-sm leading-5 dark:text-gray-200">
           <FormattedDate
             value={intervals[0].startAt}
             dateStyle="medium"
@@ -27,10 +27,10 @@ export const Disruption: React.FC<Props> = (props) => {
       </div>
 
       <div>
-        <dt className="text-gray-500 text-xs uppercase dark:text-gray-400">
+        <dt className="font-medium text-[11px] text-gray-500 uppercase tracking-wide dark:text-gray-400">
           <FormattedMessage id="general.resolved" defaultMessage="Resolved" />
         </dt>
-        <dd className="font-medium text-base text-gray-800 dark:text-gray-200">
+        <dd className="mt-0.5 font-medium text-gray-800 text-sm leading-5 dark:text-gray-200">
           {intervals[0].endAt != null ? (
             <FormattedDate
               value={intervals[0].endAt}
@@ -44,10 +44,10 @@ export const Disruption: React.FC<Props> = (props) => {
       </div>
 
       <div>
-        <dt className="text-gray-500 text-xs uppercase dark:text-gray-400">
+        <dt className="font-medium text-[11px] text-gray-500 uppercase tracking-wide dark:text-gray-400">
           <FormattedMessage id="general.duration" defaultMessage="Duration" />
         </dt>
-        <dd className="font-medium text-base text-gray-800 dark:text-gray-200">
+        <dd className="mt-0.5 font-medium text-gray-800 text-sm leading-5 dark:text-gray-200">
           <FormattedDuration
             duration={Duration.fromObject({
               seconds: issue.durationSeconds,

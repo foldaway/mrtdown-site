@@ -16,6 +16,7 @@ import { IssueTypeLabels } from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildSeoMetadata } from '~/helpers/seo';
+import { IssueStatusBadge } from '~/components/IssueStatusBadge';
 import type { IssueInterval } from '~/types';
 import { assert } from '~/util/assert';
 import { getIssueFn } from '~/util/issue.functions';
@@ -206,60 +207,72 @@ function IssuePage() {
   const { updates } = data;
 
   const intl = useIntl();
+  const statusInterval =
+    issue.intervals.find((interval) => interval.status === 'ongoing') ??
+    issue.intervals.find((interval) => interval.status === 'future') ??
+    issue.intervals.at(-1);
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
-      <div className="flex flex-col gap-y-4">
-        {/*<IssueViewer issue={issue} />*/}
-
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6 dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex items-center gap-x-2">
+      <div className="flex flex-col gap-4 sm:gap-5">
+        <header className="mx-auto flex max-w-3xl flex-col items-center text-center">
+          <p className="font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
+            <FormattedMessage
+              id="issue.service_advisory"
+              defaultMessage="Service advisory"
+            />
+          </p>
+          <h1 className="mt-1 text-pretty font-bold text-gray-900 text-xl leading-tight sm:text-2xl dark:text-gray-100">
+            {getLocalizedTranslation(issue.title, intl.locale)}
+          </h1>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             <div
               className={classNames(
-                'flex size-7 items-center justify-center rounded-full shadow-sm',
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold text-xs ring-1 ring-inset',
                 {
-                  'bg-disruption-light/20 ring-2 ring-disruption-light/30 dark:bg-disruption-dark/30 dark:ring-disruption-dark/50':
+                  'bg-red-50 text-red-700 ring-red-200 dark:bg-red-950/40 dark:text-red-300 dark:ring-red-800':
                     issue.type === 'disruption',
-                  'bg-maintenance-light/20 ring-2 ring-maintenance-light/30 dark:bg-maintenance-dark/30 dark:ring-maintenance-dark/50':
+                  'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-800':
                     issue.type === 'maintenance',
-                  'bg-infra-light/20 ring-2 ring-infra-light/30 dark:bg-infra-dark/30 dark:ring-infra-dark/50':
+                  'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:ring-blue-800':
                     issue.type === 'infra',
                 },
               )}
             >
               {issue.type === 'disruption' && (
-                <ExclamationTriangleIcon className="size-4 shrink-0 text-disruption-light dark:text-disruption-dark" />
+                <ExclamationTriangleIcon className="size-3.5 shrink-0" />
               )}
               {issue.type === 'maintenance' && (
-                <Cog8ToothIcon className="size-4 shrink-0 text-maintenance-light dark:text-maintenance-dark" />
+                <Cog8ToothIcon className="size-3.5 shrink-0" />
               )}
               {issue.type === 'infra' && (
-                <BuildingOfficeIcon className="size-4 shrink-0 text-infra-light dark:text-infra-dark" />
+                <BuildingOfficeIcon className="size-3.5 shrink-0" />
               )}
-            </div>
-            <span
-              className={classNames('font-medium text-sm', {
-                'text-disruption-light dark:text-disruption-dark':
-                  issue.type === 'disruption',
-                'text-maintenance-light dark:text-maintenance-dark':
-                  issue.type === 'maintenance',
-                'text-infra-light dark:text-infra-dark': issue.type === 'infra',
-              })}
-            >
               <FormattedMessage {...IssueTypeLabels[issue.type]} />
-            </span>
+            </div>
+            {statusInterval != null && (
+              <IssueStatusBadge interval={statusInterval} issue={issue} />
+            )}
           </div>
+        </header>
 
-          <h1 className="mt-3 font-bold text-2xl text-gray-900 dark:text-gray-100">
-            {getLocalizedTranslation(issue.title, intl.locale)}
-          </h1>
-
-          <Attributes issue={issue} />
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)] lg:items-start">
+          <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="px-4 py-2.5 sm:px-6 sm:py-3">
+              <h2 className="font-bold text-base text-gray-900 leading-tight dark:text-gray-100">
+                <FormattedMessage
+                  id="issue.details.overview"
+                  defaultMessage="Advisory details"
+                />
+              </h2>
+            </div>
+            <div className="border-gray-200 border-t bg-gray-50/60 px-4 py-4 sm:px-6 sm:py-5 dark:border-gray-700 dark:bg-gray-900/20">
+              <Attributes issue={issue} />
+            </div>
+          </section>
+          <StatsCard issue={issue} />
         </div>
-
         <TimelineCard updates={updates} />
-
-        <StatsCard issue={issue} />
       </div>
     </IncludedEntitiesContext.Provider>
   );

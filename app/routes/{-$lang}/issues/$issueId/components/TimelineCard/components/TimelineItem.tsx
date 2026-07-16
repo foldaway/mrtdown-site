@@ -21,13 +21,13 @@ export const TimelineItem: React.FC<Props> = (props) => {
   const localizedText = getLocalizedText(update, intl.locale);
 
   return (
-    <div className="relative flex items-start space-x-4 pb-8 last:pb-0">
+    <div className="relative flex items-start gap-3 pb-5 last:pb-0 sm:pb-6">
       <div className="relative flex size-5 items-center justify-center rounded-full bg-blue-500 dark:bg-blue-400">
         <div className="h-2 w-2 rounded-full bg-white" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center space-x-2">
-          <time className="text-gray-500 text-sm dark:text-gray-400">
+        <div className="flex flex-wrap items-center gap-2">
+          <time className="font-medium text-gray-500 text-xs dark:text-gray-400">
             <FormattedDate
               value={update.createdAt}
               dateStyle="medium"
@@ -50,7 +50,7 @@ export const TimelineItem: React.FC<Props> = (props) => {
         </div>
         <div className="mt-2">
           {localizedText.trim().length > 0 ? (
-            <p className="text-gray-800 text-sm dark:text-gray-200">
+            <p className="text-gray-800 text-sm leading-5 dark:text-gray-200">
               {localizedText}
             </p>
           ) : (

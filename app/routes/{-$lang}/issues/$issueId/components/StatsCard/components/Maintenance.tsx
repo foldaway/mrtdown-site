@@ -1,3 +1,4 @@
+import { CalendarDaysIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { useMemo } from 'react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import type { Issue } from '~/types';
@@ -23,27 +24,33 @@ export const Maintenance: React.FC<Props> = (props) => {
 
   return (
     <>
-      <div className="flex flex-col justify-center rounded-lg bg-gray-100 p-4 text-center dark:bg-gray-700">
-        <dd className="font-bold text-2xl text-gray-800 dark:text-gray-200">
-          {stationCount}
-        </dd>
-        <dt className="text-gray-400 text-sm uppercase">
-          <FormattedMessage
-            id="issue.details.stations_affected"
-            defaultMessage="Stations affected"
-          />
-        </dt>
-      </div>
-      <div className="flex flex-col justify-center rounded-lg bg-gray-100 p-4 text-center dark:bg-gray-700">
-        <dd className="font-bold text-2xl text-gray-800 dark:text-gray-200">
-          <FormattedNumber value={issue.intervals.length} />
-        </dd>
-        <dt className="text-gray-400 text-sm uppercase">
+      <div className="col-span-2 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <dt className="flex items-center gap-2 font-semibold text-gray-600 text-xs dark:text-gray-300">
+          <span className="inline-flex size-7 items-center justify-center rounded-full bg-accent-light/10 text-accent-light ring-1 ring-accent-light/25 dark:bg-accent-dark/15 dark:text-accent-dark dark:ring-accent-dark/30">
+            <CalendarDaysIcon className="size-4" />
+          </span>
           <FormattedMessage
             id="issue.details.sessions"
             defaultMessage="Sessions"
           />
         </dt>
+        <dd className="mt-3 font-bold text-3xl text-gray-900 leading-none dark:text-gray-100">
+          <FormattedNumber value={issue.intervals.length} />
+        </dd>
+      </div>
+      <div className="col-span-2 flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+        <dt className="flex items-center gap-2 font-semibold text-gray-600 text-xs dark:text-gray-300">
+          <span className="inline-flex size-7 items-center justify-center rounded-full bg-accent-light/10 text-accent-light ring-1 ring-accent-light/25 dark:bg-accent-dark/15 dark:text-accent-dark dark:ring-accent-dark/30">
+            <MapPinIcon className="size-4" />
+          </span>
+          <FormattedMessage
+            id="issue.details.stations_affected"
+            defaultMessage="Stations affected"
+          />
+        </dt>
+        <dd className="font-bold text-2xl text-gray-900 leading-none dark:text-gray-100">
+          {stationCount}
+        </dd>
       </div>
     </>
   );

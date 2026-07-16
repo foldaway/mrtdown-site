@@ -14,13 +14,13 @@ export const Attributes: React.FC<Props> = (props) => {
   const { issue } = props;
 
   return (
-    <dl className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
+    <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-[repeat(auto-fit,minmax(14rem,1fr))]">
       {issue.type === 'disruption' && <Disruption issue={issue} />}
       {issue.type === 'maintenance' && <Maintenance issue={issue} />}
       {issue.type === 'infra' && <Infrastructure issue={issue} />}
 
       <div className="flex flex-col gap-y-1">
-        <dt className="text-gray-500 text-xs uppercase dark:text-gray-400">
+        <dt className="font-medium text-[11px] text-gray-500 uppercase tracking-wide dark:text-gray-400">
           <FormattedMessage
             id="general.affected_stations"
             defaultMessage="Affected stations"
@@ -39,7 +39,7 @@ export const Attributes: React.FC<Props> = (props) => {
 
       {issue.subtypes.length > 0 && (
         <div className="flex flex-col gap-y-1">
-          <dt className="text-gray-500 text-xs uppercase dark:text-gray-400">
+          <dt className="font-medium text-[11px] text-gray-500 uppercase tracking-wide dark:text-gray-400">
             <FormattedMessage id="general.subtypes" defaultMessage="Subtypes" />
           </dt>
           <dd className="flex flex-wrap items-center gap-2">
