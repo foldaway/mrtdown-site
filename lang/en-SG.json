@@ -386,7 +386,7 @@
   "stations.search_hint": "Use any combination of name, code, line and area.",
   "stations.search_label": "Station name or code",
   "stations.search_placeholder": "e.g. Bishan, NS17 or Circle Line",
-  "stations.seo_description": "Browse all {stationCount} Singapore MRT and LRT stations across {lineCount} lines and {townCount} areas. Search station codes, check live status, opening dates and recent disruptions.",
+  "stations.seo_description": "Browse Singapore MRT and LRT stations, including {operationalCount} operational and {futureCount} future stations. Search codes, lines, live status, opening dates and recent disruptions.",
   "stations.seo_title": "Singapore MRT & LRT Stations List, Codes & Status | mrtdown",
   "stations.view_station": "View {stationName}",
   "status.future_service": "Under Development",

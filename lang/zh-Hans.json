@@ -385,7 +385,7 @@
   "stations.search_hint": "可组合使用名称、代码、线路和地区进行搜索。",
   "stations.search_label": "车站名称或代码",
   "stations.search_placeholder": "例如：碧山、NS17 或环线",
-  "stations.seo_description": "浏览新加坡全部 {stationCount} 个地铁与轻轨车站，涵盖 {lineCount} 条线路和 {townCount} 个地区。搜索车站代码，并查看实时状态、通车日期和近期中断。",
+  "stations.seo_description": "浏览新加坡地铁与轻轨车站，包括 {operationalCount} 个运营中车站和 {futureCount} 个未来车站。搜索车站代码、线路、实时状态、通车日期和近期中断。",
   "stations.seo_title": "新加坡地铁与轻轨车站列表、代码及状态 | mrtdown",
   "stations.view_station": "查看{stationName}",
   "status.future_service": "开发中",

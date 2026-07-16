@@ -42,27 +42,27 @@ export const Route = createFileRoute('/{-$lang}/stations/')({
   async head(ctx) {
     const { lang = 'en-SG' } = ctx.params;
     assert(ctx.loaderData != null);
-    const { stations, lines, towns } = ctx.loaderData;
+    const { stations } = ctx.loaderData;
     const { default: messages } = await import(`../../../../lang/${lang}.json`);
     const intl = createIntl({ locale: lang, messages });
-    const stationCount = stations.length;
-    const lineCount = Object.keys(lines).length;
-    const townCount = Object.keys(towns).length;
-    const title = intl.formatMessage(
-      {
-        id: 'stations.seo_title',
-        defaultMessage:
-          'Singapore MRT & LRT Stations List, Codes & Status | mrtdown',
-      },
-      { stationCount },
-    );
+    const operationalCount = stations.filter(
+      (station) => station.operationalState === 'open',
+    ).length;
+    const futureCount = stations.filter(
+      (station) => station.operationalState === 'future',
+    ).length;
+    const title = intl.formatMessage({
+      id: 'stations.seo_title',
+      defaultMessage:
+        'Singapore MRT & LRT Stations List, Codes & Status | mrtdown',
+    });
     const description = intl.formatMessage(
       {
         id: 'stations.seo_description',
         defaultMessage:
-          'Browse all {stationCount} Singapore MRT and LRT stations across {lineCount} lines and {townCount} areas. Search station codes, check live status, opening dates and recent disruptions.',
+          'Browse Singapore MRT and LRT stations, including {operationalCount} operational and {futureCount} future stations. Search codes, lines, live status, opening dates and recent disruptions.',
       },
-      { stationCount, lineCount, townCount },
+      { operationalCount, futureCount },
     );
     const rootUrl = import.meta.env.VITE_ROOT_URL;
     const seo = buildSeoMetadata({ lang, path: '/stations', rootUrl });
@@ -89,42 +89,6 @@ export const Route = createFileRoute('/{-$lang}/stations/')({
                 inLanguage: lang,
                 url: seo.ogUrl,
                 image: seo.ogImage,
-                mainEntity: {
-                  '@type': 'ItemList',
-                  numberOfItems: stationCount,
-                  itemListElement: stations.map((station, index) => {
-                    const town = towns[station.townId];
-                    return {
-                      '@type': 'ListItem',
-                      position: index + 1,
-                      item: {
-                        '@type': 'TrainStation',
-                        name: getLocalizedTranslation(station.name, lang),
-                        alternateName: station.memberships
-                          .map((membership) => membership.code)
-                          .join(' / '),
-                        identifier: station.id,
-                        ...(town == null
-                          ? {}
-                          : {
-                              address: {
-                                '@type': 'PostalAddress',
-                                addressLocality: getLocalizedTranslation(
-                                  town.name,
-                                  lang,
-                                ),
-                                addressCountry: 'SG',
-                              },
-                            }),
-                        url: buildLocalizedAbsoluteUrl(
-                          `/stations/${station.id}`,
-                          lang,
-                          rootUrl,
-                        ),
-                      },
-                    };
-                  }),
-                },
               },
               {
                 '@type': 'BreadcrumbList',

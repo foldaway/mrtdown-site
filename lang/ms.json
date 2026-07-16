@@ -385,7 +385,7 @@
   "stations.search_hint": "Gunakan sebarang gabungan nama, kod, laluan dan kawasan.",
   "stations.search_label": "Nama atau kod stesen",
   "stations.search_placeholder": "cth. Bishan, NS17 atau Circle Line",
-  "stations.seo_description": "Layari kesemua {stationCount} stesen MRT dan LRT Singapura merentasi {lineCount} laluan dan {townCount} kawasan. Cari kod stesen, semak status langsung, tarikh pembukaan dan gangguan terkini.",
+  "stations.seo_description": "Layari stesen MRT dan LRT Singapura, termasuk {operationalCount} stesen beroperasi dan {futureCount} stesen akan datang. Cari kod, laluan, status langsung, tarikh pembukaan dan gangguan terkini.",
   "stations.seo_title": "Senarai Stesen MRT & LRT Singapura, Kod & Status | mrtdown",
   "stations.view_station": "Lihat {stationName}",
   "status.future_service": "Dalam Pembangunan",
