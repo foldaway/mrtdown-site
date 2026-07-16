@@ -181,7 +181,7 @@ function SystemMapPage() {
               {lines.map((line) => (
                 <Link
                   key={line.id}
-                  className="group grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-x-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-white dark:hover:bg-gray-800"
+                  className="group grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-x-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-white dark:hover:bg-gray-800"
                   to="/{-$lang}/lines/$lineId"
                   params={{ lineId: line.id }}
                 >
