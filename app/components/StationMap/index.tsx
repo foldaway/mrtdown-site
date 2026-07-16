@@ -575,13 +575,19 @@ export const StationMap: React.FC<Props> = (props) => {
   };
 
   return (
-    <div className="flex flex-col fill-gray-800 dark:fill-gray-50">
+    <div className="flex min-w-0 flex-col fill-gray-800 dark:fill-gray-50">
       {/* Tailwind Class trappers */}
       <div className="hidden fill-gray-800 stroke-gray-800 dark:fill-gray-300 dark:stroke-gray-300" />
 
       <Tabs.Root defaultValue={defaultTab}>
         {showTimeline && <Timeline currentDate={currentDate} />}
-        <div className="relative overflow-hidden">
+        <div
+          className={
+            mode.type === 'network'
+              ? 'relative overflow-hidden bg-gray-50/70 px-2 py-3 sm:px-4 sm:py-5 dark:bg-gray-900/30'
+              : 'relative overflow-hidden'
+          }
+        >
           <div className="overflow-auto">
             <Tabs.Content value="2032-12">
               {renderSnapshot('2032-12', MapDec2032)}
@@ -619,17 +625,19 @@ export const StationMap: React.FC<Props> = (props) => {
       </Tabs.Root>
 
       {showAffectedStationsSummary && affectedStationIds.size > 0 && (
-        <>
-          <span className="font-bold text-gray-500 text-sm dark:text-gray-400">
-            <FormattedMessage
-              id="general.station_count"
-              defaultMessage="{count, plural, one { {count} stations } other { {count} stations }}"
-              values={{
-                count: affectedStationIds.size,
-              }}
-            />
-          </span>
-          <span className="text-gray-500 text-sm dark:text-gray-400">
+        <div className="border-gray-200 border-t bg-white px-4 py-3 sm:px-6 sm:py-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
+              <FormattedMessage
+                id="general.affected_stations"
+                defaultMessage="Affected stations"
+              />
+            </span>
+            <span className="rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+              {affectedStationIds.size}
+            </span>
+          </div>
+          <div className="mt-1.5 text-gray-600 text-sm leading-5 dark:text-gray-300">
             <FormattedList
               value={Array.from(affectedStationIds).map((stationId) => {
                 const station = included.stations[stationId];
@@ -646,8 +654,8 @@ export const StationMap: React.FC<Props> = (props) => {
                 );
               })}
             />
-          </span>
-        </>
+          </div>
+        </div>
       )}
     </div>
   );

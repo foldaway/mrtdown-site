@@ -9,10 +9,10 @@ export const TimelineHeader: React.FC<TimelineHeaderProps> = ({
 }) => {
   return (
     <div className="mb-3 flex items-baseline justify-between gap-4 sm:mb-4">
-      <span className="font-semibold text-slate-300 text-xs uppercase tracking-wider dark:text-slate-400">
+      <span className="font-semibold text-gray-500 text-xs leading-5 dark:text-gray-400">
         Timeline
       </span>
-      <span className="text-right font-medium text-slate-400 text-sm dark:text-slate-300">
+      <span className="text-right font-medium text-gray-700 text-sm leading-5 dark:text-gray-300">
         <FormattedDate
           value={currentDate || '2025-04'}
           year="numeric"

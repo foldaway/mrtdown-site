@@ -50,7 +50,7 @@ export const Timeline: React.FC<TimelineProps> = ({ currentDate }) => {
   });
 
   return (
-    <div className="border-gray-300 border-b bg-gradient-to-b from-slate-900 to-slate-800 px-2 py-3 sm:px-4 sm:py-4 dark:border-slate-700 dark:from-slate-950 dark:to-slate-900">
+    <div className="border-gray-200 border-b bg-white px-4 py-3 sm:px-6 sm:py-4 dark:border-gray-700 dark:bg-gray-800">
       <TimelineHeader currentDate={currentDate} />
       <Tabs.List className="flex items-center gap-0.5 overflow-x-auto [scrollbar-width:thin] sm:gap-1">
         {timelineElements}

@@ -144,7 +144,7 @@ function SystemMapPage() {
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
-      <div className="flex flex-col space-y-8">
+      <div className="flex flex-col space-y-5 sm:space-y-7">
         <header className="flex flex-col items-center gap-1 text-center">
           <h1 className="font-bold text-gray-900 text-xl leading-tight sm:text-2xl dark:text-gray-100">
             <FormattedMessage
@@ -165,7 +165,7 @@ function SystemMapPage() {
           lineOperationalCount={lineOperationalCount}
         />
 
-        <div className="flex flex-col bg-gray-100 p-4 dark:bg-gray-800">
+        <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <StationMap
             currentDate={DateTime.now().toISODate()}
             snapshotComponents={SYSTEM_MAP_SNAPSHOTS}
@@ -176,34 +176,34 @@ function SystemMapPage() {
             }}
           />
 
-          <div className="mt-2 flex bg-gray-50 px-4 py-2.5 dark:bg-gray-900">
-            <div className="grid grow grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          <div className="border-gray-200 border-t bg-gray-50/60 px-4 py-3 sm:px-6 sm:py-4 dark:border-gray-700 dark:bg-gray-900/20">
+            <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {lines.map((line) => (
                 <Link
                   key={line.id}
-                  className="group flex items-center gap-x-2 overflow-hidden"
+                  className="group grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-x-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-white dark:hover:bg-gray-800"
                   to="/{-$lang}/lines/$lineId"
                   params={{ lineId: line.id }}
                 >
                   <div
-                    className="flex h-4 w-12 items-center justify-center rounded-md"
+                    className="flex h-5 w-14 items-center justify-center rounded-md"
                     style={{
                       backgroundColor: line.color,
                     }}
                   >
-                    <span className="font-semibold text-white text-xs">
+                    <span className="font-bold text-[11px] text-white leading-none">
                       {line.id}
                     </span>
                   </div>
 
-                  <span className="text-gray-800 text-sm group-hover:underline dark:text-gray-200">
+                  <span className="font-medium text-gray-700 text-sm leading-5 group-hover:text-gray-950 group-hover:underline dark:text-gray-300 dark:group-hover:text-gray-100">
                     {getLocalizedTranslation(line.name, intl.locale)}
                   </span>
                 </Link>
               ))}
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </IncludedEntitiesContext.Provider>
   );
