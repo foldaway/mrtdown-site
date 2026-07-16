@@ -245,7 +245,7 @@ function StationsPage() {
         <p className="max-w-xl text-gray-600 text-xs leading-4 sm:text-sm sm:leading-5 dark:text-gray-400">
           <FormattedMessage
             id="stations.introduction"
-            defaultMessage="Search by station name, code, line or town, with live status and recent disruption history."
+            defaultMessage="Search by station name, code, line, town or area, with live status and recent disruption history."
           />
         </p>
       </header>
@@ -380,7 +380,7 @@ function StationsPage() {
             <option value="all">
               {intl.formatMessage({
                 id: 'stations.all_towns',
-                defaultMessage: 'All towns',
+                defaultMessage: 'All towns and areas',
               })}
             </option>
             {townOptions.map((town) => (
@@ -456,6 +456,7 @@ function StationsPage() {
                       ? null
                       : getLocalizedTranslation(town.name, intl.locale)
                   }
+                  townId={town?.id ?? null}
                 />
               );
             })}
@@ -536,10 +537,12 @@ function StationCard({
   station,
   lines,
   townName,
+  townId,
 }: {
   station: StationDirectoryEntry;
   lines: StationsDirectoryPayload['lines'];
   townName: string | null;
+  townId: string | null;
 }) {
   const intl = useIntl();
   const stationName = getLocalizedTranslation(station.name, intl.locale);
@@ -572,10 +575,16 @@ function StationCard({
           </div>
 
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-gray-500 text-xs dark:text-gray-400">
-            {townName != null && (
+            {townName != null && townId != null && (
               <span className="inline-flex items-center gap-1.5">
                 <MapPinIcon className="size-3.5 shrink-0" />
-                {townName}
+                <Link
+                  to="/{-$lang}/towns/$townId"
+                  params={{ townId }}
+                  className="transition-colors hover:text-accent-light hover:underline"
+                >
+                  {townName}
+                </Link>
               </span>
             )}
             <StationDisruptionHistory station={station} />

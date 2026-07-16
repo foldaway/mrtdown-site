@@ -33,7 +33,7 @@ export const Route = createFileRoute('/{-$lang}/towns/')({
       {
         id: 'towns.page_description',
         defaultMessage:
-          'Explore MRT and LRT stations across {townCount} Singapore towns, with the lines serving each area and links to live station status.',
+          'Explore MRT and LRT stations across {townCount} Singapore towns and planning areas, with the lines serving each area and links to live station status.',
       },
       { townCount: data.towns.length },
     );
@@ -151,7 +151,7 @@ function TownsPage() {
               <dt className="text-gray-500 dark:text-gray-400">
                 <FormattedMessage
                   id="towns.summary.towns"
-                  defaultMessage="towns"
+                  defaultMessage="towns and areas"
                 />
               </dt>
             </div>
@@ -187,7 +187,7 @@ function TownsPage() {
               <p className="mt-1 text-gray-600 text-xs leading-5 sm:text-sm dark:text-gray-400">
                 <FormattedMessage
                   id="towns.directory.description"
-                  defaultMessage="Select a town for its station map, current status and recent disruptions."
+                  defaultMessage="Select a town or area for its station map, current status and recent disruptions."
                 />
               </p>
             </div>
@@ -228,7 +228,7 @@ function TownsPage() {
                       <p className="sr-only">
                         <FormattedMessage
                           id="towns.card.lines"
-                          defaultMessage="Lines serving this town"
+                          defaultMessage="Lines serving this area"
                         />
                       </p>
                       <LineBar lineIds={summary.lineIds} />

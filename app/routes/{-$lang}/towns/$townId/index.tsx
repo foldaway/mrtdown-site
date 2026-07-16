@@ -368,7 +368,7 @@ function TownPage() {
               <p className="mt-1 text-gray-600 text-xs leading-5 sm:text-sm dark:text-gray-400">
                 <FormattedMessage
                   id="town.map.description"
-                  defaultMessage="Stations in this town are highlighted on the Singapore rail network."
+                  defaultMessage="Stations in this area are highlighted on the Singapore rail network."
                 />
               </p>
             </div>
@@ -541,7 +541,7 @@ function RecentTownIssues({
       <p className="mt-1 text-gray-600 text-xs leading-5 sm:text-sm dark:text-gray-400">
         <FormattedMessage
           id="town.recent_issues.description"
-          defaultMessage="The latest reported disruptions, maintenance and infrastructure issues touching stations in this town."
+          defaultMessage="The latest reported disruptions, maintenance and infrastructure issues touching stations in this area."
         />
       </p>
 
@@ -561,7 +561,7 @@ function RecentTownIssues({
             <p className="mt-3 text-gray-600 text-sm dark:text-gray-400">
               <FormattedMessage
                 id="town.recent_issues.empty"
-                defaultMessage="No service issues have been reported for this town in the last 90 days."
+                defaultMessage="No service issues have been reported for this area in the last 90 days."
               />
             </p>
           </div>
