@@ -1,9 +1,10 @@
+import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { Tabs } from 'radix-ui';
 import type React from 'react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { FormattedList, FormattedMessage, useIntl } from 'react-intl';
+import { FormattedMessage, useIntl } from 'react-intl';
 import { ZoomControls } from '~/components/ZoomControls';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
@@ -80,6 +81,8 @@ type FocusedLineBranch = {
   stationIds: string[];
 };
 
+const INITIAL_AFFECTED_STATION_COUNT = 6;
+
 export type StationMapMode =
   | {
       type: 'network';
@@ -115,6 +118,7 @@ export const StationMap: React.FC<Props> = (props) => {
   const included = useIncludedEntities();
 
   const [ref, setRef] = useState<SVGElement | null>(null);
+  const [showAllAffectedStations, setShowAllAffectedStations] = useState(false);
 
   const affectedStationIds = useMemo(() => {
     const result = new Set<string>();
@@ -627,7 +631,7 @@ export const StationMap: React.FC<Props> = (props) => {
       {showAffectedStationsSummary && affectedStationIds.size > 0 && (
         <div className="border-gray-200 border-t bg-white px-4 py-3 sm:px-6 sm:py-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
+            <span className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
               <FormattedMessage
                 id="general.affected_stations"
                 defaultMessage="Affected stations"
@@ -637,24 +641,62 @@ export const StationMap: React.FC<Props> = (props) => {
               {affectedStationIds.size}
             </span>
           </div>
-          <div className="mt-1.5 text-gray-600 text-sm leading-5 dark:text-gray-300">
-            <FormattedList
-              value={Array.from(affectedStationIds).map((stationId) => {
-                const station = included.stations[stationId];
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {Array.from(affectedStationIds).map((stationId, index) => {
+              const station = included.stations[stationId];
+              const isInitiallyHidden =
+                index >= INITIAL_AFFECTED_STATION_COUNT &&
+                !showAllAffectedStations;
 
-                return (
+              return (
+                <li
+                  key={stationId}
+                  className={isInitiallyHidden ? 'hidden sm:block' : undefined}
+                >
                   <Link
-                    className="hover:underline"
-                    key={stationId}
+                    className="inline-flex rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 font-medium text-gray-700 text-sm leading-5 transition-colors hover:border-gray-300 hover:bg-white hover:text-gray-950 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-100"
                     to="/{-$lang}/stations/$stationId"
                     params={{ stationId }}
                   >
                     {getLocalizedTranslation(station.name, intl.locale)}
                   </Link>
-                );
-              })}
-            />
-          </div>
+                </li>
+              );
+            })}
+          </ul>
+          {affectedStationIds.size > INITIAL_AFFECTED_STATION_COUNT && (
+            <button
+              type="button"
+              aria-expanded={showAllAffectedStations}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 font-semibold text-blue-600 text-sm transition-colors hover:bg-blue-50 sm:hidden dark:text-blue-400 dark:hover:bg-blue-950/40"
+              onClick={() =>
+                setShowAllAffectedStations((isExpanded) => !isExpanded)
+              }
+            >
+              {showAllAffectedStations ? (
+                <>
+                  <FormattedMessage
+                    id="general.show_less"
+                    defaultMessage="Show less"
+                  />
+                  <ChevronUpIcon className="size-4" />
+                </>
+              ) : (
+                <>
+                  <FormattedMessage
+                    id="general.show_more_with_count"
+                    defaultMessage="Show {count, number} more"
+                    values={{
+                      count:
+                        affectedStationIds.size -
+                        INITIAL_AFFECTED_STATION_COUNT,
+                    }}
+                  />
+                  <ChevronDownIcon className="size-4" />
+                </>
+              )}
+            </button>
+          )}
         </div>
       )}
     </div>
