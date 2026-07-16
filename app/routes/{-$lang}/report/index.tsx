@@ -5,7 +5,6 @@ import {
   ClockIcon,
   ExclamationTriangleIcon,
   ForwardIcon,
-  InformationCircleIcon,
   MagnifyingGlassIcon,
   MapIcon,
   MapPinIcon,
@@ -321,10 +320,11 @@ function ReportPage() {
   const scopeRef = useRef<HTMLDivElement>(null);
   const stationSearchRef = useRef<HTMLInputElement>(null);
   const lineRef = useRef<HTMLDivElement>(null);
-  const effectRef = useRef<HTMLDivElement>(null);
+  const effectRef = useRef<HTMLFieldSetElement>(null);
   const affectedStopsRef = useRef<HTMLDivElement>(null);
   const directionSelectRef = useRef<HTMLSelectElement>(null);
   const observedAtRef = useRef<HTMLInputElement>(null);
+  const optionalDetailsRef = useRef<HTMLDetailsElement>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetIdRef = useRef<string | undefined>(undefined);
   const initialObservedAtRef = useRef<string | null>(null);
@@ -642,40 +642,9 @@ function ReportPage() {
       })
       .slice(0, 8);
   };
-  const getLineStationSuggestions = (filterLineIds?: string[]) => {
-    if (filterLineIds == null || filterLineIds.length === 0) {
-      return [];
-    }
-
-    const stationIds: string[] = [];
-    for (const lineId of filterLineIds) {
-      for (const path of lineStationPaths[lineId] ?? []) {
-        for (const stationId of path) {
-          if (!stationIds.includes(stationId)) {
-            stationIds.push(stationId);
-          }
-        }
-      }
-    }
-
-    const orderedStations = stationIds
-      .map((stationId) => stationById[stationId])
-      .filter((station): station is (typeof stations)[number] => {
-        return station != null;
-      });
-    if (orderedStations.length > 0) {
-      return orderedStations.slice(0, 12);
-    }
-
-    return getStationSearchResults('', filterLineIds).slice(0, 12);
-  };
-  const stationSearchResults = getStationSearchResults(stationSearch);
-  const mainStationSuggestionLineIds =
-    reportScope === 'train' && selectedLineIds.length > 0
-      ? selectedLineIds
-      : undefined;
-  const mainStationSuggestions = getLineStationSuggestions(
-    mainStationSuggestionLineIds,
+  const stationSearchResults = getStationSearchResults(
+    stationSearch,
+    reportScope === 'train' ? selectedLineIds : undefined,
   );
 
   useEffect(() => {
@@ -800,12 +769,18 @@ function ReportPage() {
         return;
       }
       if (field === 'affectedStops') {
+        if (optionalDetailsRef.current != null) {
+          optionalDetailsRef.current.open = true;
+        }
         affectedStopsRef.current?.focus();
         return;
       }
       if (field === 'direction') {
         directionSelectRef.current?.focus();
         return;
+      }
+      if (optionalDetailsRef.current != null) {
+        optionalDetailsRef.current.open = true;
       }
       observedAtRef.current?.focus();
     });
@@ -817,7 +792,6 @@ function ReportPage() {
     reason: string,
   ) => {
     setFieldErrors({ [field]: message });
-    setClientError(message);
     posthog.capture('crowd_report_validation_failed', { reason });
     focusField(field);
   };
@@ -848,6 +822,7 @@ function ReportPage() {
   };
 
   const clearStation = () => {
+    setStationSearch('');
     setReportContext((current) => {
       if (current.scope === 'station') {
         return { ...current, stationId: null, lineIds: [] };
@@ -856,6 +831,13 @@ function ReportPage() {
         return { ...current, stationId: null };
       }
       return current;
+    });
+  };
+
+  const changeStation = () => {
+    clearStation();
+    window.requestAnimationFrame(() => {
+      stationSearchRef.current?.focus();
     });
   };
 
@@ -912,8 +894,12 @@ function ReportPage() {
   ]);
 
   const chooseReportScope = (scope: ReportScope) => {
-    clearFieldError('scope');
+    setClientError(null);
+    setFieldErrors({});
     setStationSearch('');
+    if (optionalDetailsRef.current != null) {
+      optionalDetailsRef.current.open = false;
+    }
     setReportContext((current) => {
       if (scope === 'line') {
         return {
@@ -1241,8 +1227,9 @@ function ReportPage() {
         key={line.id}
         type="button"
         onClick={() => toggleLine(line.id)}
+        aria-label={`${line.id} ${getLocalizedTranslation(line.name, intl.locale)}`}
         className={classNames(
-          'flex min-h-12 items-center gap-2 rounded-lg border px-3 py-2 text-start text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-accent-light/30',
+          'flex min-h-10 items-center justify-center gap-2 rounded-lg border px-2.5 py-2 text-start text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-accent-light/30 sm:min-h-11 sm:justify-start',
           selected
             ? 'border-accent-light bg-accent-light/10 text-gray-950 dark:text-white'
             : 'border-gray-300 bg-white text-gray-700 hover:border-accent-light dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200',
@@ -1255,7 +1242,7 @@ function ReportPage() {
         >
           {line.id}
         </span>
-        <span className="min-w-0 truncate">
+        <span className="hidden min-w-0 text-xs leading-4 sm:block">
           {getLocalizedTranslation(line.name, intl.locale)}
         </span>
       </button>
@@ -1307,8 +1294,6 @@ function ReportPage() {
     onSelect: (stationId: string) => void;
     onClear: () => void;
   }) => {
-    const stationSuggestions = getLineStationSuggestions(filterLineIds);
-
     return (
       <div className="flex flex-col gap-2">
         <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
@@ -1319,7 +1304,12 @@ function ReportPage() {
             {renderStationIdentity(selectedStation)}
             <button
               type="button"
-              onClick={onClear}
+              onClick={() => {
+                onClear();
+                window.requestAnimationFrame(() => {
+                  document.getElementById(`${id}-search`)?.focus();
+                });
+              }}
               className="ms-auto shrink-0 rounded-md px-2 py-1 font-medium text-accent-light text-xs hover:bg-white dark:hover:bg-gray-800"
             >
               <FormattedMessage id="report.change" defaultMessage="Change" />
@@ -1330,6 +1320,7 @@ function ReportPage() {
           <span className="sr-only">{label}</span>
           <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-gray-400" />
           <input
+            id={`${id}-search`}
             type="search"
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
@@ -1356,38 +1347,14 @@ function ReportPage() {
             )}
           </div>
         )}
-        {searchValue.trim().length === 0 &&
-          selectedStation == null &&
-          stationSuggestions.length > 0 && (
-            <div className="grid gap-2">
-              <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
-                <FormattedMessage
-                  id="report.affected_stop_quick_pick"
-                  defaultMessage="Stops on the selected line"
-                />
-              </p>
-              {stationSuggestions.map((station) => (
-                <button
-                  key={`${id}:${station.id}`}
-                  type="button"
-                  onClick={() => onSelect(station.id)}
-                  className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
-                >
-                  {renderStationIdentity(station)}
-                </button>
-              ))}
-            </div>
-          )}
-        {searchValue.trim().length === 0 &&
-          selectedStation == null &&
-          stationSuggestions.length === 0 && (
-            <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
-              <FormattedMessage
-                id="report.affected_stop_search_hint"
-                defaultMessage="Search when you want to add a specific stop or range."
-              />
-            </p>
-          )}
+        {searchValue.trim().length === 0 && selectedStation == null && (
+          <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+            <FormattedMessage
+              id="report.affected_stop_search_hint"
+              defaultMessage="Search when you want to add a specific stop or range."
+            />
+          </p>
+        )}
       </div>
     );
   };
@@ -1396,26 +1363,183 @@ function ReportPage() {
     const selected = effect === effectValue;
     const Icon = EFFECT_ICONS[effectValue];
     return (
-      <button
+      <label
         key={effectValue}
-        type="button"
-        onClick={() => {
-          clearFieldError('effect');
-          setEffect(effectValue);
-        }}
         className={classNames(
-          'flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-center font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-accent-light/30',
+          'flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-2.5 py-2 text-center font-medium text-sm transition-colors focus-within:ring-2 focus-within:ring-accent-light/30',
           selected
             ? 'border-accent-light bg-accent-light/10 text-gray-950 dark:text-white'
             : 'border-gray-300 bg-white text-gray-700 hover:border-accent-light dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200',
         )}
-        aria-pressed={selected}
       >
+        <input
+          type="radio"
+          name="report-effect"
+          value={effectValue}
+          checked={selected}
+          onChange={() => {
+            clearFieldError('effect');
+            setEffect(effectValue);
+          }}
+          className="sr-only"
+        />
         <Icon className="size-4 shrink-0" />
         <span>{intl.formatMessage(EFFECT_LABELS[effectValue])}</span>
-      </button>
+      </label>
     );
   };
+
+  const renderStationPicker = (scope: 'station' | 'train') => {
+    const isTrain = scope === 'train';
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+            {isTrain ? (
+              <FormattedMessage
+                id="report.train_station"
+                defaultMessage="Next station or destination"
+              />
+            ) : (
+              <FormattedMessage
+                id="report.station"
+                defaultMessage="Affected station"
+              />
+            )}
+          </span>
+          <span className="rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+            {isTrain ? (
+              <FormattedMessage
+                id="report.optional"
+                defaultMessage="Optional"
+              />
+            ) : (
+              <FormattedMessage
+                id="report.required"
+                defaultMessage="Required"
+              />
+            )}
+          </span>
+        </div>
+
+        {selectedStation != null ? (
+          <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900">
+            {renderStationIdentity(selectedStation)}
+            <button
+              type="button"
+              onClick={changeStation}
+              className="ms-auto shrink-0 rounded-md px-2 py-1 font-medium text-accent-light text-xs hover:bg-white dark:hover:bg-gray-800"
+            >
+              <FormattedMessage id="report.change" defaultMessage="Change" />
+            </button>
+          </div>
+        ) : (
+          <>
+            <label className="relative">
+              <span className="sr-only">
+                {isTrain ? (
+                  <FormattedMessage
+                    id="report.train_station_search"
+                    defaultMessage="Search next station or destination"
+                  />
+                ) : (
+                  <FormattedMessage
+                    id="report.station_search"
+                    defaultMessage="Search station"
+                  />
+                )}
+              </span>
+              <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-gray-400" />
+              <input
+                ref={stationSearchRef}
+                type="search"
+                value={stationSearch}
+                onChange={(event) => {
+                  clearFieldError('station');
+                  setStationSearch(event.target.value);
+                }}
+                placeholder={intl.formatMessage({
+                  id: isTrain
+                    ? 'report.train_station_search_placeholder'
+                    : 'report.station_search_placeholder',
+                  defaultMessage: isTrain
+                    ? 'Search by next station, destination, or code'
+                    : 'Search by station name or code',
+                })}
+                aria-invalid={fieldErrors.station != null}
+                aria-describedby={
+                  fieldErrors.station ? 'report-station-error' : undefined
+                }
+                className="w-full rounded-lg border border-gray-300 bg-white py-2 pr-3 pl-9 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+              />
+            </label>
+            {stationSearchQuery.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {stationSearchResults.map((station) => (
+                  <button
+                    key={station.id}
+                    type="button"
+                    onClick={() => selectStation(station.id)}
+                    className="flex min-h-11 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
+                  >
+                    {renderStationIdentity(station)}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+                <FormattedMessage
+                  id={
+                    isTrain
+                      ? 'report.train_station_search_hint'
+                      : 'report.station_search_hint'
+                  }
+                  defaultMessage={
+                    isTrain
+                      ? 'Add this only if it helps describe where you are headed.'
+                      : 'Start typing a station name or station code.'
+                  }
+                />
+              </p>
+            )}
+          </>
+        )}
+
+        {fieldErrors.station != null && (
+          <p
+            className="text-red-700 text-sm dark:text-red-300"
+            id="report-station-error"
+          >
+            {fieldErrors.station}
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  const selectedDirectionOption = selectedLineDirectionOptions.find(
+    (option) => option.stationId === directionChoice,
+  );
+  const selectedDirectionLabel =
+    directionChoice === 'not-sure'
+      ? intl.formatMessage({
+          id: 'report.direction_not_sure',
+          defaultMessage: 'Not sure',
+        })
+      : selectedDirectionOption != null
+        ? intl.formatMessage(
+            {
+              id: 'report.direction_towards',
+              defaultMessage: 'Towards {stationName}',
+            },
+            {
+              stationName: getLocalizedTranslation(
+                selectedDirectionOption.name,
+                intl.locale,
+              ),
+            },
+          )
+        : undefined;
 
   if (submitState === 'success') {
     return (
@@ -1449,10 +1573,10 @@ function ReportPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 sm:gap-5">
       <header>
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="font-bold text-3xl text-gray-900 tracking-normal dark:text-gray-100">
+          <h1 className="font-bold text-2xl text-gray-900 leading-tight sm:text-3xl dark:text-gray-100">
             <FormattedMessage
               id="report.heading"
               defaultMessage="Submit a community train report"
@@ -1460,7 +1584,7 @@ function ReportPage() {
           </h1>
           <BetaBadge />
         </div>
-        <p className="mt-2 max-w-2xl text-gray-600 text-sm leading-6 dark:text-gray-300">
+        <p className="mt-1.5 max-w-2xl text-gray-600 text-sm leading-5 dark:text-gray-300">
           <FormattedMessage
             id="report.intro"
             defaultMessage="Share what you are seeing on the MRT or LRT. Community reports are reviewed separately from official operator advisories."
@@ -1469,13 +1593,13 @@ function ReportPage() {
       </header>
 
       <form
-        className="flex flex-col gap-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6 dark:border-gray-700 dark:bg-gray-800"
+        className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
         onSubmit={submitReport}
       >
         {clientError != null && (
           <div
             ref={errorRef}
-            className="flex gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-red-800 text-sm dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
+            className="flex gap-3 border-red-200 border-b bg-red-50 px-4 py-3 text-red-800 text-sm sm:px-6 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
             role="alert"
             tabIndex={-1}
           >
@@ -1485,61 +1609,83 @@ function ReportPage() {
         )}
 
         <section
-          className="flex flex-col gap-3"
+          className="px-4 py-4 sm:px-6"
           ref={scopeRef}
           tabIndex={-1}
           aria-describedby={
             fieldErrors.scope ? 'report-scope-error' : undefined
           }
         >
-          <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-            <FormattedMessage
-              id="report.scope"
-              defaultMessage="What are you reporting?"
-            />
-          </span>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {REPORT_SCOPES.map((scope) => {
-              const selected = reportScope === scope;
-              const Icon = REPORT_SCOPE_LABELS[scope].icon;
-              return (
-                <button
-                  key={scope}
-                  type="button"
-                  onClick={() => chooseReportScope(scope)}
-                  className={classNames(
-                    'min-h-24 rounded-lg border p-3 text-start transition-colors focus:outline-none focus:ring-2 focus:ring-accent-light/30',
-                    selected
-                      ? 'border-accent-light bg-accent-light/10'
-                      : 'border-gray-300 bg-white hover:border-accent-light dark:border-gray-600 dark:bg-gray-900',
-                  )}
-                  aria-pressed={selected}
-                >
-                  <span className="flex items-center gap-2 font-semibold text-gray-900 text-sm dark:text-gray-100">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-100 font-semibold text-gray-600 text-xs ring-1 ring-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600">
+              1
+            </span>
+            <h2 className="font-semibold text-gray-900 text-sm dark:text-gray-100">
+              <FormattedMessage
+                id="report.scope"
+                defaultMessage="What are you reporting?"
+              />
+            </h2>
+          </div>
+          <fieldset className="mt-3">
+            <legend className="sr-only">
+              <FormattedMessage
+                id="report.scope"
+                defaultMessage="What are you reporting?"
+              />
+            </legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {REPORT_SCOPES.map((scope) => {
+                const selected = reportScope === scope;
+                const Icon = REPORT_SCOPE_LABELS[scope].icon;
+                return (
+                  <label
+                    key={scope}
+                    className={classNames(
+                      'flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-start transition-colors focus-within:ring-2 focus-within:ring-accent-light/30',
+                      selected
+                        ? 'border-accent-light bg-accent-light/10'
+                        : 'border-gray-300 bg-white hover:border-accent-light dark:border-gray-600 dark:bg-gray-900',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="report-scope"
+                      value={scope}
+                      checked={selected}
+                      onChange={() => chooseReportScope(scope)}
+                      className="sr-only"
+                    />
                     <span
                       className={classNames(
-                        'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                        'inline-flex size-7 shrink-0 items-center justify-center rounded-full ring-1',
                         selected
-                          ? 'bg-accent-light text-white'
-                          : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300',
+                          ? 'bg-accent-light text-white ring-accent-light'
+                          : 'bg-gray-100 text-gray-500 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600',
                       )}
                     >
                       <Icon className="size-4" />
                     </span>
-                    <span>
-                      <FormattedMessage {...REPORT_SCOPE_LABELS[scope].title} />
+                    <span className="min-w-0">
+                      <span className="block font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
+                        <FormattedMessage
+                          {...REPORT_SCOPE_LABELS[scope].title}
+                        />
+                      </span>
+                      <span className="mt-0.5 block text-gray-600 text-xs leading-4 dark:text-gray-300">
+                        <FormattedMessage
+                          {...REPORT_SCOPE_LABELS[scope].body}
+                        />
+                      </span>
                     </span>
-                  </span>
-                  <span className="mt-1 block text-gray-600 text-xs leading-5 dark:text-gray-300">
-                    <FormattedMessage {...REPORT_SCOPE_LABELS[scope].body} />
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
           {fieldErrors.scope != null && (
             <p
-              className="text-red-700 text-sm dark:text-red-300"
+              className="mt-2 text-red-700 text-sm dark:text-red-300"
               id="report-scope-error"
             >
               {fieldErrors.scope}
@@ -1547,287 +1693,210 @@ function ReportPage() {
           )}
         </section>
 
-        {reportScope &&
-          (selectedStation != null || selectedLineIds.length > 0) && (
-            <section className="flex flex-wrap gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm dark:border-sky-900 dark:bg-sky-950/30">
-              <span className="font-semibold text-gray-800 dark:text-gray-100">
-                <FormattedMessage
-                  id="report.context_summary"
-                  defaultMessage="Reporting:"
-                />
+        {reportScope && (
+          <section className="border-gray-200 border-t px-4 py-4 sm:px-6 dark:border-gray-700">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-100 font-semibold text-gray-600 text-xs ring-1 ring-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600">
+                2
               </span>
-              {selectedStation != null && (
-                <span className="text-gray-700 dark:text-gray-200">
-                  {getLocalizedTranslation(selectedStation.name, intl.locale)}
-                </span>
-              )}
-              {selectedLineIds.map((lineId) => {
-                const line = lineById[lineId];
-                if (line == null) {
-                  return null;
-                }
-                return (
-                  <span
-                    key={lineId}
-                    className="rounded px-2 py-0.5 font-bold text-white text-xs"
-                    style={{ backgroundColor: line.color }}
-                  >
-                    {line.id}
-                  </span>
-                );
-              })}
-            </section>
-          )}
-
-        {(reportScope === 'station' || reportScope === 'train') && (
-          <section className="flex flex-col gap-3">
-            <div>
-              <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                {reportScope === 'train' ? (
+              <h2 className="font-semibold text-gray-900 text-sm dark:text-gray-100">
+                {reportScope === 'line' ? (
                   <FormattedMessage
-                    id="report.train_station"
-                    defaultMessage="Next station or destination"
+                    id="report.context_line_title"
+                    defaultMessage="Choose the affected line"
+                  />
+                ) : reportScope === 'station' ? (
+                  <FormattedMessage
+                    id="report.context_station_title"
+                    defaultMessage="Choose the affected station"
                   />
                 ) : (
                   <FormattedMessage
-                    id="report.station"
-                    defaultMessage="Affected station"
+                    id="report.context_train_title"
+                    defaultMessage="Add your journey details"
                   />
                 )}
-              </span>
-              {reportScope === 'train' && (
-                <span className="ms-2 text-gray-500 text-xs dark:text-gray-400">
-                  <FormattedMessage
-                    id="report.optional"
-                    defaultMessage="Optional"
-                  />
-                </span>
-              )}
+              </h2>
             </div>
-            {selectedStation != null && (
-              <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
-                {renderStationIdentity(selectedStation)}
-                <button
-                  type="button"
-                  onClick={clearStation}
-                  className="ms-auto shrink-0 rounded-md px-2 py-1 font-medium text-accent-light text-xs hover:bg-white dark:hover:bg-gray-800"
+
+            <div className="mt-3 grid gap-4">
+              {reportScope === 'station' && renderStationPicker('station')}
+
+              {(reportScope !== 'station' || selectedStation != null) && (
+                <div
+                  className="flex flex-col gap-2"
+                  ref={lineRef}
+                  tabIndex={-1}
+                  aria-describedby={
+                    fieldErrors.line ? 'report-line-error' : undefined
+                  }
                 >
-                  <FormattedMessage
-                    id="report.change"
-                    defaultMessage="Change"
-                  />
-                </button>
-              </div>
-            )}
-            <label className="relative">
-              <span className="sr-only">
-                {reportScope === 'train' ? (
-                  <FormattedMessage
-                    id="report.train_station_search"
-                    defaultMessage="Search next station or destination"
-                  />
-                ) : (
-                  <FormattedMessage
-                    id="report.station_search"
-                    defaultMessage="Search station"
-                  />
-                )}
-              </span>
-              <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-gray-400" />
-              <input
-                ref={stationSearchRef}
-                type="search"
-                value={stationSearch}
-                onChange={(event) => {
-                  clearFieldError('station');
-                  setStationSearch(event.target.value);
-                }}
-                placeholder={intl.formatMessage({
-                  id:
-                    reportScope === 'train'
-                      ? 'report.train_station_search_placeholder'
-                      : 'report.station_search_placeholder',
-                  defaultMessage:
-                    reportScope === 'train'
-                      ? 'Search by next station, destination, or code'
-                      : 'Search by station name or code',
-                })}
-                aria-invalid={fieldErrors.station != null}
-                aria-describedby={
-                  fieldErrors.station ? 'report-station-error' : undefined
-                }
-                className="w-full rounded-lg border border-gray-300 bg-white py-2 pr-3 pl-9 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-              />
-            </label>
-            {fieldErrors.station != null && (
-              <p
-                className="text-red-700 text-sm dark:text-red-300"
-                id="report-station-error"
-              >
-                {fieldErrors.station}
-              </p>
-            )}
-            {stationSearchQuery.length > 0 && (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {stationSearchResults.map((station) => (
-                  <button
-                    key={station.id}
-                    type="button"
-                    onClick={() => selectStation(station.id)}
-                    className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
-                  >
-                    {renderStationIdentity(station)}
-                  </button>
-                ))}
-              </div>
-            )}
-            {stationSearchQuery.length === 0 &&
-              selectedStation == null &&
-              mainStationSuggestions.length > 0 && (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <p className="text-gray-500 text-xs leading-5 sm:col-span-2 dark:text-gray-400">
-                    <FormattedMessage
-                      id="report.station_quick_pick"
-                      defaultMessage="Stations on the selected line"
-                    />
-                  </p>
-                  {mainStationSuggestions.map((station) => (
-                    <button
-                      key={station.id}
-                      type="button"
-                      onClick={() => selectStation(station.id)}
-                      className="flex min-h-12 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-start text-sm transition-colors hover:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900"
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+                      {reportScope === 'train' ? (
+                        <FormattedMessage
+                          id="report.train_line"
+                          defaultMessage="Line you are travelling on"
+                        />
+                      ) : (
+                        <FormattedMessage
+                          id="report.lines"
+                          defaultMessage="Affected lines"
+                        />
+                      )}
+                    </span>
+                    <span className="rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                      <FormattedMessage
+                        id="report.required"
+                        defaultMessage="Required"
+                      />
+                    </span>
+                  </div>
+                  {selectedStationLineIds.length > 0 && (
+                    <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+                      <FormattedMessage
+                        id="report.station_lines_hint"
+                        defaultMessage="Lines serving the selected station are shown first."
+                      />
+                    </p>
+                  )}
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                    {primaryLineIds.map(renderLineButton)}
+                  </div>
+                  {additionalLineIds.length > 0 && (
+                    <details className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900">
+                      <summary className="cursor-pointer font-medium text-gray-700 text-sm dark:text-gray-200">
+                        <FormattedMessage
+                          id="report.additional_lines"
+                          defaultMessage="Use a different line"
+                        />
+                      </summary>
+                      <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                        {additionalLineIds.map(renderLineButton)}
+                      </div>
+                    </details>
+                  )}
+                  {fieldErrors.line != null && (
+                    <p
+                      className="text-red-700 text-sm dark:text-red-300"
+                      id="report-line-error"
                     >
-                      {renderStationIdentity(station)}
-                    </button>
-                  ))}
+                      {fieldErrors.line}
+                    </p>
+                  )}
                 </div>
               )}
-            {stationSearchQuery.length === 0 &&
-              selectedStation == null &&
-              mainStationSuggestions.length === 0 && (
-                <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
-                  <FormattedMessage
-                    id={
-                      reportScope === 'train'
-                        ? 'report.train_station_search_hint'
-                        : 'report.station_search_hint'
-                    }
-                    defaultMessage={
-                      reportScope === 'train'
-                        ? 'Add this only if it helps describe where you are headed.'
-                        : 'Start typing a station name or station code.'
-                    }
-                  />
-                </p>
-              )}
-          </section>
-        )}
 
-        {reportScope &&
-          (reportScope !== 'station' || selectedStation != null) && (
-            <section
-              className="flex flex-col gap-2"
-              ref={lineRef}
-              tabIndex={-1}
-              aria-describedby={
-                fieldErrors.line ? 'report-line-error' : undefined
-              }
-            >
-              <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                {reportScope === 'train' ? (
-                  <FormattedMessage
-                    id="report.train_line"
-                    defaultMessage="Line you are travelling on"
-                  />
-                ) : (
-                  <FormattedMessage
-                    id="report.lines"
-                    defaultMessage="Affected lines"
-                  />
-                )}
-              </span>
-              {selectedStationLineIds.length > 0 && (
-                <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
-                  <FormattedMessage
-                    id="report.station_lines_hint"
-                    defaultMessage="Lines serving the selected station are shown first."
-                  />
-                </p>
-              )}
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                {primaryLineIds.map(renderLineButton)}
-              </div>
-              {additionalLineIds.length > 0 && (
-                <details className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
-                  <summary className="cursor-pointer font-medium text-gray-700 text-sm dark:text-gray-200">
+              {reportScope === 'train' && selectedLineIds.length > 0 && (
+                <label className="flex max-w-md flex-col gap-2">
+                  <span className="flex flex-wrap items-center gap-2 font-semibold text-gray-800 text-sm dark:text-gray-100">
                     <FormattedMessage
-                      id="report.additional_lines"
-                      defaultMessage="Use a different line"
+                      id="report.direction"
+                      defaultMessage="Direction or destination"
                     />
-                  </summary>
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                    {additionalLineIds.map(renderLineButton)}
-                  </div>
-                </details>
+                    <span className="rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                      <FormattedMessage
+                        id="report.required"
+                        defaultMessage="Required"
+                      />
+                    </span>
+                  </span>
+                  <select
+                    ref={directionSelectRef}
+                    value={directionChoice}
+                    onChange={(event) => {
+                      clearFieldError('direction');
+                      setDirectionChoice(event.target.value);
+                    }}
+                    aria-invalid={fieldErrors.direction != null}
+                    aria-describedby={
+                      fieldErrors.direction
+                        ? 'report-direction-error'
+                        : undefined
+                    }
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                  >
+                    <option value="">
+                      {intl.formatMessage({
+                        id: 'report.direction_placeholder',
+                        defaultMessage: 'Choose direction or Not sure',
+                      })}
+                    </option>
+                    {selectedLineDirectionOptions.map((option) => (
+                      <option key={option.stationId} value={option.stationId}>
+                        {intl.formatMessage(
+                          {
+                            id: 'report.direction_towards',
+                            defaultMessage: 'Towards {stationName}',
+                          },
+                          {
+                            stationName: getLocalizedTranslation(
+                              option.name,
+                              intl.locale,
+                            ),
+                          },
+                        )}
+                      </option>
+                    ))}
+                    <option value="not-sure">
+                      {intl.formatMessage({
+                        id: 'report.direction_not_sure',
+                        defaultMessage: 'Not sure',
+                      })}
+                    </option>
+                  </select>
+                  {fieldErrors.direction != null && (
+                    <p
+                      className="text-red-700 text-sm dark:text-red-300"
+                      id="report-direction-error"
+                    >
+                      {fieldErrors.direction}
+                    </p>
+                  )}
+                </label>
               )}
-              {fieldErrors.line != null && (
-                <p
-                  className="text-red-700 text-sm dark:text-red-300"
-                  id="report-line-error"
-                >
-                  {fieldErrors.line}
-                </p>
-              )}
-            </section>
-          )}
-
-        {reportScope && !primaryContextComplete && (
-          <section className="flex gap-3 rounded-lg border border-gray-300 border-dashed bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-900">
-            <InformationCircleIcon className="mt-0.5 size-5 shrink-0 text-gray-400" />
-            <p className="text-gray-600 leading-5 dark:text-gray-300">
-              <FormattedMessage
-                id="report.primary_context_hint"
-                defaultMessage="Add the affected line, station, or train direction before choosing what is happening."
-              />
-            </p>
+            </div>
           </section>
         )}
 
         {primaryContextComplete && (
-          <section className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
-            <div
-              className="flex flex-col gap-2"
+          <section className="border-gray-200 border-t px-4 py-4 sm:px-6 dark:border-gray-700">
+            <fieldset
               ref={effectRef}
               tabIndex={-1}
               aria-describedby={
                 fieldErrors.effect ? 'report-effect-error' : undefined
               }
             >
-              <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                <FormattedMessage
-                  id="report.effect"
-                  defaultMessage="What is happening?"
-                />
-              </span>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <legend className="flex items-center gap-2.5">
+                <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-100 font-semibold text-gray-600 text-xs ring-1 ring-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600">
+                  3
+                </span>
+                <span className="font-semibold text-gray-900 text-sm dark:text-gray-100">
+                  <FormattedMessage
+                    id="report.effect"
+                    defaultMessage="What is happening?"
+                  />
+                </span>
+              </legend>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {IngestContentCrowdReportEffects.map(renderEffectButton)}
               </div>
               {fieldErrors.effect != null && (
                 <p
-                  className="text-red-700 text-sm dark:text-red-300"
+                  className="mt-2 text-red-700 text-sm dark:text-red-300"
                   id="report-effect-error"
                 >
                   {fieldErrors.effect}
                 </p>
               )}
-            </div>
-            <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-900">
+            </fieldset>
+            <label className="mt-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900">
               <input
                 type="checkbox"
                 checked={isStillHappening}
                 onChange={(event) => setIsStillHappening(event.target.checked)}
-                className="mt-1 size-4"
+                className="size-4"
               />
               <span className="text-gray-700 dark:text-gray-200">
                 <FormattedMessage
@@ -1839,217 +1908,170 @@ function ReportPage() {
           </section>
         )}
 
-        {supportsAffectedStopRange && (
-          <section
-            className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900"
-            ref={affectedStopsRef}
-            tabIndex={-1}
-            aria-describedby={
-              fieldErrors.affectedStops
-                ? 'report-affected-stops-error'
-                : undefined
-            }
+        {primaryContextComplete && (
+          <details
+            ref={optionalDetailsRef}
+            className="border-gray-200 border-t dark:border-gray-700"
           >
-            <div>
+            <summary className="cursor-pointer px-4 py-3 sm:px-6">
               <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
                 <FormattedMessage
-                  id="report.affected_stops"
-                  defaultMessage="Affected stops"
+                  id="report.optional_details"
+                  defaultMessage="Add optional details"
                 />
               </span>
-              <span className="ms-2 text-gray-500 text-xs dark:text-gray-400">
+              <span className="ms-2 rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                 <FormattedMessage
                   id="report.optional"
                   defaultMessage="Optional"
                 />
               </span>
-              <p className="mt-1 text-gray-500 text-xs leading-5 dark:text-gray-400">
+              <span className="mt-1 block text-gray-500 text-xs leading-5 dark:text-gray-400">
                 <FormattedMessage
-                  id="report.affected_stops_hint"
-                  defaultMessage="Add a stop or range only if this is about skipped stops or no service between stations."
-                />
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {renderAffectedStopPicker({
-                id: 'range-start',
-                label: intl.formatMessage({
-                  id: 'report.affected_stop_from',
-                  defaultMessage: 'From station',
-                }),
-                selectedStation: rangeStartStation,
-                searchValue: rangeStartStationSearch,
-                filterLineIds: affectedStopSearchLineIds,
-                onSearchChange: setRangeStartStationSearch,
-                onSelect: (stationId) => {
-                  clearFieldError('affectedStops');
-                  setRangeStartStationId(stationId);
-                  setRangeStartStationSearch('');
-                },
-                onClear: () => {
-                  clearFieldError('affectedStops');
-                  setRangeStartStationId('');
-                },
-              })}
-              {renderAffectedStopPicker({
-                id: 'range-end',
-                label: intl.formatMessage({
-                  id: 'report.affected_stop_to',
-                  defaultMessage: 'To station',
-                }),
-                selectedStation: rangeEndStation,
-                searchValue: rangeEndStationSearch,
-                filterLineIds: affectedStopSearchLineIds,
-                onSearchChange: setRangeEndStationSearch,
-                onSelect: (stationId) => {
-                  clearFieldError('affectedStops');
-                  setRangeEndStationId(stationId);
-                  setRangeEndStationSearch('');
-                },
-                onClear: () => {
-                  clearFieldError('affectedStops');
-                  setRangeEndStationId('');
-                },
-              })}
-            </div>
-            {fieldErrors.affectedStops != null && (
-              <p
-                className="text-red-700 text-sm dark:text-red-300"
-                id="report-affected-stops-error"
-              >
-                {fieldErrors.affectedStops}
-              </p>
-            )}
-          </section>
-        )}
-
-        {reportScope === 'train' && selectedLineIds.length > 0 && (
-          <section className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2">
-              <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                <FormattedMessage
-                  id="report.direction"
-                  defaultMessage="Direction or destination"
+                  id="report.optional_details_hint"
+                  defaultMessage="Add timing, delay, station, or affected stops only when helpful."
                 />
               </span>
-              <select
-                ref={directionSelectRef}
-                value={directionChoice}
-                onChange={(event) => {
-                  clearFieldError('direction');
-                  setDirectionChoice(event.target.value);
-                }}
-                aria-invalid={fieldErrors.direction != null}
-                aria-describedby={
-                  fieldErrors.direction ? 'report-direction-error' : undefined
-                }
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-              >
-                <option value="">
-                  {intl.formatMessage({
-                    id: 'report.direction_placeholder',
-                    defaultMessage: 'Choose if known',
-                  })}
-                </option>
-                {selectedLineDirectionOptions.map((option) => (
-                  <option key={option.stationId} value={option.stationId}>
-                    {intl.formatMessage(
-                      {
-                        id: 'report.direction_towards',
-                        defaultMessage: 'Towards {stationName}',
-                      },
-                      {
-                        stationName: getLocalizedTranslation(
-                          option.name,
-                          intl.locale,
-                        ),
-                      },
-                    )}
-                  </option>
-                ))}
-                <option value="not-sure">
-                  {intl.formatMessage({
-                    id: 'report.direction_not_sure',
-                    defaultMessage: 'Not sure',
-                  })}
-                </option>
-              </select>
-            </label>
-            {fieldErrors.direction != null && (
-              <p
-                className="text-red-700 text-sm sm:col-span-2 dark:text-red-300"
-                id="report-direction-error"
-              >
-                {fieldErrors.direction}
-              </p>
-            )}
-          </section>
-        )}
-
-        {primaryContextComplete && (
-          <details className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
-            <summary className="cursor-pointer font-medium text-gray-700 text-sm dark:text-gray-200">
-              <FormattedMessage
-                id="report.more_details"
-                defaultMessage="More details"
-              />
             </summary>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-2">
-                <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                  <FormattedMessage
-                    id="report.delay_minutes"
-                    defaultMessage="Estimated delay"
+            <div className="grid gap-4 border-gray-200 border-t bg-gray-50/60 px-4 py-4 sm:px-6 dark:border-gray-700 dark:bg-gray-900/20">
+              {reportScope === 'train' && renderStationPicker('train')}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-2">
+                  <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+                    <FormattedMessage
+                      id="report.delay_minutes"
+                      defaultMessage="Estimated delay"
+                    />
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={180}
+                    inputMode="numeric"
+                    value={delayMinutes}
+                    onChange={(event) => setDelayMinutes(event.target.value)}
+                    placeholder={intl.formatMessage({
+                      id: 'report.delay_placeholder',
+                      defaultMessage: 'Minutes, if known',
+                    })}
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
                   />
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  max={180}
-                  inputMode="numeric"
-                  value={delayMinutes}
-                  onChange={(event) => setDelayMinutes(event.target.value)}
-                  placeholder={intl.formatMessage({
-                    id: 'report.delay_placeholder',
-                    defaultMessage: 'Minutes, if known',
-                  })}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
-                />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
-                  <FormattedMessage
-                    id="report.observed_at"
-                    defaultMessage="Observed time"
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+                    <FormattedMessage
+                      id="report.observed_at"
+                      defaultMessage="Observed time"
+                    />
+                  </span>
+                  <input
+                    ref={observedAtRef}
+                    type="datetime-local"
+                    value={observedAt}
+                    max={toSgDatetimeLocal(
+                      DateTime.now().plus({ minutes: 15 }),
+                    )}
+                    onChange={(event) => {
+                      clearFieldError('observedAt');
+                      setObservedAt(event.target.value);
+                    }}
+                    aria-invalid={fieldErrors.observedAt != null}
+                    aria-describedby={
+                      fieldErrors.observedAt
+                        ? 'report-observed-at-error'
+                        : undefined
+                    }
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
                   />
-                </span>
-                <input
-                  ref={observedAtRef}
-                  type="datetime-local"
-                  value={observedAt}
-                  max={toSgDatetimeLocal(DateTime.now().plus({ minutes: 15 }))}
-                  onChange={(event) => {
-                    clearFieldError('observedAt');
-                    setObservedAt(event.target.value);
-                  }}
-                  aria-invalid={fieldErrors.observedAt != null}
+                  {fieldErrors.observedAt != null && (
+                    <p
+                      className="text-red-700 text-sm dark:text-red-300"
+                      id="report-observed-at-error"
+                    >
+                      {fieldErrors.observedAt}
+                    </p>
+                  )}
+                </label>
+              </div>
+
+              {supportsAffectedStopRange && (
+                <section
+                  className="flex flex-col gap-3 border-gray-200 border-t pt-4 dark:border-gray-700"
+                  ref={affectedStopsRef}
+                  tabIndex={-1}
                   aria-describedby={
-                    fieldErrors.observedAt
-                      ? 'report-observed-at-error'
+                    fieldErrors.affectedStops
+                      ? 'report-affected-stops-error'
                       : undefined
                   }
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm shadow-sm focus:border-accent-light focus:outline-none focus:ring-2 focus:ring-accent-light/30 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
-                  required
-                />
-                {fieldErrors.observedAt != null && (
-                  <p
-                    className="text-red-700 text-sm dark:text-red-300"
-                    id="report-observed-at-error"
-                  >
-                    {fieldErrors.observedAt}
-                  </p>
-                )}
-              </label>
+                >
+                  <div>
+                    <span className="font-semibold text-gray-800 text-sm dark:text-gray-100">
+                      <FormattedMessage
+                        id="report.affected_stops"
+                        defaultMessage="Affected stops"
+                      />
+                    </span>
+                    <p className="mt-1 text-gray-500 text-xs leading-5 dark:text-gray-400">
+                      <FormattedMessage
+                        id="report.affected_stops_hint"
+                        defaultMessage="Add a stop or range only if this is about skipped stops or no service between stations."
+                      />
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {renderAffectedStopPicker({
+                      id: 'range-start',
+                      label: intl.formatMessage({
+                        id: 'report.affected_stop_from',
+                        defaultMessage: 'From station',
+                      }),
+                      selectedStation: rangeStartStation,
+                      searchValue: rangeStartStationSearch,
+                      filterLineIds: affectedStopSearchLineIds,
+                      onSearchChange: setRangeStartStationSearch,
+                      onSelect: (stationId) => {
+                        clearFieldError('affectedStops');
+                        setRangeStartStationId(stationId);
+                        setRangeStartStationSearch('');
+                      },
+                      onClear: () => {
+                        clearFieldError('affectedStops');
+                        setRangeStartStationId('');
+                      },
+                    })}
+                    {renderAffectedStopPicker({
+                      id: 'range-end',
+                      label: intl.formatMessage({
+                        id: 'report.affected_stop_to',
+                        defaultMessage: 'To station',
+                      }),
+                      selectedStation: rangeEndStation,
+                      searchValue: rangeEndStationSearch,
+                      filterLineIds: affectedStopSearchLineIds,
+                      onSearchChange: setRangeEndStationSearch,
+                      onSelect: (stationId) => {
+                        clearFieldError('affectedStops');
+                        setRangeEndStationId(stationId);
+                        setRangeEndStationSearch('');
+                      },
+                      onClear: () => {
+                        clearFieldError('affectedStops');
+                        setRangeEndStationId('');
+                      },
+                    })}
+                  </div>
+                  {fieldErrors.affectedStops != null && (
+                    <p
+                      className="text-red-700 text-sm dark:text-red-300"
+                      id="report-affected-stops-error"
+                    >
+                      {fieldErrors.affectedStops}
+                    </p>
+                  )}
+                </section>
+              )}
             </div>
           </details>
         )}
@@ -2057,7 +2079,7 @@ function ReportPage() {
         {turnstileSiteKey && (
           <div
             ref={turnstileRef}
-            className="min-h-16"
+            className="min-h-16 border-gray-200 border-t px-4 py-3 sm:px-6 dark:border-gray-700"
             role="group"
             aria-label={intl.formatMessage({
               id: 'report.verification',
@@ -2066,19 +2088,64 @@ function ReportPage() {
           />
         )}
 
-        <div className="flex flex-col gap-3 border-gray-200 border-t pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-700">
-          <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
-            <FormattedMessage
-              id="report.disclaimer"
-              defaultMessage="Submitting does not create an official alert. Reports may be reviewed, merged, or rejected before any public community signal is shown."
-            />
-          </p>
+        <div className="flex flex-col gap-3 border-gray-200 border-t bg-gray-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-gray-700 dark:bg-gray-900/20">
+          <div className="min-w-0">
+            {(selectedStation != null ||
+              selectedLineIds.length > 0 ||
+              selectedDirectionLabel != null ||
+              effect) && (
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="font-semibold text-gray-700 dark:text-gray-200">
+                  <FormattedMessage
+                    id="report.context_summary"
+                    defaultMessage="Reporting:"
+                  />
+                </span>
+                {selectedStation != null && (
+                  <span className="text-gray-600 dark:text-gray-300">
+                    {getLocalizedTranslation(selectedStation.name, intl.locale)}
+                  </span>
+                )}
+                {selectedLineIds.map((lineId) => {
+                  const line = lineById[lineId];
+                  if (line == null) {
+                    return null;
+                  }
+                  return (
+                    <span
+                      key={lineId}
+                      className="rounded px-1.5 py-0.5 font-bold text-[11px] text-white"
+                      style={{ backgroundColor: line.color }}
+                    >
+                      {line.id}
+                    </span>
+                  );
+                })}
+                {selectedDirectionLabel != null && (
+                  <span className="rounded-md bg-white px-1.5 py-0.5 text-gray-600 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600">
+                    {selectedDirectionLabel}
+                  </span>
+                )}
+                {effect && (
+                  <span className="rounded-md bg-white px-1.5 py-0.5 text-gray-600 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600">
+                    {intl.formatMessage(EFFECT_LABELS[effect])}
+                  </span>
+                )}
+              </div>
+            )}
+            <p className="text-gray-500 text-xs leading-5 dark:text-gray-400">
+              <FormattedMessage
+                id="report.disclaimer"
+                defaultMessage="Submitting does not create an official alert. Reports may be reviewed, merged, or rejected before any public community signal is shown."
+              />
+            </p>
+          </div>
           <button
             type="submit"
             disabled={submitState === 'submitting'}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:bg-gray-400"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:bg-gray-400"
           >
-            <PaperAirplaneIcon className="size-5" />
+            <PaperAirplaneIcon className="size-4" />
             {submitState === 'submitting' ? (
               <FormattedMessage
                 id="report.submitting"
