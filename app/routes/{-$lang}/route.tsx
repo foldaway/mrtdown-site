@@ -1,5 +1,5 @@
 import { LinkIcon } from '@heroicons/react/16/solid';
-import { Bars3Icon } from '@heroicons/react/24/outline';
+import { Bars3Icon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { ClockIcon } from '@heroicons/react/24/solid';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -46,6 +46,15 @@ const linkClassNameMobile = classNames(
   '[&.active]:bg-gradient-to-r [&.active]:from-accent-light [&.active]:to-accent-dark [&.active]:text-white [&.active]:shadow-accent-light/30 [&.active]:shadow-lg',
 );
 
+const linkClassNameDropdown = classNames(
+  'flex w-full items-center rounded-lg px-3 py-2 font-medium text-sm outline-none transition-colors',
+  'text-gray-700 hover:bg-accent-light/10 hover:text-accent-light focus:bg-accent-light/10 focus:text-accent-light data-[highlighted]:bg-accent-light/10 data-[highlighted]:text-accent-light dark:text-gray-300 dark:hover:bg-accent-light/20 dark:hover:text-accent-light dark:focus:bg-accent-light/20 dark:focus:text-accent-light dark:data-[highlighted]:bg-accent-light/20 dark:data-[highlighted]:text-accent-light',
+  '[&.active]:bg-accent-light [&.active]:text-white',
+);
+
+const dropdownContentClassName =
+  'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[220px] rounded-2xl border border-gray-200/40 bg-white/98 p-1.5 shadow-black/10 shadow-xl backdrop-blur-xl data-[state=closed]:animate-out data-[state=open]:animate-in dark:border-gray-700/40 dark:bg-gray-950/98 dark:shadow-white/5';
+
 function RouteComponent() {
   const { lang = 'en-SG' } = Route.useParams();
   const loaderData = Route.useLoaderData();
@@ -57,6 +66,12 @@ function RouteComponent() {
   const isNavigating = useRouterState({
     select: (state) => state.status === 'pending',
   });
+  const currentPathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const isNetworkRoute = /\/(?:lines|stations|towns|system-map)(?:\/|$)/.test(
+    currentPathname,
+  );
 
   const lastUpdatedAt = useMemo(() => {
     if (metadata.length === 0) return null;
@@ -94,48 +109,99 @@ function RouteComponent() {
               </div>
 
               <nav className="flex items-center space-x-1">
-                <div className="hidden md:flex md:items-center md:space-x-1">
+                <div className="hidden lg:flex lg:items-center lg:space-x-1">
                   <Link
                     to="/{-$lang}"
                     className={linkClassName}
                     activeOptions={{ exact: true }}
                   >
-                    <FormattedMessage id="general.home" defaultMessage="Home" />
-                  </Link>
-                  <Link to="/{-$lang}/lines" className={linkClassName}>
                     <FormattedMessage
-                      id="general.lines"
-                      defaultMessage="Lines"
+                      id="general.status"
+                      defaultMessage="Status"
                     />
                   </Link>
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                      <button
+                        type="button"
+                        className={classNames(
+                          linkClassName,
+                          'group inline-flex items-center gap-1.5',
+                          {
+                            active: isNetworkRoute,
+                          },
+                        )}
+                      >
+                        <FormattedMessage
+                          id="general.network"
+                          defaultMessage="Network"
+                        />
+                        <ChevronDownIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                      </button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content
+                        className={dropdownContentClassName}
+                        align="start"
+                        sideOffset={8}
+                      >
+                        <DropdownMenu.Item>
+                          <Link
+                            to="/{-$lang}/lines"
+                            className={linkClassNameDropdown}
+                          >
+                            <FormattedMessage
+                              id="general.lines"
+                              defaultMessage="Lines"
+                            />
+                          </Link>
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item>
+                          <Link
+                            to="/{-$lang}/stations"
+                            className={linkClassNameDropdown}
+                          >
+                            <FormattedMessage
+                              id="general.stations"
+                              defaultMessage="Stations"
+                            />
+                          </Link>
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item>
+                          <Link
+                            to="/{-$lang}/towns"
+                            className={linkClassNameDropdown}
+                          >
+                            <FormattedMessage
+                              id="general.towns"
+                              defaultMessage="Towns & areas"
+                            />
+                          </Link>
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item>
+                          <Link
+                            to="/{-$lang}/system-map"
+                            className={linkClassNameDropdown}
+                          >
+                            <FormattedMessage
+                              id="general.system_map"
+                              defaultMessage="System Map"
+                            />
+                          </Link>
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
                   <Link to="/{-$lang}/history" className={linkClassName}>
                     <FormattedMessage
                       id="general.history"
                       defaultMessage="History"
                     />
                   </Link>
-                  <Link to="/{-$lang}/stations" className={linkClassName}>
-                    <FormattedMessage
-                      id="general.stations"
-                      defaultMessage="Stations"
-                    />
-                  </Link>
-                  <Link to="/{-$lang}/towns" className={linkClassName}>
-                    <FormattedMessage
-                      id="general.towns"
-                      defaultMessage="Towns"
-                    />
-                  </Link>
                   <Link to="/{-$lang}/statistics" className={linkClassName}>
                     <FormattedMessage
                       id="general.statistics"
                       defaultMessage="Statistics"
-                    />
-                  </Link>
-                  <Link to="/{-$lang}/system-map" className={linkClassName}>
-                    <FormattedMessage
-                      id="general.system_map"
-                      defaultMessage="System Map"
                     />
                   </Link>
                   <Link to="/{-$lang}/about" className={linkClassName}>
@@ -146,7 +212,7 @@ function RouteComponent() {
                   </Link>
                 </div>
 
-                <div className="md:hidden">
+                <div className="lg:hidden">
                   <DropdownMenu.Root>
                     <DropdownMenu.Trigger asChild>
                       <button
@@ -162,7 +228,7 @@ function RouteComponent() {
 
                     <DropdownMenu.Portal>
                       <DropdownMenu.Content
-                        className="data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[220px] rounded-2xl border border-gray-200/40 bg-white/98 p-1.5 shadow-black/10 shadow-xl backdrop-blur-xl data-[state=closed]:animate-out data-[state=open]:animate-in dark:border-gray-700/40 dark:bg-gray-950/98 dark:shadow-white/5"
+                        className={dropdownContentClassName}
                         align="end"
                         sideOffset={12}
                       >
@@ -170,23 +236,11 @@ function RouteComponent() {
                           <Link
                             to="/{-$lang}"
                             className={linkClassNameMobile}
-                            // end
+                            activeOptions={{ exact: true }}
                           >
                             <FormattedMessage
-                              id="general.home"
-                              defaultMessage="Home"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/lines"
-                            className={linkClassNameMobile}
-                          >
-                            <FormattedMessage
-                              id="general.lines"
-                              defaultMessage="Lines"
+                              id="general.status"
+                              defaultMessage="Status"
                             />
                           </Link>
                         </DropdownMenu.Item>
@@ -199,6 +253,26 @@ function RouteComponent() {
                             <FormattedMessage
                               id="general.history"
                               defaultMessage="History"
+                            />
+                          </Link>
+                        </DropdownMenu.Item>
+
+                        <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-800" />
+                        <DropdownMenu.Label className="px-4 pt-2 pb-1 font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
+                          <FormattedMessage
+                            id="general.network"
+                            defaultMessage="Network"
+                          />
+                        </DropdownMenu.Label>
+
+                        <DropdownMenu.Item>
+                          <Link
+                            to="/{-$lang}/lines"
+                            className={linkClassNameMobile}
+                          >
+                            <FormattedMessage
+                              id="general.lines"
+                              defaultMessage="Lines"
                             />
                           </Link>
                         </DropdownMenu.Item>
@@ -222,19 +296,7 @@ function RouteComponent() {
                           >
                             <FormattedMessage
                               id="general.towns"
-                              defaultMessage="Towns"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/statistics"
-                            className={linkClassNameMobile}
-                          >
-                            <FormattedMessage
-                              id="general.statistics"
-                              defaultMessage="Statistics"
+                              defaultMessage="Towns & areas"
                             />
                           </Link>
                         </DropdownMenu.Item>
@@ -247,6 +309,26 @@ function RouteComponent() {
                             <FormattedMessage
                               id="general.system_map"
                               defaultMessage="System Map"
+                            />
+                          </Link>
+                        </DropdownMenu.Item>
+
+                        <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-800" />
+                        <DropdownMenu.Label className="px-4 pt-2 pb-1 font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
+                          <FormattedMessage
+                            id="general.more"
+                            defaultMessage="More"
+                          />
+                        </DropdownMenu.Label>
+
+                        <DropdownMenu.Item>
+                          <Link
+                            to="/{-$lang}/statistics"
+                            className={linkClassNameMobile}
+                          >
+                            <FormattedMessage
+                              id="general.statistics"
+                              defaultMessage="Statistics"
                             />
                           </Link>
                         </DropdownMenu.Item>
