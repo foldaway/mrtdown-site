@@ -8,6 +8,7 @@ import type {
   Station as CoreStation,
   Town as CoreTown,
 } from '@mrtdown/core';
+import type { AffectedServiceRevision } from '~/util/affectedServiceRevisions';
 
 type StationCode = CoreStation['stationCodes'][number];
 
@@ -32,6 +33,7 @@ export type IssueAffectedBranch = {
   lineId: string;
   branchId: string;
   stationIds: string[];
+  wholeServiceRevisions?: AffectedServiceRevision[];
 };
 
 export type IssueInterval = {

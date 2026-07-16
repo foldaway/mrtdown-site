@@ -401,6 +401,23 @@ describe('deriveServiceScopeStationIds', () => {
     ).toEqual(BRANCH_STATION_IDS);
   });
 
+  it('returns the reference revision path for whole-service scopes', () => {
+    expect(
+      deriveServiceScopeStationIds(
+        BRANCH_STATION_IDS,
+        [
+          {
+            type: 'service.whole',
+            station_id: null,
+            from_station_id: null,
+            to_station_id: null,
+          },
+        ],
+        ['NS1', 'NS2', 'NS3'],
+      ),
+    ).toEqual(['NS1', 'NS2', 'NS3']);
+  });
+
   it('returns the inclusive station range for segment scopes', () => {
     expect(
       deriveServiceScopeStationIds(BRANCH_STATION_IDS, [

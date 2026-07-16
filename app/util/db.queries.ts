@@ -53,6 +53,10 @@ import type {
   Station,
   TimeScaleChart,
 } from '~/types';
+import {
+  type AffectedServiceRevision,
+  selectAffectedServiceRevisionForReferenceAt,
+} from '~/util/affectedServiceRevisions';
 import { getPublicCrowdReportSignals } from '~/util/crowdReports';
 import {
   issueContributesToLineDowntime,
@@ -149,13 +153,14 @@ type AdvisoryCandidate = {
 export function deriveServiceScopeStationIds(
   branchStationIds: readonly string[],
   scopeRows: readonly ImpactEventServiceScopeRow[],
+  wholeServiceStationIds: readonly string[] = branchStationIds,
 ) {
   if (scopeRows.length === 0) {
     return [...branchStationIds];
   }
 
   if (scopeRows.some((scope) => scope.type === 'service.whole')) {
-    return [...branchStationIds];
+    return [...wholeServiceStationIds];
   }
 
   const stationIds = new Set<string>();
@@ -1598,6 +1603,36 @@ async function buildDataset(
     return acc;
   }, {});
 
+  const affectedServiceRevisionsByServiceId = Object.fromEntries(
+    serviceRows.map((service) => {
+      const revisions = (revisionsByServiceId[service.id] ?? []).flatMap(
+        (revision): AffectedServiceRevision[] => {
+          const revisionKey = `${revision.id}::${service.id}`;
+          const entries = [...(pathEntriesByRevisionKey[revisionKey] ?? [])]
+            .sort((a, b) => a.path_index - b.path_index)
+            .map((entry) => entry.station_id);
+          if (entries.length === 0) {
+            return [];
+          }
+
+          return [
+            {
+              id: revision.id,
+              startAt: revision.start_at,
+              endAt: revision.end_at,
+              updatedAt:
+                revision.updated_at instanceof Date
+                  ? revision.updated_at.toISOString()
+                  : revision.updated_at,
+              stationIds: [...new Set(entries)],
+            },
+          ];
+        },
+      );
+      return [service.id, revisions] as const;
+    }),
+  );
+
   const latestRevisionByServiceId = Object.fromEntries(
     serviceRows
       .map((service) => {
@@ -1952,6 +1987,15 @@ async function buildDataset(
     const canonicalPeriods = periodEvents.flatMap((event) => {
       return periodsByImpactEventId[event.id] ?? [];
     });
+    const latestEvidenceAt = latestEvidenceAtByIssueId[row.id];
+    const intervals = resolveOperationalIssueIntervals(
+      canonicalPeriods.map((period) => ({
+        start_at: period.start_at,
+        end_at: period.end_at,
+      })),
+      row.type === 'infra' ? null : latestEvidenceAt,
+      referenceNow,
+    );
 
     const serviceScopeEvent = latestEventByType['service_scopes.set'];
     if (serviceScopeEvent != null) {
@@ -2017,13 +2061,33 @@ async function buildDataset(
         if (branch == null || service == null) {
           continue;
         }
+        const scopeRows =
+          serviceScopeRowsByServiceId.get(serviceRef.service_id) ?? [];
+        const wholeServiceRevisions = scopeRows.some(
+          (scope) => scope.type === 'service.whole',
+        )
+          ? affectedServiceRevisionsByServiceId[serviceRef.service_id]
+          : undefined;
+        const issueReferenceAt =
+          intervals[0]?.startAt ??
+          serviceScopeEvent?.ts ??
+          isoDateTime(referenceNow);
+        const referenceRevision =
+          wholeServiceRevisions != null
+            ? selectAffectedServiceRevisionForReferenceAt(
+                wholeServiceRevisions,
+                issueReferenceAt,
+              )
+            : undefined;
         serviceBranches.set(branch.id, {
           lineId: service.line_id,
           branchId: branch.id,
           stationIds: deriveServiceScopeStationIds(
             branch.stationIds,
-            serviceScopeRowsByServiceId.get(serviceRef.service_id) ?? [],
+            scopeRows,
+            referenceRevision?.stationIds,
           ),
+          wholeServiceRevisions,
         });
       }
     }
@@ -2051,16 +2115,6 @@ async function buildDataset(
     const lineIds = [
       ...new Set(branchesAffected.map((branch) => branch.lineId)),
     ];
-    const latestEvidenceAt = latestEvidenceAtByIssueId[row.id];
-    const intervals = resolveOperationalIssueIntervals(
-      canonicalPeriods.map((period) => ({
-        start_at: period.start_at,
-        end_at: period.end_at,
-      })),
-      row.type === 'infra' ? null : latestEvidenceAt,
-      referenceNow,
-    );
-
     const durationSeconds = sumIntervalSeconds(
       intervals.map((interval) => ({
         start: parseDateTime(interval.startAt),
@@ -2338,7 +2392,13 @@ export function selectIncludedEntities(
       }
       for (const branch of issue.branchesAffected) {
         lineIds.add(branch.lineId);
-        for (const stationId of branch.stationIds) {
+        const affectedStationIds = [
+          ...branch.stationIds,
+          ...(branch.wholeServiceRevisions?.flatMap(
+            (revision) => revision.stationIds,
+          ) ?? []),
+        ];
+        for (const stationId of affectedStationIds) {
           stationIds.add(stationId);
         }
       }

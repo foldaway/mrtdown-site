@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { IssueAffectedBranch, Line, Station } from '~/types';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { selectAffectedServiceRevisionForReferenceAt } from '~/util/affectedServiceRevisions';
 
 interface UseAffectedStationsReturn {
   line: Line;
@@ -39,22 +40,43 @@ export function sortAffectedStationsByBranch(
 
 export const useAffectedStations = (
   branch: IssueAffectedBranch,
+  referenceAt: string | null,
 ): UseAffectedStationsReturn => {
   const { lines, stations } = useIncludedEntities();
   const line = lines[branch.lineId];
 
   const stationsAffected = useMemo(() => {
+    const referenceRevision =
+      referenceAt != null && branch.wholeServiceRevisions != null
+        ? selectAffectedServiceRevisionForReferenceAt(
+            branch.wholeServiceRevisions,
+            referenceAt,
+          )
+        : undefined;
+    const stationIds = referenceRevision?.stationIds ?? branch.stationIds;
+
     // Branch payloads identify the affected stations, while station memberships
     // carry the canonical sequence used to display a readable range.
-    const resolvedStations = branch.stationIds
+    const resolvedStations = stationIds
       .map((stationId) => stations[stationId])
       .filter((station): station is Station => station != null);
+
+    if (referenceRevision != null) {
+      return resolvedStations;
+    }
 
     return sortAffectedStationsByBranch(resolvedStations, {
       branchId: branch.branchId,
       lineId: branch.lineId,
     });
-  }, [branch.branchId, branch.lineId, branch.stationIds, stations]);
+  }, [
+    branch.branchId,
+    branch.lineId,
+    branch.stationIds,
+    branch.wholeServiceRevisions,
+    referenceAt,
+    stations,
+  ]);
 
   const { source, destination } = useMemo(() => {
     if (stationsAffected.length === 0) {

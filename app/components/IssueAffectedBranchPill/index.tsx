@@ -31,10 +31,6 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
 
   const intl = useIntl();
   const { lines } = useIncludedEntities();
-  const { line, source, destination, allStations } =
-    useAffectedStations(branch);
-
-  const hasMultipleStations = allStations.length > 2;
   const membershipReferenceAt =
     interval?.startAt ??
     issue.intervals.reduce<string | null>((earliest, candidate) => {
@@ -47,6 +43,12 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
         ? candidate.startAt
         : earliest;
     }, null);
+  const { line, source, destination, allStations } = useAffectedStations(
+    branch,
+    membershipReferenceAt,
+  );
+
+  const hasMultipleStations = allStations.length > 2;
 
   const renderStationRange = () => {
     if (source == null) return null;
