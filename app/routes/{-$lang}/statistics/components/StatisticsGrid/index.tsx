@@ -47,27 +47,33 @@ export const StatisticsGrid: React.FC<Props> = (props) => {
   const { statistics } = props;
 
   return (
-    <div className="grid grid-cols-1 gap-4 text-gray-800 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 dark:text-gray-200">
+    <div className="grid grid-cols-1 gap-3 text-gray-800 sm:gap-4 md:grid-cols-12 dark:text-gray-200">
       <DeferredViewportWidget
-        className="col-span-6"
+        className="md:col-span-6"
         fallback={<TrendCardSkeleton />}
       >
         <CountTrendCards graphs={statistics.timeScaleChartsIssueCount} />
       </DeferredViewportWidget>
       <DeferredViewportWidget
-        className="col-span-6"
+        className="md:col-span-6"
+        fallback={<TrendCardSkeleton />}
+      >
+        <DurationTrendCards graphs={statistics.timeScaleChartsIssueDuration} />
+      </DeferredViewportWidget>
+      <DeferredViewportWidget
+        className="md:col-span-12"
         fallback={<HeatmapCardSkeleton />}
       >
         <DisruptionsHeatmap chart={statistics.chartRollingYearHeatmap} />
       </DeferredViewportWidget>
       <DeferredViewportWidget
-        className="col-span-6"
+        className="md:col-span-12"
         fallback={<BarChartCardSkeleton barCount={8} heightClassName="h-64" />}
       >
         <LinesIssueCountCard chart={statistics.chartTotalIssueCountByLine} />
       </DeferredViewportWidget>
       <DeferredViewportWidget
-        className="col-span-6"
+        className="md:col-span-12"
         fallback={<LongestDisruptionsCardSkeleton />}
       >
         <LongestDisruptionsCard
@@ -75,18 +81,12 @@ export const StatisticsGrid: React.FC<Props> = (props) => {
         />
       </DeferredViewportWidget>
       <DeferredViewportWidget
-        className="col-span-6"
+        className="md:col-span-12"
         fallback={<BarChartCardSkeleton barCount={15} heightClassName="h-72" />}
       >
         <StationsIssueCountCard
           chart={statistics.chartTotalIssueCountByStation}
         />
-      </DeferredViewportWidget>
-      <DeferredViewportWidget
-        className="col-span-6"
-        fallback={<TrendCardSkeleton />}
-      >
-        <DurationTrendCards graphs={statistics.timeScaleChartsIssueDuration} />
       </DeferredViewportWidget>
     </div>
   );

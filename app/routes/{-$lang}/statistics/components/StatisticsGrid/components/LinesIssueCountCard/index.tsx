@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import type { SystemAnalytics } from '~/util/db.queries';
 
+import { StatisticsCard } from '../StatisticsCard';
 import { Tick } from './components/Tick';
 import { TooltipContent } from './components/TooltipContent';
 
@@ -24,14 +25,18 @@ export const LinesIssueCountCard: React.FC<Props> = (props) => {
   const intl = useIntl();
 
   return (
-    <div className="col-span-6 flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
-      <h3 className="mb-2 font-semibold text-base text-gray-900 dark:text-white">
-        <FormattedMessage
-          id="general.line_issue_counts"
-          defaultMessage="Issue Count by Line"
-        />
-      </h3>
-      <div className="h-64">
+    <StatisticsCard
+      contentClassName="px-2 pt-2 pb-3 sm:px-3 sm:pt-3 sm:pb-4"
+      header={
+        <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
+          <FormattedMessage
+            id="general.line_issue_counts"
+            defaultMessage="Issue Count by Line"
+          />
+        </h2>
+      }
+    >
+      <div className="h-56 sm:h-64">
         <ResponsiveContainer>
           <BarChart
             accessibilityLayer
@@ -104,6 +109,6 @@ export const LinesIssueCountCard: React.FC<Props> = (props) => {
           </BarChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </StatisticsCard>
   );
 };

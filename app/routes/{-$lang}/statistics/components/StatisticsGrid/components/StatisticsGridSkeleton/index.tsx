@@ -4,36 +4,42 @@ export function StatisticsGridSkeleton() {
   return (
     <div
       aria-busy="true"
-      className="grid grid-cols-1 gap-4 text-gray-800 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 dark:text-gray-200"
+      className="grid grid-cols-1 gap-3 text-gray-800 sm:gap-4 md:grid-cols-12 dark:text-gray-200"
     >
       <span className="sr-only">Loading statistics</span>
+      <TrendCardSkeleton />
       <TrendCardSkeleton />
       <HeatmapCardSkeleton />
       <BarChartCardSkeleton barCount={8} heightClassName="h-64" />
       <LongestDisruptionsCardSkeleton />
       <BarChartCardSkeleton barCount={15} heightClassName="h-72" />
-      <TrendCardSkeleton />
     </div>
   );
 }
 
-function CardSkeleton(props: React.PropsWithChildren) {
-  const { children } = props;
+function CardSkeleton(props: React.PropsWithChildren<{ className?: string }>) {
+  const { children, className = 'md:col-span-12' } = props;
 
   return (
-    <div className="col-span-6 flex animate-pulse flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-      {children}
+    <div
+      className={`${className} overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800`}
+    >
+      <div className="border-gray-200 border-b px-4 py-2.5 sm:px-5 sm:py-3 dark:border-gray-700">
+        <div className="h-5 w-52 animate-pulse rounded-md bg-gray-200 dark:bg-gray-700" />
+      </div>
+      <div className="flex animate-pulse flex-col px-4 py-3 sm:px-5 sm:py-4">
+        {children}
+      </div>
     </div>
   );
 }
 
 export function TrendCardSkeleton() {
   return (
-    <CardSkeleton>
-      <div className="mb-2 h-5 w-56 rounded-md bg-gray-200 dark:bg-gray-700" />
-      <div className="mb-2 h-9 w-44 rounded-md bg-gray-200 dark:bg-gray-700" />
-      <div className="mb-4 h-4 w-32 rounded-sm bg-gray-200 dark:bg-gray-700" />
-      <div className="mb-4 flex h-48 items-end gap-x-3 border-gray-100 border-b px-1 pb-4 dark:border-gray-800">
+    <CardSkeleton className="md:col-span-6">
+      <div className="h-8 w-40 rounded-md bg-gray-200 dark:bg-gray-700" />
+      <div className="mt-1 h-3 w-28 rounded-sm bg-gray-200 dark:bg-gray-700" />
+      <div className="mt-3 flex h-40 items-end gap-x-3 border-gray-100 border-b px-1 pb-4 sm:h-44 dark:border-gray-700">
         {TREND_POINT_IDS.map((pointId, index) => (
           <div
             className="flex flex-1 flex-col items-center justify-end gap-y-2"
@@ -47,10 +53,10 @@ export function TrendCardSkeleton() {
           </div>
         ))}
       </div>
-      <div className="flex self-start overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+      <div className="mt-3 flex self-start overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50">
         {TIME_SCALE_IDS.map((scaleId, index) => (
           <div
-            className="h-9 w-20 border-gray-200 border-l first:border-l-0 dark:border-gray-700"
+            className="h-8 w-16 border-gray-200 border-l first:border-l-0 dark:border-gray-700"
             key={scaleId}
           >
             <div
@@ -70,8 +76,6 @@ export function TrendCardSkeleton() {
 export function HeatmapCardSkeleton() {
   return (
     <CardSkeleton>
-      <div className="mb-1 h-5 w-48 rounded-md bg-gray-200 dark:bg-gray-700" />
-      <div className="mb-5 h-4 w-36 rounded-sm bg-gray-200 dark:bg-gray-700" />
       <div className="overflow-hidden pb-2">
         <div className="mb-2 ml-8 flex gap-x-9">
           {HEATMAP_MONTH_IDS.map((monthId) => (
@@ -125,7 +129,6 @@ export function BarChartCardSkeleton(props: BarChartCardSkeletonProps) {
 
   return (
     <CardSkeleton>
-      <div className="mb-6 h-5 w-52 rounded-md bg-gray-200 dark:bg-gray-700" />
       <div
         className={`flex ${heightClassName} items-end gap-x-2 border-gray-100 border-b px-1 pb-8 dark:border-gray-800`}
       >
@@ -151,8 +154,7 @@ export function BarChartCardSkeleton(props: BarChartCardSkeletonProps) {
 export function LongestDisruptionsCardSkeleton() {
   return (
     <CardSkeleton>
-      <div className="mb-4 h-5 w-44 rounded-md bg-gray-200 dark:bg-gray-700" />
-      <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800/70">
+      <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-3 flex items-center gap-x-3">
           <div className="size-10 rounded-full bg-gray-200 dark:bg-gray-700" />
           <div className="min-w-0 flex-1 space-y-2">
@@ -174,7 +176,7 @@ export function LongestDisruptionsCardSkeleton() {
 
 function getHeatmapCellSkeletonClassName(index: number) {
   const intensityClassNames = [
-    'bg-gray-100 dark:bg-gray-800',
+    'bg-gray-100 dark:bg-gray-700/70',
     'bg-gray-200 dark:bg-gray-700',
     'bg-gray-300 dark:bg-gray-600',
   ];

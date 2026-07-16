@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { FormattedMessage } from 'react-intl';
 import { IssueCard } from '~/components/IssueCard';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { StatisticsCard } from '../StatisticsCard';
 
 interface Props {
   issueIds: string[];
@@ -21,22 +22,21 @@ export const LongestDisruptionsCard: React.FC<Props> = (props) => {
 
   return (
     <Collapsible.Root asChild>
-      <div className="group col-span-6 flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-x-2">
-            <div className="flex items-center gap-x-2">
-              <h3 className="font-bold text-base text-gray-900 dark:text-gray-100">
-                <FormattedMessage
-                  id="general.longest_disruptions"
-                  defaultMessage="Longest Disruptions"
-                />
-              </h3>
-            </div>
-          </div>
-        </div>
+      <StatisticsCard
+        className="group"
+        contentClassName="p-3 sm:p-4"
+        header={
+          <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
+            <FormattedMessage
+              id="general.longest_disruptions"
+              defaultMessage="Longest Disruptions"
+            />
+          </h2>
+        }
+      >
         {issues.length === 0 && (
-          <div className="flex items-center justify-center rounded-lg border-2 border-gray-300 border-dashed py-12 dark:border-gray-600">
-            <p className="text-gray-500 dark:text-gray-400">
+          <div className="flex items-center justify-center rounded-xl border border-gray-300 border-dashed py-8 dark:border-gray-600">
+            <p className="text-gray-500 text-sm dark:text-gray-400">
               <FormattedMessage
                 id="general.no_longest_disruptions"
                 defaultMessage="No disruptions found"
@@ -45,13 +45,16 @@ export const LongestDisruptionsCard: React.FC<Props> = (props) => {
           </div>
         )}
         {issues.length > 0 && (
-          <div className="mt-4 flex flex-col">
+          <div className="flex flex-col">
             <div className="relative">
-              <IssueCard issue={issues[0]} className="!w-auto" />
-              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent group-data-[state=open]:hidden dark:from-gray-900" />
+              <IssueCard
+                issue={issues[0]}
+                className="!w-auto !rounded-xl !border-gray-200 !px-3 !py-2.5 !shadow-none hover:!border-gray-300 hover:!shadow-sm sm:!px-4 dark:!border-gray-700 dark:hover:!border-gray-600"
+              />
+              <div className="absolute inset-x-px bottom-px h-12 rounded-b-xl bg-gradient-to-t from-white to-transparent group-data-[state=open]:hidden dark:from-gray-800" />
             </div>
             {issues.length > 1 && (
-              <Collapsible.Trigger className="mt-3 shrink-0 self-center rounded-xl bg-blue-600 px-4 py-2 font-medium text-sm text-white transition-all duration-200 hover:bg-blue-700 hover:shadow-md group-data-[state=open]:hidden dark:bg-blue-700 dark:hover:bg-blue-600">
+              <Collapsible.Trigger className="mt-3 shrink-0 self-center rounded-lg bg-accent-light px-3 py-1.5 font-semibold text-white text-xs transition-colors hover:bg-accent-dark group-data-[state=open]:hidden">
                 <div className="flex items-center justify-between gap-x-2">
                   <FormattedMessage
                     id="general.show_remaining_count"
@@ -68,13 +71,13 @@ export const LongestDisruptionsCard: React.FC<Props> = (props) => {
                   <IssueCard
                     key={issueRef.id}
                     issue={issueRef}
-                    className="!w-auto"
+                    className="!w-auto !rounded-xl !border-gray-200 !px-3 !py-2.5 !shadow-none hover:!border-gray-300 hover:!shadow-sm sm:!px-4 dark:!border-gray-700 dark:hover:!border-gray-600"
                   />
                 ))}
                 <Collapsible.Trigger asChild>
                   <button
                     type="button"
-                    className="inline-flex items-center gap-x-2 self-center rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                    className="inline-flex items-center gap-x-2 self-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 font-medium text-gray-700 text-xs hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                   >
                     <FormattedMessage
                       id="general.collapse"
@@ -87,7 +90,7 @@ export const LongestDisruptionsCard: React.FC<Props> = (props) => {
             </Collapsible.Content>
           </div>
         )}
-      </div>
+      </StatisticsCard>
     </Collapsible.Root>
   );
 };

@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import type { TimeScaleChart } from '~/types';
 import { getDateFormatOptions } from '~/helpers/getDateFormatOptions';
+import { StatisticsCard } from '../StatisticsCard';
 import { CustomTooltip } from './components/CustomTooltip';
 
 interface Props {
@@ -37,38 +38,42 @@ export const CountTrendCards: React.FC<Props> = (props) => {
   );
 
   return (
-    <div className="col-span-6 flex flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
-      <h3 className="mb-1 font-semibold text-base text-gray-900 dark:text-white">
-        <FormattedMessage
-          id="general.issues_past_period"
-          defaultMessage="Issue Count (past {period})"
-          values={{
-            period: (
-              <FormattedNumber
-                value={
-                  graph.displayTimeScale?.count ?? graph.dataTimeScale.count
-                }
-                unit={
-                  graph.displayTimeScale?.granularity ??
-                  graph.dataTimeScale.granularity
-                }
-                unitDisplay="long"
-                style="unit"
-              />
-            ),
-          }}
-        />
-      </h3>
-      <div className="mb-1 font-bold text-3xl text-gray-900 dark:text-white">
+    <StatisticsCard
+      header={
+        <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
+          <FormattedMessage
+            id="general.issues_past_period"
+            defaultMessage="Issue Count (past {period})"
+            values={{
+              period: (
+                <FormattedNumber
+                  value={
+                    graph.displayTimeScale?.count ?? graph.dataTimeScale.count
+                  }
+                  unit={
+                    graph.displayTimeScale?.granularity ??
+                    graph.dataTimeScale.granularity
+                  }
+                  unitDisplay="long"
+                  style="unit"
+                />
+              ),
+            }}
+          />
+        </h2>
+      }
+    >
+      <div className="font-bold text-2xl text-gray-900 tracking-tight sm:text-3xl dark:text-gray-100">
         <FormattedMessage
           id="general.disruption_count"
           defaultMessage="{count, plural, one {{count} disruption} other {{count} disruptions}}"
           values={{
-            count: graph.dataCumulative[0].payload.disruption as number,
+            count:
+              (graph.dataCumulative[0]?.payload?.disruption as number) ?? 0,
           }}
         />
       </div>
-      <p className="mb-4 text-gray-500 text-sm dark:text-gray-400">
+      <p className="text-gray-500 text-xs dark:text-gray-400">
         <FormattedMessage
           id="general.change_since_previous"
           defaultMessage="{change} vs previous"
@@ -76,8 +81,10 @@ export const CountTrendCards: React.FC<Props> = (props) => {
             change: (
               <FormattedNumber
                 value={
-                  (graph.dataCumulative[0].payload.disruption as number) -
-                  (graph.dataCumulative[1].payload.disruption as number)
+                  ((graph.dataCumulative[0]?.payload?.disruption as number) ??
+                    0) -
+                  ((graph.dataCumulative[1]?.payload?.disruption as number) ??
+                    0)
                 }
                 signDisplay="always"
               />
@@ -85,7 +92,7 @@ export const CountTrendCards: React.FC<Props> = (props) => {
           }}
         />
       </p>
-      <div className="mb-4 h-48">
+      <div className="mt-3 h-40 sm:h-44">
         <ResponsiveContainer>
           <LineChart
             accessibilityLayer
@@ -100,8 +107,12 @@ export const CountTrendCards: React.FC<Props> = (props) => {
             <XAxis
               type="category"
               dataKey="name"
-              className="text-gray-600 text-sm dark:text-gray-300"
+              className="text-gray-700 text-sm dark:text-gray-200"
               tickFormatter={tickFormatter}
+              tick={{ fontSize: 11, fontWeight: 500 }}
+              axisLine={{ stroke: 'currentColor', strokeWidth: 1 }}
+              tickLine={{ stroke: 'currentColor', strokeWidth: 1 }}
+              height={42}
             />
             <Line
               dataKey="payload.disruption"
@@ -139,31 +150,35 @@ export const CountTrendCards: React.FC<Props> = (props) => {
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex items-center divide-x divide-gray-200 self-start rounded-lg border border-gray-200 bg-gray-50 shadow-sm dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
-        {graphs.map((graph, index) => (
-          <button
-            key={graph.title}
-            className={classNames(
-              'px-3 py-2 font-medium text-sm transition-colors first:rounded-l-lg last:rounded-r-lg hover:bg-gray-100 dark:hover:bg-gray-700',
-              graphIndex === index
-                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                : 'text-gray-600 dark:text-gray-400',
-            )}
-            type="button"
-            onClick={() => setGraphIndex(index)}
-          >
-            <FormattedNumber
-              style="unit"
-              unitDisplay="long"
-              unit={
-                graph.displayTimeScale?.granularity ??
-                graph.dataTimeScale.granularity
-              }
-              value={graph.displayTimeScale?.count ?? graph.dataTimeScale.count}
-            />
-          </button>
-        ))}
+      <div className="mt-3 overflow-x-auto pb-0.5">
+        <div className="flex w-max items-center divide-x divide-gray-200 rounded-lg border border-gray-200 bg-gray-50 shadow-sm dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-900/50">
+          {graphs.map((graph, index) => (
+            <button
+              key={graph.title}
+              className={classNames(
+                'px-2.5 py-1.5 font-medium text-xs transition-colors first:rounded-l-lg last:rounded-r-lg hover:bg-gray-100 dark:hover:bg-gray-700',
+                graphIndex === index
+                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                  : 'text-gray-600 dark:text-gray-400',
+              )}
+              type="button"
+              onClick={() => setGraphIndex(index)}
+            >
+              <FormattedNumber
+                style="unit"
+                unitDisplay="long"
+                unit={
+                  graph.displayTimeScale?.granularity ??
+                  graph.dataTimeScale.granularity
+                }
+                value={
+                  graph.displayTimeScale?.count ?? graph.dataTimeScale.count
+                }
+              />
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
+    </StatisticsCard>
   );
 };

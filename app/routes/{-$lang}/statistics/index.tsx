@@ -75,7 +75,7 @@ function StatisticsPage() {
 
   return (
     <IncludedEntitiesContext.Provider value={loaderData.included}>
-      <div className="flex flex-col space-y-8">
+      <div className="flex flex-col space-y-5 sm:space-y-7">
         <header className="flex flex-col items-center gap-1 text-center">
           <h1 className="font-bold text-gray-900 text-xl leading-tight sm:text-2xl dark:text-gray-100">
             <FormattedMessage
@@ -98,7 +98,7 @@ function StatisticsPage() {
 
 function StatisticsPagePending() {
   return (
-    <div className="flex flex-col space-y-8">
+    <div className="flex flex-col space-y-5 sm:space-y-7">
       <header className="flex flex-col items-center gap-1 text-center">
         <div className="h-7 w-40 animate-pulse rounded-md bg-gray-200 sm:h-8 dark:bg-gray-800" />
         <div className="h-4 w-full max-w-2xl animate-pulse rounded-md bg-gray-200 sm:h-5 dark:bg-gray-800" />

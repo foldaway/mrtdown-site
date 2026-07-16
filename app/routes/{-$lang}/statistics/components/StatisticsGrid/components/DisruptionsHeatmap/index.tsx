@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import type { SystemAnalytics } from '~/util/db.queries';
+import { StatisticsCard } from '../StatisticsCard';
 import { DayIssuesList } from './components/DayIssuesList';
 import { useDayIssues } from './hooks/useDayIssues';
 
@@ -126,7 +127,7 @@ export const DisruptionsHeatmap: React.FC<Props> = (props) => {
 
   const getCellColor = useCallback(
     (value: number) => {
-      if (value === 0) return 'bg-gray-100 dark:bg-gray-800';
+      if (value === 0) return 'bg-gray-100 dark:bg-gray-700/70';
       const intensity = value / maxValue;
       if (intensity <= 0.25) return 'bg-red-200 dark:bg-red-900/40';
       if (intensity <= 0.5) return 'bg-red-400 dark:bg-red-700/60';
@@ -138,25 +139,25 @@ export const DisruptionsHeatmap: React.FC<Props> = (props) => {
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
-      <div className="col-span-6 flex flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
-        <div className="mb-4 flex items-center justify-between">
+      <StatisticsCard
+        header={
           <div>
-            <h3 className="font-semibold text-base text-gray-900 dark:text-white">
+            <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
               <FormattedMessage
                 id="general.disruptions_heatmap"
                 defaultMessage="Disruptions Heatmap"
               />
-            </h3>
-            <p className="text-gray-500 text-sm dark:text-gray-400">
+            </h2>
+            <p className="text-gray-500 text-xs leading-4 dark:text-gray-400">
               <FormattedMessage
                 id="general.heatmap_description"
                 defaultMessage="Issue count over time"
               />
             </p>
           </div>
-        </div>
-
-        <div className="relative mb-2 overflow-x-auto pb-2">
+        }
+      >
+        <div className="relative overflow-x-auto pb-2">
           <div className="inline-flex flex-col">
             {/* Month headers */}
             <div className="flex h-6">
@@ -238,9 +239,9 @@ export const DisruptionsHeatmap: React.FC<Props> = (props) => {
                                   }
                                 }}
                                 className={classNames(
-                                  'size-3 cursor-pointer rounded-[2px] transition-all hover:ring-2 hover:ring-blue-400 hover:ring-offset-1 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:ring-offset-gray-900',
+                                  'size-3 cursor-pointer rounded-[2px] transition-all hover:ring-2 hover:ring-blue-400 hover:ring-offset-1 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:ring-offset-gray-800',
                                   selectedDate === cell.dateString &&
-                                    'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-900',
+                                    'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-800',
                                   getCellColor(cell.disruption),
                                 )}
                                 aria-label={`${intl.formatDate(cell.date.toJSDate(), { month: 'short', day: 'numeric' })}: ${cell.disruption} disruptions. Click to view issues.`}
@@ -286,7 +287,7 @@ export const DisruptionsHeatmap: React.FC<Props> = (props) => {
 
         <div className="mt-2 flex items-center justify-end gap-1.5 text-[10px] text-gray-500 dark:text-gray-400">
           <span>Less</span>
-          <div className="size-3 rounded-[2px] bg-gray-100 dark:bg-gray-800" />
+          <div className="size-3 rounded-[2px] bg-gray-100 dark:bg-gray-700/70" />
           <div className="size-3 rounded-[2px] bg-red-200 dark:bg-red-900/40" />
           <div className="size-3 rounded-[2px] bg-red-400 dark:bg-red-700/60" />
           <div className="size-3 rounded-[2px] bg-red-600 dark:bg-red-500" />
@@ -295,7 +296,7 @@ export const DisruptionsHeatmap: React.FC<Props> = (props) => {
         </div>
 
         {selectedDate && (
-          <div className="mt-6 space-y-4 border-gray-200 border-t pt-6 dark:border-gray-700">
+          <div className="mt-4 space-y-3 border-gray-200 border-t pt-4 dark:border-gray-700">
             <DayIssuesList
               dateString={selectedDate}
               issues={issues}
@@ -305,7 +306,7 @@ export const DisruptionsHeatmap: React.FC<Props> = (props) => {
             />
           </div>
         )}
-      </div>
+      </StatisticsCard>
     </IncludedEntitiesContext.Provider>
   );
 };
