@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { useIntl } from 'react-intl';
+import { FormattedMessage, useIntl } from 'react-intl';
 import { IssueSubtypeBadge } from '~/components/IssueSubtypeBadge';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import type { Issue, IssueInterval } from '~/types';
@@ -14,6 +14,9 @@ interface Props {
 export const IssueContent: React.FC<Props> = (props) => {
   const { issue, interval } = props;
   const intl = useIntl();
+  const hasAffectedServices = issue.branchesAffected.some(
+    (branch) => branch.serviceName != null,
+  );
 
   return (
     <div className="mt-0.5 flex flex-col">
@@ -27,8 +30,21 @@ export const IssueContent: React.FC<Props> = (props) => {
         </h3>
       </Link>
 
-      <div className="mt-1.5 space-y-1">
-        <div className="flex flex-wrap items-center gap-1.5">
+      <div className="mt-2 space-y-1">
+        <p className="font-medium text-[10px] text-gray-400 uppercase tracking-wide dark:text-gray-500">
+          {hasAffectedServices ? (
+            <FormattedMessage
+              id="general.affected_services"
+              defaultMessage="Affected services"
+            />
+          ) : (
+            <FormattedMessage
+              id="general.affected_stations"
+              defaultMessage="Affected stations"
+            />
+          )}
+        </p>
+        <div className="flex flex-wrap items-stretch gap-1.5">
           {issue.branchesAffected.map((branch) => (
             <IssueAffectedBranchPill
               key={`${branch.branchId}@${branch.lineId}`}

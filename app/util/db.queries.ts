@@ -230,6 +230,54 @@ export function selectServiceBranchSourceEvents<T extends ImpactEventStateRow>(
     : selectedStateEvents;
 }
 
+type ServiceEventCandidate = ImpactEventStateRow & {
+  issue_id: string;
+  ts: string;
+};
+
+type ServiceEventReference = {
+  impact_event_id: string;
+  service_id: string;
+};
+
+export function selectLatestServiceEvents<
+  T extends ServiceEventCandidate,
+  R extends ServiceEventReference,
+>(
+  events: readonly T[],
+  serviceReferences: readonly R[],
+  issueId: string,
+  eventType: T['type'],
+) {
+  const eventById = new Map(events.map((event) => [event.id, event]));
+  const latestByServiceId = new Map<string, T>();
+
+  for (const reference of serviceReferences) {
+    const event = eventById.get(reference.impact_event_id);
+    if (
+      event == null ||
+      event.issue_id !== issueId ||
+      event.type !== eventType
+    ) {
+      continue;
+    }
+
+    const current = latestByServiceId.get(reference.service_id);
+    if (current == null) {
+      latestByServiceId.set(reference.service_id, event);
+      continue;
+    }
+
+    const tsDiff =
+      parseDateTime(event.ts).toMillis() - parseDateTime(current.ts).toMillis();
+    if (tsDiff > 0 || (tsDiff === 0 && event.id > current.id)) {
+      latestByServiceId.set(reference.service_id, event);
+    }
+  }
+
+  return [...latestByServiceId.values()];
+}
+
 type CommunitySignalOptions = {
   includeCommunitySignals?: boolean;
 };
@@ -1366,6 +1414,12 @@ async function buildDataset(
         .filter((eventId): eventId is string => eventId != null),
     ),
   ];
+  const serviceScopeEventIds = impactEventRows
+    .filter((event) => event.type === 'service_scopes.set')
+    .map((event) => event.id);
+  const serviceEntityEventIds = [
+    ...new Set([...selectedStateEventIds, ...serviceScopeEventIds]),
+  ];
   const [
     impactEventPeriodRows,
     impactEventServiceRows,
@@ -1389,7 +1443,7 @@ async function buildDataset(
               ),
           )
         : ([] as (typeof impactEventPeriodsTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
+      serviceEntityEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_services', () =>
             database
               .select()
@@ -1397,7 +1451,7 @@ async function buildDataset(
               .where(
                 inArray(
                   impactEventEntityServicesTable.impact_event_id,
-                  selectedStateEventIds,
+                  serviceEntityEventIds,
                 ),
               ),
           )
@@ -1428,7 +1482,7 @@ async function buildDataset(
               ),
           )
         : ([] as (typeof impactEventCausesTable.$inferSelect)[]),
-      selectedStateEventIds.length > 0
+      serviceScopeEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_service_scopes', () =>
             database
               .select()
@@ -1436,7 +1490,7 @@ async function buildDataset(
               .where(
                 inArray(
                   impactEventServiceScopesTable.impact_event_id,
-                  selectedStateEventIds,
+                  serviceScopeEventIds,
                 ),
               ),
           )
@@ -1902,6 +1956,32 @@ async function buildDataset(
     return acc;
   }, {});
 
+  const impactEventsByIssueId = impactEventRows.reduce<
+    Record<string, Array<typeof impactEventsTable.$inferSelect>>
+  >((acc, event) => {
+    if (acc[event.issue_id] == null) {
+      acc[event.issue_id] = [];
+    }
+    acc[event.issue_id].push(event);
+    return acc;
+  }, {});
+  const impactEventById = new Map(
+    impactEventRows.map((event) => [event.id, event]),
+  );
+  const serviceRowsByIssueId = impactEventServiceRows.reduce<
+    Record<string, Array<typeof impactEventEntityServicesTable.$inferSelect>>
+  >((acc, serviceReference) => {
+    const event = impactEventById.get(serviceReference.impact_event_id);
+    if (event == null) {
+      return acc;
+    }
+    if (acc[event.issue_id] == null) {
+      acc[event.issue_id] = [];
+    }
+    acc[event.issue_id].push(serviceReference);
+    return acc;
+  }, {});
+
   const facilityRowsByImpactEventId = impactEventFacilityRows.reduce<
     Record<string, typeof impactEventFacilityRows>
   >((acc, row) => {
@@ -1979,6 +2059,10 @@ async function buildDataset(
       string,
       typeof impactEventServiceScopeRows
     >();
+    const serviceScopeEventByServiceId = new Map<
+      string,
+      (typeof impactEventRows)[number]
+    >();
 
     const periodEvents =
       latestEventByType['periods.set'] != null
@@ -1997,14 +2081,23 @@ async function buildDataset(
       referenceNow,
     );
 
-    const serviceScopeEvent = latestEventByType['service_scopes.set'];
-    if (serviceScopeEvent != null) {
+    const serviceScopeEvents = selectLatestServiceEvents(
+      impactEventsByIssueId[row.id] ?? [],
+      serviceRowsByIssueId[row.id] ?? [],
+      row.id,
+      'service_scopes.set',
+    );
+    for (const serviceScopeEvent of serviceScopeEvents) {
       const scopeRows =
         serviceScopesByImpactEventId[serviceScopeEvent.id] ?? [];
       for (const serviceRef of serviceRowsByImpactEventId[
         serviceScopeEvent.id
       ] ?? []) {
         serviceScopeRowsByServiceId.set(serviceRef.service_id, scopeRows);
+        serviceScopeEventByServiceId.set(
+          serviceRef.service_id,
+          serviceScopeEvent,
+        );
       }
     }
 
@@ -2054,7 +2147,11 @@ async function buildDataset(
       }
     }
 
-    for (const event of selectServiceBranchSourceEvents(selectedStateEvents)) {
+    const serviceBranchSourceEvents =
+      serviceScopeEvents.length > 0
+        ? serviceScopeEvents
+        : selectServiceBranchSourceEvents(selectedStateEvents);
+    for (const event of serviceBranchSourceEvents) {
       for (const serviceRef of serviceRowsByImpactEventId[event.id] ?? []) {
         const branch = branchByServiceId[serviceRef.service_id];
         const service = serviceById[serviceRef.service_id];
@@ -2070,7 +2167,7 @@ async function buildDataset(
           : undefined;
         const issueReferenceAt =
           intervals[0]?.startAt ??
-          serviceScopeEvent?.ts ??
+          serviceScopeEventByServiceId.get(serviceRef.service_id)?.ts ??
           isoDateTime(referenceNow);
         const referenceRevision =
           wholeServiceRevisions != null
@@ -2082,6 +2179,7 @@ async function buildDataset(
         serviceBranches.set(branch.id, {
           lineId: service.line_id,
           branchId: branch.id,
+          serviceName: branch.name,
           stationIds: deriveServiceScopeStationIds(
             branch.stationIds,
             scopeRows,

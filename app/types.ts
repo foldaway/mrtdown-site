@@ -5,6 +5,7 @@ import type {
   Landmark as CoreLandmark,
   Line as CoreLine,
   Operator as CoreOperator,
+  Service as CoreService,
   Station as CoreStation,
   Town as CoreTown,
 } from '@mrtdown/core';
@@ -32,6 +33,7 @@ export type Station = Omit<CoreStation, 'stationCodes'> & {
 export type IssueAffectedBranch = {
   lineId: string;
   branchId: string;
+  serviceName?: CoreService['name'];
   stationIds: string[];
   wholeServiceRevisions?: AffectedServiceRevision[];
 };

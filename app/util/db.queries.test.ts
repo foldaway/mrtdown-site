@@ -16,6 +16,7 @@ import {
   type SystemAnalytics,
   selectIncludedEntities,
   selectIssueIdsWithLatestOverlappingPeriodEvents,
+  selectLatestServiceEvents,
   selectRecentTownIssueIds,
   selectServiceBranchSourceEvents,
 } from './db.queries';
@@ -498,6 +499,81 @@ describe('selectServiceBranchSourceEvents', () => {
     ] as const;
 
     expect(selectServiceBranchSourceEvents(events)).toEqual(events);
+  });
+});
+
+describe('selectLatestServiceEvents', () => {
+  it('keeps the latest state independently for every affected service', () => {
+    const events = [
+      {
+        id: 'north-old',
+        issue_id: 'issue-1',
+        type: 'service_scopes.set',
+        ts: '2025-01-01T00:00:00+08:00',
+      },
+      {
+        id: 'south-latest',
+        issue_id: 'issue-1',
+        type: 'service_scopes.set',
+        ts: '2025-01-03T00:00:00+08:00',
+      },
+      {
+        id: 'north-latest',
+        issue_id: 'issue-1',
+        type: 'service_scopes.set',
+        ts: '2025-01-02T00:00:00+08:00',
+      },
+      {
+        id: 'other-issue',
+        issue_id: 'issue-2',
+        type: 'service_scopes.set',
+        ts: '2025-01-04T00:00:00+08:00',
+      },
+    ] as const;
+    const references = [
+      { impact_event_id: 'north-old', service_id: 'northbound' },
+      { impact_event_id: 'south-latest', service_id: 'southbound' },
+      { impact_event_id: 'north-latest', service_id: 'northbound' },
+      { impact_event_id: 'other-issue', service_id: 'northbound' },
+    ];
+
+    expect(
+      selectLatestServiceEvents(
+        events,
+        references,
+        'issue-1',
+        'service_scopes.set',
+      ).map((event) => event.id),
+    ).toEqual(['north-latest', 'south-latest']);
+  });
+
+  it('uses event ids as a deterministic timestamp tie-breaker per service', () => {
+    const events = [
+      {
+        id: 'scope-a',
+        issue_id: 'issue-1',
+        type: 'service_scopes.set',
+        ts: '2025-01-01T00:00:00+08:00',
+      },
+      {
+        id: 'scope-b',
+        issue_id: 'issue-1',
+        type: 'service_scopes.set',
+        ts: '2025-01-01T00:00:00+08:00',
+      },
+    ] as const;
+
+    expect(
+      selectLatestServiceEvents(
+        events,
+        events.map((event) => ({
+          impact_event_id: event.id,
+          service_id: 'northbound',
+        })),
+        'issue-1',
+        'service_scopes.set',
+      ).map((event) => event.id),
+    ).toEqual(['scope-b']);
   });
 });
 

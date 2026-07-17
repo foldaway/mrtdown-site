@@ -1,7 +1,4 @@
-import {
-  ArrowsRightLeftIcon,
-  ChevronDownIcon,
-} from '@heroicons/react/20/solid';
+import { ArrowRightIcon, ChevronDownIcon } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
@@ -47,6 +44,11 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
     branch,
     membershipReferenceAt,
   );
+  const serviceName =
+    branch.serviceName != null
+      ? getLocalizedTranslation(branch.serviceName, intl.locale)
+      : null;
+  const isWholeService = branch.wholeServiceRevisions != null;
 
   const hasMultipleStations = allStations.length > 2;
 
@@ -60,21 +62,71 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
         : null;
 
     if (destination) {
-      return `${sourceName} ↔ ${destinationName}`;
+      return `${sourceName} → ${destinationName}`;
     }
 
     return sourceName;
+  };
+
+  const stationRange = renderStationRange();
+
+  const renderStationRangeLinks = () => (
+    <div className="flex min-w-0 items-center gap-x-1">
+      {source && (
+        <Link
+          to="/{-$lang}/stations/$stationId"
+          params={{ stationId: source.id }}
+          className="truncate font-semibold text-gray-800 text-xs transition-colors hover:underline dark:text-gray-100"
+        >
+          {getLocalizedTranslation(source.name, intl.locale)}
+        </Link>
+      )}
+      {destination != null && (
+        <>
+          <ArrowRightIcon className="size-3 shrink-0 text-gray-500" />
+          <Link
+            to="/{-$lang}/stations/$stationId"
+            params={{ stationId: destination.id }}
+            className="truncate font-semibold text-gray-800 text-xs transition-colors hover:underline dark:text-gray-100"
+          >
+            {getLocalizedTranslation(destination.name, intl.locale)}
+          </Link>
+        </>
+      )}
+    </div>
+  );
+
+  const renderServiceContext = () => {
+    if (serviceName == null && !isWholeService) {
+      return null;
+    }
+
+    return (
+      <div className="flex min-w-0 items-center gap-1.5">
+        {serviceName != null && (
+          <span className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+            {serviceName}
+          </span>
+        )}
+        {isWholeService && (
+          <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 font-semibold text-[9px] text-blue-700 uppercase tracking-wide dark:bg-blue-900/40 dark:text-blue-300">
+            <FormattedMessage
+              id="issue.whole_service_badge"
+              defaultMessage="Whole service"
+            />
+          </span>
+        )}
+      </div>
+    );
   };
 
   if (!hasMultipleStations) {
     return (
       <div
         className={classNames(
-          'flex items-center gap-x-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs transition-all duration-200 hover:border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600',
+          'flex min-w-0 items-center gap-x-2 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs transition-all duration-200 hover:border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600',
           className,
         )}
-        role="img"
-        aria-label={`${line.id} line: ${renderStationRange()}`}
       >
         <span
           className="rounded-md px-2 py-1 font-bold text-white text-xs leading-none"
@@ -83,28 +135,9 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
           {line.id}
         </span>
 
-        <div className="flex items-center gap-x-1">
-          {source && (
-            <Link
-              to="/{-$lang}/stations/$stationId"
-              params={{ stationId: source.id }}
-              className="font-medium text-gray-700 text-xs transition-colors hover:underline dark:text-gray-200"
-            >
-              {getLocalizedTranslation(source.name, intl.locale)}
-            </Link>
-          )}
-          {destination != null && (
-            <>
-              <ArrowsRightLeftIcon className="size-3 text-gray-400" />
-              <Link
-                to="/{-$lang}/stations/$stationId"
-                params={{ stationId: destination.id }}
-                className="font-medium text-gray-700 text-xs transition-colors hover:underline dark:text-gray-200"
-              >
-                {getLocalizedTranslation(destination.name, intl.locale)}
-              </Link>
-            </>
-          )}
+        <div className="flex min-w-0 flex-col">
+          {renderStationRangeLinks()}
+          {renderServiceContext()}
         </div>
       </div>
     );
@@ -115,10 +148,8 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
       <DropdownMenu.Root>
         <DropdownMenu.Trigger
           className={classNames(
-            'flex w-full cursor-pointer items-center gap-x-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs transition-all duration-200 hover:border-gray-300 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600',
+            'flex w-full cursor-pointer items-center gap-x-2 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-left text-xs transition-all duration-200 hover:border-gray-300 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600',
           )}
-          role="img"
-          aria-label={`${line.id} line: ${renderStationRange()}`}
         >
           <span
             className="rounded-md px-2 py-1 font-bold text-white text-xs leading-none"
@@ -127,20 +158,23 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
             {line.id}
           </span>
 
-          <div className="flex items-center gap-x-1">
-            <span className="font-medium text-gray-700 text-xs dark:text-gray-200">
-              {source != null
-                ? getLocalizedTranslation(source.name, intl.locale)
-                : 'N/A'}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="flex min-w-0 items-center gap-x-1 font-semibold text-gray-800 text-xs dark:text-gray-100">
+              <span className="truncate">
+                {source != null
+                  ? getLocalizedTranslation(source.name, intl.locale)
+                  : 'N/A'}
+              </span>
+              {destination != null && (
+                <>
+                  <ArrowRightIcon className="size-3 shrink-0 text-gray-500" />
+                  <span className="truncate">
+                    {getLocalizedTranslation(destination.name, intl.locale)}
+                  </span>
+                </>
+              )}
             </span>
-            {destination != null && (
-              <>
-                <ArrowsRightLeftIcon className="size-3 text-gray-400" />
-                <span className="font-medium text-gray-700 text-xs dark:text-gray-200">
-                  {getLocalizedTranslation(destination.name, intl.locale)}
-                </span>
-              </>
-            )}
+            {renderServiceContext()}
           </div>
 
           <div className="ml-auto">
@@ -150,26 +184,82 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
 
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            className="z-50 max-h-80 w-72 overflow-hidden rounded border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
-            sideOffset={4}
+            className="z-50 flex max-h-[var(--radix-dropdown-menu-content-available-height)] w-80 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
+            sideOffset={6}
+            collisionPadding={8}
           >
-            <div className="p-2">
-              <div className="mb-2 flex items-center gap-1.5">
+            <div className="shrink-0 border-gray-200 border-b bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900/40">
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="rounded-md px-2 py-1 font-bold text-white text-xs leading-none"
+                  style={{ backgroundColor: line.color }}
+                >
+                  {line.id}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-gray-900 text-xs dark:text-gray-100">
+                    {getLocalizedTranslation(line.name, intl.locale)}
+                  </p>
+                  {serviceName != null && (
+                    <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                      {serviceName}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="shrink-0 p-3 pb-2">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 dark:border-gray-700 dark:bg-gray-900/30">
+                <p className="font-medium text-[10px] text-gray-400 uppercase tracking-wide dark:text-gray-500">
+                  <FormattedMessage
+                    id="issue.service_coverage"
+                    defaultMessage="Service coverage"
+                  />
+                </p>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <p className="truncate font-semibold text-gray-800 text-xs dark:text-gray-200">
+                    {isWholeService ? (
+                      <FormattedMessage
+                        id="issue.entire_service"
+                        defaultMessage="Entire service"
+                      />
+                    ) : (
+                      stationRange
+                    )}
+                  </p>
+                  <span className="shrink-0 rounded-md bg-white px-1.5 py-0.5 font-medium text-[10px] text-gray-500 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700">
+                    <FormattedMessage
+                      id="issue.station_count"
+                      defaultMessage="{count, plural, one {# station} other {# stations}}"
+                      values={{ count: allStations.length }}
+                    />
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-1.5 px-0.5">
                 <div
                   className="size-2 rounded-full"
                   style={{ backgroundColor: line.color }}
                 />
-                <span className="font-medium text-gray-500 text-xs dark:text-gray-400">
-                  <FormattedMessage
-                    id="issue.affected_stations_schematic"
-                    defaultMessage="Affected Stations ({count})"
-                    values={{ count: allStations.length }}
-                  />
+                <span className="font-semibold text-gray-600 text-xs dark:text-gray-300">
+                  {isWholeService ? (
+                    <FormattedMessage
+                      id="issue.stations_on_service"
+                      defaultMessage="Stations on this service"
+                    />
+                  ) : (
+                    <FormattedMessage
+                      id="general.affected_stations"
+                      defaultMessage="Affected stations"
+                    />
+                  )}
                 </span>
               </div>
             </div>
 
-            <div className="max-h-64 overflow-y-auto px-2 pb-2">
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
               <div className="grid grid-cols-[auto_1fr] gap-x-2">
                 {allStations.map((station, index) => (
                   <Fragment key={station.id}>
