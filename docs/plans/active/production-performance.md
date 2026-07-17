@@ -58,7 +58,7 @@ Relevant code:
 
 - `app/routes/{-$lang}/statistics/index.tsx`
 - `app/util/statistics.functions.ts`
-- `app/util/db.queries.ts#getStatisticsData`
+- `app/util/dbQueries/statistics.ts#getStatisticsData`
 
 ### 2. Route responses serialize more included data than they need
 
@@ -74,7 +74,7 @@ This inflates:
 
 Relevant code:
 
-- `app/util/db.queries.ts#withIssues`
+- `app/util/dbQueries/includedEntities.ts#selectIncludedEntities`
 - `app/contexts/IncludedEntities.ts`
 
 ### 3. Home page performs viewport-dependent data loading
@@ -99,8 +99,8 @@ cost of heavier origin work on Cloudflare misses.
 
 Relevant code:
 
-- `app/util/db.queries.ts#getBaseDataset`
-- `app/util/db.queries.ts#buildDataset`
+- `app/util/dbQueries/dataset.ts#getBaseDataset`
+- `app/util/dbQueries/dataset.ts#buildDataset`
 
 ### 5. Public SSR HTML is not application-cached
 
@@ -321,7 +321,7 @@ progress notes and current measurements before planning new work.
   disruption issues, and the line/station dependencies those issue cards need.
   It no longer serializes the full operators, towns, landmarks, or station
   dictionaries for the statistics route. Added focused selector coverage in
-  `app/util/db.queries.test.ts`.
+  `app/util/dbQueries/includedEntities.test.ts`.
 - 2026-05-27: Advanced Phase 2 for `/` and started Phase 3. The home loader now
   returns an explicit included-entity subset instead of the full base included
   graph: rendered line summaries, selected advisory/date-card issues, and the

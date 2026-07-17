@@ -25,7 +25,7 @@ import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import type { Station } from '~/types';
 import { assert } from '~/util/assert';
-import type { TownStationStatus } from '~/util/db.queries';
+import type { TownStationStatus } from '~/util/dbQueries/towns';
 import { getTownProfileFn } from '~/util/town.functions';
 
 const SG_TIMEZONE = 'Asia/Singapore';

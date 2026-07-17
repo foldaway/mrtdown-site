@@ -8,7 +8,7 @@ vi.mock('@tanstack/react-start', () => ({
   }),
 }));
 
-vi.mock('./db.queries', () => ({
+vi.mock('./dbQueries/sitemap', () => ({
   getSitemapData: vi.fn(),
 }));
 

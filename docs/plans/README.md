@@ -30,6 +30,9 @@ Use plans for:
 
 ## Completed
 
+- [Database query decomposition](completed/database-query-decomposition.md):
+  split the monolithic read-model query module into layered dataset, domain,
+  maintenance, and feature modules without changing public responses.
 - [Crowdsourced reports](completed/crowdsourced-reports.md): site-local public
   report collection, moderation, clustering, and canonical ingest dispatch.
 - [Fly.io migration](completed/fly-migration.md): migration from Cloudflare

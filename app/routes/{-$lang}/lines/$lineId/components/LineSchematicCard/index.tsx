@@ -7,7 +7,7 @@ import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { getVisibleStationMembershipsAt } from '~/helpers/isStationMembershipVisibleAt';
-import type { LineBranch } from '~/util/db.queries';
+import type { LineBranch } from '~/util/dbQueries/lines';
 import { deriveLineBranchMembershipReferenceDate } from '~/util/lineBranches';
 import type { Line } from '~/types';
 import { BranchItem } from './components/BranchItem';

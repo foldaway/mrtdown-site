@@ -5,7 +5,7 @@ import type React from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
-import type { SystemAnalytics } from '~/util/db.queries';
+import type { SystemAnalytics } from '~/util/dbQueries/statistics';
 import { StatisticsCard } from '../StatisticsCard';
 import { DayIssuesList } from './components/DayIssuesList';
 import { useDayIssues } from './hooks/useDayIssues';

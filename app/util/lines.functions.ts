@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
-import { getLineProfileData, getLinesDirectoryData } from './db.queries';
+import { getLineProfileData, getLinesDirectoryData } from './dbQueries/lines';
 import { timeServerSpan } from './serverTiming';
 
 export const getLinesDirectoryFn = createServerFn({ method: 'GET' }).handler(

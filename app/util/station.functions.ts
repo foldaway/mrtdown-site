@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { getStationProfileData, getStationsDirectoryData } from './db.queries';
+import {
+  getStationProfileData,
+  getStationsDirectoryData,
+} from './dbQueries/stations';
 import { timeServerSpan } from './serverTiming';
 
 const InputSchema = z.object({

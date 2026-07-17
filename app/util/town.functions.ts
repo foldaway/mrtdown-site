@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { getTownProfileData, getTownsData } from './db.queries';
+import { getTownProfileData, getTownsData } from './dbQueries/towns';
 
 const TownProfileInputSchema = z.object({
   townId: z.string(),

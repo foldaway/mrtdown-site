@@ -1,9 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
-import {
-  rebuildOperationalFactsRange,
-  rebuildStatisticsSnapshot,
-} from '~/util/db.queries';
+import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts';
+import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics';
 import { internalMiddleware } from '~/util/internal.middleware';
 
 const RequestSchema = z.object({

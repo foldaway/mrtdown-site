@@ -1,7 +1,7 @@
 import { createWorkflow } from '@upstash/workflow/tanstack';
 import { getDb } from '~/db/index.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
-import { rebuildOperationalFactsForDates } from '~/util/db.queries.js';
+import { rebuildOperationalFactsForDates } from '~/util/dbQueries/operationalFacts.js';
 import { syncPublicHolidaysFromDataGov } from './helpers/syncPublicHolidays.js';
 
 type Params = Record<string, never>;

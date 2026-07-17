@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import { FormattedDate, FormattedMessage, useIntl } from 'react-intl';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import type { LineBranch } from '~/util/db.queries';
+import type { LineBranch } from '~/util/dbQueries/lines';
 import { lineBranchHasEnded, lineBranchIsActiveOn } from '~/util/lineBranches';
 
 interface Props {

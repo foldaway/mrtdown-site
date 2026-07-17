@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import { relations } from '~/db/relations.js';
 import { ZipStore } from '../helpers/ZipStore.js';
-import { rebuildOperationalFactsRange } from '../util/db.queries.js';
+import { rebuildOperationalFactsRange } from '../util/dbQueries/operationalFacts.js';
 import { syncPublicHolidaysFromDataGov } from '../workflows/publicHolidays/helpers/syncPublicHolidays.js';
 import { fetchArchive } from '../workflows/pull/helpers/fetchArchive.js';
 import { fetchManifest } from '../workflows/pull/helpers/fetchManifest.js';

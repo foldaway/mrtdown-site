@@ -1,10 +1,8 @@
-import type {
-  getIssueData,
-  getLineProfileData,
-  getOperatorProfileData,
-  getOverviewData,
-  getStationProfileData,
-} from '../db.queries';
+import type { getIssueData } from '../dbQueries/issue';
+import type { getLineProfileData } from '../dbQueries/lines';
+import type { getOperatorProfileData } from '../dbQueries/operators';
+import type { getOverviewData } from '../dbQueries/overview';
+import type { getStationProfileData } from '../dbQueries/stations';
 
 export const DEFAULT_ROOT_URL = 'https://www.mrtdown.org';
 

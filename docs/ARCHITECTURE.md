@@ -11,7 +11,8 @@ client assets.
   Markdown request negotiation.
 - `app/util/*.functions.ts`: TanStack server functions used by loaders and
   client code.
-- `app/util/db.queries.ts`: DB-backed read model queries used by server
+- `app/util/dbQueries`: layered DB-backed read-model assembly, domain
+  calculations, maintenance tasks, and feature queries used by server
   functions and workflows.
 - `app/types.ts`: source-owned domain and response shapes returned by server
   functions.
@@ -25,7 +26,7 @@ client assets.
 
 Canonical mrtdown archive data is fetched by the pull workflow, staged in
 `*_next` tables, promoted into normalized live tables, and read by server
-functions through `app/util/db.queries.ts`.
+functions through the modules under `app/util/dbQueries`.
 
 QStash invokes the public workflow endpoint under
 `/internal/api/workflows/$workflowName`. Authenticated internal task routes can

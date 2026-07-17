@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
 import { HOME_OVERVIEW_INITIAL_DATE_COUNT } from '~/constants';
-import { getOverviewData } from './db.queries';
+import { getOverviewData } from './dbQueries/overview';
 import { timeServerSpan } from './serverTiming';
 
 const RequestSchema = z.object({

@@ -6,10 +6,8 @@ import {
 import { createWorkflow } from '@upstash/workflow/tanstack';
 import { ZipStore } from '~/helpers/ZipStore.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
-import {
-  rebuildOperationalFactsRange,
-  rebuildStatisticsSnapshot,
-} from '~/util/db.queries.js';
+import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts.js';
+import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics.js';
 import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';

@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
-import { getRootData } from './db.queries';
+import { getRootData } from './dbQueries/root';
 import { getLocaleMessages } from './localeMessages';
 import { timeServerSpan } from './serverTiming';
 

@@ -1,0 +1,53 @@
+import { asc, eq } from 'drizzle-orm';
+import { linesTable, metadataTable, operatorsTable } from '~/db/schema';
+import { timeServerSpan } from '~/util/serverTiming';
+import { getDefaultDb, timeDbQuery } from './database';
+
+const ROOT_LAST_UPDATED_METADATA_KEY = 'manifest_last_pulled_at';
+
+export async function getRootData() {
+  return timeServerSpan('root_data', async () => {
+    const db = await getDefaultDb();
+    const [lineRows, metadataRows, operatorRows] = await timeServerSpan(
+      'root_nav_queries',
+      () =>
+        Promise.all([
+          timeDbQuery('root_q_lines', () =>
+            db
+              .select({
+                id: linesTable.id,
+                name: linesTable.name,
+                color: linesTable.color,
+              })
+              .from(linesTable)
+              .orderBy(asc(linesTable.id)),
+          ),
+          timeDbQuery('root_q_metadata', () =>
+            db
+              .select({
+                key: metadataTable.key,
+                value: metadataTable.value,
+              })
+              .from(metadataTable)
+              .where(eq(metadataTable.key, ROOT_LAST_UPDATED_METADATA_KEY))
+              .limit(1),
+          ),
+          timeDbQuery('root_q_operators', () =>
+            db
+              .select({
+                id: operatorsTable.id,
+                name: operatorsTable.name,
+              })
+              .from(operatorsTable)
+              .orderBy(asc(operatorsTable.id)),
+          ),
+        ]),
+    );
+
+    return {
+      lineNavItems: lineRows,
+      metadata: metadataRows,
+      operatorNavItems: operatorRows,
+    };
+  });
+}
