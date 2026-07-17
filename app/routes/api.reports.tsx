@@ -3,6 +3,7 @@ import { RateLimiterRes } from 'rate-limiter-flexible';
 import { getDb } from '~/db';
 import { getCrowdReportRateLimiter } from '~/limiters/crowdReport';
 import { purgePublicDataCache } from '~/util/cloudflareCache';
+import { triggerCrowdReportDispatchAfterSubmission } from '~/util/crowdReportDispatch';
 import {
   buildCrowdReportAbuseContext,
   CrowdReportRateLimitError,
@@ -141,6 +142,8 @@ export const Route = createFileRoute('/api/reports')({
               ),
             },
           );
+
+          triggerCrowdReportDispatchAfterSubmission(db);
 
           try {
             await purgePublicDataCache();

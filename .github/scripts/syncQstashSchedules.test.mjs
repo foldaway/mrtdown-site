@@ -30,6 +30,7 @@ describe('QStash schedule synchronization', () => {
         scheduleId: 'mrtdown-production-crowd-report-dispatch',
         destination:
           'https://www.mrtdown.org/internal/api/tasks/crowd-report-dispatch',
+        cron: '0 18 * * *',
         headers: { Authorization: 'Bearer schedule-secret' },
         redactHeaders: ['Authorization'],
       },

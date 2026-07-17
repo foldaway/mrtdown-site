@@ -77,6 +77,8 @@ export type CrowdReportDispatchRunResult = {
   }>;
 };
 
+type CrowdReportDispatchEnvironment = Record<string, string | undefined>;
+
 type CrowdReportDispatchOptions = {
   candidates?: CrowdReportDispatchCandidate[];
   limit?: number;
@@ -105,6 +107,13 @@ function clampDispatchLimit(limit: number | undefined) {
     return DEFAULT_DISPATCH_LIMIT;
   }
   return Math.max(1, Math.min(MAX_DISPATCH_LIMIT, limit));
+}
+
+export function getCrowdReportDispatchLimit(value: string | undefined) {
+  const parsed = Number(value ?? DEFAULT_DISPATCH_LIMIT);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= MAX_DISPATCH_LIMIT
+    ? parsed
+    : DEFAULT_DISPATCH_LIMIT;
 }
 
 function normalizeTimestamp(value: string | Date) {
@@ -783,4 +792,41 @@ export async function dispatchPendingCrowdReports(
     failed,
     results,
   };
+}
+
+/**
+ * Starts an immediate dispatch attempt after a public submission commits.
+ * Accepted rows remain the durable source of truth, so the scheduled dispatcher
+ * can retry if this best-effort attempt fails or the process exits early.
+ */
+export function triggerCrowdReportDispatchAfterSubmission(
+  db: AppDb,
+  environment: CrowdReportDispatchEnvironment = process.env,
+  dispatchImplementation: typeof dispatchPendingCrowdReports = dispatchPendingCrowdReports,
+) {
+  const rootUrl = environment.VITE_ROOT_URL?.trim();
+  const token = environment.CROWD_REPORT_DISPATCH_GITHUB_TOKEN?.trim();
+  if (!rootUrl || !token) {
+    return false;
+  }
+
+  void dispatchImplementation(db, {
+    kind: 'any',
+    limit: getCrowdReportDispatchLimit(environment.CROWD_REPORT_DISPATCH_LIMIT),
+    rootUrl,
+    token,
+    owner: environment.CROWD_REPORT_DISPATCH_GITHUB_OWNER,
+    repo: environment.CROWD_REPORT_DISPATCH_GITHUB_REPO,
+    eventType: environment.CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE,
+  })
+    .then((result) => {
+      for (const failure of result.results.filter((item) => !item.success)) {
+        console.error('Crowd report dispatch after submission failed', failure);
+      }
+    })
+    .catch((error: unknown) => {
+      console.error('Crowd report dispatch after submission failed', { error });
+    });
+
+  return true;
 }

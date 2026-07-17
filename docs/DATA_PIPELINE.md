@@ -59,9 +59,11 @@ lanes rather than aggregate durations alone.
 
 ## Crowd Report Dispatch
 
-Accepted crowdsourced reports and accepted report clusters stay site-local until
-the scheduled dispatch job or an operator invokes the dispatch path. The
-`/internal/api/tasks/crowd-report-dispatch` endpoint builds an
+Accepted crowdsourced reports and accepted report clusters trigger a
+best-effort dispatch attempt as soon as the submission transaction commits. The
+submission response does not wait for GitHub, and accepted rows stay pending if
+that attempt cannot complete. The `/internal/api/tasks/crowd-report-dispatch`
+endpoint builds an
 `@mrtdown/ingest-contracts` `crowd-report` payload, posts it to the
 `mrtdown-data` `repository_dispatch` ingest workflow, and records dispatch
 success or failure on the site-local report rows.
@@ -74,8 +76,9 @@ built from `VITE_ROOT_URL` as a stable `/community-reports/{kind}/{id}`
 permalink. Send `{ "dryRun": true }` to the endpoint to inspect pending payloads
 without calling GitHub or mutating report state.
 
-The six-hourly QStash schedule also invokes the same dispatch path when
-`CROWD_REPORT_DISPATCH_GITHUB_TOKEN` is configured. Use
+The daily 18:00 UTC QStash schedule invokes the same dispatch path as a retry
+backstop when `CROWD_REPORT_DISPATCH_GITHUB_TOKEN` is configured. This gives
+the upstream ingest workflow six hours before the daily canonical pull. Use
 `CROWD_REPORT_DISPATCH_LIMIT` to tune the maximum number of dispatch candidates
 processed per scheduled run.
 

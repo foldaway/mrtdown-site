@@ -254,9 +254,9 @@ republishing deleted Reddit text. Decide whether individual upstream URLs may
 remain visible after deletion before freezing the contract.
 
 Canonical dispatch must use a durable outbox and stable idempotency key. Do not
-depend on the existing six-hour crowd-report schedule for live reply-driven
-signals; dispatch when a signal crosses an accepted transition, with scheduled
-retry as a fallback.
+depend on the daily crowd-report retry schedule for live reply-driven signals;
+dispatch when a signal crosses an accepted transition, with scheduled retry as
+a fallback.
 
 ## Phases
 

@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PULL_CRON = '0 0 * * *';
+const CROWD_REPORT_DISPATCH_CRON = '0 18 * * *';
 const PUBLIC_HOLIDAYS_CRON = '0 18 * * SUN';
 
 export const DEPLOYMENT_TIERS = ['preview', 'staging', 'production'];
@@ -70,7 +71,7 @@ export function buildManagedSchedules({ internalApiToken, rootUrl, tier }) {
         '/internal/api/tasks/crowd-report-dispatch',
         origin,
       ).toString(),
-      cron: PULL_CRON,
+      cron: CROWD_REPORT_DISPATCH_CRON,
       retries: 3,
       label: `${prefix}-crowd-report-dispatch`,
       headers: {

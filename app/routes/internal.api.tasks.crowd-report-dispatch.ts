@@ -4,6 +4,7 @@ import { getDb } from '~/db';
 import {
   dispatchPendingCrowdReports,
   getDispatchableCrowdReportCandidates,
+  getCrowdReportDispatchLimit,
 } from '~/util/crowdReportDispatch';
 import { internalMiddleware } from '~/util/internal.middleware';
 
@@ -14,11 +15,6 @@ const RequestSchema = z
     limit: z.number().int().min(1).max(50).optional(),
   })
   .strict();
-
-function getDefaultDispatchLimit() {
-  const parsed = Number(process.env.CROWD_REPORT_DISPATCH_LIMIT ?? 10);
-  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 50 ? parsed : 10;
-}
 
 async function parseOptionalJsonBody(request: Request) {
   if (request.headers.get('content-length') === '0') {
@@ -80,7 +76,9 @@ export const Route = createFileRoute(
         }
 
         const db = getDb();
-        const limit = parsed.data.limit ?? getDefaultDispatchLimit();
+        const limit =
+          parsed.data.limit ??
+          getCrowdReportDispatchLimit(process.env.CROWD_REPORT_DISPATCH_LIMIT);
         if (parsed.data.dryRun) {
           const candidates = await getDispatchableCrowdReportCandidates(db, {
             kind: parsed.data.kind,

@@ -7,8 +7,10 @@ import {
   buildCrowdReportSourceUrl,
   dispatchCrowdReportPayloadToGitHub,
   dispatchPendingCrowdReports,
+  getCrowdReportDispatchLimit,
   getDispatchableCrowdReportCandidates,
   markCrowdReportDispatchSuccess,
+  triggerCrowdReportDispatchAfterSubmission,
 } from './crowdReportDispatch';
 
 function makeFakeCandidateDb() {
@@ -595,6 +597,65 @@ describe('getDispatchableCrowdReportCandidates', () => {
       dispatch_error:
         'Crowd report dispatch was sent, but local success marking became stale',
     });
+  });
+});
+
+describe('submission-triggered crowd report dispatch', () => {
+  it('starts a configured dispatch without waiting for the scheduled job', () => {
+    const dispatchImplementation = vi.fn().mockResolvedValue({
+      success: true,
+      count: 0,
+      dispatched: 0,
+      failed: 0,
+      results: [],
+    });
+
+    expect(
+      triggerCrowdReportDispatchAfterSubmission(
+        {} as never,
+        {
+          VITE_ROOT_URL: ' https://mrtdown.example ',
+          CROWD_REPORT_DISPATCH_GITHUB_TOKEN: ' github-token ',
+          CROWD_REPORT_DISPATCH_GITHUB_OWNER: 'foldaway',
+          CROWD_REPORT_DISPATCH_GITHUB_REPO: 'mrtdown-data',
+          CROWD_REPORT_DISPATCH_GITHUB_EVENT_TYPE: 'ingest',
+          CROWD_REPORT_DISPATCH_LIMIT: '7',
+        },
+        dispatchImplementation,
+      ),
+    ).toBe(true);
+
+    expect(dispatchImplementation).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        kind: 'any',
+        limit: 7,
+        rootUrl: 'https://mrtdown.example',
+        token: 'github-token',
+        owner: 'foldaway',
+        repo: 'mrtdown-data',
+        eventType: 'ingest',
+      }),
+    );
+  });
+
+  it('leaves dispatch to the scheduled retry when configuration is missing', () => {
+    const dispatchImplementation = vi.fn();
+
+    expect(
+      triggerCrowdReportDispatchAfterSubmission(
+        {} as never,
+        { VITE_ROOT_URL: 'https://mrtdown.example' },
+        dispatchImplementation,
+      ),
+    ).toBe(false);
+    expect(dispatchImplementation).not.toHaveBeenCalled();
+  });
+
+  it('uses the bounded default for invalid dispatch limits', () => {
+    expect(getCrowdReportDispatchLimit('51')).toBe(10);
+    expect(getCrowdReportDispatchLimit('not-a-number')).toBe(10);
+    expect(getCrowdReportDispatchLimit(undefined)).toBe(10);
   });
 });
 
