@@ -18,7 +18,7 @@ describe('QStash schedule synchronization', () => {
       {
         scheduleId: 'mrtdown-production-pull',
         destination: 'https://www.mrtdown.org/internal/api/workflows/pull',
-        cron: '0 0,6,12,18 * * *',
+        cron: '0 0 * * *',
       },
       {
         scheduleId: 'mrtdown-production-public-holidays',

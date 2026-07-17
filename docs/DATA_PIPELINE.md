@@ -30,6 +30,7 @@ The preview, staging, and production deployment workflows run
 idempotently creates or updates the QStash schedules for the canonical pull,
 public holiday sync, and crowd report dispatch. Schedule IDs include `TIER`, so
 the environments can share one QStash account without overwriting each other.
+Canonical pulls run daily at 00:00 UTC in every environment.
 
 Configure `QSTASH_URL`, `QSTASH_TOKEN`, and `INTERNAL_API_TOKEN` as secrets in
 each GitHub deployment environment. The deployment workflow supplies `TIER`

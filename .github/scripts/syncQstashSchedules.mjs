@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const PULL_CRON = '0 0,6,12,18 * * *';
+const PULL_CRON = '0 0 * * *';
 const PUBLIC_HOLIDAYS_CRON = '0 18 * * SUN';
 
 export const DEPLOYMENT_TIERS = ['preview', 'staging', 'production'];
