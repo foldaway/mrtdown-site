@@ -1,21 +1,25 @@
-import type { Line, LineSummaryStatus, Station } from '~/types';
-import { asc, eq, inArray } from 'drizzle-orm';
+import type { LineSummaryStatus, Station } from '~/types';
+import { and, asc, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import {
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
   impactEventsTable,
+  issueDayFactsTable,
+  linesTable,
   servicesTable,
   stationCodesTable,
+  stationIssueFactsTable,
   stationLandmarksTable,
   stationsTable,
+  townsTable,
 } from '~/db/schema';
 import {
   type CommunitySignalOptions,
   getPageCommunitySignals,
 } from './communitySignals';
 import { getDefaultDb, timeDbQuery } from './database';
-import { buildDataset, getCompleteDataset } from './dataset';
-import { isoDate, nowSg, parseDateTime } from './dateTime';
+import { buildDataset, parseTranslations } from './dataset';
+import { isoDate, nowSg } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
 import {
@@ -316,13 +320,108 @@ export async function getStationProfileReadModel(
 /** @deprecated Use the explicitly scoped read-model name. */
 export const getStationProfileData = getStationProfileReadModel;
 
+export function deriveStationDirectoryStatus(
+  stationIssues: readonly IssueWithOperationalEffects[],
+  referenceNow = nowSg(),
+): LineSummaryStatus {
+  const activeIssues = stationIssues.filter((issue) =>
+    issueActiveNow(issue, referenceNow),
+  );
+
+  if (activeIssues.some((issue) => issue.type === 'disruption')) {
+    return 'ongoing_disruption';
+  }
+  if (activeIssues.some((issue) => issue.type === 'maintenance')) {
+    return 'ongoing_maintenance';
+  }
+  if (activeIssues.some((issue) => issue.type === 'infra')) {
+    return 'ongoing_infra';
+  }
+  return 'normal';
+}
+
+export function deriveStationDirectoryOperationalState(
+  memberships: readonly Pick<Station['memberships'][number], 'startedAt'>[],
+  referenceDate: string,
+) {
+  if (memberships.some((membership) => membership.startedAt <= referenceDate)) {
+    return 'open' as const;
+  }
+  return memberships.length > 0 ? ('future' as const) : ('closed' as const);
+}
+
 export async function getStationsDirectoryData() {
-  const dataset = await getCompleteDataset('route:/stations');
   const referenceNow = nowSg();
   const referenceDate = isoDate(referenceNow);
+  const db = await getDefaultDb();
+  const [stationRows, membershipRows, townRows, activeIssueRows, latestRows] =
+    await Promise.all([
+      timeDbQuery('stations_directory_q_stations', () =>
+        db
+          .select({
+            id: stationsTable.id,
+            name: stationsTable.name,
+            townId: stationsTable.townId,
+          })
+          .from(stationsTable),
+      ),
+      timeDbQuery('stations_directory_q_memberships', () =>
+        db
+          .select({
+            stationId: stationCodesTable.station_id,
+            lineId: stationCodesTable.line_id,
+            code: stationCodesTable.code,
+            startedAt: stationCodesTable.started_at,
+            structureType: stationCodesTable.structure_type,
+          })
+          .from(stationCodesTable)
+          .where(
+            or(
+              isNull(stationCodesTable.ended_at),
+              gt(stationCodesTable.ended_at, referenceDate),
+            ),
+          ),
+      ),
+      timeDbQuery('stations_directory_q_towns', () =>
+        db
+          .select({ id: townsTable.id, name: townsTable.name })
+          .from(townsTable),
+      ),
+      timeDbQuery('stations_directory_q_active_issues', () =>
+        db
+          .select({ issueId: issueDayFactsTable.issue_id })
+          .from(issueDayFactsTable)
+          .where(
+            and(
+              eq(issueDayFactsTable.date, referenceDate),
+              eq(issueDayFactsTable.active_anytime, true),
+            ),
+          ),
+      ),
+      timeDbQuery('stations_directory_q_latest_disruptions', () =>
+        db
+          .selectDistinctOn([stationIssueFactsTable.station_id], {
+            stationId: stationIssueFactsTable.station_id,
+            issueId: stationIssueFactsTable.issue_id,
+            latestActivityAt: stationIssueFactsTable.latest_activity_at,
+          })
+          .from(stationIssueFactsTable)
+          .where(eq(stationIssueFactsTable.issue_type, 'disruption'))
+          .orderBy(
+            asc(stationIssueFactsTable.station_id),
+            desc(stationIssueFactsTable.latest_activity_at),
+            desc(stationIssueFactsTable.issue_id),
+          ),
+      ),
+    ]);
+  const activeIssueIds = activeIssueRows.map((row) => row.issueId);
+  const activeDataset =
+    activeIssueIds.length > 0
+      ? await buildDataset(referenceNow, db, activeIssueIds)
+      : null;
   const issuesByStationId = new Map<string, IssueWithOperationalEffects[]>();
 
-  for (const issue of Object.values(dataset.allIssues)) {
+  for (const issue of Object.values(activeDataset?.allIssues ?? {})) {
     const stationIds = new Set(
       issue.branchesAffected.flatMap((branch) => branch.stationIds),
     );
@@ -336,68 +435,47 @@ export async function getStationsDirectoryData() {
     }
   }
 
-  const stations = Object.values(dataset.included.stations).map((station) => {
-    const memberships = station.memberships.filter(
-      (membership) => membership.endedAt == null,
+  const membershipsByStationId = Map.groupBy(
+    membershipRows,
+    (membership) => membership.stationId,
+  );
+  const latestByStationId = new Map(
+    latestRows.map((row) => [row.stationId, row]),
+  );
+  const stations = stationRows.map((station) => {
+    const memberships = (membershipsByStationId.get(station.id) ?? []).map(
+      (membership) => ({
+        lineId: membership.lineId,
+        branchId: `${membership.lineId}:${membership.code}`,
+        code: membership.code,
+        startedAt: membership.startedAt,
+        endedAt: undefined,
+        structureType: membership.structureType,
+        sequenceOrder: 0,
+      }),
     );
     const stationIssues = issuesByStationId.get(station.id) ?? [];
-    const activeIssues = stationIssues.filter((issue) =>
-      issueActiveNow(issue, referenceNow),
+    const status = deriveStationDirectoryStatus(stationIssues, referenceNow);
+    const operationalState = deriveStationDirectoryOperationalState(
+      memberships,
+      referenceDate,
     );
-
-    let status: LineSummaryStatus = 'normal';
-    if (activeIssues.some((issue) => issue.type === 'disruption')) {
-      status = 'ongoing_disruption';
-    } else if (activeIssues.some((issue) => issue.type === 'maintenance')) {
-      status = 'ongoing_maintenance';
-    } else if (activeIssues.some((issue) => issue.type === 'infra')) {
-      status = 'ongoing_infra';
-    }
-
-    const hasStartedMembership = memberships.some(
-      (membership) => membership.startedAt <= referenceDate,
-    );
-    const operationalState = hasStartedMembership
-      ? 'open'
-      : memberships.length > 0
-        ? 'future'
-        : 'closed';
-    const latestDisruptionId = sortIssuesByLatestActivity(
-      stationIssues
-        .filter((issue) => issue.type === 'disruption')
-        .map((issue) => issue.id),
-      dataset.allIssues,
-    )[0];
-    const latestDisruption =
-      latestDisruptionId == null ? null : dataset.allIssues[latestDisruptionId];
-    const latestDisruptionAt =
-      latestDisruption == null
-        ? null
-        : latestDisruption.intervals.reduce<string | null>(
-            (latest, interval) => {
-              const candidate = interval.endAt ?? interval.startAt;
-              if (
-                latest == null ||
-                parseDateTime(candidate) > parseDateTime(latest)
-              ) {
-                return candidate;
-              }
-              return latest;
-            },
-            null,
-          );
+    const latestDisruption = latestByStationId.get(station.id);
 
     return {
       id: station.id,
-      name: station.name,
+      name: parseTranslations(station.name),
       townId: station.townId,
       memberships,
       status,
       operationalState,
       latestDisruption:
-        latestDisruptionId == null || latestDisruptionAt == null
+        latestDisruption == null
           ? null
-          : { id: latestDisruptionId, at: latestDisruptionAt },
+          : {
+              id: latestDisruption.issueId,
+              at: latestDisruption.latestActivityAt,
+            },
     };
   });
 
@@ -406,29 +484,39 @@ export async function getStationsDirectoryData() {
       station.memberships.map((membership) => membership.lineId),
     ),
   );
-  const townIds = new Set(stations.map((station) => station.townId));
+  const lineRows =
+    lineIds.size > 0
+      ? await timeDbQuery('stations_directory_q_lines', () =>
+          db
+            .select({
+              id: linesTable.id,
+              name: linesTable.name,
+              color: linesTable.color,
+              type: linesTable.type,
+            })
+            .from(linesTable)
+            .where(inArray(linesTable.id, [...lineIds])),
+        )
+      : [];
 
   return {
     stations,
     lines: Object.fromEntries(
-      [...lineIds]
-        .map((lineId) => dataset.included.lines[lineId])
-        .filter((line): line is Line => line != null)
-        .map((line) => [
-          line.id,
-          {
-            id: line.id,
-            name: line.name,
-            color: line.color,
-            type: line.type,
-          },
-        ]),
+      lineRows.map((line) => [
+        line.id,
+        {
+          id: line.id,
+          name: parseTranslations(line.name),
+          color: line.color,
+          type: line.type,
+        },
+      ]),
     ),
     towns: Object.fromEntries(
-      [...townIds]
-        .map((townId) => dataset.included.towns[townId])
-        .filter((town): town is NonNullable<typeof town> => town != null)
-        .map((town) => [town.id, town]),
+      townRows.map((town) => [
+        town.id,
+        { id: town.id, name: parseTranslations(town.name) },
+      ]),
     ),
   };
 }

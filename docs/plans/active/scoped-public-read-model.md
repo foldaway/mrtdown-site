@@ -102,7 +102,7 @@ Exit criteria:
 - A representative profile read returns a materially smaller row count and
   payload than the current full-dataset path.
 
-### Phase 2: Replace Directory Reads
+### Phase 2: Replace Directory Reads — Implementation Complete
 
 - Move `/lines`, `/stations`, and `/towns` to compact directory projections.
 - Prefer the existing operational-facts read model for current status and
@@ -209,6 +209,14 @@ Exit criteria:
   uptime and ranking now come from `line_day_facts`, while exact live status is
   assembled from only today's active issue-fact candidates. `/lines` no longer
   constructs the complete dataset or reads global issue history.
+- 2026-07-18: Added the rebuildable `station_issue_facts` projection and moved
+  the stations directory to it. The route now reads station memberships, line
+  labels, and town labels directly; loads only today's active issue candidates
+  for exact live status; and selects one persisted latest disruption per
+  station. `/stations` no longer constructs the complete dataset or reads
+  global issue and impact-event history. All Phase 2 directory entry points now
+  use compact read models; production payload and timing measurements remain
+  part of Phase 4.
 
 ## Decision Log
 
@@ -218,6 +226,11 @@ Exit criteria:
 - 2026-07-18: Prefer typed route read models over a Redis cache of the complete
   dataset. A whole-object cache reduces Neon egress but preserves unnecessary
   serialization, transfer, and filtering work.
+- 2026-07-18: Persist exact issue-to-station associations as rebuildable
+  operational facts. Existing daily line facts cannot distinguish a
+  station-scoped disruption from a whole-line disruption, while reconstructing
+  that distinction from impact-event history would defeat the directory-read
+  boundary.
 
 ## Validation
 

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  deriveStationDirectoryOperationalState,
+  deriveStationDirectoryStatus,
   mergeStationReadModelScope,
   resolveStationProfileStationId,
 } from './stations';
-import { TEST_STATION } from './testFixtures';
+import { buildIssue, REFERENCE_NOW, TEST_STATION } from './testFixtures';
 
 describe('resolveStationProfileStationId', () => {
   it('keeps canonical station ids unchanged', () => {
@@ -76,5 +78,59 @@ describe('station read-model scope', () => {
       serviceIds: ['jrl-main'],
       stationIds: ['JS1'],
     });
+  });
+});
+
+describe('station directory summaries', () => {
+  it('preserves live status priority and ignores ended issues', () => {
+    const activeMaintenance = buildIssue('maintenance-1', 'maintenance', [
+      {
+        startAt: '2026-02-23T20:00:00+08:00',
+        endAt: null,
+        status: 'ongoing',
+      },
+    ]);
+    const activeDisruption = buildIssue('disruption-1', 'disruption', [
+      {
+        startAt: '2026-02-23T21:00:00+08:00',
+        endAt: null,
+        status: 'ongoing',
+      },
+    ]);
+    const endedInfra = buildIssue('infra-1', 'infra', [
+      {
+        startAt: '2026-02-22T20:00:00+08:00',
+        endAt: '2026-02-22T21:00:00+08:00',
+        status: 'ended',
+      },
+    ]);
+
+    expect(
+      deriveStationDirectoryStatus(
+        [activeMaintenance, activeDisruption, endedInfra],
+        REFERENCE_NOW,
+      ),
+    ).toBe('ongoing_disruption');
+    expect(deriveStationDirectoryStatus([endedInfra], REFERENCE_NOW)).toBe(
+      'normal',
+    );
+  });
+
+  it('distinguishes open, future, and closed stations', () => {
+    expect(
+      deriveStationDirectoryOperationalState(
+        [{ startedAt: '2024-06-23' }],
+        '2026-02-23',
+      ),
+    ).toBe('open');
+    expect(
+      deriveStationDirectoryOperationalState(
+        [{ startedAt: '2027-01-01' }],
+        '2026-02-23',
+      ),
+    ).toBe('future');
+    expect(deriveStationDirectoryOperationalState([], '2026-02-23')).toBe(
+      'closed',
+    );
   });
 });

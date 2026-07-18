@@ -5,12 +5,19 @@ import {
   issueDayFactsTable,
   lineDayFactsTable,
   lineDayIssueIntervalsTable,
+  stationIssueFactsTable,
 } from '~/db/schema';
 import type { Line } from '~/types';
 import { issueContributesToLineDowntime } from '~/util/issueOperationalEffects';
 import { type AppDb, chunk, getDefaultDb } from './database';
 import { type BaseDataset, buildCompleteDataset } from './dataset';
-import { isoDate, isoDateTime, nowSg, SG_TIMEZONE } from './dateTime';
+import {
+  isoDate,
+  isoDateTime,
+  nowSg,
+  parseDateTime,
+  SG_TIMEZONE,
+} from './dateTime';
 import {
   addIssueTypeCount,
   createIssueTypeCounts,
@@ -42,6 +49,37 @@ type OperationalFactRowsForDate = {
   lineRows: (typeof lineDayFactsTable.$inferInsert)[];
   lineIssueIntervalRows: (typeof lineDayIssueIntervalsTable.$inferInsert)[];
 };
+
+export function buildStationIssueFactRows(
+  dataset: BaseDataset,
+  asOf: DateTime,
+) {
+  const asOfIso = isoDateTime(asOf);
+
+  return Object.values(dataset.allIssues).flatMap((issue) => {
+    const firstInterval = issue.intervals[0];
+    if (firstInterval == null) {
+      return [];
+    }
+    const latestActivityAt = issue.intervals.reduce((latest, interval) => {
+      const candidate = interval.endAt ?? interval.startAt;
+      return parseDateTime(candidate) > parseDateTime(latest)
+        ? candidate
+        : latest;
+    }, firstInterval.endAt ?? firstInterval.startAt);
+    const stationIds = new Set(
+      issue.branchesAffected.flatMap((branch) => branch.stationIds),
+    );
+
+    return [...stationIds].map((stationId) => ({
+      station_id: stationId,
+      issue_id: issue.id,
+      issue_type: issue.type,
+      latest_activity_at: latestActivityAt,
+      as_of: asOfIso,
+    })) satisfies (typeof stationIssueFactsTable.$inferInsert)[];
+  });
+}
 
 function buildOperationalFactsRebuildContext(
   dataset: BaseDataset,
@@ -240,6 +278,23 @@ async function replaceOperationalFactRows(
   });
 }
 
+async function replaceStationIssueFactRows(
+  database: AppDb,
+  dataset: BaseDataset,
+  asOf: DateTime,
+) {
+  const rows = buildStationIssueFactRows(dataset, asOf);
+
+  await database.transaction(async (tx) => {
+    await tx.delete(stationIssueFactsTable);
+    for (const batch of chunk(rows, 500)) {
+      if (batch.length > 0) {
+        await tx.insert(stationIssueFactsTable).values(batch);
+      }
+    }
+  });
+}
+
 async function rebuildOperationalFactsForDateFromDataset(
   date: DateTime,
   dataset: BaseDataset,
@@ -250,6 +305,7 @@ async function rebuildOperationalFactsForDateFromDataset(
   const rows = buildOperationalFactRowsForDate(date, dataset, context);
 
   await replaceOperationalFactRows(database, [rows]);
+  await replaceStationIssueFactRows(database, dataset, date.endOf('day'));
 
   return {
     date: rows.date,
@@ -324,6 +380,7 @@ export async function rebuildOperationalFactsForDates(
       })),
     );
   }
+  await replaceStationIssueFactRows(database, dataset, latestDate.endOf('day'));
 
   return results;
 }
@@ -365,5 +422,10 @@ export async function rebuildOperationalFactsRange(
       })),
     );
   }
+  await replaceStationIssueFactRows(
+    database,
+    dataset,
+    normalizedEnd.endOf('day'),
+  );
   return results;
 }

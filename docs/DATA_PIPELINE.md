@@ -55,7 +55,10 @@ Daily fact rebuilds write aggregate service, downtime, and issue counts to
 `line_day_facts`. They also write each issue interval clipped to the applicable
 line service window to `line_day_issue_intervals`. The interval rows are derived,
 rebuildable data used when a read needs exact placement or overlapping impact
-lanes rather than aggregate durations alone.
+lanes rather than aggregate durations alone. The same rebuild refreshes
+`station_issue_facts`, an exact issue-to-station projection used for compact
+station status and latest-disruption reads without reconstructing impact-event
+history on a public request.
 
 ## Crowd Report Dispatch
 

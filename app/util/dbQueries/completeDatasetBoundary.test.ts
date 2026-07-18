@@ -65,6 +65,18 @@ describe('complete dataset boundary', () => {
     expect(profileReader).not.toMatch(COMPLETE_DATASET_CALL);
   });
 
+  it('keeps the stations directory reader off the complete dataset', () => {
+    const stationReader = readFileSync(
+      join(APP_ROOT, 'util', 'dbQueries', 'stations.ts'),
+      'utf8',
+    );
+
+    const directoryReader = stationReader.slice(
+      stationReader.indexOf('export async function getStationsDirectoryData'),
+    );
+    expect(directoryReader).not.toMatch(COMPLETE_DATASET_CALL);
+  });
+
   it('keeps the migrated line profile reader off the complete dataset', () => {
     const lineReader = readFileSync(
       join(APP_ROOT, 'util', 'dbQueries', 'lines.ts'),

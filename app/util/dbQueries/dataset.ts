@@ -92,9 +92,6 @@ export type BaseDataset = {
 };
 
 export type CompleteDatasetCaller =
-  | 'route:/lines'
-  | 'route:/stations'
-  | 'route:/towns'
   | 'route:/sitemap.xml'
   | 'route:/statistics'
   | 'workflow:operational-facts';

@@ -857,6 +857,48 @@ export const issueDayFactsTable = pgTable(
   },
 );
 
+// Rebuildable issue-to-station projection. Public station summaries use this
+// instead of reconstructing every issue branch from impact-event history.
+export const stationIssueFactsTable = pgTable(
+  'station_issue_facts',
+  {
+    station_id: text('station_id')
+      .references(() => stationsTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
+      .notNull(),
+    issue_id: text('issue_id')
+      .references(() => issuesTable.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      })
+      .notNull(),
+    issue_type: issueTypeEnum().notNull(),
+    latest_activity_at: timestamp('latest_activity_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    as_of: timestamp('as_of', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      primaryKey({ columns: [table.station_id, table.issue_id] }),
+      index('station_issue_facts_issue_id_idx').on(table.issue_id),
+      index('station_issue_facts_station_type_activity_idx').on(
+        table.station_id,
+        table.issue_type,
+        table.latest_activity_at,
+      ),
+      index('station_issue_facts_as_of_idx').using('btree', table.as_of.asc()),
+    ];
+  },
+);
+
 // Derived daily uptime and incident facts per line. This is the intended landing
 // zone for analytical queries that would otherwise need to recompute operational
 // periods across the full issue history on every request.
