@@ -133,7 +133,13 @@ Exit criteria:
 
 ### Phase 4: Production Rollout and Verification
 
+- Pre-rollout checkpoint captured on 2026-07-19. Production is still on the
+  pre-scoped read model, while the completed implementation is on local `main`.
 - Roll out one route family at a time behind the existing cache configuration.
+- Measure uncached origin timing and HTML behaviour through the privately
+  supplied origin endpoint, which must not be recorded in repository files;
+  use `www.mrtdown.org` separately for Cloudflare cache eligibility and
+  `HIT`/`MISS` checks.
 - Compare Neon `pg_stat_statements` deltas over an equivalent window; the
   unfiltered `impact_events` statement should stop tracking normal public
   traffic.
@@ -226,6 +232,39 @@ Exit criteria:
   caller labels are now limited to bounded workflows. Phase 3 implementation is
   complete; deployment backfill and production counter/cache verification remain
   in Phase 4.
+- 2026-07-19: Captured the Phase 4 pre-rollout production checkpoint at
+  2026-07-18 16:49:20 UTC. The known unfiltered `impact_events` statement
+  (query ID `-1208032944424713892`) had reached 3,185 calls, 36,487,360 rows,
+  13.90 ms mean execution time, and 44,265.58 ms total execution time since the
+  2026-07-17 21:19:59 UTC statistics reset. Relative to the earlier checkpoint,
+  that is another 1,621 calls and 18,570,176 returned rows, exactly 11,456 rows
+  per call. Production had one statistics snapshot, but the
+  `station_issue_facts` and `sitemap_snapshots` relations were not present yet,
+  as expected before the latest migrations are deployed. This establishes the
+  migration and projection-backfill prerequisites for the rollout rather than
+  indicating a failure in the currently deployed release.
+- 2026-07-19: Ran `SAMPLES=2 PROBES=all npm run perf:routes --
+  https://www.mrtdown.org` for the pre-rollout HTTP checkpoint. Canonical
+  Markdown profiles returned `MISS` on the first sample and `HIT` on the second;
+  warm TTFB was 14.1-17.3 ms for the representative line, station, and operator
+  profiles. Cloudflare returned a managed-challenge 403 for HTML and
+  `/llms.txt` requests from both the timing script, browser-like `curl`, and a
+  real browser session, so those results are not valid origin timings. This
+  limits automated edge verification from the current probe but does not block
+  verification through the out-of-band origin endpoint.
+- 2026-07-19: Captured the pre-deploy baseline through the out-of-band origin
+  endpoint; the endpoint is intentionally omitted from repository files. Home
+  HTML was 450,090 bytes with 473.3-754.8 ms TTFB; statistics HTML was 378,254
+  bytes with 83.8-620.4 ms TTFB; and the representative line, station, and
+  operator Markdown profiles took 1.31-1.49 seconds, 716.1-736.4 ms, and
+  3.77-3.93 seconds respectively. Browser checks confirmed the line, station,
+  operator, towns, and Simplified Chinese line pages render with the expected
+  headings, document languages, and public-host canonical URLs.
+  `/en-SG/lines/BPLRT` also canonicalized to `/lines/BPLRT`. At the 390 px
+  pre-deploy mobile baseline, the operator page document was 418 px wide because
+  a future date-range label used a non-wrapping `shrink-0` span; the 1,440 px
+  layout had no horizontal overflow. Treat this as an existing responsive
+  baseline when comparing the scoped-reader deployment.
 
 ## Decision Log
 
