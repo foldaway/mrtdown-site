@@ -1,5 +1,5 @@
 import type { getIssueReadModel } from '../dbQueries/issue';
-import type { getLineProfileData } from '../dbQueries/lines';
+import type { getLineProfileReadModel } from '../dbQueries/lines';
 import type { getOperatorProfileData } from '../dbQueries/operators';
 import type { getOverviewData } from '../dbQueries/overview';
 import type { getStationProfileReadModel } from '../dbQueries/stations';
@@ -11,7 +11,9 @@ export interface AgentMarkdownOptions {
 }
 
 export type OverviewPayload = Awaited<ReturnType<typeof getOverviewData>>;
-export type LineProfilePayload = Awaited<ReturnType<typeof getLineProfileData>>;
+export type LineProfilePayload = Awaited<
+  ReturnType<typeof getLineProfileReadModel>
+>;
 export type StationProfilePayload = Awaited<
   ReturnType<typeof getStationProfileReadModel>
 >;

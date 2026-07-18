@@ -46,7 +46,7 @@ Related plan: [Production performance](production-performance.md).
 | Data function | Public entry points | Required scope |
 | --- | --- | --- |
 | `getIssueData` | `/issues/:issueId`, issue Markdown | One issue, its events, evidence, and referenced entities |
-| `getLineProfileData` | `/lines/:lineId`, line Markdown | One line, its services/stations, and issues affecting that line in the requested window |
+| `getLineProfileReadModel` | `/lines/:lineId`, line Markdown | One line, its services/stations, and issues affecting that line in the requested window |
 | `getStationProfileReadModel` | `/stations/:stationId`, station Markdown | One station, memberships, and issues affecting that station |
 | `getOperatorProfileData` | `/operators/:operatorId`, operator Markdown, desktop expansion request | Operator's lines and issues affecting those lines in the requested window |
 | `getTownProfileData` | `/towns/:townId` | Town's stations, memberships, and their relevant issues |
@@ -179,6 +179,12 @@ Exit criteria:
   station, town, and landmark reads to the resulting graph. Station profile and
   Markdown requests no longer invoke `getCompleteDataset`; the previous
   function name remains as a compatibility alias.
+- 2026-07-18: Added `getLineProfileReadModel`. It resolves the root line before
+  discovering its services, stations, issue references, interchange
+  memberships, operators, and community-signal entities. Detailed profile and
+  Markdown reads now assemble only that scoped graph, while the existing uptime
+  rank is derived from compact `line_day_facts` rows instead of complete issue
+  history. The previous function name remains as a compatibility alias.
 
 ## Decision Log
 

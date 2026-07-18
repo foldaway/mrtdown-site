@@ -64,4 +64,19 @@ describe('complete dataset boundary', () => {
     );
     expect(profileReader).not.toMatch(COMPLETE_DATASET_CALL);
   });
+
+  it('keeps the migrated line profile reader off the complete dataset', () => {
+    const lineReader = readFileSync(
+      join(APP_ROOT, 'util', 'dbQueries', 'lines.ts'),
+      'utf8',
+    );
+
+    const profileReader = lineReader.slice(
+      lineReader.indexOf('export async function getLineProfileReadModel'),
+      lineReader.indexOf(
+        '/** @deprecated Use the explicitly scoped read-model name. */',
+      ),
+    );
+    expect(profileReader).not.toMatch(COMPLETE_DATASET_CALL);
+  });
 });

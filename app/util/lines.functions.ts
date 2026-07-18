@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
-import { getLineProfileData, getLinesDirectoryData } from './dbQueries/lines';
+import {
+  getLineProfileReadModel,
+  getLinesDirectoryData,
+} from './dbQueries/lines';
 import { timeServerSpan } from './serverTiming';
 
 export const getLinesDirectoryFn = createServerFn({ method: 'GET' }).handler(
@@ -16,7 +19,7 @@ const InputSchema = z.object({
 export const getLineProfileFn = createServerFn({ method: 'GET' })
   .inputValidator((val) => InputSchema.parse(val))
   .handler(async (val) => {
-    return getLineProfileData(val.data.lineId, val.data.days, {
+    return getLineProfileReadModel(val.data.lineId, val.data.days, {
       includeCommunitySignals: true,
     });
   });
