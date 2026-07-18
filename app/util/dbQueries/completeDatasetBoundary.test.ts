@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 const APP_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const COMPLETE_DATASET_IMPORT = /from\s+['"][^'"]*dbQueries\/dataset['"]/;
+const COMPLETE_DATASET_CALL =
+  /\b(?:buildCompleteDataset|getCompleteDataset)\s*\(/;
 
 function findSourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -39,5 +41,14 @@ describe('complete dataset boundary', () => {
     );
 
     expect(findCompleteDatasetImports(publicRoutes)).toEqual([]);
+  });
+
+  it('keeps the migrated issue reader off the complete dataset', () => {
+    const issueReader = readFileSync(
+      join(APP_ROOT, 'util', 'dbQueries', 'issue.ts'),
+      'utf8',
+    );
+
+    expect(issueReader).not.toMatch(COMPLETE_DATASET_CALL);
   });
 });

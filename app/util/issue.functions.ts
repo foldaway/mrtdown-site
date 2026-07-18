@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { getIssueData } from './dbQueries/issue';
+import { getIssueReadModel } from './dbQueries/issue';
 
 const InputSchema = z.object({
   issueId: z.string(),
@@ -9,5 +9,5 @@ const InputSchema = z.object({
 export const getIssueFn = createServerFn({ method: 'GET' })
   .inputValidator((val) => InputSchema.parse(val))
   .handler(async (val) => {
-    return getIssueData(val.data.issueId);
+    return getIssueReadModel(val.data.issueId);
   });

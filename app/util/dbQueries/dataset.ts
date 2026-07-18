@@ -104,6 +104,12 @@ export type CompleteDatasetCaller =
   | 'route:/statistics'
   | 'workflow:operational-facts';
 
+export type DatasetStaticScope = {
+  lineIds: readonly string[];
+  serviceIds: readonly string[];
+  stationIds: readonly string[];
+};
+
 function parseTranslations(value: unknown): Line['name'] {
   const isNonEmptyTranslation = (
     translation: string | null | undefined,
@@ -131,11 +137,18 @@ export async function buildDataset(
   referenceNow = nowSg(),
   db?: AppDb,
   issueIds?: readonly string[],
+  staticScope?: DatasetStaticScope,
 ): Promise<BaseDataset> {
   const database =
     db ?? (await timeServerSpan('db_connect', () => getDefaultDb()));
   const selectedIssueIds =
     issueIds == null ? undefined : [...new Set(issueIds)];
+  const selectedLineIds =
+    staticScope == null ? undefined : [...new Set(staticScope.lineIds)];
+  const selectedServiceIds =
+    staticScope == null ? undefined : [...new Set(staticScope.serviceIds)];
+  const selectedStationIds =
+    staticScope == null ? undefined : [...new Set(staticScope.stationIds)];
 
   const [
     metadataRows,
@@ -155,46 +168,135 @@ export async function buildDataset(
     impactEventRows,
   ] = await timeServerSpan('dataset_base_queries', () =>
     Promise.all([
-      timeDbQuery('dataset_q_metadata', () =>
-        database.select().from(metadataTable),
-      ),
-      timeDbQuery('dataset_q_lines', () => database.select().from(linesTable)),
-      timeDbQuery('dataset_q_line_operators', () =>
-        database.select().from(lineOperatorsTable),
-      ),
-      timeDbQuery('dataset_q_operators', () =>
-        database.select().from(operatorsTable),
-      ),
-      timeDbQuery('dataset_q_towns', () => database.select().from(townsTable)),
-      timeDbQuery('dataset_q_landmarks', () =>
-        database.select().from(landmarksTable),
-      ),
-      timeDbQuery('dataset_q_stations', () =>
-        database
-          .select({
-            id: stationsTable.id,
-            name: stationsTable.name,
-            townId: stationsTable.townId,
-            latitude: sql<number>`ST_Y(${stationsTable.geo})`,
-            longitude: sql<number>`ST_X(${stationsTable.geo})`,
-          })
-          .from(stationsTable),
-      ),
-      timeDbQuery('dataset_q_station_codes', () =>
-        database.select().from(stationCodesTable),
-      ),
-      timeDbQuery('dataset_q_station_landmarks', () =>
-        database.select().from(stationLandmarksTable),
-      ),
-      timeDbQuery('dataset_q_services', () =>
-        database.select().from(servicesTable),
-      ),
-      timeDbQuery('dataset_q_service_revisions', () =>
-        database.select().from(serviceRevisionsTable),
-      ),
-      timeDbQuery('dataset_q_public_holidays', () =>
-        database.select().from(publicHolidaysTable),
-      ),
+      staticScope == null
+        ? timeDbQuery('dataset_q_metadata', () =>
+            database.select().from(metadataTable),
+          )
+        : [],
+      selectedLineIds == null
+        ? timeDbQuery('dataset_q_lines', () =>
+            database.select().from(linesTable),
+          )
+        : selectedLineIds.length > 0
+          ? timeDbQuery('dataset_q_lines', () =>
+              database
+                .select()
+                .from(linesTable)
+                .where(inArray(linesTable.id, selectedLineIds)),
+            )
+          : [],
+      selectedLineIds == null
+        ? timeDbQuery('dataset_q_line_operators', () =>
+            database.select().from(lineOperatorsTable),
+          )
+        : selectedLineIds.length > 0
+          ? timeDbQuery('dataset_q_line_operators', () =>
+              database
+                .select()
+                .from(lineOperatorsTable)
+                .where(inArray(lineOperatorsTable.line_id, selectedLineIds)),
+            )
+          : [],
+      staticScope == null
+        ? timeDbQuery('dataset_q_operators', () =>
+            database.select().from(operatorsTable),
+          )
+        : [],
+      staticScope == null
+        ? timeDbQuery('dataset_q_towns', () =>
+            database.select().from(townsTable),
+          )
+        : [],
+      staticScope == null
+        ? timeDbQuery('dataset_q_landmarks', () =>
+            database.select().from(landmarksTable),
+          )
+        : [],
+      selectedStationIds == null
+        ? timeDbQuery('dataset_q_stations', () =>
+            database
+              .select({
+                id: stationsTable.id,
+                name: stationsTable.name,
+                townId: stationsTable.townId,
+                latitude: sql<number>`ST_Y(${stationsTable.geo})`,
+                longitude: sql<number>`ST_X(${stationsTable.geo})`,
+              })
+              .from(stationsTable),
+          )
+        : selectedStationIds.length > 0
+          ? timeDbQuery('dataset_q_stations', () =>
+              database
+                .select({
+                  id: stationsTable.id,
+                  name: stationsTable.name,
+                  townId: stationsTable.townId,
+                  latitude: sql<number>`ST_Y(${stationsTable.geo})`,
+                  longitude: sql<number>`ST_X(${stationsTable.geo})`,
+                })
+                .from(stationsTable)
+                .where(inArray(stationsTable.id, selectedStationIds)),
+            )
+          : [],
+      selectedStationIds == null
+        ? timeDbQuery('dataset_q_station_codes', () =>
+            database.select().from(stationCodesTable),
+          )
+        : selectedStationIds.length > 0
+          ? timeDbQuery('dataset_q_station_codes', () =>
+              database
+                .select()
+                .from(stationCodesTable)
+                .where(
+                  inArray(stationCodesTable.station_id, selectedStationIds),
+                ),
+            )
+          : [],
+      selectedStationIds == null
+        ? timeDbQuery('dataset_q_station_landmarks', () =>
+            database.select().from(stationLandmarksTable),
+          )
+        : selectedStationIds.length > 0
+          ? timeDbQuery('dataset_q_station_landmarks', () =>
+              database
+                .select()
+                .from(stationLandmarksTable)
+                .where(
+                  inArray(stationLandmarksTable.station_id, selectedStationIds),
+                ),
+            )
+          : [],
+      selectedServiceIds == null
+        ? timeDbQuery('dataset_q_services', () =>
+            database.select().from(servicesTable),
+          )
+        : selectedServiceIds.length > 0
+          ? timeDbQuery('dataset_q_services', () =>
+              database
+                .select()
+                .from(servicesTable)
+                .where(inArray(servicesTable.id, selectedServiceIds)),
+            )
+          : [],
+      selectedServiceIds == null
+        ? timeDbQuery('dataset_q_service_revisions', () =>
+            database.select().from(serviceRevisionsTable),
+          )
+        : selectedServiceIds.length > 0
+          ? timeDbQuery('dataset_q_service_revisions', () =>
+              database
+                .select()
+                .from(serviceRevisionsTable)
+                .where(
+                  inArray(serviceRevisionsTable.service_id, selectedServiceIds),
+                ),
+            )
+          : [],
+      staticScope == null
+        ? timeDbQuery('dataset_q_public_holidays', () =>
+            database.select().from(publicHolidaysTable),
+          )
+        : [],
       selectedIssueIds == null
         ? timeDbQuery('dataset_q_issues', () =>
             database.select().from(issuesTable),
@@ -480,7 +582,7 @@ export async function buildDataset(
   ) as IncludedEntities['lines'];
 
   const revisionsByServiceId = serviceRevisionRows.reduce<
-    Record<string, typeof serviceRevisionRows>
+    Record<string, Array<typeof serviceRevisionsTable.$inferSelect>>
   >((acc, row) => {
     if (acc[row.service_id] == null) {
       acc[row.service_id] = [];

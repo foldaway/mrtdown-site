@@ -167,6 +167,12 @@ Exit criteria:
 - 2026-07-18: Confirmed Cloudflare origin caching for `/_serverFn/*` and
   `GET /api/issues-day`, then observed the deployed `complete_dataset_read`
   production logs. Phase 0 exit criteria are complete.
+- 2026-07-18: Added the first Phase 1 scoped reader,
+  `getIssueReadModel`. It checks the root issue first, derives the affected
+  line/service/station graph from that issue's impact events, and constrains
+  both issue history and static network queries before preserving the existing
+  issue response contract. Issue page and Markdown requests no longer invoke
+  `getCompleteDataset`.
 
 ## Decision Log
 

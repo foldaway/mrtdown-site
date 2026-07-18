@@ -1,4 +1,4 @@
-import type { getIssueData } from '../dbQueries/issue';
+import type { getIssueReadModel } from '../dbQueries/issue';
 import type { getLineProfileData } from '../dbQueries/lines';
 import type { getOperatorProfileData } from '../dbQueries/operators';
 import type { getOverviewData } from '../dbQueries/overview';
@@ -18,4 +18,4 @@ export type StationProfilePayload = Awaited<
 export type OperatorProfilePayload = Awaited<
   ReturnType<typeof getOperatorProfileData>
 >;
-export type IssuePayload = Awaited<ReturnType<typeof getIssueData>>;
+export type IssuePayload = Awaited<ReturnType<typeof getIssueReadModel>>;
