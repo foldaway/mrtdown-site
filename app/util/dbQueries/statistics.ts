@@ -806,7 +806,7 @@ export async function getStatisticsData() {
       };
     }
 
-    const dataset = await getCompleteDataset();
+    const dataset = await getCompleteDataset('route:/statistics');
     const statistics = await buildStatisticsDataFromDataset(dataset);
     return {
       data: statistics,

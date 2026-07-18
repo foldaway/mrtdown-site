@@ -189,7 +189,7 @@ export function selectRecentTownIssueIds(
 }
 
 export async function getTownsData() {
-  const dataset = await getCompleteDataset();
+  const dataset = await getCompleteDataset('route:/towns');
   const stations = Object.values(dataset.included.stations);
   const towns = Object.values(dataset.included.towns).map((town) => {
     const townStations = stations.filter(
@@ -216,7 +216,7 @@ export async function getTownsData() {
 }
 
 export async function getTownProfileData(townId: string) {
-  const dataset = await getCompleteDataset();
+  const dataset = await getCompleteDataset('route:/towns/:townId');
   const town = dataset.included.towns[townId];
   if (town == null) {
     throw new Response('Town not found', {

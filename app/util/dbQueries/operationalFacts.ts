@@ -263,7 +263,11 @@ export async function rebuildOperationalFactsForDate(
   db?: AppDb,
 ) {
   const normalizedDate = date.setZone(SG_TIMEZONE).startOf('day');
-  const dataset = await buildCompleteDataset(normalizedDate.endOf('day'), db);
+  const dataset = await buildCompleteDataset(
+    'workflow:operational-facts',
+    normalizedDate.endOf('day'),
+    db,
+  );
   return rebuildOperationalFactsForDateFromDataset(normalizedDate, dataset, db);
 }
 
@@ -292,7 +296,11 @@ export async function rebuildOperationalFactsForDates(
   const latestDate = dateTimes.reduce((latest, date) =>
     date > latest ? date : latest,
   );
-  const dataset = await buildCompleteDataset(latestDate.endOf('day'), db);
+  const dataset = await buildCompleteDataset(
+    'workflow:operational-facts',
+    latestDate.endOf('day'),
+    db,
+  );
   const context = buildOperationalFactsRebuildContext(dataset);
   const database = db ?? (await getDefaultDb());
   const results: Array<{
@@ -326,7 +334,11 @@ export async function rebuildOperationalFactsRange(
   db?: AppDb,
 ) {
   const normalizedEnd = end.setZone(SG_TIMEZONE).startOf('day');
-  const dataset = await buildCompleteDataset(normalizedEnd.endOf('day'), db);
+  const dataset = await buildCompleteDataset(
+    'workflow:operational-facts',
+    normalizedEnd.endOf('day'),
+    db,
+  );
   const context = buildOperationalFactsRebuildContext(dataset);
   const database = db ?? (await getDefaultDb());
   const results: Array<{

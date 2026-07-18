@@ -15,7 +15,7 @@ import {
 } from './lineAnalytics';
 
 export async function getLinesDirectoryData(days: number) {
-  const dataset = await getCompleteDataset();
+  const dataset = await getCompleteDataset('route:/lines');
   const referenceNow = nowSg();
   const referenceDate = isoDate(referenceNow);
   const lines = Object.values(dataset.included.lines);
@@ -88,7 +88,7 @@ export async function getLineProfileData(
   days: number,
   options: CommunitySignalOptions = {},
 ) {
-  const dataset = await getCompleteDataset();
+  const dataset = await getCompleteDataset('route:/lines/:lineId');
   const referenceNow = nowSg();
   const referenceDate = isoDate(referenceNow);
   const line = dataset.included.lines[lineId];

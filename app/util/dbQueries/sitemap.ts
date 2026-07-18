@@ -2,7 +2,7 @@ import { getCompleteDataset } from './dataset';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
 
 export async function getSitemapData() {
-  const dataset = await getCompleteDataset();
+  const dataset = await getCompleteDataset('route:/sitemap.xml');
   const skippedIssueIds: string[] = [];
   const issuesWithFirstDates = Object.values(dataset.allIssues).flatMap(
     (issue) => {

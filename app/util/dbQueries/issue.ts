@@ -7,7 +7,7 @@ import { selectIncludedEntities } from './includedEntities';
 export async function getIssueData(issueId: string) {
   const db = await getDefaultDb();
   const [dataset, evidenceRows] = await Promise.all([
-    getCompleteDataset(),
+    getCompleteDataset('route:/issues/:issueId'),
     db
       .select()
       .from(evidencesTable)

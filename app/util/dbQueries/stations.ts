@@ -45,7 +45,7 @@ export async function getStationProfileData(
   stationId: string,
   options: CommunitySignalOptions = {},
 ) {
-  const dataset = await getCompleteDataset();
+  const dataset = await getCompleteDataset('route:/stations/:stationId');
   const resolvedStationId = resolveStationProfileStationId(
     dataset.included,
     stationId,
@@ -113,7 +113,7 @@ export async function getStationProfileData(
 }
 
 export async function getStationsDirectoryData() {
-  const dataset = await getCompleteDataset();
+  const dataset = await getCompleteDataset('route:/stations');
   const referenceNow = nowSg();
   const referenceDate = isoDate(referenceNow);
   const issuesByStationId = new Map<string, IssueWithOperationalEffects[]>();

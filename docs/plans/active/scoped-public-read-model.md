@@ -157,6 +157,13 @@ Exit criteria:
   public server functions and route handlers from importing the complete
   dataset directly. Public data readers still use it indirectly until their
   scoped replacements land in Phases 1 and 2.
+- 2026-07-18: Captured the production `pg_stat_statements` baseline for the
+  unfiltered `impact_events` query (query ID `-1208032944424713892`): 1,564
+  calls, 17,917,184 returned rows, and 13.99 ms mean execution time. Added a
+  stable caller label to every complete-dataset entry point; the application
+  now emits `complete_dataset_read` logs such as `route:/lines/:lineId` and
+  `workflow:operational-facts`, so these counter changes can be correlated
+  without changing the database connection role.
 
 ## Decision Log
 

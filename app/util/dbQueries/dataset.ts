@@ -91,6 +91,19 @@ export type BaseDataset = {
   issuesByLineId: Record<string, IssueWithOperationalEffects[]>;
 };
 
+export type CompleteDatasetCaller =
+  | 'route:/issues/:issueId'
+  | 'route:/lines'
+  | 'route:/lines/:lineId'
+  | 'route:/operators/:operatorId'
+  | 'route:/stations'
+  | 'route:/stations/:stationId'
+  | 'route:/towns'
+  | 'route:/towns/:townId'
+  | 'route:/sitemap.xml'
+  | 'route:/statistics'
+  | 'workflow:operational-facts';
+
 function parseTranslations(value: unknown): Line['name'] {
   const isNonEmptyTranslation = (
     translation: string | null | undefined,
@@ -1146,12 +1159,19 @@ export async function buildDataset(
  * use a scoped read model instead.
  */
 export async function buildCompleteDataset(
+  caller: CompleteDatasetCaller,
   referenceNow = nowSg(),
   db?: AppDb,
 ): Promise<BaseDataset> {
+  console.info(
+    JSON.stringify({
+      event: 'complete_dataset_read',
+      caller,
+    }),
+  );
   return timeServerSpan('build_dataset', () => buildDataset(referenceNow, db));
 }
 
-export async function getCompleteDataset() {
-  return buildCompleteDataset();
+export async function getCompleteDataset(caller: CompleteDatasetCaller) {
+  return buildCompleteDataset(caller);
 }

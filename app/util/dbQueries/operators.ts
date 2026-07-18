@@ -27,7 +27,7 @@ type OperatorLinePerformance = {
 };
 
 export async function getOperatorProfileData(operatorId: string, days: number) {
-  const dataset = await getCompleteDataset();
+  const dataset = await getCompleteDataset('route:/operators/:operatorId');
   const operator = dataset.included.operators[operatorId];
   if (operator == null) {
     throw new Response('Operator not found', {
