@@ -201,6 +201,14 @@ Exit criteria:
   `getCompleteDataset`; the previous data-function name remains as a
   compatibility alias. All Phase 1 public entry points now use scoped readers;
   production payload and row-count measurement remains part of Phase 4.
+- 2026-07-18: Moved the towns directory to a compact static projection. It now
+  reads towns, station IDs, active station-to-line memberships, and the small
+  set of rendered line entities directly; `/towns` no longer constructs the
+  complete dataset or reads issue and impact-event history.
+- 2026-07-18: Moved the lines directory to operational facts. Its 90-day
+  uptime and ranking now come from `line_day_facts`, while exact live status is
+  assembled from only today's active issue-fact candidates. `/lines` no longer
+  constructs the complete dataset or reads global issue history.
 
 ## Decision Log
 

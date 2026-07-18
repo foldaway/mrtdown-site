@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { mergeLineReadModelScope, rankLineSummaryFromFacts } from './lines';
+import {
+  aggregateLineUptimeFacts,
+  mergeLineReadModelScope,
+  rankLineSummaryFromFacts,
+} from './lines';
 
 describe('line read-model scope', () => {
   it('merges the root, community, and issue graph without duplicates', () => {
@@ -42,6 +46,53 @@ describe('line read-model scope', () => {
 });
 
 describe('line uptime ranking', () => {
+  it('aggregates compact daily facts into directory uptime', () => {
+    expect(
+      aggregateLineUptimeFacts([
+        {
+          line_id: 'NSL',
+          service_seconds: 100,
+          downtime_disruption_seconds: 2,
+          downtime_maintenance_seconds: 1,
+          downtime_infra_seconds: 0,
+        },
+        {
+          line_id: 'NSL',
+          service_seconds: 100,
+          downtime_disruption_seconds: 1,
+          downtime_maintenance_seconds: 0,
+          downtime_infra_seconds: 0,
+        },
+        {
+          line_id: 'JRL',
+          service_seconds: 0,
+          downtime_disruption_seconds: 0,
+          downtime_maintenance_seconds: 0,
+          downtime_infra_seconds: 0,
+        },
+      ]),
+    ).toEqual(
+      new Map([
+        [
+          'NSL',
+          {
+            totalServiceSeconds: 200,
+            totalDowntimeSeconds: 4,
+            uptimeRatio: 0.98,
+          },
+        ],
+        [
+          'JRL',
+          {
+            totalServiceSeconds: null,
+            totalDowntimeSeconds: null,
+            uptimeRatio: null,
+          },
+        ],
+      ]),
+    );
+  });
+
   it('ranks the live line summary against compact daily facts', () => {
     expect(
       rankLineSummaryFromFacts('NSL', 0.98, [

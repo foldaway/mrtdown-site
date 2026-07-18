@@ -1,18 +1,26 @@
 import type { IssueType } from '@mrtdown/core';
-import { eq, inArray, or } from 'drizzle-orm';
+import { eq, inArray, isNull, or } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
 import {
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
   impactEventsTable,
+  lineOperatorsTable,
+  linesTable,
   servicesTable,
   stationCodesTable,
   stationsTable,
   townsTable,
 } from '~/db/schema';
-import type { Issue, LineSummaryStatus, Station } from '~/types';
+import type {
+  IncludedEntities,
+  Issue,
+  Line,
+  LineSummaryStatus,
+  Station,
+} from '~/types';
 import { getDefaultDb, timeDbQuery } from './database';
-import { buildDataset, getCompleteDataset, parseTranslations } from './dataset';
+import { buildDataset, parseTranslations } from './dataset';
 import { isoDate, isoDateTime, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
@@ -281,14 +289,47 @@ export function mergeTownReadModelScope(input: {
 }
 
 export async function getTownsData() {
-  const dataset = await getCompleteDataset('route:/towns');
-  const stations = Object.values(dataset.included.stations);
-  const towns = Object.values(dataset.included.towns).map((town) => {
-    const townStations = stations.filter(
-      (station) => station.townId === town.id,
+  const db = await getDefaultDb();
+  const [townRows, stationRows, membershipRows] = await Promise.all([
+    timeDbQuery('towns_directory_q_towns', () =>
+      db.select({ id: townsTable.id, name: townsTable.name }).from(townsTable),
+    ),
+    timeDbQuery('towns_directory_q_stations', () =>
+      db
+        .select({ id: stationsTable.id, townId: stationsTable.townId })
+        .from(stationsTable),
+    ),
+    timeDbQuery('towns_directory_q_memberships', () =>
+      db
+        .select({
+          stationId: stationCodesTable.station_id,
+          lineId: stationCodesTable.line_id,
+        })
+        .from(stationCodesTable)
+        .where(isNull(stationCodesTable.ended_at)),
+    ),
+  ]);
+  const stationIdsByTownId = Map.groupBy(
+    stationRows,
+    (station) => station.townId,
+  );
+  const lineIdsByStationId = Map.groupBy(
+    membershipRows,
+    (membership) => membership.stationId,
+  );
+  const towns = townRows.map((town) => {
+    const stationIds = (stationIdsByTownId.get(town.id) ?? []).map(
+      (station) => station.id,
     );
-    const stationIds = townStations.map((station) => station.id);
-    const lineIds = getTownLineIds(townStations);
+    const lineIds = [
+      ...new Set(
+        stationIds.flatMap((stationId) =>
+          (lineIdsByStationId.get(stationId) ?? []).map(
+            (membership) => membership.lineId,
+          ),
+        ),
+      ),
+    ].sort();
 
     return {
       townId: town.id,
@@ -296,14 +337,62 @@ export async function getTownsData() {
       lineIds,
     };
   });
+  const lineIds = [...new Set(towns.flatMap((town) => town.lineIds))];
+  const [lineRows, lineOperatorRows] =
+    lineIds.length > 0
+      ? await Promise.all([
+          timeDbQuery('towns_directory_q_lines', () =>
+            db.select().from(linesTable).where(inArray(linesTable.id, lineIds)),
+          ),
+          timeDbQuery('towns_directory_q_line_operators', () =>
+            db
+              .select()
+              .from(lineOperatorsTable)
+              .where(inArray(lineOperatorsTable.line_id, lineIds)),
+          ),
+        ])
+      : [[], []];
+  const lineOperatorsByLineId = Map.groupBy(
+    lineOperatorRows,
+    (operator) => operator.line_id,
+  );
+  const lines = Object.fromEntries(
+    lineRows.map((row) => {
+      const line: Line = {
+        id: row.id,
+        name: parseTranslations(row.name),
+        type: row.type,
+        color: row.color,
+        startedAt: row.started_at,
+        operatingHours: row.operating_hours,
+        operators: (lineOperatorsByLineId.get(row.id) ?? []).map(
+          (operator) => ({
+            operatorId: operator.operator_id,
+            startedAt: operator.started_at,
+            endedAt: operator.ended_at,
+          }),
+        ),
+      };
+      return [line.id, line];
+    }),
+  );
+  const included: IncludedEntities = {
+    lines,
+    towns: Object.fromEntries(
+      townRows.map((town) => [
+        town.id,
+        { id: town.id, name: parseTranslations(town.name) },
+      ]),
+    ),
+    stations: {},
+    issues: {},
+    landmarks: {},
+    operators: {},
+  };
 
   return {
     data: { towns },
-    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
-      issueIds: [],
-      lineIds: towns.flatMap((town) => town.lineIds),
-      townIds: towns.map((town) => town.townId),
-    }),
+    included,
   };
 }
 

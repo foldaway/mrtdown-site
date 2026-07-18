@@ -80,6 +80,19 @@ describe('complete dataset boundary', () => {
     expect(profileReader).not.toMatch(COMPLETE_DATASET_CALL);
   });
 
+  it('keeps the lines directory reader off the complete dataset', () => {
+    const lineReader = readFileSync(
+      join(APP_ROOT, 'util', 'dbQueries', 'lines.ts'),
+      'utf8',
+    );
+
+    const directoryReader = lineReader.slice(
+      lineReader.indexOf('export async function getLinesDirectoryData'),
+      lineReader.indexOf('export async function getLineProfileReadModel'),
+    );
+    expect(directoryReader).not.toMatch(COMPLETE_DATASET_CALL);
+  });
+
   it('keeps the migrated operator profile reader off the complete dataset', () => {
     const operatorReader = readFileSync(
       join(APP_ROOT, 'util', 'dbQueries', 'operators.ts'),
@@ -110,5 +123,18 @@ describe('complete dataset boundary', () => {
       ),
     );
     expect(profileReader).not.toMatch(COMPLETE_DATASET_CALL);
+  });
+
+  it('keeps the towns directory reader off the complete dataset', () => {
+    const townReader = readFileSync(
+      join(APP_ROOT, 'util', 'dbQueries', 'towns.ts'),
+      'utf8',
+    );
+
+    const directoryReader = townReader.slice(
+      townReader.indexOf('export async function getTownsData'),
+      townReader.indexOf('export async function getTownProfileReadModel'),
+    );
+    expect(directoryReader).not.toMatch(COMPLETE_DATASET_CALL);
   });
 });

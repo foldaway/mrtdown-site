@@ -3,6 +3,7 @@ import {
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
   impactEventsTable,
+  issueDayFactsTable,
   lineDayFactsTable,
   lineOperatorsTable,
   linesTable,
@@ -16,7 +17,7 @@ import {
   getPageCommunitySignals,
 } from './communitySignals';
 import { getDefaultDb, timeDbQuery } from './database';
-import { buildDataset, getCompleteDataset } from './dataset';
+import { buildDataset } from './dataset';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
@@ -84,6 +85,41 @@ export function rankLineSummaryFromFacts(
     uptimeRank: rank === -1 ? null : rank + 1,
     totalLines: ratios.length > 0 ? ratios.length : null,
   };
+}
+
+export function aggregateLineUptimeFacts(rows: readonly LineUptimeFact[]) {
+  const totalsByLineId = new Map<
+    string,
+    { serviceSeconds: number; downtimeSeconds: number }
+  >();
+  for (const row of rows) {
+    const totals = totalsByLineId.get(row.line_id) ?? {
+      serviceSeconds: 0,
+      downtimeSeconds: 0,
+    };
+    totals.serviceSeconds += row.service_seconds;
+    totals.downtimeSeconds +=
+      row.downtime_disruption_seconds +
+      row.downtime_maintenance_seconds +
+      row.downtime_infra_seconds;
+    totalsByLineId.set(row.line_id, totals);
+  }
+
+  return new Map(
+    [...totalsByLineId].map(([lineId, totals]) => [
+      lineId,
+      {
+        totalServiceSeconds:
+          totals.serviceSeconds > 0 ? totals.serviceSeconds : null,
+        totalDowntimeSeconds:
+          totals.serviceSeconds > 0 ? totals.downtimeSeconds : null,
+        uptimeRatio:
+          totals.serviceSeconds > 0
+            ? Math.max(0, 1 - totals.downtimeSeconds / totals.serviceSeconds)
+            : null,
+      },
+    ]),
+  );
 }
 
 export function mergeLineReadModelScope(input: {
@@ -176,20 +212,68 @@ async function getLineCandidateIssueIds(
 }
 
 export async function getLinesDirectoryData(days: number) {
-  const dataset = await getCompleteDataset('route:/lines');
   const referenceNow = nowSg();
   const referenceDate = isoDate(referenceNow);
+  const startDate = isoDate(
+    referenceNow.startOf('day').minus({ days: days - 1 }),
+  );
+  const db = await getDefaultDb();
+  const [activeIssueRows, uptimeFactRows] = await Promise.all([
+    timeDbQuery('lines_directory_q_active_issues', () =>
+      db
+        .select({ issueId: issueDayFactsTable.issue_id })
+        .from(issueDayFactsTable)
+        .where(
+          and(
+            eq(issueDayFactsTable.date, referenceDate),
+            eq(issueDayFactsTable.active_anytime, true),
+          ),
+        ),
+    ),
+    timeDbQuery('lines_directory_q_uptime_facts', () =>
+      db
+        .select({
+          line_id: lineDayFactsTable.line_id,
+          service_seconds: lineDayFactsTable.service_seconds,
+          downtime_disruption_seconds:
+            lineDayFactsTable.downtime_disruption_seconds,
+          downtime_maintenance_seconds:
+            lineDayFactsTable.downtime_maintenance_seconds,
+          downtime_infra_seconds: lineDayFactsTable.downtime_infra_seconds,
+        })
+        .from(lineDayFactsTable)
+        .where(
+          and(
+            gte(lineDayFactsTable.date, startDate),
+            lte(lineDayFactsTable.date, referenceDate),
+          ),
+        ),
+    ),
+  ]);
+  const dataset = await buildDataset(
+    referenceNow,
+    db,
+    activeIssueRows.map((row) => row.issueId),
+  );
   const lines = Object.values(dataset.included.lines);
+  const uptimeByLineId = aggregateLineUptimeFacts(uptimeFactRows);
   const summaries = rankLineSummaries(
-    lines.map((line) =>
-      buildLineSummary(
+    lines.map((line) => {
+      const statusSummary = buildLineSummary(
         line,
         dataset.issuesByLineId[line.id] ?? [],
-        days,
+        1,
         dataset.publicHolidaySet,
         referenceNow,
-      ),
-    ),
+      );
+      const uptime = uptimeByLineId.get(line.id);
+      return {
+        ...statusSummary,
+        uptimeRatio: uptime?.uptimeRatio ?? null,
+        totalServiceSeconds: uptime?.totalServiceSeconds ?? null,
+        totalDowntimeSeconds: uptime?.totalDowntimeSeconds ?? null,
+      };
+    }),
   );
   const summariesByLineId = Object.fromEntries(
     summaries.map((summary) => [summary.lineId, summary]),
