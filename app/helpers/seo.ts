@@ -1,7 +1,7 @@
-import { LANGUAGES } from '~/constants';
+import { LOCALES, PRIMARY_LOCALE } from '~/constants';
 import { buildLocaleAwareLink } from './buildLocaleAwareLink';
 
-type SeoLanguage = (typeof LANGUAGES)[number];
+type SeoLanguage = (typeof LOCALES)[number];
 
 export interface LocaleAlternate {
   href: string;
@@ -64,7 +64,7 @@ export function buildLocaleAlternates(
   const normalizedPath = normalizeSeoPath(path);
 
   return [
-    ...LANGUAGES.map((lang) => {
+    ...LOCALES.map((lang) => {
       return {
         hreflang: lang,
         href: buildLocalizedAbsoluteUrl(normalizedPath, lang, rootUrl),
@@ -72,7 +72,7 @@ export function buildLocaleAlternates(
     }),
     {
       hreflang: 'x-default' as const,
-      href: buildLocalizedAbsoluteUrl(normalizedPath, 'en-SG', rootUrl),
+      href: buildLocalizedAbsoluteUrl(normalizedPath, PRIMARY_LOCALE, rootUrl),
     },
   ];
 }

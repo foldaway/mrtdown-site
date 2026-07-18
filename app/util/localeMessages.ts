@@ -1,7 +1,9 @@
+import { PRIMARY_LOCALE } from '~/constants';
+
 type LocaleMessages = Record<string, string>;
 
 const localeMessageImports: Record<string, () => Promise<LocaleMessages>> = {
-  'en-SG': () =>
+  [PRIMARY_LOCALE]: () =>
     import('../../lang/en-SG.json').then((module) => module.default),
   ms: () => import('../../lang/ms.json').then((module) => module.default),
   ta: () => import('../../lang/ta.json').then((module) => module.default),
@@ -16,7 +18,7 @@ const localeMessagePromises = new Map<string, Promise<LocaleMessages>>();
  * in the same worker isolate.
  */
 export function getLocaleMessages(lang: string) {
-  const locale = localeMessageImports[lang] == null ? 'en-SG' : lang;
+  const locale = localeMessageImports[lang] == null ? PRIMARY_LOCALE : lang;
   const cached = localeMessagePromises.get(locale);
   if (cached != null) {
     return cached;

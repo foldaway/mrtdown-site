@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-router';
 import { RouteWebVitals } from '~/components/RouteWebVitals';
 import { SentryAnonymousUserBootstrap } from '~/components/SentryAnonymousUserBootstrap';
-import { LANGUAGES } from '~/constants';
+import { LOCALES, PRIMARY_LOCALE } from '~/constants';
 import { getPosthogOptions } from '~/helpers/getPosthogOptions';
 import { OptionalPostHogProvider } from '~/helpers/OptionalPostHogProvider';
 import stylesheet from '../index.css?url';
@@ -71,7 +71,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     select: (state) => state.location.pathname,
   });
   const pathLocale = pathname.split('/')[1];
-  const lang = LANGUAGES.includes(pathLocale) ? pathLocale : 'en-SG';
+  const lang = LOCALES.includes(pathLocale as (typeof LOCALES)[number])
+    ? pathLocale
+    : PRIMARY_LOCALE;
 
   return (
     <html lang={lang}>

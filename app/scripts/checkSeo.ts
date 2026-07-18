@@ -1,4 +1,4 @@
-export {};
+import { LOCALES, PRIMARY_LOCALE } from '../constants';
 
 type HtmlHead = {
   canonicalUrls: string[];
@@ -16,7 +16,7 @@ type SeoFailure = {
 
 const DEFAULT_BASE_URL = 'http://localhost:3000';
 const DEFAULT_TIMEOUT_MS = 25_000;
-const REQUIRED_HREFLANGS = ['en-SG', 'zh-Hans', 'ms', 'ta', 'x-default'];
+const REQUIRED_HREFLANGS = [...LOCALES, 'x-default'];
 const PLACEHOLDER_DESCRIPTION_PATTERNS = [/\bWIP\b/i];
 
 function getBaseUrl() {
@@ -292,6 +292,54 @@ async function checkSitemapUrls(locs: string[], timeoutMs: number) {
   return failures;
 }
 
+async function checkPrimaryLocaleRedirects(baseUrl: string, timeoutMs: number) {
+  const failures: SeoFailure[] = [];
+  const redirects = [
+    { from: `/${PRIMARY_LOCALE}`, to: '/' },
+    { from: `/${PRIMARY_LOCALE}/about`, to: '/about' },
+  ];
+
+  for (const { from, to } of redirects) {
+    const url = new URL(from, baseUrl).toString();
+    try {
+      const response = await fetchWithTimeout(
+        url,
+        { redirect: 'manual' },
+        timeoutMs,
+      );
+      if (response.status !== 308) {
+        failures.push({
+          label: 'locale redirect',
+          url,
+          message: `expected 308, got ${response.status}`,
+        });
+        continue;
+      }
+
+      const location = response.headers.get('location');
+      const expectedLocation = new URL(to, baseUrl).toString();
+      if (
+        location == null ||
+        new URL(location, url).toString() !== expectedLocation
+      ) {
+        failures.push({
+          label: 'locale redirect',
+          url,
+          message: `expected Location ${expectedLocation}, got ${location ?? 'none'}`,
+        });
+      }
+    } catch (error) {
+      failures.push({
+        label: 'locale redirect',
+        url,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return failures;
+}
+
 async function checkRepresentativePages(
   urls: string[],
   timeoutMs: number,
@@ -339,6 +387,7 @@ async function main() {
     sitemapLocs,
   );
   const failures: SeoFailure[] = [
+    ...(await checkPrimaryLocaleRedirects(baseUrl, timeoutMs)),
     ...(await checkSitemapUrls(sitemapLocs, timeoutMs)),
     ...(await checkRepresentativePages(representativeUrls, timeoutMs)),
     ...missingDynamicPrefixes.map((prefix) => ({

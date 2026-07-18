@@ -1,4 +1,4 @@
-import { LOCALES } from './constants';
+import { LOCALES } from '~/constants';
 
 export function removeLocalePrefix(path: string) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;

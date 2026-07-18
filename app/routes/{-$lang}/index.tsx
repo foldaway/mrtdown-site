@@ -7,7 +7,11 @@ import { BetaBadge } from '~/components/BetaBadge';
 import { DeferredViewportWidget } from '~/components/DeferredViewportWidget';
 import { LineSummaryBlock } from '~/components/LineSummaryBlock';
 import { CommunitySignalsSectionSkeleton } from '~/components/ProfileWidgetSkeletons';
-import { HOME_OVERVIEW_INITIAL_DATE_COUNT, LANGUAGES } from '~/constants';
+import {
+  HOME_OVERVIEW_INITIAL_DATE_COUNT,
+  LOCALES,
+  PRIMARY_LOCALE,
+} from '~/constants';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { buildSeoMetadata } from '~/helpers/seo';
@@ -32,8 +36,8 @@ export const Route = createFileRoute('/{-$lang}/')({
   pendingMinMs: 0,
 
   async loader({ params }) {
-    const lang = params.lang ?? 'en-SG';
-    if (!LANGUAGES.includes(lang)) {
+    const lang = params.lang ?? PRIMARY_LOCALE;
+    if (!LOCALES.includes(lang as (typeof LOCALES)[number])) {
       throw notFound();
     }
 
@@ -47,8 +51,8 @@ export const Route = createFileRoute('/{-$lang}/')({
     };
   },
   async head(ctx) {
-    const lang = ctx.params.lang ?? 'en-SG';
-    if (!LANGUAGES.includes(lang)) {
+    const lang = ctx.params.lang ?? PRIMARY_LOCALE;
+    if (!LOCALES.includes(lang as (typeof LOCALES)[number])) {
       throw notFound();
     }
 
@@ -127,7 +131,7 @@ export const Route = createFileRoute('/{-$lang}/')({
                 '@id': websiteId,
                 name: 'mrtdown',
                 url: websiteUrl,
-                inLanguage: LANGUAGES,
+                inLanguage: LOCALES,
               },
               {
                 '@type': 'WebPage',

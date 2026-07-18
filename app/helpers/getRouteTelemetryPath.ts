@@ -1,8 +1,10 @@
-import { LANGUAGES } from '~/constants';
+import { LOCALES } from '~/constants';
 
 export function getRouteTelemetryPath(pathname: string) {
   const segments = pathname.split('/').filter(Boolean);
-  const routeSegments = LANGUAGES.includes(segments[0] ?? '')
+  const routeSegments = LOCALES.includes(
+    segments[0] as (typeof LOCALES)[number],
+  )
     ? segments.slice(1)
     : segments;
 

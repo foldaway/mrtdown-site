@@ -7,6 +7,7 @@ import {
   Link,
   notFound,
   Outlet,
+  redirect,
   useHydrated,
   useRouterState,
 } from '@tanstack/react-router';
@@ -17,15 +18,23 @@ import { useMemo } from 'react';
 import { FormattedDate, FormattedMessage, IntlProvider } from 'react-intl';
 import { LocaleSwitcher } from '~/components/LocaleSwitcher';
 import Spinner from '~/components/Spinner';
-import { LANGUAGES } from '~/constants';
+import { LOCALES, PRIMARY_LOCALE } from '~/constants';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { removePrimaryLocalePrefix } from '~/helpers/removePrimaryLocalePrefix';
 import { getRootFn } from '~/util/root.functions';
 
 export const Route = createFileRoute('/{-$lang}')({
   component: RouteComponent,
-  loader: ({ params }) => {
-    const lang = params.lang ?? 'en-SG';
-    if (!LANGUAGES.includes(lang)) {
+  loader: ({ location, params }) => {
+    if (params.lang === PRIMARY_LOCALE) {
+      throw redirect({
+        href: `${removePrimaryLocalePrefix(location.pathname)}${location.searchStr}`,
+        statusCode: 308,
+      });
+    }
+
+    const lang = params.lang ?? PRIMARY_LOCALE;
+    if (!LOCALES.includes(lang as (typeof LOCALES)[number])) {
       throw notFound();
     }
     return getRootFn({ data: { lang: params.lang } });
@@ -56,7 +65,7 @@ const dropdownContentClassName =
   'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[220px] rounded-2xl border border-gray-200/40 bg-white/98 p-1.5 shadow-black/10 shadow-xl backdrop-blur-xl data-[state=closed]:animate-out data-[state=open]:animate-in dark:border-gray-700/40 dark:bg-gray-950/98 dark:shadow-white/5';
 
 function RouteComponent() {
-  const { lang = 'en-SG' } = Route.useParams();
+  const { lang = PRIMARY_LOCALE } = Route.useParams();
   const loaderData = Route.useLoaderData();
 
   const { messages, lineNavItems, metadata, operatorNavItems } = loaderData;
@@ -83,7 +92,7 @@ function RouteComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <IntlProvider locale={lang ?? 'en-SG'} messages={messages}>
+      <IntlProvider locale={lang ?? PRIMARY_LOCALE} messages={messages}>
         <header className="sticky top-0 z-50 w-full border-gray-200/20 border-b bg-white/80 shadow-black/5 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-white/70 dark:border-gray-800/30 dark:bg-gray-950/80 dark:shadow-white/5 dark:supports-[backdrop-filter]:bg-gray-950/70">
           <div className="mx-3 max-w-5xl sm:mx-4 lg:mx-auto">
             <div className="flex h-14 items-center justify-between sm:h-18">

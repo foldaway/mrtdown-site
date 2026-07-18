@@ -1,8 +1,8 @@
 import { Link, useRouterState } from '@tanstack/react-router';
 import classNames from 'classnames';
 import type React from 'react';
+import { LOCALES } from '~/constants';
 import { buildLocaleAwareLink } from '~/helpers/buildLocaleAwareLink';
-import { LOCALES } from './constants';
 import { removeLocalePrefix } from './helpers';
 
 export const LocaleSwitcher: React.FC = () => {
