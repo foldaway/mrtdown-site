@@ -43,7 +43,11 @@ export function deriveIssueInitialScope(referenceRows: IssueReferenceRows) {
 export async function getIssueStaticScope(
   issueIds: readonly string[],
   db: AppDb,
-  queryPrefix: 'issue' | 'line_profile' | 'station_profile',
+  queryPrefix:
+    | 'issue'
+    | 'line_profile'
+    | 'operator_profile'
+    | 'station_profile',
 ): Promise<DatasetStaticScope> {
   const uniqueIssueIds = [...new Set(issueIds)];
   if (uniqueIssueIds.length === 0) {

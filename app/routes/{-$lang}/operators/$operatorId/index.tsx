@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, notFound } from '@tanstack/react-router';
 import { lazy } from 'react';
 import {
@@ -13,11 +12,9 @@ import {
   ProfileTrendCardSkeleton,
 } from '~/components/ProfileWidgetSkeletons';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
-import { getDateCountForViewport } from '~/helpers/getDateCountForViewport';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import { useHydrated } from '~/hooks/useHydrated';
-import { useViewport } from '~/hooks/useViewport';
 import { getOperatorProfileFn } from '~/util/operator.functions';
 import { assert } from '../../../../util/assert';
 import { OperatorCurrentStatusCard } from './components/OperatorCurrentStatusCard';
@@ -25,14 +22,14 @@ import { OperatorLinePerformanceCard } from './components/OperatorLinePerformanc
 import { OperatorQuickFactsCard } from './components/OperatorQuickFactsCard';
 import { OperatorUptimeCard } from './components/OperatorUptimeCard';
 
-const OPERATOR_PROFILE_INITIAL_DATE_COUNT = 30;
+const OPERATOR_PROFILE_DATE_COUNT = 90;
 
 async function loadOperatorProfile(operatorId: string) {
   try {
     return await getOperatorProfileFn({
       data: {
         operatorId,
-        days: OPERATOR_PROFILE_INITIAL_DATE_COUNT,
+        days: OPERATOR_PROFILE_DATE_COUNT,
       },
     });
   } catch (error) {
@@ -237,30 +234,7 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
 
 function OperatorPage() {
   const loaderData = Route.useLoaderData();
-  const measuredViewport = useViewport();
-  const desiredDateCount = getDateCountForViewport(measuredViewport);
-  const expandedProfileQuery = useQuery({
-    queryKey: [
-      'operator-profile',
-      loaderData.data.operatorId,
-      desiredDateCount,
-    ],
-    queryFn: () =>
-      getOperatorProfileFn({
-        data: {
-          operatorId: loaderData.data.operatorId,
-          days: desiredDateCount,
-        },
-      }),
-    enabled: desiredDateCount > loaderData.dateCount,
-    staleTime: 60_000,
-  });
-  const activeData =
-    desiredDateCount > loaderData.dateCount && expandedProfileQuery.data != null
-      ? expandedProfileQuery.data
-      : loaderData;
-
-  const { data: operatorProfile, included, dateCount } = activeData;
+  const { data: operatorProfile, included, dateCount } = loaderData;
   const operator = included.operators[operatorProfile.operatorId];
   const intl = useIntl();
   const operatorName = getLocalizedTranslation(operator.name, intl.locale);

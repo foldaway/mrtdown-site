@@ -185,6 +185,14 @@ Exit criteria:
   Markdown reads now assemble only that scoped graph, while the existing uptime
   rank is derived from compact `line_day_facts` rows instead of complete issue
   history. The previous function name remains as a compatibility alias.
+- 2026-07-18: Added `getOperatorProfileReadModel`. It resolves the root
+  operator and operated lines first, scopes services, stations, issue
+  references, membership lines, and public holidays to that graph, and
+  preserves the existing profile payload without constructing the complete
+  dataset. Human and Markdown routes now use the scoped reader. The human page
+  also performs one 90-day profile request instead of loading 30 days and then
+  repeating the read for wider viewports; the previous data-function name
+  remains as a compatibility alias.
 
 ## Decision Log
 

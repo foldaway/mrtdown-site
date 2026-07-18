@@ -94,7 +94,6 @@ export type BaseDataset = {
 export type CompleteDatasetCaller =
   | 'route:/lines'
   | 'route:/lines/:lineId'
-  | 'route:/operators/:operatorId'
   | 'route:/stations'
   | 'route:/towns'
   | 'route:/towns/:townId'

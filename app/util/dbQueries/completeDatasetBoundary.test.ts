@@ -79,4 +79,21 @@ describe('complete dataset boundary', () => {
     );
     expect(profileReader).not.toMatch(COMPLETE_DATASET_CALL);
   });
+
+  it('keeps the migrated operator profile reader off the complete dataset', () => {
+    const operatorReader = readFileSync(
+      join(APP_ROOT, 'util', 'dbQueries', 'operators.ts'),
+      'utf8',
+    );
+
+    const profileReader = operatorReader.slice(
+      operatorReader.indexOf(
+        'export async function getOperatorProfileReadModel',
+      ),
+      operatorReader.indexOf(
+        '/** @deprecated Use the explicitly scoped read-model name. */',
+      ),
+    );
+    expect(profileReader).not.toMatch(COMPLETE_DATASET_CALL);
+  });
 });
