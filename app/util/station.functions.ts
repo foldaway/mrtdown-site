@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import {
-  getStationProfileData,
+  getStationProfileReadModel,
   getStationsDirectoryData,
 } from './dbQueries/stations';
 import { timeServerSpan } from './serverTiming';
@@ -13,7 +13,7 @@ const InputSchema = z.object({
 export const getStationProfileFn = createServerFn({ method: 'GET' })
   .inputValidator((val) => InputSchema.parse(val))
   .handler((val) =>
-    getStationProfileData(val.data.stationId, {
+    getStationProfileReadModel(val.data.stationId, {
       includeCommunitySignals: true,
     }),
   );

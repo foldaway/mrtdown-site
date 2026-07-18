@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { resolveStationProfileStationId } from './stations';
+import {
+  mergeStationReadModelScope,
+  resolveStationProfileStationId,
+} from './stations';
 import { TEST_STATION } from './testFixtures';
 
 describe('resolveStationProfileStationId', () => {
@@ -33,5 +36,45 @@ describe('resolveStationProfileStationId', () => {
         'NOPE',
       ),
     ).toBeNull();
+  });
+});
+
+describe('station read-model scope', () => {
+  it('merges the root, community, and issue graph without duplicates', () => {
+    expect(
+      mergeStationReadModelScope({
+        stationId: 'NS1',
+        stationLineIds: ['NSL'],
+        stationServiceIds: ['nsl-main'],
+        communityLineIds: ['NSL', 'TEL'],
+        communityStationIds: ['NS1', 'TE2'],
+        issueScope: {
+          lineIds: ['NSL', 'EWL'],
+          serviceIds: ['nsl-main', 'ewl-main'],
+          stationIds: ['NS1', 'NS2'],
+        },
+      }),
+    ).toEqual({
+      lineIds: ['NSL', 'TEL', 'EWL'],
+      serviceIds: ['nsl-main', 'ewl-main'],
+      stationIds: ['NS1', 'TE2', 'NS2'],
+    });
+  });
+
+  it('keeps a no-issue station scoped to its own static graph', () => {
+    expect(
+      mergeStationReadModelScope({
+        stationId: 'JS1',
+        stationLineIds: ['JRL'],
+        stationServiceIds: ['jrl-main'],
+        communityLineIds: [],
+        communityStationIds: [],
+        issueScope: { lineIds: [], serviceIds: [], stationIds: [] },
+      }),
+    ).toEqual({
+      lineIds: ['JRL'],
+      serviceIds: ['jrl-main'],
+      stationIds: ['JS1'],
+    });
   });
 });

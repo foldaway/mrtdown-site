@@ -51,4 +51,17 @@ describe('complete dataset boundary', () => {
 
     expect(issueReader).not.toMatch(COMPLETE_DATASET_CALL);
   });
+
+  it('keeps the migrated station profile reader off the complete dataset', () => {
+    const stationReader = readFileSync(
+      join(APP_ROOT, 'util', 'dbQueries', 'stations.ts'),
+      'utf8',
+    );
+
+    const profileReader = stationReader.slice(
+      stationReader.indexOf('export async function getStationProfileReadModel'),
+      stationReader.indexOf('export async function getStationsDirectoryData'),
+    );
+    expect(profileReader).not.toMatch(COMPLETE_DATASET_CALL);
+  });
 });

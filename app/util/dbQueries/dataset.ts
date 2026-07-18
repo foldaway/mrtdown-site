@@ -92,12 +92,10 @@ export type BaseDataset = {
 };
 
 export type CompleteDatasetCaller =
-  | 'route:/issues/:issueId'
   | 'route:/lines'
   | 'route:/lines/:lineId'
   | 'route:/operators/:operatorId'
   | 'route:/stations'
-  | 'route:/stations/:stationId'
   | 'route:/towns'
   | 'route:/towns/:townId'
   | 'route:/sitemap.xml'
@@ -108,6 +106,10 @@ export type DatasetStaticScope = {
   lineIds: readonly string[];
   serviceIds: readonly string[];
   stationIds: readonly string[];
+  operatorIds?: readonly string[];
+  townIds?: readonly string[];
+  landmarkIds?: readonly string[];
+  includePublicHolidays?: boolean;
 };
 
 function parseTranslations(value: unknown): Line['name'] {
@@ -149,6 +151,16 @@ export async function buildDataset(
     staticScope == null ? undefined : [...new Set(staticScope.serviceIds)];
   const selectedStationIds =
     staticScope == null ? undefined : [...new Set(staticScope.stationIds)];
+  const selectedOperatorIds =
+    staticScope == null
+      ? undefined
+      : [...new Set(staticScope.operatorIds ?? [])];
+  const selectedTownIds =
+    staticScope == null ? undefined : [...new Set(staticScope.townIds ?? [])];
+  const selectedLandmarkIds =
+    staticScope == null
+      ? undefined
+      : [...new Set(staticScope.landmarkIds ?? [])];
 
   const [
     metadataRows,
@@ -197,21 +209,42 @@ export async function buildDataset(
                 .where(inArray(lineOperatorsTable.line_id, selectedLineIds)),
             )
           : [],
-      staticScope == null
+      selectedOperatorIds == null
         ? timeDbQuery('dataset_q_operators', () =>
             database.select().from(operatorsTable),
           )
-        : [],
-      staticScope == null
+        : selectedOperatorIds.length > 0
+          ? timeDbQuery('dataset_q_operators', () =>
+              database
+                .select()
+                .from(operatorsTable)
+                .where(inArray(operatorsTable.id, selectedOperatorIds)),
+            )
+          : [],
+      selectedTownIds == null
         ? timeDbQuery('dataset_q_towns', () =>
             database.select().from(townsTable),
           )
-        : [],
-      staticScope == null
+        : selectedTownIds.length > 0
+          ? timeDbQuery('dataset_q_towns', () =>
+              database
+                .select()
+                .from(townsTable)
+                .where(inArray(townsTable.id, selectedTownIds)),
+            )
+          : [],
+      selectedLandmarkIds == null
         ? timeDbQuery('dataset_q_landmarks', () =>
             database.select().from(landmarksTable),
           )
-        : [],
+        : selectedLandmarkIds.length > 0
+          ? timeDbQuery('dataset_q_landmarks', () =>
+              database
+                .select()
+                .from(landmarksTable)
+                .where(inArray(landmarksTable.id, selectedLandmarkIds)),
+            )
+          : [],
       selectedStationIds == null
         ? timeDbQuery('dataset_q_stations', () =>
             database
@@ -292,7 +325,7 @@ export async function buildDataset(
                 ),
             )
           : [],
-      staticScope == null
+      staticScope == null || staticScope.includePublicHolidays === true
         ? timeDbQuery('dataset_q_public_holidays', () =>
             database.select().from(publicHolidaysTable),
           )

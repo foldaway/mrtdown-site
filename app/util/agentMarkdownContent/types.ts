@@ -2,7 +2,7 @@ import type { getIssueReadModel } from '../dbQueries/issue';
 import type { getLineProfileData } from '../dbQueries/lines';
 import type { getOperatorProfileData } from '../dbQueries/operators';
 import type { getOverviewData } from '../dbQueries/overview';
-import type { getStationProfileData } from '../dbQueries/stations';
+import type { getStationProfileReadModel } from '../dbQueries/stations';
 
 export const DEFAULT_ROOT_URL = 'https://www.mrtdown.org';
 
@@ -13,7 +13,7 @@ export interface AgentMarkdownOptions {
 export type OverviewPayload = Awaited<ReturnType<typeof getOverviewData>>;
 export type LineProfilePayload = Awaited<ReturnType<typeof getLineProfileData>>;
 export type StationProfilePayload = Awaited<
-  ReturnType<typeof getStationProfileData>
+  ReturnType<typeof getStationProfileReadModel>
 >;
 export type OperatorProfilePayload = Awaited<
   ReturnType<typeof getOperatorProfileData>

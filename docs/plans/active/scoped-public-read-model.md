@@ -47,7 +47,7 @@ Related plan: [Production performance](production-performance.md).
 | --- | --- | --- |
 | `getIssueData` | `/issues/:issueId`, issue Markdown | One issue, its events, evidence, and referenced entities |
 | `getLineProfileData` | `/lines/:lineId`, line Markdown | One line, its services/stations, and issues affecting that line in the requested window |
-| `getStationProfileData` | `/stations/:stationId`, station Markdown | One station, memberships, and issues affecting that station |
+| `getStationProfileReadModel` | `/stations/:stationId`, station Markdown | One station, memberships, and issues affecting that station |
 | `getOperatorProfileData` | `/operators/:operatorId`, operator Markdown, desktop expansion request | Operator's lines and issues affecting those lines in the requested window |
 | `getTownProfileData` | `/towns/:townId` | Town's stations, memberships, and their relevant issues |
 | `getLinesDirectoryData` | `/lines` | Per-line current status and bounded uptime summary |
@@ -173,6 +173,12 @@ Exit criteria:
   both issue history and static network queries before preserving the existing
   issue response contract. Issue page and Markdown requests no longer invoke
   `getCompleteDataset`.
+- 2026-07-18: Added `getStationProfileReadModel`. It resolves canonical station
+  IDs and station-code aliases before assembly, discovers candidate issues from
+  the station and its services, and scopes issue history plus line, service,
+  station, town, and landmark reads to the resulting graph. Station profile and
+  Markdown requests no longer invoke `getCompleteDataset`; the previous
+  function name remains as a compatibility alias.
 
 ## Decision Log
 

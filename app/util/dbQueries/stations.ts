@@ -1,9 +1,20 @@
 import type { Line, LineSummaryStatus, Station } from '~/types';
+import { asc, eq, inArray } from 'drizzle-orm';
+import {
+  impactEventEntityFacilitiesTable,
+  impactEventEntityServicesTable,
+  impactEventsTable,
+  servicesTable,
+  stationCodesTable,
+  stationLandmarksTable,
+  stationsTable,
+} from '~/db/schema';
 import {
   type CommunitySignalOptions,
   getPageCommunitySignals,
 } from './communitySignals';
-import { getCompleteDataset } from './dataset';
+import { getDefaultDb, timeDbQuery } from './database';
+import { buildDataset, getCompleteDataset } from './dataset';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
@@ -12,6 +23,7 @@ import {
   issueActiveNow,
   sortIssuesByLatestActivity,
 } from './issueIntervals';
+import { getIssueStaticScope } from './readModelScope';
 
 export function resolveStationProfileStationId(
   included: { stations: Record<string, Pick<Station, 'id' | 'memberships'>> },
@@ -41,15 +53,119 @@ export function resolveStationProfileStationId(
   return aliasMatches[0]?.stationId ?? null;
 }
 
-export async function getStationProfileData(
+async function resolveStationProfileStationIdFromDb(stationIdOrCode: string) {
+  const db = await getDefaultDb();
+  const [stationRow] = await timeDbQuery('station_profile_q_root', () =>
+    db
+      .select({ id: stationsTable.id })
+      .from(stationsTable)
+      .where(eq(stationsTable.id, stationIdOrCode))
+      .limit(1),
+  );
+  if (stationRow != null) {
+    return { db, stationId: stationRow.id };
+  }
+
+  const [stationCodeRow] = await timeDbQuery(
+    'station_profile_q_root_by_code',
+    () =>
+      db
+        .select({ stationId: stationCodesTable.station_id })
+        .from(stationCodesTable)
+        .where(eq(stationCodesTable.code, stationIdOrCode))
+        .orderBy(
+          asc(stationCodesTable.line_id),
+          asc(stationCodesTable.station_id),
+        )
+        .limit(1),
+  );
+  return { db, stationId: stationCodeRow?.stationId ?? null };
+}
+
+async function getStationCandidateIssueIds(
+  stationId: string,
+  serviceIds: readonly string[],
+  db: Awaited<ReturnType<typeof getDefaultDb>>,
+) {
+  const [facilityIssueRows, serviceIssueRows] = await Promise.all([
+    timeDbQuery('station_profile_q_facility_issues', () =>
+      db
+        .selectDistinct({ issueId: impactEventsTable.issue_id })
+        .from(impactEventsTable)
+        .innerJoin(
+          impactEventEntityFacilitiesTable,
+          eq(
+            impactEventEntityFacilitiesTable.impact_event_id,
+            impactEventsTable.id,
+          ),
+        )
+        .where(eq(impactEventEntityFacilitiesTable.station_id, stationId)),
+    ),
+    serviceIds.length > 0
+      ? timeDbQuery('station_profile_q_service_issues', () =>
+          db
+            .selectDistinct({ issueId: impactEventsTable.issue_id })
+            .from(impactEventsTable)
+            .innerJoin(
+              impactEventEntityServicesTable,
+              eq(
+                impactEventEntityServicesTable.impact_event_id,
+                impactEventsTable.id,
+              ),
+            )
+            .where(
+              inArray(impactEventEntityServicesTable.service_id, serviceIds),
+            ),
+        )
+      : [],
+  ]);
+
+  return [
+    ...new Set(
+      [...facilityIssueRows, ...serviceIssueRows].map((row) => row.issueId),
+    ),
+  ];
+}
+
+export function mergeStationReadModelScope(input: {
+  stationId: string;
+  stationLineIds: readonly string[];
+  stationServiceIds: readonly string[];
+  communityLineIds: readonly string[];
+  communityStationIds: readonly string[];
+  issueScope: {
+    lineIds: readonly string[];
+    serviceIds: readonly string[];
+    stationIds: readonly string[];
+  };
+}) {
+  return {
+    lineIds: [
+      ...new Set([
+        ...input.stationLineIds,
+        ...input.communityLineIds,
+        ...input.issueScope.lineIds,
+      ]),
+    ],
+    serviceIds: [
+      ...new Set([...input.stationServiceIds, ...input.issueScope.serviceIds]),
+    ],
+    stationIds: [
+      ...new Set([
+        input.stationId,
+        ...input.communityStationIds,
+        ...input.issueScope.stationIds,
+      ]),
+    ],
+  };
+}
+
+export async function getStationProfileReadModel(
   stationId: string,
   options: CommunitySignalOptions = {},
 ) {
-  const dataset = await getCompleteDataset('route:/stations/:stationId');
-  const resolvedStationId = resolveStationProfileStationId(
-    dataset.included,
-    stationId,
-  );
+  const { db, stationId: resolvedStationId } =
+    await resolveStationProfileStationIdFromDb(stationId);
   if (resolvedStationId == null) {
     throw new Response('Station not found', {
       status: 404,
@@ -57,12 +173,101 @@ export async function getStationProfileData(
     });
   }
 
+  const stationCodeRows = await timeDbQuery(
+    'station_profile_q_membership_lines',
+    () =>
+      db
+        .select({ lineId: stationCodesTable.line_id })
+        .from(stationCodesTable)
+        .where(eq(stationCodesTable.station_id, resolvedStationId)),
+  );
+  const stationLineIds = [...new Set(stationCodeRows.map((row) => row.lineId))];
+  const stationServiceRows =
+    stationLineIds.length > 0
+      ? await timeDbQuery('station_profile_q_line_services', () =>
+          db
+            .select({ id: servicesTable.id })
+            .from(servicesTable)
+            .where(inArray(servicesTable.line_id, stationLineIds)),
+        )
+      : [];
+  const stationServiceIds = stationServiceRows.map((row) => row.id);
+  const [candidateIssueIds, communitySignals] = await Promise.all([
+    getStationCandidateIssueIds(resolvedStationId, stationServiceIds, db),
+    getPageCommunitySignals(options, { stationId: resolvedStationId }),
+  ]);
+  const issueScope = await getIssueStaticScope(
+    candidateIssueIds,
+    db,
+    'station_profile',
+  );
+  const initialScope = mergeStationReadModelScope({
+    stationId: resolvedStationId,
+    stationLineIds,
+    stationServiceIds,
+    communityLineIds: communitySignals.flatMap((signal) => signal.lineIds),
+    communityStationIds: communitySignals.flatMap(
+      (signal) => signal.stationIds,
+    ),
+    issueScope,
+  });
+  const [scopedStationCodeRows, scopedStationRows, stationLandmarkRows] =
+    await Promise.all([
+      timeDbQuery('station_profile_q_scoped_membership_lines', () =>
+        db
+          .select({ lineId: stationCodesTable.line_id })
+          .from(stationCodesTable)
+          .where(
+            inArray(stationCodesTable.station_id, initialScope.stationIds),
+          ),
+      ),
+      timeDbQuery('station_profile_q_scoped_towns', () =>
+        db
+          .select({ townId: stationsTable.townId })
+          .from(stationsTable)
+          .where(inArray(stationsTable.id, initialScope.stationIds)),
+      ),
+      timeDbQuery('station_profile_q_scoped_landmarks', () =>
+        db
+          .select({ landmarkId: stationLandmarksTable.landmark_id })
+          .from(stationLandmarksTable)
+          .where(
+            inArray(stationLandmarksTable.station_id, initialScope.stationIds),
+          ),
+      ),
+    ]);
+  const lineIds = [
+    ...new Set([
+      ...initialScope.lineIds,
+      ...scopedStationCodeRows.map((row) => row.lineId),
+    ]),
+  ];
+  const scopedServiceRows =
+    lineIds.length > 0
+      ? await timeDbQuery('station_profile_q_scoped_services', () =>
+          db
+            .select({ id: servicesTable.id })
+            .from(servicesTable)
+            .where(inArray(servicesTable.line_id, lineIds)),
+        )
+      : [];
+  const dataset = await buildDataset(undefined, db, candidateIssueIds, {
+    lineIds,
+    serviceIds: [
+      ...new Set([
+        ...initialScope.serviceIds,
+        ...scopedServiceRows.map((row) => row.id),
+      ]),
+    ],
+    stationIds: initialScope.stationIds,
+    townIds: [...new Set(scopedStationRows.map((row) => row.townId))],
+    landmarkIds: [...new Set(stationLandmarkRows.map((row) => row.landmarkId))],
+  });
   const station = dataset.included.stations[resolvedStationId];
   if (station == null) {
-    throw new Response('Station not found', {
-      status: 404,
-      statusText: 'Not Found',
-    });
+    throw new Error(
+      `Station ${resolvedStationId} disappeared while building its read model`,
+    );
   }
 
   const issues = Object.values(dataset.allIssues).filter((issue) =>
@@ -85,10 +290,6 @@ export async function getStationProfileData(
     issues.map((issue) => issue.id),
     dataset.allIssues,
   ).slice(0, 15);
-  const communitySignals = await getPageCommunitySignals(options, {
-    stationId: resolvedStationId,
-  });
-
   return {
     data: {
       stationId: resolvedStationId,
@@ -111,6 +312,9 @@ export async function getStationProfileData(
     }),
   };
 }
+
+/** @deprecated Use the explicitly scoped read-model name. */
+export const getStationProfileData = getStationProfileReadModel;
 
 export async function getStationsDirectoryData() {
   const dataset = await getCompleteDataset('route:/stations');
