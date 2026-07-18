@@ -265,6 +265,14 @@ Exit criteria:
   a future date-range label used a non-wrapping `shrink-0` span; the 1,440 px
   layout had no horizontal overflow. Treat this as an existing responsive
   baseline when comparing the scoped-reader deployment.
+- 2026-07-19: Captured the final production `pg_stat_statements` before-sample
+  at 2026-07-18 17:22:57 UTC without resetting the counters. Query ID
+  `-1208032944424713892` had reached 3,296 calls, 37,758,976 rows, 13.93 ms mean
+  execution time, and 45,899.54 ms total execution time; the statistics reset
+  remained 2026-07-17 21:19:59 UTC. Over the 33 minutes and 37 seconds since the
+  preceding checkpoint, the statement added 111 calls and 1,271,616 rows,
+  remaining exactly 11,456 rows per call and averaging one complete read every
+  18.2 seconds. Use these values as T0 for the post-deploy delta.
 
 ## Decision Log
 
