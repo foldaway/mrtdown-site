@@ -24,7 +24,7 @@ import {
   type TimeScale,
 } from './analyticsShared';
 import { type AppDb, getDefaultDb, isUndefinedTableError } from './database';
-import { type BaseDataset, buildDataset, getCompleteDataset } from './dataset';
+import { type BaseDataset, buildDataset } from './dataset';
 import { isoDate, isoDateTime, nowSg } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import {
@@ -521,6 +521,19 @@ export function parseStatisticsSnapshotPayload(value: unknown): {
   return null;
 }
 
+export function assertCompleteStatisticsSnapshot(
+  snapshot: ReturnType<typeof parseStatisticsSnapshotPayload>,
+): asserts snapshot is {
+  data: SystemAnalytics;
+  included: IncludedEntities;
+} {
+  if (snapshot?.included == null) {
+    throw new Error(
+      'Statistics snapshot is missing or incomplete. Apply database migrations, then run the canonical data pull or POST /internal/api/tasks/facts before serving /statistics.',
+    );
+  }
+}
+
 async function getLatestStatisticsSnapshot(db?: AppDb) {
   const database = db ?? (await getDefaultDb());
   try {
@@ -782,37 +795,11 @@ export async function rebuildStatisticsSnapshot(db?: AppDb) {
 export async function getStatisticsData() {
   return timeServerSpan('statistics_data', async () => {
     const snapshot = await getLatestStatisticsSnapshot();
-    if (snapshot != null) {
-      if (snapshot.included != null) {
-        recordServerTiming('statistics_included', 0, 'source=snapshot');
-        return {
-          data: snapshot.data,
-          included: snapshot.included,
-        };
-      }
-
-      const dataset = await timeServerSpan('statistics_included_dataset', () =>
-        buildDataset(
-          nowSg(),
-          undefined,
-          snapshot.data.issueIdsDisruptionLongest,
-        ),
-      );
-      return {
-        data: snapshot.data,
-        included: timeSyncServerSpan('statistics_included', () =>
-          getStatisticsIncluded(dataset, snapshot.data),
-        ),
-      };
-    }
-
-    const dataset = await getCompleteDataset('route:/statistics');
-    const statistics = await buildStatisticsDataFromDataset(dataset);
+    assertCompleteStatisticsSnapshot(snapshot);
+    recordServerTiming('statistics_included', 0, 'source=snapshot');
     return {
-      data: statistics,
-      included: timeSyncServerSpan('statistics_included', () =>
-        getStatisticsIncluded(dataset, statistics),
-      ),
+      data: snapshot.data,
+      included: snapshot.included,
     };
   });
 }

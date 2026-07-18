@@ -60,6 +60,12 @@ lanes rather than aggregate durations alone. The same rebuild refreshes
 station status and latest-disruption reads without reconstructing impact-event
 history on a public request.
 
+After operational facts, the canonical pull refreshes the persisted statistics
+and sitemap snapshots before purging the public edge-cache tag. Statistics and
+sitemap requests require those successfully rebuilt projections in every
+environment. Missing or invalid snapshots fail with instructions to apply
+migrations and run the canonical pull or authenticated facts rebuild.
+
 ## Crowd Report Dispatch
 
 Accepted crowdsourced reports and accepted report clusters trigger a

@@ -7,6 +7,7 @@ import { createWorkflow } from '@upstash/workflow/tanstack';
 import { ZipStore } from '~/helpers/ZipStore.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts.js';
+import { rebuildSitemapSnapshot } from '~/util/dbQueries/sitemap.js';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics.js';
 import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
@@ -305,6 +306,19 @@ async function executePull(context: WorkflowContext<Params>) {
 
   console.log(
     `[PULL] Rebuilt statistics snapshot ${statistics.asOf} with ${statistics.issueIdsDisruptionLongest.length} longest disruptions`,
+  );
+
+  const sitemap = await runPullStep(
+    context,
+    'rebuild-sitemap-snapshot',
+    async () => {
+      console.log('[PULL] Rebuilding sitemap snapshot...');
+      return rebuildSitemapSnapshot();
+    },
+  );
+
+  console.log(
+    `[PULL] Rebuilt sitemap snapshot ${sitemap.asOf} with ${sitemap.pathEntityCount} entity paths`,
   );
 
   await runPullStep(context, 'publish-public-data-cache', () =>

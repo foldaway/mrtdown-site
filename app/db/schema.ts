@@ -1026,6 +1026,26 @@ export const statisticsSnapshotsTable = pgTable(
   },
 );
 
+// Precomputed sitemap entity and history bounds. Public sitemap requests read
+// this compact projection instead of constructing the complete dataset.
+export const sitemapSnapshotsTable = pgTable(
+  'sitemap_snapshots',
+  {
+    id: text('id').primaryKey(),
+    as_of: timestamp('as_of', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    data: jsonb('data').$type<unknown>().notNull(),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      index('sitemap_snapshots_as_of_idx').using('btree', table.as_of.desc()),
+    ];
+  },
+);
+
 export const impactEventServiceScopeTypeEnum = pgEnum(
   'impact_event_service_scope_type',
   enumToPgEnum(ServiceScopeTypeSchema.enum),

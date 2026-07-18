@@ -115,7 +115,7 @@ Exit criteria:
 - Directory routes do not load global issue or impact-event history.
 - Their response sizes and route timings are measured before and after.
 
-### Phase 3: Remove Request-Time Global Fallbacks
+### Phase 3: Remove Request-Time Global Fallbacks — Implementation Complete
 
 - Make production statistics require the latest successfully rebuilt snapshot;
   retain the full request-time fallback only for local development or explicit
@@ -217,6 +217,15 @@ Exit criteria:
   global issue and impact-event history. All Phase 2 directory entry points now
   use compact read models; production payload and timing measurements remain
   part of Phase 4.
+- 2026-07-18: Removed the remaining production request-time global fallbacks.
+  Statistics requests now require a complete v1 snapshot in every environment.
+  Added a rebuildable `sitemap_snapshots` projection, refreshed it
+  after canonical pulls and manual facts rebuilds, and moved `/sitemap.xml` to
+  that compact row. Missing snapshots fail with explicit migration and rebuild
+  instructions rather than triggering request-time recovery. Complete-dataset
+  caller labels are now limited to bounded workflows. Phase 3 implementation is
+  complete; deployment backfill and production counter/cache verification remain
+  in Phase 4.
 
 ## Decision Log
 

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts';
+import { rebuildSitemapSnapshot } from '~/util/dbQueries/sitemap';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics';
 import { internalMiddleware } from '~/util/internal.middleware';
 
@@ -38,12 +39,14 @@ export const Route = createFileRoute('/internal/api/tasks/facts')({
         const { days } = parsed.data;
         const rows = await rebuildOperationalFactsRange(days);
         const statistics = await rebuildStatisticsSnapshot();
+        const sitemap = await rebuildSitemapSnapshot();
         return Response.json(
           {
             success: true,
             days,
             rows,
             statistics,
+            sitemap,
           },
           { status: 200 },
         );

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseStatisticsSnapshotPayload } from './statistics';
+import {
+  assertCompleteStatisticsSnapshot,
+  parseStatisticsSnapshotPayload,
+} from './statistics';
 import { buildStatistics } from './testFixtures';
 
 describe('parseStatisticsSnapshotPayload', () => {
@@ -26,7 +29,7 @@ describe('parseStatisticsSnapshotPayload', () => {
     });
   });
 
-  it('keeps legacy statistics-only snapshots as a fallback', () => {
+  it('recognizes legacy statistics-only snapshots as incomplete', () => {
     const statistics = buildStatistics();
 
     expect(parseStatisticsSnapshotPayload(statistics)).toEqual({
@@ -43,5 +46,17 @@ describe('parseStatisticsSnapshotPayload', () => {
       }),
     ).toBeNull();
     expect(parseStatisticsSnapshotPayload({})).toBeNull();
+  });
+
+  it('throws rebuild instructions when the snapshot is missing or incomplete', () => {
+    expect(() => assertCompleteStatisticsSnapshot(null)).toThrow(
+      'Apply database migrations, then run the canonical data pull or POST /internal/api/tasks/facts',
+    );
+    expect(() =>
+      assertCompleteStatisticsSnapshot({
+        data: buildStatistics(),
+        included: null,
+      }),
+    ).toThrow('before serving /statistics');
   });
 });

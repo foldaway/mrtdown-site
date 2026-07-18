@@ -60,7 +60,7 @@ separates edge freshness from the browser-facing `Cache-Control` policy.
 The canonical pull publishes updated data in this order:
 
 1. Promote staged canonical data.
-2. Rebuild operational facts and the statistics snapshot.
+2. Rebuild operational facts plus the statistics and sitemap snapshots.
 3. Purge `mrtdown-<tier>-data` through the Cloudflare API.
 4. Release the pull-workflow lease.
 

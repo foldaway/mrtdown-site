@@ -18,6 +18,7 @@ describe('pull workflow promotion order', () => {
       'finalize',
       'rebuild-operational-facts',
       'rebuild-statistics-snapshot',
+      'rebuild-sitemap-snapshot',
       'publish-public-data-cache',
     ];
 

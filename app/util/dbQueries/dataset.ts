@@ -92,9 +92,8 @@ export type BaseDataset = {
 };
 
 export type CompleteDatasetCaller =
-  | 'route:/sitemap.xml'
-  | 'route:/statistics'
-  | 'workflow:operational-facts';
+  | 'workflow:operational-facts'
+  | 'workflow:sitemap-snapshot';
 
 export type DatasetStaticScope = {
   lineIds: readonly string[];
