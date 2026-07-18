@@ -16,12 +16,13 @@ reporter IP hashes. A machine producer must not bypass or distort those
 assumptions.
 
 The proposed system uses the sibling `mrtdown-reddit-monitor` Cloudflare Worker
-as a platform-specific acquisition adapter. The Worker owns Reddit API access,
-discovery cursors, watched-thread polling, reply detection, source edits and
-deletions, retries, and delivery state. It submits authenticated, idempotent
-source events to `mrtdown-site`. The site owns classification, moderation,
-conversation lifecycle, confidence, short-lived community signals, and any
-accepted canonical handoff.
+as a platform-specific monitor and claim producer. The Worker owns Reddit API
+access, discovery cursors, watched-thread polling, reply detection, source edits
+and deletions, bounded conversation storage, source-specific extraction,
+support aggregation, claim lifecycle, retries, and delivery state. It submits
+authenticated, idempotent structured claim events to `mrtdown-site`. The site
+owns producer policy, cross-source merging, short-lived community signals,
+public presentation, and any accepted canonical handoff.
 
 The dedicated Worker is a workload-shape decision, not a capacity requirement.
 Five-minute discovery means 288 scheduled checks per day, most of which should
@@ -31,10 +32,12 @@ in the site.
 
 Raw Reddit text should not become permanent append-only canonical evidence.
 Reddit requires authenticated API access and deletion-aware handling of user
-content, while `mrtdown-data` intentionally preserves evidence. The site should
-retain only the source material needed for a bounded moderation window, remove
-deleted or expired material, and dispatch a structured MRTDown-authored signal
-rather than a durable copy of a Reddit thread or comment.
+content, while `mrtdown-data` intentionally preserves evidence. The monitor
+retains only the source material needed for bounded extraction and replay,
+removes deleted or expired material, and sends no raw body, comment tree,
+fullname, username, or actor key to the site. The site persists structured
+claims and dispatches a structured MRTDown-authored signal rather than a durable
+copy of a Reddit thread or comment.
 
 Related references:
 
@@ -58,14 +61,15 @@ discovery, polling leases, change detection, bounded producer snapshots, and
 at-least-once delivery; they do not replace the site's moderation and signal
 state.
 
-The monitor currently also contains a handwritten Reddit-specific TypeScript
-version-one event contract and documents the unversioned route
-`POST /internal/api/sources/reddit/events`. Treat that as an implementation
-draft. Before shadow traffic, `mrtdown-site` must own a generic community
-observation runtime schema and generated OpenAPI document, the route must become
-`POST /internal/api/community-observations/v1/events`, and the monitor must
-consume a pinned copy of that site-owned artifact. Reddit fullnames, subreddit
-rules, and thread/comment parsing stay on the producer side.
+The monitor currently also contains a transitional Reddit source-event parser
+and a wire-neutral outbox built around individual source changes. Preserve the
+source storage as monitor-internal state, but do not materialize those source
+objects as site events. Before shadow delivery, `mrtdown-site` must own a
+generic community-claim runtime schema and generated OpenAPI document, the
+route must be `POST /internal/api/community-claims/v1/events`, and the monitor
+must derive claim transitions and consume a pinned copy of that site-owned
+artifact. Reddit fullnames, subreddit rules, thread/comment parsing, raw text,
+and pseudonymous actor keys stay on the producer side.
 
 ## System Flow
 
@@ -76,14 +80,14 @@ flowchart LR
   subgraph monitor["mrtdown-reddit-monitor"]
     discover["Discover candidate threads"]
     watch["Watch replies, edits, and deletions"]
-    outbox["Durable idempotent delivery outbox"]
+    derive["Extract and aggregate structured claims"]
+    outbox["Durable claim-event outbox"]
   end
 
   subgraph site["mrtdown-site"]
-    producerApi["Generic community-observation endpoint"]
-    sourceStore["Deletion-aware source observations"]
-    classify["Classification and moderation"]
-    lifecycle["Signal confidence and lifecycle"]
+    producerApi["Generic community-claim endpoint"]
+    claimStore["Versioned structured claims"]
+    lifecycle["Cross-source merge and signal lifecycle"]
     sourcePage["Stable community-signal source page"]
     canonicalOutbox["Canonical dispatch outbox"]
   end
@@ -94,8 +98,8 @@ flowchart LR
     evidence["Accepted structured evidence"]
   end
 
-  reddit --> discover --> watch --> outbox
-  outbox --> producerApi --> sourceStore --> classify --> lifecycle
+  reddit --> discover --> watch --> derive --> outbox
+  outbox --> producerApi --> claimStore --> lifecycle
   lifecycle --> sourcePage
   lifecycle --> canonicalOutbox --> contract --> triage --> evidence
 ```
@@ -109,14 +113,16 @@ flowchart LR
 - Publish that boundary as a checked-in, versioned OpenAPI artifact owned by
   `mrtdown-site`, with generated consumer types in the monitor.
 - Keep the site's endpoint, tables, and domain model generic across external
-  community producers; Reddit-specific identifiers and parsing remain in the
-  monitor.
+  community producers; Reddit-specific identifiers, parsing, conversations,
+  and actors remain in the monitor.
 - Keep Reddit credentials, API rate-limit state, polling cursors, and delivery
   retries in the dedicated monitor.
-- Keep source classification, moderation decisions, signal confidence, and
+- Keep source-specific extraction and support aggregation in the monitor while
+  keeping producer trust, cross-source merging, final signal confidence, and
   product presentation in the site.
 - Distinguish independent support from repeated comments, nested agreement,
-  and multiple comments by one Reddit author.
+  and multiple comments by one Reddit author before a claim crosses the
+  boundary.
 - Maintain an explicit signal lifecycle such as `candidate`, `ongoing`,
   `resolved`, `corrected`, `expired`, and `rejected`.
 - Exercise edits and deletions throughout the pipeline and avoid permanent raw
@@ -136,6 +142,8 @@ flowchart LR
 - This plan does not write canonical issues directly from the Worker or site.
 - This plan does not retain Reddit usernames, profiles, or raw content longer
   than required for moderation and deletion compliance.
+- This plan does not send raw Reddit text, object hierarchies, fullnames, or
+  pseudonymous actor keys to `mrtdown-site`.
 - This plan does not delete historical Reddit provenance or rights rules from
   already-published canonical evidence.
 - This plan does not require native crowd reports and Reddit observations to
@@ -149,12 +157,15 @@ flowchart LR
 - Discover candidate submissions using configured communities and queries.
 - Maintain durable watch state for relevant or potentially relevant threads.
 - Detect new replies, edits, removals, and deletions.
-- Apply only cheap acquisition filters; avoid making final product or
-  canonical-ingest decisions.
-- Normalize Reddit threads and comments into generic conversation and message
-  observations before delivery; do not leak Reddit fullname or listing
-  semantics into the consumer contract.
-- Deliver versioned source events through a durable outbox and retry safely.
+- Apply acquisition filters and source-specific extraction to derive structured
+  transit claims, support/update/correction/resolution classifications, and
+  aggregate independence counts.
+- Keep raw conversations, Reddit fullnames, relationships, and pseudonymous
+  actor keys in D1 under bounded retention; do not leak them into the consumer
+  contract.
+- Version claim transitions independently from source-object versions and
+  deliver claim events through a durable outbox.
+- Avoid making the final public-signal or canonical-ingest decision.
 - Minimize cached source content and propagate deletion events promptly.
 - Vendor a pinned site-owned OpenAPI artifact and generate transport types and
   validation from it; do not define a competing producer-owned wire schema.
@@ -162,13 +173,13 @@ flowchart LR
 ### `mrtdown-site`
 
 - Authenticate the producer independently from public report authentication.
-- Validate, deduplicate, and persist source events transactionally.
-- Retain a deletion-aware conversation/observation timeline for moderation.
-- Classify observations as support, update, correction, resolution, or
-  irrelevant content.
-- Apply registered-producer and source-class confidence policy through generic
-  conversation, actor, and observation concepts; combine sources only through
-  explicit cross-source policy.
+- Validate, deduplicate, and persist structured claim events transactionally.
+- Apply registered-producer and source-class trust policy to claim summaries,
+  structured transit scope, aggregate support counts, freshness, and lifecycle.
+- Merge claims and direct crowd reports only through explicit cross-source
+  policy; never require Reddit conversation state to do so.
+- Give moderators an inspectable structured claim and upstream link where
+  permitted, without copying the source conversation into site storage.
 - Render short-lived community signals separately from canonical advisories.
 - Own stable source pages and the canonical dispatch outbox.
 - Own the Worker-to-site runtime schema, generated OpenAPI artifact, endpoint
@@ -185,12 +196,11 @@ flowchart LR
 
 ## Storage Boundary
 
-Some source identity and short-lived content exists on both sides of the HTTP
-boundary for different reasons. The monitor copy detects upstream changes and
-supports retry; the site copy supports classification, moderation, and product
-lifecycle. Shared opaque external IDs and source versions make those copies
-correlatable, but neither database is a replica of the other. The site neither
-parses nor validates Reddit fullname formats.
+Conversation state exists only in the monitor. The site is stateless with
+respect to Reddit source objects, but it is not globally stateless: it must keep
+minimal claim inbox, current claim, merged signal, public-page, and canonical
+dispatch state. Claim IDs and versions cross the boundary; Reddit object IDs and
+source-object versions do not.
 
 | State | Owner | Purpose |
 | --- | --- | --- |
@@ -198,20 +208,22 @@ parses nor validates Reddit fullname formats.
 | Discovery feeds, cursors, candidate deduplication, and leases | Monitor D1 | Find new threads once |
 | Watch schedules, polling leases, and deletion audits | Monitor D1 | Decide when Reddit is fetched again |
 | Last-observed source snapshot, content hash, and producer version | Monitor D1 | Detect edits/deletions and produce ordered events |
-| Worker delivery attempts, leases, and acknowledgements | Monitor D1 | At-least-once delivery to the site |
-| Received event ID, payload digest, source version, and outcome | Site Postgres | Consumer idempotency, stale-event protection, and audit |
-| Bounded conversation and observation material | Site Postgres | Classification and moderator inspection |
-| Observation classification and structured transit claim | Site Postgres | Product interpretation, independent of polling |
+| Raw conversations, relationships, bounded text, and actor keys | Monitor D1 | Source-specific extraction, aggregation, and replay |
+| Structured claim state and claim version | Monitor D1 | Turn source timelines into stable producer output |
+| Claim delivery attempts, leases, and acknowledgements | Monitor D1 | At-least-once delivery to the site |
+| Received claim event ID, payload digest, claim version, and outcome | Site Postgres | Consumer idempotency, stale-event protection, and audit |
+| Structured producer claims without raw content or actor identifiers | Site Postgres | Producer policy and cross-source merging |
 | Community-signal confidence, lifecycle, and source page | Site Postgres | Public product state |
 | Canonical handoff attempts and acknowledgements | Site Postgres | Reliable accepted-signal dispatch |
 | Accepted append-only evidence | `mrtdown-data` | Canonical history after triage |
 
 The site must not create tables for discovery cursors, Reddit request budgets,
-watch scheduling, polling leases, source diffing, or Worker delivery retries.
-The monitor must not own classifications, moderator decisions, confidence,
-public signal state, or canonical dispatch. An implementation may combine
-closely related site concepts into fewer tables; the conceptual list below is
-not a requirement to create one table per heading.
+watch scheduling, polling leases, source diffing, conversations, messages, raw
+source content, actor keys, source classification, or Worker delivery retries.
+The monitor must not own registered-producer trust policy, cross-source merge
+policy, final public signal state, or canonical dispatch. An implementation may
+combine closely related site concepts into fewer tables; the conceptual list
+below is not a requirement to create one table per heading.
 
 ## Measured Workload And Initial Cadence
 
@@ -256,41 +268,46 @@ Reference samples:
 - [CCL train delay](https://www.reddit.com/r/singapore/comments/1kqrfgn/there_is_a_train_delay_along_the_circle_line/)
 - [TEL track-fault thread with a resolution edit](https://www.reddit.com/r/singapore/comments/1rjnd4f/track_fault_on_tel/)
 
-## Generic Community Observation Boundary
+## Generic Community Claim Boundary
 
 Add the dedicated internal endpoint
-`POST /internal/api/community-observations/v1/events`. This is a machine
-producer endpoint for external community material, not a replacement for the
-human `POST /api/reports` form and not a catch-all canonical evidence webhook.
-Its behavior must include:
+`POST /internal/api/community-claims/v1/events`. This is a machine-producer
+endpoint for structured claims derived from external community material, not a
+replacement for the human `POST /api/reports` form and not a catch-all
+canonical evidence webhook. Its behavior must include:
 
 - bearer or signed-request authentication using a producer-specific secret;
 - a versioned batch envelope;
-- a stable producer event ID for every upsert or deletion;
+- a stable producer event ID for every claim transition;
 - a registered producer ID and source provider carried as provenance data;
-- opaque external object, conversation, and optional parent IDs;
-- generic `conversation` and `message` object kinds;
-- source creation, edit, observation, and deletion timestamps;
-- an upstream permalink where permitted;
-- a scoped pseudonymous actor key sufficient for short-window distinct-actor
-  counting, without sending a platform username;
-- explicit `upsert` and `delete` semantics;
+- an opaque claim ID and monotonic claim version unrelated to Reddit fullnames;
+- claim lifecycle such as `candidate`, `active`, `resolved`, `corrected`,
+  `retracted`, or `expired`;
+- structured lines, stations, direction, effect, delay, and observed period
+  where known;
+- a bounded producer-authored summary containing no copied source body;
+- aggregate observation, distinct-actor, and conversation counts without actor
+  identifiers;
+- extraction quality and source-class inputs needed by registered site policy;
+- an upstream permalink where permitted, plus explicit retraction or permalink
+  removal when deletion policy requires it;
 - all-or-itemized batch results so the Worker can retry safely;
 - transactional idempotency that returns success for an already-applied event;
 - bounded payload and batch sizes.
 
-The common event model should contain only capabilities the site actually
-uses: lifecycle, hierarchy, bounded content, timestamps, provenance, and
-pseudonymous correlation. Provider-specific values such as `reddit` and
+The common event model should contain only capabilities the site actually uses:
+structured transit claims, lifecycle, freshness, provenance, aggregate support,
+and extraction-quality inputs. Provider-specific values such as `reddit` and
 `mrtdown-reddit-monitor` may appear as registered data, but the schema must not
-contain subreddit fields, Reddit fullname patterns, flair, score, listing
-cursors, or comment-specific API shapes. A future producer should be able to
-use the same endpoint by mapping its platform into the same semantics and
-receiving an explicit site-side policy registration.
+contain raw source content, object or parent IDs, pseudonymous actor keys,
+subreddit fields, Reddit fullname patterns, flair, score, listing cursors, or
+comment-specific API shapes. A future producer should be able to use the same
+endpoint by deriving the same structured claim semantics and receiving an
+explicit site-side policy registration.
 
-Do not make HTTP arrival order the source of truth. Use source timestamps and a
-monotonic source version or deterministic content version so a delayed retry
-cannot resurrect deleted or older content.
+Do not make HTTP arrival order the source of truth. Use a monotonic claim
+version so a delayed retry cannot reverse a resolution, correction, retraction,
+or expiry.
 
 ### OpenAPI ownership and distribution
 
@@ -299,12 +316,11 @@ endpoint. The site is not required to become a monorepo or publish an npm
 package:
 
 - keep the runtime Zod schemas in
-  `app/contracts/communityObservationEvents.ts` as the executable source of
-  truth;
+  `app/contracts/communityClaimEvents.ts` as the executable source of truth;
 - generate and check in
-  `openapi/community-observation-events.v1.json` from those schemas;
+  `openapi/community-claim-events.v1.json` from those schemas;
 - generate the artifact with
-  `app/scripts/generateCommunityObservationOpenApi.ts` and add a deterministic
+  `app/scripts/generateCommunityClaimOpenApi.ts` and add a deterministic
   drift check to `npm run verify`;
 - define bearer authentication, `Idempotency-Key`, batch and event schemas,
   itemized outcomes, error responses, and byte/count limits in the document;
@@ -312,7 +328,7 @@ package:
   remain interpretable across deployments.
 
 `mrtdown-reddit-monitor` vendors the artifact under
-`contracts/mrtdown-site/community-observation-events.v1.json` and records the
+`contracts/mrtdown-site/community-claim-events.v1.json` and records the
 upstream site repository, commit, path, and SHA-256 digest in
 `contracts/mrtdown-site/upstream.json`. It generates TypeScript types and
 validators from the vendored file during development or build. Production
@@ -330,33 +346,22 @@ Finalize names during implementation and generate migrations through Drizzle.
 The model should cover these concepts without forcing them into the native
 `crowd_reports` tables:
 
-### Source conversations
-
-- registered producer, provider, and opaque external conversation ID;
-- optional community label and upstream permalink;
-- source timestamps and last observed version;
-- relevance and site processing state;
-- deletion/removal state;
-- bounded raw-content expiry;
-- first/last observation times.
-
-### Source observations
-
-- opaque external object ID, generic object kind, and parent relationship;
-- scoped pseudonymous actor key;
-- source timestamps and last observed version;
-- bounded title/body fields used during classification;
-- deletion/removal state;
-- classification and structured transit claim;
-- moderation status and audit metadata.
-
-### Ingest events
+### Claim ingest events
 
 - stable producer event ID;
 - schema version;
 - received and applied timestamps;
 - application outcome or validation error;
-- source version used for stale-event protection.
+- claim ID, claim version, and payload digest used for stale-event protection.
+
+### Community claims
+
+- registered producer, provider, opaque claim ID, and current claim version;
+- claim lifecycle, structured transit scope/effect, and observed period;
+- bounded producer-authored summary and extraction-quality inputs;
+- aggregate support counts without actor identifiers;
+- optional upstream permalink and its deletion/retraction state;
+- moderation outcome and merge relationship to any site signal.
 
 ### Community signals
 
@@ -368,23 +373,22 @@ The model should cover these concepts without forcing them into the native
 - stable public source-page identity;
 - canonical dispatch status, payload, attempts, and error state.
 
-Raw source text and actor keys are operational data, not canonical read-model
-data. Define explicit expiry and purge behavior before production collection.
+The site schema contains no raw source text, source-object hierarchy, or actor
+keys. Those are monitor-operational data with monitor-owned expiry and purge
+behavior.
 
 ## Confidence And Lifecycle Rules
 
-- Count distinct scoped actors, not messages, as the first independence unit.
-- Treat multiple messages in one conversation as correlated evidence even when
-  actors differ; record distinct conversation count separately.
-- Prevent one actor from increasing confidence by posting repeatedly or in
-  nested replies.
-- Treat a conversation author repeating the original claim in messages as an
-  update, not independent support.
+- The monitor counts scoped actors, observations, and conversations and emits
+  only aggregates; the site does not reconstruct independence from source data.
+- The site treats a producer claim as one correlated unit even when its support
+  counts are large, unless explicit policy says otherwise.
+- Repeated claim versions update one claim and never create independent support.
 - Model explicit resolution, correction, and contradiction observations. Do
   not wait only for a display timeout to clear an ongoing signal.
-- Keep native crowd-report IP diversity and external-community
-  actor/conversation diversity as separate measures. Any combined confidence
-  policy must be explicit and tested.
+- Keep native crowd-report IP diversity and producer-reported aggregate support
+  as separate measures. Any combined confidence policy must be explicit and
+  tested.
 - Expire weak or inactive candidates without dispatching them.
 - Quarantine ambiguous accepted candidates rather than silently converting
   them to canonical evidence.
@@ -421,12 +425,12 @@ a fallback.
 
 - Confirm Reddit API access, authentication, user-agent, rate-limit, deletion,
   and retention requirements before production collection.
-- Define the site-owned generic community-observation Zod schema, generated
+- Define the site-owned generic community-claim Zod schema, generated
   OpenAPI v1 artifact, producer registry, and authentication mechanism.
 - Prove the contract contains no Reddit-only identifiers, fields, validation,
-  route names, or table requirements; keep provider-specific normalization in
-  the monitor.
-- Define source event IDs, stale-version handling, batch limits, and retry
+  route names, raw content, actor keys, or table requirements; keep
+  provider-specific storage, extraction, and aggregation in the monitor.
+- Define claim event IDs, claim-version handling, batch limits, and retry
   semantics.
 - Vendor the pinned artifact in the monitor, generate its consumer types, and
   remove the producer-owned wire schema as an independent authority.
@@ -443,23 +447,27 @@ Exit criteria:
 - Security, retention, and deletion behavior have explicit owners.
 - Fixtures cover every event kind and ordering edge case.
 
-### Phase 2: Add Private Source Ingestion
+### Phase 2: Add Private Claim Ingestion
 
-- Add only the site-owned inbox, bounded moderation/observation, derived-signal,
-  and canonical-dispatch state through generated Drizzle migrations; do not
-  duplicate monitor discovery, watch, polling, or delivery-outbox tables.
+- Add only the site-owned claim inbox, structured claim, merged-signal, and
+  canonical-dispatch state through generated Drizzle migrations. Do not add
+  conversation, observation, message, raw-content, actor-key, discovery, watch,
+  polling, or Worker delivery tables.
 - Add the authenticated batch endpoint.
-- Implement transactional event idempotency and stale-version protection.
-- Implement deletion propagation and bounded-content purge jobs.
-- Add metrics for accepted, duplicate, stale, invalid, and deleted events.
+- Implement transactional event idempotency and stale claim-version protection.
+- Implement retraction, resolution, correction, expiry, and permalink-removal
+  propagation without retaining the upstream conversation.
+- Add metrics for accepted, duplicate, stale, invalid, retracted, and resolved
+  claim events.
 - Keep all Reddit-derived product and canonical output disabled.
 
 Exit criteria:
 
-- Replayed batches do not duplicate observations.
-- Out-of-order upserts cannot overwrite newer edits or deletions.
+- Replayed batches do not duplicate claims.
+- Out-of-order transitions cannot overwrite newer resolutions, corrections,
+  retractions, or expiries.
 - Authentication and batch limits reject invalid producers safely.
-- Purge behavior is deterministic and tested.
+- The site database and logs contain no raw source content or actor keys.
 - `npm run verify` passes.
 
 ### Phase 3: Run Shadow Monitoring
@@ -467,7 +475,8 @@ Exit criteria:
 - Enable candidate thread discovery and reply monitoring in the Worker.
 - Start with five-minute discovery and the measured 2/5/15/60-minute adaptive
   watch profile, then tune from observed reply timing and provider headers.
-- Persist and classify events privately in the site.
+- Persist conversations and derive structured claims privately in the monitor;
+  ingest only those claims in the site.
 - Compare discovery coverage with the current crawler RSS path.
 - Measure relevance precision, useful reply frequency, edit/delete frequency,
   distinct-author distribution, conversation duration, and API cost.
@@ -482,21 +491,24 @@ Exit criteria:
 - The team can choose watch windows, polling backoff, and initial confidence
   thresholds from measured results.
 
-### Phase 4: Derive Community Signals
+### Phase 4: Derive Claims And Community Signals
 
-- Implement producer-neutral observation classification with explicit policy
-  inputs for registered producer and source class.
-- Implement candidate, ongoing, resolved, corrected, expired, and rejected
-  transitions.
-- Derive structured transit scope and effect without treating messages as
-  independent by default.
+- Implement source-specific conversation extraction and candidate, active,
+  resolved, corrected, retracted, and expired claim transitions in the monitor.
+- Derive structured transit scope, effect, observed period, and aggregate
+  independence counts before delivery.
+- Implement producer-neutral claim acceptance and cross-source merge policy in
+  the site using registered producer and source-class inputs.
 - Add moderator inspection and override affordances where automated decisions
-  remain ambiguous.
-- Add deterministic replay tests for recorded conversation timelines.
+  remain ambiguous, using structured claims and upstream links rather than
+  stored conversations.
+- Add deterministic monitor replay tests for recorded conversation timelines
+  and deterministic site replay tests for claim-event sequences.
 
 Exit criteria:
 
-- Replaying the same source timeline yields the same signal state.
+- Replaying the same source timeline yields the same monitor claim sequence;
+  replaying that claim sequence yields the same site signal state.
 - Resolution and correction replies update current state without erasing audit
   history.
 - Weak, stale, and contradictory conversations do not become accepted signals.
@@ -567,6 +579,10 @@ Exit criteria:
 - 2026-07-18: Generalized the site boundary from Reddit events to external
   community observations so future producers can reuse the endpoint and the
   site does not acquire Reddit-specific routes, tables, or identifiers.
+- 2026-07-18: Narrowed the boundary further to structured community claims.
+  Conversations, raw text, source-object versions, and actor keys now remain in
+  the monitor; the site stores only claim idempotency, structured claims, merged
+  signals, and canonical dispatch state.
 
 ## Decision Log
 
@@ -592,10 +608,14 @@ Exit criteria:
 - 2026-07-18: Make `mrtdown-site` the owner of a generated OpenAPI contract;
   the monitor vendors a commit- and digest-pinned artifact and generates its
   consumer surface from it.
-- 2026-07-18: Keep the site contract intentionally generic but narrow: external
-  community observation lifecycle, hierarchy, content, provenance, and
-  pseudonymous correlation. Reddit parsing and API semantics remain in the
-  monitor, while final classification and trust remain in the site.
+- 2026-07-18: Initially chose a generic community-observation boundary carrying
+  lifecycle, hierarchy, content, provenance, and pseudonymous correlation. This
+  decision is superseded by the narrower claim boundary below.
+- 2026-07-18: Supersede the observation boundary with a community-claim
+  boundary. The monitor owns source-specific extraction and aggregate support;
+  the site owns producer trust, cross-source merging, final public signals, and
+  canonical handoff. The site is stateless with respect to Reddit conversations
+  but retains minimal product and delivery state.
 
 ## Validation
 
@@ -604,9 +624,12 @@ For site-side implementation phases:
 - Run `npm run verify`.
 - Verify generated Drizzle migrations have no drift.
 - Test producer authentication, invalid payloads, batch limits, duplicates,
-  stale versions, out-of-order delivery, deletion, and retry behavior.
-- Replay checked-in synthetic conversation timelines for confirmation,
-  correction, contradiction, resolution, expiry, edit, and deletion cases.
+  stale claim versions, out-of-order delivery, retraction, and retry behavior.
+- Replay checked-in synthetic claim-event sequences for confirmation,
+  correction, contradiction, resolution, expiry, and retraction cases. Replay
+  raw conversation timelines only in the monitor.
+- Assert site schemas, fixtures, logs, and public pages contain no raw Reddit
+  bodies, fullnames, comment trees, or actor keys.
 - Inspect shadow metrics before enabling public presentation.
 - Exercise staging end to end from Worker delivery through site moderation and,
   once enabled, canonical publication and pull-back.
