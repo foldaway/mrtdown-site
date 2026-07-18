@@ -82,6 +82,47 @@ the upstream ingest workflow six hours before the daily canonical pull. Use
 `CROWD_REPORT_DISPATCH_LIMIT` to tune the maximum number of dispatch candidates
 processed per scheduled run.
 
+### Programmatic crowd reports
+
+Registered machine producers submit structured reports to
+`POST /internal/api/crowd-reports` with their own bearer credential. Configure
+the credentials and permitted upstream origins as a JSON map in
+`CROWD_REPORT_PRODUCERS`:
+
+```json
+{
+  "reddit-monitor": {
+    "token": "replace-with-a-long-random-secret",
+    "sourceOrigins": ["https://www.reddit.com"]
+  }
+}
+```
+
+The request wraps the public structured-report fields with a producer-owned
+idempotency key and optional upstream URL:
+
+```json
+{
+  "externalReportId": "opaque-source-object-id",
+  "sourceUrl": "https://www.reddit.com/r/singapore/comments/example",
+  "report": {
+    "reportScope": "line",
+    "observedAt": "2026-07-18T08:00:00+08:00",
+    "lineIds": ["CCL"],
+    "stationIds": [],
+    "effect": "delay",
+    "delayMinutes": 10,
+    "isStillHappening": true
+  }
+}
+```
+
+A new report and an identical replay both return `202`; the response sets
+`idempotentReplay` to distinguish them. Reusing an external ID with a different
+payload returns `409`. Programmatic reports bypass public Turnstile, IP rate
+limits, and distinct-IP confidence requirements, but retain the same reference
+validation, moderation, clustering, cache purge, and canonical dispatch path.
+
 ## Staging Tables
 
 Staging tables are named with a `_next` suffix. They are the durable handoff between workflow steps and avoid returning large parsed payloads between Upstash Workflow steps.

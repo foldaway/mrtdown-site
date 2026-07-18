@@ -132,6 +132,18 @@ original result without creating another report. Reusing the ID with a
 different payload should return `409`, making producer bugs visible rather than
 silently changing a submitted report.
 
+```json
+{
+  "success": true,
+  "data": {
+    "id": "site-report-id",
+    "status": "accepted",
+    "duplicateOfId": null,
+    "idempotentReplay": false
+  }
+}
+```
+
 A single database uniqueness constraint on `(producer, external_report_id)` is
 the idempotency boundary. A separate inbox or event table is unnecessary.
 
@@ -215,7 +227,7 @@ updates or unnecessary request volume.
 
 ## Implementation Plan
 
-### Phase 1: Add the programmatic endpoint
+### Phase 1: Add the programmatic endpoint (completed 2026-07-18)
 
 - Define the small authenticated request schema alongside the crowd-report
   domain code.
