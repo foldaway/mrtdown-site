@@ -1,4 +1,6 @@
 import { DateTime } from 'luxon';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 import {
   crowdReportAbuseEventsTable,
@@ -43,6 +45,11 @@ function makeFakeDb(
   options: {
     insertedReport?: { id: string };
     selectResults?: unknown[][];
+    updatedReport?: {
+      id: string;
+      status: 'accepted' | 'duplicate';
+      duplicateOfId: string | null;
+    };
   } = {},
 ) {
   const inserts: Array<{ table: unknown; values: unknown }> = [];
@@ -53,6 +60,11 @@ function makeFakeDb(
     options.insertedReport === undefined
       ? { id: 'report-1' }
       : options.insertedReport;
+  const updatedReport = options.updatedReport ?? {
+    id: 'report-1',
+    status: 'accepted',
+    duplicateOfId: null,
+  };
   const selectBuilder = {
     from() {
       return this;
@@ -107,13 +119,7 @@ function makeFakeDb(
             where() {
               return {
                 returning() {
-                  return Promise.resolve([
-                    {
-                      id: 'report-1',
-                      status: 'accepted',
-                      duplicateOfId: null,
-                    },
-                  ]);
+                  return Promise.resolve([updatedReport]);
                 },
               };
             },
@@ -231,6 +237,54 @@ describe('persistAutomoderatedProgrammaticCrowdReport', () => {
     );
 
     expect(fake.inserts[5]?.values).toMatchObject({ status: 'accepted' });
+  });
+
+  it('promotes a pending cluster for a trusted recovery duplicate', async () => {
+    const fake = makeFakeDb({
+      selectResults: [
+        [
+          {
+            id: 'existing-report',
+            status: 'accepted',
+            observedAt: '2026-07-18T11:54:00+08:00',
+            directionText: null,
+            clusterId: 'cluster-1',
+          },
+        ],
+        [{ reportId: 'existing-report', lineId: 'CCL' }],
+        [{ reportId: 'existing-report', stationId: 'CC1' }],
+        [{ id: 'cluster-1' }],
+      ],
+      updatedReport: {
+        id: 'report-1',
+        status: 'duplicate',
+        duplicateOfId: 'existing-report',
+      },
+    });
+    const ids = ['report-1', 'submitted-event', 'duplicate-event'];
+
+    await expect(
+      persistAutomoderatedProgrammaticCrowdReport(
+        fake.db as never,
+        { ...SUBMISSION, isStillHappening: false },
+        DELIVERY,
+        {
+          now: NOW,
+          idFactory: () => ids.shift() ?? 'fallback-id',
+        },
+      ),
+    ).resolves.toEqual({
+      id: 'report-1',
+      status: 'duplicate',
+      duplicateOfId: 'existing-report',
+      created: true,
+    });
+
+    const clusterStatus = fake.updates[2]?.values as { status: SQL };
+    const statusSql = new PgDialect().sqlToQuery(clusterStatus.status).sql;
+    expect(statusSql).toContain("then 'accepted'");
+    expect(statusSql).not.toContain('still_happening');
+    expect(statusSql).not.toContain('count(distinct');
   });
 });
 

@@ -1244,6 +1244,7 @@ async function automoderateCrowdReportInTransaction(
   clusterWindowMinutes = DEFAULT_CLUSTER_WINDOW_MINUTES,
   publicSignalMinReports = DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
   publicSignalMinDistinctIpHashes = DEFAULT_PUBLIC_SIGNAL_MIN_DISTINCT_IP_HASHES,
+  trustedSubmission = false,
 ) {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${buildDuplicateLockKey(submission)}, 0::bigint))`,
@@ -1345,6 +1346,7 @@ async function automoderateCrowdReportInTransaction(
     publicSignalMinReports,
     publicSignalMinDistinctIpHashes,
     idFactory,
+    trustedSubmission,
   );
 
   return (
@@ -1364,6 +1366,7 @@ async function createCrowdReportClusterInTransaction(
   idFactory: () => string,
   publicSignalMinReports: number,
   publicSignalMinDistinctIpHashes: number,
+  trustedSubmission: boolean,
 ) {
   const clusterId = idFactory();
   const { windowStartAt, windowEndAt } = getCrowdReportClusterWindow(
@@ -1377,11 +1380,11 @@ async function createCrowdReportClusterInTransaction(
     window_start_at: windowStartAt,
     window_end_at: windowEndAt,
     report_count: 1,
-    status:
-      publicSignalMinReports <= 1 &&
-      ((submission.isStillHappening === true &&
-        publicSignalMinDistinctIpHashes <= 1) ||
-        publicSignalMinDistinctIpHashes === 0)
+    status: trustedSubmission
+      ? 'accepted'
+      : submission.isStillHappening === true &&
+          publicSignalMinReports <= 1 &&
+          publicSignalMinDistinctIpHashes <= 1
         ? 'accepted'
         : 'pending',
   });
@@ -1425,6 +1428,7 @@ async function clusterModeratedCrowdReportInTransaction(
   publicSignalMinReports: number,
   publicSignalMinDistinctIpHashes: number,
   idFactory: () => string,
+  trustedSubmission: boolean,
 ) {
   if (duplicate == null) {
     await createCrowdReportClusterInTransaction(
@@ -1435,6 +1439,7 @@ async function clusterModeratedCrowdReportInTransaction(
       idFactory,
       publicSignalMinReports,
       publicSignalMinDistinctIpHashes,
+      trustedSubmission,
     );
     return;
   }
@@ -1449,6 +1454,7 @@ async function clusterModeratedCrowdReportInTransaction(
       idFactory,
       publicSignalMinReports,
       publicSignalMinDistinctIpHashes,
+      trustedSubmission,
     ));
   const { windowStartAt, windowEndAt } = getCrowdReportClusterWindow(
     submission.observedAt,
@@ -1468,7 +1474,9 @@ async function clusterModeratedCrowdReportInTransaction(
     .update(crowdReportClustersTable)
     .set({
       report_count: sql`${crowdReportClustersTable.report_count} + 1`,
-      status: sql`case when ${crowdReportClustersTable.status} = 'pending' and ${getCrowdReportClusterOngoingReportCountSql(clusterId)} >= ${publicSignalMinReports} and ${getCrowdReportClusterOngoingDistinctIpHashCountSql(clusterId)} >= ${publicSignalMinDistinctIpHashes} then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`,
+      status: trustedSubmission
+        ? sql`case when ${crowdReportClustersTable.status} = 'pending' then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`
+        : sql`case when ${crowdReportClustersTable.status} = 'pending' and ${getCrowdReportClusterOngoingReportCountSql(clusterId)} >= ${publicSignalMinReports} and ${getCrowdReportClusterOngoingDistinctIpHashCountSql(clusterId)} >= ${publicSignalMinDistinctIpHashes} then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`,
       window_start_at: sql`least(${crowdReportClustersTable.window_start_at}, ${windowStartAt}::timestamptz)`,
       window_end_at: sql`greatest(${crowdReportClustersTable.window_end_at}, ${windowEndAt}::timestamptz)`,
       updated_at: sql`now()`,
@@ -1765,8 +1773,9 @@ export async function persistAutomoderatedProgrammaticCrowdReport(
       idFactory,
       now,
       undefined,
-      1,
-      0,
+      undefined,
+      undefined,
+      true,
     );
 
     return { ...moderated, created: true as const };

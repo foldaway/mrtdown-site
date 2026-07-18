@@ -1,6 +1,6 @@
 import type { Translations } from '@mrtdown/core';
 import { createServerFn } from '@tanstack/react-start';
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '~/db';
 import {
@@ -149,7 +149,10 @@ async function getClusterSource(
             'duplicate',
             'dispatched',
           ]),
-          eq(crowdReportsTable.still_happening, true),
+          or(
+            eq(crowdReportsTable.still_happening, true),
+            ne(crowdReportsTable.producer, 'public'),
+          ),
         ),
       )
       .orderBy(desc(crowdReportsTable.observed_at)),
