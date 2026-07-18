@@ -1,13 +1,13 @@
 import { desc, eq } from 'drizzle-orm';
 import { evidencesTable } from '~/db/schema';
 import { getDefaultDb } from './database';
-import { getBaseDataset } from './dataset';
+import { getCompleteDataset } from './dataset';
 import { selectIncludedEntities } from './includedEntities';
 
 export async function getIssueData(issueId: string) {
   const db = await getDefaultDb();
   const [dataset, evidenceRows] = await Promise.all([
-    getBaseDataset(),
+    getCompleteDataset(),
     db
       .select()
       .from(evidencesTable)

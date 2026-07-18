@@ -1140,13 +1140,18 @@ export async function buildDataset(
   };
 }
 
-export async function buildBaseDataset(
+/**
+ * Builds the entire network and issue graph. This is intentionally reserved
+ * for bounded maintenance and recovery work; public request readers should
+ * use a scoped read model instead.
+ */
+export async function buildCompleteDataset(
   referenceNow = nowSg(),
   db?: AppDb,
 ): Promise<BaseDataset> {
   return timeServerSpan('build_dataset', () => buildDataset(referenceNow, db));
 }
 
-export async function getBaseDataset() {
-  return buildBaseDataset();
+export async function getCompleteDataset() {
+  return buildCompleteDataset();
 }

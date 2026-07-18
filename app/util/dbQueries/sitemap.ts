@@ -1,8 +1,8 @@
-import { getBaseDataset } from './dataset';
+import { getCompleteDataset } from './dataset';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
 
 export async function getSitemapData() {
-  const dataset = await getBaseDataset();
+  const dataset = await getCompleteDataset();
   const skippedIssueIds: string[] = [];
   const issuesWithFirstDates = Object.values(dataset.allIssues).flatMap(
     (issue) => {

@@ -24,7 +24,7 @@ import {
   type TimeScale,
 } from './analyticsShared';
 import { type AppDb, getDefaultDb, isUndefinedTableError } from './database';
-import { type BaseDataset, buildDataset, getBaseDataset } from './dataset';
+import { type BaseDataset, buildDataset, getCompleteDataset } from './dataset';
 import { isoDate, isoDateTime, nowSg } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import {
@@ -806,7 +806,7 @@ export async function getStatisticsData() {
       };
     }
 
-    const dataset = await getBaseDataset();
+    const dataset = await getCompleteDataset();
     const statistics = await buildStatisticsDataFromDataset(dataset);
     return {
       data: statistics,

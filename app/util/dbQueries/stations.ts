@@ -3,7 +3,7 @@ import {
   type CommunitySignalOptions,
   getPageCommunitySignals,
 } from './communitySignals';
-import { getBaseDataset } from './dataset';
+import { getCompleteDataset } from './dataset';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
@@ -45,7 +45,7 @@ export async function getStationProfileData(
   stationId: string,
   options: CommunitySignalOptions = {},
 ) {
-  const dataset = await getBaseDataset();
+  const dataset = await getCompleteDataset();
   const resolvedStationId = resolveStationProfileStationId(
     dataset.included,
     stationId,
@@ -113,7 +113,7 @@ export async function getStationProfileData(
 }
 
 export async function getStationsDirectoryData() {
-  const dataset = await getBaseDataset();
+  const dataset = await getCompleteDataset();
   const referenceNow = nowSg();
   const referenceDate = isoDate(referenceNow);
   const issuesByStationId = new Map<string, IssueWithOperationalEffects[]>();

@@ -9,7 +9,7 @@ application's complete JSON-equivalent dataset is about 6 MB, despite most
 public routes rendering one entity or a bounded date range.
 
 The cause is architectural rather than an inefficient query plan:
-`getBaseDataset()` constructs the full network and issue graph on the request
+`getCompleteDataset()` constructs the full network and issue graph on the request
 path, then public feature functions filter it in memory. The same connection
 role and SQL shape are shared across callers, so Postgres cannot identify the
 originating URL. The candidate public callers are nevertheless explicit in the
@@ -64,10 +64,10 @@ bounded internal workflow work rather than per visitor request.
 
 ### Phase 0: Establish the Boundary and Baseline
 
-- Rename `buildBaseDataset`/`getBaseDataset` to communicate bulk-only intent,
-  such as `buildCompleteDataset`.
-- Add a focused test or repository guard that prevents public server functions
-  and public route handlers from importing the bulk builder.
+- Completed: renamed the bulk entry points to `buildCompleteDataset` and
+  `getCompleteDataset`.
+- Completed: added a repository guard that prevents public server functions
+  and public route handlers from importing the bulk builder directly.
 - Record the current Neon counters for the unfiltered `impact_events` query
   and its relationship-query batch before each rollout.
 - Ensure edge cache rules honour the deployed origin headers for
@@ -122,7 +122,7 @@ Exit criteria:
   internal recovery.
 - Build or refresh a sitemap projection during the pull/facts workflow, then
   serve that small result with normal edge caching.
-- Audit every remaining `getBaseDataset`/complete-builder call and classify it
+- Audit every remaining `getCompleteDataset`/complete-builder call and classify it
   as bulk maintenance or remove it from the request path.
 
 Exit criteria:
@@ -148,6 +148,15 @@ Exit criteria:
   work, not visitor traffic.
 - Production egress and page timings remain stable through a cache purge and a
   Fly Machine restart.
+
+## Progress Log
+
+- 2026-07-18: Renamed the complete-dataset entry points to
+  `buildCompleteDataset` and `getCompleteDataset`, with an explicit
+  maintenance/recovery-only contract. Added a repository test that prevents
+  public server functions and route handlers from importing the complete
+  dataset directly. Public data readers still use it indirectly until their
+  scoped replacements land in Phases 1 and 2.
 
 ## Decision Log
 

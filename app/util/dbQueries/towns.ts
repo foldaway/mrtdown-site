@@ -1,7 +1,7 @@
 import type { IssueType } from '@mrtdown/core';
 import type { DateTime } from 'luxon';
 import type { Issue, LineSummaryStatus, Station } from '~/types';
-import { getBaseDataset } from './dataset';
+import { getCompleteDataset } from './dataset';
 import { isoDate, isoDateTime, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
@@ -189,7 +189,7 @@ export function selectRecentTownIssueIds(
 }
 
 export async function getTownsData() {
-  const dataset = await getBaseDataset();
+  const dataset = await getCompleteDataset();
   const stations = Object.values(dataset.included.stations);
   const towns = Object.values(dataset.included.towns).map((town) => {
     const townStations = stations.filter(
@@ -216,7 +216,7 @@ export async function getTownsData() {
 }
 
 export async function getTownProfileData(townId: string) {
-  const dataset = await getBaseDataset();
+  const dataset = await getCompleteDataset();
   const town = dataset.included.towns[townId];
   if (town == null) {
     throw new Response('Town not found', {

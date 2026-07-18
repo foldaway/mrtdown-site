@@ -1,5 +1,5 @@
 import type { LineSummary, LineSummaryStatus } from '~/types';
-import { getBaseDataset } from './dataset';
+import { getCompleteDataset } from './dataset';
 import { nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueDurationByType, pickIssueTypes } from './issueAnalytics';
@@ -27,7 +27,7 @@ type OperatorLinePerformance = {
 };
 
 export async function getOperatorProfileData(operatorId: string, days: number) {
-  const dataset = await getBaseDataset();
+  const dataset = await getCompleteDataset();
   const operator = dataset.included.operators[operatorId];
   if (operator == null) {
     throw new Response('Operator not found', {

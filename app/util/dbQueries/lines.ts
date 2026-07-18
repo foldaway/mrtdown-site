@@ -3,7 +3,7 @@ import {
   type CommunitySignalOptions,
   getPageCommunitySignals,
 } from './communitySignals';
-import { getBaseDataset } from './dataset';
+import { getCompleteDataset } from './dataset';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
@@ -15,7 +15,7 @@ import {
 } from './lineAnalytics';
 
 export async function getLinesDirectoryData(days: number) {
-  const dataset = await getBaseDataset();
+  const dataset = await getCompleteDataset();
   const referenceNow = nowSg();
   const referenceDate = isoDate(referenceNow);
   const lines = Object.values(dataset.included.lines);
@@ -88,7 +88,7 @@ export async function getLineProfileData(
   days: number,
   options: CommunitySignalOptions = {},
 ) {
-  const dataset = await getBaseDataset();
+  const dataset = await getCompleteDataset();
   const referenceNow = nowSg();
   const referenceDate = isoDate(referenceNow);
   const line = dataset.included.lines[lineId];
