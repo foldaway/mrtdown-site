@@ -62,7 +62,7 @@ bounded internal workflow work rather than per visitor request.
 
 ## Phases
 
-### Phase 0: Establish the Boundary and Baseline
+### Phase 0: Establish the Boundary and Baseline — Complete
 
 - Completed: renamed the bulk entry points to `buildCompleteDataset` and
   `getCompleteDataset`.
@@ -164,6 +164,9 @@ Exit criteria:
   now emits `complete_dataset_read` logs such as `route:/lines/:lineId` and
   `workflow:operational-facts`, so these counter changes can be correlated
   without changing the database connection role.
+- 2026-07-18: Confirmed Cloudflare origin caching for `/_serverFn/*` and
+  `GET /api/issues-day`, then observed the deployed `complete_dataset_read`
+  production logs. Phase 0 exit criteria are complete.
 
 ## Decision Log
 
