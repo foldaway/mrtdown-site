@@ -8,8 +8,6 @@ export const Route = createFileRoute('/{-$lang}/sitemap.xml')({
   server: {
     handlers: {
       async GET() {
-        const rootUrl =
-          import.meta.env.VITE_ROOT_URL ?? 'http://localhost:3000';
         try {
           return new Response(await getSitemapXml(), {
             headers: {
@@ -18,7 +16,7 @@ export const Route = createFileRoute('/{-$lang}/sitemap.xml')({
             },
           });
         } catch (error) {
-          return createSitemapErrorResponse(error, rootUrl);
+          return createSitemapErrorResponse(error);
         }
       },
     },

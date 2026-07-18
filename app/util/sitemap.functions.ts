@@ -47,7 +47,7 @@ function sanitizeHeaderValue(value: string) {
   return value.replace(/[\r\n]/g, ' ').slice(0, 180);
 }
 
-export function createSitemapErrorResponse(error: unknown, rootUrl: string) {
+export function createSitemapErrorResponse(error: unknown) {
   const stage =
     error instanceof SitemapGenerationError ? error.stage : 'route_handler';
   const cause =
@@ -55,27 +55,13 @@ export function createSitemapErrorResponse(error: unknown, rootUrl: string) {
       ? error.cause
       : error;
 
-  const fallbackRoot: Root = {
-    type: 'root',
-    children: [
-      {
-        type: 'element',
-        name: 'urlset',
-        attributes: {
-          xmlns: 'http://www.sitemaps.org/schemas/sitemap/0.9',
-          'xmlns:xhtml': 'http://www.w3.org/1999/xhtml',
-        },
-        children: [buildEntries('/', rootUrl)],
-      },
-    ],
-  };
-
-  return new Response(toXml(fallbackRoot), {
-    status: 200,
+  return new Response('Sitemap temporarily unavailable.', {
+    status: 503,
     headers: {
       'cache-control': 'no-store',
-      'content-type': 'application/xml',
-      'x-sitemap-status': 'fallback',
+      'content-type': 'text/plain; charset=utf-8',
+      'retry-after': '300',
+      'x-sitemap-status': 'unavailable',
       'x-sitemap-error-stage': sanitizeHeaderValue(stage),
       'x-sitemap-error-name': sanitizeHeaderValue(getErrorName(cause)),
       'x-sitemap-error-message': sanitizeHeaderValue(getErrorMessage(cause)),

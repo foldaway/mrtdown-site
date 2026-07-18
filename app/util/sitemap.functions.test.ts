@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { buildSitemapPaths } from './sitemap.functions';
+import {
+  buildSitemapPaths,
+  createSitemapErrorResponse,
+  SitemapGenerationError,
+} from './sitemap.functions';
 
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({
@@ -13,6 +17,28 @@ vi.mock('./dbQueries/sitemap', () => ({
 }));
 
 describe('agent Markdown discovery', () => {
+  it('returns 503 instead of a fallback sitemap when generation fails', async () => {
+    const response = createSitemapErrorResponse(
+      new SitemapGenerationError(
+        'load_sitemap_data',
+        new Error('Database unavailable'),
+      ),
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('content-type')).toBe(
+      'text/plain; charset=utf-8',
+    );
+    expect(response.headers.get('retry-after')).toBe('300');
+    expect(response.headers.get('x-sitemap-status')).toBe('unavailable');
+    expect(response.headers.get('x-sitemap-error-stage')).toBe(
+      'load_sitemap_data',
+    );
+    await expect(response.text()).resolves.toBe(
+      'Sitemap temporarily unavailable.',
+    );
+  });
+
   it('keeps robots.txt limited to standard discovery directives', () => {
     const robotsTxt = readFileSync(
       new URL('../../public/robots.txt', import.meta.url),
