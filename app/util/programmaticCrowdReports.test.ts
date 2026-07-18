@@ -48,6 +48,22 @@ describe('authenticateCrowdReportProducer', () => {
       ),
     ).resolves.toMatchObject({ success: false, status: 503 });
   });
+
+  it('rejects public as a reserved producer ID', async () => {
+    await expect(
+      authenticateCrowdReportProducer(
+        new Request('https://example.com/internal/api/crowd-reports', {
+          headers: { authorization: 'Bearer public-producer-secret' },
+        }),
+        JSON.stringify({
+          public: {
+            token: 'public-producer-secret',
+            sourceOrigins: [],
+          },
+        }),
+      ),
+    ).resolves.toMatchObject({ success: false, status: 503 });
+  });
 });
 
 describe('programmatic crowd report request contract', () => {

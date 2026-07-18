@@ -6,7 +6,10 @@ const ProducerIdSchema = z
   .trim()
   .min(1)
   .max(64)
-  .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/);
+  .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/)
+  .refine((value) => value !== 'public', {
+    message: 'public is reserved for unauthenticated submissions',
+  });
 
 const HttpOriginSchema = z
   .string()
