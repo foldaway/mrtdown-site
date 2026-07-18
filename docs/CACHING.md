@@ -37,12 +37,15 @@ conditions:
   descendants, or a public `/issues/*`, `/lines/*`, `/operators/*`, or
   `/stations/*` profile, including locale-prefixed variants; or it is a
   canonical `index.md` route, `/llms.txt`, or `/sitemap.xml`.
+- Or it is `/_serverFn/*` with request header `X-TSR-ServerFn: true`, or the
+  public `GET /api/issues-day` endpoint. Keep the default cache key, including
+  the query string, so server-function inputs and day parameters stay distinct.
 - Requests to an HTML URL whose `Accept` header explicitly prefers
   `text/markdown` are bypassed. Those requests intentionally reach the origin
   and receive `406`; canonical Markdown URLs remain eligible.
 
-Explicitly exclude `/report`, `/community-reports/*`, `/api/*`, `/internal/*`,
-and `/healthz`.
+Explicitly exclude `/report`, `/community-reports/*`, `/internal/*`,
+`/healthz`, and every `/api/*` endpoint other than `GET /api/issues-day`.
 
 Set **Cache eligibility** to **Eligible for cache**, and configure Edge TTL to
 respect the origin cache-control header. Do not create a blanket "cache

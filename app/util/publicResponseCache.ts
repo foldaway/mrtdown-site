@@ -3,7 +3,12 @@ export const PUBLIC_BROWSER_CACHE_CONTROL =
 export const PUBLIC_CLOUDFLARE_CACHE_CONTROL =
   'public, max-age=900, stale-while-revalidate=300, stale-if-error=86400';
 
-export type PublicCacheKind = 'html' | 'markdown' | 'sitemap';
+export type PublicCacheKind =
+  | 'html'
+  | 'markdown'
+  | 'sitemap'
+  | 'server-function'
+  | 'issues-day';
 
 export function getPublicDataCacheTag(tier = process.env.TIER) {
   const normalizedTier = (tier ?? 'development')
@@ -27,7 +32,10 @@ export function setPublicDataCacheHeaders(
   headers.delete('X-MRTDown-Render');
 }
 
-function getResponseKind(response: Response): PublicCacheKind | null {
+function getResponseKind(
+  request: Request,
+  response: Response,
+): PublicCacheKind | null {
   const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
   if (contentType.includes('text/html')) {
     return 'html';
@@ -41,6 +49,18 @@ function getResponseKind(response: Response): PublicCacheKind | null {
     response.headers.get('x-sitemap-status') === 'ok'
   ) {
     return 'sitemap';
+  }
+  if (
+    contentType.includes('application/json') &&
+    request.headers.get('x-tsr-serverfn') === 'true'
+  ) {
+    return 'server-function';
+  }
+  if (
+    contentType.includes('application/json') &&
+    new URL(request.url).pathname === '/api/issues-day'
+  ) {
+    return 'issues-day';
   }
   return null;
 }
@@ -58,7 +78,7 @@ export function applyPublicDataCacheHeaders(
   request: Request,
   response: Response,
 ) {
-  const kind = getResponseKind(response);
+  const kind = getResponseKind(request, response);
   if (
     (request.method !== 'GET' && request.method !== 'HEAD') ||
     response.status !== 200 ||

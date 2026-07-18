@@ -54,6 +54,27 @@ describe('public response cache policy', () => {
     expect(fallback.headers.get('x-mrtdown-cache')).toBeNull();
   });
 
+  it('marks successful public JSON read responses as cacheable', () => {
+    const serverFunction = applyPublicDataCacheHeaders(
+      request({ headers: { 'x-tsr-serverfn': 'true' } }),
+      response('application/json'),
+    );
+    const issuesDay = applyPublicDataCacheHeaders(
+      new Request('https://www.mrtdown.org/api/issues-day?year=2026'),
+      response('application/json'),
+    );
+    const otherApi = applyPublicDataCacheHeaders(
+      new Request('https://www.mrtdown.org/api/reports'),
+      response('application/json'),
+    );
+
+    expect(serverFunction.headers.get('x-mrtdown-cache')).toBe(
+      'public-server-function',
+    );
+    expect(issuesDay.headers.get('x-mrtdown-cache')).toBe('public-issues-day');
+    expect(otherApi.headers.get('x-mrtdown-cache')).toBeNull();
+  });
+
   it('respects method, status, cookies, and explicit cache opt-outs', () => {
     expect(
       applyPublicDataCacheHeaders(
