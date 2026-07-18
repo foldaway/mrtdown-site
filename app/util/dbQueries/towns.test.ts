@@ -12,6 +12,7 @@ import {
   deriveTownStatus,
   getTownLineIds,
   getTownRecentIssueWindow,
+  mergeTownReadModelScope,
   selectRecentTownIssueIds,
 } from './towns';
 
@@ -169,5 +170,41 @@ describe('town profile helpers', () => {
     ).toEqual(['recent']);
     const window = getTownRecentIssueWindow(REFERENCE_NOW);
     expect(window.end.diff(window.start, 'days').days).toBe(90);
+  });
+});
+
+describe('town read-model scope', () => {
+  it('merges the town stations and lines with the affected issue graph', () => {
+    expect(
+      mergeTownReadModelScope({
+        townLineIds: ['NSL', 'TEL'],
+        townServiceIds: ['nsl-main', 'tel-main'],
+        townStationIds: ['NS1', 'TE1'],
+        issueScope: {
+          lineIds: ['TEL', 'EWL'],
+          serviceIds: ['tel-main', 'ewl-main'],
+          stationIds: ['TE1', 'EW1'],
+        },
+      }),
+    ).toEqual({
+      lineIds: ['NSL', 'TEL', 'EWL'],
+      serviceIds: ['nsl-main', 'tel-main', 'ewl-main'],
+      stationIds: ['NS1', 'TE1', 'EW1'],
+    });
+  });
+
+  it('keeps a no-issue town scoped to its own planned station graph', () => {
+    expect(
+      mergeTownReadModelScope({
+        townLineIds: ['JRL'],
+        townServiceIds: ['jrl-main'],
+        townStationIds: ['JS1', 'JS2'],
+        issueScope: { lineIds: [], serviceIds: [], stationIds: [] },
+      }),
+    ).toEqual({
+      lineIds: ['JRL'],
+      serviceIds: ['jrl-main'],
+      stationIds: ['JS1', 'JS2'],
+    });
   });
 });

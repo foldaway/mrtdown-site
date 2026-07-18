@@ -93,10 +93,8 @@ export type BaseDataset = {
 
 export type CompleteDatasetCaller =
   | 'route:/lines'
-  | 'route:/lines/:lineId'
   | 'route:/stations'
   | 'route:/towns'
-  | 'route:/towns/:townId'
   | 'route:/sitemap.xml'
   | 'route:/statistics'
   | 'workflow:operational-facts';
@@ -111,7 +109,7 @@ export type DatasetStaticScope = {
   includePublicHolidays?: boolean;
 };
 
-function parseTranslations(value: unknown): Line['name'] {
+export function parseTranslations(value: unknown): Line['name'] {
   const isNonEmptyTranslation = (
     translation: string | null | undefined,
   ): translation is string =>

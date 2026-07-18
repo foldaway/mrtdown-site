@@ -47,7 +47,8 @@ export async function getIssueStaticScope(
     | 'issue'
     | 'line_profile'
     | 'operator_profile'
-    | 'station_profile',
+    | 'station_profile'
+    | 'town_profile',
 ): Promise<DatasetStaticScope> {
   const uniqueIssueIds = [...new Set(issueIds)];
   if (uniqueIssueIds.length === 0) {

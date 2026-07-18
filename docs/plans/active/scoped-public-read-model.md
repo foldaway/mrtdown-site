@@ -45,11 +45,11 @@ Related plan: [Production performance](production-performance.md).
 
 | Data function | Public entry points | Required scope |
 | --- | --- | --- |
-| `getIssueData` | `/issues/:issueId`, issue Markdown | One issue, its events, evidence, and referenced entities |
+| `getIssueReadModel` | `/issues/:issueId`, issue Markdown | One issue, its events, evidence, and referenced entities |
 | `getLineProfileReadModel` | `/lines/:lineId`, line Markdown | One line, its services/stations, and issues affecting that line in the requested window |
 | `getStationProfileReadModel` | `/stations/:stationId`, station Markdown | One station, memberships, and issues affecting that station |
-| `getOperatorProfileData` | `/operators/:operatorId`, operator Markdown, desktop expansion request | Operator's lines and issues affecting those lines in the requested window |
-| `getTownProfileData` | `/towns/:townId` | Town's stations, memberships, and their relevant issues |
+| `getOperatorProfileReadModel` | `/operators/:operatorId`, operator Markdown, desktop expansion request | Operator's lines and issues affecting those lines in the requested window |
+| `getTownProfileReadModel` | `/towns/:townId` | Town's stations, memberships, and their relevant issues |
 | `getLinesDirectoryData` | `/lines` | Per-line current status and bounded uptime summary |
 | `getStationsDirectoryData` | `/stations` | Per-station current status and bounded uptime summary |
 | `getTownsData` | `/towns` | Town/station membership summaries, without global issue-event history |
@@ -82,7 +82,7 @@ Exit criteria:
 - A production sample has a before value for complete-dataset calls and a way
   to correlate a future request with a route.
 
-### Phase 1: Replace Entity Profile Reads
+### Phase 1: Replace Entity Profile Reads — Implementation Complete
 
 - Implement typed scoped readers rather than another generic dataset filter:
   `getIssueReadModel`, `getLineProfileReadModel`, `getStationProfileReadModel`,
@@ -193,6 +193,14 @@ Exit criteria:
   also performs one 90-day profile request instead of loading 30 days and then
   repeating the read for wider viewports; the previous data-function name
   remains as a compatibility alias.
+- 2026-07-18: Added `getTownProfileReadModel`. It resolves the root town and
+  its stations before discovering membership lines, services, and candidate
+  issues, then scopes issue history and static network assembly to that graph.
+  The full-network station-map label contract is preserved with a compact
+  station-name projection. Town profile requests no longer invoke
+  `getCompleteDataset`; the previous data-function name remains as a
+  compatibility alias. All Phase 1 public entry points now use scoped readers;
+  production payload and row-count measurement remains part of Phase 4.
 
 ## Decision Log
 

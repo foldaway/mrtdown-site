@@ -1,7 +1,18 @@
 import type { IssueType } from '@mrtdown/core';
+import { eq, inArray, or } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
+import {
+  impactEventEntityFacilitiesTable,
+  impactEventEntityServicesTable,
+  impactEventsTable,
+  servicesTable,
+  stationCodesTable,
+  stationsTable,
+  townsTable,
+} from '~/db/schema';
 import type { Issue, LineSummaryStatus, Station } from '~/types';
-import { getCompleteDataset } from './dataset';
+import { getDefaultDb, timeDbQuery } from './database';
+import { buildDataset, getCompleteDataset, parseTranslations } from './dataset';
 import { isoDate, isoDateTime, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
@@ -10,6 +21,7 @@ import {
   issueOverlapsRange,
   sortIssuesByLatestActivity,
 } from './issueIntervals';
+import { getIssueStaticScope } from './readModelScope';
 import { isLineOperatingNow } from './serviceOperations';
 
 export type TownStationStatus = LineSummaryStatus | 'not_in_service';
@@ -188,6 +200,86 @@ export function selectRecentTownIssueIds(
   ).slice(0, limit);
 }
 
+async function getTownCandidateIssueIds(
+  lineIds: readonly string[],
+  serviceIds: readonly string[],
+  stationIds: readonly string[],
+  db: Awaited<ReturnType<typeof getDefaultDb>>,
+) {
+  const facilityCondition =
+    lineIds.length > 0 && stationIds.length > 0
+      ? or(
+          inArray(impactEventEntityFacilitiesTable.line_id, lineIds),
+          inArray(impactEventEntityFacilitiesTable.station_id, stationIds),
+        )
+      : lineIds.length > 0
+        ? inArray(impactEventEntityFacilitiesTable.line_id, lineIds)
+        : stationIds.length > 0
+          ? inArray(impactEventEntityFacilitiesTable.station_id, stationIds)
+          : null;
+  const [serviceIssueRows, facilityIssueRows] = await Promise.all([
+    serviceIds.length > 0
+      ? timeDbQuery('town_profile_q_service_issues', () =>
+          db
+            .selectDistinct({ issueId: impactEventsTable.issue_id })
+            .from(impactEventsTable)
+            .innerJoin(
+              impactEventEntityServicesTable,
+              eq(
+                impactEventEntityServicesTable.impact_event_id,
+                impactEventsTable.id,
+              ),
+            )
+            .where(
+              inArray(impactEventEntityServicesTable.service_id, serviceIds),
+            ),
+        )
+      : [],
+    facilityCondition == null
+      ? []
+      : timeDbQuery('town_profile_q_facility_issues', () =>
+          db
+            .selectDistinct({ issueId: impactEventsTable.issue_id })
+            .from(impactEventsTable)
+            .innerJoin(
+              impactEventEntityFacilitiesTable,
+              eq(
+                impactEventEntityFacilitiesTable.impact_event_id,
+                impactEventsTable.id,
+              ),
+            )
+            .where(facilityCondition),
+        ),
+  ]);
+
+  return [
+    ...new Set(
+      [...serviceIssueRows, ...facilityIssueRows].map((row) => row.issueId),
+    ),
+  ];
+}
+
+export function mergeTownReadModelScope(input: {
+  townLineIds: readonly string[];
+  townServiceIds: readonly string[];
+  townStationIds: readonly string[];
+  issueScope: {
+    lineIds: readonly string[];
+    serviceIds: readonly string[];
+    stationIds: readonly string[];
+  };
+}) {
+  return {
+    lineIds: [...new Set([...input.townLineIds, ...input.issueScope.lineIds])],
+    serviceIds: [
+      ...new Set([...input.townServiceIds, ...input.issueScope.serviceIds]),
+    ],
+    stationIds: [
+      ...new Set([...input.townStationIds, ...input.issueScope.stationIds]),
+    ],
+  };
+}
+
 export async function getTownsData() {
   const dataset = await getCompleteDataset('route:/towns');
   const stations = Object.values(dataset.included.stations);
@@ -215,19 +307,113 @@ export async function getTownsData() {
   };
 }
 
-export async function getTownProfileData(townId: string) {
-  const dataset = await getCompleteDataset('route:/towns/:townId');
-  const town = dataset.included.towns[townId];
-  if (town == null) {
+export async function getTownProfileReadModel(townId: string) {
+  const referenceNow = nowSg();
+  const db = await getDefaultDb();
+  const [townRow] = await timeDbQuery('town_profile_q_root', () =>
+    db
+      .select({ id: townsTable.id })
+      .from(townsTable)
+      .where(eq(townsTable.id, townId))
+      .limit(1),
+  );
+  if (townRow == null) {
     throw new Response('Town not found', {
       status: 404,
       statusText: 'Not Found',
     });
   }
 
-  const stations = Object.values(dataset.included.stations).filter(
-    (station) => station.townId === townId,
+  const [townStationRows, allStationNameRows] = await Promise.all([
+    timeDbQuery('town_profile_q_stations', () =>
+      db
+        .select({ id: stationsTable.id })
+        .from(stationsTable)
+        .where(eq(stationsTable.townId, townId)),
+    ),
+    timeDbQuery('town_profile_q_station_names', () =>
+      db
+        .select({ id: stationsTable.id, name: stationsTable.name })
+        .from(stationsTable),
+    ),
+  ]);
+  const townStationIds = townStationRows.map((row) => row.id);
+  const townStationCodeRows =
+    townStationIds.length > 0
+      ? await timeDbQuery('town_profile_q_station_codes', () =>
+          db
+            .select({ lineId: stationCodesTable.line_id })
+            .from(stationCodesTable)
+            .where(inArray(stationCodesTable.station_id, townStationIds)),
+        )
+      : [];
+  const townLineIds = [
+    ...new Set(townStationCodeRows.map((row) => row.lineId)),
+  ];
+  const townServiceRows =
+    townLineIds.length > 0
+      ? await timeDbQuery('town_profile_q_services', () =>
+          db
+            .select({ id: servicesTable.id })
+            .from(servicesTable)
+            .where(inArray(servicesTable.line_id, townLineIds)),
+        )
+      : [];
+  const townServiceIds = townServiceRows.map((row) => row.id);
+  const candidateIssueIds = await getTownCandidateIssueIds(
+    townLineIds,
+    townServiceIds,
+    townStationIds,
+    db,
   );
+  const issueScope = await getIssueStaticScope(
+    candidateIssueIds,
+    db,
+    'town_profile',
+  );
+  const initialScope = mergeTownReadModelScope({
+    townLineIds,
+    townServiceIds,
+    townStationIds,
+    issueScope,
+  });
+  const stationMembershipRows =
+    initialScope.stationIds.length > 0
+      ? await timeDbQuery('town_profile_q_membership_lines', () =>
+          db
+            .select({ lineId: stationCodesTable.line_id })
+            .from(stationCodesTable)
+            .where(
+              inArray(stationCodesTable.station_id, initialScope.stationIds),
+            ),
+        )
+      : [];
+  const dataset = await buildDataset(referenceNow, db, candidateIssueIds, {
+    lineIds: [
+      ...new Set([
+        ...initialScope.lineIds,
+        ...stationMembershipRows.map((row) => row.lineId),
+      ]),
+    ],
+    serviceIds: initialScope.serviceIds,
+    stationIds: initialScope.stationIds,
+    townIds: [townId],
+    includePublicHolidays: true,
+  });
+  const town = dataset.included.towns[townId];
+  if (town == null) {
+    throw new Error(`Town ${townId} disappeared while building its read model`);
+  }
+
+  const stations = townStationIds.map((stationId) => {
+    const station = dataset.included.stations[stationId];
+    if (station == null) {
+      throw new Error(
+        `Station ${stationId} disappeared while building town ${townId}`,
+      );
+    }
+    return station;
+  });
   const stationIds = stations.map((station) => station.id);
   const stationIdSet = new Set(stationIds);
   const lineIds = getTownLineIds(stations);
@@ -236,7 +422,6 @@ export async function getTownProfileData(townId: string) {
       branch.stationIds.some((stationId) => stationIdSet.has(stationId)),
     ),
   );
-  const referenceNow = nowSg();
   const activeIssues = issues.filter((issue) =>
     issueActiveNow(issue, referenceNow),
   );
@@ -289,9 +474,9 @@ export async function getTownProfileData(townId: string) {
       recentIssueDays: TOWN_RECENT_ISSUE_DAYS,
       mapReferenceDate: isoDate(mapReferenceDate),
       stationNames: Object.fromEntries(
-        Object.values(dataset.included.stations).map((station) => [
+        allStationNameRows.map((station) => [
           station.id,
-          station.name,
+          parseTranslations(station.name),
         ]),
       ),
     },
@@ -304,3 +489,6 @@ export async function getTownProfileData(townId: string) {
     }),
   };
 }
+
+/** @deprecated Use the explicitly scoped read-model name. */
+export const getTownProfileData = getTownProfileReadModel;

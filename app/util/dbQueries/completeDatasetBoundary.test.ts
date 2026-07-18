@@ -96,4 +96,19 @@ describe('complete dataset boundary', () => {
     );
     expect(profileReader).not.toMatch(COMPLETE_DATASET_CALL);
   });
+
+  it('keeps the migrated town profile reader off the complete dataset', () => {
+    const townReader = readFileSync(
+      join(APP_ROOT, 'util', 'dbQueries', 'towns.ts'),
+      'utf8',
+    );
+
+    const profileReader = townReader.slice(
+      townReader.indexOf('export async function getTownProfileReadModel'),
+      townReader.indexOf(
+        '/** @deprecated Use the explicitly scoped read-model name. */',
+      ),
+    );
+    expect(profileReader).not.toMatch(COMPLETE_DATASET_CALL);
+  });
 });
