@@ -30,6 +30,7 @@ import { Route as StationsStationIdIndexDotmdRouteImport } from './routes/statio
 import { Route as OperatorsOperatorIdIndexDotmdRouteImport } from './routes/operators/$operatorId/index[.]md'
 import { Route as LinesLineIdIndexDotmdRouteImport } from './routes/lines/$lineId/index[.]md'
 import { Route as IssuesIssueIdIndexDotmdRouteImport } from './routes/issues/$issueId/index[.]md'
+import { Route as InternalApiCrowdReportsRouteImport } from './routes/internal.api.crowd-reports'
 import { Route as ApiPhSplatRouteImport } from './routes/api.ph.$'
 import { Route as Char123LangChar125TownsTownIdIndexRouteImport } from './routes/{-$lang}/towns/$townId/index'
 import { Route as Char123LangChar125StatusLineIdIndexRouteImport } from './routes/{-$lang}/status/$lineId/index'
@@ -163,6 +164,11 @@ const IssuesIssueIdIndexDotmdRoute = IssuesIssueIdIndexDotmdRouteImport.update({
   path: '/issues/$issueId/index.md',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InternalApiCrowdReportsRoute = InternalApiCrowdReportsRouteImport.update({
+  id: '/internal/api/crowd-reports',
+  path: '/internal/api/crowd-reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPhSplatRoute = ApiPhSplatRouteImport.update({
   id: '/api/ph/$',
   path: '/api/ph/$',
@@ -268,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
   '/{-$lang}/': typeof Char123LangChar125IndexRoute
   '/api/ph/$': typeof ApiPhSplatRoute
+  '/internal/api/crowd-reports': typeof InternalApiCrowdReportsRoute
   '/issues/$issueId/index.md': typeof IssuesIssueIdIndexDotmdRoute
   '/lines/$lineId/index.md': typeof LinesLineIdIndexDotmdRoute
   '/operators/$operatorId/index.md': typeof OperatorsOperatorIdIndexDotmdRoute
@@ -306,6 +313,7 @@ export interface FileRoutesByTo {
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
   '/{-$lang}': typeof Char123LangChar125IndexRoute
   '/api/ph/$': typeof ApiPhSplatRoute
+  '/internal/api/crowd-reports': typeof InternalApiCrowdReportsRoute
   '/issues/$issueId/index.md': typeof IssuesIssueIdIndexDotmdRoute
   '/lines/$lineId/index.md': typeof LinesLineIdIndexDotmdRoute
   '/operators/$operatorId/index.md': typeof OperatorsOperatorIdIndexDotmdRoute
@@ -346,6 +354,7 @@ export interface FileRoutesById {
   '/{-$lang}/sitemap.xml': typeof Char123LangChar125SitemapDotxmlRoute
   '/{-$lang}/': typeof Char123LangChar125IndexRoute
   '/api/ph/$': typeof ApiPhSplatRoute
+  '/internal/api/crowd-reports': typeof InternalApiCrowdReportsRoute
   '/issues/$issueId/index.md': typeof IssuesIssueIdIndexDotmdRoute
   '/lines/$lineId/index.md': typeof LinesLineIdIndexDotmdRoute
   '/operators/$operatorId/index.md': typeof OperatorsOperatorIdIndexDotmdRoute
@@ -387,6 +396,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/sitemap.xml'
     | '/{-$lang}/'
     | '/api/ph/$'
+    | '/internal/api/crowd-reports'
     | '/issues/$issueId/index.md'
     | '/lines/$lineId/index.md'
     | '/operators/$operatorId/index.md'
@@ -425,6 +435,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/sitemap.xml'
     | '/{-$lang}'
     | '/api/ph/$'
+    | '/internal/api/crowd-reports'
     | '/issues/$issueId/index.md'
     | '/lines/$lineId/index.md'
     | '/operators/$operatorId/index.md'
@@ -464,6 +475,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/sitemap.xml'
     | '/{-$lang}/'
     | '/api/ph/$'
+    | '/internal/api/crowd-reports'
     | '/issues/$issueId/index.md'
     | '/lines/$lineId/index.md'
     | '/operators/$operatorId/index.md'
@@ -502,6 +514,7 @@ export interface RootRouteChildren {
   ApiReportsRoute: typeof ApiReportsRoute
   ApiSentryAnonymousUserRoute: typeof ApiSentryAnonymousUserRoute
   ApiPhSplatRoute: typeof ApiPhSplatRoute
+  InternalApiCrowdReportsRoute: typeof InternalApiCrowdReportsRoute
   IssuesIssueIdIndexDotmdRoute: typeof IssuesIssueIdIndexDotmdRoute
   LinesLineIdIndexDotmdRoute: typeof LinesLineIdIndexDotmdRoute
   OperatorsOperatorIdIndexDotmdRoute: typeof OperatorsOperatorIdIndexDotmdRoute
@@ -660,6 +673,13 @@ declare module '@tanstack/react-router' {
       path: '/issues/$issueId/index.md'
       fullPath: '/issues/$issueId/index.md'
       preLoaderRoute: typeof IssuesIssueIdIndexDotmdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/internal/api/crowd-reports': {
+      id: '/internal/api/crowd-reports'
+      path: '/internal/api/crowd-reports'
+      fullPath: '/internal/api/crowd-reports'
+      preLoaderRoute: typeof InternalApiCrowdReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/ph/$': {
@@ -850,6 +870,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiReportsRoute: ApiReportsRoute,
   ApiSentryAnonymousUserRoute: ApiSentryAnonymousUserRoute,
   ApiPhSplatRoute: ApiPhSplatRoute,
+  InternalApiCrowdReportsRoute: InternalApiCrowdReportsRoute,
   IssuesIssueIdIndexDotmdRoute: IssuesIssueIdIndexDotmdRoute,
   LinesLineIdIndexDotmdRoute: LinesLineIdIndexDotmdRoute,
   OperatorsOperatorIdIndexDotmdRoute: OperatorsOperatorIdIndexDotmdRoute,

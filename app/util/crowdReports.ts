@@ -62,7 +62,7 @@ const optionalTrimmedString = (maxLength: number) =>
     .optional()
     .transform((value) => (value && value.length > 0 ? value : undefined));
 
-const RawCrowdReportSubmissionSchema = z
+export const StructuredCrowdReportSubmissionSchema = z
   .object({
     reportScope: CrowdReportScopeSchema,
     observedAt: optionalTrimmedString(64),
@@ -73,10 +73,14 @@ const RawCrowdReportSubmissionSchema = z
     effect: CrowdReportEffectSchema,
     delayMinutes: z.number().int().min(0).max(180).optional(),
     isStillHappening: z.boolean().optional(),
-    turnstileToken: optionalTrimmedString(4096),
-    clientFingerprint: optionalTrimmedString(512),
   })
   .strict();
+
+const RawCrowdReportSubmissionSchema =
+  StructuredCrowdReportSubmissionSchema.extend({
+    turnstileToken: optionalTrimmedString(4096),
+    clientFingerprint: optionalTrimmedString(512),
+  }).strict();
 
 export type CrowdReportEffect = IngestContentCrowdReportEffect;
 
@@ -108,6 +112,12 @@ export class CrowdReportRateLimitError extends Error {
   }
 }
 
+export class CrowdReportIdempotencyConflictError extends Error {
+  constructor(public readonly reportId: string) {
+    super('External report ID was already used with a different payload');
+  }
+}
+
 export type CrowdReportJsonBodyResult =
   | { success: true; body: unknown }
   | { success: false; status: 400 | 413; error: string };
@@ -124,6 +134,13 @@ type PersistCrowdReportOptions = {
   idFactory?: () => string;
 };
 
+export type ProgrammaticCrowdReportDelivery = {
+  producer: string;
+  externalReportId: string;
+  sourceUrl?: string;
+  requestPayloadDigest: string;
+};
+
 type PersistCrowdReportTransactionContext = {
   rateLimitPerHour: number;
   idFactory: () => string;
@@ -135,6 +152,12 @@ type AutomoderateCrowdReportOptions = ClusterCrowdReportOptions & {
   duplicateWindowMinutes?: number;
   now?: DateTime;
 };
+
+type PersistProgrammaticCrowdReportOptions = Pick<
+  PersistCrowdReportOptions,
+  'idFactory' | 'now'
+> &
+  Pick<AutomoderateCrowdReportOptions, 'duplicateWindowMinutes'>;
 
 type ClusterCrowdReportOptions = {
   clusterWindowMinutes?: number;
@@ -337,11 +360,24 @@ function hasCrowdReportClusterCurrentConfidenceSql(
   minReportCount: number,
   minDistinctIpHashes: number,
 ) {
-  return sql`${getCrowdReportClusterOngoingReportCountSql(
-    crowdReportClustersTable.id,
-  )} >= ${minReportCount} and ${getCrowdReportClusterOngoingDistinctIpHashCountSql(
-    crowdReportClustersTable.id,
-  )} >= ${minDistinctIpHashes}`;
+  return sql`(
+    (
+      ${getCrowdReportClusterOngoingReportCountSql(
+        crowdReportClustersTable.id,
+      )} >= ${minReportCount}
+      and ${getCrowdReportClusterOngoingDistinctIpHashCountSql(
+        crowdReportClustersTable.id,
+      )} >= ${minDistinctIpHashes}
+    )
+    or exists (
+      select 1
+      from ${crowdReportsTable}
+      where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
+        and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+        and ${crowdReportsTable.still_happening} is true
+        and ${crowdReportsTable.producer} <> 'public'
+    )
+  )`;
 }
 
 function hasCrowdReportClusterScopeSql() {
@@ -405,54 +441,70 @@ export function validateCrowdReportSubmission(
     };
   }
 
-  const lineIds = [...new Set(parsed.data.lineIds)];
-  const stationIds = [...new Set(parsed.data.stationIds)];
+  return validateParsedCrowdReportSubmission(parsed.data, now);
+}
+
+export function validateStructuredCrowdReportSubmission(
+  input: unknown,
+  now = DateTime.now().setZone(SG_TIMEZONE),
+): CrowdReportValidationResult {
+  const parsed = StructuredCrowdReportSubmissionSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      issues: parsed.error.issues.map((issue) => issue.message),
+    };
+  }
+
+  return validateParsedCrowdReportSubmission(parsed.data, now);
+}
+
+function validateParsedCrowdReportSubmission(
+  data: z.infer<typeof StructuredCrowdReportSubmissionSchema> & {
+    turnstileToken?: string;
+    clientFingerprint?: string;
+  },
+  now: DateTime,
+): CrowdReportValidationResult {
+  const lineIds = [...new Set(data.lineIds)];
+  const stationIds = [...new Set(data.stationIds)];
   const issues: string[] = [];
   if (lineIds.length === 0 && stationIds.length === 0) {
     issues.push('At least one affected line or station is required');
   }
-  if (parsed.data.reportScope === 'line' && lineIds.length === 0) {
+  if (data.reportScope === 'line' && lineIds.length === 0) {
     issues.push('Line reports require at least one affected line');
   }
-  if (parsed.data.reportScope === 'station' && stationIds.length === 0) {
+  if (data.reportScope === 'station' && stationIds.length === 0) {
     issues.push('Station reports require at least one affected station');
   }
-  if (parsed.data.reportScope === 'train' && lineIds.length !== 1) {
+  if (data.reportScope === 'train' && lineIds.length !== 1) {
     issues.push('Train reports require exactly one affected line');
   }
   if (
-    parsed.data.reportScope === 'train' &&
-    parsed.data.directionStationId == null &&
-    parsed.data.directionUnknown !== true
+    data.reportScope === 'train' &&
+    data.directionStationId == null &&
+    data.directionUnknown !== true
   ) {
     issues.push(
       'Train reports require a direction station or explicit unknown direction',
     );
   }
-  if (parsed.data.directionStationId != null && lineIds.length !== 1) {
+  if (data.directionStationId != null && lineIds.length !== 1) {
     issues.push('directionStationId requires exactly one affected line');
   }
-  if (
-    parsed.data.reportScope !== 'train' &&
-    parsed.data.directionStationId != null
-  ) {
+  if (data.reportScope !== 'train' && data.directionStationId != null) {
     issues.push('directionStationId is only allowed for train reports');
   }
-  if (
-    parsed.data.directionStationId != null &&
-    parsed.data.directionUnknown === true
-  ) {
+  if (data.directionStationId != null && data.directionUnknown === true) {
     issues.push('directionUnknown cannot be combined with directionStationId');
   }
-  if (
-    parsed.data.reportScope !== 'train' &&
-    parsed.data.directionUnknown != null
-  ) {
+  if (data.reportScope !== 'train' && data.directionUnknown != null) {
     issues.push('directionUnknown is only allowed for train reports');
   }
 
-  const observedAt = parsed.data.observedAt
-    ? DateTime.fromISO(parsed.data.observedAt, { setZone: true })
+  const observedAt = data.observedAt
+    ? DateTime.fromISO(data.observedAt, { setZone: true })
     : now;
 
   if (!observedAt.isValid) {
@@ -482,26 +534,24 @@ export function validateCrowdReportSubmission(
   return {
     success: true,
     data: {
-      reportScope: parsed.data.reportScope,
+      reportScope: data.reportScope,
       observedAt: observedAtIso,
       lineIds,
       stationIds,
-      ...(parsed.data.directionStationId != null
-        ? { directionStationId: parsed.data.directionStationId }
+      ...(data.directionStationId != null
+        ? { directionStationId: data.directionStationId }
         : {}),
-      ...(parsed.data.directionUnknown === true
-        ? { directionUnknown: true }
-        : {}),
-      directionText: parsed.data.directionStationId
-        ? `towards:${parsed.data.directionStationId}`
-        : parsed.data.directionUnknown === true
+      ...(data.directionUnknown === true ? { directionUnknown: true } : {}),
+      directionText: data.directionStationId
+        ? `towards:${data.directionStationId}`
+        : data.directionUnknown === true
           ? 'not-sure'
           : undefined,
-      effect: parsed.data.effect,
-      delayMinutes: parsed.data.delayMinutes,
-      isStillHappening: parsed.data.isStillHappening,
-      turnstileToken: parsed.data.turnstileToken,
-      clientFingerprint: parsed.data.clientFingerprint,
+      effect: data.effect,
+      delayMinutes: data.delayMinutes,
+      isStillHappening: data.isStillHappening,
+      turnstileToken: data.turnstileToken,
+      clientFingerprint: data.clientFingerprint,
     },
   };
 }
@@ -1194,6 +1244,7 @@ async function automoderateCrowdReportInTransaction(
   clusterWindowMinutes = DEFAULT_CLUSTER_WINDOW_MINUTES,
   publicSignalMinReports = DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
   publicSignalMinDistinctIpHashes = DEFAULT_PUBLIC_SIGNAL_MIN_DISTINCT_IP_HASHES,
+  trustedSubmission = false,
 ) {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${buildDuplicateLockKey(submission)}, 0::bigint))`,
@@ -1295,6 +1346,7 @@ async function automoderateCrowdReportInTransaction(
     publicSignalMinReports,
     publicSignalMinDistinctIpHashes,
     idFactory,
+    trustedSubmission,
   );
 
   return (
@@ -1314,6 +1366,7 @@ async function createCrowdReportClusterInTransaction(
   idFactory: () => string,
   publicSignalMinReports: number,
   publicSignalMinDistinctIpHashes: number,
+  trustedSubmission: boolean,
 ) {
   const clusterId = idFactory();
   const { windowStartAt, windowEndAt } = getCrowdReportClusterWindow(
@@ -1327,10 +1380,11 @@ async function createCrowdReportClusterInTransaction(
     window_start_at: windowStartAt,
     window_end_at: windowEndAt,
     report_count: 1,
-    status:
-      submission.isStillHappening === true &&
-      publicSignalMinReports <= 1 &&
-      publicSignalMinDistinctIpHashes <= 1
+    status: trustedSubmission
+      ? 'accepted'
+      : submission.isStillHappening === true &&
+          publicSignalMinReports <= 1 &&
+          publicSignalMinDistinctIpHashes <= 1
         ? 'accepted'
         : 'pending',
   });
@@ -1374,6 +1428,7 @@ async function clusterModeratedCrowdReportInTransaction(
   publicSignalMinReports: number,
   publicSignalMinDistinctIpHashes: number,
   idFactory: () => string,
+  trustedSubmission: boolean,
 ) {
   if (duplicate == null) {
     await createCrowdReportClusterInTransaction(
@@ -1384,6 +1439,7 @@ async function clusterModeratedCrowdReportInTransaction(
       idFactory,
       publicSignalMinReports,
       publicSignalMinDistinctIpHashes,
+      trustedSubmission,
     );
     return;
   }
@@ -1398,6 +1454,7 @@ async function clusterModeratedCrowdReportInTransaction(
       idFactory,
       publicSignalMinReports,
       publicSignalMinDistinctIpHashes,
+      trustedSubmission,
     ));
   const { windowStartAt, windowEndAt } = getCrowdReportClusterWindow(
     submission.observedAt,
@@ -1417,7 +1474,9 @@ async function clusterModeratedCrowdReportInTransaction(
     .update(crowdReportClustersTable)
     .set({
       report_count: sql`${crowdReportClustersTable.report_count} + 1`,
-      status: sql`case when ${crowdReportClustersTable.status} = 'pending' and ${getCrowdReportClusterOngoingReportCountSql(clusterId)} >= ${publicSignalMinReports} and ${getCrowdReportClusterOngoingDistinctIpHashCountSql(clusterId)} >= ${publicSignalMinDistinctIpHashes} then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`,
+      status: trustedSubmission
+        ? sql`case when ${crowdReportClustersTable.status} = 'pending' then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`
+        : sql`case when ${crowdReportClustersTable.status} = 'pending' and ${getCrowdReportClusterOngoingReportCountSql(clusterId)} >= ${publicSignalMinReports} and ${getCrowdReportClusterOngoingDistinctIpHashCountSql(clusterId)} >= ${publicSignalMinDistinctIpHashes} then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`,
       window_start_at: sql`least(${crowdReportClustersTable.window_start_at}, ${windowStartAt}::timestamptz)`,
       window_end_at: sql`greatest(${crowdReportClustersTable.window_end_at}, ${windowEndAt}::timestamptz)`,
       updated_at: sql`now()`,
@@ -1464,34 +1523,15 @@ async function persistCrowdReportInTransaction(
     );
   }
 
-  await tx.insert(crowdReportsTable).values({
-    id: context.reportId,
-    observed_at: submission.observedAt,
-    direction_text: submission.directionText,
-    effect: submission.effect,
-    delay_minutes: submission.delayMinutes,
-    still_happening: submission.isStillHappening,
-    text: buildCrowdReportStorageText(submission),
-    status: 'pending',
-  });
+  await tx
+    .insert(crowdReportsTable)
+    .values(buildCrowdReportInsertValues(context.reportId, submission));
 
-  if (submission.lineIds.length > 0) {
-    await tx.insert(crowdReportLinesTable).values(
-      submission.lineIds.map((lineId) => ({
-        report_id: context.reportId,
-        line_id: lineId,
-      })),
-    );
-  }
-
-  if (submission.stationIds.length > 0) {
-    await tx.insert(crowdReportStationsTable).values(
-      submission.stationIds.map((stationId) => ({
-        report_id: context.reportId,
-        station_id: stationId,
-      })),
-    );
-  }
+  await insertCrowdReportReferencesInTransaction(
+    tx,
+    context.reportId,
+    submission,
+  );
 
   await tx.insert(crowdReportAbuseEventsTable).values({
     id: context.idFactory(),
@@ -1513,6 +1553,97 @@ async function persistCrowdReportInTransaction(
   });
 
   return { id: context.reportId, status: 'pending' as const };
+}
+
+function buildCrowdReportInsertValues(
+  reportId: string,
+  submission: CrowdReportSubmission,
+  delivery?: ProgrammaticCrowdReportDelivery,
+) {
+  return {
+    id: reportId,
+    observed_at: submission.observedAt,
+    direction_text: submission.directionText,
+    effect: submission.effect,
+    delay_minutes: submission.delayMinutes,
+    still_happening: submission.isStillHappening,
+    text: buildCrowdReportStorageText(submission),
+    status: 'pending',
+    producer: delivery?.producer ?? 'public',
+    external_report_id: delivery?.externalReportId,
+    source_url: delivery?.sourceUrl,
+    request_payload_digest: delivery?.requestPayloadDigest,
+  } as const;
+}
+
+async function insertCrowdReportReferencesInTransaction(
+  tx: CrowdReportTransaction,
+  reportId: string,
+  submission: CrowdReportSubmission,
+) {
+  if (submission.lineIds.length > 0) {
+    await tx.insert(crowdReportLinesTable).values(
+      submission.lineIds.map((lineId) => ({
+        report_id: reportId,
+        line_id: lineId,
+      })),
+    );
+  }
+
+  if (submission.stationIds.length > 0) {
+    await tx.insert(crowdReportStationsTable).values(
+      submission.stationIds.map((stationId) => ({
+        report_id: reportId,
+        station_id: stationId,
+      })),
+    );
+  }
+}
+
+async function selectProgrammaticCrowdReport(
+  db: CrowdReportReadableDb,
+  producer: string,
+  externalReportId: string,
+) {
+  const [report] = await db
+    .select({
+      id: crowdReportsTable.id,
+      status: crowdReportsTable.status,
+      duplicateOfId: crowdReportsTable.duplicate_of_id,
+      requestPayloadDigest: crowdReportsTable.request_payload_digest,
+    })
+    .from(crowdReportsTable)
+    .where(
+      and(
+        eq(crowdReportsTable.producer, producer),
+        eq(crowdReportsTable.external_report_id, externalReportId),
+      ),
+    )
+    .limit(1);
+  return report;
+}
+
+export async function findProgrammaticCrowdReportRetry(
+  db: AppDb,
+  delivery: ProgrammaticCrowdReportDelivery,
+) {
+  const report = await selectProgrammaticCrowdReport(
+    db,
+    delivery.producer,
+    delivery.externalReportId,
+  );
+  if (report == null) {
+    return undefined;
+  }
+  if (report.requestPayloadDigest !== delivery.requestPayloadDigest) {
+    throw new CrowdReportIdempotencyConflictError(report.id);
+  }
+  return {
+    id: report.id,
+    status: report.status,
+    duplicateOfId: report.duplicateOfId,
+    created: false as const,
+  };
 }
 
 export async function persistCrowdReport(
@@ -1576,6 +1707,78 @@ export async function persistAutomoderatedCrowdReport(
       options.publicSignalMinReports,
       options.publicSignalMinDistinctIpHashes,
     );
+  });
+}
+
+export async function persistAutomoderatedProgrammaticCrowdReport(
+  db: AppDb,
+  submission: CrowdReportSubmission,
+  delivery: ProgrammaticCrowdReportDelivery,
+  options: PersistProgrammaticCrowdReportOptions = {},
+) {
+  const now = options.now ?? DateTime.now().setZone(SG_TIMEZONE);
+  const duplicateWindowMinutes =
+    options.duplicateWindowMinutes ?? DEFAULT_DUPLICATE_WINDOW_MINUTES;
+  const idFactory = options.idFactory ?? (() => crypto.randomUUID());
+  const reportId = idFactory();
+
+  return db.transaction(async (tx) => {
+    const [insertedReport] = await tx
+      .insert(crowdReportsTable)
+      .values(buildCrowdReportInsertValues(reportId, submission, delivery))
+      .onConflictDoNothing({
+        target: [
+          crowdReportsTable.producer,
+          crowdReportsTable.external_report_id,
+        ],
+      })
+      .returning({ id: crowdReportsTable.id });
+
+    if (insertedReport == null) {
+      const existingReport = await selectProgrammaticCrowdReport(
+        tx,
+        delivery.producer,
+        delivery.externalReportId,
+      );
+      if (existingReport == null) {
+        throw new Error('Conflicting programmatic report could not be loaded');
+      }
+      if (
+        existingReport.requestPayloadDigest !== delivery.requestPayloadDigest
+      ) {
+        throw new CrowdReportIdempotencyConflictError(existingReport.id);
+      }
+      return {
+        id: existingReport.id,
+        status: existingReport.status,
+        duplicateOfId: existingReport.duplicateOfId,
+        created: false as const,
+      };
+    }
+
+    await insertCrowdReportReferencesInTransaction(tx, reportId, submission);
+    await tx.insert(crowdReportModerationEventsTable).values({
+      id: idFactory(),
+      report_id: reportId,
+      actor: 'system',
+      action: 'submitted',
+      note: `Report submitted by authenticated producer ${delivery.producer}`,
+    });
+
+    const moderated = await automoderateCrowdReportInTransaction(
+      tx,
+      reportId,
+      submission,
+      duplicateWindowMinutes,
+      idFactory,
+      now,
+      undefined,
+      undefined,
+      undefined,
+      true,
+    );
+
+    return { ...moderated, created: true as const };
   });
 }
 

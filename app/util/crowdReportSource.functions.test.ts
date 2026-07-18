@@ -16,7 +16,27 @@ function name(value: string) {
   };
 }
 
-function makeFakeClusterSourceDb() {
+function makeFakeClusterSourceDb(
+  reportRows: Array<{
+    observedAt: string;
+    directionText: string | null;
+    delayMinutes: number | null;
+    stillHappening: boolean;
+  }> = [
+    {
+      observedAt: '2026-05-24T04:30:00.000Z',
+      directionText: 'towards:BP6',
+      delayMinutes: 10,
+      stillHappening: true,
+    },
+    {
+      observedAt: '2026-05-24T04:40:00.000Z',
+      directionText: null,
+      delayMinutes: null,
+      stillHappening: true,
+    },
+  ],
+) {
   const whereCalls: unknown[] = [];
   const selectResults = [
     [
@@ -32,20 +52,7 @@ function makeFakeClusterSourceDb() {
     ],
     [{ id: 'BPLRT', name: name('Bukit Panjang LRT'), color: '#718472' }],
     [{ id: 'BP6', name: name('Bukit Panjang') }],
-    [
-      {
-        observedAt: '2026-05-24T04:30:00.000Z',
-        directionText: 'towards:BP6',
-        delayMinutes: 10,
-        stillHappening: true,
-      },
-      {
-        observedAt: '2026-05-24T04:40:00.000Z',
-        directionText: null,
-        delayMinutes: null,
-        stillHappening: true,
-      },
-    ],
+    reportRows,
   ];
   let selectCount = 0;
 
@@ -129,7 +136,7 @@ function makeFakeReportSourceDb(
 }
 
 describe('getCrowdReportSource', () => {
-  it('builds cluster evidence from ongoing reports only', async () => {
+  it('builds cluster evidence from ongoing public reports', async () => {
     const fake = makeFakeClusterSourceDb();
 
     const source = await getCrowdReportSource(fake.db as never, {
@@ -150,6 +157,32 @@ describe('getCrowdReportSource', () => {
     const reportWhereSql = dialect.sqlToQuery(fake.whereCalls[3] as SQL).sql;
 
     expect(reportWhereSql).toContain('"crowd_reports"."still_happening" =');
+    expect(reportWhereSql).toContain('"crowd_reports"."producer" <>');
+  });
+
+  it('keeps recovery-only authenticated cluster sources resolvable', async () => {
+    const fake = makeFakeClusterSourceDb([
+      {
+        observedAt: '2026-05-24T04:50:00.000Z',
+        directionText: null,
+        delayMinutes: 0,
+        stillHappening: false,
+      },
+    ]);
+
+    const source = await getCrowdReportSource(fake.db as never, {
+      kind: 'cluster',
+      sourceId: 'cluster-1',
+    });
+
+    expect(source).toMatchObject({
+      kind: 'cluster',
+      id: 'cluster-1',
+      reportCount: 1,
+      observedStartAt: '2026-05-24T04:50:00.000Z',
+      observedEndAt: '2026-05-24T04:50:00.000Z',
+      stillHappening: false,
+    });
   });
 
   it('builds single-report evidence for accepted unclustered reports with scope', async () => {

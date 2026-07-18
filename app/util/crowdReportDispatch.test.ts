@@ -41,7 +41,7 @@ function makeFakeCandidateDb() {
   };
 }
 
-function makeFakeClusterCandidateDb() {
+function makeFakeClusterCandidateDb(stillHappening = true) {
   const whereCalls: unknown[] = [];
   const selectResults = [
     [
@@ -63,7 +63,7 @@ function makeFakeClusterCandidateDb() {
         text: 'Train stalled near the platform for several minutes.',
         directionText: 'towards:BP6',
         delayMinutes: 10,
-        stillHappening: true,
+        stillHappening,
       },
     ],
   ];
@@ -393,7 +393,7 @@ describe('getDispatchableCrowdReportCandidates', () => {
     expect(whereSql).toContain('crowd_report_stations');
   });
 
-  it('builds cluster dispatch payloads from ongoing reports only', async () => {
+  it('builds cluster dispatch payloads from ongoing public reports', async () => {
     const fake = makeFakeClusterCandidateDb();
 
     await getDispatchableCrowdReportCandidates(fake.db as never, {
@@ -408,6 +408,32 @@ describe('getDispatchableCrowdReportCandidates', () => {
     ).sql;
 
     expect(reportRowsWhereSql).toContain('"still_happening" =');
+  });
+
+  it('includes authenticated producer resolution reports in dispatch', async () => {
+    const fake = makeFakeClusterCandidateDb(false);
+
+    const candidates = await getDispatchableCrowdReportCandidates(
+      fake.db as never,
+      {
+        kind: 'cluster',
+        limit: 1,
+        rootUrl: 'https://mrtdown.example',
+      },
+    );
+
+    const dialect = new PgDialect();
+    const clusterWhereSql = dialect.sqlToQuery(fake.whereCalls[0] as SQL).sql;
+    const reportRowsWhereSql = dialect.sqlToQuery(
+      fake.whereCalls[3] as SQL,
+    ).sql;
+
+    expect(clusterWhereSql).toContain('"producer" <>');
+    expect(reportRowsWhereSql).toContain('"producer" <>');
+    expect(candidates[0]?.payload.content[0]).toHaveProperty(
+      'text',
+      expect.stringContaining('no longer happening'),
+    );
   });
 
   it('marks only the report IDs included in a cluster dispatch payload', async () => {

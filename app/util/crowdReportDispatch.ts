@@ -10,6 +10,7 @@ import {
   eq,
   inArray,
   isNull,
+  ne,
   notInArray,
   or,
   sql,
@@ -135,7 +136,19 @@ function hasCrowdReportScope() {
 }
 
 function hasCrowdReportClusterCurrentConfidence() {
-  return sql`${getCrowdReportClusterOngoingReportCountSql()} >= ${DEFAULT_DISPATCH_MIN_ONGOING_REPORTS} and ${getCrowdReportClusterOngoingDistinctIpHashCountSql()} >= ${DEFAULT_DISPATCH_MIN_DISTINCT_IP_HASHES}`;
+  return sql`(
+    (
+      ${getCrowdReportClusterOngoingReportCountSql()} >= ${DEFAULT_DISPATCH_MIN_ONGOING_REPORTS}
+      and ${getCrowdReportClusterOngoingDistinctIpHashCountSql()} >= ${DEFAULT_DISPATCH_MIN_DISTINCT_IP_HASHES}
+    )
+    or exists (
+      select 1
+      from ${crowdReportsTable}
+      where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
+        and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+        and ${crowdReportsTable.producer} <> 'public'
+    )
+  )`;
 }
 
 function getCrowdReportClusterOngoingReportCountSql() {
@@ -157,6 +170,19 @@ function getCrowdReportClusterOngoingDistinctIpHashCountSql() {
     where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
       and ${crowdReportsTable.still_happening} is true
+  )`;
+}
+
+function getCrowdReportClusterDispatchReportCountSql() {
+  return sql<number>`(
+    select count(*)::int
+    from ${crowdReportsTable}
+    where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
+      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
+      and (
+        ${crowdReportsTable.still_happening} is true
+        or ${crowdReportsTable.producer} <> 'public'
+      )
   )`;
 }
 
@@ -283,7 +309,7 @@ async function getDispatchableCrowdReportClusterCandidates(
     .select({
       id: crowdReportClustersTable.id,
       effect: crowdReportClustersTable.effect,
-      reportCount: getCrowdReportClusterOngoingReportCountSql(),
+      reportCount: getCrowdReportClusterDispatchReportCountSql(),
       windowEndAt: crowdReportClustersTable.window_end_at,
       updatedAt: crowdReportClustersTable.updated_at,
     })
@@ -333,7 +359,10 @@ async function getDispatchableCrowdReportClusterCandidates(
         and(
           inArray(crowdReportsTable.cluster_id, clusterIds),
           inArray(crowdReportsTable.status, ['accepted', 'duplicate']),
-          eq(crowdReportsTable.still_happening, true),
+          or(
+            eq(crowdReportsTable.still_happening, true),
+            ne(crowdReportsTable.producer, 'public'),
+          ),
         ),
       )
       .orderBy(desc(crowdReportsTable.observed_at)),
@@ -614,7 +643,10 @@ function hasNoOngoingClusterReportsOutsideDispatchPayload(
     from ${crowdReportsTable}
     where ${crowdReportsTable.cluster_id} = ${candidate.id}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
-      and ${crowdReportsTable.still_happening} is true
+      and (
+        ${crowdReportsTable.still_happening} is true
+        or ${crowdReportsTable.producer} <> 'public'
+      )
       and ${notInArray(crowdReportsTable.id, candidate.reportIds)}
   )`;
 }
@@ -631,7 +663,10 @@ function hasAllClusterDispatchPayloadReportsCurrent(
     from ${crowdReportsTable}
     where ${crowdReportsTable.cluster_id} = ${candidate.id}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
-      and ${crowdReportsTable.still_happening} is true
+      and (
+        ${crowdReportsTable.still_happening} is true
+        or ${crowdReportsTable.producer} <> 'public'
+      )
       and ${inArray(crowdReportsTable.id, candidate.reportIds)}
   ) = ${candidate.reportIds.length}`;
 }
@@ -795,7 +830,7 @@ export async function dispatchPendingCrowdReports(
 }
 
 /**
- * Starts an immediate dispatch attempt after a public submission commits.
+ * Starts an immediate dispatch attempt after a crowd-report submission commits.
  * Accepted rows remain the durable source of truth, so the scheduled dispatcher
  * can retry if this best-effort attempt fails or the process exits early.
  */

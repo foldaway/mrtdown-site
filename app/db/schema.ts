@@ -38,6 +38,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { enumToPgEnum, timestampColumns } from './columns.helpers.js';
 
@@ -279,6 +280,10 @@ export const crowdReportsTable = pgTable(
     }),
     dispatch_payload: jsonb('dispatch_payload').$type<unknown>(),
     dispatch_error: text('dispatch_error'),
+    producer: text('producer').notNull().default('public'),
+    external_report_id: text('external_report_id'),
+    source_url: text('source_url'),
+    request_payload_digest: text('request_payload_digest'),
     ...timestampColumns,
   },
   (table) => {
@@ -290,6 +295,10 @@ export const crowdReportsTable = pgTable(
       index('crowd_reports_status_idx').on(table.status),
       index('crowd_reports_cluster_id_idx').on(table.cluster_id),
       index('crowd_reports_duplicate_of_id_idx').on(table.duplicate_of_id),
+      uniqueIndex('crowd_reports_producer_external_report_id_uidx').on(
+        table.producer,
+        table.external_report_id,
+      ),
       check(
         'crowd_reports_delay_minutes_check',
         sql`${table.delay_minutes} is null or (${table.delay_minutes} >= 0 and ${table.delay_minutes} <= 180)`,
