@@ -33,48 +33,52 @@ export const OperatorCurrentStatusCard: React.FC<Props> = (props) => {
   const { currentOperationalStatus, linesAffected } = props;
 
   return (
-    <div className="flex flex-col rounded-lg border border-gray-300 p-6 text-gray-800 shadow-lg md:col-span-4 dark:border-gray-700 dark:text-gray-200">
-      <h2 className="mb-2 font-semibold text-base text-gray-900 dark:text-white">
-        <FormattedMessage
-          id="general.current_status"
-          defaultMessage="Current Status"
-        />
-      </h2>
-      <div className="flex items-center gap-x-2">
-        <div
-          className={classNames('size-3 rounded-full', {
-            'bg-operational-light dark:bg-operational-dark':
-              currentOperationalStatus === 'all_operational',
-            'bg-disruption-light dark:bg-disruption-dark':
-              currentOperationalStatus === 'some_lines_disrupted',
-            'bg-maintenance-light dark:bg-maintenance-dark':
-              currentOperationalStatus === 'some_lines_under_maintenance',
-            'bg-gray-400 dark:bg-gray-500':
-              currentOperationalStatus === 'all_lines_closed_for_day',
-          })}
-        />
-        <span className="text-sm">
-          <FormattedMessage {...StatusLabels[currentOperationalStatus]} />
-        </span>
-      </div>
-
-      {linesAffected.length > 0 && (
-        <span className="mt-2 text-gray-500 text-xs dark:text-gray-400">
+    <section className="h-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="border-gray-200 border-b px-4 py-2.5 sm:px-5 sm:py-3 dark:border-gray-700">
+        <h2 className="font-bold text-gray-900 text-sm leading-5 dark:text-gray-100">
           <FormattedMessage
-            id="operator.lines_affected"
-            defaultMessage="{count, plural, one {# line affected} other {# lines affected}}"
-            values={{ count: linesAffected.length }}
+            id="general.current_status"
+            defaultMessage="Current Status"
           />
-        </span>
-      )}
-
-      <span className="mt-2 text-gray-500 text-xs dark:text-gray-400">
-        <FormattedMessage
-          id="lines.current_status.timestamp"
-          defaultMessage="As of {timestamp, time, short}"
-          values={{ timestamp: new Date() }}
-        />
-      </span>
-    </div>
+        </h2>
+      </div>
+      <div className="px-4 py-3 sm:px-5 sm:py-4">
+        <div className="flex items-center gap-x-2.5">
+          <div
+            className={classNames('size-2.5 shrink-0 rounded-full ring-4', {
+              'bg-operational-light ring-emerald-50 dark:bg-operational-dark dark:ring-emerald-950/50':
+                currentOperationalStatus === 'all_operational',
+              'bg-disruption-light ring-red-50 dark:bg-disruption-dark dark:ring-red-950/50':
+                currentOperationalStatus === 'some_lines_disrupted',
+              'bg-maintenance-light ring-amber-50 dark:bg-maintenance-dark dark:ring-amber-950/50':
+                currentOperationalStatus === 'some_lines_under_maintenance',
+              'bg-gray-400 ring-gray-100 dark:bg-gray-500 dark:ring-gray-700':
+                currentOperationalStatus === 'all_lines_closed_for_day',
+            })}
+          />
+          <span className="font-semibold text-gray-900 text-sm dark:text-white">
+            <FormattedMessage {...StatusLabels[currentOperationalStatus]} />
+          </span>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          {linesAffected.length > 0 && (
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+              <FormattedMessage
+                id="operator.lines_affected"
+                defaultMessage="{count, plural, one {# line affected} other {# lines affected}}"
+                values={{ count: linesAffected.length }}
+              />
+            </span>
+          )}
+          <span className="text-gray-500 dark:text-gray-400">
+            <FormattedMessage
+              id="lines.current_status.timestamp"
+              defaultMessage="As of {timestamp, time, short}"
+              values={{ timestamp: new Date() }}
+            />
+          </span>
+        </div>
+      </div>
+    </section>
   );
 };

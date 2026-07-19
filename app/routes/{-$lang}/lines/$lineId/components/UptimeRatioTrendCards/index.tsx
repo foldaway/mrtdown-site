@@ -37,124 +37,128 @@ export const UptimeRatioTrendCards: React.FC<Props> = (props) => {
   );
 
   return (
-    <section className="flex flex-col rounded-2xl border border-gray-200 bg-white px-4 py-3 text-gray-800 shadow-sm sm:px-5 sm:py-4 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
-      <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
-        <FormattedMessage
-          id="general.uptime_trend_past_period"
-          defaultMessage="Uptime trend (past {period})"
-          values={{
-            period: (
-              <FormattedNumber
-                value={
-                  graph.displayTimeScale?.count ?? graph.dataTimeScale.count
-                }
-                unit={
-                  graph.displayTimeScale?.granularity ??
-                  graph.dataTimeScale.granularity
-                }
-                unitDisplay="long"
-                style="unit"
-              />
-            ),
-          }}
-        />
-      </h2>
-      <span className="mt-2 font-bold text-2xl tracking-tight sm:text-3xl">
-        <FormattedNumber
-          value={graph.dataCumulative[0].payload.uptimeRatio}
-          style="percent"
-          maximumFractionDigits={2}
-        />
-      </span>
-      <span className="text-gray-500 text-xs dark:text-gray-400">
-        <FormattedMessage
-          id="general.change_since_previous"
-          defaultMessage="{change} vs previous"
-          values={{
-            change: (
-              <FormattedNumber
-                value={
-                  (graph.dataCumulative[0].payload.uptimeRatio as number) -
-                  (graph.dataCumulative[1].payload.uptimeRatio as number)
-                }
-                signDisplay="always"
-                style="percent"
-                maximumFractionDigits={2}
-              />
-            ),
-          }}
-        />
-      </span>
-      <div className="mt-3 h-44 sm:h-52">
-        <ResponsiveContainer>
-          <LineChart
-            accessibilityLayer
-            data={graph.data}
-            layout="horizontal"
-            margin={{ top: 30, left: 5, right: 5, bottom: 5 }}
-          >
-            <CartesianGrid
-              vertical={false}
-              className="stroke-gray-300 dark:stroke-gray-600"
-            />
-            <XAxis
-              type="category"
-              dataKey="name"
-              className="text-gray-700 text-sm dark:text-gray-200"
-              tickFormatter={tickFormatter}
-              tick={{ fontSize: 12, fontWeight: 500 }}
-              axisLine={{ stroke: 'currentColor', strokeWidth: 1 }}
-              tickLine={{ stroke: 'currentColor', strokeWidth: 1 }}
-              height={50}
-            />
-            <Line
-              dataKey="payload.uptimeRatio"
-              className="stroke-sky-600 dark:stroke-sky-700"
-              stroke=""
-              radius={5}
-              type="monotone"
-              strokeWidth={2}
-            />
-            <Tooltip
-              content={(tooltipProps) => (
-                // @ts-expect-error typing issue
-                <CustomTooltip
-                  {...tooltipProps}
-                  granularity={graph.dataTimeScale.granularity}
+    <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white text-gray-800 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+      <div className="border-gray-200 border-b px-4 py-2.5 sm:px-5 sm:py-3 dark:border-gray-700">
+        <h2 className="font-semibold text-gray-900 text-sm leading-5 dark:text-gray-100">
+          <FormattedMessage
+            id="general.uptime_trend_past_period"
+            defaultMessage="Uptime trend (past {period})"
+            values={{
+              period: (
+                <FormattedNumber
+                  value={
+                    graph.displayTimeScale?.count ?? graph.dataTimeScale.count
+                  }
+                  unit={
+                    graph.displayTimeScale?.granularity ??
+                    graph.dataTimeScale.granularity
+                  }
+                  unitDisplay="long"
+                  style="unit"
                 />
-              )}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+              ),
+            }}
+          />
+        </h2>
       </div>
-      <div className="mt-3 flex items-center self-start">
-        <div className="flex items-center divide-x divide-gray-200 self-start rounded-lg border border-gray-200 bg-gray-50 shadow-sm dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
-          {graphs.map((graph, index) => (
-            <button
-              key={graph.title}
-              className={classNames(
-                'font-medium transition-colors first:rounded-l-lg last:rounded-r-lg hover:bg-gray-100 dark:hover:bg-gray-700',
-                'px-2.5 py-1.5 text-xs',
-                graphIndex === index
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                  : 'text-gray-600 dark:text-gray-400',
-              )}
-              type="button"
-              onClick={() => setGraphIndex(index)}
+      <div className="px-4 py-3 sm:px-5 sm:py-4">
+        <span className="font-bold text-2xl tracking-tight sm:text-3xl">
+          <FormattedNumber
+            value={graph.dataCumulative[0].payload.uptimeRatio}
+            style="percent"
+            maximumFractionDigits={2}
+          />
+        </span>
+        <span className="text-gray-500 text-xs dark:text-gray-400">
+          <FormattedMessage
+            id="general.change_since_previous"
+            defaultMessage="{change} vs previous"
+            values={{
+              change: (
+                <FormattedNumber
+                  value={
+                    (graph.dataCumulative[0].payload.uptimeRatio as number) -
+                    (graph.dataCumulative[1].payload.uptimeRatio as number)
+                  }
+                  signDisplay="always"
+                  style="percent"
+                  maximumFractionDigits={2}
+                />
+              ),
+            }}
+          />
+        </span>
+        <div className="mt-3 h-40 sm:h-44">
+          <ResponsiveContainer>
+            <LineChart
+              accessibilityLayer
+              data={graph.data}
+              layout="horizontal"
+              margin={{ top: 30, left: 5, right: 5, bottom: 5 }}
             >
-              <FormattedNumber
-                style="unit"
-                unitDisplay="long"
-                unit={
-                  graph.displayTimeScale?.granularity ??
-                  graph.dataTimeScale.granularity
-                }
-                value={
-                  graph.displayTimeScale?.count ?? graph.dataTimeScale.count
-                }
+              <CartesianGrid
+                vertical={false}
+                className="stroke-gray-300 dark:stroke-gray-600"
               />
-            </button>
-          ))}
+              <XAxis
+                type="category"
+                dataKey="name"
+                className="text-gray-700 text-sm dark:text-gray-200"
+                tickFormatter={tickFormatter}
+                tick={{ fontSize: 12, fontWeight: 500 }}
+                axisLine={{ stroke: 'currentColor', strokeWidth: 1 }}
+                tickLine={{ stroke: 'currentColor', strokeWidth: 1 }}
+                height={50}
+              />
+              <Line
+                dataKey="payload.uptimeRatio"
+                className="stroke-sky-600 dark:stroke-sky-700"
+                stroke=""
+                radius={5}
+                type="monotone"
+                strokeWidth={2}
+              />
+              <Tooltip
+                content={(tooltipProps) => (
+                  // @ts-expect-error typing issue
+                  <CustomTooltip
+                    {...tooltipProps}
+                    granularity={graph.dataTimeScale.granularity}
+                  />
+                )}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="mt-3 overflow-x-auto pb-0.5">
+          <div className="flex w-max items-center divide-x divide-gray-200 rounded-lg border border-gray-200 bg-gray-50 shadow-sm dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-900/50">
+            {graphs.map((graph, index) => (
+              <button
+                key={graph.title}
+                className={classNames(
+                  'font-medium transition-colors first:rounded-l-lg last:rounded-r-lg hover:bg-gray-100 dark:hover:bg-gray-700',
+                  'px-2.5 py-1.5 text-xs',
+                  graphIndex === index
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                    : 'text-gray-600 dark:text-gray-400',
+                )}
+                type="button"
+                onClick={() => setGraphIndex(index)}
+              >
+                <FormattedNumber
+                  style="unit"
+                  unitDisplay="long"
+                  unit={
+                    graph.displayTimeScale?.granularity ??
+                    graph.dataTimeScale.granularity
+                  }
+                  value={
+                    graph.displayTimeScale?.count ?? graph.dataTimeScale.count
+                  }
+                />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </section>

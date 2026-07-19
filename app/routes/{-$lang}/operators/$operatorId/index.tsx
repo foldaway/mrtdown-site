@@ -244,107 +244,127 @@ function OperatorPage() {
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
-      {/* Operator Header Section */}
-      <header className="flex flex-col justify-center">
-        <h1 className="font-bold text-gray-900 text-xl leading-tight md:text-2xl dark:text-gray-100">
-          {operatorName}
+      <div className="grid grid-cols-1 gap-y-5 md:grid-cols-12 md:gap-x-3">
+        <header className="flex flex-col items-center gap-1 text-center md:col-span-12">
+          <h1 className="font-bold text-gray-900 text-xl leading-tight sm:text-2xl dark:text-gray-100">
+            {operatorName}
+          </h1>
           {operatorDefaultName !== operatorName && (
-            <span className="ml-2 text-gray-600 text-lg dark:text-gray-300">
+            <p className="font-medium text-gray-500 text-sm leading-5 dark:text-gray-400">
               {operatorDefaultName}
-            </span>
+            </p>
           )}
-        </h1>
-
-        <div className="flex items-center gap-x-2">
-          <span className="text-gray-500 text-sm dark:text-gray-400">
+          <p className="mx-auto max-w-2xl text-gray-600 text-xs leading-4 sm:text-sm sm:leading-5 dark:text-gray-400">
             <FormattedMessage
-              id="operator.founded"
-              defaultMessage="Founded {date}"
+              id="operator.description"
+              defaultMessage="Check {operatorName} service status, uptime, disruptions, planned maintenance and performance across {lineCount, plural, one {# line} other {# lines}} in Singapore."
               values={{
-                date: isHydrated ? (
-                  <FormattedDate
-                    value={operator.foundedAt}
-                    day="numeric"
-                    month="long"
-                    year="numeric"
-                  />
-                ) : (
-                  operator.foundedAt
-                ),
+                operatorName,
+                lineCount: operatorProfile.lineIds.length,
               }}
             />
-          </span>
-          <span className="text-gray-500 text-lg dark:text-gray-400">•</span>
-          {operatorProfile.yearsOfOperation != null && (
-            <span className="text-gray-900 text-sm dark:text-gray-50">
-              <FormattedMessage
-                id="operator.years_of_operation_display"
-                defaultMessage="{years, plural, one {# year} other {# years}} of operation"
-                values={{
-                  years: operatorProfile.yearsOfOperation,
-                }}
-              />
-            </span>
-          )}
-        </div>
-        {operator.url != null && (
-          <div className="flex flex-wrap items-center gap-1">
-            <a
-              href={operator.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-300 text-sm hover:underline"
-            >
-              <FormattedMessage
-                id="operator.website"
-                defaultMessage="Visit website"
-              />
-            </a>
+          </p>
+          <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs">
+            {operator.foundedAt != null && (
+              <span className="text-gray-500 dark:text-gray-400">
+                <FormattedMessage
+                  id="operator.founded"
+                  defaultMessage="Founded {date}"
+                  values={{
+                    date: isHydrated ? (
+                      <FormattedDate
+                        value={operator.foundedAt}
+                        day="numeric"
+                        month="long"
+                        year="numeric"
+                      />
+                    ) : (
+                      operator.foundedAt
+                    ),
+                  }}
+                />
+              </span>
+            )}
+            {operator.foundedAt != null &&
+              operatorProfile.yearsOfOperation != null && (
+                <span className="text-gray-300 dark:text-gray-600">•</span>
+              )}
+            {operatorProfile.yearsOfOperation != null && (
+              <span className="font-medium text-gray-700 dark:text-gray-200">
+                <FormattedMessage
+                  id="operator.years_of_operation_display"
+                  defaultMessage="{years, plural, one {# year} other {# years}} of operation"
+                  values={{ years: operatorProfile.yearsOfOperation }}
+                />
+              </span>
+            )}
+            {operator.url != null && (
+              <a
+                href={operator.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-blue-700 hover:underline dark:text-blue-400"
+              >
+                <FormattedMessage
+                  id="operator.website"
+                  defaultMessage="Visit website"
+                />
+              </a>
+            )}
           </div>
-        )}
-      </header>
-      <div className="mt-4 grid grid-cols-1 gap-x-3 gap-y-5 md:grid-cols-12">
-        <OperatorUptimeCard
-          aggregateUptimeRatio={operatorProfile.aggregateUptimeRatio}
-          dateCount={dateCount}
-        />
+        </header>
 
-        <OperatorCurrentStatusCard
-          currentOperationalStatus={operatorProfile.currentOperationalStatus}
-          linesAffected={operatorProfile.linesAffected}
-        />
+        <section className="grid grid-cols-1 gap-3 md:col-span-12 md:grid-cols-2">
+          <OperatorUptimeCard
+            aggregateUptimeRatio={operatorProfile.aggregateUptimeRatio}
+            dateCount={dateCount}
+          />
 
-        <OperatorQuickFactsCard operatorProfile={operatorProfile} />
+          <OperatorCurrentStatusCard
+            currentOperationalStatus={operatorProfile.currentOperationalStatus}
+            linesAffected={operatorProfile.linesAffected}
+          />
+
+          <OperatorQuickFactsCard operatorProfile={operatorProfile} />
+        </section>
 
         <OperatorLinePerformanceCard
           linePerformanceComparison={operatorProfile.linePerformanceComparison}
           dateCount={dateCount}
         />
 
-        {operatorProfile.aggregateUptimeRatio != null && (
+        <section className="grid grid-cols-1 gap-3 sm:gap-4 md:col-span-12 md:grid-cols-12">
+          {operatorProfile.aggregateUptimeRatio != null && (
+            <DeferredViewportWidget
+              className="md:col-span-6"
+              fallback={<ProfileTrendCardSkeleton />}
+            >
+              <UptimeRatioTrendCards
+                graphs={operatorProfile.timeScaleGraphsUptimeRatios}
+              />
+            </DeferredViewportWidget>
+          )}
+
           <DeferredViewportWidget
-            className="md:col-span-12 lg:col-span-8"
+            className={
+              operatorProfile.aggregateUptimeRatio != null
+                ? 'md:col-span-6'
+                : 'md:col-span-12'
+            }
             fallback={<ProfileTrendCardSkeleton />}
           >
-            <UptimeRatioTrendCards
-              graphs={operatorProfile.timeScaleGraphsUptimeRatios}
+            <CountTrendCards
+              graphs={operatorProfile.timeScaleGraphsIssueCount}
             />
           </DeferredViewportWidget>
-        )}
 
-        <DeferredViewportWidget
-          className="md:col-span-12"
-          fallback={<ProfileRecentIssuesSectionSkeleton />}
-        >
-          <RecentIssuesSection issueIds={operatorProfile.issueIdsRecent} />
-        </DeferredViewportWidget>
-
-        <DeferredViewportWidget
-          className="md:col-span-12 lg:col-span-8"
-          fallback={<ProfileTrendCardSkeleton />}
-        >
-          <CountTrendCards graphs={operatorProfile.timeScaleGraphsIssueCount} />
-        </DeferredViewportWidget>
+          <DeferredViewportWidget
+            className="md:col-span-12"
+            fallback={<ProfileRecentIssuesSectionSkeleton />}
+          >
+            <RecentIssuesSection issueIds={operatorProfile.issueIdsRecent} />
+          </DeferredViewportWidget>
+        </section>
       </div>
     </IncludedEntitiesContext.Provider>
   );
