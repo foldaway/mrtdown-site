@@ -59,6 +59,8 @@ or a parallel community-signal product model to the site.
 - Make producer retries safe with one stable external report ID.
 - Retain enough generic provenance to identify the producer and inspect the
   upstream source when permitted.
+- Give machine producers a compact canonical line and station catalog for
+  validating parsed identifiers before submission.
 - Keep route names, validation, database fields, and downstream code independent
   of Reddit.
 - Preserve the existing crawler until the monitor demonstrates equivalent
@@ -186,6 +188,26 @@ Do not add OpenAPI generation, vendoring, compatibility windows, or generated
 consumer types until the boundary has more than one real producer or manual
 contract drift becomes a demonstrated problem.
 
+### Reference catalog
+
+Registered producers may use the same bearer credential to call:
+
+```text
+GET /internal/api/reference-catalog/v1
+```
+
+The versioned response contains the last completed canonical dataset-pull
+timestamp, the Singapore reference date used to select active records, active
+line IDs with validity dates, active station entities with localized names and
+flat searchable aliases, public station codes, and station-to-line membership
+validity dates. Aliases are derived from non-empty canonical localized names;
+the site does not invent or maintain a separate alias list.
+
+The catalog is a producer convenience, not an alternative source of truth for
+ingestion. The report endpoint continues validating submitted references at the
+report's observation date, which also protects producers using a briefly stale
+catalog.
+
 ## Monitor Boundary
 
 This plan does not implement the sibling Worker, but the site contract assumes
@@ -251,6 +273,24 @@ Exit criteria:
 - No Reddit-specific route, schema, or table name exists in the site.
 - `npm run verify` passes.
 
+### Phase 1b: Add the producer reference catalog (completed 2026-07-19)
+
+- Add an authenticated `v1` reference-catalog endpoint using the producer
+  credential registry.
+- Project active lines, stations, public codes, and dated memberships directly
+  from the canonical local read model.
+- Version each response with the last completed dataset-pull timestamp.
+- Cover authentication, unavailable datasets, active-date filtering, alias
+  projection, and response caching with deterministic tests.
+
+Exit criteria:
+
+- The monitor can validate line IDs, station IDs, and line membership without
+  copying canonical reference data into its repository.
+- The response is small, deterministic, generic, and explicitly versioned.
+- The submission endpoint remains the authoritative observed-date validator.
+- `npm run verify` passes.
+
 ### Phase 2: Integrate the monitor in shadow mode
 
 - Give the monitor a producer credential and the site endpoint URL.
@@ -298,6 +338,9 @@ Exit criteria:
   event inbox, claim version, or site-side lifecycle.
 - 2026-07-18: Defer OpenAPI generation until multiple producers or observed
   contract drift justify it.
+- 2026-07-19: Expose a small authenticated `v1` reference catalog so machine
+  producers can validate parsed IDs without coupling to site-internal tables or
+  vendoring canonical data. Derive aliases only from canonical localized names.
 
 ## Validation
 

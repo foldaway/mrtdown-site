@@ -44,6 +44,7 @@ import { Route as InternalApiTasksPullRouteImport } from './routes/internal.api.
 import { Route as InternalApiTasksPublicHolidaysRouteImport } from './routes/internal.api.tasks.public-holidays'
 import { Route as InternalApiTasksFactsRouteImport } from './routes/internal.api.tasks.facts'
 import { Route as InternalApiTasksCrowdReportDispatchRouteImport } from './routes/internal.api.tasks.crowd-report-dispatch'
+import { Route as InternalApiReferenceCatalogV1RouteImport } from './routes/internal.api.reference-catalog.v1'
 import { Route as Char123LangChar125HistoryPagePageNumIndexRouteImport } from './routes/{-$lang}/history/page/$pageNum/index'
 import { Route as Char123LangChar125HistoryYearMonthIndexRouteImport } from './routes/{-$lang}/history/$year/$month/index'
 import { Route as Char123LangChar125CommunityReportsKindSourceIdIndexRouteImport } from './routes/{-$lang}/community-reports/$kind/$sourceId/index'
@@ -244,6 +245,12 @@ const InternalApiTasksCrowdReportDispatchRoute =
     path: '/internal/api/tasks/crowd-report-dispatch',
     getParentRoute: () => rootRouteImport,
   } as any)
+const InternalApiReferenceCatalogV1Route =
+  InternalApiReferenceCatalogV1RouteImport.update({
+    id: '/internal/api/reference-catalog/v1',
+    path: '/internal/api/reference-catalog/v1',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const Char123LangChar125HistoryPagePageNumIndexRoute =
   Char123LangChar125HistoryPagePageNumIndexRouteImport.update({
     id: '/history/page/$pageNum/',
@@ -287,6 +294,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns/': typeof Char123LangChar125TownsIndexRoute
+  '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
@@ -326,6 +334,7 @@ export interface FileRoutesByTo {
   '/{-$lang}/statistics': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns': typeof Char123LangChar125TownsIndexRoute
+  '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
@@ -367,6 +376,7 @@ export interface FileRoutesById {
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns/': typeof Char123LangChar125TownsIndexRoute
+  '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
@@ -409,6 +419,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/statistics/'
     | '/{-$lang}/system-map/'
     | '/{-$lang}/towns/'
+    | '/internal/api/reference-catalog/v1'
     | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
@@ -448,6 +459,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/statistics'
     | '/{-$lang}/system-map'
     | '/{-$lang}/towns'
+    | '/internal/api/reference-catalog/v1'
     | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
@@ -488,6 +500,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/statistics/'
     | '/{-$lang}/system-map/'
     | '/{-$lang}/towns/'
+    | '/internal/api/reference-catalog/v1'
     | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
     | '/internal/api/tasks/public-holidays'
@@ -519,6 +532,7 @@ export interface RootRouteChildren {
   LinesLineIdIndexDotmdRoute: typeof LinesLineIdIndexDotmdRoute
   OperatorsOperatorIdIndexDotmdRoute: typeof OperatorsOperatorIdIndexDotmdRoute
   StationsStationIdIndexDotmdRoute: typeof StationsStationIdIndexDotmdRoute
+  InternalApiReferenceCatalogV1Route: typeof InternalApiReferenceCatalogV1Route
   InternalApiTasksCrowdReportDispatchRoute: typeof InternalApiTasksCrowdReportDispatchRoute
   InternalApiTasksFactsRoute: typeof InternalApiTasksFactsRoute
   InternalApiTasksPublicHolidaysRoute: typeof InternalApiTasksPublicHolidaysRoute
@@ -773,6 +787,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InternalApiTasksCrowdReportDispatchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/internal/api/reference-catalog/v1': {
+      id: '/internal/api/reference-catalog/v1'
+      path: '/internal/api/reference-catalog/v1'
+      fullPath: '/internal/api/reference-catalog/v1'
+      preLoaderRoute: typeof InternalApiReferenceCatalogV1RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/{-$lang}/history/page/$pageNum/': {
       id: '/{-$lang}/history/page/$pageNum/'
       path: '/history/page/$pageNum'
@@ -875,6 +896,7 @@ const rootRouteChildren: RootRouteChildren = {
   LinesLineIdIndexDotmdRoute: LinesLineIdIndexDotmdRoute,
   OperatorsOperatorIdIndexDotmdRoute: OperatorsOperatorIdIndexDotmdRoute,
   StationsStationIdIndexDotmdRoute: StationsStationIdIndexDotmdRoute,
+  InternalApiReferenceCatalogV1Route: InternalApiReferenceCatalogV1Route,
   InternalApiTasksCrowdReportDispatchRoute:
     InternalApiTasksCrowdReportDispatchRoute,
   InternalApiTasksFactsRoute: InternalApiTasksFactsRoute,

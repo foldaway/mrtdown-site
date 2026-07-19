@@ -132,6 +132,19 @@ payload returns `409`. Programmatic reports bypass public Turnstile, IP rate
 limits, and distinct-IP confidence requirements, but retain the same reference
 validation, moderation, clustering, cache purge, and canonical dispatch path.
 
+Registered producers can fetch the compact validation catalog from
+`GET /internal/api/reference-catalog/v1` with the same bearer credential. The
+response includes its schema version, the timestamp of the last completed
+canonical data pull, the current Singapore reference date, active line validity
+windows, active stations, and active station-to-line code memberships. Station
+`aliases` are a deduplicated flat projection of the canonical localized names;
+the site does not currently store a separate alias dataset.
+
+Consumers should cache the catalog briefly, reject unknown identifiers before
+delivery, and refresh after a dataset-version change. The submission endpoint
+remains authoritative and still validates references against each report's
+`observedAt` date.
+
 ## Staging Tables
 
 Staging tables are named with a `_next` suffix. They are the durable handoff between workflow steps and avoid returning large parsed payloads between Upstash Workflow steps.

@@ -23,8 +23,8 @@ Use plans for:
 - [Production performance](active/production-performance.md): public route
   latency and payload reduction plan.
 - [Reddit community monitoring](active/reddit-community-monitoring.md):
-  stateful Reddit thread and reply monitoring, site-side community signals,
-  deletion-aware source handling, and canonical handoff.
+  stateful Reddit thread and reply monitoring through authenticated
+  programmatic crowd reports and canonical reference validation.
 - [SEO remediation](active/seo-remediation.md): crawl-clean sitemap output,
   canonical metadata, locale alternates, and metadata quality fixes.
 
