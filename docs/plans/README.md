@@ -22,8 +22,6 @@ Use plans for:
   data and data-driven site rendering.
 - [Production performance](active/production-performance.md): public route
   latency and payload reduction plan.
-- [Scoped public read model](active/scoped-public-read-model.md): replace
-  request-time complete-dataset reads with typed, entity-scoped readers.
 - [Reddit community monitoring](active/reddit-community-monitoring.md):
   stateful Reddit thread and reply monitoring, site-side community signals,
   deletion-aware source handling, and canonical handoff.
@@ -32,6 +30,9 @@ Use plans for:
 
 ## Completed
 
+- [Scoped public read model](completed/scoped-public-read-model.md): replaced
+  request-time complete-dataset reads with typed, entity-scoped readers and
+  verified the production read reduction through cold-cache checks and restart.
 - [Database query decomposition](completed/database-query-decomposition.md):
   split the monolithic read-model query module into layered dataset, domain,
   maintenance, and feature modules without changing public responses.

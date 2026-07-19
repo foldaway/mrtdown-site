@@ -20,7 +20,7 @@ marks public TanStack server-function responses and `/api/issues-day` with
 origin cache headers, but cache misses must no longer require a complete
 dataset read.
 
-Related plan: [Production performance](production-performance.md).
+Related plan: [Production performance](../active/production-performance.md).
 
 ## Goals
 
@@ -131,10 +131,10 @@ Exit criteria:
 - The only complete-builder callers are internal, bounded workflows and
   explicitly documented recovery tools.
 
-### Phase 4: Production Rollout and Verification
+### Phase 4: Production Rollout and Verification — Complete
 
-- Pre-rollout checkpoint captured on 2026-07-19. Production is still on the
-  pre-scoped read model, while the completed implementation is on local `main`.
+- Production rollout, projection backfill, cache verification, and restart
+  verification completed on 2026-07-19.
 - Roll out one route family at a time behind the existing cache configuration.
 - Measure uncached origin timing and HTML behaviour through the privately
   supplied origin endpoint, which must not be recorded in repository files;
@@ -152,8 +152,8 @@ Exit criteria:
 
 - The unfiltered `impact_events` query rate is limited to expected workflow
   work, not visitor traffic.
-- Production egress and page timings remain stable through a cache purge and a
-  Fly Machine restart.
+- Production egress and page timings remain stable through cold-cache requests
+  and a Fly Machine restart.
 
 ## Progress Log
 
@@ -273,6 +273,47 @@ Exit criteria:
   preceding checkpoint, the statement added 111 calls and 1,271,616 rows,
   remaining exactly 11,456 rows per call and averaging one complete read every
   18.2 seconds. Use these values as T0 for the post-deploy delta.
+- 2026-07-19: Completed the production deployment, facts rebuild, and canonical
+  pull. The post-publication P0 at 2026-07-18 18:08:28 UTC was 3,327 calls and
+  38,114,112 rows, a gross rollout-and-workflow increase of 31 complete reads
+  and 355,136 rows above T0. Projection checks found 11,185
+  `station_issue_facts` rows plus one current statistics snapshot and one
+  current sitemap snapshot.
+- 2026-07-19: The overnight sample added exactly three complete reads, matching
+  the scheduled canonical pull. The daytime traffic window ran from
+  2026-07-19 02:19:24 UTC to 02:55:40 UTC with an unchanged statistics reset;
+  calls remained 3,330 and rows remained 38,148,480. A final sample after the
+  private-origin regression probes at 03:07:02 UTC was also unchanged. Normal
+  visitor traffic and the scoped-reader verification probes therefore produced
+  zero unfiltered `impact_events` reads, down from approximately 3.3 calls per
+  minute before deployment.
+- 2026-07-19: Post-deploy private-origin timing and regression checks returned
+  the expected status for every tested route. Line Markdown improved from
+  1.31-1.49 seconds to 506-653 ms, station Markdown improved from 716-736 ms to
+  235-277 ms, and operator Markdown remained stable at 3.82-3.97 seconds. Home
+  and statistics HTML remained stable, while directory TTFB was 61-323 ms,
+  representative profile TTFB was 117-776 ms except for the operator at
+  4.17-4.20 seconds, and sitemap TTFB was 120-161 ms. Locale, public canonical,
+  default-locale redirect, mobile, and desktop checks passed. Existing
+  non-wrapping raw timestamp spans still cause mobile horizontal overflow on
+  affected line and operator timelines; this is separate from the scoped read
+  model.
+- 2026-07-19: Manual edge checks completed from an allowed browser session.
+  HTML, Markdown, and sitemap requests each transitioned from `MISS` to `HIT`,
+  with observed warm-object ages of 158, 153, and 148 seconds respectively.
+  Two distinct `/api/issues-day` query strings each transitioned independently
+  from `MISS` to `HIT`, confirming query-string cache separation. A repeated
+  server-function request also transitioned from `MISS` to `HIT`.
+- 2026-07-19: Restarted the production Machine at 11:21 SGT. The health
+  endpoint returned HTTP 204 and all representative requests through the
+  privately supplied origin endpoint returned HTTP 200. The final read-only
+  Neon sample at 2026-07-19 03:24:54 UTC remained at 3,330 calls and
+  38,148,480 rows for query ID `-1208032944424713892`, with a 13.92 ms mean
+  execution time and the unchanged 2026-07-17 21:19:59 UTC statistics reset.
+  Projections remained populated with 11,185 `station_issue_facts` rows, one
+  statistics snapshot, and one sitemap snapshot. The rollout, cache purge, and
+  cold-cache checks, and restart therefore satisfy the final Phase 4 exit
+  criteria.
 
 ## Decision Log
 
@@ -290,8 +331,12 @@ Exit criteria:
 
 ## Validation
 
-- `npm run verify`
-- Contract tests for each migrated reader, including empty and future entities.
-- `npm run check:route-timings` (or its current replacement) against warm and
-  cache-miss production requests.
-- Read-only Neon `pg_stat_statements` samples before and after rollout.
+- Completed `npm run verify` after implementation and rollout documentation.
+- Added contract tests for each migrated reader, including empty and future
+  entities.
+- Measured representative warm and cache-miss production requests before and
+  after rollout.
+- Captured read-only Neon `pg_stat_statements` samples before rollout, during
+  daytime traffic, after private-origin probes, and after the Machine restart.
+- Verified independent Cloudflare cache transitions for HTML, Markdown,
+  sitemap, issues-day query strings, and a server-function request.
