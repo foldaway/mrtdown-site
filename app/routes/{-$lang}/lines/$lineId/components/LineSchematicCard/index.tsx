@@ -1,4 +1,8 @@
-import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowDownIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from '@heroicons/react/24/outline';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DropdownMenu } from 'radix-ui';
@@ -189,7 +193,24 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
     );
   };
 
-  const renderLoopRailMarker = (index: number, hasStation: boolean) => (
+  const renderDirectionArrow = (direction: 'down' | 'up') => (
+    <ArrowDownIcon
+      aria-hidden="true"
+      className={classNames(
+        '-translate-x-1/2 absolute top-[70%] left-1/2 z-20 size-5 rounded-full bg-white p-0.5 shadow-sm dark:bg-gray-800',
+        { 'rotate-180': direction === 'up' },
+      )}
+      style={{ color: line.color }}
+      strokeWidth={3.25}
+    />
+  );
+
+  const renderLoopRailMarker = (
+    index: number,
+    hasStation: boolean,
+    direction: 'down' | 'up',
+    showDirectionArrow: boolean,
+  ) => (
     <div className="relative flex h-11 items-center justify-center">
       <div
         className={classNames('-translate-x-1/2 absolute left-1/2 z-10 w-1', {
@@ -208,10 +229,15 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
           }}
         />
       )}
+      {showDirectionArrow && renderDirectionArrow(direction)}
     </div>
   );
 
-  const renderStraightRailMarker = (index: number, total: number) => (
+  const renderStraightRailMarker = (
+    index: number,
+    total: number,
+    showDirectionArrow: boolean,
+  ) => (
     <div className="relative flex h-10 items-center justify-center">
       <div
         className="z-20 size-4 rounded-full border-4 bg-white dark:bg-gray-800"
@@ -229,6 +255,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
           backgroundColor: line.color,
         }}
       />
+      {showDirectionArrow && renderDirectionArrow('down')}
     </div>
   );
 
@@ -296,7 +323,12 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
               >
                 {stationPath.map((station, index) => (
                   <Fragment key={station.key}>
-                    {renderStraightRailMarker(index, stationPath.length)}
+                    {renderStraightRailMarker(
+                      index,
+                      stationPath.length,
+                      stationPath.length > 1 &&
+                        index === Math.min(2, stationPath.length - 2),
+                    )}
                     <div className="flex min-w-0 items-center">
                       {renderStationLabel(station.stationId, 'right')}
                     </div>
@@ -325,12 +357,24 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                       </div>
                       <div>
                         {(hasLeftStation || index > 0) &&
-                          renderLoopRailMarker(index, hasLeftStation)}
+                          renderLoopRailMarker(
+                            index,
+                            hasLeftStation,
+                            'down',
+                            index ===
+                              Math.floor(loopColumns.leftStations.length / 2),
+                          )}
                       </div>
                       <div />
                       <div>
                         {(hasRightStation || index > 0) &&
-                          renderLoopRailMarker(index, hasRightStation)}
+                          renderLoopRailMarker(
+                            index,
+                            hasRightStation,
+                            'up',
+                            index ===
+                              Math.floor(loopColumns.rightStations.length / 2),
+                          )}
                       </div>
                       <div className="flex min-w-0 items-center pl-2">
                         {hasRightStation &&
