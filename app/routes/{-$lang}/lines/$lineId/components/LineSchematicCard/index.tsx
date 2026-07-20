@@ -11,6 +11,7 @@ import type { LineBranch } from '~/util/dbQueries/lines';
 import { deriveLineBranchMembershipReferenceDate } from '~/util/lineBranches';
 import type { Line } from '~/types';
 import { BranchItem } from './components/BranchItem';
+import { getSchematicStationPath } from './helpers/getSchematicStationPath';
 import { orderStationMemberships } from './helpers/orderStationMemberships';
 
 interface Props {
@@ -60,29 +61,31 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
     );
   }, [line.id, referenceAt, selectedBranch, stations]);
 
+  const stationPath = useMemo(
+    () =>
+      selectedBranch == null ? [] : getSchematicStationPath(selectedBranch),
+    [selectedBranch],
+  );
+
   const loopColumns = useMemo(() => {
     if (selectedBranch == null) {
-      return { bottomStationId: null, leftStationIds: [], rightStationIds: [] };
+      return { bottomStation: null, leftStations: [], rightStations: [] };
     }
 
-    const hasBottomStation = selectedBranch.stationIds.length % 2 === 1;
-    const sideCount = Math.floor(selectedBranch.stationIds.length / 2);
+    const hasBottomStation = stationPath.length % 2 === 1;
+    const sideCount = Math.floor(stationPath.length / 2);
     const rightStartIndex = hasBottomStation ? sideCount + 1 : sideCount;
 
     return {
-      bottomStationId: hasBottomStation
-        ? selectedBranch.stationIds[sideCount]
-        : null,
-      leftStationIds: selectedBranch.stationIds.slice(0, sideCount),
-      rightStationIds: selectedBranch.stationIds
-        .slice(rightStartIndex)
-        .reverse(),
+      bottomStation: hasBottomStation ? stationPath[sideCount] : null,
+      leftStations: stationPath.slice(0, sideCount),
+      rightStations: stationPath.slice(rightStartIndex).reverse(),
     };
-  }, [selectedBranch]);
+  }, [selectedBranch, stationPath]);
 
   const rowCount = Math.max(
-    loopColumns.leftStationIds.length,
-    loopColumns.rightStationIds.length,
+    loopColumns.leftStations.length,
+    loopColumns.rightStations.length,
   );
 
   const renderCodePills = (
@@ -291,14 +294,11 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                 key={`${selectedBranchId}-mobile`}
                 className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3"
               >
-                {selectedBranch.stationIds.map((stationId, index) => (
-                  <Fragment key={stationId}>
-                    {renderStraightRailMarker(
-                      index,
-                      selectedBranch.stationIds.length,
-                    )}
+                {stationPath.map((station, index) => (
+                  <Fragment key={station.key}>
+                    {renderStraightRailMarker(index, stationPath.length)}
                     <div className="flex min-w-0 items-center">
-                      {renderStationLabel(stationId, 'right')}
+                      {renderStationLabel(station.stationId, 'right')}
                     </div>
                   </Fragment>
                 ))}
@@ -310,18 +310,18 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                 className="grid grid-cols-[minmax(12rem,1fr)_2.5rem_minmax(3rem,6rem)_2.5rem_minmax(12rem,1fr)] items-stretch"
               >
                 {Array.from({ length: rowCount }).map((_, index) => {
-                  const leftStationId = loopColumns.leftStationIds[index];
-                  const rightStationId = loopColumns.rightStationIds[index];
-                  const hasLeftStation = leftStationId != null;
-                  const hasRightStation = rightStationId != null;
+                  const leftStation = loopColumns.leftStations[index];
+                  const rightStation = loopColumns.rightStations[index];
+                  const hasLeftStation = leftStation != null;
+                  const hasRightStation = rightStation != null;
 
                   return (
                     <Fragment
-                      key={`${leftStationId ?? 'empty'}-${rightStationId ?? 'empty'}`}
+                      key={`${leftStation?.key ?? 'empty'}-${rightStation?.key ?? 'empty'}`}
                     >
                       <div className="flex min-w-0 items-center justify-end pr-2">
                         {hasLeftStation &&
-                          renderStationLabel(leftStationId, 'left')}
+                          renderStationLabel(leftStation.stationId, 'left')}
                       </div>
                       <div>
                         {(hasLeftStation || index > 0) &&
@@ -334,17 +334,17 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                       </div>
                       <div className="flex min-w-0 items-center pl-2">
                         {hasRightStation &&
-                          renderStationLabel(rightStationId, 'right')}
+                          renderStationLabel(rightStation.stationId, 'right')}
                       </div>
                     </Fragment>
                   );
                 })}
-                {(loopColumns.rightStationIds.length > 0 ||
-                  loopColumns.bottomStationId != null) && (
+                {(loopColumns.rightStations.length > 0 ||
+                  loopColumns.bottomStation != null) && (
                   <div
                     className={classNames('relative col-start-2 col-end-5', {
-                      'h-6': loopColumns.bottomStationId == null,
-                      'h-8': loopColumns.bottomStationId != null,
+                      'h-6': loopColumns.bottomStation == null,
+                      'h-8': loopColumns.bottomStation != null,
                     })}
                   >
                     <svg
@@ -363,7 +363,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                         vectorEffect="non-scaling-stroke"
                       />
                     </svg>
-                    {loopColumns.bottomStationId != null && (
+                    {loopColumns.bottomStation != null && (
                       <div
                         className="-translate-x-1/2 -translate-y-1/2 absolute top-[80%] left-1/2 z-20 size-4 rounded-full border-4 bg-white dark:bg-gray-800"
                         style={{ borderColor: line.color }}
@@ -371,9 +371,11 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                     )}
                   </div>
                 )}
-                {loopColumns.bottomStationId != null && (
+                {loopColumns.bottomStation != null && (
                   <div className="col-start-1 col-end-6 flex justify-center pt-4">
-                    {renderBottomStationLabel(loopColumns.bottomStationId)}
+                    {renderBottomStationLabel(
+                      loopColumns.bottomStation.stationId,
+                    )}
                   </div>
                 )}
               </div>
