@@ -232,16 +232,39 @@ route-specific profile shows unusually wide landmark payloads.
 
 ## Candidate Triage Order
 
-This is intentionally provisional:
+Triage completed 2026-07-21. The selected order is:
 
-| Candidate | Expected opportunity | Effort | Contract risk |
-| --- | --- | --- | --- |
-| Direct distinct issue-scope queries | High | Medium | Medium |
-| Remove report-form duplicate path join | Medium | Low | Low |
-| Collapse date-range fan-out in SQL | High | Medium | High |
-| Persist or cache static topology | High | Medium-High | Medium |
-| Cloudflare origin-volume attribution | Enables prioritization | Medium | Low |
-| Landmark/static metadata cleanup | Low | Low-Medium | Low |
+| Order | Candidate | Decision | Rationale |
+| ---: | --- | --- | --- |
+| 1 | Direct distinct issue-scope queries, plus distinct path-station scope discovery | Implement in the first tranche | It removes the approximately 940,708 transferred event IDs and lets Postgres deduplicate service, line, station, and path-station references before they reach application code. It is shared by issue, line, operator, station, and town profiles. |
+| 1 | Remove report-form duplicate path join | Implement in the first tranche | The current options function joins revisions to path entries, deduplicates revision rows in memory, and then fetches the same path entries again. Fetch revisions without multiplying them by paths, retain only revisions represented by the one path result, and preserve the existing form payload. |
+| 2 | Collapse date-range fan-out in SQL | Implement after tranche 1, starting with one SQL CTE/window query | The existing `issue_day_facts` projection has daily operational semantics and is not a direct replacement for month, year, current, planned, and open-ended history selection. A SQL query can preserve canonical latest-period semantics while returning only final issue IDs. |
+| Parallel measurement | Cloudflare origin-volume attribution | Start measurement now; do not block tranche 1 | It is needed to choose a cache/traffic mitigation, but does not change the clear per-request amplification above. Compare normalized route family, cache status, and database feature labels over the same hourly window. |
+| 3 | Persist or cache static topology | Defer pending tranche-1/2 measurements and cache-miss attribution | A process-local cache keyed by the manifest version would not reliably reduce cold-start or multi-instance egress. Choose a topology-specific shared representation only after demonstrating enough repeated origin cache misses to justify its invalidation and availability complexity. |
+| Later | Landmark/static metadata cleanup | Defer | It represented only approximately 5% of returned application rows in the sampled window. |
+
+### Triage Decisions
+
+- Ship the two first-tranche changes together, while retaining distinct query
+  timing labels and adding row-count labels for each family so their production
+  deltas remain attributable.
+- Treat `getIssueStaticScope` path-station deduplication as part of the
+  issue-scope rewrite rather than as the later topology-cache project. The
+  current path discovery reads repeated station memberships across service
+  revisions even though the next step only needs station IDs.
+- Keep both transfer targets: median public transfer below 100 MB/hour over a
+  comparable complete day, and normalized transfer below 2.5 GB/day. The
+  former protects the observed hourly experience; the latter prevents a lower
+  hourly median from concealing a traffic-normalization regression. Also retain
+  the no-regression guard against the approximately 78% baseline improvement.
+- Set per-family row targets rather than applying the provisional 50% target
+  uniformly: at least 90% fewer intermediate rows for issue scope, at least
+  50% fewer report-form path rows, and elimination of date-range ID chunk
+  fan-out. Neon transfer bytes remain the production success measure.
+- Use `manifest_last_pulled_at` as the candidate topology version marker if a
+  later shared representation is selected. The pull already updates it before
+  publishing the public cache; a manual facts rebuild needs an explicit
+  freshness decision rather than assuming it refreshes canonical topology.
 
 ## Phases
 
