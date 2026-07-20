@@ -1,4 +1,4 @@
-import { timeServerSpan } from '~/util/serverTiming';
+import { recordServerTiming, timeServerSpan } from '~/util/serverTiming';
 
 const SELECT_IN_BATCH_SIZE = 100;
 
@@ -11,6 +11,20 @@ export async function getDefaultDb() {
 
 export async function timeDbQuery<T>(name: string, query: () => Promise<T>) {
   return timeServerSpan(name, query);
+}
+
+/**
+ * Records the transferred row count beside a timed read-model query. Keeping
+ * this separate from query duration makes production egress comparisons
+ * possible even when the database does not expose statement statistics.
+ */
+export async function timeDbRowsQuery<T>(
+  name: string,
+  query: () => Promise<T[]>,
+) {
+  const rows = await timeDbQuery(name, query);
+  recordServerTiming(`${name}_rows`, 0, `rows=${rows.length}`);
+  return rows;
 }
 
 export function chunk<T>(items: readonly T[], size: number) {

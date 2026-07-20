@@ -1,4 +1,4 @@
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import {
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
@@ -7,7 +7,7 @@ import {
   servicesTable,
   stationCodesTable,
 } from '~/db/schema';
-import { type AppDb, timeDbQuery } from './database';
+import { type AppDb, timeDbQuery, timeDbRowsQuery } from './database';
 import type { DatasetStaticScope } from './dataset';
 
 type IssueReferenceRows = {
@@ -55,47 +55,39 @@ export async function getIssueStaticScope(
     return { lineIds: [], serviceIds: [], stationIds: [] };
   }
 
-  const impactEventRows = await timeDbQuery(
-    `${queryPrefix}_q_impact_events`,
-    () =>
+  const [serviceReferenceRows, facilityReferenceRows] = await Promise.all([
+    timeDbRowsQuery(`${queryPrefix}_q_service_references`, () =>
       db
-        .select({ id: impactEventsTable.id })
-        .from(impactEventsTable)
+        .selectDistinct({
+          service_id: impactEventEntityServicesTable.service_id,
+        })
+        .from(impactEventEntityServicesTable)
+        .innerJoin(
+          impactEventsTable,
+          eq(
+            impactEventEntityServicesTable.impact_event_id,
+            impactEventsTable.id,
+          ),
+        )
         .where(inArray(impactEventsTable.issue_id, uniqueIssueIds)),
-  );
-  const impactEventIds = impactEventRows.map((row) => row.id);
-  const [serviceReferenceRows, facilityReferenceRows] =
-    impactEventIds.length > 0
-      ? await Promise.all([
-          timeDbQuery(`${queryPrefix}_q_service_references`, () =>
-            db
-              .select({
-                service_id: impactEventEntityServicesTable.service_id,
-              })
-              .from(impactEventEntityServicesTable)
-              .where(
-                inArray(
-                  impactEventEntityServicesTable.impact_event_id,
-                  impactEventIds,
-                ),
-              ),
+    ),
+    timeDbRowsQuery(`${queryPrefix}_q_facility_references`, () =>
+      db
+        .selectDistinct({
+          line_id: impactEventEntityFacilitiesTable.line_id,
+          station_id: impactEventEntityFacilitiesTable.station_id,
+        })
+        .from(impactEventEntityFacilitiesTable)
+        .innerJoin(
+          impactEventsTable,
+          eq(
+            impactEventEntityFacilitiesTable.impact_event_id,
+            impactEventsTable.id,
           ),
-          timeDbQuery(`${queryPrefix}_q_facility_references`, () =>
-            db
-              .select({
-                line_id: impactEventEntityFacilitiesTable.line_id,
-                station_id: impactEventEntityFacilitiesTable.station_id,
-              })
-              .from(impactEventEntityFacilitiesTable)
-              .where(
-                inArray(
-                  impactEventEntityFacilitiesTable.impact_event_id,
-                  impactEventIds,
-                ),
-              ),
-          ),
-        ])
-      : [[], []];
+        )
+        .where(inArray(impactEventsTable.issue_id, uniqueIssueIds)),
+    ),
+  ]);
   const initialScope = deriveIssueInitialScope({
     facilityRows: facilityReferenceRows,
     serviceRows: serviceReferenceRows,
@@ -130,9 +122,9 @@ export async function getIssueStaticScope(
   const affectedLineServiceIds = affectedLineServiceRows.map((row) => row.id);
   const affectedPathRows =
     affectedLineServiceIds.length > 0
-      ? await timeDbQuery(`${queryPrefix}_q_affected_service_paths`, () =>
+      ? await timeDbRowsQuery(`${queryPrefix}_q_affected_service_paths`, () =>
           db
-            .select({
+            .selectDistinct({
               station_id: serviceRevisionPathStationEntriesTable.station_id,
             })
             .from(serviceRevisionPathStationEntriesTable)

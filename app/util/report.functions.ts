@@ -1,6 +1,6 @@
 import type { Translations } from '@mrtdown/core';
 import { createServerFn } from '@tanstack/react-start';
-import { and, asc, eq } from 'drizzle-orm';
+import { asc } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { getDb } from '~/db';
 import {
@@ -290,7 +290,8 @@ export const getCrowdReportFormOptionsFn = createServerFn({
     stations,
     stationCodes,
     services,
-    serviceRevisionsWithPathRows,
+    serviceRevisionRows,
+    servicePathEntries,
   ] = await Promise.all([
     db
       .select({
@@ -335,39 +336,26 @@ export const getCrowdReportFormOptionsFn = createServerFn({
         updated_at: serviceRevisionsTable.updated_at,
       })
       .from(serviceRevisionsTable)
-      .innerJoin(
-        serviceRevisionPathStationEntriesTable,
-        and(
-          eq(
-            serviceRevisionPathStationEntriesTable.service_revision_id,
-            serviceRevisionsTable.id,
-          ),
-          eq(
-            serviceRevisionPathStationEntriesTable.service_id,
-            serviceRevisionsTable.service_id,
-          ),
-        ),
-      )
       .orderBy(serviceRevisionsTable.service_id, serviceRevisionsTable.id),
+    db
+      .select({
+        serviceRevisionId:
+          serviceRevisionPathStationEntriesTable.service_revision_id,
+        serviceId: serviceRevisionPathStationEntriesTable.service_id,
+        stationId: serviceRevisionPathStationEntriesTable.station_id,
+        pathIndex: serviceRevisionPathStationEntriesTable.path_index,
+      })
+      .from(serviceRevisionPathStationEntriesTable),
   ]);
-
-  const serviceRevisionByKey = new Map<
-    string,
-    (typeof serviceRevisionsWithPathRows)[number]
-  >();
-  for (const revision of serviceRevisionsWithPathRows) {
-    serviceRevisionByKey.set(`${revision.serviceId}::${revision.id}`, revision);
-  }
-  const serviceRevisions = Array.from(serviceRevisionByKey.values());
-  const servicePathEntries = await db
-    .select({
-      serviceRevisionId:
-        serviceRevisionPathStationEntriesTable.service_revision_id,
-      serviceId: serviceRevisionPathStationEntriesTable.service_id,
-      stationId: serviceRevisionPathStationEntriesTable.station_id,
-      pathIndex: serviceRevisionPathStationEntriesTable.path_index,
-    })
-    .from(serviceRevisionPathStationEntriesTable);
+  const revisionKeysWithPath = new Set(
+    servicePathEntries.map(
+      ({ serviceId, serviceRevisionId }) =>
+        `${serviceId}::${serviceRevisionId}`,
+    ),
+  );
+  const serviceRevisions = serviceRevisionRows.filter((revision) =>
+    revisionKeysWithPath.has(`${revision.serviceId}::${revision.id}`),
+  );
 
   const formOptionRows = {
     lines,

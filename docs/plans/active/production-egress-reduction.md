@@ -346,9 +346,16 @@ Exit criteria:
 ## Progress Log
 
 - 2026-07-21: Drafted the follow-up plan from the measured approximately 78%
-  rollout reduction and the first post-rollout query-family sample. No further
-  implementation priority has been approved yet; candidate ordering and
-  success targets remain subject to triage.
+  rollout reduction and the first post-rollout query-family sample, then
+  selected the first-tranche candidates and their per-family row targets.
+- 2026-07-21: Implemented the first-tranche query changes pending deployment
+  measurement: issue scope now joins reference tables directly to candidate
+  issues and deduplicates service, facility, and path-station rows in
+  Postgres; the crowd-report form now reads path entries once and filters
+  independently read revisions to paths that exist. Query timing now includes
+  zero-duration `*_rows` entries with row-count descriptions for the new
+  issue-scope queries. Production transfer and statement-counter deltas still
+  need to be captured after deployment.
 
 ## Decision Log
 
