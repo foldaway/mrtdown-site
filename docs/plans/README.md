@@ -22,6 +22,9 @@ Use plans for:
   data and data-driven site rendering.
 - [Production performance](active/production-performance.md): public route
   latency and payload reduction plan.
+- [Production egress reduction](active/production-egress-reduction.md): reduce
+  remaining database transfer from scoped issue, date-range, and static
+  topology reads.
 - [Reddit community monitoring](active/reddit-community-monitoring.md):
   stateful Reddit thread and reply monitoring through authenticated
   programmatic crowd reports and canonical reference validation.

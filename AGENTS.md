@@ -54,5 +54,6 @@ Current active plans:
 
 - `docs/plans/active/dynamic-system-map.md`
 - `docs/plans/active/production-performance.md`
+- `docs/plans/active/production-egress-reduction.md`
 - `docs/plans/active/reddit-community-monitoring.md`
 - `docs/plans/active/seo-remediation.md`
