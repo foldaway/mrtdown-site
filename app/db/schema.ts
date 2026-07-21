@@ -16,6 +16,8 @@ import {
   ServiceEffectKindSchema,
   ServiceScopeTypeSchema,
   type Station,
+  type StationLayoutExit,
+  type StationLayoutExitSourceId,
   type StationLayoutPlatform,
   StationLayoutPlatformBoardingStatusSchema,
   StationStructureTypeSchema,
@@ -71,6 +73,7 @@ const stationNameHashSharedColumns = {
 };
 
 type StationPlatform = StationLayoutPlatform;
+type StationExit = StationLayoutExit;
 
 /** PostGIS point (SRID 4326) — shared by `stations` and `stations_next`. */
 const stationGeoColumn = {
@@ -87,6 +90,13 @@ const stationStagingExtraColumns = {
   landmark_ids: jsonb('landmark_ids').$type<string[]>().notNull(),
   first_last_train:
     jsonb('first_last_train').$type<Station['firstLastTrain']>(),
+  layout_exit_source_id: text(
+    'layout_exit_source_id',
+  ).$type<StationLayoutExitSourceId | null>(),
+  layout_exits: jsonb('layout_exits')
+    .$type<StationExit[]>()
+    .notNull()
+    .default([]),
   layout_platforms: jsonb('layout_platforms')
     .$type<StationPlatform[]>()
     .notNull(),
@@ -695,6 +705,31 @@ export const stationPlatformsTable = pgTable(
     return [
       primaryKey({ columns: [table.station_id, table.platform_id] }),
       index('station_platforms_line_id_idx').on(table.line_id),
+    ];
+  },
+);
+
+// Normalized Entity Field: Station.layout.exits
+export const stationExitsTable = pgTable(
+  'station_exits',
+  {
+    station_id: text('station_id')
+      .references(() => stationsTable.id, { onDelete: 'cascade' })
+      .notNull(),
+    source_id: text('source_id').$type<StationLayoutExitSourceId>().notNull(),
+    source_object_id: integer('source_object_id').notNull(),
+    source_checksum: text('source_checksum').notNull(),
+    label: text('label').notNull(),
+    last_updated: date('last_updated', { mode: 'string' }).notNull(),
+    geo: geometry('geo', { type: 'point', srid: 4326 }).notNull(),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      primaryKey({
+        columns: [table.station_id, table.source_id, table.source_object_id],
+      }),
+      index('station_exits_geo_idx').using('gist', table.geo),
     ];
   },
 );

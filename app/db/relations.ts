@@ -32,6 +32,7 @@ import {
   serviceRevisionsTable,
   servicesTable,
   stationCodesTable,
+  stationExitsTable,
   stationLandmarksTable,
   stationPlatformServicesTable,
   stationPlatformsTable,
@@ -72,6 +73,7 @@ const schema = {
   serviceRevisions: serviceRevisionsTable,
   services: servicesTable,
   stationCodes: stationCodesTable,
+  stationExits: stationExitsTable,
   stationLandmarks: stationLandmarksTable,
   stationPlatformServices: stationPlatformServicesTable,
   stationPlatforms: stationPlatformsTable,
@@ -161,6 +163,7 @@ export const relations = defineRelations(schema, (r) => ({
     }),
     lines: r.many.lines(),
     landmarks: r.many.landmarks(),
+    stationExits: r.many.stationExits(),
     stationPlatforms: r.many.stationPlatforms(),
     town: r.one.towns({
       from: r.stations.townId,
@@ -335,6 +338,12 @@ export const relations = defineRelations(schema, (r) => ({
       to: r.stations.id,
     }),
     stationPlatformServices: r.many.stationPlatformServices(),
+  },
+  stationExits: {
+    station: r.one.stations({
+      from: r.stationExits.station_id,
+      to: r.stations.id,
+    }),
   },
   stationPlatformServices: {
     service: r.one.services({

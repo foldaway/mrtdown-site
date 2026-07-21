@@ -170,6 +170,19 @@ describe('pull staging inserts', () => {
         ],
         landmarkIds: ['bukit-panjang-plaza'],
         layout: {
+          exitSourceId: 'lta-mrt-station-exit-geojson',
+          exits: [
+            {
+              sourceObjectId: 123,
+              sourceChecksum: '1234567890ABCDEF',
+              label: 'Exit A',
+              lastUpdated: '2026-07-21',
+              geo: {
+                latitude: 1.3791,
+                longitude: 103.7611,
+              },
+            },
+          ],
           platforms: [
             {
               id: 'BP6_BPLRT_A',
@@ -215,6 +228,19 @@ describe('pull staging inserts', () => {
             ],
             landmark_ids: ['bukit-panjang-plaza'],
             first_last_train: null,
+            layout_exit_source_id: 'lta-mrt-station-exit-geojson',
+            layout_exits: [
+              {
+                sourceObjectId: 123,
+                sourceChecksum: '1234567890ABCDEF',
+                label: 'Exit A',
+                lastUpdated: '2026-07-21',
+                geo: {
+                  latitude: 1.3791,
+                  longitude: 103.7611,
+                },
+              },
+            ],
             layout_platforms: [
               {
                 id: 'BP6_BPLRT_A',

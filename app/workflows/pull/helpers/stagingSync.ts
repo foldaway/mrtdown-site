@@ -57,6 +57,7 @@ import {
   servicesNextTable,
   servicesTable,
   stationCodesTable,
+  stationExitsTable,
   stationLandmarksTable,
   stationPlatformServicesTable,
   stationPlatformsTable,
@@ -231,6 +232,8 @@ export async function insertStationsStaging(
     station_codes: s.stationCodes,
     landmark_ids: s.landmarkIds,
     first_last_train: s.firstLastTrain ?? null,
+    layout_exit_source_id: s.layout?.exitSourceId ?? null,
+    layout_exits: s.layout?.exits ?? [],
     layout_platforms: s.layout?.platforms ?? [],
   }));
   for (const c of chunk(stationRows, BATCH)) {
@@ -744,8 +747,22 @@ export async function syncStations(db: Db): Promise<void> {
             JSON.stringify(row.nextFirstLastTrain),
       )
       .map((r) => r.id);
+    // A newly added normalized child table starts empty even when a station's
+    // manifest hash has not changed since the last pull. Promote those rows
+    // once so migrations can be deployed without requiring archive churn.
+    const stationIdsWithMissingExits = await tx
+      .select({ id: stationsNextTable.id })
+      .from(stationsNextTable)
+      .where(sql`
+        ${stationsNextTable.layout_exits} != '[]'::jsonb
+        AND NOT EXISTS (
+          SELECT 1 FROM ${stationExitsTable}
+          WHERE ${stationExitsTable.station_id} = ${stationsNextTable.id}
+        )
+      `);
+    changedIds.push(...stationIdsWithMissingExits.map((row) => row.id));
 
-    for (const ch of chunk(changedIds, BATCH)) {
+    for (const ch of chunk([...new Set(changedIds)], BATCH)) {
       if (ch.length === 0) continue;
       const full = await tx
         .select()
@@ -780,6 +797,9 @@ export async function syncStations(db: Db): Promise<void> {
         .delete(stationLandmarksTable)
         .where(inArray(stationLandmarksTable.station_id, ch));
       await tx
+        .delete(stationExitsTable)
+        .where(inArray(stationExitsTable.station_id, ch));
+      await tx
         .delete(stationPlatformsTable)
         .where(inArray(stationPlatformsTable.station_id, ch));
       for (const row of full) {
@@ -804,6 +824,30 @@ export async function syncStations(db: Db): Promise<void> {
                 station_id: row.id,
                 landmark_id: landmarkId,
               } satisfies InferInsertModel<typeof stationLandmarksTable>;
+            }),
+          );
+        }
+        if (row.layout_exits.length > 0) {
+          const exitSourceId = row.layout_exit_source_id;
+          if (exitSourceId == null) {
+            throw new Error(
+              `Station ${row.id} has layout exits without an exit source ID`,
+            );
+          }
+          await tx.insert(stationExitsTable).values(
+            row.layout_exits.map((exit) => {
+              return {
+                station_id: row.id,
+                source_id: exitSourceId,
+                source_object_id: exit.sourceObjectId,
+                source_checksum: exit.sourceChecksum,
+                label: exit.label,
+                last_updated: exit.lastUpdated,
+                geo: [exit.geo.longitude, exit.geo.latitude] as [
+                  number,
+                  number,
+                ],
+              } satisfies InferInsertModel<typeof stationExitsTable>;
             }),
           );
         }
@@ -847,6 +891,16 @@ export async function deleteStationOrphans(db: Db): Promise<void> {
             .select()
             .from(stationsNextTable)
             .where(eq(stationsNextTable.id, stationLandmarksTable.station_id)),
+        ),
+      );
+    await tx
+      .delete(stationExitsTable)
+      .where(
+        notExists(
+          tx
+            .select()
+            .from(stationsNextTable)
+            .where(eq(stationsNextTable.id, stationExitsTable.station_id)),
         ),
       );
     await tx

@@ -10,6 +10,8 @@ import {
   stationCodesTable,
   stationIssueFactsTable,
   stationLandmarksTable,
+  stationPlatformServicesTable,
+  stationPlatformsTable,
   stationsTable,
   townsTable,
 } from '~/db/schema';
@@ -20,6 +22,7 @@ import {
 import { getDefaultDb, timeDbQuery } from './database';
 import { buildDataset, parseTranslations } from './dataset';
 import { isoDate, nowSg } from './dateTime';
+import { getEstimatedStationArrivalTimings } from '~/util/estimatedArrivals';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
 import {
@@ -168,6 +171,7 @@ export async function getStationProfileReadModel(
   stationId: string,
   options: CommunitySignalOptions = {},
 ) {
+  const referenceNow = nowSg();
   const { db, stationId: resolvedStationId } =
     await resolveStationProfileStationIdFromDb(stationId);
   if (resolvedStationId == null) {
@@ -255,7 +259,7 @@ export async function getStationProfileReadModel(
             .where(inArray(servicesTable.line_id, lineIds)),
         )
       : [];
-  const dataset = await buildDataset(undefined, db, candidateIssueIds, {
+  const dataset = await buildDataset(referenceNow, db, candidateIssueIds, {
     lineIds,
     serviceIds: [
       ...new Set([
@@ -266,6 +270,7 @@ export async function getStationProfileReadModel(
     stationIds: initialScope.stationIds,
     townIds: [...new Set(scopedStationRows.map((row) => row.townId))],
     landmarkIds: [...new Set(stationLandmarkRows.map((row) => row.landmarkId))],
+    includePublicHolidays: true,
   });
   const station = dataset.included.stations[resolvedStationId];
   if (station == null) {
@@ -294,6 +299,128 @@ export async function getStationProfileReadModel(
     issues.map((issue) => issue.id),
     dataset.allIssues,
   ).slice(0, 15);
+  const arrivalBranches = Object.values(dataset.branchByServiceId).filter(
+    (branch) =>
+      branch.startedAt != null &&
+      branch.endedAt == null &&
+      branch.entries.some((entry) => entry.stationId === station.id),
+  );
+  const platformRows = await timeDbQuery('station_profile_q_platforms', () =>
+    db
+      .select({
+        id: stationPlatformsTable.platform_id,
+        label: stationPlatformsTable.label,
+        lineId: stationPlatformsTable.line_id,
+        boardingStatus: stationPlatformsTable.boarding_status,
+        serviceId: stationPlatformServicesTable.service_id,
+      })
+      .from(stationPlatformsTable)
+      .leftJoin(
+        stationPlatformServicesTable,
+        and(
+          eq(
+            stationPlatformServicesTable.station_id,
+            stationPlatformsTable.station_id,
+          ),
+          eq(
+            stationPlatformServicesTable.platform_id,
+            stationPlatformsTable.platform_id,
+          ),
+        ),
+      )
+      .where(eq(stationPlatformsTable.station_id, station.id)),
+  );
+  const platformsById = new Map<
+    string,
+    {
+      id: string;
+      label: string;
+      lineId: string;
+      boardingStatus: 'alighting_only' | 'not_in_service' | null;
+      serviceIds: string[];
+    }
+  >();
+  for (const row of platformRows) {
+    const platform = platformsById.get(row.id) ?? {
+      id: row.id,
+      label: row.label,
+      lineId: row.lineId,
+      boardingStatus: row.boardingStatus,
+      serviceIds: [],
+    };
+    if (row.serviceId != null) {
+      platform.serviceIds.push(row.serviceId);
+    }
+    platformsById.set(row.id, platform);
+  }
+  const platforms = [...platformsById.values()].sort((a, b) => {
+    const lineDiff = a.lineId.localeCompare(b.lineId);
+    return lineDiff !== 0 ? lineDiff : a.label.localeCompare(b.label);
+  });
+  const boardablePlatformLabelsByServiceId = new Map<string, string[]>();
+  for (const platform of platforms) {
+    if (platform.boardingStatus != null) {
+      continue;
+    }
+    for (const serviceId of platform.serviceIds) {
+      const labels = boardablePlatformLabelsByServiceId.get(serviceId) ?? [];
+      labels.push(platform.label);
+      boardablePlatformLabelsByServiceId.set(serviceId, labels);
+    }
+  }
+  const destinationStationIds = [
+    ...new Set(
+      arrivalBranches
+        .map((branch) => branch.entries.at(-1)?.stationId)
+        .filter((stationId): stationId is string => stationId != null),
+    ),
+  ];
+  const destinationStationRows =
+    destinationStationIds.length > 0
+      ? await timeDbQuery('station_profile_q_arrival_destinations', () =>
+          db
+            .select({ id: stationsTable.id, name: stationsTable.name })
+            .from(stationsTable)
+            .where(inArray(stationsTable.id, destinationStationIds)),
+        )
+      : [];
+  const destinationNameByStationId = Object.fromEntries(
+    destinationStationRows.map((destination) => [
+      destination.id,
+      parseTranslations(destination.name),
+    ]),
+  );
+  const arrivalTimings = getEstimatedStationArrivalTimings({
+    station,
+    services: arrivalBranches.map((branch) => {
+      const destination = branch.entries.at(-1);
+      return {
+        serviceId: branch.id,
+        lineId: branch.lineId,
+        destinationCode: destination?.displayCode ?? branch.id,
+        destinationName:
+          destinationNameByStationId[destination?.stationId ?? ''] ?? null,
+        revision: {
+          path: {
+            stations: branch.entries.map((entry) => ({
+              stationId: entry.stationId,
+              displayCode: entry.displayCode,
+            })),
+          },
+          estimatedFrequency: branch.estimatedFrequency,
+        },
+      };
+    }),
+    referenceNow,
+    publicHolidayDates: dataset.publicHolidaySet,
+  }).map((timing) => ({
+    ...timing,
+    platformLabels: [
+      ...new Set(
+        boardablePlatformLabelsByServiceId.get(timing.serviceId) ?? [],
+      ),
+    ].sort((a, b) => a.localeCompare(b)),
+  }));
   return {
     data: {
       stationId: resolvedStationId,
@@ -301,6 +428,10 @@ export async function getStationProfileReadModel(
       issueIdsRecent,
       issueCountByType: pickIssueTypes(issues),
       communitySignals,
+      arrivalTimings,
+      platforms: platforms.map(
+        ({ serviceIds: _serviceIds, ...platform }) => platform,
+      ),
     },
     included: selectIncludedEntities(dataset.included, dataset.allIssues, {
       issueIds: issueIdsRecent,

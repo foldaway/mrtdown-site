@@ -1,9 +1,9 @@
 import { ChevronRightIcon } from '@heroicons/react/16/solid';
-import { MapPinIcon } from '@heroicons/react/24/solid';
+import { ClockIcon, MapPinIcon } from '@heroicons/react/24/solid';
 import type { IssueType } from '@mrtdown/core';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { lazy, useMemo } from 'react';
+import { lazy, useEffect, useMemo, useState } from 'react';
 import {
   createIntl,
   FormattedDate,
@@ -425,6 +425,16 @@ function StationPage() {
   }, [included.lines, membershipsUniqueVisible]);
 
   const rotatedLineColor = useRotatingLineColors(lineColorsUnique);
+  const lineColors = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(included.lines).map(([lineId, line]) => [
+          lineId,
+          line.color,
+        ]),
+      ),
+    [included.lines],
+  );
 
   return (
     <IncludedEntitiesContext.Provider value={included}>
@@ -630,6 +640,21 @@ function StationPage() {
         </section>
 
         <div className="flex flex-col gap-4 pt-1 sm:gap-5 sm:pt-2">
+          {stationProfile.arrivalTimings.length > 0 && (
+            <ArrivalTimingsSection
+              arrivalTimings={stationProfile.arrivalTimings}
+              isHydrated={isHydrated}
+              lineColors={lineColors}
+            />
+          )}
+
+          {stationProfile.platforms.length > 0 && (
+            <StationPlatformsSection
+              lineColors={lineColors}
+              platforms={stationProfile.platforms}
+            />
+          )}
+
           {stationProfile.communitySignals.length > 0 && (
             <DeferredViewportWidget
               className="block"
@@ -821,6 +846,259 @@ function StationPage() {
         </div>
       </div>
     </IncludedEntitiesContext.Provider>
+  );
+}
+
+type ArrivalTiming = {
+  serviceId: string;
+  lineId: string;
+  destinationCode: string;
+  destinationName: Station['name'] | null;
+  firstTrainTime: string | null;
+  lastTrainTime: string | null;
+  platformLabels: string[];
+  departures: string[];
+};
+
+type StationPlatform = {
+  id: string;
+  label: string;
+  lineId: string;
+  boardingStatus: 'alighting_only' | 'not_in_service' | null;
+};
+
+function ArrivalTimingsSection({
+  arrivalTimings,
+  isHydrated,
+  lineColors,
+}: {
+  arrivalTimings: ArrivalTiming[];
+  isHydrated: boolean;
+  lineColors: Record<string, string>;
+}) {
+  const intl = useIntl();
+  const [now, setNow] = useState<DateTime | null>(null);
+
+  useEffect(() => {
+    const updateNow = () => setNow(DateTime.now().setZone('Asia/Singapore'));
+    updateNow();
+    const interval = window.setInterval(updateNow, 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  return (
+    <section
+      aria-labelledby="arrival-timings-title"
+      className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
+    >
+      <div className="flex flex-wrap items-center gap-2 px-4 pt-3 sm:px-6 sm:pt-4">
+        <ClockIcon className="size-5 text-gray-500 dark:text-gray-400" />
+        <h2
+          id="arrival-timings-title"
+          className="font-bold text-base text-gray-900 leading-tight dark:text-gray-100"
+        >
+          <FormattedMessage
+            id="station.arrival_timings.title"
+            defaultMessage="Estimated arrivals"
+          />
+        </h2>
+        <BetaBadge />
+      </div>
+      <p className="px-4 pt-1 text-gray-600 text-xs leading-5 sm:px-6 dark:text-gray-300">
+        <FormattedMessage
+          id="station.arrival_timings.disclaimer"
+          defaultMessage="Based on scheduled frequencies, not live train tracking."
+        />
+      </p>
+      <ul className="mt-3 divide-y divide-gray-200 border-gray-200 border-t dark:divide-gray-700 dark:border-gray-700">
+        {arrivalTimings.map((timing) => (
+          <li
+            key={timing.serviceId}
+            className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6"
+          >
+            <div className="flex min-w-0 items-start gap-2">
+              <span
+                className="rounded-md px-2 py-1 font-semibold text-white text-xs leading-none shadow-sm"
+                style={{ backgroundColor: lineColors[timing.lineId] }}
+              >
+                {timing.lineId}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-medium text-gray-800 text-sm dark:text-gray-200">
+                  <FormattedMessage
+                    id="station.arrival_timings.towards"
+                    defaultMessage="Towards {destination}"
+                    values={{
+                      destination:
+                        timing.destinationName == null
+                          ? timing.destinationCode
+                          : getLocalizedTranslation(
+                              timing.destinationName,
+                              intl.locale,
+                            ),
+                    }}
+                  />
+                </p>
+                {timing.firstTrainTime != null &&
+                  timing.lastTrainTime != null && (
+                    <p className="mt-0.5 text-gray-500 text-xs tabular-nums dark:text-gray-400">
+                      <FormattedMessage
+                        id="station.arrival_timings.service_hours"
+                        defaultMessage="First {firstTrain} · Last {lastTrain} SGT"
+                        values={{
+                          firstTrain: timing.firstTrainTime.slice(0, 5),
+                          lastTrain: timing.lastTrainTime.slice(0, 5),
+                        }}
+                      />
+                    </p>
+                  )}
+                {timing.platformLabels.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {timing.platformLabels.map((label) => (
+                      <span
+                        key={label}
+                        className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                      >
+                        <FormattedMessage
+                          id="station.arrival_timings.platform"
+                          defaultMessage="Platform {label}"
+                          values={{ label }}
+                        />
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 font-semibold text-gray-900 text-sm tabular-nums dark:text-gray-100">
+              {timing.departures.map((departure) => (
+                <span
+                  key={departure}
+                  className="rounded-full bg-white px-2.5 py-1 shadow-sm dark:bg-gray-800"
+                >
+                  <ArrivalTimingValue
+                    departure={departure}
+                    intl={intl}
+                    now={isHydrated ? now : null}
+                  />
+                </span>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function StationPlatformsSection({
+  lineColors,
+  platforms,
+}: {
+  lineColors: Record<string, string>;
+  platforms: StationPlatform[];
+}) {
+  return (
+    <section
+      aria-labelledby="station-platforms-title"
+      className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
+    >
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3 sm:px-6">
+        <h2
+          id="station-platforms-title"
+          className="font-bold text-base text-gray-900 leading-tight dark:text-gray-100"
+        >
+          <FormattedMessage
+            id="station.platforms.title"
+            defaultMessage="Station platforms"
+          />
+        </h2>
+        <BetaBadge />
+      </div>
+      <ul className="divide-y divide-gray-200 border-gray-200 border-t dark:divide-gray-700 dark:border-gray-700">
+        {platforms.map((platform) => (
+          <li
+            key={platform.id}
+            className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="rounded-md px-2 py-1 font-semibold text-white text-xs leading-none shadow-sm"
+                style={{ backgroundColor: lineColors[platform.lineId] }}
+              >
+                {platform.lineId}
+              </span>
+              <span className="truncate font-medium text-gray-800 text-sm dark:text-gray-200">
+                <FormattedMessage
+                  id="station.platforms.platform"
+                  defaultMessage="Platform {label}"
+                  values={{ label: platform.label }}
+                />
+              </span>
+            </div>
+            {platform.boardingStatus != null && (
+              <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 font-medium text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                {platform.boardingStatus === 'alighting_only' ? (
+                  <FormattedMessage
+                    id="station.platforms.alighting_only"
+                    defaultMessage="Alighting only"
+                  />
+                ) : (
+                  <FormattedMessage
+                    id="station.platforms.not_in_service"
+                    defaultMessage="Not in service"
+                  />
+                )}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function ArrivalTimingValue({
+  departure,
+  intl,
+  now,
+}: {
+  departure: string;
+  intl: IntlShape;
+  now: DateTime | null;
+}) {
+  const departureTime = DateTime.fromISO(departure, { setZone: true });
+  if (now == null || !departureTime.isValid) {
+    return departure;
+  }
+
+  const minutes = Math.max(0, Math.ceil(departureTime.diff(now).as('minutes')));
+  const relativeTime =
+    minutes === 0
+      ? intl.formatMessage({
+          id: 'station.arrival_timings.now',
+          defaultMessage: 'Now',
+        })
+      : intl.formatMessage(
+          {
+            id: 'station.arrival_timings.minutes',
+            defaultMessage: 'in {minutes, number} min',
+          },
+          { minutes },
+        );
+  return intl.formatMessage(
+    {
+      id: 'station.arrival_timings.departure_time',
+      defaultMessage: '{relativeTime} · {absoluteTime} SGT',
+    },
+    {
+      relativeTime,
+      absoluteTime: intl.formatTime(departureTime.toJSDate(), {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: 'Asia/Singapore',
+      }),
+    },
   );
 }
 
