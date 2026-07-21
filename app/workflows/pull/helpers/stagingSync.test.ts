@@ -85,6 +85,8 @@ describe('pull staging inserts', () => {
         type: 'lrt',
         color: '#748274',
         startedAt: '1999-11-06',
+        platformDoorCount: null,
+        trainCarCounts: [1],
         endedAt: null,
         operatingHours: {
           weekdays: { start: '05:30', end: '23:30' },
@@ -106,6 +108,8 @@ describe('pull staging inserts', () => {
         type: 'mrt',
         color: '#000000',
         startedAt: '2026-01-01',
+        platformDoorCount: 1,
+        trainCarCounts: [1],
         endedAt: null,
         operatingHours: null,
         serviceIds: [],
@@ -129,6 +133,8 @@ describe('pull staging inserts', () => {
             type: 'lrt',
             color: '#748274',
             started_at: '1999-11-06',
+            platform_door_count: null,
+            train_car_counts: [1],
             ended_at: null,
             operating_hours: {
               weekdays: { start: '05:30', end: '23:30' },

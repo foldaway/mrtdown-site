@@ -1,0 +1,7742 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "cfa3e6a9-8c86-4923-892f-d946feda371c",
+  "prevIds": [
+    "17551edb-38b6-4113-bbfa-4c71ab8781e4"
+  ],
+  "ddl": [
+    {
+      "values": [
+        "lift",
+        "escalator",
+        "screen-door"
+      ],
+      "name": "affected_entity_facility_kind",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "pending",
+        "accepted",
+        "rejected",
+        "dispatched"
+      ],
+      "name": "crowd_report_cluster_status",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "delay",
+        "no-service",
+        "crowding",
+        "skipped-stop",
+        "unknown"
+      ],
+      "name": "crowd_report_effect",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "pending",
+        "accepted",
+        "rejected",
+        "duplicate",
+        "dispatched"
+      ],
+      "name": "crowd_report_status",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "statement.official",
+        "report.public",
+        "report.media"
+      ],
+      "name": "evidence_type",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "out-of-service",
+        "degraded"
+      ],
+      "name": "facility_effect_kind",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "signal.fault",
+        "track.fault",
+        "train.fault",
+        "power.fault",
+        "station.fault",
+        "security",
+        "weather",
+        "passenger.incident",
+        "platform_door.fault",
+        "delay",
+        "track.work",
+        "system.upgrade",
+        "elevator.outage",
+        "escalator.outage",
+        "air_conditioning.issue",
+        "station.renovation"
+      ],
+      "name": "impact_event_cause_type",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "service.whole",
+        "service.segment",
+        "service.point"
+      ],
+      "name": "impact_event_service_scope_type",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "disruption",
+        "maintenance",
+        "infra"
+      ],
+      "name": "issue_type",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "mrt.high",
+        "mrt.medium",
+        "lrt"
+      ],
+      "name": "line_type",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "delay",
+        "no-service",
+        "reduced-service",
+        "service-hours-adjustment"
+      ],
+      "name": "service_effect_kind",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "alighting_only",
+        "not_in_service"
+      ],
+      "name": "station_platform_boarding_status",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "elevated",
+        "underground",
+        "at_grade",
+        "in_building"
+      ],
+      "name": "station_structure_type",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "crowd_report_abuse_events",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "crowd_report_cluster_lines",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "crowd_report_cluster_stations",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "crowd_report_clusters",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "crowd_report_lines",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "crowd_report_moderation_events",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "crowd_report_rate_limits",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "crowd_report_stations",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "crowd_reports",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "evidences",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "impact_event_basis_evidences",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "impact_event_causes",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "impact_event_entity_facilities",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "impact_event_entity_services",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "impact_event_facility_effects",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "impact_event_periods",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "impact_event_service_effects",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "impact_event_service_scopes",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "impact_events",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "issue_day_facts",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "issues_next",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "issues",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "landmarks_next",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "landmarks",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "line_day_facts",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "line_day_issue_intervals",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "line_operators",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "line_services",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "lines_next",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "lines",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "metadata",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "operators_next",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "operators",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "public_holidays",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "service_revision_path_station_entries",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "service_revisions",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "services_next",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "services",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "sitemap_snapshots",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "station_codes",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "station_exits",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "station_issue_facts",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "station_landmarks",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "station_platform_services",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "station_platforms",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "stations_next",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "stations",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "statistics_snapshots",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "towns_next",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "towns",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "workflow_leases",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "report_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ip_hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_agent_hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "client_fingerprint_hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "turnstile_token_hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "turnstile_outcome",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "rate_limit_bucket_start_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "cluster_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_cluster_lines"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "line_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_cluster_lines"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "cluster_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_cluster_stations"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_cluster_stations"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_clusters"
+    },
+    {
+      "type": "crowd_report_effect",
+      "typeSchema": "public",
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "effect",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_clusters"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "window_start_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_clusters"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "window_end_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_clusters"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "report_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_clusters"
+    },
+    {
+      "type": "crowd_report_cluster_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending'",
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_clusters"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "dispatched_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_clusters"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_clusters"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_clusters"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "report_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_lines"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "line_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_lines"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_moderation_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "report_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_moderation_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "actor",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_moderation_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "action",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_moderation_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "note",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_moderation_events"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_moderation_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ip_hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_rate_limits"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "bucket_start_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_rate_limits"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "submission_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_rate_limits"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "client_fingerprint_hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_rate_limits"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_rate_limits"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_rate_limits"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "report_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_stations"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_report_stations"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "observed_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "direction_text",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "crowd_report_effect",
+      "typeSchema": "public",
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "effect",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "delay_minutes",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "still_happening",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "text",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "crowd_report_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending'",
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "cluster_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "duplicate_of_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "dispatched_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "dispatch_payload",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "dispatch_error",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'public'",
+      "generated": null,
+      "identity": null,
+      "name": "producer",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "external_report_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "request_payload_digest",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "text",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "type": "evidence_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "render",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issue_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "impact_event_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_basis_evidences"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "evidence_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_basis_evidences"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_basis_evidences"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_basis_evidences"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "impact_event_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_causes"
+    },
+    {
+      "type": "impact_event_cause_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_causes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_causes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_causes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "impact_event_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "line_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "type": "affected_entity_facility_kind",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "impact_event_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_entity_services"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "service_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_entity_services"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_entity_services"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_entity_services"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "impact_event_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_facility_effects"
+    },
+    {
+      "type": "facility_effect_kind",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_facility_effects"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_facility_effects"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_facility_effects"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "impact_event_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_periods"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "index",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_periods"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "start_ts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_periods"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "end_ts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_periods"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_periods"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_periods"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "impact_event_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_effects"
+    },
+    {
+      "type": "service_effect_kind",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_effects"
+    },
+    {
+      "type": "interval",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "duration",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_effects"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_effects"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_effects"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "impact_event_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "index",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "type": "impact_event_service_scope_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "from_station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "to_station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_events"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issue_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_events"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_events"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "impact_events"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "date",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issue_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "type": "issue_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issue_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "as_of",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "active_anytime",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "active_end_of_day",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "duration_seconds",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "inferred_interval_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues_next"
+    },
+    {
+      "type": "issue_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "title_meta",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "evidences",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "impact_events",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues"
+    },
+    {
+      "type": "issue_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "title_meta",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "issues"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "landmarks_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "landmarks_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "landmarks_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "landmarks"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "landmarks"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "landmarks"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "landmarks"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "landmarks"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "date",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "line_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "as_of",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "service_seconds",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "downtime_disruption_seconds",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "downtime_maintenance_seconds",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "downtime_infra_seconds",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issue_count_disruption",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issue_count_maintenance",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issue_count_infra",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "date",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "line_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issue_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "interval_index",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "type": "issue_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issue_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "start_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "end_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "as_of",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "line_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_operators"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "operator_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_operators"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "started_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_operators"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ended_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_operators"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_operators"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "line_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_services"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "service_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_services"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_services"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "line_services"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines_next"
+    },
+    {
+      "type": "line_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "color",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines_next"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "started_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines_next"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "platform_door_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "train_car_counts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines_next"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ended_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "operating_hours",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "operators",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "line_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "color",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "started_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "platform_door_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "train_car_counts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ended_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "operating_hours",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lines"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "key",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "metadata"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "metadata"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators_next"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "founded_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "founded_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "operators"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_holidays"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "date",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_holidays"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "holiday_name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_holidays"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_holidays"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_holidays"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_holidays"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "service_revision_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "service_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "display_code",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "path_index",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revisions"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "service_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revisions"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "start_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revisions"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "end_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revisions"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "operating_hours",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revisions"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "estimated_frequency",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revisions"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revisions"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "service_revisions"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "services_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "services_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "services_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "line_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "services_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "revisions",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "services_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "services"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "line_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "services"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "services"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "services"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "services"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "services"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "sitemap_snapshots"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "as_of",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "sitemap_snapshots"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "data",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "sitemap_snapshots"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "sitemap_snapshots"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "sitemap_snapshots"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "line_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "code",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "started_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ended_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "type": "station_structure_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "structure_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_object_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_checksum",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "label",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_updated",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "type": "geometry(point,4326)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "geo",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issue_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "type": "issue_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issue_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "latest_activity_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "as_of",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_landmarks"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "landmark_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_landmarks"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_landmarks"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_landmarks"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platform_services"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "platform_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platform_services"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "service_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platform_services"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platform_services"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platform_services"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "platform_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "label",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_updated",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "line_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "type": "station_platform_boarding_status",
+      "typeSchema": "public",
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "boarding_status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "inference",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "type": "geometry(point,4326)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "geo",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "town_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "station_codes",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "landmark_ids",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "first_last_train",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "layout_exit_source_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "layout_exits",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "layout_platforms",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations"
+    },
+    {
+      "type": "geometry(point,4326)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "geo",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "town_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "first_last_train",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "stations"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "statistics_snapshots"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "as_of",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "statistics_snapshots"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "data",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "statistics_snapshots"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "statistics_snapshots"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "statistics_snapshots"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "towns_next"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "towns_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "towns_next"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "towns"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "towns"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "towns"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "towns"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "towns"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "key",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "workflow_leases"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "owner",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "workflow_leases"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "expires_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "workflow_leases"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "report_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_report_abuse_events_report_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "ip_hash",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_report_abuse_events_ip_hash_created_at_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_report_cluster_lines_line_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_report_cluster_lines"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "station_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_report_cluster_stations_station_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_report_cluster_stations"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_report_clusters_status_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_report_clusters"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "window_start_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_report_clusters_window_start_at_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_report_clusters"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_report_lines_line_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_report_lines"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "report_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_report_moderation_events_report_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_report_moderation_events"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_report_moderation_events_created_at_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_report_moderation_events"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "bucket_start_at",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_report_rate_limits_bucket_start_at_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_report_rate_limits"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "station_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_report_stations_station_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_report_stations"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "observed_at",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_reports_observed_at_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_reports_status_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "cluster_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_reports_cluster_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "duplicate_of_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_reports_duplicate_of_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "producer",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "external_report_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "crowd_reports_producer_external_report_id_uidx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "issue_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "evidences_issue_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "ts",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "evidences_ts_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "impact_event_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_basis_evidences_impact_event_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_basis_evidences"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "evidence_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_basis_evidences_evidence_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_basis_evidences"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "impact_event_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_causes_impact_event_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_causes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "impact_event_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_entity_facilities_impact_event_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "station_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_entity_facilities_station_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_entity_facilities_line_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "impact_event_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_entity_services_impact_event_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_entity_services"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "service_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_entity_services_service_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_entity_services"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "impact_event_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_facility_effects_impact_event_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_facility_effects"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "kind",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_facility_effects_kind_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_facility_effects"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "start_ts",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_periods_start_at_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_periods"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "end_ts",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_periods_end_at_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_periods"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "impact_event_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_service_effects_impact_event_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_service_effects"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "kind",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_service_effects_kind_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_service_effects"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "impact_event_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_service_scopes_impact_event_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_service_scopes_type_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "station_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_service_scopes_station_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "from_station_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_service_scopes_from_station_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "to_station_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_event_service_scopes_to_station_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "issue_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "impact_events_issue_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "impact_events"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "issue_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "issue_day_facts_issue_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "date",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "issue_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "issue_day_facts_date_issue_type_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "as_of",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "issue_day_facts_as_of_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "line_day_facts_line_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "date",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "line_day_facts_date_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "as_of",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "line_day_facts_as_of_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "date",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "line_day_issue_intervals_line_id_date_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "issue_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "line_day_issue_intervals_issue_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "date",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "issue_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "line_day_issue_intervals_date_issue_type_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "as_of",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "line_day_issue_intervals_as_of_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "line_operators_line_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "line_operators"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "operator_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "line_operators_operator_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "line_operators"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "line_services_line_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "line_services"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "service_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "line_services_service_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "line_services"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "service_revision_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "service_revision_path_entries_service_revision_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "service_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "service_revision_path_entries_service_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "station_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "service_revision_path_entries_station_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "path_index",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "service_revision_path_entries_path_index_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "service_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "service_revisions_service_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "service_revisions"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "services_line_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "services"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "as_of",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "sitemap_snapshots_as_of_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "sitemap_snapshots"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "station_codes_line_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "station_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "station_codes_station_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "geo",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "gist",
+      "concurrently": false,
+      "name": "station_exits_geo_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "issue_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "station_issue_facts_issue_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "station_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "issue_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "latest_activity_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "station_issue_facts_station_type_activity_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "as_of",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "station_issue_facts_as_of_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "station_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "station_landmarks_station_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "station_landmarks"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "landmark_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "station_landmarks_landmark_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "station_landmarks"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "service_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "station_platform_services_service_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "station_platform_services"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "station_platforms_line_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "geo",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "gist",
+      "concurrently": false,
+      "name": "stations_next_geo_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "stations_next"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "geo",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "gist",
+      "concurrently": false,
+      "name": "stations_geo_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "stations"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "as_of",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "statistics_snapshots_as_of_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "statistics_snapshots"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "report_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "crowd_reports",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "crowd_report_abuse_events_report_id_crowd_reports_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_report_abuse_events"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "cluster_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "crowd_report_clusters",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "crowd_report_cluster_lines_cluster_id_crowd_report_clusters_id_",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_report_cluster_lines"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "line_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "crowd_report_cluster_lines_line_id_lines_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_report_cluster_lines"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "cluster_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "crowd_report_clusters",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "crowd_report_cluster_stations_cluster_id_crowd_report_clusters_",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_report_cluster_stations"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "crowd_report_cluster_stations_station_id_stations_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_report_cluster_stations"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "report_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "crowd_reports",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "crowd_report_lines_report_id_crowd_reports_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_report_lines"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "line_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "crowd_report_lines_line_id_lines_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_report_lines"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "report_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "crowd_reports",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "crowd_report_moderation_events_report_id_crowd_reports_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_report_moderation_events"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "report_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "crowd_reports",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "crowd_report_stations_report_id_crowd_reports_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_report_stations"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "crowd_report_stations_station_id_stations_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_report_stations"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "cluster_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "crowd_report_clusters",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "crowd_reports_cluster_id_crowd_report_clusters_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "duplicate_of_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "crowd_reports",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "crowd_reports_duplicate_of_id_crowd_reports_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "issue_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "issues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "evidences_issue_id_issues_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "evidences"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "impact_event_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "impact_events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "impact_event_basis_evidences_impact_event_id_impact_events_id_f",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_basis_evidences"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "evidence_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "evidences",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "impact_event_basis_evidences_evidence_id_evidences_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_basis_evidences"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "impact_event_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "impact_events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "impact_event_causes_impact_event_id_impact_events_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_causes"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "impact_event_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "impact_events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "impact_event_entity_facilities_impact_event_id_impact_events_id",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "impact_event_entity_facilities_station_id_stations_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "line_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "impact_event_entity_facilities_line_id_lines_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "impact_event_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "impact_events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "impact_event_entity_services_impact_event_id_impact_events_id_f",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_entity_services"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "service_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "services",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "impact_event_entity_services_service_id_services_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_entity_services"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "impact_event_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "impact_events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "impact_event_facility_effects_impact_event_id_impact_events_id_",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_facility_effects"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "impact_event_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "impact_events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "impact_event_periods_impact_event_id_impact_events_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_periods"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "impact_event_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "impact_events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "impact_event_service_effects_impact_event_id_impact_events_id_f",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_service_effects"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "impact_event_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "impact_events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "impact_event_service_scopes_impact_event_id_impact_events_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "impact_event_service_scopes_station_id_stations_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "from_station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "impact_event_service_scopes_from_station_id_stations_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "to_station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "impact_event_service_scopes_to_station_id_stations_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "issue_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "issues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "impact_events_issue_id_issues_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "impact_events"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "issue_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "issues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "issue_day_facts_issue_id_issues_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "line_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "line_day_facts_line_id_lines_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "issue_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "issues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "line_day_issue_intervals_issue_id_issues_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "date",
+        "line_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "line_day_facts",
+      "columnsTo": [
+        "date",
+        "line_id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "line_day_issue_intervals_line_day_fact_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "line_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "line_operators_line_id_lines_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "line_operators"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "operator_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "operators",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "line_operators_operator_id_operators_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "line_operators"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "line_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "line_services_line_id_lines_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "line_services"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "service_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "services",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "line_services_service_id_services_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "line_services"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "service_revision_id",
+        "service_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "service_revisions",
+      "columnsTo": [
+        "id",
+        "service_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "sr_path_entries_revision_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "sr_path_entries_station_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "service_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "services",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "service_revisions_service_id_services_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "service_revisions"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "line_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "services_line_id_lines_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "services"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "line_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "station_codes_line_id_lines_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "station_codes_station_id_stations_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "station_exits_station_id_stations_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "station_issue_facts_station_id_stations_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "issue_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "issues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "CASCADE",
+      "name": "station_issue_facts_issue_id_issues_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "station_landmarks_station_id_stations_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "station_landmarks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "landmark_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "landmarks",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "station_landmarks_landmark_id_landmarks_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "station_landmarks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "service_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "services",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "station_platform_services_service_id_services_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "station_platform_services"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "station_id",
+        "platform_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "station_platforms",
+      "columnsTo": [
+        "station_id",
+        "platform_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "station_platform_services_platform_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "station_platform_services"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "station_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "stations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "station_platforms_station_id_stations_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "line_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "station_platforms_line_id_lines_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "town_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "towns",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "stations_town_id_towns_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "stations"
+    },
+    {
+      "columns": [
+        "cluster_id",
+        "line_id"
+      ],
+      "nameExplicit": false,
+      "name": "crowd_report_cluster_lines_cluster_id_line_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "crowd_report_cluster_lines"
+    },
+    {
+      "columns": [
+        "cluster_id",
+        "station_id"
+      ],
+      "nameExplicit": false,
+      "name": "crowd_report_cluster_stations_cluster_id_station_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "crowd_report_cluster_stations"
+    },
+    {
+      "columns": [
+        "report_id",
+        "line_id"
+      ],
+      "nameExplicit": false,
+      "name": "crowd_report_lines_report_id_line_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "crowd_report_lines"
+    },
+    {
+      "columns": [
+        "ip_hash",
+        "bucket_start_at"
+      ],
+      "nameExplicit": false,
+      "name": "crowd_report_rate_limits_ip_hash_bucket_start_at_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "crowd_report_rate_limits"
+    },
+    {
+      "columns": [
+        "report_id",
+        "station_id"
+      ],
+      "nameExplicit": false,
+      "name": "crowd_report_stations_report_id_station_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "crowd_report_stations"
+    },
+    {
+      "columns": [
+        "impact_event_id",
+        "evidence_id"
+      ],
+      "nameExplicit": false,
+      "name": "impact_event_basis_evidences_impact_event_id_evidence_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "impact_event_basis_evidences"
+    },
+    {
+      "columns": [
+        "impact_event_id",
+        "type"
+      ],
+      "nameExplicit": false,
+      "name": "impact_event_causes_impact_event_id_type_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "impact_event_causes"
+    },
+    {
+      "columns": [
+        "impact_event_id",
+        "station_id",
+        "kind"
+      ],
+      "nameExplicit": false,
+      "name": "impact_event_entity_facilities_impact_event_id_station_id_kind_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "impact_event_entity_facilities"
+    },
+    {
+      "columns": [
+        "impact_event_id",
+        "service_id"
+      ],
+      "nameExplicit": false,
+      "name": "impact_event_entity_services_impact_event_id_service_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "impact_event_entity_services"
+    },
+    {
+      "columns": [
+        "impact_event_id",
+        "kind"
+      ],
+      "nameExplicit": false,
+      "name": "impact_event_facility_effects_impact_event_id_kind_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "impact_event_facility_effects"
+    },
+    {
+      "columns": [
+        "impact_event_id",
+        "index"
+      ],
+      "nameExplicit": false,
+      "name": "impact_event_periods_impact_event_id_index_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "impact_event_periods"
+    },
+    {
+      "columns": [
+        "impact_event_id",
+        "kind"
+      ],
+      "nameExplicit": false,
+      "name": "impact_event_service_effects_impact_event_id_kind_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "impact_event_service_effects"
+    },
+    {
+      "columns": [
+        "impact_event_id",
+        "index"
+      ],
+      "nameExplicit": false,
+      "name": "impact_event_service_scopes_impact_event_id_index_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    },
+    {
+      "columns": [
+        "date",
+        "issue_id"
+      ],
+      "nameExplicit": false,
+      "name": "issue_day_facts_date_issue_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "issue_day_facts"
+    },
+    {
+      "columns": [
+        "date",
+        "line_id"
+      ],
+      "nameExplicit": false,
+      "name": "line_day_facts_date_line_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "line_day_facts"
+    },
+    {
+      "columns": [
+        "date",
+        "line_id",
+        "issue_id",
+        "interval_index"
+      ],
+      "nameExplicit": false,
+      "name": "line_day_issue_intervals_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "line_day_issue_intervals"
+    },
+    {
+      "columns": [
+        "line_id",
+        "operator_id"
+      ],
+      "nameExplicit": false,
+      "name": "line_operators_line_id_operator_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "line_operators"
+    },
+    {
+      "columns": [
+        "line_id",
+        "service_id"
+      ],
+      "nameExplicit": false,
+      "name": "line_services_line_id_service_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "line_services"
+    },
+    {
+      "columns": [
+        "service_revision_id",
+        "service_id",
+        "station_id",
+        "path_index"
+      ],
+      "nameExplicit": true,
+      "name": "sr_path_entries_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "service_revision_path_station_entries"
+    },
+    {
+      "columns": [
+        "id",
+        "service_id"
+      ],
+      "nameExplicit": false,
+      "name": "service_revisions_id_service_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "service_revisions"
+    },
+    {
+      "columns": [
+        "line_id",
+        "station_id",
+        "code"
+      ],
+      "nameExplicit": false,
+      "name": "station_codes_line_id_station_id_code_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "station_codes"
+    },
+    {
+      "columns": [
+        "station_id",
+        "source_id",
+        "source_object_id"
+      ],
+      "nameExplicit": false,
+      "name": "station_exits_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "station_exits"
+    },
+    {
+      "columns": [
+        "station_id",
+        "issue_id"
+      ],
+      "nameExplicit": false,
+      "name": "station_issue_facts_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "station_issue_facts"
+    },
+    {
+      "columns": [
+        "station_id",
+        "landmark_id"
+      ],
+      "nameExplicit": false,
+      "name": "station_landmarks_station_id_landmark_id_pk",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "station_landmarks"
+    },
+    {
+      "columns": [
+        "station_id",
+        "platform_id",
+        "service_id"
+      ],
+      "nameExplicit": false,
+      "name": "station_platform_services_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "station_platform_services"
+    },
+    {
+      "columns": [
+        "station_id",
+        "platform_id"
+      ],
+      "nameExplicit": false,
+      "name": "station_platforms_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "station_platforms"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "crowd_report_abuse_events_pkey",
+      "schema": "public",
+      "table": "crowd_report_abuse_events",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "crowd_report_clusters_pkey",
+      "schema": "public",
+      "table": "crowd_report_clusters",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "crowd_report_moderation_events_pkey",
+      "schema": "public",
+      "table": "crowd_report_moderation_events",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "crowd_reports_pkey",
+      "schema": "public",
+      "table": "crowd_reports",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "evidences_pkey",
+      "schema": "public",
+      "table": "evidences",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "impact_events_pkey",
+      "schema": "public",
+      "table": "impact_events",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "issues_next_pkey",
+      "schema": "public",
+      "table": "issues_next",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "issues_pkey",
+      "schema": "public",
+      "table": "issues",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "landmarks_next_pkey",
+      "schema": "public",
+      "table": "landmarks_next",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "landmarks_pkey",
+      "schema": "public",
+      "table": "landmarks",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "lines_next_pkey",
+      "schema": "public",
+      "table": "lines_next",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "lines_pkey",
+      "schema": "public",
+      "table": "lines",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "key"
+      ],
+      "nameExplicit": false,
+      "name": "metadata_pkey",
+      "schema": "public",
+      "table": "metadata",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "operators_next_pkey",
+      "schema": "public",
+      "table": "operators_next",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "operators_pkey",
+      "schema": "public",
+      "table": "operators",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "public_holidays_pkey",
+      "schema": "public",
+      "table": "public_holidays",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "services_next_pkey",
+      "schema": "public",
+      "table": "services_next",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "services_pkey",
+      "schema": "public",
+      "table": "services",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "sitemap_snapshots_pkey",
+      "schema": "public",
+      "table": "sitemap_snapshots",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "stations_next_pkey",
+      "schema": "public",
+      "table": "stations_next",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "stations_pkey",
+      "schema": "public",
+      "table": "stations",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "statistics_snapshots_pkey",
+      "schema": "public",
+      "table": "statistics_snapshots",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "towns_next_pkey",
+      "schema": "public",
+      "table": "towns_next",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "towns_pkey",
+      "schema": "public",
+      "table": "towns",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "key"
+      ],
+      "nameExplicit": false,
+      "name": "workflow_leases_pkey",
+      "schema": "public",
+      "table": "workflow_leases",
+      "entityType": "pks"
+    },
+    {
+      "value": "\"delay_minutes\" is null or (\"delay_minutes\" >= 0 and \"delay_minutes\" <= 180)",
+      "name": "crowd_reports_delay_minutes_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "crowd_reports"
+    },
+    {
+      "value": "\n          (\n            \"type\" = 'service.whole'\n            and \"station_id\" is null\n            and \"from_station_id\" is null\n            and \"to_station_id\" is null\n          )\n          or (\n            \"type\" = 'service.point'\n            and \"station_id\" is not null\n            and \"from_station_id\" is null\n            and \"to_station_id\" is null\n          )\n          or (\n            \"type\" = 'service.segment'\n            and \"station_id\" is null\n            and \"from_station_id\" is not null\n            and \"to_station_id\" is not null\n          )\n        ",
+      "name": "impact_event_service_scopes_type_station_shape_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "impact_event_service_scopes"
+    }
+  ],
+  "renames": []
+}

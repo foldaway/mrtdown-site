@@ -14,6 +14,8 @@ const TEST_LINE: Line = {
   type: 'lrt',
   color: '#748274',
   startedAt: '1999-11-06',
+  platformDoorCount: null,
+  trainCarCounts: [1],
   operatingHours: {
     weekdays: { start: '05:30', end: '05:30' },
     weekends: { start: '05:30', end: '05:30' },

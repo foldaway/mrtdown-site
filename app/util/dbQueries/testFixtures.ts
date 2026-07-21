@@ -26,6 +26,8 @@ export const TEST_LINE: Line = {
   type: 'lrt',
   color: '#748274',
   startedAt: '1999-11-06',
+  platformDoorCount: null,
+  trainCarCounts: [1],
   operatingHours: {
     weekdays: { start: '05:30', end: '23:30' },
     weekends: { start: '05:30', end: '23:30' },
@@ -44,6 +46,8 @@ export const TEST_FEEDER_LINE: Line = {
   type: 'mrt.high',
   color: '#005ec4',
   startedAt: '2015-12-27',
+  platformDoorCount: 1,
+  trainCarCounts: [1],
   operatingHours: {
     weekdays: { start: '05:30', end: '23:30' },
     weekends: { start: '05:30', end: '23:30' },

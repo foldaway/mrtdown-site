@@ -364,6 +364,8 @@ export async function getTownsData() {
         type: row.type,
         color: row.color,
         startedAt: row.started_at,
+        platformDoorCount: row.platform_door_count,
+        trainCarCounts: row.train_car_counts,
         operatingHours: row.operating_hours,
         operators: (lineOperatorsByLineId.get(row.id) ?? []).map(
           (operator) => ({

@@ -495,6 +495,11 @@ export const lineEntitySharedColumns = {
   type: lineTypeEnum().notNull(),
   color: text('color').notNull(),
   started_at: date('started_at', { mode: 'string' }).notNull(),
+  platform_door_count: integer('platform_door_count'),
+  train_car_counts: jsonb('train_car_counts')
+    .$type<Line['trainCarCounts']>()
+    .notNull()
+    .default([]),
   ended_at: date('ended_at', { mode: 'string' }),
   operating_hours: jsonb('operating_hours').$type<OperatingHours>().notNull(),
   hash: text('hash').notNull(),
