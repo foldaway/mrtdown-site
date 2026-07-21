@@ -65,6 +65,7 @@ export type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
 
 type DatasetLineBranch = {
   id: CoreService['id'];
+  lineId: CoreService['lineId'];
   name: CoreService['name'];
   startedAt: CoreService['revisions'][number]['startAt'] | null;
   endedAt: CoreService['revisions'][number]['endAt'];
@@ -74,6 +75,7 @@ type DatasetLineBranch = {
 };
 
 type BranchWithEntries = DatasetLineBranch & {
+  estimatedFrequency: CoreService['revisions'][number]['estimatedFrequency'];
   entries: Array<{
     stationId: string;
     displayCode: string;
@@ -245,6 +247,7 @@ export async function buildDataset(
                 id: stationsTable.id,
                 name: stationsTable.name,
                 townId: stationsTable.townId,
+                firstLastTrain: stationsTable.first_last_train,
                 latitude: sql<number>`ST_Y(${stationsTable.geo})`,
                 longitude: sql<number>`ST_X(${stationsTable.geo})`,
               })
@@ -257,6 +260,7 @@ export async function buildDataset(
                   id: stationsTable.id,
                   name: stationsTable.name,
                   townId: stationsTable.townId,
+                  firstLastTrain: stationsTable.first_last_train,
                   latitude: sql<number>`ST_Y(${stationsTable.geo})`,
                   longitude: sql<number>`ST_X(${stationsTable.geo})`,
                 })
@@ -783,7 +787,9 @@ export async function buildDataset(
     const effectiveStart = revisionStartDate ?? minStart ?? null;
     const branch: BranchWithEntries = {
       id: service.id,
+      lineId: service.line_id,
       name,
+      estimatedFrequency: latestRevision.estimated_frequency ?? undefined,
       startedAt:
         effectiveStart != null && effectiveStart <= referenceNow
           ? effectiveStart.toISODate()
@@ -937,6 +943,7 @@ export async function buildDataset(
           }
           return a.sequenceOrder - b.sequenceOrder;
         }),
+        firstLastTrain: row.firstLastTrain ?? undefined,
         townId: row.townId,
         landmarkIds: landmarkIdsByStationId[row.id] ?? [],
       };

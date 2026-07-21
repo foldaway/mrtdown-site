@@ -194,6 +194,7 @@ describe('pull staging inserts', () => {
               },
             ],
             landmark_ids: ['bukit-panjang-plaza'],
+            first_last_train: null,
           },
         ],
       },

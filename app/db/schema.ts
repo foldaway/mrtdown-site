@@ -81,6 +81,8 @@ const stationStagingExtraColumns = {
     .$type<Station['stationCodes']>()
     .notNull(),
   landmark_ids: jsonb('landmark_ids').$type<string[]>().notNull(),
+  first_last_train:
+    jsonb('first_last_train').$type<Station['firstLastTrain']>(),
 };
 
 /** Shared by `services` and `services_next`. */
@@ -453,6 +455,8 @@ export const stationsTable = pgTable(
     townId: text('town_id')
       .references(() => townsTable.id)
       .notNull(),
+    first_last_train:
+      jsonb('first_last_train').$type<Station['firstLastTrain']>(),
     ...timestampColumns,
   },
   (table) => {
@@ -563,6 +567,9 @@ export const serviceRevisionsTable = pgTable(
     start_at: date('start_at', { mode: 'string' }),
     end_at: date('end_at', { mode: 'string' }),
     operating_hours: jsonb('operating_hours').$type<OperatingHours>().notNull(),
+    estimated_frequency: jsonb('estimated_frequency').$type<
+      Service['revisions'][number]['estimatedFrequency']
+    >(),
     ...timestampColumns,
   },
   (table) => {

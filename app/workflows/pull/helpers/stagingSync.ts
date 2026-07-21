@@ -228,6 +228,7 @@ export async function insertStationsStaging(
     town_id: s.townId,
     station_codes: s.stationCodes,
     landmark_ids: s.landmarkIds,
+    first_last_train: s.firstLastTrain ?? null,
   }));
   for (const c of chunk(stationRows, BATCH)) {
     if (c.length === 0) continue;
@@ -725,12 +726,20 @@ export async function syncStations(db: Db): Promise<void> {
         id: stationsNextTable.id,
         nextHash: stationsNextTable.hash,
         liveHash: stationsTable.hash,
+        nextFirstLastTrain: stationsNextTable.first_last_train,
+        liveFirstLastTrain: stationsTable.first_last_train,
       })
       .from(stationsNextTable)
       .leftJoin(stationsTable, eq(stationsNextTable.id, stationsTable.id));
 
     const changedIds = rows
-      .filter((r) => r.liveHash == null || r.liveHash !== r.nextHash)
+      .filter(
+        (row) =>
+          row.liveHash == null ||
+          row.liveHash !== row.nextHash ||
+          JSON.stringify(row.liveFirstLastTrain) !==
+            JSON.stringify(row.nextFirstLastTrain),
+      )
       .map((r) => r.id);
 
     for (const ch of chunk(changedIds, BATCH)) {
@@ -748,6 +757,7 @@ export async function syncStations(db: Db): Promise<void> {
             name: row.name,
             geo: row.geo,
             townId: row.town_id,
+            first_last_train: row.first_last_train,
           })
           .onConflictDoUpdate({
             target: [stationsTable.id],
@@ -756,6 +766,7 @@ export async function syncStations(db: Db): Promise<void> {
               name: row.name,
               geo: row.geo,
               townId: row.town_id,
+              first_last_train: row.first_last_train,
             },
           });
       }
@@ -893,7 +904,11 @@ export async function syncServices(db: Db): Promise<void> {
     const serviceIds = rows.map((row) => row.id);
     const liveRevisionDatesByKey = new Map<
       string,
-      { startAt: string | null; endAt: string | null }
+      {
+        startAt: string | null;
+        endAt: string | null;
+        estimatedFrequency: Service['revisions'][number]['estimatedFrequency'];
+      }
     >();
     const liveRevisionIdsByServiceId = new Map<string, Set<string>>();
     for (const serviceIdChunk of chunk(serviceIds, BATCH)) {
@@ -904,6 +919,7 @@ export async function syncServices(db: Db): Promise<void> {
           service_id: serviceRevisionsTable.service_id,
           start_at: serviceRevisionsTable.start_at,
           end_at: serviceRevisionsTable.end_at,
+          estimated_frequency: serviceRevisionsTable.estimated_frequency,
         })
         .from(serviceRevisionsTable)
         .where(inArray(serviceRevisionsTable.service_id, serviceIdChunk));
@@ -913,6 +929,7 @@ export async function syncServices(db: Db): Promise<void> {
           {
             startAt: revisionRow.start_at,
             endAt: revisionRow.end_at,
+            estimatedFrequency: revisionRow.estimated_frequency ?? undefined,
           },
         );
         const liveRevisionIds =
@@ -944,7 +961,9 @@ export async function syncServices(db: Db): Promise<void> {
             !liveRevisionIds.has(revision.id) ||
             liveDates == null ||
             liveDates.startAt !== serviceRevisionStartAt(revision) ||
-            liveDates.endAt !== serviceRevisionEndAt(revision)
+            liveDates.endAt !== serviceRevisionEndAt(revision) ||
+            JSON.stringify(liveDates.estimatedFrequency) !==
+              JSON.stringify(revision.estimatedFrequency ?? null)
           );
         });
       })
@@ -1000,6 +1019,7 @@ export async function syncServices(db: Db): Promise<void> {
               start_at: serviceRevisionStartAt(revisionData),
               end_at: serviceRevisionEndAt(revisionData),
               operating_hours: revisionData.operatingHours,
+              estimated_frequency: revisionData.estimatedFrequency ?? null,
             } satisfies InferInsertModel<typeof serviceRevisionsTable>)
             .onConflictDoUpdate({
               target: [
@@ -1010,6 +1030,7 @@ export async function syncServices(db: Db): Promise<void> {
                 start_at: serviceRevisionStartAt(revisionData),
                 end_at: serviceRevisionEndAt(revisionData),
                 operating_hours: revisionData.operatingHours,
+                estimated_frequency: revisionData.estimatedFrequency ?? null,
                 updated_at: new Date(),
               },
             });
