@@ -169,6 +169,26 @@ describe('pull staging inserts', () => {
           },
         ],
         landmarkIds: ['bukit-panjang-plaza'],
+        layout: {
+          platforms: [
+            {
+              id: 'BP6_BPLRT_A',
+              label: 'A',
+              lastUpdated: '2026-07-21',
+              lineId: 'BPLRT',
+              serviceIds: ['BPLRT_SERVICE'],
+              inference: {
+                method: 'same-line-platform-label',
+                basis: [
+                  {
+                    stationId: 'BP5',
+                    platformId: 'BP5_BPLRT_A',
+                  },
+                ],
+              },
+            },
+          ],
+        },
       },
     ] as Parameters<typeof insertStationsStaging>[1];
 
@@ -195,6 +215,24 @@ describe('pull staging inserts', () => {
             ],
             landmark_ids: ['bukit-panjang-plaza'],
             first_last_train: null,
+            layout_platforms: [
+              {
+                id: 'BP6_BPLRT_A',
+                label: 'A',
+                lastUpdated: '2026-07-21',
+                lineId: 'BPLRT',
+                serviceIds: ['BPLRT_SERVICE'],
+                inference: {
+                  method: 'same-line-platform-label',
+                  basis: [
+                    {
+                      stationId: 'BP5',
+                      platformId: 'BP5_BPLRT_A',
+                    },
+                  ],
+                },
+              },
+            ],
           },
         ],
       },

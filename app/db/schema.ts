@@ -16,6 +16,8 @@ import {
   ServiceEffectKindSchema,
   ServiceScopeTypeSchema,
   type Station,
+  type StationLayoutPlatform,
+  StationLayoutPlatformBoardingStatusSchema,
   StationStructureTypeSchema,
   type Translations,
   type TranslationsMeta,
@@ -68,6 +70,8 @@ const stationNameHashSharedColumns = {
   hash: text('hash').notNull(),
 };
 
+type StationPlatform = StationLayoutPlatform;
+
 /** PostGIS point (SRID 4326) — shared by `stations` and `stations_next`. */
 const stationGeoColumn = {
   geo: geometry('geo', { type: 'point', srid: 4326 }).notNull(),
@@ -83,6 +87,9 @@ const stationStagingExtraColumns = {
   landmark_ids: jsonb('landmark_ids').$type<string[]>().notNull(),
   first_last_train:
     jsonb('first_last_train').$type<Station['firstLastTrain']>(),
+  layout_platforms: jsonb('layout_platforms')
+    .$type<StationPlatform[]>()
+    .notNull(),
 };
 
 /** Shared by `services` and `services_next`. */
@@ -658,6 +665,65 @@ export const stationCodesTable = pgTable(
       primaryKey({ columns: [table.line_id, table.station_id, table.code] }),
       index('station_codes_line_id_idx').on(table.line_id),
       index('station_codes_station_id_idx').on(table.station_id),
+    ];
+  },
+);
+
+export const stationPlatformBoardingStatusEnum = pgEnum(
+  'station_platform_boarding_status',
+  enumToPgEnum(StationLayoutPlatformBoardingStatusSchema.enum),
+);
+
+// Normalized Entity Field: Station.layout.platforms
+export const stationPlatformsTable = pgTable(
+  'station_platforms',
+  {
+    station_id: text('station_id')
+      .references(() => stationsTable.id, { onDelete: 'cascade' })
+      .notNull(),
+    platform_id: text('platform_id').notNull(),
+    label: text('label').notNull(),
+    last_updated: date('last_updated', { mode: 'string' }).notNull(),
+    line_id: text('line_id')
+      .references(() => linesTable.id)
+      .notNull(),
+    boarding_status: stationPlatformBoardingStatusEnum(),
+    inference: jsonb('inference').$type<StationPlatform['inference']>(),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      primaryKey({ columns: [table.station_id, table.platform_id] }),
+      index('station_platforms_line_id_idx').on(table.line_id),
+    ];
+  },
+);
+
+// Normalized Entity Field: Station.layout.platforms[].serviceIds
+export const stationPlatformServicesTable = pgTable(
+  'station_platform_services',
+  {
+    station_id: text('station_id').notNull(),
+    platform_id: text('platform_id').notNull(),
+    service_id: text('service_id')
+      .references(() => servicesTable.id, { onDelete: 'cascade' })
+      .notNull(),
+    ...timestampColumns,
+  },
+  (table) => {
+    return [
+      foreignKey({
+        name: 'station_platform_services_platform_fk',
+        columns: [table.station_id, table.platform_id],
+        foreignColumns: [
+          stationPlatformsTable.station_id,
+          stationPlatformsTable.platform_id,
+        ],
+      }).onDelete('cascade'),
+      primaryKey({
+        columns: [table.station_id, table.platform_id, table.service_id],
+      }),
+      index('station_platform_services_service_id_idx').on(table.service_id),
     ];
   },
 );

@@ -34,6 +34,7 @@ import {
   syncLines,
   syncOperatorsTownsLandmarksUpserts,
   syncServices,
+  syncStationPlatformServices,
   syncStations,
   truncateStagingTables,
 } from './helpers/stagingSync.js';
@@ -210,6 +211,12 @@ async function executePull(context: WorkflowContext<Params>) {
     const db = getDb();
     console.log('Syncing services...');
     await syncServices(db);
+  });
+
+  await runPullStep(context, 'sync-station-platform-services', async () => {
+    const db = getDb();
+    console.log('Syncing station platform services...');
+    await syncStationPlatformServices(db);
   });
 
   for (let batch = 1; ; batch++) {

@@ -9,6 +9,7 @@ describe('pull workflow promotion order', () => {
       'sync-lines',
       'sync-stations',
       'sync-services',
+      'sync-station-platform-services',
       'sync-issues-changed-',
       'sync-issues-orphans-',
       'delete-service-orphans',

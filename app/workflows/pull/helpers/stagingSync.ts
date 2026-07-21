@@ -58,6 +58,8 @@ import {
   servicesTable,
   stationCodesTable,
   stationLandmarksTable,
+  stationPlatformServicesTable,
+  stationPlatformsTable,
   stationsNextTable,
   stationsTable,
   townsNextTable,
@@ -229,6 +231,7 @@ export async function insertStationsStaging(
     station_codes: s.stationCodes,
     landmark_ids: s.landmarkIds,
     first_last_train: s.firstLastTrain ?? null,
+    layout_platforms: s.layout?.platforms ?? [],
   }));
   for (const c of chunk(stationRows, BATCH)) {
     if (c.length === 0) continue;
@@ -776,6 +779,9 @@ export async function syncStations(db: Db): Promise<void> {
       await tx
         .delete(stationLandmarksTable)
         .where(inArray(stationLandmarksTable.station_id, ch));
+      await tx
+        .delete(stationPlatformsTable)
+        .where(inArray(stationPlatformsTable.station_id, ch));
       for (const row of full) {
         if (row.station_codes.length > 0) {
           await tx.insert(stationCodesTable).values(
@@ -798,6 +804,21 @@ export async function syncStations(db: Db): Promise<void> {
                 station_id: row.id,
                 landmark_id: landmarkId,
               } satisfies InferInsertModel<typeof stationLandmarksTable>;
+            }),
+          );
+        }
+        if (row.layout_platforms.length > 0) {
+          await tx.insert(stationPlatformsTable).values(
+            row.layout_platforms.map((platform) => {
+              return {
+                station_id: row.id,
+                platform_id: platform.id,
+                label: platform.label,
+                last_updated: platform.lastUpdated,
+                line_id: platform.lineId,
+                boarding_status: platform.boardingStatus ?? null,
+                inference: platform.inference ?? null,
+              } satisfies InferInsertModel<typeof stationPlatformsTable>;
             }),
           );
         }
@@ -826,6 +847,16 @@ export async function deleteStationOrphans(db: Db): Promise<void> {
             .select()
             .from(stationsNextTable)
             .where(eq(stationsNextTable.id, stationLandmarksTable.station_id)),
+        ),
+      );
+    await tx
+      .delete(stationPlatformsTable)
+      .where(
+        notExists(
+          tx
+            .select()
+            .from(stationsNextTable)
+            .where(eq(stationsNextTable.id, stationPlatformsTable.station_id)),
         ),
       );
     await tx
@@ -882,6 +913,36 @@ export async function deleteStationOrphans(db: Db): Promise<void> {
             .where(eq(stationsNextTable.id, stationsTable.id)),
         ),
       );
+  });
+}
+
+/**
+ * Platform service links depend on both station platforms and services, so they
+ * are rebuilt after their respective promotion steps. The table is small and a
+ * full rebuild keeps memberships exact when either parent domain changes.
+ */
+export async function syncStationPlatformServices(db: Db): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.delete(stationPlatformServicesTable);
+    const rows = await tx
+      .select({
+        station_id: stationsNextTable.id,
+        layout_platforms: stationsNextTable.layout_platforms,
+      })
+      .from(stationsNextTable);
+    const platformServices = rows.flatMap((row) =>
+      row.layout_platforms.flatMap((platform) =>
+        (platform.serviceIds ?? []).map((serviceId) => ({
+          station_id: row.station_id,
+          platform_id: platform.id,
+          service_id: serviceId,
+        })),
+      ),
+    );
+    for (const batch of chunk(platformServices, BATCH)) {
+      if (batch.length === 0) continue;
+      await tx.insert(stationPlatformServicesTable).values(batch);
+    }
   });
 }
 

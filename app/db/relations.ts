@@ -33,6 +33,8 @@ import {
   servicesTable,
   stationCodesTable,
   stationLandmarksTable,
+  stationPlatformServicesTable,
+  stationPlatformsTable,
   stationsTable,
   townsTable,
 } from './schema';
@@ -71,6 +73,8 @@ const schema = {
   services: servicesTable,
   stationCodes: stationCodesTable,
   stationLandmarks: stationLandmarksTable,
+  stationPlatformServices: stationPlatformServicesTable,
+  stationPlatforms: stationPlatformsTable,
   stations: stationsTable,
   towns: townsTable,
 };
@@ -140,6 +144,7 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.lines.id.through(r.stationCodes.line_id),
       to: r.stations.id.through(r.stationCodes.station_id),
     }),
+    stationPlatforms: r.many.stationPlatforms(),
   },
   stations: {
     crowdReportClusters: r.many.crowdReportClusters(),
@@ -156,6 +161,7 @@ export const relations = defineRelations(schema, (r) => ({
     }),
     lines: r.many.lines(),
     landmarks: r.many.landmarks(),
+    stationPlatforms: r.many.stationPlatforms(),
     town: r.one.towns({
       from: r.stations.townId,
       to: r.towns.id,
@@ -230,6 +236,7 @@ export const relations = defineRelations(schema, (r) => ({
       alias: 'lines_id_services_id_via_lineServices',
     }),
     serviceRevisions: r.many.serviceRevisions(),
+    stationPlatformServices: r.many.stationPlatformServices(),
     line: r.one.lines({
       from: r.services.line_id,
       to: r.lines.id,
@@ -316,6 +323,30 @@ export const relations = defineRelations(schema, (r) => ({
     service: r.one.services({
       from: r.serviceRevisions.service_id,
       to: r.services.id,
+    }),
+  },
+  stationPlatforms: {
+    line: r.one.lines({
+      from: r.stationPlatforms.line_id,
+      to: r.lines.id,
+    }),
+    station: r.one.stations({
+      from: r.stationPlatforms.station_id,
+      to: r.stations.id,
+    }),
+    stationPlatformServices: r.many.stationPlatformServices(),
+  },
+  stationPlatformServices: {
+    service: r.one.services({
+      from: r.stationPlatformServices.service_id,
+      to: r.services.id,
+    }),
+    stationPlatform: r.one.stationPlatforms({
+      from: [
+        r.stationPlatformServices.station_id,
+        r.stationPlatformServices.platform_id,
+      ],
+      to: [r.stationPlatforms.station_id, r.stationPlatforms.platform_id],
     }),
   },
   landmarks: {
