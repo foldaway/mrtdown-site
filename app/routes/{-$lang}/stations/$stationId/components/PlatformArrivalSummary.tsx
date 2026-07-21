@@ -53,13 +53,11 @@ export function ServiceArrivalSummary({
               />
             </Link>
           )}
-          {arrivalTiming.firstTrainTime != null &&
-          arrivalTiming.lastTrainTime != null ? (
-            <ServiceHoursTooltip
-              firstTrainTime={arrivalTiming.firstTrainTime}
-              lastTrainTime={arrivalTiming.lastTrainTime}
-            />
-          ) : null}
+          <ServiceDetailsTooltip
+            firstTrainTime={arrivalTiming.firstTrainTime}
+            lastTrainTime={arrivalTiming.lastTrainTime}
+            serviceName={arrivalTiming.serviceName}
+          />
         </div>
         {arrivalTiming.platformLabels.length > 0 && (
           <ul className="mt-1.5 flex flex-wrap gap-1">
@@ -209,18 +207,24 @@ function ArrivalStatus({
   );
 }
 
-function ServiceHoursTooltip({
+function ServiceDetailsTooltip({
   firstTrainTime,
   lastTrainTime,
+  serviceName,
 }: {
-  firstTrainTime: string;
-  lastTrainTime: string;
+  firstTrainTime: string | null;
+  lastTrainTime: string | null;
+  serviceName: ArrivalTiming['serviceName'];
 }) {
   const intl = useIntl();
   const label = intl.formatMessage({
-    id: 'station.arrival_timings.service_hours_label',
-    defaultMessage: 'Service hours',
+    id: 'station.arrival_timings.service_details_label',
+    defaultMessage: 'Service details',
   });
+  const localizedServiceName = getLocalizedTranslation(
+    serviceName,
+    intl.locale,
+  );
 
   return (
     <Tooltip.Provider delayDuration={100}>
@@ -240,16 +244,35 @@ function ServiceHoursTooltip({
             sideOffset={4}
           >
             <p className="font-semibold">{label}</p>
-            <p className="mt-1 text-gray-200 tabular-nums dark:text-gray-300">
-              <FormattedMessage
-                id="station.arrival_timings.service_hours"
-                defaultMessage="First {firstTrain} · Last {lastTrain} (Singapore time)"
-                values={{
-                  firstTrain: formatServiceTime(firstTrainTime, intl),
-                  lastTrain: formatServiceTime(lastTrainTime, intl),
-                }}
-              />
-            </p>
+            <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-gray-200 dark:text-gray-300">
+              <dt className="text-gray-400 dark:text-gray-400">
+                <FormattedMessage
+                  id="station.arrival_timings.service_label"
+                  defaultMessage="Service"
+                />
+              </dt>
+              <dd className="min-w-0">{localizedServiceName}</dd>
+              {firstTrainTime != null && lastTrainTime != null && (
+                <>
+                  <dt className="text-gray-400 dark:text-gray-400">
+                    <FormattedMessage
+                      id="station.arrival_timings.service_hours_label"
+                      defaultMessage="Service hours"
+                    />
+                  </dt>
+                  <dd className="tabular-nums">
+                    <FormattedMessage
+                      id="station.arrival_timings.service_hours"
+                      defaultMessage="First {firstTrain} · Last {lastTrain} (Singapore time)"
+                      values={{
+                        firstTrain: formatServiceTime(firstTrainTime, intl),
+                        lastTrain: formatServiceTime(lastTrainTime, intl),
+                      }}
+                    />
+                  </dd>
+                </>
+              )}
+            </dl>
             <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
           </Tooltip.Content>
         </Tooltip.Portal>

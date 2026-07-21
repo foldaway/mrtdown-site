@@ -11,6 +11,7 @@ import { isoDate, isoDateTime } from './dbQueries/dateTime';
 export type EstimatedArrivalService = {
   serviceId: string;
   lineId: string;
+  serviceName: Station['name'];
   destinationStationId: string | null;
   destinationCode: string;
   destinationName: Station['name'] | null;
@@ -20,6 +21,7 @@ export type EstimatedArrivalService = {
 export type EstimatedArrivalTiming = {
   serviceId: string;
   lineId: string;
+  serviceName: Station['name'];
   destinationStationId: string | null;
   destinationCode: string;
   destinationName: Station['name'] | null;
@@ -144,6 +146,7 @@ export function getEstimatedStationArrivalTimings(input: {
               {
                 serviceId: service.serviceId,
                 lineId: service.lineId,
+                serviceName: service.serviceName,
                 destinationStationId: service.destinationStationId,
                 destinationCode: service.destinationCode,
                 destinationName: service.destinationName,

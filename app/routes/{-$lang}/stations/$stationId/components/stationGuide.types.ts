@@ -3,6 +3,7 @@ import type { Station } from '~/types';
 export type ArrivalTiming = {
   serviceId: string;
   lineId: string;
+  serviceName: Station['name'];
   destinationStationId: string | null;
   destinationCode: string;
   destinationName: Station['name'] | null;

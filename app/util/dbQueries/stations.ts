@@ -418,6 +418,7 @@ export async function getStationProfileReadModel(
     return {
       serviceId: branch.id,
       lineId: branch.lineId,
+      serviceName: branch.name,
       destinationStationId: destination?.stationId ?? null,
       destinationCode: destination?.displayCode ?? branch.id,
       destinationName:
@@ -455,6 +456,7 @@ export async function getStationProfileReadModel(
     Array<{
       serviceId: string;
       lineId: string;
+      serviceName: Station['name'];
       destinationStationId: string | null;
       destinationCode: string;
       destinationName: Station['name'] | null;
@@ -470,6 +472,7 @@ export async function getStationProfileReadModel(
     const timing = arrivalTimingsByServiceId.get(service.serviceId) ?? {
       serviceId: service.serviceId,
       lineId: service.lineId,
+      serviceName: service.serviceName,
       destinationStationId: service.destinationStationId,
       destinationCode: service.destinationCode,
       destinationName: service.destinationName,

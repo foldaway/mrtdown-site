@@ -50,6 +50,12 @@ describe('getEstimatedStationArrivalTimings', () => {
         {
           serviceId: 'alpha-eastbound',
           lineId: 'AL',
+          serviceName: {
+            'en-SG': 'Alpha Line eastbound',
+            'zh-Hans': null,
+            ms: null,
+            ta: null,
+          },
           destinationStationId: 'bravo',
           destinationCode: 'B2',
           destinationName: {
@@ -71,6 +77,12 @@ describe('getEstimatedStationArrivalTimings', () => {
       {
         serviceId: 'alpha-eastbound',
         lineId: 'AL',
+        serviceName: {
+          'en-SG': 'Alpha Line eastbound',
+          'zh-Hans': null,
+          ms: null,
+          ta: null,
+        },
         destinationStationId: 'bravo',
         destinationCode: 'B2',
         destinationName: {
@@ -99,6 +111,12 @@ describe('getEstimatedStationArrivalTimings', () => {
           {
             serviceId: 'alpha-eastbound',
             lineId: 'AL',
+            serviceName: {
+              'en-SG': 'Alpha Line eastbound',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
             destinationStationId: 'bravo',
             destinationCode: 'B2',
             destinationName: null,
@@ -126,6 +144,12 @@ describe('getEstimatedStationArrivalTimings', () => {
           {
             serviceId: 'alpha-eastbound',
             lineId: 'AL',
+            serviceName: {
+              'en-SG': 'Alpha Line eastbound',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
             destinationStationId: 'bravo',
             destinationCode: 'B2',
             destinationName: null,
