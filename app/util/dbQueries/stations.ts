@@ -8,6 +8,7 @@ import {
   linesTable,
   servicesTable,
   stationCodesTable,
+  stationExitsTable,
   stationIssueFactsTable,
   stationLandmarksTable,
   stationPlatformServicesTable,
@@ -330,6 +331,19 @@ export async function getStationProfileReadModel(
       )
       .where(eq(stationPlatformsTable.station_id, station.id)),
   );
+  const exitRows = await timeDbQuery('station_profile_q_exits', () =>
+    db
+      .select({
+        id: stationExitsTable.source_object_id,
+        label: stationExitsTable.label,
+      })
+      .from(stationExitsTable)
+      .where(eq(stationExitsTable.station_id, station.id))
+      .orderBy(asc(stationExitsTable.label)),
+  );
+  const exitsByLabel = new Map(
+    exitRows.map((exit) => [exit.label, exit] as const),
+  );
   const platformsById = new Map<
     string,
     {
@@ -355,7 +369,13 @@ export async function getStationProfileReadModel(
   }
   const platforms = [...platformsById.values()].sort((a, b) => {
     const lineDiff = a.lineId.localeCompare(b.lineId);
-    return lineDiff !== 0 ? lineDiff : a.label.localeCompare(b.label);
+    if (lineDiff !== 0) {
+      return lineDiff;
+    }
+    const labelDiff = a.label.localeCompare(b.label, undefined, {
+      numeric: true,
+    });
+    return labelDiff !== 0 ? labelDiff : a.id.localeCompare(b.id);
   });
   const boardablePlatformLabelsByServiceId = new Map<string, string[]>();
   for (const platform of platforms) {
@@ -368,9 +388,12 @@ export async function getStationProfileReadModel(
       boardablePlatformLabelsByServiceId.set(serviceId, labels);
     }
   }
+  const arrivalBranchesWithOtherDestinations = arrivalBranches.filter(
+    (branch) => branch.entries.at(-1)?.stationId !== station.id,
+  );
   const destinationStationIds = [
     ...new Set(
-      arrivalBranches
+      arrivalBranchesWithOtherDestinations
         .map((branch) => branch.entries.at(-1)?.stationId)
         .filter((stationId): stationId is string => stationId != null),
     ),
@@ -390,37 +413,89 @@ export async function getStationProfileReadModel(
       parseTranslations(destination.name),
     ]),
   );
-  const arrivalTimings = getEstimatedStationArrivalTimings({
-    station,
-    services: arrivalBranches.map((branch) => {
-      const destination = branch.entries.at(-1);
-      return {
-        serviceId: branch.id,
-        lineId: branch.lineId,
-        destinationCode: destination?.displayCode ?? branch.id,
-        destinationName:
-          destinationNameByStationId[destination?.stationId ?? ''] ?? null,
-        revision: {
-          path: {
-            stations: branch.entries.map((entry) => ({
-              stationId: entry.stationId,
-              displayCode: entry.displayCode,
-            })),
-          },
-          estimatedFrequency: branch.estimatedFrequency,
+  const arrivalServices = arrivalBranchesWithOtherDestinations.map((branch) => {
+    const destination = branch.entries.at(-1);
+    return {
+      serviceId: branch.id,
+      lineId: branch.lineId,
+      destinationStationId: destination?.stationId ?? null,
+      destinationCode: destination?.displayCode ?? branch.id,
+      destinationName:
+        destinationNameByStationId[destination?.stationId ?? ''] ?? null,
+      revision: {
+        path: {
+          stations: branch.entries.map((entry) => ({
+            stationId: entry.stationId,
+            displayCode: entry.displayCode,
+          })),
         },
-      };
-    }),
-    referenceNow,
-    publicHolidayDates: dataset.publicHolidaySet,
-  }).map((timing) => ({
-    ...timing,
-    platformLabels: [
-      ...new Set(
-        boardablePlatformLabelsByServiceId.get(timing.serviceId) ?? [],
-      ),
-    ].sort((a, b) => a.localeCompare(b)),
-  }));
+        estimatedFrequency: branch.estimatedFrequency,
+      },
+    };
+  });
+  const arrivalTimingsByServiceId = new Map(
+    getEstimatedStationArrivalTimings({
+      station,
+      services: arrivalServices,
+      referenceNow,
+      publicHolidayDates: dataset.publicHolidaySet,
+    })
+      .map((timing) => ({
+        ...timing,
+        platformLabels: [
+          ...new Set(
+            boardablePlatformLabelsByServiceId.get(timing.serviceId) ?? [],
+          ),
+        ].sort((a, b) => a.localeCompare(b)),
+      }))
+      .map((timing) => [timing.serviceId, timing] as const),
+  );
+  const arrivalLinesById = new Map<
+    string,
+    Array<{
+      serviceId: string;
+      lineId: string;
+      destinationStationId: string | null;
+      destinationCode: string;
+      destinationName: Station['name'] | null;
+      firstTrainTime: string | null;
+      lastTrainTime: string | null;
+      isServiceEnded: boolean;
+      nextServiceStart: string | null;
+      platformLabels: string[];
+      departures: string[];
+    }>
+  >();
+  for (const service of arrivalServices) {
+    const timing = arrivalTimingsByServiceId.get(service.serviceId) ?? {
+      serviceId: service.serviceId,
+      lineId: service.lineId,
+      destinationStationId: service.destinationStationId,
+      destinationCode: service.destinationCode,
+      destinationName: service.destinationName,
+      firstTrainTime: null,
+      lastTrainTime: null,
+      isServiceEnded: false,
+      nextServiceStart: null,
+      platformLabels: [],
+      departures: [],
+    };
+    const timings = arrivalLinesById.get(service.lineId) ?? [];
+    timings.push(timing);
+    arrivalLinesById.set(service.lineId, timings);
+  }
+  const arrivalLines = [...arrivalLinesById]
+    .map(([lineId, arrivalTimings]) => ({
+      lineId,
+      arrivalTimings: arrivalTimings.toSorted((a, b) => {
+        const nextDepartureDiff =
+          Date.parse(a.departures[0] ?? '') - Date.parse(b.departures[0] ?? '');
+        return nextDepartureDiff !== 0
+          ? nextDepartureDiff
+          : a.destinationCode.localeCompare(b.destinationCode);
+      }),
+    }))
+    .sort((a, b) => a.lineId.localeCompare(b.lineId));
   return {
     data: {
       stationId: resolvedStationId,
@@ -428,10 +503,8 @@ export async function getStationProfileReadModel(
       issueIdsRecent,
       issueCountByType: pickIssueTypes(issues),
       communitySignals,
-      arrivalTimings,
-      platforms: platforms.map(
-        ({ serviceIds: _serviceIds, ...platform }) => platform,
-      ),
+      arrivalLines,
+      exits: [...exitsByLabel.values()],
     },
     included: selectIncludedEntities(dataset.included, dataset.allIssues, {
       issueIds: issueIdsRecent,

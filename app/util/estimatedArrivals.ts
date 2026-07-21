@@ -11,6 +11,7 @@ import { isoDate, isoDateTime } from './dbQueries/dateTime';
 export type EstimatedArrivalService = {
   serviceId: string;
   lineId: string;
+  destinationStationId: string | null;
   destinationCode: string;
   destinationName: Station['name'] | null;
   revision: Pick<ServiceRevision, 'path' | 'estimatedFrequency'>;
@@ -19,10 +20,13 @@ export type EstimatedArrivalService = {
 export type EstimatedArrivalTiming = {
   serviceId: string;
   lineId: string;
+  destinationStationId: string | null;
   destinationCode: string;
   destinationName: Station['name'] | null;
   firstTrainTime: string | null;
   lastTrainTime: string | null;
+  isServiceEnded: boolean;
+  nextServiceStart: string | null;
   departures: string[];
 };
 
@@ -79,30 +83,74 @@ export function getEstimatedStationArrivalTimings(input: {
             calendar: calendarForDate(serviceDate, input.publicHolidayDates),
           }),
         }));
-        const currentSchedule = schedules[1]?.schedule;
-        const departures = schedules
-          .flatMap(({ serviceDate, schedule }) => {
+        const scheduleDepartures = schedules.map(
+          ({ serviceDate, schedule }) => {
             const startOfServiceDay = serviceDate.startOf('day');
-            return enumerateEstimatedStationDepartures(schedule).map(
-              (departure) =>
-                isoDateTime(
-                  startOfServiceDay.plus({ seconds: departure.seconds }),
-                ),
-            );
-          })
+            const departures = enumerateEstimatedStationDepartures(
+              schedule,
+            ).map((departure) => ({
+              seconds: departure.seconds,
+              time: isoDateTime(
+                startOfServiceDay.plus({ seconds: departure.seconds }),
+              ),
+            }));
+            return { serviceDate, schedule, departures };
+          },
+        );
+        const currentSchedule = scheduleDepartures[1]?.schedule;
+        const allDepartures = scheduleDepartures
+          .flatMap(({ departures }) => departures)
+          .sort((a, b) => a.time.localeCompare(b.time));
+        const departures = allDepartures
+          .map((departure) => departure.time)
           .filter((departure) => Date.parse(departure) >= referenceMillis)
-          .sort((a, b) => a.localeCompare(b))
           .slice(0, 2);
+        const isServiceEnded = !scheduleDepartures.some(
+          ({ serviceDate, departures: scheduledDepartures }) => {
+            const firstDeparture = scheduledDepartures[0];
+            const lastDeparture = scheduledDepartures.at(-1);
+            if (firstDeparture == null || lastDeparture == null) {
+              return false;
+            }
+            const startOfServiceDay = serviceDate.startOf('day');
+            return (
+              startOfServiceDay
+                .plus({ seconds: firstDeparture.seconds })
+                .toMillis() <= referenceMillis &&
+              referenceMillis <=
+                startOfServiceDay
+                  .plus({ seconds: lastDeparture.seconds })
+                  .toMillis()
+            );
+          },
+        );
+        const nextServiceStart = scheduleDepartures
+          .flatMap(({ serviceDate, departures: scheduledDepartures }) => {
+            const firstDeparture = scheduledDepartures[0];
+            return firstDeparture == null
+              ? []
+              : [
+                  isoDateTime(
+                    serviceDate
+                      .startOf('day')
+                      .plus({ seconds: firstDeparture.seconds }),
+                  ),
+                ];
+          })
+          .find((departure) => Date.parse(departure) > referenceMillis);
 
         return departures.length > 0
           ? [
               {
                 serviceId: service.serviceId,
                 lineId: service.lineId,
+                destinationStationId: service.destinationStationId,
                 destinationCode: service.destinationCode,
                 destinationName: service.destinationName,
                 firstTrainTime: currentSchedule?.firstTrainTime ?? null,
                 lastTrainTime: currentSchedule?.lastTrainTime ?? null,
+                isServiceEnded,
+                nextServiceStart: nextServiceStart ?? null,
                 departures,
               },
             ]

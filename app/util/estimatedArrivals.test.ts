@@ -50,6 +50,7 @@ describe('getEstimatedStationArrivalTimings', () => {
         {
           serviceId: 'alpha-eastbound',
           lineId: 'AL',
+          destinationStationId: 'bravo',
           destinationCode: 'B2',
           destinationName: {
             'en-SG': 'Bravo',
@@ -70,6 +71,7 @@ describe('getEstimatedStationArrivalTimings', () => {
       {
         serviceId: 'alpha-eastbound',
         lineId: 'AL',
+        destinationStationId: 'bravo',
         destinationCode: 'B2',
         destinationName: {
           'en-SG': 'Bravo',
@@ -79,10 +81,39 @@ describe('getEstimatedStationArrivalTimings', () => {
         },
         firstTrainTime: '05:00:00',
         lastTrainTime: '06:00:00',
+        isServiceEnded: false,
+        nextServiceStart: '2026-07-21T05:00:00.000+08:00',
         departures: [
           '2026-07-20T05:10:00.000+08:00',
           '2026-07-20T05:20:00.000+08:00',
         ],
+      },
+    ]);
+  });
+
+  it('marks the overnight gap as ended and provides the next first train', () => {
+    expect(
+      getEstimatedStationArrivalTimings({
+        station,
+        services: [
+          {
+            serviceId: 'alpha-eastbound',
+            lineId: 'AL',
+            destinationStationId: 'bravo',
+            destinationCode: 'B2',
+            destinationName: null,
+            revision,
+          },
+        ],
+        referenceNow: DateTime.fromISO('2026-07-20T23:00:00', {
+          zone: 'Asia/Singapore',
+        }),
+        publicHolidayDates: new Set(),
+      }),
+    ).toMatchObject([
+      {
+        isServiceEnded: true,
+        nextServiceStart: '2026-07-21T05:00:00.000+08:00',
       },
     ]);
   });
@@ -95,6 +126,7 @@ describe('getEstimatedStationArrivalTimings', () => {
           {
             serviceId: 'alpha-eastbound',
             lineId: 'AL',
+            destinationStationId: 'bravo',
             destinationCode: 'B2',
             destinationName: null,
             revision: {
