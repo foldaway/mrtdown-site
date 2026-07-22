@@ -439,6 +439,7 @@
   "status.operational": "正常运营",
   "status.service_ended": "非运营时间",
   "general.towns": "市镇",
+  "general.towns_and_areas": "市镇与区域",
   "town.heading": "{townName}的地铁与轻轨站",
   "town.intro.with_issues": "{townName}共有{stationCount, plural, one {#座轨道车站} other {#座轨道车站}}，连接{lineCount, plural, one {#条线路} other {#条线路}}；截至目前共记录了{issueTypeCountString}。",
   "town.intro.without_issues": "{townName}共有{stationCount, plural, one {#座轨道车站} other {#座轨道车站}}，连接{lineCount, plural, one {#条线路} other {#条线路}}。截至目前，这里没有服务问题记录。",

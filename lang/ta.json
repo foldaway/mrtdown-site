@@ -439,6 +439,7 @@
   "status.operational": "இயங்குகிறது",
   "status.service_ended": "சேவை நேரத்திற்கு வெளியே",
   "general.towns": "நகரங்கள்",
+  "general.towns_and_areas": "நகரங்களும் பகுதிகளும்",
   "town.heading": "{townName} நகரிலுள்ள MRT & LRT நிலையங்கள்",
   "town.intro.with_issues": "{townName} நகரில் {lineCount, plural, one {# வழித்தடத்தில்} other {# வழித்தடங்களில்}} {stationCount, plural, one {# ரயில் நிலையம்} other {# ரயில் நிலையங்கள்}} உள்ளன; இதுவரை {issueTypeCountString} பதிவாகியுள்ளன.",
   "town.intro.without_issues": "{townName} நகரில் {lineCount, plural, one {# வழித்தடத்தில்} other {# வழித்தடங்களில்}} {stationCount, plural, one {# ரயில் நிலையம்} other {# ரயில் நிலையங்கள்}} உள்ளன. இதுவரை இங்கு சேவைச் சிக்கல்கள் எதுவும் பதிவாகவில்லை.",

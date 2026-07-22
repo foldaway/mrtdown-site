@@ -439,6 +439,7 @@
   "status.operational": "Beroperasi",
   "status.service_ended": "Di Luar Waktu Perkhidmatan",
   "general.towns": "Bandar",
+  "general.towns_and_areas": "Bandar dan kawasan",
   "town.heading": "Stesen MRT & LRT di {townName}",
   "town.intro.with_issues": "{townName} mempunyai {stationCount, plural, one {# stesen rel} other {# stesen rel}} merentasi {lineCount, plural, one {# laluan} other {# laluan}}, dengan {issueTypeCountString} dilaporkan setakat ini.",
   "town.intro.without_issues": "{townName} mempunyai {stationCount, plural, one {# stesen rel} other {# stesen rel}} merentasi {lineCount, plural, one {# laluan} other {# laluan}}. Tiada isu perkhidmatan dilaporkan di sini setakat ini.",

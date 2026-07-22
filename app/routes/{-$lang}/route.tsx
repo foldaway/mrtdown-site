@@ -182,7 +182,7 @@ function RouteComponent() {
                             className={linkClassNameDropdown}
                           >
                             <FormattedMessage
-                              id="general.towns"
+                              id="general.towns_and_areas"
                               defaultMessage="Towns & areas"
                             />
                           </Link>
@@ -304,7 +304,7 @@ function RouteComponent() {
                             className={linkClassNameMobile}
                           >
                             <FormattedMessage
-                              id="general.towns"
+                              id="general.towns_and_areas"
                               defaultMessage="Towns & areas"
                             />
                           </Link>
