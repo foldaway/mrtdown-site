@@ -363,6 +363,12 @@ Exit criteria:
   final issue IDs. The query records its returned-row count as
   `issue_range_q_latest_overlapping_issue_ids_rows`; production measurement is
   still required before advancing to topology reuse.
+- 2026-07-22: Deployed the date-range query. The first production
+  `pg_stat_statements` sample at 15:15:51 UTC found the statistics window had
+  reset at 11:36:10 UTC; the new CTE had five calls, returned 360 final issue
+  IDs, and averaged 72 rows per call. Retain this reset timestamp and collect
+  a 48-72 hour matching Neon Consumption API and Cloudflare window before
+  deciding whether topology reuse is warranted.
 
 ## Decision Log
 
