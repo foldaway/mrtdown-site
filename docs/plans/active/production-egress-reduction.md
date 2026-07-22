@@ -356,6 +356,13 @@ Exit criteria:
   zero-duration `*_rows` entries with row-count descriptions for the new
   issue-scope queries. Production transfer and statement-counter deltas still
   need to be captured after deployment.
+- 2026-07-22: Replaced date-range issue discovery's overlapping-event and
+  candidate-issue ID chunk fan-out with one CTE query. Postgres now selects
+  each issue's latest `periods.set` event using the existing timestamp and ID
+  tie-break before testing that event's periods for overlap, and returns only
+  final issue IDs. The query records its returned-row count as
+  `issue_range_q_latest_overlapping_issue_ids_rows`; production measurement is
+  still required before advancing to topology reuse.
 
 ## Decision Log
 

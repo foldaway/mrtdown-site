@@ -1,12 +1,7 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { asc, desc, eq, sql } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
 import { impactEventPeriodsTable, impactEventsTable } from '~/db/schema';
-import {
-  type AppDb,
-  getDefaultDb,
-  selectByIdChunks,
-  timeDbQuery,
-} from './database';
+import { type AppDb, getDefaultDb, timeDbRowsQuery } from './database';
 import { buildDataset } from './dataset';
 import { isoDateTime, nowSg, parseDateTime } from './dateTime';
 import { issueOverlapsRange } from './issueIntervals';
@@ -17,61 +12,41 @@ async function getIssueIdsOverlappingRange(
   db?: AppDb,
 ) {
   const database = db ?? (await getDefaultDb());
-  const overlappingPeriodRows = await timeDbQuery(
-    'issue_range_q_overlapping_periods',
+  // Period events are revisions. Selecting the latest event before filtering
+  // its periods preserves the canonical rule that a stale overlapping revision
+  // must not include an issue whose newer revision no longer overlaps.
+  const latestPeriodEvents = database.$with('latest_period_events').as(
+    database
+      .selectDistinctOn([impactEventsTable.issue_id], {
+        id: impactEventsTable.id,
+        issueId: impactEventsTable.issue_id,
+      })
+      .from(impactEventsTable)
+      .where(eq(impactEventsTable.type, 'periods.set'))
+      .orderBy(
+        asc(impactEventsTable.issue_id),
+        desc(impactEventsTable.ts),
+        desc(impactEventsTable.id),
+      ),
+  );
+
+  const issueRows = await timeDbRowsQuery(
+    'issue_range_q_latest_overlapping_issue_ids',
     () =>
       database
-        .select({
-          impact_event_id: impactEventPeriodsTable.impact_event_id,
-        })
-        .from(impactEventPeriodsTable)
+        .with(latestPeriodEvents)
+        .selectDistinct({ issueId: latestPeriodEvents.issueId })
+        .from(latestPeriodEvents)
+        .innerJoin(
+          impactEventPeriodsTable,
+          eq(impactEventPeriodsTable.impact_event_id, latestPeriodEvents.id),
+        )
         .where(
           sql`${impactEventPeriodsTable.start_at} < ${isoDateTime(rangeEnd)} and (${impactEventPeriodsTable.end_at} is null or ${impactEventPeriodsTable.end_at} > ${isoDateTime(rangeStart)})`,
-        ),
+        )
+        .orderBy(asc(latestPeriodEvents.issueId)),
   );
-  const overlappingPeriodEventIds = [
-    ...new Set(overlappingPeriodRows.map((row) => row.impact_event_id)),
-  ];
-  const overlappingPeriodEventRows = await timeDbQuery(
-    'issue_range_q_period_events_for_overlap',
-    () =>
-      selectByIdChunks(overlappingPeriodEventIds, (ids) =>
-        database
-          .select({
-            id: impactEventsTable.id,
-            issue_id: impactEventsTable.issue_id,
-            ts: impactEventsTable.ts,
-          })
-          .from(impactEventsTable)
-          .where(inArray(impactEventsTable.id, ids)),
-      ),
-  );
-  const candidateIssueIds = [
-    ...new Set(overlappingPeriodEventRows.map((event) => event.issue_id)),
-  ];
-  const periodEventRows = await timeDbQuery(
-    'issue_range_q_period_events_for_issues',
-    () =>
-      selectByIdChunks(candidateIssueIds, (ids) =>
-        database
-          .select({
-            id: impactEventsTable.id,
-            issue_id: impactEventsTable.issue_id,
-            ts: impactEventsTable.ts,
-          })
-          .from(impactEventsTable)
-          .where(
-            and(
-              eq(impactEventsTable.type, 'periods.set'),
-              inArray(impactEventsTable.issue_id, ids),
-            ),
-          ),
-      ),
-  );
-  return selectIssueIdsWithLatestOverlappingPeriodEvents(
-    overlappingPeriodEventIds,
-    periodEventRows,
-  );
+  return issueRows.map((row) => row.issueId);
 }
 
 type PeriodEventCandidate = Pick<
