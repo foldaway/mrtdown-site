@@ -1,5 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { selectIssueIdsWithLatestOverlappingPeriodEvents } from './issueRange';
+
+const ISSUE_RANGE_SOURCE = readFileSync(
+  fileURLToPath(new URL('./issueRange.ts', import.meta.url)),
+  'utf8',
+);
 
 describe('history issue range selection', () => {
   it('keeps an issue when its latest period revision overlaps the range', () => {
@@ -60,5 +67,12 @@ describe('history issue range selection', () => {
         ],
       ),
     ).toEqual(['issue-1']);
+  });
+
+  it('keeps overlap discovery in one CTE query without ID chunk fan-out', () => {
+    expect(ISSUE_RANGE_SOURCE).toContain(".$with('latest_period_events').as(");
+    expect(ISSUE_RANGE_SOURCE).toContain('.selectDistinctOn(');
+    expect(ISSUE_RANGE_SOURCE).toContain('.with(latestPeriodEvents)');
+    expect(ISSUE_RANGE_SOURCE).not.toContain('selectByIdChunks');
   });
 });
