@@ -9,7 +9,7 @@ import {
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
-import { Tooltip } from 'radix-ui';
+import { Tooltip } from '../BaseUI';
 import { useMemo, useState } from 'react';
 import {
   FormattedDate,

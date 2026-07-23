@@ -13,7 +13,7 @@ import {
 } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
-import { DropdownMenu } from 'radix-ui';
+import { DropdownMenu } from '../../components/BaseUI';
 import { useMemo } from 'react';
 import { FormattedDate, FormattedMessage, IntlProvider } from 'react-intl';
 import { LocaleSwitcher } from '~/components/LocaleSwitcher';
@@ -62,7 +62,7 @@ const linkClassNameDropdown = classNames(
 );
 
 const dropdownContentClassName =
-  'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[220px] rounded-2xl border border-gray-200/40 bg-white/98 p-1.5 shadow-black/10 shadow-xl backdrop-blur-xl data-[state=closed]:animate-out data-[state=open]:animate-in dark:border-gray-700/40 dark:bg-gray-950/98 dark:shadow-white/5';
+  'data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[220px] rounded-2xl border border-gray-200/40 bg-white/98 p-1.5 shadow-black/10 shadow-xl backdrop-blur-xl data-closed:animate-out data-open:animate-in dark:border-gray-700/40 dark:bg-gray-950/98 dark:shadow-white/5';
 
 function RouteComponent() {
   const { lang = PRIMARY_LOCALE } = Route.useParams();
@@ -145,7 +145,7 @@ function RouteComponent() {
                           id="general.network"
                           defaultMessage="Network"
                         />
-                        <ChevronDownIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                        <ChevronDownIcon className="size-3.5 transition-transform group-data-open:rotate-180" />
                       </button>
                     </DropdownMenu.Trigger>
                     <DropdownMenu.Portal>

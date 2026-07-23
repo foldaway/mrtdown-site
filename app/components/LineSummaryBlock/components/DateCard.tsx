@@ -2,7 +2,7 @@ import { CalendarDaysIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime, Duration } from 'luxon';
-import { Tooltip } from 'radix-ui';
+import { Tooltip } from '../../BaseUI';
 import { Fragment, useMemo } from 'react';
 import {
   FormattedDate,

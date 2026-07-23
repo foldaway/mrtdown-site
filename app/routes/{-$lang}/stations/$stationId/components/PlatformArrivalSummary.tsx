@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useEffect, useState } from 'react';
 import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
-import { Tooltip } from 'radix-ui';
+import { Tooltip } from '../../../../../components/BaseUI';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { PlatformSign } from './StationGuideSigns';
 import type { ArrivalTiming } from './stationGuide.types';

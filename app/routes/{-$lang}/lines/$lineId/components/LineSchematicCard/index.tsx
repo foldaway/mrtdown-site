@@ -5,7 +5,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
-import { DropdownMenu } from 'radix-ui';
+import { DropdownMenu } from '../../../../../../components/BaseUI';
 import { Fragment, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
@@ -284,7 +284,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content
-              className="z-50 w-[var(--radix-dropdown-menu-trigger-width)] overflow-hidden rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+              className="z-50 w-[var(--anchor-width)] overflow-hidden rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
               sideOffset={5}
             >
               {branches.map((branch) => (

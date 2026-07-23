@@ -7,7 +7,7 @@ import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { ExclamationCircleIcon } from '@heroicons/react/24/solid';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { DropdownMenu } from 'radix-ui';
+import { DropdownMenu } from '../../../../components/BaseUI';
 import { useMemo } from 'react';
 import {
   createIntl,
@@ -226,7 +226,7 @@ function HistoryYearPage() {
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content
-                      className="z-50 max-h-64 w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                      className="z-50 max-h-64 w-[var(--anchor-width)] overflow-y-auto rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
                       sideOffset={5}
                     >
                       {yearOptions.map((yearOption) => (

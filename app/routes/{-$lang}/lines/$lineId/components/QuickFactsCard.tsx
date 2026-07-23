@@ -1,7 +1,7 @@
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { Tooltip } from 'radix-ui';
+import { Tooltip } from '../../../../../components/BaseUI';
 import { useCallback, useMemo } from 'react';
 import {
   FormattedDateTimeRange,

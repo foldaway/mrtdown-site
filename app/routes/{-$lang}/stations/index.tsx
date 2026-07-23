@@ -16,7 +16,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import classNames from 'classnames';
-import { Tooltip } from 'radix-ui';
+import { Tooltip } from '../../../components/BaseUI';
 import { type ComponentType, type ReactNode, useMemo, useState } from 'react';
 import {
   createIntl,

@@ -1,5 +1,5 @@
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
-import { Collapsible } from 'radix-ui';
+import { Collapsible } from '../../../../../../components/BaseUI';
 import { FormattedMessage } from 'react-intl';
 import { IssueCard } from '~/components/IssueCard';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
@@ -40,10 +40,10 @@ export const RecentIssuesSection: React.FC<Props> = (props) => {
           <div className="mt-3 flex flex-col">
             <div className="relative">
               <IssueCard issue={issues[issueIds[0]]} className="!w-auto" />
-              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent group-data-[state=open]:hidden dark:from-gray-800" />
+              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent group-data-open:hidden dark:from-gray-800" />
             </div>
             {issueIds.length > 1 && (
-              <Collapsible.Trigger className="mt-3 shrink-0 self-center rounded-xl bg-blue-600 px-3 py-1.5 font-medium text-white text-xs transition-all duration-200 hover:bg-blue-700 hover:shadow-md group-data-[state=open]:hidden dark:bg-blue-700 dark:hover:bg-blue-600">
+              <Collapsible.Trigger className="mt-3 shrink-0 self-center rounded-xl bg-blue-600 px-3 py-1.5 font-medium text-white text-xs transition-all duration-200 hover:bg-blue-700 hover:shadow-md group-data-open:hidden dark:bg-blue-700 dark:hover:bg-blue-600">
                 <div className="flex items-center justify-between gap-x-2">
                   <FormattedMessage
                     id="general.show_remaining_count"

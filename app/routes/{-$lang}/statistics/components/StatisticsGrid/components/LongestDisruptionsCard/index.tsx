@@ -1,5 +1,5 @@
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
-import { Collapsible } from 'radix-ui';
+import { Collapsible } from '../../../../../../../components/BaseUI';
 import type React from 'react';
 import { useMemo } from 'react';
 import { FormattedMessage } from 'react-intl';
@@ -51,10 +51,10 @@ export const LongestDisruptionsCard: React.FC<Props> = (props) => {
                 issue={issues[0]}
                 className="!w-auto !rounded-xl !border-gray-200 !px-3 !py-2.5 !shadow-none hover:!border-gray-300 hover:!shadow-sm sm:!px-4 dark:!border-gray-700 dark:hover:!border-gray-600"
               />
-              <div className="absolute inset-x-px bottom-px h-12 rounded-b-xl bg-gradient-to-t from-white to-transparent group-data-[state=open]:hidden dark:from-gray-800" />
+              <div className="absolute inset-x-px bottom-px h-12 rounded-b-xl bg-gradient-to-t from-white to-transparent group-data-open:hidden dark:from-gray-800" />
             </div>
             {issues.length > 1 && (
-              <Collapsible.Trigger className="mt-3 shrink-0 self-center rounded-lg bg-accent-light px-3 py-1.5 font-semibold text-white text-xs transition-colors hover:bg-accent-dark group-data-[state=open]:hidden">
+              <Collapsible.Trigger className="mt-3 shrink-0 self-center rounded-lg bg-accent-light px-3 py-1.5 font-semibold text-white text-xs transition-colors hover:bg-accent-dark group-data-open:hidden">
                 <div className="flex items-center justify-between gap-x-2">
                   <FormattedMessage
                     id="general.show_remaining_count"

@@ -1,7 +1,7 @@
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { Tabs } from 'radix-ui';
+import { Tabs } from '../BaseUI';
 import type React from 'react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';

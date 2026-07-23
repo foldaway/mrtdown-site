@@ -2,7 +2,7 @@ import { ArrowRightIcon, ChevronDownIcon } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
-import { DropdownMenu } from 'radix-ui';
+import { DropdownMenu } from '../BaseUI';
 import { Fragment } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { Issue, IssueAffectedBranch, IssueInterval } from '~/types';
@@ -184,7 +184,7 @@ export const IssueAffectedBranchPill: React.FC<Props> = (props) => {
 
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            className="z-50 flex max-h-[var(--radix-dropdown-menu-content-available-height)] w-80 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
+            className="z-50 flex max-h-[var(--available-height)] w-80 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
             sideOffset={6}
             collisionPadding={8}
           >

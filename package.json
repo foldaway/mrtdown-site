@@ -34,6 +34,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@base-ui/react": "^1.6.0",
     "@fontsource-variable/anek-tamil": "^5.2.7",
     "@fontsource-variable/radio-canada-big": "^5.2.7",
     "@heroicons/react": "^2.2.0",
@@ -58,7 +59,6 @@
     "mdast-util-to-markdown": "^2.1.2",
     "pg": "^8.20.0",
     "posthog-js": "^1.391.2",
-    "radix-ui": "^1.4.3",
     "rate-limiter-flexible": "^11.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

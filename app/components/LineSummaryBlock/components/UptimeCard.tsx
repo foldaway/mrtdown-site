@@ -1,6 +1,6 @@
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { Duration } from 'luxon';
-import { Popover } from 'radix-ui';
+import { Popover } from '../../BaseUI';
 import { useState } from 'react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import { useDebounce } from 'use-debounce';

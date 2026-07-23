@@ -1,7 +1,7 @@
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { FormattedMessage } from 'react-intl';
 import { Link } from '@tanstack/react-router';
-import { Tooltip } from 'radix-ui';
+import { Tooltip } from '../../../../../components/BaseUI';
 import { BetaBadge } from '~/components/BetaBadge';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { ExitSign } from './StationGuideSigns';
