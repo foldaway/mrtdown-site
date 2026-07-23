@@ -13,7 +13,7 @@ import {
 } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
-import { DropdownMenu } from '../../components/BaseUI';
+import { Menu as DropdownMenu } from '@base-ui/react/menu';
 import { useMemo } from 'react';
 import { FormattedDate, FormattedMessage, IntlProvider } from 'react-intl';
 import { LocaleSwitcher } from '~/components/LocaleSwitcher';
@@ -130,75 +130,77 @@ function RouteComponent() {
                     />
                   </Link>
                   <DropdownMenu.Root>
-                    <DropdownMenu.Trigger asChild>
-                      <button
-                        type="button"
-                        className={classNames(
-                          linkClassName,
-                          'group inline-flex items-center gap-1.5',
-                          {
-                            active: isNetworkRoute,
-                          },
-                        )}
-                      >
-                        <FormattedMessage
-                          id="general.network"
-                          defaultMessage="Network"
+                    <DropdownMenu.Trigger
+                      render={
+                        <button
+                          type="button"
+                          className={classNames(
+                            linkClassName,
+                            'group inline-flex items-center gap-1.5',
+                            {
+                              active: isNetworkRoute,
+                            },
+                          )}
                         />
-                        <ChevronDownIcon className="size-3.5 transition-transform group-data-open:rotate-180" />
-                      </button>
+                      }
+                    >
+                      <FormattedMessage
+                        id="general.network"
+                        defaultMessage="Network"
+                      />
+                      <ChevronDownIcon className="size-3.5 transition-transform group-data-open:rotate-180" />
                     </DropdownMenu.Trigger>
                     <DropdownMenu.Portal>
-                      <DropdownMenu.Content
-                        className={dropdownContentClassName}
-                        align="start"
-                        sideOffset={8}
-                      >
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/lines"
-                            className={linkClassNameDropdown}
-                          >
-                            <FormattedMessage
-                              id="general.lines"
-                              defaultMessage="Lines"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/stations"
-                            className={linkClassNameDropdown}
-                          >
-                            <FormattedMessage
-                              id="general.stations"
-                              defaultMessage="Stations"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/towns"
-                            className={linkClassNameDropdown}
-                          >
-                            <FormattedMessage
-                              id="general.towns_and_areas"
-                              defaultMessage="Towns & areas"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/system-map"
-                            className={linkClassNameDropdown}
-                          >
-                            <FormattedMessage
-                              id="general.system_map"
-                              defaultMessage="System Map"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-                      </DropdownMenu.Content>
+                      <DropdownMenu.Positioner align="start" sideOffset={8}>
+                        <DropdownMenu.Popup
+                          className={dropdownContentClassName}
+                        >
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}/lines"
+                              className={linkClassNameDropdown}
+                            >
+                              <FormattedMessage
+                                id="general.lines"
+                                defaultMessage="Lines"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}/stations"
+                              className={linkClassNameDropdown}
+                            >
+                              <FormattedMessage
+                                id="general.stations"
+                                defaultMessage="Stations"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}/towns"
+                              className={linkClassNameDropdown}
+                            >
+                              <FormattedMessage
+                                id="general.towns_and_areas"
+                                defaultMessage="Towns & areas"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}/system-map"
+                              className={linkClassNameDropdown}
+                            >
+                              <FormattedMessage
+                                id="general.system_map"
+                                defaultMessage="System Map"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
+                        </DropdownMenu.Popup>
+                      </DropdownMenu.Positioner>
                     </DropdownMenu.Portal>
                   </DropdownMenu.Root>
                   <Link to="/{-$lang}/history" className={linkClassName}>
@@ -223,137 +225,139 @@ function RouteComponent() {
 
                 <div className="lg:hidden">
                   <DropdownMenu.Root>
-                    <DropdownMenu.Trigger asChild>
-                      <button
-                        type="button"
-                        className="group relative inline-flex size-10 items-center justify-center rounded-lg bg-gray-50/50 text-gray-600 transition-all duration-200 hover:bg-accent-light/10 hover:text-accent-light hover:shadow-accent-light/20 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-2 active:scale-95 sm:size-12 sm:rounded-xl dark:bg-gray-800/50 dark:text-gray-400 dark:hover:bg-accent-light/20 dark:hover:text-accent-light"
-                      >
-                        <span className="sr-only">Open main menu</span>
-                        <div className="relative">
-                          <Bars3Icon className="size-5 transition-transform duration-200 group-hover:scale-110 sm:size-6" />
-                        </div>
-                      </button>
+                    <DropdownMenu.Trigger
+                      render={
+                        <button
+                          type="button"
+                          className="group relative inline-flex size-10 items-center justify-center rounded-lg bg-gray-50/50 text-gray-600 transition-all duration-200 hover:bg-accent-light/10 hover:text-accent-light hover:shadow-accent-light/20 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-accent-light focus:ring-offset-2 active:scale-95 sm:size-12 sm:rounded-xl dark:bg-gray-800/50 dark:text-gray-400 dark:hover:bg-accent-light/20 dark:hover:text-accent-light"
+                        />
+                      }
+                    >
+                      <span className="sr-only">Open main menu</span>
+                      <div className="relative">
+                        <Bars3Icon className="size-5 transition-transform duration-200 group-hover:scale-110 sm:size-6" />
+                      </div>
                     </DropdownMenu.Trigger>
 
                     <DropdownMenu.Portal>
-                      <DropdownMenu.Content
-                        className={dropdownContentClassName}
-                        align="end"
-                        sideOffset={12}
-                      >
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}"
-                            className={linkClassNameMobile}
-                            activeOptions={{ exact: true }}
-                          >
+                      <DropdownMenu.Positioner align="end" sideOffset={12}>
+                        <DropdownMenu.Popup
+                          className={dropdownContentClassName}
+                        >
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}"
+                              className={linkClassNameMobile}
+                              activeOptions={{ exact: true }}
+                            >
+                              <FormattedMessage
+                                id="general.status"
+                                defaultMessage="Status"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
+
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}/history"
+                              className={linkClassNameMobile}
+                            >
+                              <FormattedMessage
+                                id="general.history"
+                                defaultMessage="History"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
+
+                          <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-800" />
+                          <DropdownMenu.GroupLabel className="px-4 pt-2 pb-1 font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
                             <FormattedMessage
-                              id="general.status"
-                              defaultMessage="Status"
+                              id="general.network"
+                              defaultMessage="Network"
                             />
-                          </Link>
-                        </DropdownMenu.Item>
+                          </DropdownMenu.GroupLabel>
 
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/history"
-                            className={linkClassNameMobile}
-                          >
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}/lines"
+                              className={linkClassNameMobile}
+                            >
+                              <FormattedMessage
+                                id="general.lines"
+                                defaultMessage="Lines"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
+
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}/stations"
+                              className={linkClassNameMobile}
+                            >
+                              <FormattedMessage
+                                id="general.stations"
+                                defaultMessage="Stations"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
+
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}/towns"
+                              className={linkClassNameMobile}
+                            >
+                              <FormattedMessage
+                                id="general.towns_and_areas"
+                                defaultMessage="Towns & areas"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
+
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}/system-map"
+                              className={linkClassNameMobile}
+                            >
+                              <FormattedMessage
+                                id="general.system_map"
+                                defaultMessage="System Map"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
+
+                          <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-800" />
+                          <DropdownMenu.GroupLabel className="px-4 pt-2 pb-1 font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
                             <FormattedMessage
-                              id="general.history"
-                              defaultMessage="History"
+                              id="general.more"
+                              defaultMessage="More"
                             />
-                          </Link>
-                        </DropdownMenu.Item>
+                          </DropdownMenu.GroupLabel>
 
-                        <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-800" />
-                        <DropdownMenu.Label className="px-4 pt-2 pb-1 font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
-                          <FormattedMessage
-                            id="general.network"
-                            defaultMessage="Network"
-                          />
-                        </DropdownMenu.Label>
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}/statistics"
+                              className={linkClassNameMobile}
+                            >
+                              <FormattedMessage
+                                id="general.statistics"
+                                defaultMessage="Statistics"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
 
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/lines"
-                            className={linkClassNameMobile}
-                          >
-                            <FormattedMessage
-                              id="general.lines"
-                              defaultMessage="Lines"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/stations"
-                            className={linkClassNameMobile}
-                          >
-                            <FormattedMessage
-                              id="general.stations"
-                              defaultMessage="Stations"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/towns"
-                            className={linkClassNameMobile}
-                          >
-                            <FormattedMessage
-                              id="general.towns_and_areas"
-                              defaultMessage="Towns & areas"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/system-map"
-                            className={linkClassNameMobile}
-                          >
-                            <FormattedMessage
-                              id="general.system_map"
-                              defaultMessage="System Map"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-
-                        <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-800" />
-                        <DropdownMenu.Label className="px-4 pt-2 pb-1 font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
-                          <FormattedMessage
-                            id="general.more"
-                            defaultMessage="More"
-                          />
-                        </DropdownMenu.Label>
-
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/statistics"
-                            className={linkClassNameMobile}
-                          >
-                            <FormattedMessage
-                              id="general.statistics"
-                              defaultMessage="Statistics"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-
-                        <DropdownMenu.Item>
-                          <Link
-                            to="/{-$lang}/about"
-                            className={linkClassNameMobile}
-                          >
-                            <FormattedMessage
-                              id="general.about"
-                              defaultMessage="About"
-                            />
-                          </Link>
-                        </DropdownMenu.Item>
-                      </DropdownMenu.Content>
+                          <DropdownMenu.Item>
+                            <Link
+                              to="/{-$lang}/about"
+                              className={linkClassNameMobile}
+                            >
+                              <FormattedMessage
+                                id="general.about"
+                                defaultMessage="About"
+                              />
+                            </Link>
+                          </DropdownMenu.Item>
+                        </DropdownMenu.Popup>
+                      </DropdownMenu.Positioner>
                     </DropdownMenu.Portal>
                   </DropdownMenu.Root>
                 </div>

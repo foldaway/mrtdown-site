@@ -7,7 +7,7 @@ import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
-import { DropdownMenu } from '../../../../../components/BaseUI';
+import { Menu as DropdownMenu } from '@base-ui/react/menu';
 import { useMemo } from 'react';
 import {
   createIntl,
@@ -241,41 +241,42 @@ function HistoryMonthPage() {
                     <ChevronDownIcon className="size-4" />
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
-                    <DropdownMenu.Content
-                      className="z-50 max-h-64 w-[var(--anchor-width)] overflow-y-auto rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
-                      sideOffset={5}
-                    >
-                      {monthOptions.map((monthOption) => (
-                        <DropdownMenu.Item
-                          key={monthOption}
-                          className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
-                          onSelect={() => {
-                            navigate({
-                              to: '/{-$lang}/history/$year/$month',
-                              params: {
-                                year: dateTimeStartAt.year.toString(),
-                                month: monthOption.toString().padStart(2, '0'),
-                              },
-                            });
-                          }}
-                        >
-                          {isHydrated ? (
-                            <FormattedDate
-                              value={DateTime.fromObject({
-                                year: dateTimeStartAt.year,
-                                month: monthOption,
-                              }).toMillis()}
-                              month="long"
-                            />
-                          ) : (
-                            monthOption.toString().padStart(2, '0')
-                          )}
-                          {monthOption === dateTimeStartAt.month && (
-                            <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
-                          )}
-                        </DropdownMenu.Item>
-                      ))}
-                    </DropdownMenu.Content>
+                    <DropdownMenu.Positioner sideOffset={5}>
+                      <DropdownMenu.Popup className="z-50 max-h-64 w-[var(--anchor-width)] overflow-y-auto rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800">
+                        {monthOptions.map((monthOption) => (
+                          <DropdownMenu.Item
+                            key={monthOption}
+                            className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
+                            onSelect={() => {
+                              navigate({
+                                to: '/{-$lang}/history/$year/$month',
+                                params: {
+                                  year: dateTimeStartAt.year.toString(),
+                                  month: monthOption
+                                    .toString()
+                                    .padStart(2, '0'),
+                                },
+                              });
+                            }}
+                          >
+                            {isHydrated ? (
+                              <FormattedDate
+                                value={DateTime.fromObject({
+                                  year: dateTimeStartAt.year,
+                                  month: monthOption,
+                                }).toMillis()}
+                                month="long"
+                              />
+                            ) : (
+                              monthOption.toString().padStart(2, '0')
+                            )}
+                            {monthOption === dateTimeStartAt.month && (
+                              <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
+                            )}
+                          </DropdownMenu.Item>
+                        ))}
+                      </DropdownMenu.Popup>
+                    </DropdownMenu.Positioner>
                   </DropdownMenu.Portal>
                 </DropdownMenu.Root>
 
@@ -292,38 +293,37 @@ function HistoryMonthPage() {
                     <ChevronDownIcon className="size-4" />
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
-                    <DropdownMenu.Content
-                      className="z-50 max-h-64 w-[var(--anchor-width)] overflow-y-auto rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
-                      sideOffset={5}
-                    >
-                      {yearOptions.map((yearOption) => (
-                        <DropdownMenu.Item
-                          key={yearOption}
-                          className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
-                          onSelect={() => {
-                            navigate({
-                              to: '/{-$lang}/history/$year/$month',
-                              params: {
-                                year: yearOption.toString(),
-                                month: dateTimeStartAt.toFormat('MM'),
-                              },
-                            });
-                          }}
-                        >
-                          {isHydrated ? (
-                            <FormattedDate
-                              value={yearOption.toString()}
-                              year="numeric"
-                            />
-                          ) : (
-                            yearOption.toString()
-                          )}
-                          {yearOption === dateTimeStartAt.year && (
-                            <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
-                          )}
-                        </DropdownMenu.Item>
-                      ))}
-                    </DropdownMenu.Content>
+                    <DropdownMenu.Positioner sideOffset={5}>
+                      <DropdownMenu.Popup className="z-50 max-h-64 w-[var(--anchor-width)] overflow-y-auto rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800">
+                        {yearOptions.map((yearOption) => (
+                          <DropdownMenu.Item
+                            key={yearOption}
+                            className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
+                            onSelect={() => {
+                              navigate({
+                                to: '/{-$lang}/history/$year/$month',
+                                params: {
+                                  year: yearOption.toString(),
+                                  month: dateTimeStartAt.toFormat('MM'),
+                                },
+                              });
+                            }}
+                          >
+                            {isHydrated ? (
+                              <FormattedDate
+                                value={yearOption.toString()}
+                                year="numeric"
+                              />
+                            ) : (
+                              yearOption.toString()
+                            )}
+                            {yearOption === dateTimeStartAt.year && (
+                              <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
+                            )}
+                          </DropdownMenu.Item>
+                        ))}
+                      </DropdownMenu.Popup>
+                    </DropdownMenu.Positioner>
                   </DropdownMenu.Portal>
                 </DropdownMenu.Root>
               </div>
@@ -439,41 +439,40 @@ function HistoryMonthPage() {
                 <ChevronDownIcon className="size-3" />
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content
-                  className="z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
-                  sideOffset={5}
-                >
-                  {monthOptions.map((monthOption) => (
-                    <DropdownMenu.Item
-                      key={monthOption}
-                      className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
-                      onSelect={() => {
-                        navigate({
-                          to: '/{-$lang}/history/$year/$month',
-                          params: {
-                            year: dateTimeStartAt.year.toString(),
-                            month: monthOption.toString().padStart(2, '0'),
-                          },
-                        });
-                      }}
-                    >
-                      {isHydrated ? (
-                        <FormattedDate
-                          value={DateTime.fromObject({
-                            year: dateTimeStartAt.year,
-                            month: monthOption,
-                          }).toMillis()}
-                          month="long"
-                        />
-                      ) : (
-                        monthOption.toString().padStart(2, '0')
-                      )}
-                      {monthOption === dateTimeStartAt.month && (
-                        <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
-                      )}
-                    </DropdownMenu.Item>
-                  ))}
-                </DropdownMenu.Content>
+                <DropdownMenu.Positioner sideOffset={5}>
+                  <DropdownMenu.Popup className="z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800">
+                    {monthOptions.map((monthOption) => (
+                      <DropdownMenu.Item
+                        key={monthOption}
+                        className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
+                        onSelect={() => {
+                          navigate({
+                            to: '/{-$lang}/history/$year/$month',
+                            params: {
+                              year: dateTimeStartAt.year.toString(),
+                              month: monthOption.toString().padStart(2, '0'),
+                            },
+                          });
+                        }}
+                      >
+                        {isHydrated ? (
+                          <FormattedDate
+                            value={DateTime.fromObject({
+                              year: dateTimeStartAt.year,
+                              month: monthOption,
+                            }).toMillis()}
+                            month="long"
+                          />
+                        ) : (
+                          monthOption.toString().padStart(2, '0')
+                        )}
+                        {monthOption === dateTimeStartAt.month && (
+                          <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
+                        )}
+                      </DropdownMenu.Item>
+                    ))}
+                  </DropdownMenu.Popup>
+                </DropdownMenu.Positioner>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
 
@@ -490,38 +489,37 @@ function HistoryMonthPage() {
                 <ChevronDownIcon className="size-3" />
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content
-                  className="z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
-                  sideOffset={5}
-                >
-                  {yearOptions.map((yearOption) => (
-                    <DropdownMenu.Item
-                      key={yearOption}
-                      className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
-                      onSelect={() => {
-                        navigate({
-                          to: '/{-$lang}/history/$year/$month',
-                          params: {
-                            year: yearOption.toString(),
-                            month: dateTimeStartAt.toFormat('MM'),
-                          },
-                        });
-                      }}
-                    >
-                      {isHydrated ? (
-                        <FormattedDate
-                          value={yearOption.toString()}
-                          year="numeric"
-                        />
-                      ) : (
-                        yearOption.toString()
-                      )}
-                      {yearOption === dateTimeStartAt.year && (
-                        <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
-                      )}
-                    </DropdownMenu.Item>
-                  ))}
-                </DropdownMenu.Content>
+                <DropdownMenu.Positioner sideOffset={5}>
+                  <DropdownMenu.Popup className="z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800">
+                    {yearOptions.map((yearOption) => (
+                      <DropdownMenu.Item
+                        key={yearOption}
+                        className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
+                        onSelect={() => {
+                          navigate({
+                            to: '/{-$lang}/history/$year/$month',
+                            params: {
+                              year: yearOption.toString(),
+                              month: dateTimeStartAt.toFormat('MM'),
+                            },
+                          });
+                        }}
+                      >
+                        {isHydrated ? (
+                          <FormattedDate
+                            value={yearOption.toString()}
+                            year="numeric"
+                          />
+                        ) : (
+                          yearOption.toString()
+                        )}
+                        {yearOption === dateTimeStartAt.year && (
+                          <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
+                        )}
+                      </DropdownMenu.Item>
+                    ))}
+                  </DropdownMenu.Popup>
+                </DropdownMenu.Positioner>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
           </div>

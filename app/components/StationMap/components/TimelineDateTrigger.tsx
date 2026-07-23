@@ -1,4 +1,4 @@
-import { Tabs } from '../../BaseUI';
+import { Tabs } from '@base-ui/react/tabs';
 import { FormattedDate } from 'react-intl';
 
 interface TimelineDateTriggerProps {
@@ -26,7 +26,7 @@ export const TimelineDateTrigger: React.FC<TimelineDateTriggerProps> = ({
     : 'h-1 w-1 rounded-full bg-gray-300 transition-all group-data-active:h-1.5 group-data-active:w-1.5 group-data-active:bg-white sm:h-1.5 sm:w-1.5 dark:bg-gray-600';
 
   return (
-    <Tabs.Trigger value={value} className={baseClassName}>
+    <Tabs.Tab value={value} className={baseClassName}>
       <div className="flex items-center gap-0.5 sm:gap-1">
         <div className={`text-xs ${textClassName}`}>
           <FormattedDate value={value} year="numeric" />
@@ -38,6 +38,6 @@ export const TimelineDateTrigger: React.FC<TimelineDateTriggerProps> = ({
         )}
       </div>
       <div className={dotClassName} />
-    </Tabs.Trigger>
+    </Tabs.Tab>
   );
 };

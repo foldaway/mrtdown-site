@@ -1,4 +1,4 @@
-import { Popover } from '../../../../../../../components/BaseUI';
+import { Popover } from '@base-ui/react/popover';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
 import type React from 'react';
@@ -221,58 +221,59 @@ export const DisruptionsHeatmap: React.FC<Props> = (props) => {
                               }
                             }}
                           >
-                            <Popover.Trigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedDate(cell.dateString);
-                                  setOpenPopoverDate(cell.dateString);
-                                }}
-                                onMouseEnter={() => {
-                                  setHoveredDate(cell.dateString);
-                                  setOpenPopoverDate(cell.dateString);
-                                }}
-                                onMouseLeave={() => {
-                                  if (selectedDate !== cell.dateString) {
-                                    setHoveredDate(null);
-                                    setOpenPopoverDate(null);
-                                  }
-                                }}
-                                className={classNames(
-                                  'size-3 cursor-pointer rounded-[2px] transition-all hover:ring-2 hover:ring-blue-400 hover:ring-offset-1 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:ring-offset-gray-800',
-                                  selectedDate === cell.dateString &&
-                                    'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-800',
-                                  getCellColor(cell.disruption),
-                                )}
-                                aria-label={`${intl.formatDate(cell.date.toJSDate(), { month: 'short', day: 'numeric' })}: ${cell.disruption} disruptions. Click to view issues.`}
-                              />
-                            </Popover.Trigger>
+                            <Popover.Trigger
+                              render={
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedDate(cell.dateString);
+                                    setOpenPopoverDate(cell.dateString);
+                                  }}
+                                  onMouseEnter={() => {
+                                    setHoveredDate(cell.dateString);
+                                    setOpenPopoverDate(cell.dateString);
+                                  }}
+                                  onMouseLeave={() => {
+                                    if (selectedDate !== cell.dateString) {
+                                      setHoveredDate(null);
+                                      setOpenPopoverDate(null);
+                                    }
+                                  }}
+                                  className={classNames(
+                                    'size-3 cursor-pointer rounded-[2px] transition-all hover:ring-2 hover:ring-blue-400 hover:ring-offset-1 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:ring-offset-gray-800',
+                                    selectedDate === cell.dateString &&
+                                      'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-800',
+                                    getCellColor(cell.disruption),
+                                  )}
+                                  aria-label={`${intl.formatDate(cell.date.toJSDate(), { month: 'short', day: 'numeric' })}: ${cell.disruption} disruptions. Click to view issues.`}
+                                />
+                              }
+                            />
                             <Popover.Portal>
-                              <Popover.Content
-                                className="z-50 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-800"
-                                sideOffset={5}
-                              >
-                                <div className="space-y-1">
-                                  <div className="font-semibold text-gray-900 text-xs dark:text-white">
-                                    {intl.formatDate(cell.date.toJSDate(), {
-                                      weekday: 'long',
-                                      month: 'long',
-                                      day: 'numeric',
-                                      year: 'numeric',
-                                    })}
+                              <Popover.Positioner sideOffset={5}>
+                                <Popover.Popup className="z-50 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                                  <div className="space-y-1">
+                                    <div className="font-semibold text-gray-900 text-xs dark:text-white">
+                                      {intl.formatDate(cell.date.toJSDate(), {
+                                        weekday: 'long',
+                                        month: 'long',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                      })}
+                                    </div>
+                                    <div className="text-gray-600 text-xs dark:text-gray-400">
+                                      <FormattedMessage
+                                        id="general.disruption"
+                                        defaultMessage="Disruption"
+                                      />
+                                    </div>
+                                    <div className="font-medium text-gray-900 dark:text-white">
+                                      {cell.disruption}
+                                    </div>
                                   </div>
-                                  <div className="text-gray-600 text-xs dark:text-gray-400">
-                                    <FormattedMessage
-                                      id="general.disruption"
-                                      defaultMessage="Disruption"
-                                    />
-                                  </div>
-                                  <div className="font-medium text-gray-900 dark:text-white">
-                                    {cell.disruption}
-                                  </div>
-                                </div>
-                                <Popover.Arrow className="fill-white dark:fill-gray-800" />
-                              </Popover.Content>
+                                  <Popover.Arrow className="fill-white dark:fill-gray-800" />
+                                </Popover.Popup>
+                              </Popover.Positioner>
                             </Popover.Portal>
                           </Popover.Root>
                         );

@@ -1,6 +1,6 @@
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { Duration } from 'luxon';
-import { Popover } from '../../BaseUI';
+import { Popover } from '@base-ui/react/popover';
 import { useState } from 'react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import { useDebounce } from 'use-debounce';
@@ -72,44 +72,45 @@ export const UptimeCard: React.FC<Props> = (props) => {
             </span>
           </Popover.Trigger>
           <Popover.Portal>
-            <Popover.Content
-              className="z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-gray-900/15 shadow-xl outline-none ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30 dark:ring-white/10"
+            <Popover.Positioner
               onMouseEnter={() => setIsOpen(true)}
               onMouseLeave={() => setIsOpen(false)}
               collisionPadding={16}
               side="top"
               sideOffset={8}
             >
-              <Popover.Arrow className="fill-white dark:fill-gray-800" />
+              <Popover.Popup className="z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-gray-900/15 shadow-xl outline-none ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30 dark:ring-white/10">
+                <Popover.Arrow className="fill-white dark:fill-gray-800" />
 
-              <span className="font-semibold text-gray-900 text-sm dark:text-gray-100">
-                <FormattedMessage
-                  id="general.disruption_downtime"
-                  defaultMessage="Disruption downtime"
-                />
-              </span>
+                <span className="font-semibold text-gray-900 text-sm dark:text-gray-100">
+                  <FormattedMessage
+                    id="general.disruption_downtime"
+                    defaultMessage="Disruption downtime"
+                  />
+                </span>
 
-              <div className="mt-3 flex items-center justify-between gap-x-4">
-                <span className="font-semibold text-disruption-light text-xl tabular-nums leading-tight dark:text-disruption-dark">
-                  <FormattedDuration duration={disruptionDowntimeDuration} />
-                </span>
-                <span className="flex shrink-0 flex-col items-end text-xs">
-                  <span className="font-semibold text-disruption-light tabular-nums dark:text-disruption-dark">
-                    <FormattedNumber
-                      value={disruptionDowntimeRatio}
-                      style="percent"
-                      maximumFractionDigits={2}
-                    />
+                <div className="mt-3 flex items-center justify-between gap-x-4">
+                  <span className="font-semibold text-disruption-light text-xl tabular-nums leading-tight dark:text-disruption-dark">
+                    <FormattedDuration duration={disruptionDowntimeDuration} />
                   </span>
-                  <span className="text-gray-500 dark:text-gray-400">
-                    <FormattedMessage
-                      id="general.of_service_hours"
-                      defaultMessage="of service hours"
-                    />
+                  <span className="flex shrink-0 flex-col items-end text-xs">
+                    <span className="font-semibold text-disruption-light tabular-nums dark:text-disruption-dark">
+                      <FormattedNumber
+                        value={disruptionDowntimeRatio}
+                        style="percent"
+                        maximumFractionDigits={2}
+                      />
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      <FormattedMessage
+                        id="general.of_service_hours"
+                        defaultMessage="of service hours"
+                      />
+                    </span>
                   </span>
-                </span>
-              </div>
-            </Popover.Content>
+                </div>
+              </Popover.Popup>
+            </Popover.Positioner>
           </Popover.Portal>
         </Popover.Root>
       )}

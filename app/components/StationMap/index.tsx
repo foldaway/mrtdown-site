@@ -1,7 +1,7 @@
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { Tabs } from '../BaseUI';
+import { Tabs } from '@base-ui/react/tabs';
 import type React from 'react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
@@ -593,36 +593,36 @@ export const StationMap: React.FC<Props> = (props) => {
           }
         >
           <div className="overflow-auto">
-            <Tabs.Content value="2032-12">
+            <Tabs.Panel value="2032-12">
               {renderSnapshot('2032-12', MapDec2032)}
-            </Tabs.Content>
-            <Tabs.Content value="2030-12">
+            </Tabs.Panel>
+            <Tabs.Panel value="2030-12">
               {renderSnapshot('2030-12', MapDec2030)}
-            </Tabs.Content>
-            <Tabs.Content value="2029-12">
+            </Tabs.Panel>
+            <Tabs.Panel value="2029-12">
               {renderSnapshot('2029-12', MapDec2029)}
-            </Tabs.Content>
-            <Tabs.Content value="2027-12">
+            </Tabs.Panel>
+            <Tabs.Panel value="2027-12">
               {renderSnapshot('2027-12', MapDec2027)}
-            </Tabs.Content>
-            <Tabs.Content value="2026-07">
+            </Tabs.Panel>
+            <Tabs.Panel value="2026-07">
               {renderSnapshot('2026-07', MapApr2025)}
-            </Tabs.Content>
-            <Tabs.Content value="2025-04">
+            </Tabs.Panel>
+            <Tabs.Panel value="2025-04">
               {renderSnapshot('2025-04', MapApr2025)}
-            </Tabs.Content>
-            <Tabs.Content value="2024-11">
+            </Tabs.Panel>
+            <Tabs.Panel value="2024-11">
               {renderSnapshot('2024-11', MapNov2024)}
-            </Tabs.Content>
-            <Tabs.Content value="2019-12">
+            </Tabs.Panel>
+            <Tabs.Panel value="2019-12">
               {renderSnapshot('2019-12', MapDec2019)}
-            </Tabs.Content>
-            <Tabs.Content value="2017-11">
+            </Tabs.Panel>
+            <Tabs.Panel value="2017-11">
               {renderSnapshot('2017-11', MapNov2017)}
-            </Tabs.Content>
-            <Tabs.Content value="2012-01">
+            </Tabs.Panel>
+            <Tabs.Panel value="2012-01">
               {renderSnapshot('2012-01', MapJan2012)}
-            </Tabs.Content>
+            </Tabs.Panel>
           </div>
           <ZoomControls svgRef={ref} initialZoom={1} />
         </div>

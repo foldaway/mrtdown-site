@@ -1,5 +1,5 @@
 import { ClockIcon } from '@heroicons/react/24/outline';
-import { Tabs } from '../../BaseUI';
+import { Tabs } from '@base-ui/react/tabs';
 import type React from 'react';
 import { TimelineConnector } from './TimelineConnector';
 import { TimelineDateTrigger } from './TimelineDateTrigger';

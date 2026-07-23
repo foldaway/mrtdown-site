@@ -9,7 +9,7 @@ import {
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
-import { Tooltip } from '../BaseUI';
+import { Tooltip } from '@base-ui/react/tooltip';
 import { useMemo, useState } from 'react';
 import {
   FormattedDate,
@@ -163,28 +163,29 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
             </span>
           </Link>
           <div className="flex min-w-0 justify-end">
-            <Tooltip.Provider delayDuration={100}>
+            <Tooltip.Provider delay={100}>
               <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <button
-                    type="button"
-                    aria-label={statusLabel}
-                    className={classNames(
-                      '-m-1 inline-flex shrink-0 items-center justify-center rounded-md p-1 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                      statusIconClassName,
-                    )}
-                  >
-                    <StatusIcon aria-hidden="true" className="size-5" />
-                  </button>
+                <Tooltip.Trigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label={statusLabel}
+                      className={classNames(
+                        '-m-1 inline-flex shrink-0 items-center justify-center rounded-md p-1 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                        statusIconClassName,
+                      )}
+                    />
+                  }
+                >
+                  <StatusIcon aria-hidden="true" className="size-5" />
                 </Tooltip.Trigger>
                 <Tooltip.Portal>
-                  <Tooltip.Content
-                    className="z-50 rounded-md bg-gray-900 px-3 py-2 font-medium text-white text-xs shadow-lg dark:bg-gray-700"
-                    sideOffset={4}
-                  >
-                    <FormattedMessage {...LineSummaryStatusLabels[status]} />
-                    <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
-                  </Tooltip.Content>
+                  <Tooltip.Positioner sideOffset={4}>
+                    <Tooltip.Popup className="z-50 rounded-md bg-gray-900 px-3 py-2 font-medium text-white text-xs shadow-lg dark:bg-gray-700">
+                      <FormattedMessage {...LineSummaryStatusLabels[status]} />
+                      <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
+                    </Tooltip.Popup>
+                  </Tooltip.Positioner>
                 </Tooltip.Portal>
               </Tooltip.Root>
             </Tooltip.Provider>

@@ -5,7 +5,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
-import { DropdownMenu } from '../../../../../../components/BaseUI';
+import { Menu as DropdownMenu } from '@base-ui/react/menu';
 import { Fragment, useMemo, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
@@ -283,25 +283,24 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
             <ChevronDownIcon className="ml-2 h-5 w-5 text-gray-400" />
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
-            <DropdownMenu.Content
-              className="z-50 w-[var(--anchor-width)] overflow-hidden rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
-              sideOffset={5}
-            >
-              {branches.map((branch) => (
-                <DropdownMenu.Item
-                  key={branch.id}
-                  className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
-                  onSelect={() => {
-                    setSelectedBranchId(branch.id);
-                  }}
-                >
-                  <BranchItem branch={branch} />
-                  {selectedBranchId === branch.id && (
-                    <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
-                  )}
-                </DropdownMenu.Item>
-              ))}
-            </DropdownMenu.Content>
+            <DropdownMenu.Positioner sideOffset={5}>
+              <DropdownMenu.Popup className="z-50 w-[var(--anchor-width)] overflow-hidden rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800">
+                {branches.map((branch) => (
+                  <DropdownMenu.Item
+                    key={branch.id}
+                    className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
+                    onSelect={() => {
+                      setSelectedBranchId(branch.id);
+                    }}
+                  >
+                    <BranchItem branch={branch} />
+                    {selectedBranchId === branch.id && (
+                      <div className="ml-auto h-2 w-2 rounded-full bg-blue-600" />
+                    )}
+                  </DropdownMenu.Item>
+                ))}
+              </DropdownMenu.Popup>
+            </DropdownMenu.Positioner>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       </div>

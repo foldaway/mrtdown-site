@@ -2,7 +2,7 @@ import { CalendarDaysIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime, Duration } from 'luxon';
-import { Tooltip } from '../../BaseUI';
+import { Tooltip } from '@base-ui/react/tooltip';
 import { Fragment, useMemo } from 'react';
 import {
   FormattedDate,
@@ -152,7 +152,7 @@ function TimelineLane(props: {
           <CompactDuration duration={duration} />
         </span>
       </div>
-      <Tooltip.Provider delayDuration={100}>
+      <Tooltip.Provider delay={100}>
         <div className="relative h-4 overflow-hidden rounded-sm bg-gray-200 dark:bg-gray-700">
           {intervals.map((interval) => {
             const start = getTimelinePosition(
@@ -175,28 +175,29 @@ function TimelineLane(props: {
               <Tooltip.Root
                 key={`${interval.start.toISO()}-${interval.end.toISO()}`}
               >
-                <Tooltip.Trigger asChild>
-                  <button
-                    type="button"
-                    aria-label={`${label}: ${intervalTime}`}
-                    className={classNames(
-                      'absolute inset-y-0 min-w-px cursor-help border-0 p-0 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-[-2px]',
-                      markerClassName,
-                    )}
-                    style={{
-                      left: `${(start * 100).toFixed(3)}%`,
-                      width: `${(Math.max(0, end - start) * 100).toFixed(3)}%`,
-                    }}
-                  />
-                </Tooltip.Trigger>
+                <Tooltip.Trigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label={`${label}: ${intervalTime}`}
+                      className={classNames(
+                        'absolute inset-y-0 min-w-px cursor-help border-0 p-0 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-[-2px]',
+                        markerClassName,
+                      )}
+                      style={{
+                        left: `${(start * 100).toFixed(3)}%`,
+                        width: `${(Math.max(0, end - start) * 100).toFixed(3)}%`,
+                      }}
+                    />
+                  }
+                />
                 <Tooltip.Portal>
-                  <Tooltip.Content
-                    className="z-50 rounded-md bg-gray-900 px-3 py-2 font-medium text-white text-xs shadow-lg dark:bg-gray-700"
-                    sideOffset={4}
-                  >
-                    {intervalTime}
-                    <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
-                  </Tooltip.Content>
+                  <Tooltip.Positioner sideOffset={4}>
+                    <Tooltip.Popup className="z-50 rounded-md bg-gray-900 px-3 py-2 font-medium text-white text-xs shadow-lg dark:bg-gray-700">
+                      {intervalTime}
+                      <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
+                    </Tooltip.Popup>
+                  </Tooltip.Positioner>
                 </Tooltip.Portal>
               </Tooltip.Root>
             );

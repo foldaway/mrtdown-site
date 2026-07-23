@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useEffect, useState } from 'react';
 import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
-import { Tooltip } from '../../../../../components/BaseUI';
+import { Tooltip } from '@base-ui/react/tooltip';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { PlatformSign } from './StationGuideSigns';
 import type { ArrivalTiming } from './stationGuide.types';
@@ -227,54 +227,55 @@ function ServiceDetailsTooltip({
   );
 
   return (
-    <Tooltip.Provider delayDuration={100}>
+    <Tooltip.Provider delay={100}>
       <Tooltip.Root>
-        <Tooltip.Trigger asChild>
-          <button
-            aria-label={label}
-            className="-m-1 shrink-0 rounded-full p-1 text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 dark:hover:text-gray-200"
-            type="button"
-          >
-            <InformationCircleIcon aria-hidden={true} className="size-4" />
-          </button>
+        <Tooltip.Trigger
+          render={
+            <button
+              aria-label={label}
+              className="-m-1 shrink-0 rounded-full p-1 text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 dark:hover:text-gray-200"
+              type="button"
+            />
+          }
+        >
+          <InformationCircleIcon aria-hidden={true} className="size-4" />
         </Tooltip.Trigger>
         <Tooltip.Portal>
-          <Tooltip.Content
-            className="z-50 rounded-md bg-gray-900 px-3 py-2 text-white text-xs shadow-lg dark:bg-gray-700"
-            sideOffset={4}
-          >
-            <p className="font-semibold">{label}</p>
-            <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-gray-200 dark:text-gray-300">
-              <dt className="text-gray-400 dark:text-gray-400">
-                <FormattedMessage
-                  id="station.arrival_timings.service_label"
-                  defaultMessage="Service"
-                />
-              </dt>
-              <dd className="min-w-0">{localizedServiceName}</dd>
-              {firstTrainTime != null && lastTrainTime != null && (
-                <>
-                  <dt className="text-gray-400 dark:text-gray-400">
-                    <FormattedMessage
-                      id="station.arrival_timings.service_hours_label"
-                      defaultMessage="Service hours"
-                    />
-                  </dt>
-                  <dd className="tabular-nums">
-                    <FormattedMessage
-                      id="station.arrival_timings.service_hours"
-                      defaultMessage="First {firstTrain} · Last {lastTrain} (Singapore time)"
-                      values={{
-                        firstTrain: formatServiceTime(firstTrainTime, intl),
-                        lastTrain: formatServiceTime(lastTrainTime, intl),
-                      }}
-                    />
-                  </dd>
-                </>
-              )}
-            </dl>
-            <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
-          </Tooltip.Content>
+          <Tooltip.Positioner sideOffset={4}>
+            <Tooltip.Popup className="z-50 rounded-md bg-gray-900 px-3 py-2 text-white text-xs shadow-lg dark:bg-gray-700">
+              <p className="font-semibold">{label}</p>
+              <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-gray-200 dark:text-gray-300">
+                <dt className="text-gray-400 dark:text-gray-400">
+                  <FormattedMessage
+                    id="station.arrival_timings.service_label"
+                    defaultMessage="Service"
+                  />
+                </dt>
+                <dd className="min-w-0">{localizedServiceName}</dd>
+                {firstTrainTime != null && lastTrainTime != null && (
+                  <>
+                    <dt className="text-gray-400 dark:text-gray-400">
+                      <FormattedMessage
+                        id="station.arrival_timings.service_hours_label"
+                        defaultMessage="Service hours"
+                      />
+                    </dt>
+                    <dd className="tabular-nums">
+                      <FormattedMessage
+                        id="station.arrival_timings.service_hours"
+                        defaultMessage="First {firstTrain} · Last {lastTrain} (Singapore time)"
+                        values={{
+                          firstTrain: formatServiceTime(firstTrainTime, intl),
+                          lastTrain: formatServiceTime(lastTrainTime, intl),
+                        }}
+                      />
+                    </dd>
+                  </>
+                )}
+              </dl>
+              <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
+            </Tooltip.Popup>
+          </Tooltip.Positioner>
         </Tooltip.Portal>
       </Tooltip.Root>
     </Tooltip.Provider>

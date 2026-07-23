@@ -1,7 +1,7 @@
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
-import { Tooltip } from '../../../../../components/BaseUI';
+import { Tooltip } from '@base-ui/react/tooltip';
 import { useCallback, useMemo } from 'react';
 import {
   FormattedDateTimeRange,
@@ -97,28 +97,29 @@ export const QuickFactsCard: React.FC<Props> = (props) => {
             defaultMessage="Operating Hours"
           />
         </span>
-        <Tooltip.Provider delayDuration={100}>
+        <Tooltip.Provider delay={100}>
           <Tooltip.Root>
-            <Tooltip.Trigger asChild>
-              <button
-                type="button"
-                className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                aria-label="Information about operating hours"
-              >
-                <InformationCircleIcon className="size-4" />
-              </button>
+            <Tooltip.Trigger
+              render={
+                <button
+                  type="button"
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  aria-label="Information about operating hours"
+                />
+              }
+            >
+              <InformationCircleIcon className="size-4" />
             </Tooltip.Trigger>
             <Tooltip.Portal>
-              <Tooltip.Content
-                className="z-50 max-w-xs rounded-md bg-gray-900 px-3 py-2 text-white text-xs shadow-lg dark:bg-gray-700"
-                sideOffset={4}
-              >
-                <FormattedMessage
-                  id="general.operating_hours_tooltip"
-                  defaultMessage="Approximate hours for the entire line. Individual stations may vary."
-                />
-                <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
-              </Tooltip.Content>
+              <Tooltip.Positioner sideOffset={4}>
+                <Tooltip.Popup className="z-50 max-w-xs rounded-md bg-gray-900 px-3 py-2 text-white text-xs shadow-lg dark:bg-gray-700">
+                  <FormattedMessage
+                    id="general.operating_hours_tooltip"
+                    defaultMessage="Approximate hours for the entire line. Individual stations may vary."
+                  />
+                  <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
+                </Tooltip.Popup>
+              </Tooltip.Positioner>
             </Tooltip.Portal>
           </Tooltip.Root>
         </Tooltip.Provider>
