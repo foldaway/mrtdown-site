@@ -1,5 +1,6 @@
 import {
-  enumerateEstimatedStationDepartures,
+  estimateNextStationArrivals,
+  type EstimatedStationArrival,
   generateEstimatedStationFrequencySchedule,
   type EstimatedStationScheduleCalendar,
   type ServiceRevision,
@@ -29,7 +30,14 @@ export type EstimatedArrivalTiming = {
   lastTrainTime: string | null;
   isServiceEnded: boolean;
   nextServiceStart: string | null;
-  departures: string[];
+  departures: EstimatedArrivalDeparture[];
+};
+
+export type EstimatedArrivalDeparture = Pick<
+  EstimatedStationArrival,
+  'basis' | 'headwayRangeSeconds' | 'headwaySeconds'
+> & {
+  time: string;
 };
 
 function calendarForDate(
@@ -55,8 +63,17 @@ function scheduleForServiceDate(input: {
   });
 }
 
+function formatServiceDayTime(seconds: number) {
+  const hours = Math.floor(seconds / 3_600);
+  const minutes = Math.floor((seconds % 3_600) / 60);
+  const remainingSeconds = seconds % 60;
+  return [hours, minutes, remainingSeconds]
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':');
+}
+
 /**
- * Returns the next two deterministic frequency estimates for every service at
+ * Returns the next two frequency-based arrival estimates for every service at
  * a station. A service day may run past midnight, so the previous, current,
  * and following calendar dates are considered.
  */
@@ -70,6 +87,10 @@ export function getEstimatedStationArrivalTimings(input: {
     input.referenceNow.startOf('day').plus({ days: offset }),
   );
   const referenceMillis = input.referenceNow.toMillis();
+  const secondsSinceStartOfDay = Math.ceil(
+    input.referenceNow.diff(input.referenceNow.startOf('day'), 'seconds')
+      .seconds,
+  );
 
   return input.services
     .flatMap((service) => {
@@ -77,65 +98,75 @@ export function getEstimatedStationArrivalTimings(input: {
         if (service.revision.estimatedFrequency == null) {
           return [];
         }
-        const schedules = serviceDates.map((serviceDate) => ({
+        const schedules = serviceDates.map((serviceDate, index) => ({
           serviceDate,
           schedule: scheduleForServiceDate({
             station: input.station,
             service,
             calendar: calendarForDate(serviceDate, input.publicHolidayDates),
           }),
+          queriedAtTime: formatServiceDayTime(
+            index === 0
+              ? secondsSinceStartOfDay + 86_400
+              : index === 1
+                ? secondsSinceStartOfDay
+                : 0,
+          ),
         }));
-        const scheduleDepartures = schedules.map(
-          ({ serviceDate, schedule }) => {
+        const scheduleEstimates = schedules.map(
+          ({ serviceDate, schedule, queriedAtTime }) => {
             const startOfServiceDay = serviceDate.startOf('day');
-            const departures = enumerateEstimatedStationDepartures(
+            const estimates = estimateNextStationArrivals(
               schedule,
-            ).map((departure) => ({
-              seconds: departure.seconds,
+              queriedAtTime,
+              2,
+            ).map((estimate) => ({
+              basis: estimate.basis,
+              headwaySeconds: estimate.headwaySeconds,
+              headwayRangeSeconds: estimate.headwayRangeSeconds,
               time: isoDateTime(
-                startOfServiceDay.plus({ seconds: departure.seconds }),
+                startOfServiceDay.plus({ seconds: estimate.estimatedSeconds }),
               ),
             }));
-            return { serviceDate, schedule, departures };
+            return { serviceDate, schedule, estimates };
           },
         );
-        const currentSchedule = scheduleDepartures[1]?.schedule;
-        const allDepartures = scheduleDepartures
-          .flatMap(({ departures }) => departures)
+        const currentSchedule = scheduleEstimates[1]?.schedule;
+        const allDepartures = scheduleEstimates
+          .flatMap(({ estimates }) => estimates)
           .sort((a, b) => a.time.localeCompare(b.time));
         const departures = allDepartures
-          .map((departure) => departure.time)
-          .filter((departure) => Date.parse(departure) >= referenceMillis)
+          .filter((departure) => Date.parse(departure.time) >= referenceMillis)
           .slice(0, 2);
-        const isServiceEnded = !scheduleDepartures.some(
-          ({ serviceDate, departures: scheduledDepartures }) => {
-            const firstDeparture = scheduledDepartures[0];
-            const lastDeparture = scheduledDepartures.at(-1);
-            if (firstDeparture == null || lastDeparture == null) {
+        const isServiceEnded = !scheduleEstimates.some(
+          ({ serviceDate, schedule }) => {
+            const firstWindow = schedule.windows[0];
+            const lastWindow = schedule.windows.at(-1);
+            if (firstWindow == null || lastWindow == null) {
               return false;
             }
             const startOfServiceDay = serviceDate.startOf('day');
             return (
               startOfServiceDay
-                .plus({ seconds: firstDeparture.seconds })
+                .plus({ seconds: firstWindow.startSeconds })
                 .toMillis() <= referenceMillis &&
               referenceMillis <=
                 startOfServiceDay
-                  .plus({ seconds: lastDeparture.seconds })
+                  .plus({ seconds: lastWindow.endSeconds })
                   .toMillis()
             );
           },
         );
-        const nextServiceStart = scheduleDepartures
-          .flatMap(({ serviceDate, departures: scheduledDepartures }) => {
-            const firstDeparture = scheduledDepartures[0];
-            return firstDeparture == null
+        const nextServiceStart = scheduleEstimates
+          .flatMap(({ serviceDate, schedule }) => {
+            const firstWindow = schedule.windows[0];
+            return firstWindow == null
               ? []
               : [
                   isoDateTime(
                     serviceDate
                       .startOf('day')
-                      .plus({ seconds: firstDeparture.seconds }),
+                      .plus({ seconds: firstWindow.startSeconds }),
                   ),
                 ];
           })
@@ -166,7 +197,8 @@ export function getEstimatedStationArrivalTimings(input: {
     })
     .sort((a, b) => {
       const nextDepartureDiff =
-        Date.parse(a.departures[0] ?? '') - Date.parse(b.departures[0] ?? '');
+        Date.parse(a.departures[0]?.time ?? '') -
+        Date.parse(b.departures[0]?.time ?? '');
       return nextDepartureDiff !== 0
         ? nextDepartureDiff
         : a.serviceId.localeCompare(b.serviceId);

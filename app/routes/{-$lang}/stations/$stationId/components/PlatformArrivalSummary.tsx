@@ -54,6 +54,7 @@ export function ServiceArrivalSummary({
             </Link>
           )}
           <ServiceDetailsTooltip
+            estimate={arrivalTiming.departures[0] ?? null}
             firstTrainTime={arrivalTiming.firstTrainTime}
             lastTrainTime={arrivalTiming.lastTrainTime}
             serviceName={arrivalTiming.serviceName}
@@ -191,27 +192,50 @@ function ArrivalStatus({
           <FormattedMessage
             id="station.arrival_timings.then"
             defaultMessage="then {time}"
-            values={{ time: formatRelativeTime(followingDeparture, intl, now) }}
+            values={{
+              time: formatRelativeTime(followingDeparture.time, intl, now),
+            }}
           />
         </p>
       )}
       <p className="text-gray-500 text-xs leading-tight dark:text-gray-400">
-        {formatTime(nextDeparture, intl)}
+        {formatTime(nextDeparture.time, intl)}
       </p>
       {followingDeparture != null && (
         <p className="text-gray-500 text-xs leading-tight dark:text-gray-400">
-          {formatTime(followingDeparture, intl)}
+          {formatTime(followingDeparture.time, intl)}
         </p>
       )}
     </div>
   );
 }
 
+function formatHeadway(seconds: number, intl: IntlShape) {
+  return intl.formatNumber(seconds / 60, {
+    style: 'unit',
+    unit: 'minute',
+    unitDisplay: 'short',
+    maximumFractionDigits: seconds % 60 === 0 ? 0 : 1,
+  });
+}
+
+function formatHeadwayRange(
+  range: ArrivalTiming['departures'][number]['headwayRangeSeconds'],
+  intl: IntlShape,
+) {
+  const minimum = formatHeadway(range.min, intl);
+  return range.min === range.max
+    ? minimum
+    : `${minimum}–${formatHeadway(range.max, intl)}`;
+}
+
 function ServiceDetailsTooltip({
+  estimate,
   firstTrainTime,
   lastTrainTime,
   serviceName,
 }: {
+  estimate: ArrivalTiming['departures'][number] | null;
   firstTrainTime: string | null;
   lastTrainTime: string | null;
   serviceName: ArrivalTiming['serviceName'];
@@ -272,6 +296,29 @@ function ServiceDetailsTooltip({
                     </dd>
                   </>
                 )}
+                {estimate?.basis === 'frequency_estimate' && (
+                  <>
+                    <dt className="text-gray-400 dark:text-gray-400">
+                      <FormattedMessage
+                        id="station.arrival_timings.estimate_label"
+                        defaultMessage="Estimate"
+                      />
+                    </dt>
+                    <dd className="tabular-nums">
+                      <FormattedMessage
+                        id="station.arrival_timings.estimate_details"
+                        defaultMessage="Typical {typical} · Published range {range}"
+                        values={{
+                          typical: formatHeadway(estimate.headwaySeconds, intl),
+                          range: formatHeadwayRange(
+                            estimate.headwayRangeSeconds,
+                            intl,
+                          ),
+                        }}
+                      />
+                    </dd>
+                  </>
+                )}
               </dl>
               <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
             </Tooltip.Popup>
@@ -305,16 +352,16 @@ function ArrivalTimingValue({
   intl,
   now,
 }: {
-  departure: string;
+  departure: ArrivalTiming['departures'][number];
   intl: IntlShape;
   now: DateTime | null;
 }) {
-  const departureTime = DateTime.fromISO(departure, { setZone: true });
+  const departureTime = DateTime.fromISO(departure.time, { setZone: true });
   if (now == null || !departureTime.isValid) {
-    return formatTime(departure, intl);
+    return formatTime(departure.time, intl);
   }
 
-  return formatRelativeTime(departure, intl, now);
+  return formatRelativeTime(departure.time, intl, now);
 }
 
 function formatRelativeTime(

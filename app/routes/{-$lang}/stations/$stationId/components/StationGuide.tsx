@@ -157,7 +157,7 @@ function ArrivalEstimatorInfo() {
               <p className="mt-1 text-gray-200 dark:text-gray-300">
                 <FormattedMessage
                   id="station.arrival_timings.explainer"
-                  defaultMessage="Calculated from the station's published first and last train times and the service's representative frequency. We show the next two departures, rounded to 30 seconds; these are not live train-tracking predictions."
+                  defaultMessage="Calculated from the station's published first and last train times and representative frequency. These are planning estimates, not live train-tracking predictions. Open a service's details for its typical headway and published range."
                 />
               </p>
               <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />

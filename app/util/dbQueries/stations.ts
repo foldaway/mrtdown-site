@@ -1,4 +1,3 @@
-import type { LineSummaryStatus, Station } from '~/types';
 import { and, asc, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import {
   impactEventEntityFacilitiesTable,
@@ -16,6 +15,11 @@ import {
   stationsTable,
   townsTable,
 } from '~/db/schema';
+import type { LineSummaryStatus, Station } from '~/types';
+import {
+  type EstimatedArrivalTiming,
+  getEstimatedStationArrivalTimings,
+} from '~/util/estimatedArrivals';
 import {
   type CommunitySignalOptions,
   getPageCommunitySignals,
@@ -23,7 +27,6 @@ import {
 import { getDefaultDb, timeDbQuery } from './database';
 import { buildDataset, parseTranslations } from './dataset';
 import { isoDate, nowSg } from './dateTime';
-import { getEstimatedStationArrivalTimings } from '~/util/estimatedArrivals';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
 import {
@@ -453,20 +456,7 @@ export async function getStationProfileReadModel(
   );
   const arrivalLinesById = new Map<
     string,
-    Array<{
-      serviceId: string;
-      lineId: string;
-      serviceName: Station['name'];
-      destinationStationId: string | null;
-      destinationCode: string;
-      destinationName: Station['name'] | null;
-      firstTrainTime: string | null;
-      lastTrainTime: string | null;
-      isServiceEnded: boolean;
-      nextServiceStart: string | null;
-      platformLabels: string[];
-      departures: string[];
-    }>
+    Array<EstimatedArrivalTiming & { platformLabels: string[] }>
   >();
   for (const service of arrivalServices) {
     const timing = arrivalTimingsByServiceId.get(service.serviceId) ?? {
@@ -492,7 +482,8 @@ export async function getStationProfileReadModel(
       lineId,
       arrivalTimings: arrivalTimings.toSorted((a, b) => {
         const nextDepartureDiff =
-          Date.parse(a.departures[0] ?? '') - Date.parse(b.departures[0] ?? '');
+          Date.parse(a.departures[0]?.time ?? '') -
+          Date.parse(b.departures[0]?.time ?? '');
         return nextDepartureDiff !== 0
           ? nextDepartureDiff
           : a.destinationCode.localeCompare(b.destinationCode);

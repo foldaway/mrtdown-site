@@ -43,7 +43,7 @@ const revision = {
 } satisfies Pick<ServiceRevision, 'path' | 'estimatedFrequency'>;
 
 describe('getEstimatedStationArrivalTimings', () => {
-  it('returns the next two departures from the frequency estimator', () => {
+  it('returns the next two point estimates from the frequency estimator', () => {
     const arrivalTimings = getEstimatedStationArrivalTimings({
       station,
       services: [
@@ -96,8 +96,18 @@ describe('getEstimatedStationArrivalTimings', () => {
         isServiceEnded: false,
         nextServiceStart: '2026-07-21T05:00:00.000+08:00',
         departures: [
-          '2026-07-20T05:10:00.000+08:00',
-          '2026-07-20T05:20:00.000+08:00',
+          {
+            basis: 'frequency_estimate',
+            headwaySeconds: 600,
+            headwayRangeSeconds: { min: 600, max: 600 },
+            time: '2026-07-20T05:09:00.000+08:00',
+          },
+          {
+            basis: 'frequency_estimate',
+            headwaySeconds: 600,
+            headwayRangeSeconds: { min: 600, max: 600 },
+            time: '2026-07-20T05:19:00.000+08:00',
+          },
         ],
       },
     ]);
@@ -132,6 +142,58 @@ describe('getEstimatedStationArrivalTimings', () => {
       {
         isServiceEnded: true,
         nextServiceStart: '2026-07-21T05:00:00.000+08:00',
+      },
+    ]);
+  });
+
+  it('uses the previous service day for estimates after midnight', () => {
+    expect(
+      getEstimatedStationArrivalTimings({
+        station: {
+          id: 'alpha',
+          firstLastTrain: {
+            services: [
+              {
+                serviceId: 'alpha-eastbound',
+                times: {
+                  daily: {
+                    firstTrain: '05:00:00',
+                    lastTrain: '00:30:00',
+                  },
+                },
+              },
+            ],
+          },
+        },
+        services: [
+          {
+            serviceId: 'alpha-eastbound',
+            lineId: 'AL',
+            serviceName: {
+              'en-SG': 'Alpha Line eastbound',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
+            destinationStationId: 'bravo',
+            destinationCode: 'B2',
+            destinationName: null,
+            revision,
+          },
+        ],
+        referenceNow: DateTime.fromISO('2026-07-20T00:05:00', {
+          zone: 'Asia/Singapore',
+        }),
+        publicHolidayDates: new Set(),
+      }),
+    ).toMatchObject([
+      {
+        isServiceEnded: false,
+        nextServiceStart: '2026-07-20T05:00:00.000+08:00',
+        departures: [
+          { time: '2026-07-20T00:10:00.000+08:00' },
+          { time: '2026-07-20T00:20:00.000+08:00' },
+        ],
       },
     ]);
   });

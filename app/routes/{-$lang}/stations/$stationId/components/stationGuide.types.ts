@@ -12,7 +12,12 @@ export type ArrivalTiming = {
   isServiceEnded: boolean;
   nextServiceStart: string | null;
   platformLabels: string[];
-  departures: string[];
+  departures: Array<{
+    basis: 'first_train' | 'frequency_estimate' | 'last_train';
+    headwaySeconds: number;
+    headwayRangeSeconds: { min: number; max: number };
+    time: string;
+  }>;
 };
 
 export type ArrivalLine = {
