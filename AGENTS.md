@@ -10,6 +10,12 @@ This repository is mid-overhaul on the stacked `codex/overhaul-*` branches.
 - Canonical data pull workflow code lives in `app/workflows/pull`.
 - Generated files include `app/routeTree.gen.ts` and large station map snapshots under `app/components/StationMap/components/Map*.tsx`.
 
+## Code Organization
+
+When writing code, favor focused modules: create separate files when they improve cohesion and avoid accumulating thousands of lines in a single file.
+
+For React components, declare an explicit TypeScript props type (for example, `type ComponentProps = { ... }`) and use it in the function signature instead of declaring props inline in the parameter list.
+
 ## Verification
 
 Run `npm run verify` before handing work back or publishing changes. The command runs typechecking, linting, formatting checks, migration drift checks, and tests.
