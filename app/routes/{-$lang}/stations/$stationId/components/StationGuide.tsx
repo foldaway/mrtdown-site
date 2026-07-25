@@ -1,6 +1,7 @@
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { FormattedMessage } from 'react-intl';
 import { Link } from '@tanstack/react-router';
+import { useEffect, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { BetaBadge } from '~/components/BetaBadge';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
@@ -14,13 +15,39 @@ export function StationGuide({
   isHydrated,
   lineColors,
   lineNames,
+  stationId,
 }: {
   arrivalLines: ArrivalLine[];
   exits: StationExit[];
   isHydrated: boolean;
   lineColors: Record<string, string>;
   lineNames: Record<string, string>;
+  stationId: string;
 }) {
+  const [liveArrivalLines, setLiveArrivalLines] = useState(arrivalLines);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    let cancelled = false;
+    const refresh = async () => {
+      const response = await fetch(`/api/stations/${stationId}/arrivals`, {
+        cache: 'no-store',
+      });
+      if (!response.ok || cancelled) return;
+      const body = (await response.json()) as {
+        success?: boolean;
+        data?: ArrivalLine[];
+      };
+      if (body.success && body.data != null) setLiveArrivalLines(body.data);
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [isHydrated, stationId]);
+
   return (
     <section
       aria-labelledby="station-guide-title"
@@ -38,7 +65,7 @@ export function StationGuide({
         </h2>
         <ArrivalEstimatorInfo />
       </div>
-      {arrivalLines.length > 0 && (
+      {liveArrivalLines.length > 0 && (
         <section
           aria-labelledby="station-arrivals-title"
           className="border-gray-200 border-t dark:border-gray-700"
@@ -49,7 +76,7 @@ export function StationGuide({
               defaultMessage="Estimated arrivals"
             />
           </h3>
-          {arrivalLines.map((line) => (
+          {liveArrivalLines.map((line) => (
             <section
               aria-labelledby={`arrival-line-${line.lineId}`}
               className="border-gray-200 border-t dark:border-gray-700"
@@ -82,6 +109,7 @@ export function StationGuide({
                     isHydrated={isHydrated}
                     key={arrivalTiming.serviceId}
                     lineColor={lineColors[line.lineId]}
+                    stationId={stationId}
                   />
                 ))}
               </ul>

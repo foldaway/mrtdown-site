@@ -654,6 +654,7 @@ function StationPage() {
                   getLocalizedTranslation(line.name, intl.locale),
                 ]),
               )}
+              stationId={stationProfile.stationId}
             />
           )}
 

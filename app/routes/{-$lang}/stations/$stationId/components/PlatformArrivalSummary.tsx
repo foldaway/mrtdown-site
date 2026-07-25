@@ -13,10 +13,12 @@ export function ServiceArrivalSummary({
   arrivalTiming,
   isHydrated,
   lineColor,
+  stationId,
 }: {
   arrivalTiming: ArrivalTiming;
   isHydrated: boolean;
   lineColor: string;
+  stationId: string;
 }) {
   const intl = useIntl();
   const now = useCurrentTime(isHydrated);
@@ -26,53 +28,144 @@ export function ServiceArrivalSummary({
       : getLocalizedTranslation(arrivalTiming.destinationName, intl.locale);
 
   return (
-    <li className="grid gap-2 px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6">
-      <div className="min-w-0">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="shrink-0 text-gray-500 text-sm dark:text-gray-400">
-            <FormattedMessage
-              id="station.arrival_timings.towards_label"
-              defaultMessage="Towards"
-            />
-          </span>
-          {arrivalTiming.destinationStationId == null ? (
-            <DestinationIdentity
-              code={arrivalTiming.destinationCode}
-              color={lineColor}
-              name={destinationName}
-            />
-          ) : (
-            <Link
-              className="group flex min-w-0 items-center gap-1.5"
-              params={{ stationId: arrivalTiming.destinationStationId }}
-              to="/{-$lang}/stations/$stationId"
-            >
+    <li className="px-4 py-2.5 sm:px-6">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0 text-gray-500 text-sm dark:text-gray-400">
+              <FormattedMessage
+                id="station.arrival_timings.towards_label"
+                defaultMessage="Towards"
+              />
+            </span>
+            {arrivalTiming.destinationStationId == null ? (
               <DestinationIdentity
                 code={arrivalTiming.destinationCode}
                 color={lineColor}
                 name={destinationName}
               />
-            </Link>
+            ) : (
+              <Link
+                className="group flex min-w-0 items-center gap-1.5"
+                params={{ stationId: arrivalTiming.destinationStationId }}
+                to="/{-$lang}/stations/$stationId"
+              >
+                <DestinationIdentity
+                  code={arrivalTiming.destinationCode}
+                  color={lineColor}
+                  name={destinationName}
+                />
+              </Link>
+            )}
+            <ServiceDetailsTooltip
+              estimate={arrivalTiming.departures[0] ?? null}
+              firstTrainTime={arrivalTiming.firstTrainTime}
+              lastTrainTime={arrivalTiming.lastTrainTime}
+              serviceName={arrivalTiming.serviceName}
+            />
+          </div>
+          {arrivalTiming.platformLabels.length > 0 && (
+            <ul className="mt-1.5 flex flex-wrap gap-1">
+              {arrivalTiming.platformLabels.map((label) => (
+                <li key={label}>
+                  <PlatformBadge color={lineColor} label={label} />
+                </li>
+              ))}
+            </ul>
           )}
-          <ServiceDetailsTooltip
-            estimate={arrivalTiming.departures[0] ?? null}
-            firstTrainTime={arrivalTiming.firstTrainTime}
-            lastTrainTime={arrivalTiming.lastTrainTime}
-            serviceName={arrivalTiming.serviceName}
-          />
         </div>
-        {arrivalTiming.platformLabels.length > 0 && (
-          <ul className="mt-1.5 flex flex-wrap gap-1">
-            {arrivalTiming.platformLabels.map((label) => (
-              <li key={label}>
-                <PlatformBadge color={lineColor} label={label} />
-              </li>
-            ))}
-          </ul>
+        <ArrivalStatus arrivalTiming={arrivalTiming} intl={intl} now={now} />
+      </div>
+      <CrowdArrivalReportButton
+        serviceId={arrivalTiming.serviceId}
+        stationId={stationId}
+      />
+    </li>
+  );
+}
+
+function CrowdArrivalReportButton({
+  serviceId,
+  stationId,
+}: {
+  serviceId: string;
+  stationId: string;
+}) {
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>(
+    'idle',
+  );
+  const submit = async (minutesToArrival: number) => {
+    setStatus('sending');
+    try {
+      const response = await fetch('/api/arrival-reports', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ stationId, serviceId, minutesToArrival }),
+      });
+      setStatus(response.ok ? 'sent' : 'error');
+    } catch {
+      setStatus('error');
+    }
+  };
+  if (status === 'sent') {
+    return (
+      <p className="mt-2 text-emerald-700 text-xs dark:text-emerald-300">
+        <FormattedMessage
+          id="station.arrival_report.thanks"
+          defaultMessage="Thanks—your report will help update this estimate for the next few minutes."
+        />
+      </p>
+    );
+  }
+  return (
+    <details className="mt-2 text-xs">
+      <summary className="w-fit cursor-pointer rounded px-1 text-blue-700 hover:bg-blue-50 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300 dark:hover:bg-blue-950">
+        <FormattedMessage
+          id="station.arrival_report.summary"
+          defaultMessage="Help improve this estimate"
+        />
+      </summary>
+      <div className="mt-2 max-w-lg rounded-lg bg-blue-50 px-3 py-2.5 text-gray-700 dark:bg-blue-950/30 dark:text-gray-200">
+        <p>
+          <FormattedMessage
+            id="station.arrival_report.explainer"
+            defaultMessage="At this station now? Share the arrival time you can see. Community reports update the next-train estimate for a few minutes; they are not official train tracking."
+          />
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {[0, 1, 3, 5].map((minutes) => (
+            <button
+              className="rounded-md border border-blue-300 bg-white px-2 py-1 font-medium text-blue-800 hover:border-blue-600 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-700 dark:bg-gray-900 dark:text-blue-200 dark:hover:bg-blue-900"
+              disabled={status === 'sending'}
+              key={minutes}
+              onClick={() => void submit(minutes)}
+              type="button"
+            >
+              {minutes === 0 ? (
+                <FormattedMessage
+                  id="station.arrival_report.arriving_now"
+                  defaultMessage="Arriving now"
+                />
+              ) : (
+                <FormattedMessage
+                  id="station.arrival_report.minutes"
+                  defaultMessage="{minutes} min away"
+                  values={{ minutes }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
+        {status === 'error' && (
+          <p className="mt-2 text-red-700 dark:text-red-300">
+            <FormattedMessage
+              id="station.arrival_report.error"
+              defaultMessage="Couldn’t send your report. Please try again."
+            />
+          </p>
         )}
       </div>
-      <ArrivalStatus arrivalTiming={arrivalTiming} intl={intl} now={now} />
-    </li>
+    </details>
   );
 }
 

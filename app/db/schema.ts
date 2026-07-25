@@ -187,6 +187,51 @@ export const crowdReportEffectEnum = pgEnum(
   IngestContentCrowdReportEffects,
 );
 
+export const crowdArrivalReportStatusEnum = pgEnum(
+  'crowd_arrival_report_status',
+  ['accepted', 'rejected'],
+);
+
+// Arrival reports are short-lived estimator inputs, not canonical disruption
+// evidence, so they must never share the crowd_reports dispatch path.
+export const crowdArrivalReportsTable = pgTable(
+  'crowd_arrival_reports',
+  {
+    id: text('id').primaryKey(),
+    station_id: text('station_id')
+      .references(() => stationsTable.id)
+      .notNull(),
+    service_id: text('service_id')
+      .references(() => servicesTable.id)
+      .notNull(),
+    reported_at: timestamp('reported_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).notNull(),
+    minutes_to_arrival: integer('minutes_to_arrival').notNull(),
+    status: crowdArrivalReportStatusEnum().notNull().default('accepted'),
+    reporter_hash: text('reporter_hash').notNull(),
+    ...timestampColumns,
+  },
+  (table) => [
+    index('crowd_arrival_reports_station_service_reported_at_idx').using(
+      'btree',
+      table.station_id.asc(),
+      table.service_id.asc(),
+      table.reported_at.desc(),
+    ),
+    index('crowd_arrival_reports_reporter_created_at_idx').using(
+      'btree',
+      table.reporter_hash.asc(),
+      table.created_at.desc(),
+    ),
+    check(
+      'crowd_arrival_reports_minutes_to_arrival_check',
+      sql`${table.minutes_to_arrival} >= 0 and ${table.minutes_to_arrival} <= 30`,
+    ),
+  ],
+);
+
 export const crowdReportStatusEnum = pgEnum('crowd_report_status', [
   'pending',
   'accepted',

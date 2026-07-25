@@ -1,5 +1,6 @@
-import { and, asc, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNull, or } from 'drizzle-orm';
 import {
+  crowdArrivalReportsTable,
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
   impactEventsTable,
@@ -437,12 +438,53 @@ export async function getStationProfileReadModel(
       },
     };
   });
+  const freshCrowdArrivalRows =
+    arrivalServices.length > 0
+      ? await timeDbQuery('station_profile_q_crowd_arrivals', () =>
+          db
+            .select({
+              id: crowdArrivalReportsTable.id,
+              reporterHash: crowdArrivalReportsTable.reporter_hash,
+              serviceId: crowdArrivalReportsTable.service_id,
+              reportedAt: crowdArrivalReportsTable.reported_at,
+              minutesToArrival: crowdArrivalReportsTable.minutes_to_arrival,
+            })
+            .from(crowdArrivalReportsTable)
+            .where(
+              and(
+                eq(crowdArrivalReportsTable.station_id, station.id),
+                inArray(
+                  crowdArrivalReportsTable.service_id,
+                  arrivalServices.map((service) => service.serviceId),
+                ),
+                eq(crowdArrivalReportsTable.status, 'accepted'),
+                gte(
+                  crowdArrivalReportsTable.reported_at,
+                  referenceNow.minus({ minutes: 3 }).toISO() ?? '',
+                ),
+              ),
+            )
+            .orderBy(desc(crowdArrivalReportsTable.reported_at)),
+        )
+      : [];
+  // A reporter may correct their observation, but cannot manufacture a
+  // consensus by submitting several values inside the estimator freshness
+  // window. Rows are ordered newest-first, so retain the first per scope.
+  const freshCrowdArrivalReports = [
+    ...new Map(
+      freshCrowdArrivalRows.map((report) => [
+        `${report.reporterHash}:${report.serviceId}`,
+        report,
+      ]),
+    ).values(),
+  ];
   const arrivalTimingsByServiceId = new Map(
     getEstimatedStationArrivalTimings({
       station,
       services: arrivalServices,
       referenceNow,
       publicHolidayDates: dataset.publicHolidaySet,
+      crowdReports: freshCrowdArrivalReports,
     })
       .map((timing) => ({
         ...timing,

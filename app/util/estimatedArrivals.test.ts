@@ -98,12 +98,18 @@ describe('getEstimatedStationArrivalTimings', () => {
         departures: [
           {
             basis: 'frequency_estimate',
+            confidence: 'low',
+            crowdReportCount: 0,
+            crowdReportsDisagree: false,
             headwaySeconds: 600,
             headwayRangeSeconds: { min: 600, max: 600 },
             time: '2026-07-20T05:09:00.000+08:00',
           },
           {
             basis: 'frequency_estimate',
+            confidence: 'low',
+            crowdReportCount: 0,
+            crowdReportsDisagree: false,
             headwaySeconds: 600,
             headwayRangeSeconds: { min: 600, max: 600 },
             time: '2026-07-20T05:19:00.000+08:00',

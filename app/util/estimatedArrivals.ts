@@ -1,12 +1,13 @@
 import {
   estimateNextStationArrivals,
+  type CrowdArrivalReport,
   type EstimatedStationArrival,
   generateEstimatedStationFrequencySchedule,
   type EstimatedStationScheduleCalendar,
   type ServiceRevision,
   type Station,
 } from '@mrtdown/core';
-import type { DateTime } from 'luxon';
+import { DateTime } from 'luxon';
 import { isoDate, isoDateTime } from './dbQueries/dateTime';
 
 export type EstimatedArrivalService = {
@@ -17,6 +18,13 @@ export type EstimatedArrivalService = {
   destinationCode: string;
   destinationName: Station['name'] | null;
   revision: Pick<ServiceRevision, 'path' | 'estimatedFrequency'>;
+};
+
+export type StoredCrowdArrivalReport = {
+  id: string;
+  serviceId: string;
+  reportedAt: string;
+  minutesToArrival: number;
 };
 
 export type EstimatedArrivalTiming = {
@@ -35,8 +43,10 @@ export type EstimatedArrivalTiming = {
 
 export type EstimatedArrivalDeparture = Pick<
   EstimatedStationArrival,
-  'basis' | 'headwayRangeSeconds' | 'headwaySeconds'
+  'basis' | 'confidence' | 'headwayRangeSeconds' | 'headwaySeconds'
 > & {
+  crowdReportCount: number;
+  crowdReportsDisagree: boolean;
   time: string;
 };
 
@@ -82,6 +92,7 @@ export function getEstimatedStationArrivalTimings(input: {
   services: readonly EstimatedArrivalService[];
   referenceNow: DateTime;
   publicHolidayDates: ReadonlySet<string>;
+  crowdReports?: readonly StoredCrowdArrivalReport[];
 }): EstimatedArrivalTiming[] {
   const serviceDates = [-1, 0, 1].map((offset) =>
     input.referenceNow.startOf('day').plus({ days: offset }),
@@ -119,9 +130,32 @@ export function getEstimatedStationArrivalTimings(input: {
             const estimates = estimateNextStationArrivals(
               schedule,
               queriedAtTime,
-              2,
+              {
+                count: 2,
+                crowdReports: input.crowdReports
+                  ?.filter((report) => report.serviceId === service.serviceId)
+                  .map(
+                    (report): CrowdArrivalReport => ({
+                      id: report.id,
+                      reportedAtTime: formatServiceDayTime(
+                        Math.round(
+                          DateTime.fromISO(report.reportedAt, {
+                            setZone: true,
+                          })
+                            .setZone(input.referenceNow.zone)
+                            .diff(serviceDate.startOf('day'), 'seconds')
+                            .seconds,
+                        ),
+                      ),
+                      minutesToArrival: report.minutesToArrival,
+                    }),
+                  ),
+              },
             ).map((estimate) => ({
               basis: estimate.basis,
+              confidence: estimate.confidence,
+              crowdReportCount: estimate.crowdReportIds?.length ?? 0,
+              crowdReportsDisagree: estimate.crowdReportsDisagree ?? false,
               headwaySeconds: estimate.headwaySeconds,
               headwayRangeSeconds: estimate.headwayRangeSeconds,
               time: isoDateTime(

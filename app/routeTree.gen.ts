@@ -18,6 +18,7 @@ import { Route as Char123LangChar125SitemapDotxmlRouteImport } from './routes/{-
 import { Route as ApiSentryAnonymousUserRouteImport } from './routes/api.sentry-anonymous-user'
 import { Route as ApiReportsRouteImport } from './routes/api.reports'
 import { Route as ApiIssuesDayRouteImport } from './routes/api.issues-day'
+import { Route as ApiArrivalReportsRouteImport } from './routes/api.arrival-reports'
 import { Route as Char123LangChar125TownsIndexRouteImport } from './routes/{-$lang}/towns/index'
 import { Route as Char123LangChar125SystemMapIndexRouteImport } from './routes/{-$lang}/system-map/index'
 import { Route as Char123LangChar125StatisticsIndexRouteImport } from './routes/{-$lang}/statistics/index'
@@ -45,6 +46,7 @@ import { Route as InternalApiTasksPublicHolidaysRouteImport } from './routes/int
 import { Route as InternalApiTasksFactsRouteImport } from './routes/internal.api.tasks.facts'
 import { Route as InternalApiTasksCrowdReportDispatchRouteImport } from './routes/internal.api.tasks.crowd-report-dispatch'
 import { Route as InternalApiReferenceCatalogV1RouteImport } from './routes/internal.api.reference-catalog.v1'
+import { Route as ApiStationsStationIdArrivalsRouteImport } from './routes/api.stations.$stationId.arrivals'
 import { Route as Char123LangChar125HistoryPagePageNumIndexRouteImport } from './routes/{-$lang}/history/page/$pageNum/index'
 import { Route as Char123LangChar125HistoryYearMonthIndexRouteImport } from './routes/{-$lang}/history/$year/$month/index'
 import { Route as Char123LangChar125CommunityReportsKindSourceIdIndexRouteImport } from './routes/{-$lang}/community-reports/$kind/$sourceId/index'
@@ -93,6 +95,11 @@ const ApiReportsRoute = ApiReportsRouteImport.update({
 const ApiIssuesDayRoute = ApiIssuesDayRouteImport.update({
   id: '/api/issues-day',
   path: '/api/issues-day',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiArrivalReportsRoute = ApiArrivalReportsRouteImport.update({
+  id: '/api/arrival-reports',
+  path: '/api/arrival-reports',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char123LangChar125TownsIndexRoute =
@@ -251,6 +258,12 @@ const InternalApiReferenceCatalogV1Route =
     path: '/internal/api/reference-catalog/v1',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiStationsStationIdArrivalsRoute =
+  ApiStationsStationIdArrivalsRouteImport.update({
+    id: '/api/stations/$stationId/arrivals',
+    path: '/api/stations/$stationId/arrivals',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const Char123LangChar125HistoryPagePageNumIndexRoute =
   Char123LangChar125HistoryPagePageNumIndexRouteImport.update({
     id: '/history/page/$pageNum/',
@@ -275,6 +288,7 @@ export interface FileRoutesByFullPath {
   '/healthz': typeof HealthzRoute
   '/index.md': typeof IndexDotmdRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/api/arrival-reports': typeof ApiArrivalReportsRoute
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
   '/api/sentry-anonymous-user': typeof ApiSentryAnonymousUserRoute
@@ -294,6 +308,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns/': typeof Char123LangChar125TownsIndexRoute
+  '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRoute
   '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
@@ -315,6 +330,7 @@ export interface FileRoutesByTo {
   '/healthz': typeof HealthzRoute
   '/index.md': typeof IndexDotmdRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/api/arrival-reports': typeof ApiArrivalReportsRoute
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
   '/api/sentry-anonymous-user': typeof ApiSentryAnonymousUserRoute
@@ -334,6 +350,7 @@ export interface FileRoutesByTo {
   '/{-$lang}/statistics': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns': typeof Char123LangChar125TownsIndexRoute
+  '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRoute
   '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
@@ -357,6 +374,7 @@ export interface FileRoutesById {
   '/healthz': typeof HealthzRoute
   '/index.md': typeof IndexDotmdRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/api/arrival-reports': typeof ApiArrivalReportsRoute
   '/api/issues-day': typeof ApiIssuesDayRoute
   '/api/reports': typeof ApiReportsRoute
   '/api/sentry-anonymous-user': typeof ApiSentryAnonymousUserRoute
@@ -376,6 +394,7 @@ export interface FileRoutesById {
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns/': typeof Char123LangChar125TownsIndexRoute
+  '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRoute
   '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
@@ -400,6 +419,7 @@ export interface FileRouteTypes {
     | '/healthz'
     | '/index.md'
     | '/llms.txt'
+    | '/api/arrival-reports'
     | '/api/issues-day'
     | '/api/reports'
     | '/api/sentry-anonymous-user'
@@ -419,6 +439,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/statistics/'
     | '/{-$lang}/system-map/'
     | '/{-$lang}/towns/'
+    | '/api/stations/$stationId/arrivals'
     | '/internal/api/reference-catalog/v1'
     | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
@@ -440,6 +461,7 @@ export interface FileRouteTypes {
     | '/healthz'
     | '/index.md'
     | '/llms.txt'
+    | '/api/arrival-reports'
     | '/api/issues-day'
     | '/api/reports'
     | '/api/sentry-anonymous-user'
@@ -459,6 +481,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/statistics'
     | '/{-$lang}/system-map'
     | '/{-$lang}/towns'
+    | '/api/stations/$stationId/arrivals'
     | '/internal/api/reference-catalog/v1'
     | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
@@ -481,6 +504,7 @@ export interface FileRouteTypes {
     | '/healthz'
     | '/index.md'
     | '/llms.txt'
+    | '/api/arrival-reports'
     | '/api/issues-day'
     | '/api/reports'
     | '/api/sentry-anonymous-user'
@@ -500,6 +524,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/statistics/'
     | '/{-$lang}/system-map/'
     | '/{-$lang}/towns/'
+    | '/api/stations/$stationId/arrivals'
     | '/internal/api/reference-catalog/v1'
     | '/internal/api/tasks/crowd-report-dispatch'
     | '/internal/api/tasks/facts'
@@ -523,6 +548,7 @@ export interface RootRouteChildren {
   HealthzRoute: typeof HealthzRoute
   IndexDotmdRoute: typeof IndexDotmdRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
+  ApiArrivalReportsRoute: typeof ApiArrivalReportsRoute
   ApiIssuesDayRoute: typeof ApiIssuesDayRoute
   ApiReportsRoute: typeof ApiReportsRoute
   ApiSentryAnonymousUserRoute: typeof ApiSentryAnonymousUserRoute
@@ -532,6 +558,7 @@ export interface RootRouteChildren {
   LinesLineIdIndexDotmdRoute: typeof LinesLineIdIndexDotmdRoute
   OperatorsOperatorIdIndexDotmdRoute: typeof OperatorsOperatorIdIndexDotmdRoute
   StationsStationIdIndexDotmdRoute: typeof StationsStationIdIndexDotmdRoute
+  ApiStationsStationIdArrivalsRoute: typeof ApiStationsStationIdArrivalsRoute
   InternalApiReferenceCatalogV1Route: typeof InternalApiReferenceCatalogV1Route
   InternalApiTasksCrowdReportDispatchRoute: typeof InternalApiTasksCrowdReportDispatchRoute
   InternalApiTasksFactsRoute: typeof InternalApiTasksFactsRoute
@@ -603,6 +630,13 @@ declare module '@tanstack/react-router' {
       path: '/api/issues-day'
       fullPath: '/api/issues-day'
       preLoaderRoute: typeof ApiIssuesDayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/arrival-reports': {
+      id: '/api/arrival-reports'
+      path: '/api/arrival-reports'
+      fullPath: '/api/arrival-reports'
+      preLoaderRoute: typeof ApiArrivalReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/{-$lang}/towns/': {
@@ -794,6 +828,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InternalApiReferenceCatalogV1RouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/stations/$stationId/arrivals': {
+      id: '/api/stations/$stationId/arrivals'
+      path: '/api/stations/$stationId/arrivals'
+      fullPath: '/api/stations/$stationId/arrivals'
+      preLoaderRoute: typeof ApiStationsStationIdArrivalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/{-$lang}/history/page/$pageNum/': {
       id: '/{-$lang}/history/page/$pageNum/'
       path: '/history/page/$pageNum'
@@ -887,6 +928,7 @@ const rootRouteChildren: RootRouteChildren = {
   HealthzRoute: HealthzRoute,
   IndexDotmdRoute: IndexDotmdRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
+  ApiArrivalReportsRoute: ApiArrivalReportsRoute,
   ApiIssuesDayRoute: ApiIssuesDayRoute,
   ApiReportsRoute: ApiReportsRoute,
   ApiSentryAnonymousUserRoute: ApiSentryAnonymousUserRoute,
@@ -896,6 +938,7 @@ const rootRouteChildren: RootRouteChildren = {
   LinesLineIdIndexDotmdRoute: LinesLineIdIndexDotmdRoute,
   OperatorsOperatorIdIndexDotmdRoute: OperatorsOperatorIdIndexDotmdRoute,
   StationsStationIdIndexDotmdRoute: StationsStationIdIndexDotmdRoute,
+  ApiStationsStationIdArrivalsRoute: ApiStationsStationIdArrivalsRoute,
   InternalApiReferenceCatalogV1Route: InternalApiReferenceCatalogV1Route,
   InternalApiTasksCrowdReportDispatchRoute:
     InternalApiTasksCrowdReportDispatchRoute,
