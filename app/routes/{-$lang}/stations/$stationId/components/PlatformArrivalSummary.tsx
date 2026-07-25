@@ -76,10 +76,12 @@ export function ServiceArrivalSummary({
         </div>
         <ArrivalStatus arrivalTiming={arrivalTiming} intl={intl} now={now} />
       </div>
-      <CrowdArrivalReportButton
-        serviceId={arrivalTiming.serviceId}
-        stationId={stationId}
-      />
+      {arrivalTiming.departures[0] != null && (
+        <CrowdArrivalReportButton
+          serviceId={arrivalTiming.serviceId}
+          stationId={stationId}
+        />
+      )}
     </li>
   );
 }
