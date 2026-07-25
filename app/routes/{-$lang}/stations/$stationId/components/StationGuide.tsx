@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { BetaBadge } from '~/components/BetaBadge';
+import { getStationArrivalLinesFn } from '~/util/station.functions';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { ExitSign } from './StationGuideSigns';
 import type { ArrivalLine, StationExit } from './stationGuide.types';
@@ -27,18 +28,16 @@ export function StationGuide({
   const [liveArrivalLines, setLiveArrivalLines] = useState(arrivalLines);
 
   useEffect(() => {
-    if (!isHydrated) return;
     let cancelled = false;
     const refresh = async () => {
-      const response = await fetch(`/api/stations/${stationId}/arrivals`, {
-        cache: 'no-store',
-      });
-      if (!response.ok || cancelled) return;
-      const body = (await response.json()) as {
-        success?: boolean;
-        data?: ArrivalLine[];
-      };
-      if (body.success && body.data != null) setLiveArrivalLines(body.data);
+      try {
+        const nextArrivalLines = await getStationArrivalLinesFn({
+          data: { stationId },
+        });
+        if (!cancelled) setLiveArrivalLines(nextArrivalLines);
+      } catch {
+        // Keep the server-rendered estimates when the refresh is unavailable.
+      }
     };
     void refresh();
     const interval = window.setInterval(() => void refresh(), 30_000);
@@ -46,7 +45,7 @@ export function StationGuide({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [isHydrated, stationId]);
+  }, [stationId]);
 
   return (
     <section

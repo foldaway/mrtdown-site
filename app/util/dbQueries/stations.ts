@@ -392,12 +392,9 @@ export async function getStationProfileReadModel(
       boardablePlatformLabelsByServiceId.set(serviceId, labels);
     }
   }
-  const arrivalBranchesWithOtherDestinations = arrivalBranches.filter(
-    (branch) => branch.entries.at(-1)?.stationId !== station.id,
-  );
   const destinationStationIds = [
     ...new Set(
-      arrivalBranchesWithOtherDestinations
+      arrivalBranches
         .map((branch) => branch.entries.at(-1)?.stationId)
         .filter((stationId): stationId is string => stationId != null),
     ),
@@ -417,7 +414,7 @@ export async function getStationProfileReadModel(
       parseTranslations(destination.name),
     ]),
   );
-  const arrivalServices = arrivalBranchesWithOtherDestinations.map((branch) => {
+  const arrivalServices = arrivalBranches.map((branch) => {
     const destination = branch.entries.at(-1);
     return {
       serviceId: branch.id,
@@ -512,7 +509,11 @@ export async function getStationProfileReadModel(
       lastTrainTime: null,
       isServiceEnded: false,
       nextServiceStart: null,
-      platformLabels: [],
+      platformLabels: [
+        ...new Set(
+          boardablePlatformLabelsByServiceId.get(service.serviceId) ?? [],
+        ),
+      ].sort((a, b) => a.localeCompare(b)),
       departures: [],
     };
     const timings = arrivalLinesById.get(service.lineId) ?? [];

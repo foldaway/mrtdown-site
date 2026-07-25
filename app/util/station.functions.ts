@@ -18,6 +18,15 @@ export const getStationProfileFn = createServerFn({ method: 'GET' })
     }),
   );
 
+export const getStationArrivalLinesFn = createServerFn({ method: 'GET' })
+  .inputValidator((val) => InputSchema.parse(val))
+  .handler(async (val) => {
+    const profile = await getStationProfileReadModel(val.data.stationId, {
+      includeCommunitySignals: false,
+    });
+    return profile.data.arrivalLines;
+  });
+
 export const getStationsDirectoryFn = createServerFn({ method: 'GET' }).handler(
   () =>
     timeServerSpan('stations_directory_loader', () =>
