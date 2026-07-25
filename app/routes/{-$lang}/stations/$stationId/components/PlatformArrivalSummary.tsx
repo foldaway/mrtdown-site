@@ -3,10 +3,11 @@ import { Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useEffect, useState } from 'react';
 import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
-import { Tooltip } from '@base-ui/react/tooltip';
+import { Popover } from '@base-ui/react/popover';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { PlatformSign } from './StationGuideSigns';
 import type { ArrivalTiming } from './stationGuide.types';
+import { useHoverPopover } from './useHoverPopover';
 
 export function ServiceArrivalSummary({
   arrivalTiming,
@@ -241,6 +242,7 @@ function ServiceDetailsTooltip({
   serviceName: ArrivalTiming['serviceName'];
 }) {
   const intl = useIntl();
+  const { closeAfterHover, isOpen, openOnHover, setIsOpen } = useHoverPopover();
   const label = intl.formatMessage({
     id: 'station.arrival_timings.service_details_label',
     defaultMessage: 'Service details',
@@ -251,81 +253,86 @@ function ServiceDetailsTooltip({
   );
 
   return (
-    <Tooltip.Provider delay={100}>
-      <Tooltip.Root>
-        <Tooltip.Trigger
-          render={
-            <button
-              aria-label={label}
-              className="-m-1 shrink-0 rounded-full p-1 text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 dark:hover:text-gray-200"
-              type="button"
-            />
-          }
+    <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
+      <Popover.Trigger
+        render={
+          <button
+            aria-label={label}
+            className="-m-1 shrink-0 rounded-full p-1 text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 dark:hover:text-gray-200"
+            onMouseEnter={openOnHover}
+            onMouseLeave={closeAfterHover}
+            type="button"
+          />
+        }
+      >
+        <InformationCircleIcon aria-hidden={true} className="size-4" />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner
+          collisionPadding={16}
+          onMouseEnter={openOnHover}
+          onMouseLeave={closeAfterHover}
+          sideOffset={8}
         >
-          <InformationCircleIcon aria-hidden={true} className="size-4" />
-        </Tooltip.Trigger>
-        <Tooltip.Portal>
-          <Tooltip.Positioner sideOffset={4}>
-            <Tooltip.Popup className="z-50 rounded-md bg-gray-900 px-3 py-2 text-white text-xs shadow-lg dark:bg-gray-700">
-              <p className="font-semibold">{label}</p>
-              <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-gray-200 dark:text-gray-300">
-                <dt className="text-gray-400 dark:text-gray-400">
-                  <FormattedMessage
-                    id="station.arrival_timings.service_label"
-                    defaultMessage="Service"
-                  />
-                </dt>
-                <dd className="min-w-0">{localizedServiceName}</dd>
-                {firstTrainTime != null && lastTrainTime != null && (
-                  <>
-                    <dt className="text-gray-400 dark:text-gray-400">
-                      <FormattedMessage
-                        id="station.arrival_timings.service_hours_label"
-                        defaultMessage="Service hours"
-                      />
-                    </dt>
-                    <dd className="tabular-nums">
-                      <FormattedMessage
-                        id="station.arrival_timings.service_hours"
-                        defaultMessage="First {firstTrain} · Last {lastTrain} (Singapore time)"
-                        values={{
-                          firstTrain: formatServiceTime(firstTrainTime, intl),
-                          lastTrain: formatServiceTime(lastTrainTime, intl),
-                        }}
-                      />
-                    </dd>
-                  </>
-                )}
-                {estimate?.basis === 'frequency_estimate' && (
-                  <>
-                    <dt className="text-gray-400 dark:text-gray-400">
-                      <FormattedMessage
-                        id="station.arrival_timings.estimate_label"
-                        defaultMessage="Estimate"
-                      />
-                    </dt>
-                    <dd className="tabular-nums">
-                      <FormattedMessage
-                        id="station.arrival_timings.estimate_details"
-                        defaultMessage="Typical {typical} · Published range {range}"
-                        values={{
-                          typical: formatHeadway(estimate.headwaySeconds, intl),
-                          range: formatHeadwayRange(
-                            estimate.headwayRangeSeconds,
-                            intl,
-                          ),
-                        }}
-                      />
-                    </dd>
-                  </>
-                )}
-              </dl>
-              <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
-            </Tooltip.Popup>
-          </Tooltip.Positioner>
-        </Tooltip.Portal>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+          <Popover.Popup className="z-50 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-700 text-xs shadow-gray-900/15 shadow-xl outline-none ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:shadow-black/30 dark:ring-white/10">
+            <p className="font-semibold">{label}</p>
+            <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-gray-600 dark:text-gray-300">
+              <dt className="text-gray-400 dark:text-gray-400">
+                <FormattedMessage
+                  id="station.arrival_timings.service_label"
+                  defaultMessage="Service"
+                />
+              </dt>
+              <dd className="min-w-0">{localizedServiceName}</dd>
+              {firstTrainTime != null && lastTrainTime != null && (
+                <>
+                  <dt className="text-gray-400 dark:text-gray-400">
+                    <FormattedMessage
+                      id="station.arrival_timings.service_hours_label"
+                      defaultMessage="Service hours"
+                    />
+                  </dt>
+                  <dd className="tabular-nums">
+                    <FormattedMessage
+                      id="station.arrival_timings.service_hours"
+                      defaultMessage="First {firstTrain} · Last {lastTrain} (Singapore time)"
+                      values={{
+                        firstTrain: formatServiceTime(firstTrainTime, intl),
+                        lastTrain: formatServiceTime(lastTrainTime, intl),
+                      }}
+                    />
+                  </dd>
+                </>
+              )}
+              {estimate?.basis === 'frequency_estimate' && (
+                <>
+                  <dt className="text-gray-400 dark:text-gray-400">
+                    <FormattedMessage
+                      id="station.arrival_timings.estimate_label"
+                      defaultMessage="Estimate"
+                    />
+                  </dt>
+                  <dd className="tabular-nums">
+                    <FormattedMessage
+                      id="station.arrival_timings.estimate_details"
+                      defaultMessage="Typical {typical} · Published range {range}"
+                      values={{
+                        typical: formatHeadway(estimate.headwaySeconds, intl),
+                        range: formatHeadwayRange(
+                          estimate.headwayRangeSeconds,
+                          intl,
+                        ),
+                      }}
+                    />
+                  </dd>
+                </>
+              )}
+            </dl>
+            <Popover.Arrow className="fill-white dark:fill-gray-800" />
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

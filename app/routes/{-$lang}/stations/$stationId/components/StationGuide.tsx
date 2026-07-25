@@ -1,11 +1,12 @@
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { FormattedMessage } from 'react-intl';
 import { Link } from '@tanstack/react-router';
-import { Tooltip } from '@base-ui/react/tooltip';
+import { Popover } from '@base-ui/react/popover';
 import { BetaBadge } from '~/components/BetaBadge';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { ExitSign } from './StationGuideSigns';
 import type { ArrivalLine, StationExit } from './stationGuide.types';
+import { useHoverPopover } from './useHoverPopover';
 
 export function StationGuide({
   arrivalLines,
@@ -125,46 +126,54 @@ export function StationGuide({
 }
 
 function ArrivalEstimatorInfo() {
+  const { closeAfterHover, isOpen, openOnHover, setIsOpen } = useHoverPopover();
+
   return (
-    <Tooltip.Provider delay={100}>
-      <Tooltip.Root>
-        <Tooltip.Trigger
-          render={
-            <button
-              className="ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-gray-500 text-xs transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-              type="button"
-            />
-          }
-        >
-          <InformationCircleIcon aria-hidden={true} className="size-5" />
-          <FormattedMessage
-            id="station.arrival_timings.info_label"
-            defaultMessage="About arrivals"
+    <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
+      <Popover.Trigger
+        render={
+          <button
+            className="ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-gray-500 text-xs transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+            onMouseEnter={openOnHover}
+            onMouseLeave={closeAfterHover}
+            type="button"
           />
-        </Tooltip.Trigger>
-        <Tooltip.Portal>
-          <Tooltip.Positioner side="bottom" sideOffset={4}>
-            <Tooltip.Popup className="z-50 max-w-sm rounded-md bg-gray-900 px-3 py-2 text-white text-xs leading-5 shadow-lg dark:bg-gray-700">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold">
-                  <FormattedMessage
-                    id="station.arrival_timings.explainer_label"
-                    defaultMessage="How estimated arrivals work"
-                  />
-                </p>
-                <BetaBadge />
-              </div>
-              <p className="mt-1 text-gray-200 dark:text-gray-300">
+        }
+      >
+        <InformationCircleIcon aria-hidden={true} className="size-5" />
+        <FormattedMessage
+          id="station.arrival_timings.info_label"
+          defaultMessage="About arrivals"
+        />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner
+          collisionPadding={16}
+          onMouseEnter={openOnHover}
+          onMouseLeave={closeAfterHover}
+          side="bottom"
+          sideOffset={8}
+        >
+          <Popover.Popup className="z-50 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-700 text-xs leading-5 shadow-gray-900/15 shadow-xl outline-none ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:shadow-black/30 dark:ring-white/10">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-semibold">
                 <FormattedMessage
-                  id="station.arrival_timings.explainer"
-                  defaultMessage="Calculated from the station's published first and last train times and representative frequency. These are planning estimates, not live train-tracking predictions. Open a service's details for its typical headway and published range."
+                  id="station.arrival_timings.explainer_label"
+                  defaultMessage="How estimated arrivals work"
                 />
               </p>
-              <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
-            </Tooltip.Popup>
-          </Tooltip.Positioner>
-        </Tooltip.Portal>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+              <BetaBadge />
+            </div>
+            <p className="mt-1 text-gray-600 dark:text-gray-300">
+              <FormattedMessage
+                id="station.arrival_timings.explainer"
+                defaultMessage="Calculated from the station's published first and last train times and representative frequency. These are planning estimates, not live train-tracking predictions. Open a service's details for its typical headway and published range."
+              />
+            </p>
+            <Popover.Arrow className="fill-white dark:fill-gray-800" />
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
