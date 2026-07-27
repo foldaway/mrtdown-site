@@ -1,14 +1,23 @@
-import { InformationCircleIcon } from '@heroicons/react/20/solid';
-import { FormattedMessage } from 'react-intl';
-import { Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
+import { InformationCircleIcon } from '@heroicons/react/20/solid';
+import { Link } from '@tanstack/react-router';
+import { useCallback, useEffect, useState } from 'react';
+import { FormattedMessage } from 'react-intl';
 import { BetaBadge } from '~/components/BetaBadge';
 import { getStationArrivalLinesFn } from '~/util/station.functions';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { ExitSign } from './StationGuideSigns';
 import type { ArrivalLine, StationExit } from './stationGuide.types';
 import { useHoverPopover } from './useHoverPopover';
+
+type StationGuideProps = {
+  arrivalLines: ArrivalLine[];
+  exits: StationExit[];
+  isHydrated: boolean;
+  lineColors: Record<string, string>;
+  lineNames: Record<string, string>;
+  stationId: string;
+};
 
 export function StationGuide({
   arrivalLines,
@@ -17,35 +26,30 @@ export function StationGuide({
   lineColors,
   lineNames,
   stationId,
-}: {
-  arrivalLines: ArrivalLine[];
-  exits: StationExit[];
-  isHydrated: boolean;
-  lineColors: Record<string, string>;
-  lineNames: Record<string, string>;
-  stationId: string;
-}) {
+}: StationGuideProps) {
   const [liveArrivalLines, setLiveArrivalLines] = useState(arrivalLines);
 
+  const refreshArrivalLines = useCallback(async () => {
+    try {
+      const nextArrivalLines = await getStationArrivalLinesFn({
+        data: { stationId },
+      });
+      setLiveArrivalLines(nextArrivalLines);
+    } catch {
+      // Keep the latest available estimates when the refresh is unavailable.
+    }
+  }, [stationId]);
+
   useEffect(() => {
-    let cancelled = false;
-    const refresh = async () => {
-      try {
-        const nextArrivalLines = await getStationArrivalLinesFn({
-          data: { stationId },
-        });
-        if (!cancelled) setLiveArrivalLines(nextArrivalLines);
-      } catch {
-        // Keep the server-rendered estimates when the refresh is unavailable.
-      }
-    };
-    void refresh();
-    const interval = window.setInterval(() => void refresh(), 30_000);
+    void refreshArrivalLines();
+    const interval = window.setInterval(
+      () => void refreshArrivalLines(),
+      30_000,
+    );
     return () => {
-      cancelled = true;
       window.clearInterval(interval);
     };
-  }, [stationId]);
+  }, [refreshArrivalLines]);
 
   return (
     <section
@@ -108,6 +112,7 @@ export function StationGuide({
                     isHydrated={isHydrated}
                     key={arrivalTiming.serviceId}
                     lineColor={lineColors[line.lineId]}
+                    onArrivalReportSubmitted={refreshArrivalLines}
                     stationId={stationId}
                   />
                 ))}
