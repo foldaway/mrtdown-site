@@ -1,10 +1,9 @@
 import { Popover } from '@base-ui/react/popover';
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FormattedMessage } from 'react-intl';
 import { BetaBadge } from '~/components/BetaBadge';
-import { getStationArrivalLinesFn } from '~/util/station.functions';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { ExitSign } from './StationGuideSigns';
 import type { ArrivalLine, StationExit } from './stationGuide.types';
@@ -28,16 +27,42 @@ export function StationGuide({
   stationId,
 }: StationGuideProps) {
   const [liveArrivalLines, setLiveArrivalLines] = useState(arrivalLines);
+  const activeStationIdRef = useRef<string | null>(null);
+  const refreshGenerationRef = useRef(0);
 
   const refreshArrivalLines = useCallback(async () => {
+    const requestGeneration = ++refreshGenerationRef.current;
     try {
-      const nextArrivalLines = await getStationArrivalLinesFn({
-        data: { stationId },
-      });
-      setLiveArrivalLines(nextArrivalLines);
+      const response = await fetch(
+        `/api/stations/${encodeURIComponent(stationId)}/arrivals`,
+        { cache: 'no-store' },
+      );
+      if (!response.ok) {
+        return;
+      }
+      const payload = (await response.json()) as {
+        data?: ArrivalLine[];
+        success?: boolean;
+      };
+      if (
+        payload.success === true &&
+        payload.data != null &&
+        refreshGenerationRef.current === requestGeneration &&
+        activeStationIdRef.current === stationId
+      ) {
+        setLiveArrivalLines(payload.data);
+      }
     } catch {
       // Keep the latest available estimates when the refresh is unavailable.
     }
+  }, [stationId]);
+
+  useEffect(() => {
+    activeStationIdRef.current = stationId;
+    return () => {
+      activeStationIdRef.current = null;
+      refreshGenerationRef.current += 1;
+    };
   }, [stationId]);
 
   useEffect(() => {
