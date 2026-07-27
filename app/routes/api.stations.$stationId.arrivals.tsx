@@ -7,7 +7,7 @@ export const Route = createFileRoute('/api/stations/$stationId/arrivals')({
       async GET({ params }) {
         try {
           const profile = await getStationProfileReadModel(params.stationId, {
-            includeCommunitySignals: true,
+            includeCommunitySignals: false,
           });
           return Response.json(
             { success: true, data: profile.data.arrivalLines },

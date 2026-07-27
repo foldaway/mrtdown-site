@@ -28,42 +28,59 @@ export function StationGuide({
 }: StationGuideProps) {
   const [liveArrivalLines, setLiveArrivalLines] = useState(arrivalLines);
   const activeStationIdRef = useRef<string | null>(null);
-  const refreshGenerationRef = useRef(0);
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
 
   const refreshArrivalLines = useCallback(async () => {
-    const requestGeneration = ++refreshGenerationRef.current;
+    if (activeStationIdRef.current !== stationId) {
+      return;
+    }
+    if (refreshInFlightRef.current != null) {
+      await refreshInFlightRef.current;
+      return;
+    }
+
+    const refresh = (async () => {
+      try {
+        const response = await fetch(
+          `/api/stations/${encodeURIComponent(stationId)}/arrivals`,
+          { cache: 'no-store' },
+        );
+        if (!response.ok) {
+          return;
+        }
+        const payload = (await response.json()) as {
+          data?: ArrivalLine[];
+          success?: boolean;
+        };
+        if (
+          payload.success === true &&
+          payload.data != null &&
+          activeStationIdRef.current === stationId
+        ) {
+          setLiveArrivalLines(payload.data);
+        }
+      } catch {
+        // Keep the latest available estimates when the refresh is unavailable.
+      }
+    })();
+    refreshInFlightRef.current = refresh;
     try {
-      const response = await fetch(
-        `/api/stations/${encodeURIComponent(stationId)}/arrivals`,
-        { cache: 'no-store' },
-      );
-      if (!response.ok) {
-        return;
+      await refresh;
+    } finally {
+      if (refreshInFlightRef.current === refresh) {
+        refreshInFlightRef.current = null;
       }
-      const payload = (await response.json()) as {
-        data?: ArrivalLine[];
-        success?: boolean;
-      };
-      if (
-        payload.success === true &&
-        payload.data != null &&
-        refreshGenerationRef.current === requestGeneration &&
-        activeStationIdRef.current === stationId
-      ) {
-        setLiveArrivalLines(payload.data);
-      }
-    } catch {
-      // Keep the latest available estimates when the refresh is unavailable.
     }
   }, [stationId]);
 
   useEffect(() => {
     activeStationIdRef.current = stationId;
+    setLiveArrivalLines(arrivalLines);
     return () => {
       activeStationIdRef.current = null;
-      refreshGenerationRef.current += 1;
+      refreshInFlightRef.current = null;
     };
-  }, [stationId]);
+  }, [arrivalLines, stationId]);
 
   useEffect(() => {
     void refreshArrivalLines();
