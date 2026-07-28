@@ -369,6 +369,27 @@ Exit criteria:
   IDs, and averaged 72 rows per call. Retain this reset timestamp and collect
   a 48-72 hour matching Neon Consumption API and Cloudflare window before
   deciding whether topology reuse is warranted.
+- 2026-07-29: Captured a new read-only production statement sample after the
+  2026-07-28 02:11:15 UTC statistics reset. The date-range CTE had 234 calls,
+  returning 16,576 final issue IDs (70.84 per call), confirming the previous
+  ID-chunk fan-out is absent. The same 13.9-hour window still returned
+  2,740,116 service-path rows across 1,667 dataset path reads (1,643.74 per
+  call), plus 99,968 path-scope rows across 1,396 reads. This makes topology
+  the leading remaining row-count proxy, but not yet a billing conclusion:
+  capture the required 48-72 hour Neon Consumption API series and matching
+  Cloudflare cache-status data before starting Phase 3. The Neon dashboard was
+  not authenticated in this measurement session, so no billed-transfer or
+  route/cache attribution was recorded.
+- 2026-07-29: A Neon Consumption API export supplied 48 complete hours for
+  2026-07-26 through 2026-07-28 UTC. Public network transfer was 2.435 GB on
+  July 26 (101.46 MB/hour mean; 101.16 MB/hour median) and 3.338 GB on July 27
+  (139.10 MB/hour mean; 121.41 MB/hour median). Across the full window it was
+  5.774 GB, or 120.28 MB/hour mean, 105.36 MB/hour median, and a 2.887 GB/day
+  equivalent. This is lower than the earlier 135.4 MB/hour mean, 121.6 MB/hour
+  median, and 3.25 GB/day post-rollout baseline, but it misses the current
+  targets of under 100 MB/hour median and under 2.5 GB/day. The sample meets
+  the 48-hour minimum but has no matching Cloudflare route/cache-status export;
+  retain the topology-reuse decision gate until that attribution is available.
 
 ## Decision Log
 
