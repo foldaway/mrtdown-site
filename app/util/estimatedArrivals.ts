@@ -8,7 +8,13 @@ import {
   type Station,
 } from '@mrtdown/core';
 import type { DateTime } from 'luxon';
-import { isoDate, isoDateTime, parseDateTime } from './dbQueries/dateTime';
+import {
+  isoDate,
+  isoDateTime,
+  parseDateTimeUncached,
+} from './dbQueries/dateTime';
+
+const CROWD_REPORT_FRESHNESS_MILLIS = 3 * 60 * 1_000;
 
 export type EstimatedArrivalService = {
   serviceId: string;
@@ -102,6 +108,12 @@ export function getEstimatedStationArrivalTimings(input: {
     input.referenceNow.diff(input.referenceNow.startOf('day'), 'seconds')
       .seconds,
   );
+  const crowdReports = input.crowdReports?.map((report) => ({
+    ...report,
+    reportedAt: parseDateTimeUncached(report.reportedAt).setZone(
+      input.referenceNow.zone,
+    ),
+  }));
 
   return input.services
     .flatMap((service) => {
@@ -132,22 +144,30 @@ export function getEstimatedStationArrivalTimings(input: {
               queriedAtTime,
               {
                 count: 2,
-                crowdReports: input.crowdReports
+                crowdReports: crowdReports
                   ?.filter((report) => report.serviceId === service.serviceId)
-                  .map(
-                    (report): CrowdArrivalReport => ({
+                  .map((report): CrowdArrivalReport => {
+                    const reportAgeMillis =
+                      referenceMillis - report.reportedAt.toMillis();
+                    const isFreshArrivingNow =
+                      report.minutesToArrival === 0 &&
+                      reportAgeMillis >= 0 &&
+                      reportAgeMillis <= CROWD_REPORT_FRESHNESS_MILLIS;
+                    return {
                       id: report.id,
-                      reportedAtTime: formatServiceDayTime(
-                        Math.round(
-                          parseDateTime(report.reportedAt)
-                            .setZone(input.referenceNow.zone)
-                            .diff(serviceDate.startOf('day'), 'seconds')
-                            .seconds,
-                        ),
-                      ),
+                      reportedAtTime: isFreshArrivingNow
+                        ? queriedAtTime
+                        : formatServiceDayTime(
+                            Math.round(
+                              report.reportedAt.diff(
+                                serviceDate.startOf('day'),
+                                'seconds',
+                              ).seconds,
+                            ),
+                          ),
                       minutesToArrival: report.minutesToArrival,
-                    }),
-                  ),
+                    };
+                  }),
               },
             ).map((estimate) => ({
               basis: estimate.basis,

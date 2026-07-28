@@ -22,6 +22,8 @@ type RefreshArrivalLinesOptions = {
   afterReport?: boolean;
 };
 
+const REFRESH_TIMEOUT_MILLIS = 15_000;
+
 export function StationGuide({
   arrivalLines,
   exits,
@@ -35,6 +37,7 @@ export function StationGuide({
   const arrivalLinesRef = useRef(arrivalLines);
   const refreshAbortControllerRef = useRef<AbortController | null>(null);
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
+  const refreshTimeoutRef = useRef<number | null>(null);
 
   const refreshArrivalLines = useCallback(
     async ({ afterReport = false }: RefreshArrivalLinesOptions = {}) => {
@@ -80,9 +83,18 @@ export function StationGuide({
       })();
       refreshAbortControllerRef.current = abortController;
       refreshInFlightRef.current = refresh;
+      const timeout = window.setTimeout(
+        () => abortController.abort(),
+        REFRESH_TIMEOUT_MILLIS,
+      );
+      refreshTimeoutRef.current = timeout;
       try {
         await refresh;
       } finally {
+        if (refreshTimeoutRef.current === timeout) {
+          window.clearTimeout(timeout);
+          refreshTimeoutRef.current = null;
+        }
         if (refreshAbortControllerRef.current === abortController) {
           refreshAbortControllerRef.current = null;
         }
@@ -105,6 +117,10 @@ export function StationGuide({
       activeStationIdRef.current = null;
       refreshAbortControllerRef.current?.abort();
       refreshAbortControllerRef.current = null;
+      if (refreshTimeoutRef.current != null) {
+        window.clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = null;
+      }
       refreshInFlightRef.current = null;
     };
   }, [stationId]);

@@ -119,7 +119,7 @@ describe('getEstimatedStationArrivalTimings', () => {
     ]);
   });
 
-  it('uses crowd reports returned as Postgres timestamp strings', () => {
+  it('uses an arriving-now report returned as a Postgres timestamp string', () => {
     const arrivalTimings = getEstimatedStationArrivalTimings({
       station,
       services: [
@@ -138,7 +138,7 @@ describe('getEstimatedStationArrivalTimings', () => {
           revision,
         },
       ],
-      referenceNow: DateTime.fromISO('2026-07-20T05:04:00', {
+      referenceNow: DateTime.fromISO('2026-07-20T05:04:00.700', {
         zone: 'Asia/Singapore',
       }),
       publicHolidayDates: new Set(),
@@ -146,7 +146,7 @@ describe('getEstimatedStationArrivalTimings', () => {
         {
           id: 'report-1',
           serviceId: 'alpha-eastbound',
-          reportedAt: '2026-07-19 21:04:00+00',
+          reportedAt: '2026-07-19 21:04:00.100+00',
           minutesToArrival: 0,
         },
       ],
@@ -156,7 +156,7 @@ describe('getEstimatedStationArrivalTimings', () => {
       basis: 'crowd_report',
       confidence: 'high',
       crowdReportCount: 1,
-      time: '2026-07-20T05:04:00.000+08:00',
+      time: '2026-07-20T05:04:01.000+08:00',
     });
   });
 
