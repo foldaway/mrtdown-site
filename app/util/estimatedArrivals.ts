@@ -7,8 +7,8 @@ import {
   type ServiceRevision,
   type Station,
 } from '@mrtdown/core';
-import { DateTime } from 'luxon';
-import { isoDate, isoDateTime } from './dbQueries/dateTime';
+import type { DateTime } from 'luxon';
+import { isoDate, isoDateTime, parseDateTime } from './dbQueries/dateTime';
 
 export type EstimatedArrivalService = {
   serviceId: string;
@@ -139,9 +139,7 @@ export function getEstimatedStationArrivalTimings(input: {
                       id: report.id,
                       reportedAtTime: formatServiceDayTime(
                         Math.round(
-                          DateTime.fromISO(report.reportedAt, {
-                            setZone: true,
-                          })
+                          parseDateTime(report.reportedAt)
                             .setZone(input.referenceNow.zone)
                             .diff(serviceDate.startOf('day'), 'seconds')
                             .seconds,

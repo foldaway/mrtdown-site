@@ -119,6 +119,47 @@ describe('getEstimatedStationArrivalTimings', () => {
     ]);
   });
 
+  it('uses crowd reports returned as Postgres timestamp strings', () => {
+    const arrivalTimings = getEstimatedStationArrivalTimings({
+      station,
+      services: [
+        {
+          serviceId: 'alpha-eastbound',
+          lineId: 'AL',
+          serviceName: {
+            'en-SG': 'Alpha Line eastbound',
+            'zh-Hans': null,
+            ms: null,
+            ta: null,
+          },
+          destinationStationId: 'bravo',
+          destinationCode: 'B2',
+          destinationName: null,
+          revision,
+        },
+      ],
+      referenceNow: DateTime.fromISO('2026-07-20T05:04:00', {
+        zone: 'Asia/Singapore',
+      }),
+      publicHolidayDates: new Set(),
+      crowdReports: [
+        {
+          id: 'report-1',
+          serviceId: 'alpha-eastbound',
+          reportedAt: '2026-07-19 21:04:00+00',
+          minutesToArrival: 0,
+        },
+      ],
+    });
+
+    expect(arrivalTimings[0]?.departures[0]).toMatchObject({
+      basis: 'crowd_report',
+      confidence: 'high',
+      crowdReportCount: 1,
+      time: '2026-07-20T05:04:00.000+08:00',
+    });
+  });
+
   it('marks the overnight gap as ended and provides the next first train', () => {
     expect(
       getEstimatedStationArrivalTimings({
