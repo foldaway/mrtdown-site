@@ -18,6 +18,10 @@ type StationGuideProps = {
   stationId: string;
 };
 
+type RefreshArrivalLinesOptions = {
+  afterReport?: boolean;
+};
+
 export function StationGuide({
   arrivalLines,
   exits,
@@ -28,56 +32,74 @@ export function StationGuide({
 }: StationGuideProps) {
   const [liveArrivalLines, setLiveArrivalLines] = useState(arrivalLines);
   const activeStationIdRef = useRef<string | null>(null);
+  const refreshAbortControllerRef = useRef<AbortController | null>(null);
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
 
-  const refreshArrivalLines = useCallback(async () => {
-    if (activeStationIdRef.current !== stationId) {
-      return;
-    }
-    if (refreshInFlightRef.current != null) {
-      await refreshInFlightRef.current;
-      return;
-    }
-
-    const refresh = (async () => {
-      try {
-        const response = await fetch(
-          `/api/stations/${encodeURIComponent(stationId)}/arrivals`,
-          { cache: 'no-store' },
-        );
-        if (!response.ok) {
+  const refreshArrivalLines = useCallback(
+    async ({ afterReport = false }: RefreshArrivalLinesOptions = {}) => {
+      if (activeStationIdRef.current !== stationId) {
+        return;
+      }
+      if (refreshInFlightRef.current != null) {
+        if (!afterReport) {
+          await refreshInFlightRef.current;
           return;
         }
-        const payload = (await response.json()) as {
-          data?: ArrivalLine[];
-          success?: boolean;
-        };
-        if (
-          payload.success === true &&
-          payload.data != null &&
-          activeStationIdRef.current === stationId
-        ) {
-          setLiveArrivalLines(payload.data);
+        refreshAbortControllerRef.current?.abort();
+        await refreshInFlightRef.current;
+        if (activeStationIdRef.current !== stationId) {
+          return;
         }
-      } catch {
-        // Keep the latest available estimates when the refresh is unavailable.
       }
-    })();
-    refreshInFlightRef.current = refresh;
-    try {
-      await refresh;
-    } finally {
-      if (refreshInFlightRef.current === refresh) {
-        refreshInFlightRef.current = null;
+
+      const abortController = new AbortController();
+      const refresh = (async () => {
+        try {
+          const response = await fetch(
+            `/api/stations/${encodeURIComponent(stationId)}/arrivals`,
+            { cache: 'no-store', signal: abortController.signal },
+          );
+          if (!response.ok) {
+            return;
+          }
+          const payload = (await response.json()) as {
+            data?: ArrivalLine[];
+            success?: boolean;
+          };
+          if (
+            payload.success === true &&
+            payload.data != null &&
+            activeStationIdRef.current === stationId
+          ) {
+            setLiveArrivalLines(payload.data);
+          }
+        } catch {
+          // Keep the latest available estimates when the refresh is unavailable.
+        }
+      })();
+      refreshAbortControllerRef.current = abortController;
+      refreshInFlightRef.current = refresh;
+      try {
+        await refresh;
+      } finally {
+        if (refreshAbortControllerRef.current === abortController) {
+          refreshAbortControllerRef.current = null;
+        }
+        if (refreshInFlightRef.current === refresh) {
+          refreshInFlightRef.current = null;
+        }
       }
-    }
-  }, [stationId]);
+    },
+    [stationId],
+  );
 
   useEffect(() => {
     activeStationIdRef.current = stationId;
     setLiveArrivalLines(arrivalLines);
     return () => {
       activeStationIdRef.current = null;
+      refreshAbortControllerRef.current?.abort();
+      refreshAbortControllerRef.current = null;
       refreshInFlightRef.current = null;
     };
   }, [arrivalLines, stationId]);
@@ -92,6 +114,11 @@ export function StationGuide({
       window.clearInterval(interval);
     };
   }, [refreshArrivalLines]);
+
+  const refreshArrivalLinesAfterReport = useCallback(
+    () => refreshArrivalLines({ afterReport: true }),
+    [refreshArrivalLines],
+  );
 
   return (
     <section
@@ -154,7 +181,7 @@ export function StationGuide({
                     isHydrated={isHydrated}
                     key={arrivalTiming.serviceId}
                     lineColor={lineColors[line.lineId]}
-                    onArrivalReportSubmitted={refreshArrivalLines}
+                    onArrivalReportSubmitted={refreshArrivalLinesAfterReport}
                     stationId={stationId}
                   />
                 ))}
