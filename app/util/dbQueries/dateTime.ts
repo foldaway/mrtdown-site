@@ -8,12 +8,7 @@ export function nowSg() {
   return DateTime.now().setZone(SG_TIMEZONE);
 }
 
-export function parseDateTime(value: string) {
-  const cached = dateTimeCache.get(value);
-  if (cached != null) {
-    return cached;
-  }
-
+export function parseDateTimeUncached(value: string) {
   let parsed: DateTime;
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     parsed = DateTime.fromISO(value, { zone: SG_TIMEZONE });
@@ -28,6 +23,17 @@ export function parseDateTime(value: string) {
         : DateTime.fromJSDate(new Date(value)).setZone(SG_TIMEZONE);
     }
   }
+
+  return parsed;
+}
+
+export function parseDateTime(value: string) {
+  const cached = dateTimeCache.get(value);
+  if (cached != null) {
+    return cached;
+  }
+
+  const parsed = parseDateTimeUncached(value);
 
   dateTimeCache.set(value, parsed);
   return parsed;

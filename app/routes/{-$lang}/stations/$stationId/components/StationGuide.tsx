@@ -1,14 +1,28 @@
-import { InformationCircleIcon } from '@heroicons/react/20/solid';
-import { FormattedMessage } from 'react-intl';
-import { Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
+import { InformationCircleIcon } from '@heroicons/react/20/solid';
+import { Link } from '@tanstack/react-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FormattedMessage } from 'react-intl';
 import { BetaBadge } from '~/components/BetaBadge';
-import { getStationArrivalLinesFn } from '~/util/station.functions';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { ExitSign } from './StationGuideSigns';
 import type { ArrivalLine, StationExit } from './stationGuide.types';
 import { useHoverPopover } from './useHoverPopover';
+
+type StationGuideProps = {
+  arrivalLines: ArrivalLine[];
+  exits: StationExit[];
+  isHydrated: boolean;
+  lineColors: Record<string, string>;
+  lineNames: Record<string, string>;
+  stationId: string;
+};
+
+type RefreshArrivalLinesOptions = {
+  afterReport?: boolean;
+};
+
+const REFRESH_TIMEOUT_MILLIS = 15_000;
 
 export function StationGuide({
   arrivalLines,
@@ -17,35 +31,115 @@ export function StationGuide({
   lineColors,
   lineNames,
   stationId,
-}: {
-  arrivalLines: ArrivalLine[];
-  exits: StationExit[];
-  isHydrated: boolean;
-  lineColors: Record<string, string>;
-  lineNames: Record<string, string>;
-  stationId: string;
-}) {
+}: StationGuideProps) {
   const [liveArrivalLines, setLiveArrivalLines] = useState(arrivalLines);
+  const activeStationIdRef = useRef<string | null>(null);
+  const arrivalLinesRef = useRef(arrivalLines);
+  const refreshAbortControllerRef = useRef<AbortController | null>(null);
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
+  const refreshTimeoutRef = useRef<number | null>(null);
+
+  const refreshArrivalLines = useCallback(
+    async ({ afterReport = false }: RefreshArrivalLinesOptions = {}) => {
+      if (activeStationIdRef.current !== stationId) {
+        return;
+      }
+      if (refreshInFlightRef.current != null) {
+        if (!afterReport) {
+          await refreshInFlightRef.current;
+          return;
+        }
+        refreshAbortControllerRef.current?.abort();
+        await refreshInFlightRef.current;
+        if (activeStationIdRef.current !== stationId) {
+          return;
+        }
+      }
+
+      const abortController = new AbortController();
+      const refresh = (async () => {
+        try {
+          const response = await fetch(
+            `/api/stations/${encodeURIComponent(stationId)}/arrivals`,
+            { cache: 'no-store', signal: abortController.signal },
+          );
+          if (!response.ok) {
+            return;
+          }
+          const payload = (await response.json()) as {
+            data?: ArrivalLine[];
+            success?: boolean;
+          };
+          if (
+            payload.success === true &&
+            payload.data != null &&
+            activeStationIdRef.current === stationId
+          ) {
+            setLiveArrivalLines(payload.data);
+          }
+        } catch {
+          // Keep the latest available estimates when the refresh is unavailable.
+        }
+      })();
+      refreshAbortControllerRef.current = abortController;
+      refreshInFlightRef.current = refresh;
+      const timeout = window.setTimeout(
+        () => abortController.abort(),
+        REFRESH_TIMEOUT_MILLIS,
+      );
+      refreshTimeoutRef.current = timeout;
+      try {
+        await refresh;
+      } finally {
+        if (refreshTimeoutRef.current === timeout) {
+          window.clearTimeout(timeout);
+          refreshTimeoutRef.current = null;
+        }
+        if (refreshAbortControllerRef.current === abortController) {
+          refreshAbortControllerRef.current = null;
+        }
+        if (refreshInFlightRef.current === refresh) {
+          refreshInFlightRef.current = null;
+        }
+      }
+    },
+    [stationId],
+  );
 
   useEffect(() => {
-    let cancelled = false;
-    const refresh = async () => {
-      try {
-        const nextArrivalLines = await getStationArrivalLinesFn({
-          data: { stationId },
-        });
-        if (!cancelled) setLiveArrivalLines(nextArrivalLines);
-      } catch {
-        // Keep the server-rendered estimates when the refresh is unavailable.
-      }
-    };
-    void refresh();
-    const interval = window.setInterval(() => void refresh(), 30_000);
+    arrivalLinesRef.current = arrivalLines;
+  }, [arrivalLines]);
+
+  useEffect(() => {
+    activeStationIdRef.current = stationId;
+    setLiveArrivalLines(arrivalLinesRef.current);
     return () => {
-      cancelled = true;
-      window.clearInterval(interval);
+      activeStationIdRef.current = null;
+      refreshAbortControllerRef.current?.abort();
+      refreshAbortControllerRef.current = null;
+      if (refreshTimeoutRef.current != null) {
+        window.clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = null;
+      }
+      refreshInFlightRef.current = null;
     };
   }, [stationId]);
+
+  useEffect(() => {
+    void refreshArrivalLines();
+    const interval = window.setInterval(
+      () => void refreshArrivalLines(),
+      30_000,
+    );
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [refreshArrivalLines]);
+
+  const refreshArrivalLinesAfterReport = useCallback(
+    () => refreshArrivalLines({ afterReport: true }),
+    [refreshArrivalLines],
+  );
 
   return (
     <section
@@ -108,6 +202,7 @@ export function StationGuide({
                     isHydrated={isHydrated}
                     key={arrivalTiming.serviceId}
                     lineColor={lineColors[line.lineId]}
+                    onArrivalReportSubmitted={refreshArrivalLinesAfterReport}
                     stationId={stationId}
                   />
                 ))}

@@ -1,25 +1,29 @@
+import { Popover } from '@base-ui/react/popover';
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
 import { DateTime } from 'luxon';
 import { useEffect, useState } from 'react';
 import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
-import { Popover } from '@base-ui/react/popover';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { PlatformSign } from './StationGuideSigns';
 import type { ArrivalTiming } from './stationGuide.types';
 import { useHoverPopover } from './useHoverPopover';
 
+type ServiceArrivalSummaryProps = {
+  arrivalTiming: ArrivalTiming;
+  isHydrated: boolean;
+  lineColor: string;
+  onArrivalReportSubmitted: () => Promise<void>;
+  stationId: string;
+};
+
 export function ServiceArrivalSummary({
   arrivalTiming,
   isHydrated,
   lineColor,
+  onArrivalReportSubmitted,
   stationId,
-}: {
-  arrivalTiming: ArrivalTiming;
-  isHydrated: boolean;
-  lineColor: string;
-  stationId: string;
-}) {
+}: ServiceArrivalSummaryProps) {
   const intl = useIntl();
   const now = useCurrentTime(isHydrated);
   const destinationName =
@@ -78,6 +82,7 @@ export function ServiceArrivalSummary({
       </div>
       {arrivalTiming.departures[0] != null && (
         <CrowdArrivalReportButton
+          onSubmitted={onArrivalReportSubmitted}
           serviceId={arrivalTiming.serviceId}
           stationId={stationId}
         />
@@ -86,13 +91,17 @@ export function ServiceArrivalSummary({
   );
 }
 
-function CrowdArrivalReportButton({
-  serviceId,
-  stationId,
-}: {
+type CrowdArrivalReportButtonProps = {
+  onSubmitted: () => Promise<void>;
   serviceId: string;
   stationId: string;
-}) {
+};
+
+function CrowdArrivalReportButton({
+  onSubmitted,
+  serviceId,
+  stationId,
+}: CrowdArrivalReportButtonProps) {
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>(
     'idle',
   );
@@ -104,7 +113,12 @@ function CrowdArrivalReportButton({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ stationId, serviceId, minutesToArrival }),
       });
-      setStatus(response.ok ? 'sent' : 'error');
+      if (!response.ok) {
+        setStatus('error');
+        return;
+      }
+      await onSubmitted();
+      setStatus('sent');
     } catch {
       setStatus('error');
     }
