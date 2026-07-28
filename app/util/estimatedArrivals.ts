@@ -14,7 +14,7 @@ import {
   parseDateTimeUncached,
 } from './dbQueries/dateTime';
 
-const CROWD_REPORT_FRESHNESS_MILLIS = 3 * 60 * 1_000;
+const ARRIVING_NOW_CLAMP_WINDOW_MILLIS = 1_000;
 
 export type EstimatedArrivalService = {
   serviceId: string;
@@ -152,7 +152,7 @@ export function getEstimatedStationArrivalTimings(input: {
                     const isFreshArrivingNow =
                       report.minutesToArrival === 0 &&
                       reportAgeMillis >= 0 &&
-                      reportAgeMillis <= CROWD_REPORT_FRESHNESS_MILLIS;
+                      reportAgeMillis <= ARRIVING_NOW_CLAMP_WINDOW_MILLIS;
                     return {
                       id: report.id,
                       reportedAtTime: isFreshArrivingNow
