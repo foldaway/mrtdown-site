@@ -32,6 +32,7 @@ export function StationGuide({
 }: StationGuideProps) {
   const [liveArrivalLines, setLiveArrivalLines] = useState(arrivalLines);
   const activeStationIdRef = useRef<string | null>(null);
+  const arrivalLinesRef = useRef(arrivalLines);
   const refreshAbortControllerRef = useRef<AbortController | null>(null);
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
 
@@ -94,15 +95,19 @@ export function StationGuide({
   );
 
   useEffect(() => {
+    arrivalLinesRef.current = arrivalLines;
+  }, [arrivalLines]);
+
+  useEffect(() => {
     activeStationIdRef.current = stationId;
-    setLiveArrivalLines(arrivalLines);
+    setLiveArrivalLines(arrivalLinesRef.current);
     return () => {
       activeStationIdRef.current = null;
       refreshAbortControllerRef.current?.abort();
       refreshAbortControllerRef.current = null;
       refreshInFlightRef.current = null;
     };
-  }, [arrivalLines, stationId]);
+  }, [stationId]);
 
   useEffect(() => {
     void refreshArrivalLines();
