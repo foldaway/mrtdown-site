@@ -80,7 +80,7 @@ export function ServiceArrivalSummary({
         </div>
         <ArrivalStatus arrivalTiming={arrivalTiming} intl={intl} now={now} />
       </div>
-      {arrivalTiming.departures[0] != null && (
+      {!arrivalTiming.isServiceEnded && arrivalTiming.departures[0] != null && (
         <CrowdArrivalReportButton
           onSubmitted={onArrivalReportSubmitted}
           serviceId={arrivalTiming.serviceId}
