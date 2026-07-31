@@ -1,16 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { getStationProfileReadModel } from '~/util/dbQueries/stations';
+import { getStationArrivalLinesReadModel } from '~/util/dbQueries/stationArrivals';
 
 export const Route = createFileRoute('/api/stations/$stationId/arrivals')({
   server: {
     handlers: {
       async GET({ params }) {
         try {
-          const profile = await getStationProfileReadModel(params.stationId, {
-            includeCommunitySignals: false,
-          });
+          const arrivalLines = await getStationArrivalLinesReadModel(
+            params.stationId,
+          );
           return Response.json(
-            { success: true, data: profile.data.arrivalLines },
+            { success: true, data: arrivalLines },
             { headers: { 'cache-control': 'no-store' } },
           );
         } catch (error) {
