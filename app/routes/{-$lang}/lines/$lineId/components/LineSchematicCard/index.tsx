@@ -289,7 +289,7 @@ export const LineSchematicCard: React.FC<Props> = (props) => {
                   <DropdownMenu.Item
                     key={branch.id}
                     className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-gray-900 text-sm outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900 dark:text-gray-100 dark:data-[state=checked]:bg-blue-900 dark:data-[state=checked]:text-blue-100 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
-                    onSelect={() => {
+                    onClick={() => {
                       setSelectedBranchId(branch.id);
                     }}
                   >
