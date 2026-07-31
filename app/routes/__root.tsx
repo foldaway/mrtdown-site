@@ -81,7 +81,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <div className="isolate">{children}</div>
         <Scripts />
       </body>
     </html>

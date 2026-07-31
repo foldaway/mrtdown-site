@@ -126,7 +126,7 @@ export const Maintenance: React.FC<Props> = (props) => {
               />
             </Dialog.Trigger>
             <Dialog.Portal>
-              <Dialog.Backdrop className="data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 bg-black/50 backdrop-blur-sm data-closed:animate-out data-open:animate-in" />
+              <Dialog.Backdrop className="data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 z-40 bg-black/50 backdrop-blur-sm data-closed:animate-out data-open:animate-in" />
               <Dialog.Popup className="data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-closed:slide-out-to-left-1/2 data-closed:slide-out-to-top-[48%] data-open:slide-in-from-left-1/2 data-open:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 grid w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-white p-6 shadow-xl duration-200 data-closed:animate-out data-open:animate-in sm:rounded-lg dark:border-gray-700 dark:bg-gray-800">
                 <div className="flex flex-col space-y-1.5 text-center sm:text-left">
                   <Dialog.Title className="font-semibold text-gray-900 text-lg leading-none tracking-tight dark:text-gray-100">
