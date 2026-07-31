@@ -270,92 +270,96 @@ function RouteComponent() {
                           </DropdownMenu.Item>
 
                           <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-800" />
-                          <DropdownMenu.GroupLabel className="px-4 pt-2 pb-1 font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
-                            <FormattedMessage
-                              id="general.network"
-                              defaultMessage="Network"
-                            />
-                          </DropdownMenu.GroupLabel>
-
-                          <DropdownMenu.Item>
-                            <Link
-                              to="/{-$lang}/lines"
-                              className={linkClassNameMobile}
-                            >
+                          <DropdownMenu.Group>
+                            <DropdownMenu.GroupLabel className="px-4 pt-2 pb-1 font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
                               <FormattedMessage
-                                id="general.lines"
-                                defaultMessage="Lines"
+                                id="general.network"
+                                defaultMessage="Network"
                               />
-                            </Link>
-                          </DropdownMenu.Item>
+                            </DropdownMenu.GroupLabel>
 
-                          <DropdownMenu.Item>
-                            <Link
-                              to="/{-$lang}/stations"
-                              className={linkClassNameMobile}
-                            >
-                              <FormattedMessage
-                                id="general.stations"
-                                defaultMessage="Stations"
-                              />
-                            </Link>
-                          </DropdownMenu.Item>
+                            <DropdownMenu.Item>
+                              <Link
+                                to="/{-$lang}/lines"
+                                className={linkClassNameMobile}
+                              >
+                                <FormattedMessage
+                                  id="general.lines"
+                                  defaultMessage="Lines"
+                                />
+                              </Link>
+                            </DropdownMenu.Item>
 
-                          <DropdownMenu.Item>
-                            <Link
-                              to="/{-$lang}/towns"
-                              className={linkClassNameMobile}
-                            >
-                              <FormattedMessage
-                                id="general.towns_and_areas"
-                                defaultMessage="Towns & areas"
-                              />
-                            </Link>
-                          </DropdownMenu.Item>
+                            <DropdownMenu.Item>
+                              <Link
+                                to="/{-$lang}/stations"
+                                className={linkClassNameMobile}
+                              >
+                                <FormattedMessage
+                                  id="general.stations"
+                                  defaultMessage="Stations"
+                                />
+                              </Link>
+                            </DropdownMenu.Item>
 
-                          <DropdownMenu.Item>
-                            <Link
-                              to="/{-$lang}/system-map"
-                              className={linkClassNameMobile}
-                            >
-                              <FormattedMessage
-                                id="general.system_map"
-                                defaultMessage="System Map"
-                              />
-                            </Link>
-                          </DropdownMenu.Item>
+                            <DropdownMenu.Item>
+                              <Link
+                                to="/{-$lang}/towns"
+                                className={linkClassNameMobile}
+                              >
+                                <FormattedMessage
+                                  id="general.towns_and_areas"
+                                  defaultMessage="Towns & areas"
+                                />
+                              </Link>
+                            </DropdownMenu.Item>
+
+                            <DropdownMenu.Item>
+                              <Link
+                                to="/{-$lang}/system-map"
+                                className={linkClassNameMobile}
+                              >
+                                <FormattedMessage
+                                  id="general.system_map"
+                                  defaultMessage="System Map"
+                                />
+                              </Link>
+                            </DropdownMenu.Item>
+                          </DropdownMenu.Group>
 
                           <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-800" />
-                          <DropdownMenu.GroupLabel className="px-4 pt-2 pb-1 font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
-                            <FormattedMessage
-                              id="general.more"
-                              defaultMessage="More"
-                            />
-                          </DropdownMenu.GroupLabel>
-
-                          <DropdownMenu.Item>
-                            <Link
-                              to="/{-$lang}/statistics"
-                              className={linkClassNameMobile}
-                            >
+                          <DropdownMenu.Group>
+                            <DropdownMenu.GroupLabel className="px-4 pt-2 pb-1 font-semibold text-gray-400 text-xs uppercase tracking-wide dark:text-gray-500">
                               <FormattedMessage
-                                id="general.statistics"
-                                defaultMessage="Statistics"
+                                id="general.more"
+                                defaultMessage="More"
                               />
-                            </Link>
-                          </DropdownMenu.Item>
+                            </DropdownMenu.GroupLabel>
 
-                          <DropdownMenu.Item>
-                            <Link
-                              to="/{-$lang}/about"
-                              className={linkClassNameMobile}
-                            >
-                              <FormattedMessage
-                                id="general.about"
-                                defaultMessage="About"
-                              />
-                            </Link>
-                          </DropdownMenu.Item>
+                            <DropdownMenu.Item>
+                              <Link
+                                to="/{-$lang}/statistics"
+                                className={linkClassNameMobile}
+                              >
+                                <FormattedMessage
+                                  id="general.statistics"
+                                  defaultMessage="Statistics"
+                                />
+                              </Link>
+                            </DropdownMenu.Item>
+
+                            <DropdownMenu.Item>
+                              <Link
+                                to="/{-$lang}/about"
+                                className={linkClassNameMobile}
+                              >
+                                <FormattedMessage
+                                  id="general.about"
+                                  defaultMessage="About"
+                                />
+                              </Link>
+                            </DropdownMenu.Item>
+                          </DropdownMenu.Group>
                         </DropdownMenu.Popup>
                       </DropdownMenu.Positioner>
                     </DropdownMenu.Portal>
