@@ -80,6 +80,14 @@ export function applyPublicDataCacheHeaders(
 ) {
   const kind = getResponseKind(request, response);
   if (
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    response.status === 200 &&
+    kind === 'html' &&
+    isStationProfilePath(new URL(request.url).pathname)
+  ) {
+    return setNoStore(response);
+  }
+  if (
     (request.method !== 'GET' && request.method !== 'HEAD') ||
     response.status !== 200 ||
     kind == null ||
@@ -94,6 +102,33 @@ export function applyPublicDataCacheHeaders(
   } catch {
     const headers = new Headers(response.headers);
     setPublicDataCacheHeaders(headers, kind);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+}
+
+function isStationProfilePath(pathname: string) {
+  const segments = pathname.split('/').filter(Boolean);
+  const stationsIndex = segments.at(-2);
+  return stationsIndex === 'stations' && segments.length <= 3;
+}
+
+function setNoStore(response: Response) {
+  try {
+    response.headers.set('Cache-Control', 'no-store');
+    response.headers.delete('Cloudflare-CDN-Cache-Control');
+    response.headers.delete('Cache-Tag');
+    response.headers.set('X-MRTDown-Cache', 'dynamic-station');
+    return response;
+  } catch {
+    const headers = new Headers(response.headers);
+    headers.set('Cache-Control', 'no-store');
+    headers.delete('Cloudflare-CDN-Cache-Control');
+    headers.delete('Cache-Tag');
+    headers.set('X-MRTDown-Cache', 'dynamic-station');
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,

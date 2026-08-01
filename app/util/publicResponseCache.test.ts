@@ -54,6 +54,26 @@ describe('public response cache policy', () => {
     expect(fallback.headers.get('x-mrtdown-cache')).toBeNull();
   });
 
+  it.each([
+    'https://www.mrtdown.org/stations/NS1',
+    'https://www.mrtdown.org/stations/NS1/',
+    'https://www.mrtdown.org/en-SG/stations/NS1',
+  ])('keeps live station profile HTML uncached at %s', (url) => {
+    const stationResponse = applyPublicDataCacheHeaders(
+      new Request(url),
+      response('text/html; charset=utf-8'),
+    );
+
+    expect(stationResponse.headers.get('cache-control')).toBe('no-store');
+    expect(
+      stationResponse.headers.get('cloudflare-cdn-cache-control'),
+    ).toBeNull();
+    expect(stationResponse.headers.get('cache-tag')).toBeNull();
+    expect(stationResponse.headers.get('x-mrtdown-cache')).toBe(
+      'dynamic-station',
+    );
+  });
+
   it('marks successful public JSON read responses as cacheable', () => {
     const serverFunction = applyPublicDataCacheHeaders(
       request({ headers: { 'x-tsr-serverfn': 'true' } }),
