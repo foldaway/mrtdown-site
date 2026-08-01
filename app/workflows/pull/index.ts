@@ -13,6 +13,11 @@ import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
 import {
+  getCanonicalManifestFingerprint,
+  isCanonicalManifestCurrent,
+  recordCanonicalManifestFingerprint,
+} from './helpers/manifestFingerprint.js';
+import {
   acquireOrRenewPullWorkflowLease,
   releasePullWorkflowLease,
 } from './helpers/workflowLease.js';
@@ -76,6 +81,20 @@ async function executePull(context: WorkflowContext<Params>) {
   const manifest = await runPullStep(context, 'manifest', async () =>
     fetchManifest(dataUrl),
   );
+  const manifestFingerprint = await runPullStep(
+    context,
+    'manifest-fingerprint',
+    async () => getCanonicalManifestFingerprint(manifest),
+  );
+  const manifestIsCurrent = await runPullStep(
+    context,
+    'check-manifest-fingerprint',
+    async () => isCanonicalManifestCurrent(getDb(), manifestFingerprint),
+  );
+  if (manifestIsCurrent) {
+    console.log('[PULL] Canonical manifest unchanged; skipping pull');
+    return;
+  }
 
   const counts = await runPullStep(context, 'parse', async () => {
     const archiveBuffer = await fetchArchive(dataUrl);
@@ -330,6 +349,10 @@ async function executePull(context: WorkflowContext<Params>) {
 
   await runPullStep(context, 'publish-public-data-cache', () =>
     purgePublicDataCache(),
+  );
+
+  await runPullStep(context, 'record-manifest-fingerprint', () =>
+    recordCanonicalManifestFingerprint(getDb(), manifestFingerprint),
   );
 
   console.log('[PULL] Pull complete', counts);

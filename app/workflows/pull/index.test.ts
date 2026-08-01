@@ -21,6 +21,7 @@ describe('pull workflow promotion order', () => {
       'rebuild-statistics-snapshot',
       'rebuild-sitemap-snapshot',
       'publish-public-data-cache',
+      'record-manifest-fingerprint',
     ];
 
     let previousIndex = -1;
@@ -32,5 +33,18 @@ describe('pull workflow promotion order', () => {
       );
       previousIndex = index;
     }
+  });
+
+  it('checks the canonical manifest before parsing and records it only after publication', () => {
+    const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
+
+    const checkIndex = source.indexOf('check-manifest-fingerprint');
+    const parseIndex = source.indexOf("'parse'");
+    const publishIndex = source.indexOf('publish-public-data-cache');
+    const recordIndex = source.indexOf('record-manifest-fingerprint');
+
+    expect(checkIndex).toBeGreaterThanOrEqual(0);
+    expect(checkIndex).toBeLessThan(parseIndex);
+    expect(recordIndex).toBeGreaterThan(publishIndex);
   });
 });

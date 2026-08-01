@@ -32,6 +32,15 @@ public holiday sync, and crowd report dispatch. Schedule IDs include `TIER`, so
 the environments can share one QStash account without overwriting each other.
 Canonical pulls run daily at 00:00 UTC in every environment.
 
+Each pull first compares a stable fingerprint of the canonical manifest's
+read-model inputs with the fingerprint recorded after the last fully successful
+pull. When it matches, the workflow exits before downloading the archive,
+staging data, rebuilding facts and snapshots, or purging the public cache.
+The fingerprint deliberately excludes `generatedAt`, which is publication
+metadata rather than a data change. Bump the pull pipeline version in
+`app/workflows/pull/helpers/manifestFingerprint.ts` when a pull or derived-data
+code change requires one full rebuild without an upstream manifest change.
+
 Configure `QSTASH_URL`, `QSTASH_TOKEN`, and `INTERNAL_API_TOKEN` as secrets in
 each GitHub deployment environment. The deployment workflow supplies `TIER`
 and `VITE_ROOT_URL`; `INTERNAL_API_TOKEN` must match one of the target app's
