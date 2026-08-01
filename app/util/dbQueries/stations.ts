@@ -18,6 +18,8 @@ import {
 } from '~/db/schema';
 import type { LineSummaryStatus, Station } from '~/types';
 import {
+  filterCurrentCrowdArrivalReports,
+  MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES,
   type EstimatedArrivalTiming,
   getEstimatedStationArrivalTimings,
 } from '~/util/estimatedArrivals';
@@ -457,7 +459,11 @@ export async function getStationProfileReadModel(
                 eq(crowdArrivalReportsTable.status, 'accepted'),
                 gte(
                   crowdArrivalReportsTable.reported_at,
-                  referenceNow.minus({ minutes: 3 }).toISO() ?? '',
+                  referenceNow
+                    .minus({
+                      minutes: MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES,
+                    })
+                    .toISO() ?? '',
                 ),
               ),
             )
@@ -465,23 +471,26 @@ export async function getStationProfileReadModel(
         )
       : [];
   // A reporter may correct their observation, but cannot manufacture a
-  // consensus by submitting several values inside the estimator freshness
-  // window. Rows are ordered newest-first, so retain the first per scope.
-  const freshCrowdArrivalReports = [
-    ...new Map(
-      freshCrowdArrivalRows.map((report) => [
-        `${report.reporterHash}:${report.serviceId}`,
-        report,
-      ]),
-    ).values(),
-  ];
+  // consensus by submitting several values before the estimated arrival.
+  // Rows are ordered newest-first, so retain the first per scope.
+  const currentCrowdArrivalReports = filterCurrentCrowdArrivalReports(
+    [
+      ...new Map(
+        freshCrowdArrivalRows.map((report) => [
+          `${report.reporterHash}:${report.serviceId}`,
+          report,
+        ]),
+      ).values(),
+    ],
+    referenceNow,
+  );
   const arrivalTimingsByServiceId = new Map(
     getEstimatedStationArrivalTimings({
       station,
       services: arrivalServices,
       referenceNow,
       publicHolidayDates: dataset.publicHolidaySet,
-      crowdReports: freshCrowdArrivalReports,
+      crowdReports: currentCrowdArrivalReports,
     })
       .map((timing) => ({
         ...timing,

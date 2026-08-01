@@ -13,6 +13,8 @@ import {
   stationsTable,
 } from '~/db/schema';
 import {
+  filterCurrentCrowdArrivalReports,
+  MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES,
   type EstimatedArrivalService,
   type EstimatedArrivalTiming,
   getEstimatedStationArrivalTimings,
@@ -139,7 +141,11 @@ export async function buildStationArrivalLines(input: {
                 eq(crowdArrivalReportsTable.status, 'accepted'),
                 gte(
                   crowdArrivalReportsTable.reported_at,
-                  input.referenceNow.minus({ minutes: 3 }).toISO() ?? '',
+                  input.referenceNow
+                    .minus({
+                      minutes: MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES,
+                    })
+                    .toISO() ?? '',
                 ),
               ),
             )
@@ -186,14 +192,17 @@ export async function buildStationArrivalLines(input: {
       };
     },
   );
-  const freshCrowdArrivalReports = [
-    ...new Map(
-      freshCrowdArrivalRows.map((report) => [
-        `${report.reporterHash}:${report.serviceId}`,
-        report,
-      ]),
-    ).values(),
-  ];
+  const currentCrowdArrivalReports = filterCurrentCrowdArrivalReports(
+    [
+      ...new Map(
+        freshCrowdArrivalRows.map((report) => [
+          `${report.reporterHash}:${report.serviceId}`,
+          report,
+        ]),
+      ).values(),
+    ],
+    input.referenceNow,
+  );
   const publicHolidayDates =
     input.publicHolidayDates ??
     new Set(holidays.map((holiday) => holiday.date));
@@ -203,7 +212,7 @@ export async function buildStationArrivalLines(input: {
       services: arrivalServices,
       referenceNow: input.referenceNow,
       publicHolidayDates,
-      crowdReports: freshCrowdArrivalReports,
+      crowdReports: currentCrowdArrivalReports,
     })
       .map((timing) => ({
         ...timing,

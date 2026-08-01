@@ -14,7 +14,11 @@ import {
   parseDateTimeUncached,
 } from './dbQueries/dateTime';
 
-const ARRIVING_NOW_CLAMP_WINDOW_MILLIS = 1_000;
+// Keep a just-submitted “arriving now” report visible through a normal page
+// refresh, but discard it before the next station polling interval. Unlike a
+// report with a future arrival time, this observation becomes stale quickly.
+const ARRIVING_NOW_CLAMP_WINDOW_MILLIS = 30_000;
+export const MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES = 30;
 
 export type EstimatedArrivalService = {
   serviceId: string;
@@ -55,6 +59,25 @@ export type EstimatedArrivalDeparture = Pick<
   crowdReportsDisagree: boolean;
   time: string;
 };
+
+export function filterCurrentCrowdArrivalReports(
+  reports: readonly StoredCrowdArrivalReport[],
+  referenceNow: DateTime,
+) {
+  const referenceMillis = referenceNow.toMillis();
+  return reports.filter((report) => {
+    const reportAgeMillis =
+      referenceMillis -
+      parseDateTimeUncached(report.reportedAt)
+        .setZone(referenceNow.zone)
+        .toMillis();
+    const validityMillis = Math.max(
+      ARRIVING_NOW_CLAMP_WINDOW_MILLIS,
+      report.minutesToArrival * 60_000,
+    );
+    return reportAgeMillis >= 0 && reportAgeMillis <= validityMillis;
+  });
+}
 
 function calendarForDate(
   date: DateTime,
@@ -108,12 +131,17 @@ export function getEstimatedStationArrivalTimings(input: {
     input.referenceNow.diff(input.referenceNow.startOf('day'), 'seconds')
       .seconds,
   );
-  const crowdReports = input.crowdReports?.map((report) => ({
-    ...report,
-    reportedAt: parseDateTimeUncached(report.reportedAt).setZone(
-      input.referenceNow.zone,
-    ),
-  }));
+  const crowdReports = input.crowdReports
+    ? filterCurrentCrowdArrivalReports(
+        input.crowdReports,
+        input.referenceNow,
+      ).map((report) => ({
+        ...report,
+        reportedAt: parseDateTimeUncached(report.reportedAt).setZone(
+          input.referenceNow.zone,
+        ),
+      }))
+    : undefined;
 
   return input.services
     .flatMap((service) => {

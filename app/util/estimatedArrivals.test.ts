@@ -1,7 +1,10 @@
 import type { ServiceRevision, Station } from '@mrtdown/core';
 import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
-import { getEstimatedStationArrivalTimings } from './estimatedArrivals';
+import {
+  filterCurrentCrowdArrivalReports,
+  getEstimatedStationArrivalTimings,
+} from './estimatedArrivals';
 
 const station = {
   id: 'alpha',
@@ -43,6 +46,34 @@ const revision = {
 } satisfies Pick<ServiceRevision, 'path' | 'estimatedFrequency'>;
 
 describe('getEstimatedStationArrivalTimings', () => {
+  it('keeps reports current through their reported arrival time', () => {
+    const reports = [
+      {
+        id: 'report-1',
+        serviceId: 'alpha-eastbound',
+        reportedAt: '2026-07-19 21:00:00+00',
+        minutesToArrival: 5,
+      },
+    ];
+
+    expect(
+      filterCurrentCrowdArrivalReports(
+        reports,
+        DateTime.fromISO('2026-07-20T05:04:59', {
+          zone: 'Asia/Singapore',
+        }),
+      ),
+    ).toEqual(reports);
+    expect(
+      filterCurrentCrowdArrivalReports(
+        reports,
+        DateTime.fromISO('2026-07-20T05:05:01', {
+          zone: 'Asia/Singapore',
+        }),
+      ),
+    ).toEqual([]);
+  });
+
   it('returns the next two point estimates from the frequency estimator', () => {
     const arrivalTimings = getEstimatedStationArrivalTimings({
       station,
@@ -152,7 +183,7 @@ describe('getEstimatedStationArrivalTimings', () => {
         crowdReports,
       });
     const arrivalTimings = getArrivalTimings(
-      DateTime.fromISO('2026-07-20T05:04:00.700', {
+      DateTime.fromISO('2026-07-20T05:04:05', {
         zone: 'Asia/Singapore',
       }),
     );
@@ -161,11 +192,11 @@ describe('getEstimatedStationArrivalTimings', () => {
       basis: 'crowd_report',
       confidence: 'high',
       crowdReportCount: 1,
-      time: '2026-07-20T05:04:01.000+08:00',
+      time: '2026-07-20T05:04:05.000+08:00',
     });
 
     const laterArrivalTimings = getArrivalTimings(
-      DateTime.fromISO('2026-07-20T05:04:30', {
+      DateTime.fromISO('2026-07-20T05:04:31', {
         zone: 'Asia/Singapore',
       }),
     );
@@ -173,7 +204,7 @@ describe('getEstimatedStationArrivalTimings', () => {
     expect(laterArrivalTimings[0]?.departures[0]).toMatchObject({
       basis: 'frequency_estimate',
       crowdReportCount: 0,
-      time: '2026-07-20T05:09:30.000+08:00',
+      time: '2026-07-20T05:09:31.000+08:00',
     });
   });
 
