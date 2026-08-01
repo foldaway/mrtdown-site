@@ -1,5 +1,5 @@
 import type { Service as CoreService } from '@mrtdown/core';
-import { inArray, sql } from 'drizzle-orm';
+import { getTableColumns, inArray, sql } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
 import {
   evidencesTable,
@@ -107,6 +107,102 @@ export type DatasetStaticScope = {
   includePublicHolidays?: boolean;
 };
 
+function omitAuditTimestamps<TColumns extends Record<string, unknown>>(
+  columns: TColumns,
+) {
+  const {
+    created_at: _createdAt,
+    updated_at: _updatedAt,
+    ...readColumns
+  } = columns;
+  return readColumns;
+}
+
+const linesReadColumns = omitAuditTimestamps(getTableColumns(linesTable));
+const operatorsReadColumns = omitAuditTimestamps(
+  getTableColumns(operatorsTable),
+);
+const townsReadColumns = omitAuditTimestamps(getTableColumns(townsTable));
+const landmarksReadColumns = omitAuditTimestamps(
+  getTableColumns(landmarksTable),
+);
+const stationCodesReadColumns = omitAuditTimestamps(
+  getTableColumns(stationCodesTable),
+);
+const stationLandmarksReadColumns = omitAuditTimestamps(
+  getTableColumns(stationLandmarksTable),
+);
+const servicesReadColumns = omitAuditTimestamps(getTableColumns(servicesTable));
+const publicHolidaysReadColumns = omitAuditTimestamps(
+  getTableColumns(publicHolidaysTable),
+);
+const issuesReadColumns = omitAuditTimestamps(getTableColumns(issuesTable));
+const impactEventsReadColumns = omitAuditTimestamps(
+  getTableColumns(impactEventsTable),
+);
+const impactEventPeriodsReadColumns = omitAuditTimestamps(
+  getTableColumns(impactEventPeriodsTable),
+);
+const impactEventEntityServicesReadColumns = omitAuditTimestamps(
+  getTableColumns(impactEventEntityServicesTable),
+);
+const impactEventEntityFacilitiesReadColumns = omitAuditTimestamps(
+  getTableColumns(impactEventEntityFacilitiesTable),
+);
+const impactEventCausesReadColumns = omitAuditTimestamps(
+  getTableColumns(impactEventCausesTable),
+);
+const impactEventServiceScopesReadColumns = omitAuditTimestamps(
+  getTableColumns(impactEventServiceScopesTable),
+);
+const impactEventServiceEffectsReadColumns = omitAuditTimestamps(
+  getTableColumns(impactEventServiceEffectsTable),
+);
+const impactEventFacilityEffectsReadColumns = omitAuditTimestamps(
+  getTableColumns(impactEventFacilityEffectsTable),
+);
+const {
+  created_at: _serviceRevisionCreatedAt,
+  ...serviceRevisionsReadColumns
+} = getTableColumns(serviceRevisionsTable);
+
+type DatasetServiceRevision = Omit<
+  typeof serviceRevisionsTable.$inferSelect,
+  'created_at'
+>;
+type DatasetImpactEvent = Omit<
+  typeof impactEventsTable.$inferSelect,
+  'created_at' | 'updated_at'
+>;
+type DatasetImpactEventEntityService = Omit<
+  typeof impactEventEntityServicesTable.$inferSelect,
+  'created_at' | 'updated_at'
+>;
+type DatasetImpactEventPeriod = Omit<
+  typeof impactEventPeriodsTable.$inferSelect,
+  'created_at' | 'updated_at'
+>;
+type DatasetImpactEventEntityFacility = Omit<
+  typeof impactEventEntityFacilitiesTable.$inferSelect,
+  'created_at' | 'updated_at'
+>;
+type DatasetImpactEventCause = Omit<
+  typeof impactEventCausesTable.$inferSelect,
+  'created_at' | 'updated_at'
+>;
+type DatasetImpactEventServiceScope = Omit<
+  typeof impactEventServiceScopesTable.$inferSelect,
+  'created_at' | 'updated_at'
+>;
+type DatasetImpactEventServiceEffect = Omit<
+  typeof impactEventServiceEffectsTable.$inferSelect,
+  'created_at' | 'updated_at'
+>;
+type DatasetImpactEventFacilityEffect = Omit<
+  typeof impactEventFacilityEffectsTable.$inferSelect,
+  'created_at' | 'updated_at'
+>;
+
 export function parseTranslations(value: unknown): Line['name'] {
   const isNonEmptyTranslation = (
     translation: string | null | undefined,
@@ -182,12 +278,12 @@ export async function buildDataset(
         : [],
       selectedLineIds == null
         ? timeDbQuery('dataset_q_lines', () =>
-            database.select().from(linesTable),
+            database.select(linesReadColumns).from(linesTable),
           )
         : selectedLineIds.length > 0
           ? timeDbQuery('dataset_q_lines', () =>
               database
-                .select()
+                .select(linesReadColumns)
                 .from(linesTable)
                 .where(inArray(linesTable.id, selectedLineIds)),
             )
@@ -206,36 +302,36 @@ export async function buildDataset(
           : [],
       selectedOperatorIds == null
         ? timeDbQuery('dataset_q_operators', () =>
-            database.select().from(operatorsTable),
+            database.select(operatorsReadColumns).from(operatorsTable),
           )
         : selectedOperatorIds.length > 0
           ? timeDbQuery('dataset_q_operators', () =>
               database
-                .select()
+                .select(operatorsReadColumns)
                 .from(operatorsTable)
                 .where(inArray(operatorsTable.id, selectedOperatorIds)),
             )
           : [],
       selectedTownIds == null
         ? timeDbQuery('dataset_q_towns', () =>
-            database.select().from(townsTable),
+            database.select(townsReadColumns).from(townsTable),
           )
         : selectedTownIds.length > 0
           ? timeDbQuery('dataset_q_towns', () =>
               database
-                .select()
+                .select(townsReadColumns)
                 .from(townsTable)
                 .where(inArray(townsTable.id, selectedTownIds)),
             )
           : [],
       selectedLandmarkIds == null
         ? timeDbQuery('dataset_q_landmarks', () =>
-            database.select().from(landmarksTable),
+            database.select(landmarksReadColumns).from(landmarksTable),
           )
         : selectedLandmarkIds.length > 0
           ? timeDbQuery('dataset_q_landmarks', () =>
               database
-                .select()
+                .select(landmarksReadColumns)
                 .from(landmarksTable)
                 .where(inArray(landmarksTable.id, selectedLandmarkIds)),
             )
@@ -270,12 +366,12 @@ export async function buildDataset(
           : [],
       selectedStationIds == null
         ? timeDbQuery('dataset_q_station_codes', () =>
-            database.select().from(stationCodesTable),
+            database.select(stationCodesReadColumns).from(stationCodesTable),
           )
         : selectedStationIds.length > 0
           ? timeDbQuery('dataset_q_station_codes', () =>
               database
-                .select()
+                .select(stationCodesReadColumns)
                 .from(stationCodesTable)
                 .where(
                   inArray(stationCodesTable.station_id, selectedStationIds),
@@ -284,12 +380,14 @@ export async function buildDataset(
           : [],
       selectedStationIds == null
         ? timeDbQuery('dataset_q_station_landmarks', () =>
-            database.select().from(stationLandmarksTable),
+            database
+              .select(stationLandmarksReadColumns)
+              .from(stationLandmarksTable),
           )
         : selectedStationIds.length > 0
           ? timeDbQuery('dataset_q_station_landmarks', () =>
               database
-                .select()
+                .select(stationLandmarksReadColumns)
                 .from(stationLandmarksTable)
                 .where(
                   inArray(stationLandmarksTable.station_id, selectedStationIds),
@@ -298,24 +396,26 @@ export async function buildDataset(
           : [],
       selectedServiceIds == null
         ? timeDbQuery('dataset_q_services', () =>
-            database.select().from(servicesTable),
+            database.select(servicesReadColumns).from(servicesTable),
           )
         : selectedServiceIds.length > 0
           ? timeDbQuery('dataset_q_services', () =>
               database
-                .select()
+                .select(servicesReadColumns)
                 .from(servicesTable)
                 .where(inArray(servicesTable.id, selectedServiceIds)),
             )
           : [],
       selectedServiceIds == null
         ? timeDbQuery('dataset_q_service_revisions', () =>
-            database.select().from(serviceRevisionsTable),
+            database
+              .select(serviceRevisionsReadColumns)
+              .from(serviceRevisionsTable),
           )
         : selectedServiceIds.length > 0
           ? timeDbQuery('dataset_q_service_revisions', () =>
               database
-                .select()
+                .select(serviceRevisionsReadColumns)
                 .from(serviceRevisionsTable)
                 .where(
                   inArray(serviceRevisionsTable.service_id, selectedServiceIds),
@@ -324,17 +424,19 @@ export async function buildDataset(
           : [],
       staticScope == null || staticScope.includePublicHolidays === true
         ? timeDbQuery('dataset_q_public_holidays', () =>
-            database.select().from(publicHolidaysTable),
+            database
+              .select(publicHolidaysReadColumns)
+              .from(publicHolidaysTable),
           )
         : [],
       selectedIssueIds == null
         ? timeDbQuery('dataset_q_issues', () =>
-            database.select().from(issuesTable),
+            database.select(issuesReadColumns).from(issuesTable),
           )
         : selectedIssueIds.length > 0
           ? timeDbQuery('dataset_q_issues', () =>
               database
-                .select()
+                .select(issuesReadColumns)
                 .from(issuesTable)
                 .where(inArray(issuesTable.id, selectedIssueIds)),
             )
@@ -363,12 +465,12 @@ export async function buildDataset(
           : [],
       selectedIssueIds == null
         ? timeDbQuery('dataset_q_impact_events', () =>
-            database.select().from(impactEventsTable),
+            database.select(impactEventsReadColumns).from(impactEventsTable),
           )
         : selectedIssueIds.length > 0
           ? timeDbQuery('dataset_q_impact_events', () =>
               database
-                .select()
+                .select(impactEventsReadColumns)
                 .from(impactEventsTable)
                 .where(inArray(impactEventsTable.issue_id, selectedIssueIds)),
             )
@@ -445,7 +547,7 @@ export async function buildDataset(
       periodImpactEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_periods', () =>
             database
-              .select()
+              .select(impactEventPeriodsReadColumns)
               .from(impactEventPeriodsTable)
               .where(
                 inArray(
@@ -454,11 +556,11 @@ export async function buildDataset(
                 ),
               ),
           )
-        : ([] as (typeof impactEventPeriodsTable.$inferSelect)[]),
+        : ([] as DatasetImpactEventPeriod[]),
       serviceEntityEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_services', () =>
             database
-              .select()
+              .select(impactEventEntityServicesReadColumns)
               .from(impactEventEntityServicesTable)
               .where(
                 inArray(
@@ -467,11 +569,11 @@ export async function buildDataset(
                 ),
               ),
           )
-        : ([] as (typeof impactEventEntityServicesTable.$inferSelect)[]),
+        : ([] as DatasetImpactEventEntityService[]),
       selectedStateEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_facilities', () =>
             database
-              .select()
+              .select(impactEventEntityFacilitiesReadColumns)
               .from(impactEventEntityFacilitiesTable)
               .where(
                 inArray(
@@ -480,11 +582,11 @@ export async function buildDataset(
                 ),
               ),
           )
-        : ([] as (typeof impactEventEntityFacilitiesTable.$inferSelect)[]),
+        : ([] as DatasetImpactEventEntityFacility[]),
       selectedStateEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_causes', () =>
             database
-              .select()
+              .select(impactEventCausesReadColumns)
               .from(impactEventCausesTable)
               .where(
                 inArray(
@@ -493,11 +595,11 @@ export async function buildDataset(
                 ),
               ),
           )
-        : ([] as (typeof impactEventCausesTable.$inferSelect)[]),
+        : ([] as DatasetImpactEventCause[]),
       serviceScopeEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_service_scopes', () =>
             database
-              .select()
+              .select(impactEventServiceScopesReadColumns)
               .from(impactEventServiceScopesTable)
               .where(
                 inArray(
@@ -506,11 +608,11 @@ export async function buildDataset(
                 ),
               ),
           )
-        : ([] as (typeof impactEventServiceScopesTable.$inferSelect)[]),
+        : ([] as DatasetImpactEventServiceScope[]),
       selectedStateEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_service_effects', () =>
             database
-              .select()
+              .select(impactEventServiceEffectsReadColumns)
               .from(impactEventServiceEffectsTable)
               .where(
                 inArray(
@@ -519,11 +621,11 @@ export async function buildDataset(
                 ),
               ),
           )
-        : ([] as (typeof impactEventServiceEffectsTable.$inferSelect)[]),
+        : ([] as DatasetImpactEventServiceEffect[]),
       selectedStateEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_facility_effects', () =>
             database
-              .select()
+              .select(impactEventFacilityEffectsReadColumns)
               .from(impactEventFacilityEffectsTable)
               .where(
                 inArray(
@@ -532,7 +634,7 @@ export async function buildDataset(
                 ),
               ),
           )
-        : ([] as (typeof impactEventFacilityEffectsTable.$inferSelect)[]),
+        : ([] as DatasetImpactEventFacilityEffect[]),
     ]),
   );
 
@@ -614,7 +716,7 @@ export async function buildDataset(
   ) as IncludedEntities['lines'];
 
   const revisionsByServiceId = serviceRevisionRows.reduce<
-    Record<string, Array<typeof serviceRevisionsTable.$inferSelect>>
+    Record<string, DatasetServiceRevision[]>
   >((acc, row) => {
     if (acc[row.service_id] == null) {
       acc[row.service_id] = [];
@@ -633,9 +735,7 @@ export async function buildDataset(
         return revision == null ? null : ([serviceId, revision] as const);
       })
       .filter(
-        (
-          entry,
-        ): entry is readonly [string, (typeof serviceRevisionRows)[number]] =>
+        (entry): entry is readonly [string, DatasetServiceRevision] =>
           entry != null,
       ),
   );
@@ -981,7 +1081,7 @@ export async function buildDataset(
   }, {});
 
   const impactEventsByIssueId = impactEventRows.reduce<
-    Record<string, Array<typeof impactEventsTable.$inferSelect>>
+    Record<string, DatasetImpactEvent[]>
   >((acc, event) => {
     if (acc[event.issue_id] == null) {
       acc[event.issue_id] = [];
@@ -993,7 +1093,7 @@ export async function buildDataset(
     impactEventRows.map((event) => [event.id, event]),
   );
   const serviceRowsByIssueId = impactEventServiceRows.reduce<
-    Record<string, Array<typeof impactEventEntityServicesTable.$inferSelect>>
+    Record<string, DatasetImpactEventEntityService[]>
   >((acc, serviceReference) => {
     const event = impactEventById.get(serviceReference.impact_event_id);
     if (event == null) {
