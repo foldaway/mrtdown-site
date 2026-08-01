@@ -648,7 +648,14 @@ export async function buildDataset(
     () =>
       allRevisionIds.length > 0
         ? database
-            .select()
+            .select({
+              service_revision_id:
+                serviceRevisionPathStationEntriesTable.service_revision_id,
+              service_id: serviceRevisionPathStationEntriesTable.service_id,
+              station_id: serviceRevisionPathStationEntriesTable.station_id,
+              display_code: serviceRevisionPathStationEntriesTable.display_code,
+              path_index: serviceRevisionPathStationEntriesTable.path_index,
+            })
             .from(serviceRevisionPathStationEntriesTable)
             .where(
               inArray(
