@@ -19,7 +19,6 @@ import { LineSummaryStatusLabels } from '~/constants';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import type { LineSummaryStatus } from '~/types';
-import { assert } from '~/util/assert';
 import { getLinesDirectoryFn } from '~/util/lines.functions';
 
 type LinesDirectoryPayload = Awaited<ReturnType<typeof getLinesDirectoryFn>>;
@@ -29,8 +28,11 @@ export const Route = createFileRoute('/{-$lang}/lines/')({
   component: LinesPage,
   loader: () => getLinesDirectoryFn(),
   async head(ctx) {
+    if (ctx.loaderData == null) {
+      return { meta: [] };
+    }
+
     const lang = ctx.params.lang ?? 'en-SG';
-    assert(ctx.loaderData != null);
     const { data, included } = ctx.loaderData;
     const { default: messages } = await import(`../../../../lang/${lang}.json`);
     const intl = createIntl({ locale: lang, messages });

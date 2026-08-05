@@ -70,8 +70,11 @@ export const Route = createFileRoute(
     );
   },
   async head(ctx) {
+    if (ctx.loaderData == null) {
+      return { meta: [] };
+    }
+
     const { kind, sourceId, lang = 'en-SG' } = ctx.params;
-    assert(ctx.loaderData != null);
     const source = ctx.loaderData;
     const { default: messages } = await import(
       `../../../../../../lang/${lang}.json`

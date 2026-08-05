@@ -154,8 +154,11 @@ export const Route = createFileRoute('/{-$lang}/stations/$stationId/')({
     return stationProfile;
   },
   async head(ctx) {
+    if (ctx.loaderData == null) {
+      return { meta: [] };
+    }
+
     const { stationId, lang = 'en-SG' } = ctx.params;
-    assert(ctx.loaderData != null);
     const { data: stationProfile, included } = ctx.loaderData;
     const station = included.stations[stationProfile.stationId];
 

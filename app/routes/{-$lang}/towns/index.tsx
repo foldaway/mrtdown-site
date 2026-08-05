@@ -11,15 +11,17 @@ import { LineBar } from '~/components/LineBar';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
-import { assert } from '~/util/assert';
 import { getTownsFn } from '~/util/town.functions';
 
 export const Route = createFileRoute('/{-$lang}/towns/')({
   component: TownsPage,
   loader: () => getTownsFn(),
   async head(ctx) {
+    if (ctx.loaderData == null) {
+      return { meta: [] };
+    }
+
     const lang = ctx.params.lang ?? 'en-SG';
-    assert(ctx.loaderData != null);
     const { data, included } = ctx.loaderData;
     const { default: messages } = await import(`../../../../lang/${lang}.json`);
     const intl = createIntl({ locale: lang, messages });

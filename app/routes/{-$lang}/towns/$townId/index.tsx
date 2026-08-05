@@ -36,8 +36,11 @@ export const Route = createFileRoute('/{-$lang}/towns/$townId/')({
   loader: ({ params }) =>
     loadOrNotFound(() => getTownProfileFn({ data: { townId: params.townId } })),
   async head(ctx) {
+    if (ctx.loaderData == null) {
+      return { meta: [] };
+    }
+
     const { townId, lang = 'en-SG' } = ctx.params;
-    assert(ctx.loaderData != null);
     const { data, included } = ctx.loaderData;
     const town = included.towns[data.townId];
     const townName = getLocalizedTranslation(town.name, lang);

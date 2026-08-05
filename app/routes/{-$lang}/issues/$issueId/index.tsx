@@ -101,8 +101,11 @@ export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
       }),
     ),
   async head(ctx) {
+    if (ctx.loaderData == null) {
+      return { meta: [] };
+    }
+
     const { issueId, lang = 'en-SG' } = ctx.params;
-    assert(ctx.loaderData != null);
     const { data, included } = ctx.loaderData;
     const issue = included.issues[data.id];
     const title = getLocalizedTranslation(issue.title, lang);

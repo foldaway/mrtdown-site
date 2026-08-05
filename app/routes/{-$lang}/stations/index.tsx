@@ -28,7 +28,6 @@ import { LineSummaryStatusLabels } from '~/constants';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import type { LineSummaryStatus } from '~/types';
-import { assert } from '~/util/assert';
 import { getStationsDirectoryFn } from '~/util/station.functions';
 
 type StationsDirectoryPayload = Awaited<
@@ -40,8 +39,11 @@ export const Route = createFileRoute('/{-$lang}/stations/')({
   component: StationsPage,
   loader: () => getStationsDirectoryFn(),
   async head(ctx) {
+    if (ctx.loaderData == null) {
+      return { meta: [] };
+    }
+
     const { lang = 'en-SG' } = ctx.params;
-    assert(ctx.loaderData != null);
     const { stations } = ctx.loaderData;
     const { default: messages } = await import(`../../../../lang/${lang}.json`);
     const intl = createIntl({ locale: lang, messages });

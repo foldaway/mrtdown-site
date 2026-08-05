@@ -21,7 +21,6 @@ import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildIssueTypeCountString } from '~/helpers/buildIssueTypeCountString';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
-import { assert } from '~/util/assert';
 import { getLineProfileFn } from '~/util/lines.functions';
 import { loadOrNotFound } from '~/util/loadOrNotFound';
 import { CurrentStatusCard } from './components/CurrentStatusCard';
@@ -72,8 +71,11 @@ export const Route = createFileRoute('/{-$lang}/lines/$lineId/')({
       }),
     ),
   async head(ctx) {
+    if (ctx.loaderData == null) {
+      return { meta: [] };
+    }
+
     const { lineId, lang = 'en-SG' } = ctx.params;
-    assert(ctx.loaderData != null);
     const { data: lineProfile, included } = ctx.loaderData;
     const { branches, stationCount } = lineProfile;
     const line = included.lines[lineId];

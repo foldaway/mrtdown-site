@@ -17,7 +17,6 @@ import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import { useHydrated } from '~/hooks/useHydrated';
 import { getOperatorProfileFn } from '~/util/operator.functions';
 import { loadOrNotFound } from '~/util/loadOrNotFound';
-import { assert } from '../../../../util/assert';
 import { OperatorCurrentStatusCard } from './components/OperatorCurrentStatusCard';
 import { OperatorLinePerformanceCard } from './components/OperatorLinePerformanceCard';
 import { OperatorQuickFactsCard } from './components/OperatorQuickFactsCard';
@@ -57,9 +56,12 @@ export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
       }),
     ),
   async head(ctx) {
+    if (ctx.loaderData == null) {
+      return { meta: [] };
+    }
+
     const { lang = 'en-SG' } = ctx.params;
 
-    assert(ctx.loaderData != null);
     const { data: operatorProfile, included } = ctx.loaderData;
 
     const operator = included.operators[operatorProfile.operatorId];
