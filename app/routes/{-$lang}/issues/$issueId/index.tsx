@@ -20,6 +20,7 @@ import { IssueStatusBadge } from '~/components/IssueStatusBadge';
 import type { IssueInterval } from '~/types';
 import { assert } from '~/util/assert';
 import { getIssueFn } from '~/util/issue.functions';
+import { loadOrNotFound } from '~/util/loadOrNotFound';
 import { Attributes } from './components/Attributes';
 import { StatsCard } from './components/StatsCard';
 import { TimelineCard } from './components/TimelineCard';
@@ -94,9 +95,11 @@ function formatIssueDescriptionPeriod(
 export const Route = createFileRoute('/{-$lang}/issues/$issueId/')({
   component: IssuePage,
   loader: ({ params }) =>
-    getIssueFn({
-      data: { issueId: params.issueId },
-    }),
+    loadOrNotFound(() =>
+      getIssueFn({
+        data: { issueId: params.issueId },
+      }),
+    ),
   async head(ctx) {
     const { issueId, lang = 'en-SG' } = ctx.params;
     assert(ctx.loaderData != null);

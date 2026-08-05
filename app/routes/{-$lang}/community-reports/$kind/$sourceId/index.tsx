@@ -7,7 +7,7 @@ import {
   MapPinIcon,
 } from '@heroicons/react/24/outline';
 import type { IngestContentCrowdReportEffect } from '@mrtdown/ingest-contracts';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, notFound } from '@tanstack/react-router';
 import classNames from 'classnames';
 import {
   createIntl,
@@ -21,6 +21,7 @@ import {
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildSeoMetadata } from '~/helpers/seo';
 import { assert } from '~/util/assert';
+import { loadOrNotFound } from '~/util/loadOrNotFound';
 import {
   getCrowdReportSourceFn,
   type CrowdReportSource,
@@ -56,18 +57,17 @@ export const Route = createFileRoute(
   component: CommunityReportSourcePage,
   loader: ({ params }) => {
     if (!isCrowdReportSourceKind(params.kind)) {
-      throw new Response('Not Found', {
-        status: 404,
-        statusText: 'Not Found',
-      });
+      throw notFound();
     }
 
-    return getCrowdReportSourceFn({
-      data: {
-        kind: params.kind,
-        sourceId: params.sourceId,
-      },
-    });
+    return loadOrNotFound(() =>
+      getCrowdReportSourceFn({
+        data: {
+          kind: params.kind,
+          sourceId: params.sourceId,
+        },
+      }),
+    );
   },
   async head(ctx) {
     const { kind, sourceId, lang = 'en-SG' } = ctx.params;

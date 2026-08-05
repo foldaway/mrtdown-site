@@ -29,6 +29,7 @@ import { useHydrated } from '~/hooks/useHydrated';
 import type { IncludedEntities, Station } from '~/types';
 import { getStationProfileFn } from '~/util/station.functions';
 import { assert } from '~/util/assert';
+import { loadOrNotFound } from '~/util/loadOrNotFound';
 import { StationGuide as StationGuideSection } from './components/StationGuide';
 import { useRotatingLineColors } from './hooks/useRotatingLineColors';
 
@@ -135,9 +136,11 @@ function formatStationHeading({
 export const Route = createFileRoute('/{-$lang}/stations/$stationId/')({
   component: StationPage,
   async loader({ params }) {
-    const stationProfile = await getStationProfileFn({
-      data: { stationId: params.stationId },
-    });
+    const stationProfile = await loadOrNotFound(() =>
+      getStationProfileFn({
+        data: { stationId: params.stationId },
+      }),
+    );
     const canonicalPath = getCanonicalStationPath({
       lang: params.lang,
       requestedStationId: params.stationId,

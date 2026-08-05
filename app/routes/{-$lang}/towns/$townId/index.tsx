@@ -26,13 +26,15 @@ import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import type { Station } from '~/types';
 import { assert } from '~/util/assert';
 import type { TownStationStatus } from '~/util/dbQueries/towns';
+import { loadOrNotFound } from '~/util/loadOrNotFound';
 import { getTownProfileFn } from '~/util/town.functions';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 
 export const Route = createFileRoute('/{-$lang}/towns/$townId/')({
   component: TownPage,
-  loader: ({ params }) => getTownProfileFn({ data: { townId: params.townId } }),
+  loader: ({ params }) =>
+    loadOrNotFound(() => getTownProfileFn({ data: { townId: params.townId } })),
   async head(ctx) {
     const { townId, lang = 'en-SG' } = ctx.params;
     assert(ctx.loaderData != null);

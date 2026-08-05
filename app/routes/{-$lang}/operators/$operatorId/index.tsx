@@ -1,4 +1,4 @@
-import { createFileRoute, notFound } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { lazy } from 'react';
 import {
   createIntl,
@@ -16,6 +16,7 @@ import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildLocalizedAbsoluteUrl, buildSeoMetadata } from '~/helpers/seo';
 import { useHydrated } from '~/hooks/useHydrated';
 import { getOperatorProfileFn } from '~/util/operator.functions';
+import { loadOrNotFound } from '~/util/loadOrNotFound';
 import { assert } from '../../../../util/assert';
 import { OperatorCurrentStatusCard } from './components/OperatorCurrentStatusCard';
 import { OperatorLinePerformanceCard } from './components/OperatorLinePerformanceCard';
@@ -23,22 +24,6 @@ import { OperatorQuickFactsCard } from './components/OperatorQuickFactsCard';
 import { OperatorUptimeCard } from './components/OperatorUptimeCard';
 
 const OPERATOR_PROFILE_DATE_COUNT = 90;
-
-async function loadOperatorProfile(operatorId: string) {
-  try {
-    return await getOperatorProfileFn({
-      data: {
-        operatorId,
-        days: OPERATOR_PROFILE_DATE_COUNT,
-      },
-    });
-  } catch (error) {
-    if (error instanceof Response && error.status === 404) {
-      throw notFound();
-    }
-    throw error;
-  }
-}
 
 const CountTrendCards = lazy(() =>
   import('../../lines/$lineId/components/CountTrendCards').then((module) => ({
@@ -62,7 +47,15 @@ const RecentIssuesSection = lazy(() =>
 
 export const Route = createFileRoute('/{-$lang}/operators/$operatorId/')({
   component: OperatorPage,
-  loader: ({ params }) => loadOperatorProfile(params.operatorId),
+  loader: ({ params }) =>
+    loadOrNotFound(() =>
+      getOperatorProfileFn({
+        data: {
+          operatorId: params.operatorId,
+          days: OPERATOR_PROFILE_DATE_COUNT,
+        },
+      }),
+    ),
   async head(ctx) {
     const { lang = 'en-SG' } = ctx.params;
 
