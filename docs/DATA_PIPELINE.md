@@ -25,12 +25,14 @@ out-of-cycle update.
 
 ## Scheduled Jobs
 
-The preview, staging, and production deployment workflows run
+The staging and production deployment workflows run
 `npm run qstash:schedules:sync` after a successful Fly deployment. The command
 idempotently creates or updates the QStash schedules for the canonical pull,
 public holiday sync, and crowd report dispatch. Schedule IDs include `TIER`, so
 the environments can share one QStash account without overwriting each other.
-Canonical pulls run daily at 00:00 UTC in every environment.
+Canonical pulls run daily at 00:00 UTC in those environments. Preview resets
+its database and queues a pull as part of every deployment, so it has no
+recurring schedules.
 
 Each pull first compares a stable fingerprint of the canonical manifest's
 read-model inputs with the fingerprint recorded after the last fully successful
