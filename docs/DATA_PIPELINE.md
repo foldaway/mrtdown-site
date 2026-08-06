@@ -18,7 +18,7 @@ The overhaul introduces a local read model for canonical mrtdown data.
 `app/workflows/publicHolidays/index.ts` syncs Singapore public holidays from the
 data.gov.sg consolidated public holidays dataset into `public_holidays`.
 Holiday changes rebuild operational facts for affected dates so line service
-windows use weekend timings on public holidays. QStash has a separate weekly
+windows use weekend timings on public holidays. QStash has a separate monthly
 schedule for this workflow; use
 `/internal/api/tasks/public-holidays` for an immediate manual refresh after an
 out-of-cycle update.
@@ -96,9 +96,10 @@ built from `VITE_ROOT_URL` as a stable `/community-reports/{kind}/{id}`
 permalink. Send `{ "dryRun": true }` to the endpoint to inspect pending payloads
 without calling GitHub or mutating report state.
 
-The daily 18:00 UTC QStash schedule invokes the same dispatch path as a retry
-backstop when `CROWD_REPORT_DISPATCH_GITHUB_TOKEN` is configured. This gives
-the upstream ingest workflow six hours before the daily canonical pull. Use
+The weekly Sunday 18:00 UTC QStash schedule invokes the same dispatch path as a
+retry backstop when `CROWD_REPORT_DISPATCH_GITHUB_TOKEN` is configured. This
+gives the upstream ingest workflow six hours before the following daily
+canonical pull. Use
 `CROWD_REPORT_DISPATCH_LIMIT` to tune the maximum number of dispatch candidates
 processed per scheduled run.
 

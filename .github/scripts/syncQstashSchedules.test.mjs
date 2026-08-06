@@ -24,13 +24,13 @@ describe('QStash schedule synchronization', () => {
         scheduleId: 'mrtdown-production-public-holidays',
         destination:
           'https://www.mrtdown.org/internal/api/workflows/publicHolidays',
-        cron: '0 18 * * SUN',
+        cron: '0 18 1 * *',
       },
       {
         scheduleId: 'mrtdown-production-crowd-report-dispatch',
         destination:
           'https://www.mrtdown.org/internal/api/tasks/crowd-report-dispatch',
-        cron: '0 18 * * *',
+        cron: '0 18 * * SUN',
         headers: { Authorization: 'Bearer schedule-secret' },
         redactHeaders: ['Authorization'],
       },

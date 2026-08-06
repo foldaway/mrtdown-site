@@ -2,8 +2,8 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PULL_CRON = '0 0 * * *';
-const CROWD_REPORT_DISPATCH_CRON = '0 18 * * *';
-const PUBLIC_HOLIDAYS_CRON = '0 18 * * SUN';
+const CROWD_REPORT_DISPATCH_CRON = '0 18 * * SUN';
+const PUBLIC_HOLIDAYS_CRON = '0 18 1 * *';
 
 export const DEPLOYMENT_TIERS = ['preview', 'staging', 'production'];
 
