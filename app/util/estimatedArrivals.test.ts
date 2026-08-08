@@ -46,7 +46,7 @@ const revision = {
 } satisfies Pick<ServiceRevision, 'path' | 'estimatedFrequency'>;
 
 describe('getEstimatedStationArrivalTimings', () => {
-  it('keeps reports current through their reported arrival time', () => {
+  it('keeps reports current for a full service day', () => {
     const reports = [
       {
         id: 'report-1',
@@ -67,7 +67,15 @@ describe('getEstimatedStationArrivalTimings', () => {
     expect(
       filterCurrentCrowdArrivalReports(
         reports,
-        DateTime.fromISO('2026-07-20T05:05:01', {
+        DateTime.fromISO('2026-07-20T12:00:00', {
+          zone: 'Asia/Singapore',
+        }),
+      ),
+    ).toEqual(reports);
+    expect(
+      filterCurrentCrowdArrivalReports(
+        reports,
+        DateTime.fromISO('2026-07-21T05:00:01', {
           zone: 'Asia/Singapore',
         }),
       ),
@@ -202,9 +210,50 @@ describe('getEstimatedStationArrivalTimings', () => {
     );
 
     expect(laterArrivalTimings[0]?.departures[0]).toMatchObject({
-      basis: 'frequency_estimate',
-      crowdReportCount: 0,
-      time: '2026-07-20T05:09:31.000+08:00',
+      basis: 'crowd_report',
+      crowdReportCount: 1,
+      time: '2026-07-20T05:14:00.000+08:00',
+    });
+  });
+
+  it('projects an earlier crowd report through the remaining service day', () => {
+    const arrivalTimings = getEstimatedStationArrivalTimings({
+      station,
+      services: [
+        {
+          serviceId: 'alpha-eastbound',
+          lineId: 'AL',
+          serviceName: {
+            'en-SG': 'Alpha Line eastbound',
+            'zh-Hans': null,
+            ms: null,
+            ta: null,
+          },
+          destinationStationId: 'bravo',
+          destinationCode: 'B2',
+          destinationName: null,
+          revision,
+        },
+      ],
+      referenceNow: DateTime.fromISO('2026-07-20T05:51:00', {
+        zone: 'Asia/Singapore',
+      }),
+      publicHolidayDates: new Set(),
+      crowdReports: [
+        {
+          id: 'report-1',
+          serviceId: 'alpha-eastbound',
+          reportedAt: '2026-07-19 21:04:00+00',
+          minutesToArrival: 0,
+        },
+      ],
+    });
+
+    expect(arrivalTimings[0]?.departures[0]).toMatchObject({
+      basis: 'crowd_report',
+      confidence: 'high',
+      crowdReportCount: 1,
+      time: '2026-07-20T05:54:00.000+08:00',
     });
   });
 
