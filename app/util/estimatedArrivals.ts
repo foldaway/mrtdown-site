@@ -2,6 +2,7 @@ import {
   estimateNextStationArrivals,
   type CrowdArrivalReport,
   type EstimatedStationArrival,
+  type EstimatedStationFrequencySchedule,
   generateEstimatedStationFrequencySchedule,
   type EstimatedStationScheduleCalendar,
   type ServiceRevision,
@@ -14,11 +15,11 @@ import {
   parseDateTimeUncached,
 } from './dbQueries/dateTime';
 
-// Keep a just-submitted “arriving now” report visible through a normal page
-// refresh, but discard it before the next station polling interval. Unlike a
-// report with a future arrival time, this observation becomes stale quickly.
+// Keep a just-submitted “arriving now” report pinned to the current arrival
+// through a normal page refresh. After that, it becomes a phase anchor like
+// every other report and is projected through the remaining service day.
 const ARRIVING_NOW_CLAMP_WINDOW_MILLIS = 30_000;
-export const MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES = 30;
+export const MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES = 24 * 60;
 
 export type EstimatedArrivalService = {
   serviceId: string;
@@ -71,12 +72,66 @@ export function filterCurrentCrowdArrivalReports(
       parseDateTimeUncached(report.reportedAt)
         .setZone(referenceNow.zone)
         .toMillis();
-    const validityMillis = Math.max(
-      ARRIVING_NOW_CLAMP_WINDOW_MILLIS,
-      report.minutesToArrival * 60_000,
+    return (
+      reportAgeMillis >= 0 &&
+      reportAgeMillis <= MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES * 60_000
     );
-    return reportAgeMillis >= 0 && reportAgeMillis <= validityMillis;
   });
+}
+
+function projectCrowdReportToQuery(input: {
+  report: Omit<StoredCrowdArrivalReport, 'reportedAt'> & {
+    reportedAt: DateTime;
+  };
+  schedule: EstimatedStationFrequencySchedule;
+  serviceDate: DateTime;
+  queriedAtSeconds: number;
+  referenceMillis: number;
+}): CrowdArrivalReport | null {
+  const reportAgeMillis =
+    input.referenceMillis - input.report.reportedAt.toMillis();
+  if (
+    input.report.minutesToArrival === 0 &&
+    reportAgeMillis <= ARRIVING_NOW_CLAMP_WINDOW_MILLIS
+  ) {
+    return {
+      id: input.report.id,
+      reportedAtTime: formatServiceDayTime(input.queriedAtSeconds),
+      minutesToArrival: 0,
+    };
+  }
+
+  let projectedSeconds = Math.round(
+    input.report.reportedAt.diff(input.serviceDate, 'seconds').seconds +
+      input.report.minutesToArrival * 60,
+  );
+  const firstWindow = input.schedule.windows[0];
+  const lastWindow = input.schedule.windows.at(-1);
+  if (
+    firstWindow == null ||
+    lastWindow == null ||
+    projectedSeconds < firstWindow.startSeconds ||
+    projectedSeconds >= lastWindow.endSeconds
+  ) {
+    return null;
+  }
+
+  while (projectedSeconds < input.queriedAtSeconds) {
+    const window = input.schedule.windows.find(
+      (candidate) =>
+        candidate.startSeconds <= projectedSeconds &&
+        projectedSeconds < candidate.endSeconds,
+    );
+    if (window == null) return null;
+    projectedSeconds += window.headwaySeconds;
+    if (projectedSeconds >= lastWindow.endSeconds) return null;
+  }
+
+  return {
+    id: input.report.id,
+    reportedAtTime: formatServiceDayTime(input.queriedAtSeconds),
+    minutesToArrival: (projectedSeconds - input.queriedAtSeconds) / 60,
+  };
 }
 
 function calendarForDate(
@@ -149,23 +204,26 @@ export function getEstimatedStationArrivalTimings(input: {
         if (service.revision.estimatedFrequency == null) {
           return [];
         }
-        const schedules = serviceDates.map((serviceDate, index) => ({
-          serviceDate,
-          schedule: scheduleForServiceDate({
-            station: input.station,
-            service,
-            calendar: calendarForDate(serviceDate, input.publicHolidayDates),
-          }),
-          queriedAtTime: formatServiceDayTime(
+        const schedules = serviceDates.map((serviceDate, index) => {
+          const queriedAtSeconds =
             index === 0
               ? secondsSinceStartOfDay + 86_400
               : index === 1
                 ? secondsSinceStartOfDay
-                : 0,
-          ),
-        }));
+                : 0;
+          return {
+            serviceDate,
+            schedule: scheduleForServiceDate({
+              station: input.station,
+              service,
+              calendar: calendarForDate(serviceDate, input.publicHolidayDates),
+            }),
+            queriedAtSeconds,
+            queriedAtTime: formatServiceDayTime(queriedAtSeconds),
+          };
+        });
         const scheduleEstimates = schedules.map(
-          ({ serviceDate, schedule, queriedAtTime }) => {
+          ({ serviceDate, schedule, queriedAtSeconds, queriedAtTime }) => {
             const startOfServiceDay = serviceDate.startOf('day');
             const estimates = estimateNextStationArrivals(
               schedule,
@@ -174,28 +232,18 @@ export function getEstimatedStationArrivalTimings(input: {
                 count: 2,
                 crowdReports: crowdReports
                   ?.filter((report) => report.serviceId === service.serviceId)
-                  .map((report): CrowdArrivalReport => {
-                    const reportAgeMillis =
-                      referenceMillis - report.reportedAt.toMillis();
-                    const isFreshArrivingNow =
-                      report.minutesToArrival === 0 &&
-                      reportAgeMillis >= 0 &&
-                      reportAgeMillis <= ARRIVING_NOW_CLAMP_WINDOW_MILLIS;
-                    return {
-                      id: report.id,
-                      reportedAtTime: isFreshArrivingNow
-                        ? queriedAtTime
-                        : formatServiceDayTime(
-                            Math.round(
-                              report.reportedAt.diff(
-                                serviceDate.startOf('day'),
-                                'seconds',
-                              ).seconds,
-                            ),
-                          ),
-                      minutesToArrival: report.minutesToArrival,
-                    };
-                  }),
+                  .map((report) =>
+                    projectCrowdReportToQuery({
+                      report,
+                      schedule,
+                      serviceDate: serviceDate.startOf('day'),
+                      queriedAtSeconds,
+                      referenceMillis,
+                    }),
+                  )
+                  .filter(
+                    (report): report is CrowdArrivalReport => report != null,
+                  ),
               },
             ).map((estimate) => ({
               basis: estimate.basis,
