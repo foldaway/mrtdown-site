@@ -128,7 +128,7 @@ function CrowdArrivalReportButton({
       <p className="mt-2 text-emerald-700 text-xs dark:text-emerald-300">
         <FormattedMessage
           id="station.arrival_report.thanks"
-          defaultMessage="Thanks—your report will help calibrate today’s arrival estimates."
+          defaultMessage="Thanks—your report will help calibrate arrival estimates for the current service day."
         />
       </p>
     );
@@ -145,7 +145,7 @@ function CrowdArrivalReportButton({
         <p>
           <FormattedMessage
             id="station.arrival_report.explainer"
-            defaultMessage="At this station now? Share the arrival time you can see. Community reports help calibrate today’s arrival estimates; they are not official train tracking."
+            defaultMessage="At this station now? Share the arrival time you can see. Community reports help calibrate arrival estimates for the current service day; they are not official train tracking."
           />
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">

@@ -1,6 +1,14 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNull, or } from 'drizzle-orm';
 import {
-  crowdArrivalReportsTable,
+  and,
+  asc,
+  desc,
+  eq,
+  gt as isAfter,
+  inArray,
+  isNull,
+  or,
+} from 'drizzle-orm';
+import {
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
   impactEventsTable,
@@ -23,6 +31,7 @@ import {
   type EstimatedArrivalTiming,
   getEstimatedStationArrivalTimings,
 } from '~/util/estimatedArrivals';
+import { getLatestCrowdArrivalReports } from '~/util/crowdArrivalReports';
 import {
   type CommunitySignalOptions,
   getPageCommunitySignals,
@@ -440,48 +449,23 @@ export async function getStationProfileReadModel(
   const freshCrowdArrivalRows =
     arrivalServices.length > 0
       ? await timeDbQuery('station_profile_q_crowd_arrivals', () =>
-          db
-            .select({
-              id: crowdArrivalReportsTable.id,
-              reporterHash: crowdArrivalReportsTable.reporter_hash,
-              serviceId: crowdArrivalReportsTable.service_id,
-              reportedAt: crowdArrivalReportsTable.reported_at,
-              minutesToArrival: crowdArrivalReportsTable.minutes_to_arrival,
-            })
-            .from(crowdArrivalReportsTable)
-            .where(
-              and(
-                eq(crowdArrivalReportsTable.station_id, station.id),
-                inArray(
-                  crowdArrivalReportsTable.service_id,
-                  arrivalServices.map((service) => service.serviceId),
-                ),
-                eq(crowdArrivalReportsTable.status, 'accepted'),
-                gte(
-                  crowdArrivalReportsTable.reported_at,
-                  referenceNow
-                    .minus({
-                      minutes: MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES,
-                    })
-                    .toISO() ?? '',
-                ),
-              ),
-            )
-            .orderBy(desc(crowdArrivalReportsTable.reported_at)),
+          getLatestCrowdArrivalReports({
+            db,
+            stationId: station.id,
+            serviceIds: arrivalServices.map((service) => service.serviceId),
+            reportedAtOrAfter:
+              referenceNow
+                .minus({
+                  minutes: MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES,
+                })
+                .toISO() ?? '',
+          }),
         )
       : [];
-  // A reporter may correct their observation, but cannot manufacture a
-  // consensus by submitting several values before the estimated arrival.
-  // Rows are ordered newest-first, so retain the first per scope.
+  // SQL retains each reporter's latest observation per service, so a reporter
+  // may correct an estimate without manufacturing consensus through repeats.
   const currentCrowdArrivalReports = filterCurrentCrowdArrivalReports(
-    [
-      ...new Map(
-        freshCrowdArrivalRows.map((report) => [
-          `${report.reporterHash}:${report.serviceId}`,
-          report,
-        ]),
-      ).values(),
-    ],
+    freshCrowdArrivalRows,
     referenceNow,
   );
   const arrivalTimingsByServiceId = new Map(
@@ -628,7 +612,7 @@ export async function getStationsDirectoryData() {
           .where(
             or(
               isNull(stationCodesTable.ended_at),
-              gt(stationCodesTable.ended_at, referenceDate),
+              isAfter(stationCodesTable.ended_at, referenceDate),
             ),
           ),
       ),
