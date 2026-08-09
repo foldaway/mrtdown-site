@@ -53,6 +53,7 @@ type ReportSearch = {
 };
 
 type ReportScope = 'line' | 'station' | 'train';
+type SuccessfulSubmissionStatus = 'accepted' | 'duplicate';
 type ReportContextBase = {
   observedAt: string;
   effect: IngestContentCrowdReportEffect | '';
@@ -405,6 +406,8 @@ function ReportPage() {
   const [submitState, setSubmitState] = useState<
     'idle' | 'submitting' | 'success'
   >('idle');
+  const [submissionStatus, setSubmissionStatus] =
+    useState<SuccessfulSubmissionStatus | null>(null);
 
   useEffect(() => {
     if (submitState === 'success') {
@@ -1211,6 +1214,7 @@ function ReportPage() {
           has_effect: effect.length > 0,
           status: result.data.status,
         });
+        setSubmissionStatus(result.data.status);
         setSubmitState('success');
         return;
       }
@@ -1591,15 +1595,24 @@ function ReportPage() {
         : undefined;
 
   if (submitState === 'success') {
+    const isDuplicateSubmission = submissionStatus === 'duplicate';
+
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 rounded-2xl border border-emerald-200 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-gray-800">
         <div className="flex items-center gap-3">
           <CheckCircleIcon className="size-10 shrink-0 text-emerald-600 dark:text-emerald-400" />
           <span className="rounded-full bg-emerald-100 px-3 py-1 font-semibold text-emerald-800 text-sm dark:bg-emerald-900/60 dark:text-emerald-200">
-            <FormattedMessage
-              id="report.success_accepted_badge"
-              defaultMessage="Accepted"
-            />
+            {isDuplicateSubmission ? (
+              <FormattedMessage
+                id="report.success_duplicate_badge"
+                defaultMessage="Matched"
+              />
+            ) : (
+              <FormattedMessage
+                id="report.success_accepted_badge"
+                defaultMessage="Accepted"
+              />
+            )}
           </span>
         </div>
         <div>
@@ -1608,16 +1621,33 @@ function ReportPage() {
             tabIndex={-1}
             className="font-bold text-2xl text-gray-900 dark:text-gray-100"
           >
-            <FormattedMessage
-              id="report.success_title"
-              defaultMessage="Your community report was accepted"
-            />
+            {isDuplicateSubmission ? (
+              <FormattedMessage
+                id="report.success_duplicate_title"
+                defaultMessage="Your report matched an existing report"
+              />
+            ) : (
+              <FormattedMessage
+                id="report.success_title"
+                defaultMessage="Your community report was accepted"
+              />
+            )}
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-300">
-            {isStillHappening ? (
+            {isDuplicateSubmission && isStillHappening ? (
+              <FormattedMessage
+                id="report.success_duplicate_body"
+                defaultMessage="Thanks — your observation was recorded and combined with a matching report."
+              />
+            ) : isDuplicateSubmission ? (
+              <FormattedMessage
+                id="report.success_duplicate_body_resolved"
+                defaultMessage="Thanks — your resolved observation was recorded and matched with an existing report. It will not appear as a current community signal."
+              />
+            ) : isStillHappening ? (
               <FormattedMessage
                 id="report.success_body"
-                defaultMessage="Thanks — your report is safely recorded and now counts as a community signal."
+                defaultMessage="Thanks — your report was safely recorded."
               />
             ) : (
               <FormattedMessage
@@ -1635,10 +1665,15 @@ function ReportPage() {
             />
           </h2>
           <p className="mt-1 text-gray-600 text-sm leading-5 dark:text-gray-300">
-            {isStillHappening ? (
+            {isDuplicateSubmission && isStillHappening ? (
+              <FormattedMessage
+                id="report.success_duplicate_what_happens_body"
+                defaultMessage="Your observation was added to the matching report. Only recent reports marked as still happening may appear as a current community signal."
+              />
+            ) : isStillHappening ? (
               <FormattedMessage
                 id="report.success_what_happens_body"
-                defaultMessage="Your report can appear on the service-status page as a community signal such as “Some reports on CCL.” Matching reports from other commuters are combined before the issue is considered for mrtdown’s incident record."
+                defaultMessage="Recent reports marked as still happening may appear on the service-status page as a community signal such as “Some reports on CCL.” Matching reports from other commuters are combined before an issue is considered for mrtdown’s incident record."
               />
             ) : (
               <FormattedMessage
