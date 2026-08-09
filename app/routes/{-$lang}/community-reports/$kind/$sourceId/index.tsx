@@ -136,17 +136,24 @@ function SourceStatusBadge(props: { status: CrowdReportSource['status'] }) {
         {
           'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-100':
             status === 'dispatched',
-          'bg-amber-100 text-amber-900 dark:bg-amber-900/70 dark:text-amber-100':
+          'bg-sky-100 text-sky-900 dark:bg-sky-900/60 dark:text-sky-100':
             status === 'accepted',
+          'bg-amber-100 text-amber-900 dark:bg-amber-900/70 dark:text-amber-100':
+            status === 'pending',
         },
       )}
     >
-      {status === 'dispatched' ? (
-        <CheckCircleIcon className="size-3.5" />
-      ) : (
+      {status === 'pending' ? (
         <ClockIcon className="size-3.5" />
+      ) : (
+        <CheckCircleIcon className="size-3.5" />
       )}
-      {status === 'dispatched' ? (
+      {status === 'pending' ? (
+        <FormattedMessage
+          id="community_report_source.status_pending"
+          defaultMessage="Collecting reports"
+        />
+      ) : status === 'dispatched' ? (
         <FormattedMessage
           id="community_report_source.status_dispatched"
           defaultMessage="Dispatched"
@@ -215,7 +222,7 @@ function CommunityReportSourcePage() {
             <p className="mt-2 max-w-2xl text-gray-700 text-sm leading-6 dark:text-gray-300">
               <FormattedMessage
                 id="community_report_source.description"
-                defaultMessage="Structured commuter reports shown separately from official operator advisories."
+                defaultMessage="Details behind this community signal. It is based on commuter observations and may not match an operator advisory."
               />
             </p>
           </div>

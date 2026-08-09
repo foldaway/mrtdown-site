@@ -1544,30 +1544,54 @@ function ReportPage() {
   if (submitState === 'success') {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 rounded-2xl border border-emerald-200 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-gray-800">
-        <CheckCircleIcon className="size-10 text-emerald-600 dark:text-emerald-400" />
+        <div className="flex items-center gap-3">
+          <CheckCircleIcon className="size-10 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <span className="rounded-full bg-emerald-100 px-3 py-1 font-semibold text-emerald-800 text-sm dark:bg-emerald-900/60 dark:text-emerald-200">
+            <FormattedMessage
+              id="report.success_accepted_badge"
+              defaultMessage="Accepted"
+            />
+          </span>
+        </div>
         <div>
           <h1 className="font-bold text-2xl text-gray-900 dark:text-gray-100">
             <FormattedMessage
               id="report.success_title"
-              defaultMessage="Community report submitted"
+              defaultMessage="Your community report was accepted"
             />
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-300">
             <FormattedMessage
               id="report.success_body"
-              defaultMessage="Thanks. The report is queued for review and will stay separate from official service status unless it is verified."
+              defaultMessage="Thanks — your report is safely recorded and now counts as a community signal."
             />
           </p>
         </div>
-        <Link
-          to="/{-$lang}"
-          className="inline-flex w-fit items-center rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
-        >
-          <FormattedMessage
-            id="report.return_home"
-            defaultMessage="Return home"
-          />
-        </Link>
+        <div className="rounded-xl bg-gray-50 p-4 dark:bg-gray-900/60">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">
+            <FormattedMessage
+              id="report.success_what_happens_title"
+              defaultMessage="What happens next?"
+            />
+          </h2>
+          <p className="mt-1 text-gray-600 text-sm leading-5 dark:text-gray-300">
+            <FormattedMessage
+              id="report.success_what_happens_body"
+              defaultMessage="Your report can appear on the service-status page as a community signal such as “Some reports on CCL.” Matching reports from other commuters are combined before the issue is considered for mrtdown’s incident record."
+            />
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            to="/{-$lang}"
+            className="inline-flex w-fit items-center rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
+          >
+            <FormattedMessage
+              id="report.view_service_status"
+              defaultMessage="View service status"
+            />
+          </Link>
+        </div>
       </div>
     );
   }

@@ -36,6 +36,7 @@ function makeFakeClusterSourceDb(
       stillHappening: true,
     },
   ],
+  clusterStatus: 'pending' | 'accepted' | 'dispatched' = 'dispatched',
 ) {
   const whereCalls: unknown[] = [];
   const selectResults = [
@@ -43,7 +44,7 @@ function makeFakeClusterSourceDb(
       {
         id: 'cluster-1',
         effect: 'delay',
-        status: 'dispatched',
+        status: clusterStatus,
         windowStartAt: '2026-05-24T04:20:00.000Z',
         windowEndAt: '2026-05-24T04:50:00.000Z',
         dispatchedAt: '2026-05-24T04:55:00.000Z',
@@ -158,6 +159,26 @@ describe('getCrowdReportSource', () => {
 
     expect(reportWhereSql).toContain('"crowd_reports"."still_happening" =');
     expect(reportWhereSql).toContain('"crowd_reports"."producer" <>');
+  });
+
+  it('keeps a pending display cluster publicly resolvable', async () => {
+    const fake = makeFakeClusterSourceDb(undefined, 'pending');
+
+    const source = await getCrowdReportSource(fake.db as never, {
+      kind: 'cluster',
+      sourceId: 'cluster-1',
+    });
+
+    expect(source).toMatchObject({
+      kind: 'cluster',
+      id: 'cluster-1',
+      status: 'pending',
+      reportCount: 2,
+    });
+
+    const dialect = new PgDialect();
+    const clusterQuery = dialect.sqlToQuery(fake.whereCalls[0] as SQL);
+    expect(clusterQuery.params).toContain('pending');
   });
 
   it('keeps recovery-only authenticated cluster sources resolvable', async () => {

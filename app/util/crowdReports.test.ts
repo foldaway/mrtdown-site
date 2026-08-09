@@ -1777,4 +1777,21 @@ describe('getPublicCrowdReportSignals', () => {
     expect(fake.whereCalls).toHaveLength(1);
     expect(fake.whereCalls[0]).toBeDefined();
   });
+
+  it('can include one-report pending clusters for display without changing the default threshold', async () => {
+    const fake = makeFakePublicSignalDb();
+
+    await getPublicCrowdReportSignals(fake.db as never, {
+      includeUnconfirmedClusters: true,
+      minDistinctIpHashes: 1,
+      minReportCount: 1,
+    });
+
+    const dialect = new PgDialect();
+    const query = dialect.sqlToQuery(fake.whereCalls[0] as SQL);
+
+    expect(query.params).toContain('pending');
+    expect(query.params).toContain('accepted');
+    expect(query.params).toContain(1);
+  });
 });

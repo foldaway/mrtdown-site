@@ -332,18 +332,6 @@ function getCrowdReportClusterOngoingDistinctIpHashCountSql(
   )`;
 }
 
-function getCrowdReportClusterOngoingWindowStartAtSql(
-  clusterId: string | typeof crowdReportClustersTable.id,
-) {
-  return sql<string>`(
-    select min(${crowdReportsTable.observed_at})
-    from ${crowdReportsTable}
-    where ${crowdReportsTable.cluster_id} = ${clusterId}
-      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
-      and ${crowdReportsTable.still_happening} is true
-  )`;
-}
-
 function getCrowdReportClusterOngoingWindowEndAtSql(
   clusterId: string | typeof crowdReportClustersTable.id,
 ) {
@@ -1791,6 +1779,7 @@ export async function getPublicCrowdReportSignals(
     maxAgeMinutes?: number;
     minReportCount?: number;
     minDistinctIpHashes?: number;
+    includeUnconfirmedClusters?: boolean;
     limit?: number;
   } = {},
 ): Promise<PublicCrowdReportSignal[]> {
@@ -1809,21 +1798,14 @@ export async function getPublicCrowdReportSignals(
     .select({
       id: crowdReportClustersTable.id,
       effect: crowdReportClustersTable.effect,
-      reportCount: getCrowdReportClusterOngoingReportCountSql(
-        crowdReportClustersTable.id,
-      ),
-      windowStartAt: getCrowdReportClusterOngoingWindowStartAtSql(
-        crowdReportClustersTable.id,
-      ),
-      windowEndAt: getCrowdReportClusterOngoingWindowEndAtSql(
-        crowdReportClustersTable.id,
-      ),
       updatedAt: crowdReportClustersTable.updated_at,
     })
     .from(crowdReportClustersTable)
     .where(
       and(
-        eq(crowdReportClustersTable.status, 'accepted'),
+        options.includeUnconfirmedClusters
+          ? inArray(crowdReportClustersTable.status, ['pending', 'accepted'])
+          : eq(crowdReportClustersTable.status, 'accepted'),
         hasCrowdReportClusterScopeSql(),
         hasCrowdReportClusterCurrentConfidenceSql(
           options.minReportCount ?? DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS,
@@ -1856,7 +1838,7 @@ export async function getPublicCrowdReportSignals(
     return [];
   }
 
-  const [lineRows, stationRows] = await Promise.all([
+  const [lineRows, stationRows, reportMetricRows] = await Promise.all([
     db
       .select({
         clusterId: crowdReportClusterLinesTable.cluster_id,
@@ -1871,10 +1853,34 @@ export async function getPublicCrowdReportSignals(
       })
       .from(crowdReportClusterStationsTable)
       .where(inArray(crowdReportClusterStationsTable.cluster_id, clusterIds)),
+    db
+      .select({
+        clusterId: crowdReportsTable.cluster_id,
+        reportCount: sql<number>`count(*)::int`,
+        windowStartAt: sql<string>`min(${crowdReportsTable.observed_at})`,
+        windowEndAt: sql<string>`max(${crowdReportsTable.observed_at})`,
+      })
+      .from(crowdReportsTable)
+      .where(
+        and(
+          inArray(crowdReportsTable.cluster_id, clusterIds),
+          inArray(crowdReportsTable.status, ['accepted', 'duplicate']),
+          eq(crowdReportsTable.still_happening, true),
+        ),
+      )
+      .groupBy(crowdReportsTable.cluster_id),
   ]);
 
+  const reportMetricsByClusterId = new Map(
+    reportMetricRows.map((metrics) => [metrics.clusterId, metrics]),
+  );
+
   return clusterRows
-    .map((cluster) => {
+    .flatMap((cluster) => {
+      const reportMetrics = reportMetricsByClusterId.get(cluster.id);
+      if (reportMetrics == null) {
+        return [];
+      }
       const lineIds = lineRows
         .filter((row) => row.clusterId === cluster.id)
         .map((row) => row.lineId)
@@ -1884,19 +1890,21 @@ export async function getPublicCrowdReportSignals(
         .map((row) => row.stationId)
         .sort((a, b) => a.localeCompare(b));
 
-      return {
-        id: cluster.id,
-        effect: cluster.effect,
-        reportCount: cluster.reportCount,
-        lineIds,
-        stationIds,
-        windowStartAt: cluster.windowStartAt,
-        windowEndAt: cluster.windowEndAt,
-        updatedAt:
-          cluster.updatedAt instanceof Date
-            ? cluster.updatedAt.toISOString()
-            : cluster.updatedAt,
-      };
+      return [
+        {
+          id: cluster.id,
+          effect: cluster.effect,
+          reportCount: reportMetrics.reportCount,
+          lineIds,
+          stationIds,
+          windowStartAt: reportMetrics.windowStartAt,
+          windowEndAt: reportMetrics.windowEndAt,
+          updatedAt:
+            cluster.updatedAt instanceof Date
+              ? cluster.updatedAt.toISOString()
+              : cluster.updatedAt,
+        },
+      ];
     })
     .filter((signal) => {
       if (signal.lineIds.length === 0 && signal.stationIds.length === 0) {
