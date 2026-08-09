@@ -116,6 +116,13 @@ const SearchParamsSchema = z.object({
   stationId: z.string().optional(),
 });
 
+const CrowdReportSubmissionResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    status: z.enum(['accepted', 'duplicate', 'rejected']),
+  }),
+});
+
 const EFFECT_LABEL_MESSAGES = defineMessages({
   delay: { id: 'report.effect.delay', defaultMessage: 'Delay' },
   noService: {
@@ -313,10 +320,12 @@ function getReportContextStationId(context: ReportContext) {
 
 function ReportPage() {
   const loaderData = Route.useLoaderData();
+  const { lang } = Route.useParams();
   const search = Route.useSearch() as ReportSearch;
   const intl = useIntl();
   const posthog = usePostHog();
   const errorRef = useRef<HTMLDivElement>(null);
+  const successHeadingRef = useRef<HTMLHeadingElement>(null);
   const scopeRef = useRef<HTMLDivElement>(null);
   const stationSearchRef = useRef<HTMLInputElement>(null);
   const lineRef = useRef<HTMLDivElement>(null);
@@ -396,6 +405,12 @@ function ReportPage() {
   const [submitState, setSubmitState] = useState<
     'idle' | 'submitting' | 'success'
   >('idle');
+
+  useEffect(() => {
+    if (submitState === 'success') {
+      successHeadingRef.current?.focus();
+    }
+  }, [submitState]);
 
   useEffect(() => {
     if (!turnstileSiteKey || turnstileRef.current == null) {
@@ -1178,12 +1193,46 @@ function ReportPage() {
     }
 
     if (response.ok) {
-      posthog.capture('crowd_report_submit_success', {
-        line_count: selectedLineIds.length,
-        station_count: submittedStationIds.length,
-        has_effect: effect.length > 0,
-      });
-      setSubmitState('success');
+      let result: z.infer<typeof CrowdReportSubmissionResponseSchema> | null =
+        null;
+      try {
+        const parsed = CrowdReportSubmissionResponseSchema.safeParse(
+          await response.json(),
+        );
+        result = parsed.success ? parsed.data : null;
+      } catch {
+        // Treat an invalid success response as a failed submission.
+      }
+
+      if (result?.data.status !== 'rejected' && result != null) {
+        posthog.capture('crowd_report_submit_success', {
+          line_count: selectedLineIds.length,
+          station_count: submittedStationIds.length,
+          has_effect: effect.length > 0,
+          status: result.data.status,
+        });
+        setSubmitState('success');
+        return;
+      }
+
+      const status = result?.data.status ?? 'invalid_success_response';
+      posthog.capture('crowd_report_submit_failed', { status });
+      showClientError(
+        intl.formatMessage(
+          status === 'rejected'
+            ? {
+                id: 'report.error.not_accepted',
+                defaultMessage:
+                  "Your report was received but wasn't accepted as a community signal. Check the details and try again.",
+              }
+            : {
+                id: 'report.error.submit_failed',
+                defaultMessage: 'Report submission failed. Please try again.',
+              },
+        ),
+      );
+      resetTurnstile();
+      setSubmitState('idle');
       return;
     }
 
@@ -1554,7 +1603,11 @@ function ReportPage() {
           </span>
         </div>
         <div>
-          <h1 className="font-bold text-2xl text-gray-900 dark:text-gray-100">
+          <h1
+            ref={successHeadingRef}
+            tabIndex={-1}
+            className="font-bold text-2xl text-gray-900 dark:text-gray-100"
+          >
             <FormattedMessage
               id="report.success_title"
               defaultMessage="Your community report was accepted"
@@ -1584,6 +1637,7 @@ function ReportPage() {
         <div className="flex flex-wrap gap-3">
           <Link
             to="/{-$lang}"
+            params={{ lang }}
             className="inline-flex w-fit items-center rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
           >
             <FormattedMessage

@@ -1,16 +1,52 @@
+import type { IngestContentCrowdReportEffect } from '@mrtdown/ingest-contracts';
 import { Link } from '@tanstack/react-router';
-import { FormattedMessage } from 'react-intl';
+import {
+  defineMessages,
+  FormattedMessage,
+  type MessageDescriptor,
+  useIntl,
+} from 'react-intl';
 import { BetaBadge } from '~/components/BetaBadge';
+import { useIncludedEntities } from '~/contexts/IncludedEntities';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import type { PublicCrowdReportSignal } from '~/util/crowdReports';
+
+const EFFECT_LABEL_MESSAGES = defineMessages({
+  delay: { id: 'report.effect.delay', defaultMessage: 'Delay' },
+  noService: {
+    id: 'report.effect.no_service',
+    defaultMessage: 'No service',
+  },
+  crowding: { id: 'report.effect.crowding', defaultMessage: 'Crowding' },
+  skippedStop: {
+    id: 'report.effect.skipped_stop',
+    defaultMessage: 'Train skipped stop',
+  },
+  unknown: { id: 'report.effect.unknown', defaultMessage: 'Not sure' },
+});
+
+const EFFECT_LABELS = {
+  delay: EFFECT_LABEL_MESSAGES.delay,
+  'no-service': EFFECT_LABEL_MESSAGES.noService,
+  crowding: EFFECT_LABEL_MESSAGES.crowding,
+  'skipped-stop': EFFECT_LABEL_MESSAGES.skippedStop,
+  unknown: EFFECT_LABEL_MESSAGES.unknown,
+} satisfies Record<IngestContentCrowdReportEffect, MessageDescriptor>;
 
 type HomeCommunityReportsStripProps = {
   signals: PublicCrowdReportSignal[];
 };
 
+function getEffectLabel(effect: PublicCrowdReportSignal['effect']) {
+  return EFFECT_LABELS[effect ?? 'unknown'];
+}
+
 export function HomeCommunityReportsStrip(
   props: HomeCommunityReportsStripProps,
 ) {
   const { signals } = props;
+  const { stations } = useIncludedEntities();
+  const intl = useIntl();
   const lineIds = [
     ...new Set(signals.flatMap((signal) => signal.lineIds)),
   ].sort((a, b) => a.localeCompare(b));
@@ -67,7 +103,7 @@ export function HomeCommunityReportsStrip(
           </h2>
           <BetaBadge />
         </div>
-        <p className="mt-1 hidden text-gray-600 text-sm leading-5 sm:block dark:text-gray-300">
+        <p className="mt-1 text-gray-600 text-xs leading-4 sm:text-sm sm:leading-5 dark:text-gray-300">
           {hasCommunityReports ? (
             <FormattedMessage
               id="home.community_reports_active_body"
@@ -85,6 +121,19 @@ export function HomeCommunityReportsStrip(
           <div className="mt-2 flex flex-wrap gap-1.5">
             {signals.map((signal) => {
               const signalLines = signal.lineIds.join(', ');
+              const signalStations = signal.stationIds
+                .map((stationId) => stations[stationId])
+                .filter((station) => station != null)
+                .map((station) =>
+                  getLocalizedTranslation(station.name, intl.locale),
+                )
+                .join(', ');
+              const signalScope = [signalLines, signalStations]
+                .filter(Boolean)
+                .join(' · ');
+              const signalEffect = intl.formatMessage(
+                getEffectLabel(signal.effect),
+              );
               return (
                 <Link
                   key={signal.id}
@@ -92,20 +141,24 @@ export function HomeCommunityReportsStrip(
                   params={{ kind: 'cluster', sourceId: signal.id }}
                   className="inline-flex items-center rounded-md border border-amber-200 bg-white/70 px-2 py-1 font-medium text-amber-900 text-xs hover:border-amber-400 hover:bg-white dark:border-amber-800 dark:bg-gray-900/50 dark:text-amber-100 dark:hover:border-amber-600 dark:hover:bg-gray-900"
                 >
-                  {signalLines.length > 0 ? (
+                  {signalScope.length > 0 ? (
                     <FormattedMessage
                       id="home.community_report_details_link"
-                      defaultMessage="{lines}: {count, plural, one {# report} other {# reports}} →"
+                      defaultMessage="{effect} · {scope}: {count, plural, one {# report} other {# reports}} →"
                       values={{
                         count: signal.reportCount,
-                        lines: signalLines,
+                        effect: signalEffect,
+                        scope: signalScope,
                       }}
                     />
                   ) : (
                     <FormattedMessage
                       id="home.community_report_details_link_general"
-                      defaultMessage="{count, plural, one {# report} other {# reports}}: details →"
-                      values={{ count: signal.reportCount }}
+                      defaultMessage="{effect}: {count, plural, one {# report} other {# reports}} →"
+                      values={{
+                        count: signal.reportCount,
+                        effect: signalEffect,
+                      }}
                     />
                   )}
                 </Link>
