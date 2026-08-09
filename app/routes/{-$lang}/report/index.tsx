@@ -53,6 +53,11 @@ type ReportSearch = {
 };
 
 type ReportScope = 'line' | 'station' | 'train';
+type SuccessfulSubmissionStatus = 'accepted' | 'duplicate';
+type SuccessfulSubmission = {
+  status: SuccessfulSubmissionStatus;
+  isStillHappening: boolean;
+};
 type ReportContextBase = {
   observedAt: string;
   effect: IngestContentCrowdReportEffect | '';
@@ -114,6 +119,13 @@ declare global {
 const SearchParamsSchema = z.object({
   lineId: z.string().optional(),
   stationId: z.string().optional(),
+});
+
+const CrowdReportSubmissionResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    status: z.enum(['accepted', 'duplicate', 'rejected']),
+  }),
 });
 
 const EFFECT_LABEL_MESSAGES = defineMessages({
@@ -313,10 +325,12 @@ function getReportContextStationId(context: ReportContext) {
 
 function ReportPage() {
   const loaderData = Route.useLoaderData();
+  const { lang } = Route.useParams();
   const search = Route.useSearch() as ReportSearch;
   const intl = useIntl();
   const posthog = usePostHog();
   const errorRef = useRef<HTMLDivElement>(null);
+  const successHeadingRef = useRef<HTMLHeadingElement>(null);
   const scopeRef = useRef<HTMLDivElement>(null);
   const stationSearchRef = useRef<HTMLInputElement>(null);
   const lineRef = useRef<HTMLDivElement>(null);
@@ -396,6 +410,14 @@ function ReportPage() {
   const [submitState, setSubmitState] = useState<
     'idle' | 'submitting' | 'success'
   >('idle');
+  const [successfulSubmission, setSuccessfulSubmission] =
+    useState<SuccessfulSubmission | null>(null);
+
+  useEffect(() => {
+    if (submitState === 'success') {
+      successHeadingRef.current?.focus();
+    }
+  }, [submitState]);
 
   useEffect(() => {
     if (!turnstileSiteKey || turnstileRef.current == null) {
@@ -1178,12 +1200,50 @@ function ReportPage() {
     }
 
     if (response.ok) {
-      posthog.capture('crowd_report_submit_success', {
-        line_count: selectedLineIds.length,
-        station_count: submittedStationIds.length,
-        has_effect: effect.length > 0,
-      });
-      setSubmitState('success');
+      let result: z.infer<typeof CrowdReportSubmissionResponseSchema> | null =
+        null;
+      try {
+        const parsed = CrowdReportSubmissionResponseSchema.safeParse(
+          await response.json(),
+        );
+        result = parsed.success ? parsed.data : null;
+      } catch {
+        // Treat an invalid success response as a failed submission.
+      }
+
+      if (result?.data.status !== 'rejected' && result != null) {
+        posthog.capture('crowd_report_submit_success', {
+          line_count: selectedLineIds.length,
+          station_count: submittedStationIds.length,
+          has_effect: effect.length > 0,
+          status: result.data.status,
+        });
+        setSuccessfulSubmission({
+          status: result.data.status,
+          isStillHappening,
+        });
+        setSubmitState('success');
+        return;
+      }
+
+      const status = result?.data.status ?? 'invalid_success_response';
+      posthog.capture('crowd_report_submit_failed', { status });
+      showClientError(
+        intl.formatMessage(
+          status === 'rejected'
+            ? {
+                id: 'report.error.not_accepted',
+                defaultMessage:
+                  "Your report was received but wasn't accepted as a community signal. Check the details and try again.",
+              }
+            : {
+                id: 'report.error.submit_failed',
+                defaultMessage: 'Report submission failed. Please try again.',
+              },
+        ),
+      );
+      resetTurnstile();
+      setSubmitState('idle');
       return;
     }
 
@@ -1541,33 +1601,108 @@ function ReportPage() {
           )
         : undefined;
 
-  if (submitState === 'success') {
+  if (submitState === 'success' && successfulSubmission != null) {
+    const isDuplicateSubmission = successfulSubmission.status === 'duplicate';
+    const submittedAsStillHappening = successfulSubmission.isStillHappening;
+
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 rounded-2xl border border-emerald-200 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-gray-800">
-        <CheckCircleIcon className="size-10 text-emerald-600 dark:text-emerald-400" />
+        <div className="flex items-center gap-3">
+          <CheckCircleIcon className="size-10 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <span className="rounded-full bg-emerald-100 px-3 py-1 font-semibold text-emerald-800 text-sm dark:bg-emerald-900/60 dark:text-emerald-200">
+            {isDuplicateSubmission ? (
+              <FormattedMessage
+                id="report.success_duplicate_badge"
+                defaultMessage="Matched"
+              />
+            ) : (
+              <FormattedMessage
+                id="report.success_accepted_badge"
+                defaultMessage="Accepted"
+              />
+            )}
+          </span>
+        </div>
         <div>
-          <h1 className="font-bold text-2xl text-gray-900 dark:text-gray-100">
-            <FormattedMessage
-              id="report.success_title"
-              defaultMessage="Community report submitted"
-            />
+          <h1
+            ref={successHeadingRef}
+            tabIndex={-1}
+            className="font-bold text-2xl text-gray-900 dark:text-gray-100"
+          >
+            {isDuplicateSubmission ? (
+              <FormattedMessage
+                id="report.success_duplicate_title"
+                defaultMessage="Your report matched an existing report"
+              />
+            ) : (
+              <FormattedMessage
+                id="report.success_title"
+                defaultMessage="Your community report was accepted"
+              />
+            )}
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-300">
-            <FormattedMessage
-              id="report.success_body"
-              defaultMessage="Thanks. The report is queued for review and will stay separate from official service status unless it is verified."
-            />
+            {isDuplicateSubmission && submittedAsStillHappening ? (
+              <FormattedMessage
+                id="report.success_duplicate_body"
+                defaultMessage="Thanks — your observation was recorded and combined with a matching report."
+              />
+            ) : isDuplicateSubmission ? (
+              <FormattedMessage
+                id="report.success_duplicate_body_resolved"
+                defaultMessage="Thanks — your resolved observation was recorded and matched with an existing report. It will not appear as a current community signal."
+              />
+            ) : submittedAsStillHappening ? (
+              <FormattedMessage
+                id="report.success_body"
+                defaultMessage="Thanks — your report was safely recorded."
+              />
+            ) : (
+              <FormattedMessage
+                id="report.success_body_resolved"
+                defaultMessage="Thanks — your resolved observation was recorded. It will not appear as a current community signal."
+              />
+            )}
           </p>
         </div>
-        <Link
-          to="/{-$lang}"
-          className="inline-flex w-fit items-center rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
-        >
-          <FormattedMessage
-            id="report.return_home"
-            defaultMessage="Return home"
-          />
-        </Link>
+        <div className="rounded-xl bg-gray-50 p-4 dark:bg-gray-900/60">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">
+            <FormattedMessage
+              id="report.success_what_happens_title"
+              defaultMessage="What happens next?"
+            />
+          </h2>
+          <p className="mt-1 text-gray-600 text-sm leading-5 dark:text-gray-300">
+            {isDuplicateSubmission && submittedAsStillHappening ? (
+              <FormattedMessage
+                id="report.success_duplicate_what_happens_body"
+                defaultMessage="Your observation was added to the matching report. Only recent reports marked as still happening may appear as a current community signal."
+              />
+            ) : submittedAsStillHappening ? (
+              <FormattedMessage
+                id="report.success_what_happens_body"
+                defaultMessage="Recent reports marked as still happening may appear on the service-status page as a community signal such as “Some reports on CCL.” Matching reports from other commuters are combined before an issue is considered for mrtdown’s incident record."
+              />
+            ) : (
+              <FormattedMessage
+                id="report.success_what_happens_body_resolved"
+                defaultMessage="Reports marked as no longer happening are kept out of the current service-status signal so commuters are not shown stale conditions."
+              />
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            to="/{-$lang}"
+            params={{ lang }}
+            className="inline-flex w-fit items-center rounded-lg bg-accent-light px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-accent-dark"
+          >
+            <FormattedMessage
+              id="report.view_service_status"
+              defaultMessage="View service status"
+            />
+          </Link>
+        </div>
       </div>
     );
   }

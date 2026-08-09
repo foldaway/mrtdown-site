@@ -24,7 +24,7 @@ const RequestSchema = z.object({
 
 type AppDb = ReturnType<typeof getDb>;
 type CrowdReportSourceKind = z.infer<typeof CrowdReportSourceKindSchema>;
-type CrowdReportSourceStatus = 'accepted' | 'dispatched';
+type CrowdReportSourceStatus = 'pending' | 'accepted' | 'dispatched';
 
 export type CrowdReportSourceLine = {
   id: string;
@@ -97,7 +97,11 @@ async function getClusterSource(
     .where(
       and(
         eq(crowdReportClustersTable.id, sourceId),
-        inArray(crowdReportClustersTable.status, ['accepted', 'dispatched']),
+        inArray(crowdReportClustersTable.status, [
+          'pending',
+          'accepted',
+          'dispatched',
+        ]),
         hasClusterScopeSql(sourceId),
       ),
     )

@@ -8,7 +8,6 @@ import {
 } from '@heroicons/react/24/outline';
 import type { IngestContentCrowdReportEffect } from '@mrtdown/ingest-contracts';
 import { createFileRoute, notFound } from '@tanstack/react-router';
-import classNames from 'classnames';
 import {
   createIntl,
   defineMessages,
@@ -50,6 +49,48 @@ const EFFECT_LABELS = {
   'skipped-stop': EFFECT_LABEL_MESSAGES.skippedStop,
   unknown: EFFECT_LABEL_MESSAGES.unknown,
 } satisfies Record<IngestContentCrowdReportEffect, MessageDescriptor>;
+
+const SOURCE_STATUS_MESSAGES = defineMessages({
+  accepted: {
+    id: 'community_report_source.status_accepted',
+    defaultMessage: 'Accepted',
+  },
+  dispatched: {
+    id: 'community_report_source.status_dispatched',
+    defaultMessage: 'Dispatched',
+  },
+  pending: {
+    id: 'community_report_source.status_pending',
+    defaultMessage: 'Collecting reports',
+  },
+});
+
+const SOURCE_STATUS_PRESENTATIONS = {
+  accepted: {
+    className: 'bg-sky-100 text-sky-900 dark:bg-sky-900/60 dark:text-sky-100',
+    icon: CheckCircleIcon,
+    message: SOURCE_STATUS_MESSAGES.accepted,
+  },
+  dispatched: {
+    className:
+      'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-100',
+    icon: CheckCircleIcon,
+    message: SOURCE_STATUS_MESSAGES.dispatched,
+  },
+  pending: {
+    className:
+      'bg-amber-100 text-amber-900 dark:bg-amber-900/70 dark:text-amber-100',
+    icon: ClockIcon,
+    message: SOURCE_STATUS_MESSAGES.pending,
+  },
+} satisfies Record<
+  CrowdReportSource['status'],
+  {
+    className: string;
+    icon: typeof CheckCircleIcon;
+    message: MessageDescriptor;
+  }
+>;
 
 export const Route = createFileRoute(
   '/{-$lang}/community-reports/$kind/$sourceId/',
@@ -127,36 +168,21 @@ function isCrowdReportSourceKind(
   return value === 'cluster' || value === 'report';
 }
 
-function SourceStatusBadge(props: { status: CrowdReportSource['status'] }) {
+type SourceStatusBadgeProps = {
+  status: CrowdReportSource['status'];
+};
+
+function SourceStatusBadge(props: SourceStatusBadgeProps) {
   const { status } = props;
+  const presentation = SOURCE_STATUS_PRESENTATIONS[status];
+  const Icon = presentation.icon;
+
   return (
     <span
-      className={classNames(
-        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium text-xs',
-        {
-          'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-100':
-            status === 'dispatched',
-          'bg-amber-100 text-amber-900 dark:bg-amber-900/70 dark:text-amber-100':
-            status === 'accepted',
-        },
-      )}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium text-xs ${presentation.className}`}
     >
-      {status === 'dispatched' ? (
-        <CheckCircleIcon className="size-3.5" />
-      ) : (
-        <ClockIcon className="size-3.5" />
-      )}
-      {status === 'dispatched' ? (
-        <FormattedMessage
-          id="community_report_source.status_dispatched"
-          defaultMessage="Dispatched"
-        />
-      ) : (
-        <FormattedMessage
-          id="community_report_source.status_accepted"
-          defaultMessage="Accepted"
-        />
-      )}
+      <Icon className="size-3.5" />
+      <FormattedMessage {...presentation.message} />
     </span>
   );
 }
@@ -215,7 +241,7 @@ function CommunityReportSourcePage() {
             <p className="mt-2 max-w-2xl text-gray-700 text-sm leading-6 dark:text-gray-300">
               <FormattedMessage
                 id="community_report_source.description"
-                defaultMessage="Structured commuter reports shown separately from official operator advisories."
+                defaultMessage="Details behind this unverified community signal. It is based on commuter observations, does not change service status, and may not match an operator advisory."
               />
             </p>
           </div>
