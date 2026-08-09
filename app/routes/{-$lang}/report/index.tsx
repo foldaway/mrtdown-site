@@ -1614,10 +1614,17 @@ function ReportPage() {
             />
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-300">
-            <FormattedMessage
-              id="report.success_body"
-              defaultMessage="Thanks — your report is safely recorded and now counts as a community signal."
-            />
+            {isStillHappening ? (
+              <FormattedMessage
+                id="report.success_body"
+                defaultMessage="Thanks — your report is safely recorded and now counts as a community signal."
+              />
+            ) : (
+              <FormattedMessage
+                id="report.success_body_resolved"
+                defaultMessage="Thanks — your resolved observation was recorded. It will not appear as a current community signal."
+              />
+            )}
           </p>
         </div>
         <div className="rounded-xl bg-gray-50 p-4 dark:bg-gray-900/60">
@@ -1628,10 +1635,17 @@ function ReportPage() {
             />
           </h2>
           <p className="mt-1 text-gray-600 text-sm leading-5 dark:text-gray-300">
-            <FormattedMessage
-              id="report.success_what_happens_body"
-              defaultMessage="Your report can appear on the service-status page as a community signal such as “Some reports on CCL.” Matching reports from other commuters are combined before the issue is considered for mrtdown’s incident record."
-            />
+            {isStillHappening ? (
+              <FormattedMessage
+                id="report.success_what_happens_body"
+                defaultMessage="Your report can appear on the service-status page as a community signal such as “Some reports on CCL.” Matching reports from other commuters are combined before the issue is considered for mrtdown’s incident record."
+              />
+            ) : (
+              <FormattedMessage
+                id="report.success_what_happens_body_resolved"
+                defaultMessage="Reports marked as no longer happening are kept out of the current service-status signal so commuters are not shown stale conditions."
+              />
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
