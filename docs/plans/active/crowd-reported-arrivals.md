@@ -2,8 +2,8 @@
 
 ## Goal
 
-Overlay fresh commuter-reported arrival times on the first station/service
-arrival estimate. Reports are operational, short-lived signals: they are not
+Use commuter-reported arrival times to calibrate the estimated train phase for
+the remainder of the service day. Reports are operational signals: they are not
 canonical evidence, community disruption reports, or historical records.
 
 ## Design
@@ -13,10 +13,12 @@ canonical evidence, community disruption reports, or historical records.
   as its observation time.
 - Require an active service that calls at the selected station. The service id
   supplies the direction and destination scope.
-- Query only recent accepted reports and supply them to
-  `estimateNextStationArrivals`; let core resolve agreement and confidence.
+- Query accepted reports from the current service day, project their reported
+  train forward through the applicable frequency windows, and supply the
+  resulting next arrivals to `estimateNextStationArrivals`; let core resolve
+  agreement and confidence.
 - Refresh only the arrival widget through an uncached endpoint. Do not purge
-  the public page cache for a three-minute signal.
+  the public page cache for a service-day calibration signal.
 - Present crowd values as community-reported arrivals, never live tracking or
   official predictions.
 

@@ -1,8 +1,7 @@
-import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
 import type { Station } from '~/types';
 import {
-  crowdArrivalReportsTable,
   publicHolidaysTable,
   serviceRevisionPathStationEntriesTable,
   serviceRevisionsTable,
@@ -19,6 +18,7 @@ import {
   type EstimatedArrivalTiming,
   getEstimatedStationArrivalTimings,
 } from '~/util/estimatedArrivals';
+import { getLatestCrowdArrivalReports } from '~/util/crowdArrivalReports';
 import {
   selectServiceRevisionForReferenceDate,
   serviceRevisionHasEnded,
@@ -125,31 +125,17 @@ export async function buildStationArrivalLines(input: {
       : Promise.resolve([]),
     arrivalServiceIds.length > 0
       ? timeDbRowsQuery('station_arrivals_q_crowd_reports', () =>
-          input.db
-            .select({
-              id: crowdArrivalReportsTable.id,
-              reporterHash: crowdArrivalReportsTable.reporter_hash,
-              serviceId: crowdArrivalReportsTable.service_id,
-              reportedAt: crowdArrivalReportsTable.reported_at,
-              minutesToArrival: crowdArrivalReportsTable.minutes_to_arrival,
-            })
-            .from(crowdArrivalReportsTable)
-            .where(
-              and(
-                eq(crowdArrivalReportsTable.station_id, input.station.id),
-                inArray(crowdArrivalReportsTable.service_id, arrivalServiceIds),
-                eq(crowdArrivalReportsTable.status, 'accepted'),
-                gte(
-                  crowdArrivalReportsTable.reported_at,
-                  input.referenceNow
-                    .minus({
-                      minutes: MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES,
-                    })
-                    .toISO() ?? '',
-                ),
-              ),
-            )
-            .orderBy(desc(crowdArrivalReportsTable.reported_at)),
+          getLatestCrowdArrivalReports({
+            db: input.db,
+            stationId: input.station.id,
+            serviceIds: arrivalServiceIds,
+            reportedAtOrAfter:
+              input.referenceNow
+                .minus({
+                  minutes: MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES,
+                })
+                .toISO() ?? '',
+          }),
         )
       : Promise.resolve([]),
     holidaysPromise,
@@ -193,14 +179,7 @@ export async function buildStationArrivalLines(input: {
     },
   );
   const currentCrowdArrivalReports = filterCurrentCrowdArrivalReports(
-    [
-      ...new Map(
-        freshCrowdArrivalRows.map((report) => [
-          `${report.reporterHash}:${report.serviceId}`,
-          report,
-        ]),
-      ).values(),
-    ],
+    freshCrowdArrivalRows,
     input.referenceNow,
   );
   const publicHolidayDates =

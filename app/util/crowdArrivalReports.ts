@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
 import type { getDb } from '~/db';
@@ -25,6 +25,44 @@ export type CrowdArrivalReportSubmission = z.infer<
 >;
 
 type AppDb = ReturnType<typeof getDb>;
+
+export function getLatestCrowdArrivalReports(input: {
+  db: AppDb;
+  stationId: string;
+  serviceIds: readonly string[];
+  reportedAtOrAfter: string;
+}) {
+  return input.db
+    .selectDistinctOn(
+      [
+        crowdArrivalReportsTable.service_id,
+        crowdArrivalReportsTable.reporter_hash,
+      ],
+      {
+        id: crowdArrivalReportsTable.id,
+        reporterHash: crowdArrivalReportsTable.reporter_hash,
+        serviceId: crowdArrivalReportsTable.service_id,
+        reportedAt: crowdArrivalReportsTable.reported_at,
+        minutesToArrival: crowdArrivalReportsTable.minutes_to_arrival,
+      },
+    )
+    .from(crowdArrivalReportsTable)
+    .where(
+      and(
+        eq(crowdArrivalReportsTable.station_id, input.stationId),
+        inArray(crowdArrivalReportsTable.service_id, input.serviceIds),
+        eq(crowdArrivalReportsTable.status, 'accepted'),
+        gte(crowdArrivalReportsTable.reported_at, input.reportedAtOrAfter),
+      ),
+    )
+    .orderBy(
+      crowdArrivalReportsTable.service_id,
+      crowdArrivalReportsTable.reporter_hash,
+      desc(crowdArrivalReportsTable.reported_at),
+      desc(crowdArrivalReportsTable.created_at),
+      desc(crowdArrivalReportsTable.id),
+    );
+}
 
 export async function serviceCallsAtStation(
   db: AppDb,
