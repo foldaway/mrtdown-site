@@ -54,6 +54,10 @@ type ReportSearch = {
 
 type ReportScope = 'line' | 'station' | 'train';
 type SuccessfulSubmissionStatus = 'accepted' | 'duplicate';
+type SuccessfulSubmission = {
+  status: SuccessfulSubmissionStatus;
+  isStillHappening: boolean;
+};
 type ReportContextBase = {
   observedAt: string;
   effect: IngestContentCrowdReportEffect | '';
@@ -406,8 +410,8 @@ function ReportPage() {
   const [submitState, setSubmitState] = useState<
     'idle' | 'submitting' | 'success'
   >('idle');
-  const [submissionStatus, setSubmissionStatus] =
-    useState<SuccessfulSubmissionStatus | null>(null);
+  const [successfulSubmission, setSuccessfulSubmission] =
+    useState<SuccessfulSubmission | null>(null);
 
   useEffect(() => {
     if (submitState === 'success') {
@@ -1214,7 +1218,10 @@ function ReportPage() {
           has_effect: effect.length > 0,
           status: result.data.status,
         });
-        setSubmissionStatus(result.data.status);
+        setSuccessfulSubmission({
+          status: result.data.status,
+          isStillHappening,
+        });
         setSubmitState('success');
         return;
       }
@@ -1594,8 +1601,9 @@ function ReportPage() {
           )
         : undefined;
 
-  if (submitState === 'success') {
-    const isDuplicateSubmission = submissionStatus === 'duplicate';
+  if (submitState === 'success' && successfulSubmission != null) {
+    const isDuplicateSubmission = successfulSubmission.status === 'duplicate';
+    const submittedAsStillHappening = successfulSubmission.isStillHappening;
 
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 rounded-2xl border border-emerald-200 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-gray-800">
@@ -1634,7 +1642,7 @@ function ReportPage() {
             )}
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-300">
-            {isDuplicateSubmission && isStillHappening ? (
+            {isDuplicateSubmission && submittedAsStillHappening ? (
               <FormattedMessage
                 id="report.success_duplicate_body"
                 defaultMessage="Thanks — your observation was recorded and combined with a matching report."
@@ -1644,7 +1652,7 @@ function ReportPage() {
                 id="report.success_duplicate_body_resolved"
                 defaultMessage="Thanks — your resolved observation was recorded and matched with an existing report. It will not appear as a current community signal."
               />
-            ) : isStillHappening ? (
+            ) : submittedAsStillHappening ? (
               <FormattedMessage
                 id="report.success_body"
                 defaultMessage="Thanks — your report was safely recorded."
@@ -1665,12 +1673,12 @@ function ReportPage() {
             />
           </h2>
           <p className="mt-1 text-gray-600 text-sm leading-5 dark:text-gray-300">
-            {isDuplicateSubmission && isStillHappening ? (
+            {isDuplicateSubmission && submittedAsStillHappening ? (
               <FormattedMessage
                 id="report.success_duplicate_what_happens_body"
                 defaultMessage="Your observation was added to the matching report. Only recent reports marked as still happening may appear as a current community signal."
               />
-            ) : isStillHappening ? (
+            ) : submittedAsStillHappening ? (
               <FormattedMessage
                 id="report.success_what_happens_body"
                 defaultMessage="Recent reports marked as still happening may appear on the service-status page as a community signal such as “Some reports on CCL.” Matching reports from other commuters are combined before an issue is considered for mrtdown’s incident record."
