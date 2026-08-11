@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { getSitemapData } from './dbQueries/sitemap';
 import {
   buildSitemapPaths,
   createSitemapErrorResponse,
+  getSitemapXml,
   SitemapGenerationError,
 } from './sitemap.functions';
 
@@ -17,6 +19,27 @@ vi.mock('./dbQueries/sitemap', () => ({
 }));
 
 describe('agent Markdown discovery', () => {
+  it('omits unreliable crawl hints from serialized sitemap entries', async () => {
+    vi.mocked(getSitemapData).mockResolvedValue({
+      lineIds: [],
+      stationIds: [],
+      townIds: [],
+      operatorIds: [],
+      issueIds: [],
+      monthEarliest: '2026-06-01',
+      monthLatest: '2026-06-01',
+      currentDate: '2026-06-21',
+    });
+
+    const sitemapXml = await getSitemapXml();
+
+    expect(sitemapXml).toContain('<loc>http://localhost:3000/</loc>');
+    expect(sitemapXml).toContain('<xhtml:link');
+    expect(sitemapXml).not.toContain('<lastmod>');
+    expect(sitemapXml).not.toContain('<changefreq>');
+    expect(sitemapXml).not.toContain('<priority>');
+  });
+
   it('returns 503 instead of a fallback sitemap when generation fails', async () => {
     const response = createSitemapErrorResponse(
       new SitemapGenerationError(

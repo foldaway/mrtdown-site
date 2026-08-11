@@ -81,24 +81,6 @@ function buildEntries(path: string, rootUrl: string): Element {
         attributes: {},
         children: [{ type: 'text', value: new URL(path, rootUrl).toString() }],
       },
-      {
-        type: 'element',
-        name: 'lastmod',
-        attributes: {},
-        children: [{ type: 'text', value: __APP_BUILD_TIMESTAMP__ }],
-      },
-      {
-        type: 'element',
-        name: 'changefreq',
-        attributes: {},
-        children: [{ type: 'text', value: 'hourly' }],
-      },
-      {
-        type: 'element',
-        name: 'priority',
-        attributes: {},
-        children: [{ type: 'text', value: '0.7' }],
-      },
       ...buildLocaleAlternates(path, rootUrl).map((alternate) => {
         return {
           type: 'element' as const,
