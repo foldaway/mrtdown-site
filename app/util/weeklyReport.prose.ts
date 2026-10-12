@@ -1,6 +1,5 @@
 import { DateTime } from 'luxon';
 import type { IntlShape } from 'react-intl';
-import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { REPORT_ZONE, type WeeklySummary } from './weeklyReport';
 import { weeklyMessages as messages } from './weeklyReport.messages';
 
@@ -65,61 +64,19 @@ type WeeklyProseInput = {
   previous: WeeklySummary;
 };
 export function buildWeeklyProse(report: WeeklyProseInput, intl: IntlShape) {
-  const { current, previous } = report;
-  const paragraphs = [
-    intl.formatMessage(
-      current.disruptionCount === 0 ? messages.quiet : messages.summary,
-      {
-        dates: formatReportDates(report.week, intl),
-        count: current.disruptionCount,
-        duration: formatReportDuration(current.disruptionSeconds, intl),
-      },
-    ),
-  ];
-  const longest = current.incidents[0];
-  if (longest)
-    paragraphs.push(
-      intl.formatMessage(messages.longest, {
-        title: getLocalizedTranslation(longest.title, intl.locale),
-        duration: formatReportDuration(longest.seconds, intl),
-      }),
-    );
-  if (report.partial) {
-    paragraphs.push(
-      intl.formatMessage(messages.partialComparison, {
-        countChange: formatCountChange(
-          current.disruptionCount,
-          previous.disruptionCount,
-          intl,
-        ),
-        timeChange: formatTimeChange(
-          current.disruptionSeconds,
-          previous.disruptionSeconds,
-          intl,
-        ),
-      }),
-    );
-  } else {
-    paragraphs.push(
-      [
-        intl.formatMessage(messages.countComparison, {
-          direction: direction(
-            current.disruptionCount - previous.disruptionCount,
-          ),
-          count: Math.abs(current.disruptionCount - previous.disruptionCount),
-        }),
-        intl.formatMessage(messages.timeComparison, {
-          direction: direction(
-            current.disruptionSeconds - previous.disruptionSeconds,
-          ),
-          duration: formatReportDuration(
-            Math.abs(current.disruptionSeconds - previous.disruptionSeconds),
-            intl,
-          ),
-        }),
-      ].join(' '),
-    );
-  }
+  const { current } = report;
+  // Takeaways explain the pattern; the incident list and metric cards provide
+  // details and comparisons. Keep this recap to the week's totals.
+  const paragraphs =
+    current.disruptionCount > 0
+      ? [
+          intl.formatMessage(messages.summary, {
+            dates: formatReportDates(report.week, intl),
+            count: current.disruptionCount,
+            duration: formatReportDuration(current.disruptionSeconds, intl),
+          }),
+        ]
+      : [];
   const other = [];
   if (current.maintenanceCount > 0)
     other.push(
@@ -133,7 +90,5 @@ export function buildWeeklyProse(report: WeeklyProseInput, intl: IntlShape) {
         count: current.infrastructureCount,
       }),
     );
-  return other.length
-    ? [paragraphs.join(' '), other.join(' ')]
-    : [paragraphs.join(' ')];
+  return [...paragraphs, ...(other.length ? [other.join(' ')] : [])];
 }

@@ -35,7 +35,8 @@ conditions:
 - Method is `GET` or `HEAD`.
 - Path is `/`, `/about`, `/statistics`, `/system-map`, `/history` and its
   descendants, or a public `/issues/*`, `/lines/*`, `/operators/*`, or
-  `/stations/*` profile, including locale-prefixed variants; or it is a
+  `/stations/*` profile, including locale-prefixed variants; or `/reports/weekly`
+  and its dated reports, including locale-prefixed variants; or it is a
   canonical `index.md` route, `/llms.txt`, or `/sitemap.xml`.
 - Or it is `/_serverFn/*` with request header `X-TSR-ServerFn: true`, or the
   public `GET /api/issues-day` endpoint. Keep the default cache key, including
@@ -99,3 +100,37 @@ After deployment:
 
 Cloudflare removes `Cache-Tag` before sending the response to visitors. Use
 Cloudflare Trace or inspect the direct origin response when validating tags.
+
+## Weekly Reports
+
+Only completed Singapore-time weeks are served. The current week returns 404
+until the following Monday at 00:00 SGT, and is absent from the archive and
+sitemap. Completed report HTML uses a 30-day Cloudflare TTL with one day of
+stale-while-revalidate; archives use one hour with five minutes of revalidation.
+Both retain the shared data cache tag, so canonical ingest purges corrections.
+Browser responses still require revalidation. Errors, cookies and private or
+no-store responses remain excluded from shared caching.
+
+Add these paths to the deployed **Eligible for cache** rule, preserving the
+existing method, Accept-header and origin TTL settings. The report-path clause
+can use this Cloudflare expression (expand it if adding another locale):
+
+```text
+(http.request.uri.path eq "/reports/weekly" or
+ starts_with(http.request.uri.path, "/reports/weekly/") or
+ http.request.uri.path eq "/en-SG/reports/weekly" or
+ starts_with(http.request.uri.path, "/en-SG/reports/weekly/") or
+ http.request.uri.path eq "/zh-Hans/reports/weekly" or
+ starts_with(http.request.uri.path, "/zh-Hans/reports/weekly/") or
+ http.request.uri.path eq "/ms/reports/weekly" or
+ starts_with(http.request.uri.path, "/ms/reports/weekly/") or
+ http.request.uri.path eq "/ta/reports/weekly" or
+ starts_with(http.request.uri.path, "/ta/reports/weekly/"))
+```
+
+Respect origin TTL; do not override error responses with an edge TTL. Keep the
+existing `/_serverFn/*` rule as well: client navigation uses GET server functions.
+After deployment, request a report twice and verify `CF-Cache-Status: HIT` on
+the second request and `Age` increasing. A local origin response cannot verify
+Cloudflare eligibility. Check the archive after the Monday boundary too; it may
+remain cached for up to an hour unless an ingest purge refreshes it sooner.

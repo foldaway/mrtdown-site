@@ -143,3 +143,38 @@ describe('public response cache policy', () => {
     );
   });
 });
+
+describe('report edge caching', () => {
+  it.each([
+    '/reports/weekly/2026-04-27',
+    '/zh-Hans/reports/weekly/2026-04-27',
+    '/ms/reports/weekly/2026-04-27/',
+    '/ta/reports/weekly/2026-04-27',
+  ])('caches completed report HTML for 30 days at %s', (path) => {
+    const cached = applyPublicDataCacheHeaders(
+      new Request(`https://www.mrtdown.org${path}`),
+      response('text/html'),
+    );
+    expect(cached.headers.get('cloudflare-cdn-cache-control')).toContain(
+      'max-age=2592000',
+    );
+    expect(cached.headers.get('cache-tag')).toBe(getPublicDataCacheTag());
+    expect(cached.headers.get('cache-control')).toBe(
+      PUBLIC_BROWSER_CACHE_CONTROL,
+    );
+  });
+  it('uses one hour for archives but does not cache unavailable weeks', () => {
+    const req = new Request('https://www.mrtdown.org/reports/weekly');
+    expect(
+      applyPublicDataCacheHeaders(req, response('text/html')).headers.get(
+        'cloudflare-cdn-cache-control',
+      ),
+    ).toContain('max-age=3600');
+    expect(
+      applyPublicDataCacheHeaders(
+        req,
+        response('text/html', { status: 404 }),
+      ).headers.has('cloudflare-cdn-cache-control'),
+    ).toBe(false);
+  });
+});

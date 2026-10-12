@@ -6,6 +6,7 @@ import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildSeoMetadata } from '~/helpers/seo';
 import { getReportWeek, REPORT_ZONE } from '~/util/weeklyReport';
 import { getWeeklyReportFn } from '~/util/weeklyReport.functions';
+import { formatWeeklyInsights } from '~/util/weeklyReport.insights';
 import { weeklyMessages } from '~/util/weeklyReport.messages';
 import {
   buildWeeklyProse,
@@ -74,7 +75,10 @@ export const Route = createFileRoute('/{-$lang}/reports/weekly/$week')({
                 ? {
                     week: loaderData.week,
                     endDate: loaderData.endDate,
-                    prose: buildWeeklyProse(loaderData, intl),
+                    prose: [
+                      ...formatWeeklyInsights(loaderData, intl),
+                      ...buildWeeklyProse(loaderData, intl),
+                    ],
                   }
                 : undefined,
             }),
@@ -108,6 +112,7 @@ function WeeklyReportPage() {
   const nextWeek = start.plus({ weeks: 1 }).toISODate() as string;
   const maxCount = Math.max(1, ...current.days.map((day) => day.count));
   const prose = buildWeeklyProse(report, intl);
+  const insights = formatWeeklyInsights(report, intl);
   const duration = (seconds: number) => formatReportDuration(seconds, intl);
   const text = (key: keyof typeof weeklyMessages) =>
     intl.formatMessage(weeklyMessages[key]);
@@ -134,7 +139,7 @@ function WeeklyReportPage() {
         >
           {text('archiveLink')}
         </Link>
-        {report.week < report.currentWeek ? (
+        {nextWeek < report.currentWeek ? (
           <Link
             to="/{-$lang}/reports/weekly/$week"
             params={{ lang, week: nextWeek }}
@@ -143,7 +148,7 @@ function WeeklyReportPage() {
             {text('next')}
           </Link>
         ) : (
-          <span className="text-gray-400">{text('current')}</span>
+          <span className="text-gray-400">{text('latest')}</span>
         )}
       </nav>
       <form
@@ -173,7 +178,7 @@ function WeeklyReportPage() {
             defaultValue={report.week}
             max={
               DateTime.fromISO(report.currentWeek)
-                .plus({ days: 6 })
+                .minus({ days: 1 })
                 .toISODate() as string
             }
             className="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-gray-900 text-sm dark:border-gray-600 dark:text-gray-100"
@@ -202,6 +207,19 @@ function WeeklyReportPage() {
           </p>
         )}
       </header>
+      {insights.length > 0 && (
+        <section
+          aria-labelledby="insight-title"
+          className="border-accent-light border-l-4 pl-5 dark:border-accent-dark"
+        >
+          <h2 id="insight-title" className="font-semibold text-xl">
+            {text('insightHeading')}
+          </h2>
+          <p className="mt-3 max-w-3xl text-gray-600 text-lg leading-relaxed dark:text-gray-300">
+            {insights.join(' ')}
+          </p>
+        </section>
+      )}
       <section aria-labelledby="recap-title">
         <h2 id="recap-title" className="font-semibold text-xl">
           {text('recap')}
@@ -251,30 +269,33 @@ function WeeklyReportPage() {
         <p className="mt-1 text-gray-500 text-sm dark:text-gray-400">
           {text('byDay')}
         </p>
-        <div className="mt-6 space-y-3">
+        <ul className="mt-6 grid grid-cols-7 gap-2 sm:gap-4">
           {current.days.map((day) => (
-            <div
+            <li
               key={day.date}
-              className="grid grid-cols-[3rem_1fr_4rem] items-center gap-3 text-sm"
+              className="flex min-w-0 flex-col items-center gap-2 text-center text-xs sm:text-sm"
             >
-              <span>
+              <span className="font-medium tabular-nums">
+                {intl.formatNumber(day.count)}
+              </span>
+              <div
+                aria-hidden="true"
+                className="flex h-24 w-full max-w-12 items-end overflow-hidden rounded-t-md bg-gray-100 sm:h-28 dark:bg-gray-800"
+              >
+                <div
+                  className="w-full rounded-t-md bg-disruption-light dark:bg-disruption-dark"
+                  style={{ height: `${(day.count / maxCount) * 100}%` }}
+                />
+              </div>
+              <span className="max-w-full break-words">
                 {intl.formatDate(
                   DateTime.fromISO(day.date, { zone: REPORT_ZONE }).toJSDate(),
                   { weekday: 'short', timeZone: REPORT_ZONE },
                 )}
               </span>
-              <div className="h-3 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                <div
-                  className="h-full rounded-full bg-disruption-light dark:bg-disruption-dark"
-                  style={{ width: `${(day.count / maxCount) * 100}%` }}
-                />
-              </div>
-              <span className="text-right tabular-nums">
-                {day.available ? intl.formatNumber(day.count) : '—'}
-              </span>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
       <section aria-labelledby="lines-title">
         <h2 id="lines-title" className="font-semibold text-xl">

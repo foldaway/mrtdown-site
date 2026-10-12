@@ -24,7 +24,7 @@ export const weeklyMessages = defineMessages({
   heading: { id: 'weekly.heading', defaultMessage: 'Your week on the rails.' },
   subtitle: {
     id: 'weekly.subtitle',
-    defaultMessage: '{dates} · Singapore MRT & LRT',
+    defaultMessage: '{dates}',
   },
   partial: {
     id: 'weekly.partial',
@@ -180,4 +180,109 @@ export const weeklyMessages = defineMessages({
     defaultMessage: 'Weekly reports',
   },
   issueHeading: { id: 'weekly.issueHeading', defaultMessage: 'Week of {date}' },
+  insightHeading: {
+    id: 'weekly.insightHeading',
+    defaultMessage: 'What stood out',
+  },
+  insightQuiet: {
+    id: 'weekly.insightQuiet',
+    defaultMessage: 'No disruptions were recorded this week.',
+  },
+  insightLonger: {
+    id: 'weekly.insightLonger',
+    defaultMessage:
+      'Fewer disruptions were recorded than last week, but they lasted longer in total.',
+  },
+  insightShorter: {
+    id: 'weekly.insightShorter',
+    defaultMessage:
+      'More disruptions were recorded than last week, but their total duration was shorter.',
+  },
+  insightLongerPartial: {
+    id: 'weekly.insightLongerPartial',
+    defaultMessage:
+      'By this point in the week, fewer disruptions were recorded than at the same point last week, but their total duration was longer.',
+  },
+  insightShorterPartial: {
+    id: 'weekly.insightShorterPartial',
+    defaultMessage:
+      'By this point in the week, more disruptions were recorded than at the same point last week, but their total duration was shorter.',
+  },
+  insightSingle: {
+    id: 'weekly.insightSingle',
+    defaultMessage: 'All recorded disruption time came from one incident.',
+  },
+  insightConcentrated: {
+    id: 'weekly.insightConcentrated',
+    defaultMessage:
+      'One incident accounted for {percent, number}% of recorded disruption time.',
+  },
+  insightSpread: {
+    id: 'weekly.insightSpread',
+    defaultMessage:
+      'Disruptions were recorded on {days, number} days, rather than being confined to one day.',
+  },
+  insightRecent: {
+    id: 'weekly.insightRecent',
+    defaultMessage:
+      '{direction, select, above {The disruption count was above} below {The disruption count was below} other {The disruption count was close to}} the previous four-week average of {average} per week.',
+  },
+  readerSuspension: {
+    id: 'weekly.readerSuspension',
+    defaultMessage:
+      'Recorded disruptions included suspended service on parts of {lines}.',
+  },
+  readerPeak: {
+    id: 'weekly.readerPeak',
+    defaultMessage:
+      '{count, plural, one {One recorded disruption overlapped} other {# recorded disruptions overlapped}} weekday peak hours (7–9 am or 5–7 pm, Singapore time).',
+  },
+  readerLine: {
+    id: 'weekly.readerLine',
+    defaultMessage: 'Recorded disruptions were confined to {line}.',
+  },
+  readerNetwork: {
+    id: 'weekly.readerNetwork',
+    defaultMessage:
+      'Disruptions reached {count, number} lines across the network.',
+  },
+  readerReturn: {
+    id: 'weekly.readerReturn',
+    defaultMessage:
+      '{line} had a recorded disruption after {weeks, plural, one {# full week} other {# full weeks}} without one.',
+  },
+  readerRecurring: {
+    id: 'weekly.readerRecurring',
+    defaultMessage:
+      'Separate disruptions affected {line} in each of the past three weeks.',
+  },
+  readerFirst: {
+    id: 'weekly.readerFirst',
+    defaultMessage:
+      'This followed four full weeks with no recorded disruptions across the network.',
+  },
+  readerMaintenance: {
+    id: 'weekly.readerMaintenance',
+    defaultMessage: 'Planned maintenance was recorded on {lines}.',
+  },
+  digestInterchanges: {
+    id: 'weekly.digestInterchanges',
+    defaultMessage:
+      'Affected sections included the interchanges at {stations}.',
+  },
+  digestWeekend: {
+    id: 'weekly.digestWeekend',
+    defaultMessage:
+      '{percent, number}% of recorded disruption time fell on Saturday or Sunday.',
+  },
+  digestMultiDay: {
+    id: 'weekly.digestMultiDay',
+    defaultMessage:
+      'One incident affected service on {days, number} days this week; those days do not represent separate breakdowns.',
+  },
+  digestMaintenanceChange: {
+    id: 'weekly.digestMaintenanceChange',
+    defaultMessage:
+      'Planned maintenance on {lines} included service closures or changes to operating hours.',
+  },
 });

@@ -10,7 +10,11 @@ export function buildWeeklyArchive(earliestDate: string, currentDate: string) {
   );
   if (!first.isValid || !current.isValid || first > current) return [];
   const weeks: Array<{ week: string; year: number; partial: boolean }> = [];
-  for (let start = current; start >= first; start = start.minus({ weeks: 1 })) {
+  for (
+    let start = current.minus({ weeks: 1 });
+    start >= first;
+    start = start.minus({ weeks: 1 })
+  ) {
     weeks.push({
       week: start.toISODate() as string,
       year: start.year,

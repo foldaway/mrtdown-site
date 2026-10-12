@@ -3,9 +3,8 @@ import { buildSitemapPaths } from './sitemap.functions';
 import { buildWeeklyArchive } from './weeklyArchive';
 
 describe('weekly archive discovery', () => {
-  it('lists every week newest first and marks only the current week unfinished', () => {
+  it('lists completed weeks newest first', () => {
     expect(buildWeeklyArchive('2026-09-29', '2026-10-13')).toEqual([
-      { week: '2026-10-12', year: 2026, partial: true },
       { week: '2026-10-05', year: 2026, partial: false },
       { week: '2026-09-28', year: 2026, partial: false },
     ]);

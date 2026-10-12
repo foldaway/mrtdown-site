@@ -15,7 +15,7 @@ export const getWeeklyReportFn = createServerFn({ method: 'GET' })
     // Compare an unfinished week with the same elapsed portion of last week.
     const previousEnd = end.minus({ weeks: 1 });
     const { dataset, issues } = await getIssuesOverlappingRange(
-      previousStart,
+      start.minus({ weeks: 4 }),
       end,
       now,
     );
@@ -25,12 +25,28 @@ export const getWeeklyReportFn = createServerFn({ method: 'GET' })
       asOf: isoDateTime(now),
       partial: end < fullEnd,
       currentWeek: now.startOf('week').toISODate() as string,
+      recentWeeks: Array.from({ length: 4 }, (_, index) => {
+        const weekStart = start.minus({ weeks: index + 1 });
+        const summary = buildWeeklySummary(
+          issues,
+          dataset.included.lines,
+          weekStart,
+          weekStart.plus({ weeks: 1 }),
+          now,
+        );
+        return {
+          disruptionCount: summary.disruptionCount,
+          disruptionSeconds: summary.disruptionSeconds,
+          lineIssueIds: summary.readerContext.lineIssueIds,
+        };
+      }),
       current: buildWeeklySummary(
         issues,
         dataset.included.lines,
         start,
         end,
         now,
+        dataset.included.stations,
       ),
       previous: buildWeeklySummary(
         issues,

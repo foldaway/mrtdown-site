@@ -85,5 +85,14 @@ When a second format ships, replace the temporary redirect in
 `app/routes/{-$lang}/reports/index.tsx` with a reports index, restore its localized
 metadata and collection JSON-LD, and add `/reports` back to the sitemap. Future
 monthly reports should use `/reports/monthly/YYYY-MM`. Only destination pages
-are currently listed in the sitemap; unfinished weekly reports remain browsable
-but are excluded from indexing until the week ends.
+are currently listed in the sitemap; current-week reports are unavailable until the week ends at Monday 00:00 SGT.
+
+Weekly digest takeaways are deterministic and capped at two. Recorded service
+suspensions take priority over weekday peak-hour overlap (07:00–09:00 and
+17:00–19:00 SGT), then network reach. A second takeaway can identify separate
+incidents in three consecutive weeks or a line returning after at least three
+weeks with no recorded disruptions in the four-week lookback. The recurrence
+rule requires distinct incident IDs; one ongoing incident is not treated as
+repeated breakdowns. These statements describe the records, not passenger delay,
+causes, or proof that service was flawless between incidents. Future advisories
+are not mixed into these historical, long-cached reports.

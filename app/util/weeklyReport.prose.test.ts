@@ -46,10 +46,8 @@ describe('deterministic weekly prose', () => {
     expect(buildWeeklyProse(report, english)).toEqual(prose);
     expect(prose[0]).toContain('1 disruption');
     expect(prose[0]).toContain('2 hours 45 minutes');
-    expect(prose[0]).toContain('“Recorded delay”');
-    expect(prose[0]).toContain(
-      'There was 1 fewer disruption than the previous week. Total disruption time fell by 15 minutes.',
-    );
+    expect(prose[0]).not.toContain('Recorded delay');
+    expect(prose[0]).not.toContain('previous week');
     expect(prose).toHaveLength(1);
   });
   it('omits longest incident and absent maintenance for quiet weeks', () => {
@@ -57,9 +55,7 @@ describe('deterministic weekly prose', () => {
       { week: '2026-09-28', partial: false, current: empty, previous: empty },
       english,
     );
-    expect(prose).toHaveLength(1);
-    expect(prose[0]).toContain('No disruptions were recorded');
-    expect(prose[0]).toContain('matched the previous week');
+    expect(prose).toEqual([]);
   });
   it('uses elapsed-period wording and mentions maintenance only when present', () => {
     const prose = buildWeeklyProse(
@@ -71,7 +67,7 @@ describe('deterministic weekly prose', () => {
       },
       english,
     );
-    expect(prose[0]).toContain('same point last week');
+    expect(prose[0]).not.toContain('last week');
     expect(prose[1]).toBe(
       'The week also included 1 planned maintenance event. 2 infrastructure issues were active during the week.',
     );
@@ -114,6 +110,13 @@ describe('deterministic weekly prose', () => {
             hours: 2,
             minutes: 45,
             date: '2026',
+            average: '1.5',
+            line: 'DTL',
+            lines: 'DTL',
+            stations: 'Dhoby Ghaut',
+            weeks: 3,
+            percent: 70,
+            days: 4,
             week: formatReportWeek('2026-09-28', intl),
           });
           expect(rendered).not.toContain('{');
