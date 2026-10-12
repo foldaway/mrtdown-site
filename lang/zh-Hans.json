@@ -303,6 +303,7 @@
   "report.error.affected_stops_too_many_stations": "请选择较短的受影响站点区间。报告最多可包含 {maxStationCount} 个站点。",
   "report.error.effect_required": "请选择发生了什么。",
   "report.error.line_required": "请选择受影响线路。",
+  "report.error.not_accepted": "您的报告已收到，但未被接受为社区信号。请检查详情后重试。",
   "report.error.observed_at_invalid": "请选择有效的观察时间。",
   "report.error.report_scope_required": "请选择要报告的问题类型。",
   "report.error.station_line_required": "请选择此换乘站的受影响线路。",

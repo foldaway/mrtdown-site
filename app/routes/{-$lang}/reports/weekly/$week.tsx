@@ -32,7 +32,9 @@ export const Route = createFileRoute('/{-$lang}/reports/weekly/$week')({
     } catch {
       throw notFound();
     }
-    return getWeeklyReportFn({ data: { week: params.week } });
+    const report = await getWeeklyReportFn({ data: { week: params.week } });
+    if (report == null) throw notFound();
+    return report;
   },
   async head({ params, loaderData }) {
     const locale = params.lang ?? PRIMARY_LOCALE;
@@ -125,13 +127,15 @@ function WeeklyReportPage() {
         aria-label={text('nav')}
         className="flex flex-wrap items-center justify-between gap-3 text-sm"
       >
-        <Link
-          to="/{-$lang}/reports/weekly/$week"
-          params={{ lang, week: previousWeek }}
-          className="text-gray-600 hover:underline dark:text-gray-300"
-        >
-          {text('prev')}
-        </Link>
+        {previousWeek >= report.earliestWeek && (
+          <Link
+            to="/{-$lang}/reports/weekly/$week"
+            params={{ lang, week: previousWeek }}
+            className="text-gray-600 hover:underline dark:text-gray-300"
+          >
+            {text('prev')}
+          </Link>
+        )}
         <Link
           to="/{-$lang}/reports/weekly"
           params={{ lang }}
@@ -175,6 +179,7 @@ function WeeklyReportPage() {
             type="date"
             name="week"
             required
+            min={report.earliestWeek}
             defaultValue={report.week}
             max={
               DateTime.fromISO(report.currentWeek)

@@ -303,6 +303,7 @@
   "report.error.affected_stops_too_many_stations": "Pilih julat hentian terjejas yang lebih pendek. Laporan boleh mengandungi sehingga {maxStationCount} stesen.",
   "report.error.effect_required": "Pilih apa yang sedang berlaku.",
   "report.error.line_required": "Pilih laluan terjejas.",
+  "report.error.not_accepted": "Laporan anda telah diterima tetapi tidak diluluskan sebagai isyarat komuniti. Semak butiran dan cuba lagi.",
   "report.error.observed_at_invalid": "Pilih masa pemerhatian yang sah.",
   "report.error.report_scope_required": "Pilih jenis isu yang anda laporkan.",
   "report.error.station_line_required": "Pilih laluan terjejas di pertukaran ini.",

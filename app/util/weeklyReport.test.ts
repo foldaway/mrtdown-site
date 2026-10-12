@@ -81,3 +81,14 @@ describe('weekly reports', () => {
     ]);
   });
 });
+
+describe('weekly archive boundary', () => {
+  it('accepts the first supported week and rejects earlier dates', () => {
+    const now = DateTime.fromISO('2026-10-13', { zone: REPORT_ZONE });
+    expect(getReportWeek('2011-08-29', now, '2011-08-29').toISODate()).toBe(
+      '2011-08-29',
+    );
+    expect(() => getReportWeek('2011-08-22', now, '2011-08-29')).toThrow();
+    expect(() => getReportWeek('1900-01-01', now, '2011-08-29')).toThrow();
+  });
+});

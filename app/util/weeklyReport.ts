@@ -8,13 +8,18 @@ import {
 
 export const REPORT_ZONE = 'Asia/Singapore';
 
-export function getReportWeek(value: string, now: DateTime) {
+export function getReportWeek(
+  value: string,
+  now: DateTime,
+  earliestWeek?: string,
+) {
   const start = DateTime.fromISO(value, { zone: REPORT_ZONE });
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
     !start.isValid ||
     start.weekday !== 1 ||
-    start.plus({ weeks: 1 }) > now.setZone(REPORT_ZONE)
+    start.plus({ weeks: 1 }) > now.setZone(REPORT_ZONE) ||
+    (earliestWeek != null && value < earliestWeek)
   ) {
     throw new Error('Choose a Monday from a completed week.');
   }
