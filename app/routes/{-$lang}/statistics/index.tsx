@@ -1,8 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { createIntl, FormattedMessage } from 'react-intl';
 import { IncludedEntitiesContext } from '~/contexts/IncludedEntities';
 import { buildSeoMetadata } from '~/helpers/seo';
 import { getStatisticsFn } from '~/util/statistics.functions';
+import { weeklyMessages } from '~/util/weeklyReport.messages';
 import { StatisticsGrid } from './components/StatisticsGrid';
 import { StatisticsGridSkeleton } from './components/StatisticsGrid/components/StatisticsGridSkeleton';
 
@@ -72,6 +73,7 @@ export const Route = createFileRoute('/{-$lang}/statistics/')({
 
 function StatisticsPage() {
   const loaderData = Route.useLoaderData();
+  const { lang } = Route.useParams();
 
   return (
     <IncludedEntitiesContext.Provider value={loaderData.included}>
@@ -90,6 +92,13 @@ function StatisticsPage() {
             />
           </p>
         </header>
+        <Link
+          to="/{-$lang}/reports/weekly"
+          params={{ lang }}
+          className="self-center font-semibold text-accent-light text-sm hover:underline dark:text-accent-dark"
+        >
+          <FormattedMessage {...weeklyMessages.link} />
+        </Link>
         <StatisticsGrid statistics={loaderData.data} />
       </div>
     </IncludedEntitiesContext.Provider>

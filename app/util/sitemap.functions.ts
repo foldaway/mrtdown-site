@@ -7,6 +7,7 @@ import {
   HISTORY_YEAR_BOUNDS,
   isHistoryYearInBounds,
 } from './historyYearBounds';
+import { buildWeeklyArchive } from './weeklyArchive';
 
 interface SitemapPathData {
   lineIds: string[];
@@ -163,6 +164,7 @@ export function buildSitemapPaths({
     '/lines',
     '/stations',
     '/statistics',
+    '/reports/weekly',
     '/system-map',
     '/towns',
     '/about',
@@ -198,6 +200,13 @@ export function buildSitemapPaths({
       currentDate,
     });
     return paths;
+  }
+
+  for (const { week, partial } of buildWeeklyArchive(
+    monthEarliest,
+    currentDate,
+  )) {
+    if (!partial) paths.push(`/reports/weekly/${week}`);
   }
 
   const interval = Interval.fromDateTimes(

@@ -198,6 +198,7 @@ describe('agent Markdown discovery', () => {
       '/lines',
       '/stations',
       '/statistics',
+      '/reports/weekly',
       '/system-map',
       '/towns',
       '/about',

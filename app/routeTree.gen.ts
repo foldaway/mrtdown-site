@@ -19,14 +19,17 @@ import { Route as ApiSentryAnonymousUserRouteImport } from './routes/api.sentry-
 import { Route as ApiReportsRouteImport } from './routes/api.reports'
 import { Route as ApiIssuesDayRouteImport } from './routes/api.issues-day'
 import { Route as ApiArrivalReportsRouteImport } from './routes/api.arrival-reports'
+import { Route as Char123LangChar125WeeklyIndexRouteImport } from './routes/{-$lang}/weekly/index'
 import { Route as Char123LangChar125TownsIndexRouteImport } from './routes/{-$lang}/towns/index'
 import { Route as Char123LangChar125SystemMapIndexRouteImport } from './routes/{-$lang}/system-map/index'
 import { Route as Char123LangChar125StatisticsIndexRouteImport } from './routes/{-$lang}/statistics/index'
 import { Route as Char123LangChar125StationsIndexRouteImport } from './routes/{-$lang}/stations/index'
+import { Route as Char123LangChar125ReportsIndexRouteImport } from './routes/{-$lang}/reports/index'
 import { Route as Char123LangChar125ReportIndexRouteImport } from './routes/{-$lang}/report/index'
 import { Route as Char123LangChar125LinesIndexRouteImport } from './routes/{-$lang}/lines/index'
 import { Route as Char123LangChar125HistoryIndexRouteImport } from './routes/{-$lang}/history/index'
 import { Route as Char123LangChar125AboutIndexRouteImport } from './routes/{-$lang}/about/index'
+import { Route as Char123LangChar125WeeklyWeekRouteImport } from './routes/{-$lang}/weekly/$week'
 import { Route as StationsStationIdIndexDotmdRouteImport } from './routes/stations/$stationId/index[.]md'
 import { Route as OperatorsOperatorIdIndexDotmdRouteImport } from './routes/operators/$operatorId/index[.]md'
 import { Route as LinesLineIdIndexDotmdRouteImport } from './routes/lines/$lineId/index[.]md'
@@ -36,10 +39,12 @@ import { Route as ApiPhSplatRouteImport } from './routes/api.ph.$'
 import { Route as Char123LangChar125TownsTownIdIndexRouteImport } from './routes/{-$lang}/towns/$townId/index'
 import { Route as Char123LangChar125StatusLineIdIndexRouteImport } from './routes/{-$lang}/status/$lineId/index'
 import { Route as Char123LangChar125StationsStationIdIndexRouteImport } from './routes/{-$lang}/stations/$stationId/index'
+import { Route as Char123LangChar125ReportsWeeklyIndexRouteImport } from './routes/{-$lang}/reports/weekly/index'
 import { Route as Char123LangChar125OperatorsOperatorIdIndexRouteImport } from './routes/{-$lang}/operators/$operatorId/index'
 import { Route as Char123LangChar125LinesLineIdIndexRouteImport } from './routes/{-$lang}/lines/$lineId/index'
 import { Route as Char123LangChar125IssuesIssueIdIndexRouteImport } from './routes/{-$lang}/issues/$issueId/index'
 import { Route as Char123LangChar125HistoryYearIndexRouteImport } from './routes/{-$lang}/history/$year/index'
+import { Route as Char123LangChar125ReportsWeeklyWeekRouteImport } from './routes/{-$lang}/reports/weekly/$week'
 import { Route as InternalApiWorkflowsWorkflowNameRouteImport } from './routes/internal.api.workflows.$workflowName'
 import { Route as InternalApiTasksPullRouteImport } from './routes/internal.api.tasks.pull'
 import { Route as InternalApiTasksPublicHolidaysRouteImport } from './routes/internal.api.tasks.public-holidays'
@@ -102,6 +107,12 @@ const ApiArrivalReportsRoute = ApiArrivalReportsRouteImport.update({
   path: '/api/arrival-reports',
   getParentRoute: () => rootRouteImport,
 } as any)
+const Char123LangChar125WeeklyIndexRoute =
+  Char123LangChar125WeeklyIndexRouteImport.update({
+    id: '/weekly/',
+    path: '/weekly/',
+    getParentRoute: () => Char123LangChar125RouteRoute,
+  } as any)
 const Char123LangChar125TownsIndexRoute =
   Char123LangChar125TownsIndexRouteImport.update({
     id: '/towns/',
@@ -126,6 +137,12 @@ const Char123LangChar125StationsIndexRoute =
     path: '/stations/',
     getParentRoute: () => Char123LangChar125RouteRoute,
   } as any)
+const Char123LangChar125ReportsIndexRoute =
+  Char123LangChar125ReportsIndexRouteImport.update({
+    id: '/reports/',
+    path: '/reports/',
+    getParentRoute: () => Char123LangChar125RouteRoute,
+  } as any)
 const Char123LangChar125ReportIndexRoute =
   Char123LangChar125ReportIndexRouteImport.update({
     id: '/report/',
@@ -148,6 +165,12 @@ const Char123LangChar125AboutIndexRoute =
   Char123LangChar125AboutIndexRouteImport.update({
     id: '/about/',
     path: '/about/',
+    getParentRoute: () => Char123LangChar125RouteRoute,
+  } as any)
+const Char123LangChar125WeeklyWeekRoute =
+  Char123LangChar125WeeklyWeekRouteImport.update({
+    id: '/weekly/$week',
+    path: '/weekly/$week',
     getParentRoute: () => Char123LangChar125RouteRoute,
   } as any)
 const StationsStationIdIndexDotmdRoute =
@@ -200,6 +223,12 @@ const Char123LangChar125StationsStationIdIndexRoute =
     path: '/stations/$stationId/',
     getParentRoute: () => Char123LangChar125RouteRoute,
   } as any)
+const Char123LangChar125ReportsWeeklyIndexRoute =
+  Char123LangChar125ReportsWeeklyIndexRouteImport.update({
+    id: '/reports/weekly/',
+    path: '/reports/weekly/',
+    getParentRoute: () => Char123LangChar125RouteRoute,
+  } as any)
 const Char123LangChar125OperatorsOperatorIdIndexRoute =
   Char123LangChar125OperatorsOperatorIdIndexRouteImport.update({
     id: '/operators/$operatorId/',
@@ -222,6 +251,12 @@ const Char123LangChar125HistoryYearIndexRoute =
   Char123LangChar125HistoryYearIndexRouteImport.update({
     id: '/history/$year/',
     path: '/history/$year/',
+    getParentRoute: () => Char123LangChar125RouteRoute,
+  } as any)
+const Char123LangChar125ReportsWeeklyWeekRoute =
+  Char123LangChar125ReportsWeeklyWeekRouteImport.update({
+    id: '/reports/weekly/$week',
+    path: '/reports/weekly/$week',
     getParentRoute: () => Char123LangChar125RouteRoute,
   } as any)
 const InternalApiWorkflowsWorkflowNameRoute =
@@ -300,14 +335,17 @@ export interface FileRoutesByFullPath {
   '/lines/$lineId/index.md': typeof LinesLineIdIndexDotmdRoute
   '/operators/$operatorId/index.md': typeof OperatorsOperatorIdIndexDotmdRoute
   '/stations/$stationId/index.md': typeof StationsStationIdIndexDotmdRoute
+  '/{-$lang}/weekly/$week': typeof Char123LangChar125WeeklyWeekRoute
   '/{-$lang}/about/': typeof Char123LangChar125AboutIndexRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/lines/': typeof Char123LangChar125LinesIndexRoute
   '/{-$lang}/report/': typeof Char123LangChar125ReportIndexRoute
+  '/{-$lang}/reports/': typeof Char123LangChar125ReportsIndexRoute
   '/{-$lang}/stations/': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns/': typeof Char123LangChar125TownsIndexRoute
+  '/{-$lang}/weekly/': typeof Char123LangChar125WeeklyIndexRoute
   '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRoute
   '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
@@ -315,10 +353,12 @@ export interface FileRoutesByFullPath {
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
   '/internal/api/workflows/$workflowName': typeof InternalApiWorkflowsWorkflowNameRoute
+  '/{-$lang}/reports/weekly/$week': typeof Char123LangChar125ReportsWeeklyWeekRoute
   '/{-$lang}/history/$year/': typeof Char123LangChar125HistoryYearIndexRoute
   '/{-$lang}/issues/$issueId/': typeof Char123LangChar125IssuesIssueIdIndexRoute
   '/{-$lang}/lines/$lineId/': typeof Char123LangChar125LinesLineIdIndexRoute
   '/{-$lang}/operators/$operatorId/': typeof Char123LangChar125OperatorsOperatorIdIndexRoute
+  '/{-$lang}/reports/weekly/': typeof Char123LangChar125ReportsWeeklyIndexRoute
   '/{-$lang}/stations/$stationId/': typeof Char123LangChar125StationsStationIdIndexRoute
   '/{-$lang}/status/$lineId/': typeof Char123LangChar125StatusLineIdIndexRoute
   '/{-$lang}/towns/$townId/': typeof Char123LangChar125TownsTownIdIndexRoute
@@ -342,14 +382,17 @@ export interface FileRoutesByTo {
   '/lines/$lineId/index.md': typeof LinesLineIdIndexDotmdRoute
   '/operators/$operatorId/index.md': typeof OperatorsOperatorIdIndexDotmdRoute
   '/stations/$stationId/index.md': typeof StationsStationIdIndexDotmdRoute
+  '/{-$lang}/weekly/$week': typeof Char123LangChar125WeeklyWeekRoute
   '/{-$lang}/about': typeof Char123LangChar125AboutIndexRoute
   '/{-$lang}/history': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/lines': typeof Char123LangChar125LinesIndexRoute
   '/{-$lang}/report': typeof Char123LangChar125ReportIndexRoute
+  '/{-$lang}/reports': typeof Char123LangChar125ReportsIndexRoute
   '/{-$lang}/stations': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns': typeof Char123LangChar125TownsIndexRoute
+  '/{-$lang}/weekly': typeof Char123LangChar125WeeklyIndexRoute
   '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRoute
   '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
@@ -357,10 +400,12 @@ export interface FileRoutesByTo {
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
   '/internal/api/workflows/$workflowName': typeof InternalApiWorkflowsWorkflowNameRoute
+  '/{-$lang}/reports/weekly/$week': typeof Char123LangChar125ReportsWeeklyWeekRoute
   '/{-$lang}/history/$year': typeof Char123LangChar125HistoryYearIndexRoute
   '/{-$lang}/issues/$issueId': typeof Char123LangChar125IssuesIssueIdIndexRoute
   '/{-$lang}/lines/$lineId': typeof Char123LangChar125LinesLineIdIndexRoute
   '/{-$lang}/operators/$operatorId': typeof Char123LangChar125OperatorsOperatorIdIndexRoute
+  '/{-$lang}/reports/weekly': typeof Char123LangChar125ReportsWeeklyIndexRoute
   '/{-$lang}/stations/$stationId': typeof Char123LangChar125StationsStationIdIndexRoute
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdIndexRoute
   '/{-$lang}/towns/$townId': typeof Char123LangChar125TownsTownIdIndexRoute
@@ -386,14 +431,17 @@ export interface FileRoutesById {
   '/lines/$lineId/index.md': typeof LinesLineIdIndexDotmdRoute
   '/operators/$operatorId/index.md': typeof OperatorsOperatorIdIndexDotmdRoute
   '/stations/$stationId/index.md': typeof StationsStationIdIndexDotmdRoute
+  '/{-$lang}/weekly/$week': typeof Char123LangChar125WeeklyWeekRoute
   '/{-$lang}/about/': typeof Char123LangChar125AboutIndexRoute
   '/{-$lang}/history/': typeof Char123LangChar125HistoryIndexRoute
   '/{-$lang}/lines/': typeof Char123LangChar125LinesIndexRoute
   '/{-$lang}/report/': typeof Char123LangChar125ReportIndexRoute
+  '/{-$lang}/reports/': typeof Char123LangChar125ReportsIndexRoute
   '/{-$lang}/stations/': typeof Char123LangChar125StationsIndexRoute
   '/{-$lang}/statistics/': typeof Char123LangChar125StatisticsIndexRoute
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns/': typeof Char123LangChar125TownsIndexRoute
+  '/{-$lang}/weekly/': typeof Char123LangChar125WeeklyIndexRoute
   '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRoute
   '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
@@ -401,10 +449,12 @@ export interface FileRoutesById {
   '/internal/api/tasks/public-holidays': typeof InternalApiTasksPublicHolidaysRoute
   '/internal/api/tasks/pull': typeof InternalApiTasksPullRoute
   '/internal/api/workflows/$workflowName': typeof InternalApiWorkflowsWorkflowNameRoute
+  '/{-$lang}/reports/weekly/$week': typeof Char123LangChar125ReportsWeeklyWeekRoute
   '/{-$lang}/history/$year/': typeof Char123LangChar125HistoryYearIndexRoute
   '/{-$lang}/issues/$issueId/': typeof Char123LangChar125IssuesIssueIdIndexRoute
   '/{-$lang}/lines/$lineId/': typeof Char123LangChar125LinesLineIdIndexRoute
   '/{-$lang}/operators/$operatorId/': typeof Char123LangChar125OperatorsOperatorIdIndexRoute
+  '/{-$lang}/reports/weekly/': typeof Char123LangChar125ReportsWeeklyIndexRoute
   '/{-$lang}/stations/$stationId/': typeof Char123LangChar125StationsStationIdIndexRoute
   '/{-$lang}/status/$lineId/': typeof Char123LangChar125StatusLineIdIndexRoute
   '/{-$lang}/towns/$townId/': typeof Char123LangChar125TownsTownIdIndexRoute
@@ -431,14 +481,17 @@ export interface FileRouteTypes {
     | '/lines/$lineId/index.md'
     | '/operators/$operatorId/index.md'
     | '/stations/$stationId/index.md'
+    | '/{-$lang}/weekly/$week'
     | '/{-$lang}/about/'
     | '/{-$lang}/history/'
     | '/{-$lang}/lines/'
     | '/{-$lang}/report/'
+    | '/{-$lang}/reports/'
     | '/{-$lang}/stations/'
     | '/{-$lang}/statistics/'
     | '/{-$lang}/system-map/'
     | '/{-$lang}/towns/'
+    | '/{-$lang}/weekly/'
     | '/api/stations/$stationId/arrivals'
     | '/internal/api/reference-catalog/v1'
     | '/internal/api/tasks/crowd-report-dispatch'
@@ -446,10 +499,12 @@ export interface FileRouteTypes {
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
     | '/internal/api/workflows/$workflowName'
+    | '/{-$lang}/reports/weekly/$week'
     | '/{-$lang}/history/$year/'
     | '/{-$lang}/issues/$issueId/'
     | '/{-$lang}/lines/$lineId/'
     | '/{-$lang}/operators/$operatorId/'
+    | '/{-$lang}/reports/weekly/'
     | '/{-$lang}/stations/$stationId/'
     | '/{-$lang}/status/$lineId/'
     | '/{-$lang}/towns/$townId/'
@@ -473,14 +528,17 @@ export interface FileRouteTypes {
     | '/lines/$lineId/index.md'
     | '/operators/$operatorId/index.md'
     | '/stations/$stationId/index.md'
+    | '/{-$lang}/weekly/$week'
     | '/{-$lang}/about'
     | '/{-$lang}/history'
     | '/{-$lang}/lines'
     | '/{-$lang}/report'
+    | '/{-$lang}/reports'
     | '/{-$lang}/stations'
     | '/{-$lang}/statistics'
     | '/{-$lang}/system-map'
     | '/{-$lang}/towns'
+    | '/{-$lang}/weekly'
     | '/api/stations/$stationId/arrivals'
     | '/internal/api/reference-catalog/v1'
     | '/internal/api/tasks/crowd-report-dispatch'
@@ -488,10 +546,12 @@ export interface FileRouteTypes {
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
     | '/internal/api/workflows/$workflowName'
+    | '/{-$lang}/reports/weekly/$week'
     | '/{-$lang}/history/$year'
     | '/{-$lang}/issues/$issueId'
     | '/{-$lang}/lines/$lineId'
     | '/{-$lang}/operators/$operatorId'
+    | '/{-$lang}/reports/weekly'
     | '/{-$lang}/stations/$stationId'
     | '/{-$lang}/status/$lineId'
     | '/{-$lang}/towns/$townId'
@@ -516,14 +576,17 @@ export interface FileRouteTypes {
     | '/lines/$lineId/index.md'
     | '/operators/$operatorId/index.md'
     | '/stations/$stationId/index.md'
+    | '/{-$lang}/weekly/$week'
     | '/{-$lang}/about/'
     | '/{-$lang}/history/'
     | '/{-$lang}/lines/'
     | '/{-$lang}/report/'
+    | '/{-$lang}/reports/'
     | '/{-$lang}/stations/'
     | '/{-$lang}/statistics/'
     | '/{-$lang}/system-map/'
     | '/{-$lang}/towns/'
+    | '/{-$lang}/weekly/'
     | '/api/stations/$stationId/arrivals'
     | '/internal/api/reference-catalog/v1'
     | '/internal/api/tasks/crowd-report-dispatch'
@@ -531,10 +594,12 @@ export interface FileRouteTypes {
     | '/internal/api/tasks/public-holidays'
     | '/internal/api/tasks/pull'
     | '/internal/api/workflows/$workflowName'
+    | '/{-$lang}/reports/weekly/$week'
     | '/{-$lang}/history/$year/'
     | '/{-$lang}/issues/$issueId/'
     | '/{-$lang}/lines/$lineId/'
     | '/{-$lang}/operators/$operatorId/'
+    | '/{-$lang}/reports/weekly/'
     | '/{-$lang}/stations/$stationId/'
     | '/{-$lang}/status/$lineId/'
     | '/{-$lang}/towns/$townId/'
@@ -639,6 +704,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArrivalReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/{-$lang}/weekly/': {
+      id: '/{-$lang}/weekly/'
+      path: '/weekly'
+      fullPath: '/{-$lang}/weekly/'
+      preLoaderRoute: typeof Char123LangChar125WeeklyIndexRouteImport
+      parentRoute: typeof Char123LangChar125RouteRoute
+    }
     '/{-$lang}/towns/': {
       id: '/{-$lang}/towns/'
       path: '/towns'
@@ -667,6 +739,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char123LangChar125StationsIndexRouteImport
       parentRoute: typeof Char123LangChar125RouteRoute
     }
+    '/{-$lang}/reports/': {
+      id: '/{-$lang}/reports/'
+      path: '/reports'
+      fullPath: '/{-$lang}/reports/'
+      preLoaderRoute: typeof Char123LangChar125ReportsIndexRouteImport
+      parentRoute: typeof Char123LangChar125RouteRoute
+    }
     '/{-$lang}/report/': {
       id: '/{-$lang}/report/'
       path: '/report'
@@ -693,6 +772,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/{-$lang}/about/'
       preLoaderRoute: typeof Char123LangChar125AboutIndexRouteImport
+      parentRoute: typeof Char123LangChar125RouteRoute
+    }
+    '/{-$lang}/weekly/$week': {
+      id: '/{-$lang}/weekly/$week'
+      path: '/weekly/$week'
+      fullPath: '/{-$lang}/weekly/$week'
+      preLoaderRoute: typeof Char123LangChar125WeeklyWeekRouteImport
       parentRoute: typeof Char123LangChar125RouteRoute
     }
     '/stations/$stationId/index.md': {
@@ -758,6 +844,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char123LangChar125StationsStationIdIndexRouteImport
       parentRoute: typeof Char123LangChar125RouteRoute
     }
+    '/{-$lang}/reports/weekly/': {
+      id: '/{-$lang}/reports/weekly/'
+      path: '/reports/weekly'
+      fullPath: '/{-$lang}/reports/weekly/'
+      preLoaderRoute: typeof Char123LangChar125ReportsWeeklyIndexRouteImport
+      parentRoute: typeof Char123LangChar125RouteRoute
+    }
     '/{-$lang}/operators/$operatorId/': {
       id: '/{-$lang}/operators/$operatorId/'
       path: '/operators/$operatorId'
@@ -784,6 +877,13 @@ declare module '@tanstack/react-router' {
       path: '/history/$year'
       fullPath: '/{-$lang}/history/$year/'
       preLoaderRoute: typeof Char123LangChar125HistoryYearIndexRouteImport
+      parentRoute: typeof Char123LangChar125RouteRoute
+    }
+    '/{-$lang}/reports/weekly/$week': {
+      id: '/{-$lang}/reports/weekly/$week'
+      path: '/reports/weekly/$week'
+      fullPath: '/{-$lang}/reports/weekly/$week'
+      preLoaderRoute: typeof Char123LangChar125ReportsWeeklyWeekRouteImport
       parentRoute: typeof Char123LangChar125RouteRoute
     }
     '/internal/api/workflows/$workflowName': {
@@ -862,18 +962,23 @@ declare module '@tanstack/react-router' {
 interface Char123LangChar125RouteRouteChildren {
   Char123LangChar125SitemapDotxmlRoute: typeof Char123LangChar125SitemapDotxmlRoute
   Char123LangChar125IndexRoute: typeof Char123LangChar125IndexRoute
+  Char123LangChar125WeeklyWeekRoute: typeof Char123LangChar125WeeklyWeekRoute
   Char123LangChar125AboutIndexRoute: typeof Char123LangChar125AboutIndexRoute
   Char123LangChar125HistoryIndexRoute: typeof Char123LangChar125HistoryIndexRoute
   Char123LangChar125LinesIndexRoute: typeof Char123LangChar125LinesIndexRoute
   Char123LangChar125ReportIndexRoute: typeof Char123LangChar125ReportIndexRoute
+  Char123LangChar125ReportsIndexRoute: typeof Char123LangChar125ReportsIndexRoute
   Char123LangChar125StationsIndexRoute: typeof Char123LangChar125StationsIndexRoute
   Char123LangChar125StatisticsIndexRoute: typeof Char123LangChar125StatisticsIndexRoute
   Char123LangChar125SystemMapIndexRoute: typeof Char123LangChar125SystemMapIndexRoute
   Char123LangChar125TownsIndexRoute: typeof Char123LangChar125TownsIndexRoute
+  Char123LangChar125WeeklyIndexRoute: typeof Char123LangChar125WeeklyIndexRoute
+  Char123LangChar125ReportsWeeklyWeekRoute: typeof Char123LangChar125ReportsWeeklyWeekRoute
   Char123LangChar125HistoryYearIndexRoute: typeof Char123LangChar125HistoryYearIndexRoute
   Char123LangChar125IssuesIssueIdIndexRoute: typeof Char123LangChar125IssuesIssueIdIndexRoute
   Char123LangChar125LinesLineIdIndexRoute: typeof Char123LangChar125LinesLineIdIndexRoute
   Char123LangChar125OperatorsOperatorIdIndexRoute: typeof Char123LangChar125OperatorsOperatorIdIndexRoute
+  Char123LangChar125ReportsWeeklyIndexRoute: typeof Char123LangChar125ReportsWeeklyIndexRoute
   Char123LangChar125StationsStationIdIndexRoute: typeof Char123LangChar125StationsStationIdIndexRoute
   Char123LangChar125StatusLineIdIndexRoute: typeof Char123LangChar125StatusLineIdIndexRoute
   Char123LangChar125TownsTownIdIndexRoute: typeof Char123LangChar125TownsTownIdIndexRoute
@@ -886,16 +991,21 @@ const Char123LangChar125RouteRouteChildren: Char123LangChar125RouteRouteChildren
   {
     Char123LangChar125SitemapDotxmlRoute: Char123LangChar125SitemapDotxmlRoute,
     Char123LangChar125IndexRoute: Char123LangChar125IndexRoute,
+    Char123LangChar125WeeklyWeekRoute: Char123LangChar125WeeklyWeekRoute,
     Char123LangChar125AboutIndexRoute: Char123LangChar125AboutIndexRoute,
     Char123LangChar125HistoryIndexRoute: Char123LangChar125HistoryIndexRoute,
     Char123LangChar125LinesIndexRoute: Char123LangChar125LinesIndexRoute,
     Char123LangChar125ReportIndexRoute: Char123LangChar125ReportIndexRoute,
+    Char123LangChar125ReportsIndexRoute: Char123LangChar125ReportsIndexRoute,
     Char123LangChar125StationsIndexRoute: Char123LangChar125StationsIndexRoute,
     Char123LangChar125StatisticsIndexRoute:
       Char123LangChar125StatisticsIndexRoute,
     Char123LangChar125SystemMapIndexRoute:
       Char123LangChar125SystemMapIndexRoute,
     Char123LangChar125TownsIndexRoute: Char123LangChar125TownsIndexRoute,
+    Char123LangChar125WeeklyIndexRoute: Char123LangChar125WeeklyIndexRoute,
+    Char123LangChar125ReportsWeeklyWeekRoute:
+      Char123LangChar125ReportsWeeklyWeekRoute,
     Char123LangChar125HistoryYearIndexRoute:
       Char123LangChar125HistoryYearIndexRoute,
     Char123LangChar125IssuesIssueIdIndexRoute:
@@ -904,6 +1014,8 @@ const Char123LangChar125RouteRouteChildren: Char123LangChar125RouteRouteChildren
       Char123LangChar125LinesLineIdIndexRoute,
     Char123LangChar125OperatorsOperatorIdIndexRoute:
       Char123LangChar125OperatorsOperatorIdIndexRoute,
+    Char123LangChar125ReportsWeeklyIndexRoute:
+      Char123LangChar125ReportsWeeklyIndexRoute,
     Char123LangChar125StationsStationIdIndexRoute:
       Char123LangChar125StationsStationIdIndexRoute,
     Char123LangChar125StatusLineIdIndexRoute:
