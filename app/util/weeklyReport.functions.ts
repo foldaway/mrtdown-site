@@ -10,6 +10,12 @@ export const getWeeklyReportFn = createServerFn({ method: 'GET' })
   .inputValidator((value) => z.object({ week: z.string() }).parse(value))
   .handler(async ({ data }) => {
     const now = nowSg();
+    let start: DateTime;
+    try {
+      start = getReportWeek(data.week, now);
+    } catch {
+      return null;
+    }
     const archive = await getSitemapData();
     if (!archive.reportEarliestDate) return null;
     const earliestWeek = DateTime.fromISO(archive.reportEarliestDate, {
@@ -20,7 +26,7 @@ export const getWeeklyReportFn = createServerFn({ method: 'GET' })
     if (earliestWeek == null)
       throw new Error('Invalid weekly archive boundary');
     if (data.week < earliestWeek) return null;
-    const start = getReportWeek(data.week, now, earliestWeek);
+
     const fullEnd = start.plus({ weeks: 1 });
     const end = fullEnd < now ? fullEnd : now;
     const previousStart = start.minus({ weeks: 1 });

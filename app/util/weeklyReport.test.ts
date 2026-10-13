@@ -1,7 +1,12 @@
 import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
 import { buildIssue, TEST_LINE } from './dbQueries/testFixtures';
-import { buildWeeklySummary, getReportWeek, REPORT_ZONE } from './weeklyReport';
+import {
+  buildWeeklySummary,
+  getReportWeek,
+  parseReportWeek,
+  REPORT_ZONE,
+} from './weeklyReport';
 
 const start = DateTime.fromISO('2026-10-05', { zone: REPORT_ZONE });
 const end = start.plus({ weeks: 1 });
@@ -90,5 +95,26 @@ describe('weekly archive boundary', () => {
     );
     expect(() => getReportWeek('2011-08-22', now, '2011-08-29')).toThrow();
     expect(() => getReportWeek('1900-01-01', now, '2011-08-29')).toThrow();
+  });
+});
+
+describe('server-owned completion boundary', () => {
+  it('parses a structurally valid week independently of completion', () => {
+    expect(parseReportWeek('2026-10-12').toISODate()).toBe('2026-10-12');
+    expect(() => parseReportWeek('2026-10-13')).toThrow();
+  });
+  it('opens the week exactly at Monday midnight in Singapore', () => {
+    expect(() =>
+      getReportWeek(
+        '2026-10-05',
+        DateTime.fromISO('2026-10-11T23:59:59', { zone: REPORT_ZONE }),
+      ),
+    ).toThrow();
+    expect(
+      getReportWeek(
+        '2026-10-05',
+        DateTime.fromISO('2026-10-12T00:00:00', { zone: REPORT_ZONE }),
+      ).toISODate(),
+    ).toBe('2026-10-05');
   });
 });

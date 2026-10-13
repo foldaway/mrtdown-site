@@ -4,7 +4,7 @@ import { createIntl, useIntl } from 'react-intl';
 import { LOCALES, PRIMARY_LOCALE } from '~/constants';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { buildSeoMetadata } from '~/helpers/seo';
-import { getReportWeek, REPORT_ZONE } from '~/util/weeklyReport';
+import { parseReportWeek, REPORT_ZONE } from '~/util/weeklyReport';
 import { getWeeklyReportFn } from '~/util/weeklyReport.functions';
 import { formatWeeklyInsights } from '~/util/weeklyReport.insights';
 import { weeklyMessages } from '~/util/weeklyReport.messages';
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/{-$lang}/reports/weekly/$week')({
     )
       throw notFound();
     try {
-      getReportWeek(params.week, DateTime.now().setZone(REPORT_ZONE));
+      parseReportWeek(params.week);
     } catch {
       throw notFound();
     }
