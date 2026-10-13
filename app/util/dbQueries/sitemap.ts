@@ -4,6 +4,7 @@ import { timeServerSpan } from '~/util/serverTiming';
 import { type AppDb, getDefaultDb, isUndefinedTableError } from './database';
 import { type BaseDataset, buildCompleteDataset } from './dataset';
 import { isoDate, isoDateTime, nowSg, parseDateTime } from './dateTime';
+import { getEarliestRecordedIssueDate } from './issueRange';
 
 const SITEMAP_SNAPSHOT_ID = 'public';
 
@@ -14,6 +15,7 @@ export type SitemapData = {
   operatorIds: string[];
   issueIds: string[];
   monthEarliest: string;
+  reportEarliestDate?: string | null;
   monthLatest: string;
   currentDate: string;
 };
@@ -123,6 +125,7 @@ export function buildSitemapDataFromDataset(
     operatorIds: Object.keys(dataset.included.operators).sort(),
     issueIds: issuesWithFirstDates.map(({ issue }) => issue.id),
     monthEarliest,
+    reportEarliestDate: earliest != null ? isoDate(earliest) : null,
     monthLatest,
     currentDate: isoDate(nowSg()),
   };
@@ -197,6 +200,10 @@ export async function getSitemapData() {
     const snapshot = requireSitemapSnapshot(await getLatestSitemapSnapshot());
     return {
       ...snapshot,
+      reportEarliestDate:
+        snapshot.reportEarliestDate !== undefined
+          ? snapshot.reportEarliestDate
+          : await getEarliestRecordedIssueDate(),
       currentDate: isoDate(nowSg()),
     };
   });

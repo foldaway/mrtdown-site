@@ -11,7 +11,8 @@ export const getWeeklyReportFn = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => {
     const now = nowSg();
     const archive = await getSitemapData();
-    const earliestWeek = DateTime.fromISO(archive.monthEarliest, {
+    if (!archive.reportEarliestDate) return null;
+    const earliestWeek = DateTime.fromISO(archive.reportEarliestDate, {
       zone: 'Asia/Singapore',
     })
       .startOf('week')

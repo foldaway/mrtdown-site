@@ -16,6 +16,7 @@ interface SitemapPathData {
   operatorIds: string[];
   issueIds: string[];
   monthEarliest: string;
+  reportEarliestDate?: string | null;
   monthLatest: string;
   currentDate: string;
 }
@@ -156,6 +157,7 @@ export function buildSitemapPaths({
   operatorIds,
   issueIds,
   monthEarliest,
+  reportEarliestDate,
   monthLatest,
   currentDate,
 }: SitemapPathData) {
@@ -203,7 +205,7 @@ export function buildSitemapPaths({
   }
 
   for (const { week, partial } of buildWeeklyArchive(
-    monthEarliest,
+    reportEarliestDate ?? '',
     currentDate,
   )) {
     if (!partial) paths.push(`/reports/weekly/${week}`);

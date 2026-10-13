@@ -21,6 +21,7 @@ describe('weekly archive discovery', () => {
       operatorIds: [],
       issueIds: [],
       monthEarliest: '2026-09-01',
+      reportEarliestDate: '2026-09-29',
       monthLatest: '2026-10-01',
       currentDate: '2026-10-13',
     });
@@ -28,5 +29,7 @@ describe('weekly archive discovery', () => {
     expect(paths).toContain('/reports/weekly/2026-09-28');
     expect(paths).toContain('/reports/weekly/2026-10-05');
     expect(paths).not.toContain('/reports/weekly/2026-10-12');
+    expect(paths).not.toContain('/reports/weekly/2026-09-21');
+    expect(paths).not.toContain('/reports/weekly/2026-08-31');
   });
 });
