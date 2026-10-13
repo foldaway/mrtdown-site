@@ -21,7 +21,6 @@ export const weeklyMessages = defineMessages({
     id: 'weekly.eyebrow',
     defaultMessage: 'mrtdown · The weekly brief',
   },
-  heading: { id: 'weekly.heading', defaultMessage: 'Your week on the rails.' },
   subtitle: {
     id: 'weekly.subtitle',
     defaultMessage: '{dates}',
@@ -32,35 +31,10 @@ export const weeklyMessages = defineMessages({
       'This week is still underway. We compare it with the same point last week.',
   },
   recap: { id: 'weekly.recap', defaultMessage: 'The week at a glance' },
-  quiet: {
-    id: 'weekly.quiet',
-    defaultMessage:
-      'No disruptions were recorded on Singapore’s MRT and LRT network from {dates}.',
-  },
   summary: {
     id: 'weekly.summary',
     defaultMessage:
       'From {dates}, we recorded {count, plural, one {# disruption} other {# disruptions}} on Singapore’s MRT and LRT network, lasting {duration} in total.',
-  },
-  longest: {
-    id: 'weekly.longest',
-    defaultMessage:
-      'The longest disruption was “{title}”, lasting {duration} within the week.',
-  },
-  countComparison: {
-    id: 'weekly.countComparison',
-    defaultMessage:
-      '{direction, select, same {The disruption count matched the previous week.} more {{count, plural, one {There was # more disruption than the previous week.} other {There were # more disruptions than the previous week.}}} other {{count, plural, one {There was # fewer disruption than the previous week.} other {There were # fewer disruptions than the previous week.}}}}',
-  },
-  timeComparison: {
-    id: 'weekly.timeComparison',
-    defaultMessage:
-      '{direction, select, same {Total disruption time was unchanged.} more {Total disruption time rose by {duration}.} other {Total disruption time fell by {duration}.}}',
-  },
-  partialComparison: {
-    id: 'weekly.partialComparison',
-    defaultMessage:
-      'Compared with the same point last week: {countChange}; {timeChange}.',
   },
   maintenance: {
     id: 'weekly.maintenance',
@@ -160,7 +134,6 @@ export const weeklyMessages = defineMessages({
     id: 'weekly.archiveLink',
     defaultMessage: 'All weekly reports',
   },
-  inProgress: { id: 'weekly.inProgress', defaultMessage: 'In progress' },
   archiveEmpty: {
     id: 'weekly.archiveEmpty',
     defaultMessage: 'No weekly reports are available yet.',

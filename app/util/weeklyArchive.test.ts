@@ -5,8 +5,8 @@ import { buildWeeklyArchive } from './weeklyArchive';
 describe('weekly archive discovery', () => {
   it('lists completed weeks newest first', () => {
     expect(buildWeeklyArchive('2026-09-29', '2026-10-13')).toEqual([
-      { week: '2026-10-05', year: 2026, partial: false },
-      { week: '2026-09-28', year: 2026, partial: false },
+      { week: '2026-10-05', year: 2026 },
+      { week: '2026-09-28', year: 2026 },
     ]);
   });
   it('does not invent reports for invalid or future bounds', () => {

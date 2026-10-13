@@ -93,7 +93,7 @@ function WeeklyArchivePage() {
           <ul className="mt-3 grid gap-x-8 sm:grid-cols-2">
             {weeks
               .filter((week) => week.year === year)
-              .map(({ week, partial }) => (
+              .map(({ week }) => (
                 <li
                   key={week}
                   className="border-gray-200 border-b dark:border-gray-700"
@@ -104,11 +104,6 @@ function WeeklyArchivePage() {
                     className="flex flex-wrap items-center justify-between gap-2 py-4 hover:underline"
                   >
                     <span>{formatReportWeek(week, intl)}</span>
-                    {partial && (
-                      <span className="text-amber-700 text-xs dark:text-amber-300">
-                        {intl.formatMessage(weeklyMessages.inProgress)}
-                      </span>
-                    )}
                   </Link>
                 </li>
               ))}

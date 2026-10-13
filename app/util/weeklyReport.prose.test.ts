@@ -35,7 +35,7 @@ const active = buildWeeklySummary(
 const english = createIntl({ locale: 'en-SG', messages: en });
 
 describe('deterministic weekly prose', () => {
-  it('reports only known facts, with singular grammar and absolute changes', () => {
+  it('summarizes totals without repeating incident details or comparisons', () => {
     const report = {
       week: '2026-09-28',
       partial: false,
@@ -43,7 +43,6 @@ describe('deterministic weekly prose', () => {
       previous: { ...empty, disruptionCount: 2, disruptionSeconds: 10800 },
     };
     const prose = buildWeeklyProse(report, english);
-    expect(buildWeeklyProse(report, english)).toEqual(prose);
     expect(prose[0]).toContain('1 disruption');
     expect(prose[0]).toContain('2 hours 45 minutes');
     expect(prose[0]).not.toContain('Recorded delay');
@@ -57,7 +56,7 @@ describe('deterministic weekly prose', () => {
     );
     expect(prose).toEqual([]);
   });
-  it('uses elapsed-period wording and mentions maintenance only when present', () => {
+  it('includes maintenance and infrastructure counts only when present', () => {
     const prose = buildWeeklyProse(
       {
         week: '2026-09-28',

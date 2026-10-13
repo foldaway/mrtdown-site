@@ -204,11 +204,11 @@ export function buildSitemapPaths({
     return paths;
   }
 
-  for (const { week, partial } of buildWeeklyArchive(
+  for (const { week } of buildWeeklyArchive(
     reportEarliestDate ?? '',
     currentDate,
   )) {
-    if (!partial) paths.push(`/reports/weekly/${week}`);
+    paths.push(`/reports/weekly/${week}`);
   }
 
   const interval = Interval.fromDateTimes(
