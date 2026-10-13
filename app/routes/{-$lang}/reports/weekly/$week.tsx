@@ -91,13 +91,17 @@ export const Route = createFileRoute('/{-$lang}/reports/weekly/$week')({
   },
 });
 
-type MetricProps = { label: string; value: string; detail: string };
+type MetricProps = { label: string; value: string; detail?: string };
 function Metric({ label, value, detail }: MetricProps) {
   return (
     <div className="border-gray-200 border-t py-5 dark:border-gray-700">
       <p className="text-gray-500 text-sm dark:text-gray-400">{label}</p>
       <p className="mt-2 font-bold text-3xl tracking-tight">{value}</p>
-      <p className="mt-2 text-gray-500 text-xs dark:text-gray-400">{detail}</p>
+      {detail && (
+        <p className="mt-2 text-gray-500 text-xs dark:text-gray-400">
+          {detail}
+        </p>
+      )}
     </div>
   );
 }
@@ -238,29 +242,41 @@ function WeeklyReportPage() {
           <Metric
             label={text('disruptions')}
             value={intl.formatNumber(current.disruptionCount)}
-            detail={formatCountChange(
-              current.disruptionCount,
-              previous.disruptionCount,
-              intl,
-            )}
+            detail={
+              previous
+                ? formatCountChange(
+                    current.disruptionCount,
+                    previous.disruptionCount,
+                    intl,
+                  )
+                : undefined
+            }
           />
           <Metric
             label={text('totalTime')}
             value={duration(current.disruptionSeconds)}
-            detail={formatTimeChange(
-              current.disruptionSeconds,
-              previous.disruptionSeconds,
-              intl,
-            )}
+            detail={
+              previous
+                ? formatTimeChange(
+                    current.disruptionSeconds,
+                    previous.disruptionSeconds,
+                    intl,
+                  )
+                : undefined
+            }
           />
           <Metric
             label={text('affected')}
             value={intl.formatNumber(current.lines.length)}
-            detail={formatCountChange(
-              current.lines.length,
-              previous.lines.length,
-              intl,
-            )}
+            detail={
+              previous
+                ? formatCountChange(
+                    current.lines.length,
+                    previous.lines.length,
+                    intl,
+                  )
+                : undefined
+            }
           />
         </div>
       </section>

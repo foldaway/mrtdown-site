@@ -71,13 +71,6 @@ function WeeklyArchivePage() {
   const years = [...new Set(weeks.map((week) => week.year))];
   return (
     <div className="mx-auto w-full max-w-4xl space-y-9 text-gray-900 dark:text-gray-100">
-      <Link
-        to="/{-$lang}/reports"
-        params={{ lang }}
-        className="text-gray-600 text-sm hover:underline dark:text-gray-300"
-      >
-        ← {intl.formatMessage(weeklyMessages.reportsHeading)}
-      </Link>
       <header className="border-gray-900 border-t-4 pt-6 dark:border-gray-100">
         <p className="font-semibold text-gray-500 text-xs uppercase tracking-widest dark:text-gray-400">
           {intl.formatMessage(weeklyMessages.eyebrow)}

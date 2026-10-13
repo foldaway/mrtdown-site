@@ -64,12 +64,15 @@ export const getWeeklyReportFn = createServerFn({ method: 'GET' })
         now,
         dataset.included.stations,
       ),
-      previous: buildWeeklySummary(
-        issues,
-        dataset.included.lines,
-        previousStart,
-        previousEnd,
-        now,
-      ),
+      previous:
+        data.week === earliestWeek
+          ? null
+          : buildWeeklySummary(
+              issues,
+              dataset.included.lines,
+              previousStart,
+              previousEnd,
+              now,
+            ),
     };
   });

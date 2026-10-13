@@ -11,7 +11,7 @@ export type WeeklyBaseline = {
 };
 type InsightInput = {
   current: WeeklySummary;
-  previous: WeeklyBaseline;
+  previous: WeeklyBaseline | null;
   partial: boolean;
   recentWeeks: WeeklyBaseline[];
 };
@@ -105,11 +105,13 @@ function generateWeeklyCandidates({
 
   const insights: WeeklyInsight[] = [];
   if (
+    previous != null &&
     current.disruptionCount < previous.disruptionCount &&
     current.disruptionSeconds > previous.disruptionSeconds
   )
     insights.push({ kind: 'longer' });
   else if (
+    previous != null &&
     current.disruptionCount > previous.disruptionCount &&
     current.disruptionSeconds < previous.disruptionSeconds
   )

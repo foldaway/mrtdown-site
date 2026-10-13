@@ -61,7 +61,7 @@ type WeeklyProseInput = {
   week: string;
   partial: boolean;
   current: WeeklySummary;
-  previous: WeeklySummary;
+  previous: WeeklySummary | null;
 };
 export function buildWeeklyProse(report: WeeklyProseInput, intl: IntlShape) {
   const { current } = report;

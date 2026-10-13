@@ -274,3 +274,21 @@ describe('ranked digest selection', () => {
     expect(result).toEqual([{ kind: 'first', weeks: 4 }]);
   });
 });
+
+describe('unavailable comparison data', () => {
+  it('does not treat a missing previous week as zero', () => {
+    const result = selectWeeklyInsights({
+      ...input,
+      previous: null,
+      recentWeeks: [],
+    });
+    expect(
+      result.some(
+        (insight) =>
+          insight.kind === 'longer' ||
+          insight.kind === 'shorter' ||
+          insight.kind === 'recent',
+      ),
+    ).toBe(false);
+  });
+});
