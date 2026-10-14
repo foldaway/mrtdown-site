@@ -101,3 +101,34 @@ export async function getIssuesOverlappingRange(
 
   return { dataset, issues };
 }
+
+/** Earliest interval from current period revisions, excluding superseded dates. */
+export async function getEarliestRecordedIssueDate(db?: AppDb) {
+  const database = db ?? (await getDefaultDb());
+  const latest = database.$with('earliest_latest_period_events').as(
+    database
+      .selectDistinctOn([impactEventsTable.issue_id], {
+        id: impactEventsTable.id,
+      })
+      .from(impactEventsTable)
+      .where(eq(impactEventsTable.type, 'periods.set'))
+      .orderBy(
+        asc(impactEventsTable.issue_id),
+        desc(impactEventsTable.ts),
+        desc(impactEventsTable.id),
+      ),
+  );
+  const [row] = await database
+    .with(latest)
+    .select({
+      earliest: sql<
+        string | null
+      >`min(${impactEventPeriodsTable.start_at})::text`,
+    })
+    .from(latest)
+    .innerJoin(
+      impactEventPeriodsTable,
+      eq(impactEventPeriodsTable.impact_event_id, latest.id),
+    );
+  return row?.earliest ? parseDateTime(row.earliest).toISODate() : null;
+}

@@ -1,3 +1,4 @@
+import { Menu as DropdownMenu } from '@base-ui/react/menu';
 import { LinkIcon } from '@heroicons/react/16/solid';
 import { Bars3Icon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { ClockIcon } from '@heroicons/react/24/solid';
@@ -13,7 +14,6 @@ import {
 } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
-import { Menu as DropdownMenu } from '@base-ui/react/menu';
 import { useMemo } from 'react';
 import { FormattedDate, FormattedMessage, IntlProvider } from 'react-intl';
 import { LocaleSwitcher } from '~/components/LocaleSwitcher';
@@ -215,6 +215,12 @@ function RouteComponent() {
                       defaultMessage="Statistics"
                     />
                   </Link>
+                  <Link to="/{-$lang}/reports" className={linkClassName}>
+                    <FormattedMessage
+                      id="general.reports"
+                      defaultMessage="Reports"
+                    />
+                  </Link>
                   <Link to="/{-$lang}/about" className={linkClassName}>
                     <FormattedMessage
                       id="general.about"
@@ -344,6 +350,18 @@ function RouteComponent() {
                                 <FormattedMessage
                                   id="general.statistics"
                                   defaultMessage="Statistics"
+                                />
+                              </Link>
+                            </DropdownMenu.Item>
+
+                            <DropdownMenu.Item>
+                              <Link
+                                to="/{-$lang}/reports"
+                                className={linkClassNameMobile}
+                              >
+                                <FormattedMessage
+                                  id="general.reports"
+                                  defaultMessage="Reports"
                                 />
                               </Link>
                             </DropdownMenu.Item>
@@ -483,6 +501,17 @@ function RouteComponent() {
                         <FormattedMessage
                           id="general.history"
                           defaultMessage="History"
+                        />
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        to="/{-$lang}/reports"
+                        className="flex text-sm transition-colors hover:text-accent-light"
+                      >
+                        <FormattedMessage
+                          id="general.reports"
+                          defaultMessage="Reports"
                         />
                       </Link>
                     </li>

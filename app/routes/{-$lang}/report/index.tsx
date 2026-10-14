@@ -1,4 +1,3 @@
-import { usePostHog } from '@posthog/react';
 import {
   ArrowsRightLeftIcon,
   CheckCircleIcon,
@@ -14,9 +13,10 @@ import {
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import {
-  IngestContentCrowdReportEffects,
   type IngestContentCrowdReportEffect,
+  IngestContentCrowdReportEffects,
 } from '@mrtdown/ingest-contracts';
+import { usePostHog } from '@posthog/react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import classNames from 'classnames';
 import { DateTime } from 'luxon';
@@ -1229,18 +1229,16 @@ function ReportPage() {
       const status = result?.data.status ?? 'invalid_success_response';
       posthog.capture('crowd_report_submit_failed', { status });
       showClientError(
-        intl.formatMessage(
-          status === 'rejected'
-            ? {
-                id: 'report.error.not_accepted',
-                defaultMessage:
-                  "Your report was received but wasn't accepted as a community signal. Check the details and try again.",
-              }
-            : {
-                id: 'report.error.submit_failed',
-                defaultMessage: 'Report submission failed. Please try again.',
-              },
-        ),
+        status === 'rejected'
+          ? intl.formatMessage({
+              id: 'report.error.not_accepted',
+              defaultMessage:
+                "Your report was received but wasn't accepted as a community signal. Check the details and try again.",
+            })
+          : intl.formatMessage({
+              id: 'report.error.submit_failed',
+              defaultMessage: 'Report submission failed. Please try again.',
+            }),
       );
       resetTurnstile();
       setSubmitState('idle');

@@ -96,12 +96,19 @@ export function applyPublicDataCacheHeaders(
     return response;
   }
 
+  const reportPolicy =
+    kind === 'html'
+      ? getReportCacheControl(new URL(request.url).pathname)
+      : null;
   try {
     setPublicDataCacheHeaders(response.headers, kind);
+    if (reportPolicy)
+      response.headers.set('Cloudflare-CDN-Cache-Control', reportPolicy);
     return response;
   } catch {
     const headers = new Headers(response.headers);
     setPublicDataCacheHeaders(headers, kind);
+    if (reportPolicy) headers.set('Cloudflare-CDN-Cache-Control', reportPolicy);
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -135,4 +142,17 @@ function setNoStore(response: Response) {
       headers,
     });
   }
+}
+
+function getReportCacheControl(pathname: string) {
+  const path = pathname
+    .replace(/^\/(?:en-SG|zh-Hans|ms|ta)(?=\/)/, '')
+    .replace(/\/$/, '');
+  if (/^\/reports\/weekly\/\d{4}-\d{2}-\d{2}$/.test(path)) {
+    return 'public, max-age=2592000, stale-while-revalidate=86400, stale-if-error=604800';
+  }
+  if (path === '/reports/weekly') {
+    return 'public, max-age=3600, stale-while-revalidate=300, stale-if-error=86400';
+  }
+  return null;
 }

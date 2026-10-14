@@ -65,3 +65,34 @@ are configured on the corresponding Fly app. Both QStash signing keys are
 required outside local `QSTASH_DEV` mode so public workflow requests are
 verified. The deployed image contains only production dependencies and the
 `dist` client/server build output.
+
+## Report Routes
+
+Report URLs reserve a frequency segment for future monthly or annual reports:
+
+- `/reports/weekly`: weekly archive.
+- `/reports/weekly/YYYY-MM-DD`: a weekly report, identified by its Monday in
+  Singapore time.
+- `/reports`: temporarily redirects to `/reports/weekly` with HTTP 302 while
+  weekly reports are the only format. Header and footer links continue to use
+  `/reports` as the stable entry point.
+
+Locale-prefixed routes follow the same structure and preserve the language on
+redirect. Legacy `/weekly` URLs redirect permanently (301) to their equivalents
+under `/reports/weekly`.
+
+When a second format ships, replace the temporary redirect in
+`app/routes/{-$lang}/reports/index.tsx` with a reports index, restore its localized
+metadata and collection JSON-LD, and add `/reports` back to the sitemap. Future
+monthly reports should use `/reports/monthly/YYYY-MM`. Only destination pages
+are currently listed in the sitemap; current-week reports are unavailable until the week ends at Monday 00:00 SGT.
+
+Weekly digest takeaways are deterministic and capped at two. Recorded service
+suspensions take priority over weekday peak-hour overlap (07:00–09:00 and
+17:00–19:00 SGT), then network reach. A second takeaway can identify separate
+incidents in three consecutive weeks or a line returning after at least three
+weeks with no recorded disruptions in the four-week lookback. The recurrence
+rule requires distinct incident IDs; one ongoing incident is not treated as
+repeated breakdowns. These statements describe the records, not passenger delay,
+causes, or proof that service was flawless between incidents. Future advisories
+are not mixed into these historical, long-cached reports.
