@@ -19,7 +19,7 @@ type DispatchRequestFailure = {
   failedCount?: number;
 };
 
-function getAuthorizationState(authorization: string | null) {
+function getHeaderFormat(authorization: string | null) {
   if (authorization == null) return 'missing';
   if (/^(?:Bearer\s+)?REDACTED:/i.test(authorization.trim())) {
     return 'redacted_placeholder';
@@ -38,9 +38,8 @@ export function captureCrowdReportDispatchRequestFailure(
   const context = {
     status: failure.status,
     reason: failure.reason,
-    authorizationState: getAuthorizationState(
-      request.headers.get('authorization'),
-    ),
+    // Avoid "authorization" in this safe enum's key: Sentry scrubs that name.
+    headerFormat: getHeaderFormat(request.headers.get('authorization')),
     internalTokensConfigured: Boolean(process.env.INTERNAL_API_TOKENS?.trim()),
     hasQstashSignature: request.headers.has('upstash-signature'),
     qstashMessageId: request.headers.get('upstash-message-id')?.slice(0, 200),

@@ -84,7 +84,7 @@ describe('crowd report dispatch diagnostics', () => {
       contexts: {
         trace: { trace_id: 'a'.repeat(32), span_id: 'b'.repeat(16) },
         crowd_report_dispatch: {
-          authorizationState: 'bearer',
+          headerFormat: 'bearer',
           hasQstashSignature: true,
           qstashMessageId: 'msg_test',
           qstashScheduleId: 'mrtdown-production-crowd-report-dispatch',
@@ -119,7 +119,7 @@ describe('crowd report dispatch diagnostics', () => {
       );
       await Sentry.flush();
       expect(events[0].contexts?.crowd_report_dispatch).toMatchObject({
-        authorizationState: 'redacted_placeholder',
+        headerFormat: 'redacted_placeholder',
       });
       expect(JSON.stringify(events)).not.toContain('secret-hash');
     },
