@@ -25,6 +25,7 @@ import {
   crowdReportStationsTable,
   crowdReportsTable,
 } from '~/db/schema';
+import { captureCrowdReportDispatchAfterSubmissionFailure } from './crowdReportDispatchDiagnostics';
 import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
 
 const DEFAULT_DISPATCH_OWNER = 'foldaway';
@@ -831,6 +832,13 @@ export function triggerCrowdReportDispatchAfterSubmission(
   const rootUrl = environment.VITE_ROOT_URL?.trim();
   const token = environment.CROWD_REPORT_DISPATCH_GITHUB_TOKEN?.trim();
   if (!rootUrl || !token) {
+    captureCrowdReportDispatchAfterSubmissionFailure({
+      reason: 'missing_configuration',
+      missingConfiguration: [
+        ...(!rootUrl ? ['VITE_ROOT_URL'] : []),
+        ...(!token ? ['CROWD_REPORT_DISPATCH_GITHUB_TOKEN'] : []),
+      ],
+    });
     return false;
   }
 
@@ -847,9 +855,20 @@ export function triggerCrowdReportDispatchAfterSubmission(
       for (const failure of result.results.filter((item) => !item.success)) {
         console.error('Crowd report dispatch after submission failed', failure);
       }
+      if (result.failed > 0) {
+        captureCrowdReportDispatchAfterSubmissionFailure({
+          reason: 'dispatch_failed',
+          candidateCount: result.count,
+          failedCount: result.failed,
+        });
+      }
     })
     .catch((error: unknown) => {
       console.error('Crowd report dispatch after submission failed', { error });
+      captureCrowdReportDispatchAfterSubmissionFailure({
+        reason: 'dispatch_exception',
+        error,
+      });
     });
 
   return true;

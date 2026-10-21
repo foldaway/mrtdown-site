@@ -118,6 +118,13 @@ events cover 400/401 request rejections, 503 configuration failures, and 207
 dispatch failures; unhandled exceptions continue through the existing Sentry
 server instrumentation.
 
+Immediate dispatch after a submission also reports missing configuration, failed
+candidate counts, and caught background exceptions to Sentry with
+`component:crowd-report-dispatch` and `trigger:submission`. Exception stacks and
+sanitized ingest validation paths are retained; original error messages and the
+submitting request's body, headers, and breadcrumbs are excluded. Reporting does
+not make the submission wait for dispatch or remove the scheduled retry backstop.
+
 ### Programmatic crowd reports
 
 Registered machine producers submit structured reports to

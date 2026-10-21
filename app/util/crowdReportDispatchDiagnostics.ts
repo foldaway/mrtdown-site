@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/tanstackstart-react';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 const DISPATCH_PATH = '/internal/api/tasks/crowd-report-dispatch';
 
@@ -18,6 +18,57 @@ type DispatchRequestFailure = {
   candidateCount?: number;
   failedCount?: number;
 };
+
+type SubmissionDispatchFailure =
+  | { reason: 'missing_configuration'; missingConfiguration: string[] }
+  | { reason: 'dispatch_failed'; candidateCount: number; failedCount: number }
+  | { reason: 'dispatch_exception'; error: unknown };
+
+type DispatchDiagnostic = {
+  message: string;
+  reason: string;
+  trigger: 'request' | 'submission';
+  status?: number;
+  context: Record<string, unknown>;
+  request?: Request;
+  error?: unknown;
+};
+
+function validationDetails(issues: z.core.$ZodIssue[] | undefined) {
+  const fields = [
+    'dryRun',
+    'kind',
+    'limit',
+    'content',
+    'source',
+    'reportId',
+    'text',
+    'createdAt',
+    'observedAt',
+    'lineIds',
+    'stationIds',
+    'directionText',
+    'effect',
+    'delayMinutes',
+    'reportCount',
+    'url',
+  ];
+  return {
+    validationIssueCount: issues?.length,
+    // Keep these flat so Sentry's context depth limit preserves the details.
+    // Messages and unknown field names can contain submitted values.
+    validationIssues: issues?.slice(0, 20).map((issue) => {
+      const path = issue.path
+        .map((part) =>
+          typeof part === 'number' || fields.includes(String(part))
+            ? part
+            : '<unknown>',
+        )
+        .join('.');
+      return `${issue.code}:${path || '<root>'}`;
+    }),
+  };
+}
 
 function getHeaderFormat(authorization: string | null) {
   if (authorization == null) return 'missing';
@@ -47,28 +98,88 @@ export function captureCrowdReportDispatchRequestFailure(
     cloudflareRayId: request.headers.get('cf-ray')?.slice(0, 200),
     candidateCount: failure.candidateCount,
     failedCount: failure.failedCount,
-    // Zod messages and unknown field names can contain submitted values.
-    validationIssueCount: failure.issues?.length,
-    // Keep these flat so Sentry's context depth limit preserves the details.
-    validationIssues: failure.issues?.slice(0, 20).map((issue) => {
-      const path = issue.path
-        .map((part) =>
-          ['dryRun', 'kind', 'limit'].includes(String(part))
-            ? part
-            : '<unknown>',
-        )
-        .join('.');
-      return `${issue.code}:${path || '<root>'}`;
-    }),
+    ...validationDetails(failure.issues),
   };
 
+  captureDispatchDiagnostic({
+    message: 'Crowd report dispatch request failed',
+    trigger: 'request',
+    reason: failure.reason,
+    status: failure.status,
+    request,
+    context,
+  });
+}
+
+/** Submission dispatch runs after the request commits and catches its own errors. */
+export function captureCrowdReportDispatchAfterSubmissionFailure(
+  failure: SubmissionDispatchFailure,
+) {
+  const isException = failure.reason === 'dispatch_exception';
+  const validationError =
+    isException && failure.error instanceof z.ZodError
+      ? failure.error
+      : undefined;
+  captureDispatchDiagnostic({
+    message: 'Crowd report dispatch after submission failed',
+    trigger: 'submission',
+    reason: failure.reason,
+    ...(isException ? { error: failure.error } : {}),
+    context: {
+      reason: failure.reason,
+      ...(failure.reason === 'missing_configuration'
+        ? { missingConfiguration: failure.missingConfiguration }
+        : failure.reason === 'dispatch_failed'
+          ? {
+              candidateCount: failure.candidateCount,
+              failedCount: failure.failedCount,
+            }
+          : {
+              errorType: validationError
+                ? 'ZodError'
+                : failure.error instanceof Error
+                  ? 'Error'
+                  : 'non_error',
+            }),
+      ...validationDetails(validationError?.issues),
+    },
+  });
+}
+
+function captureDispatchDiagnostic(diagnostic: DispatchDiagnostic) {
+  const url = diagnostic.request ? new URL(diagnostic.request.url) : undefined;
+  const metadata = {
+    level:
+      diagnostic.trigger === 'request' &&
+      diagnostic.status != null &&
+      diagnostic.status < 500 &&
+      diagnostic.status !== 207
+        ? ('warning' as const)
+        : ('error' as const),
+    tags: {
+      component: 'crowd-report-dispatch',
+      trigger: diagnostic.trigger,
+      reason: diagnostic.reason,
+      ...(diagnostic.status == null
+        ? {}
+        : { 'http.status_code': String(diagnostic.status) }),
+    },
+    fingerprint: [
+      'crowd-report-dispatch',
+      diagnostic.status == null
+        ? diagnostic.trigger
+        : String(diagnostic.status),
+      diagnostic.reason,
+    ],
+  };
   try {
     Sentry.withScope((scope) => {
       scope.addEventProcessor((event) => ({
         ...event,
+        message: diagnostic.message,
         // Replace ambient SDK request data as well as our explicit context.
-        request: {
-          method: request.method,
+        request: url && {
+          method: diagnostic.request?.method,
           url: `${url.origin}${DISPATCH_PATH}`,
         },
         contexts: {
@@ -79,29 +190,36 @@ export function captureCrowdReportDispatchRequestFailure(
             op: event.contexts.trace.op,
             status: event.contexts.trace.status,
           },
-          crowd_report_dispatch: context,
+          crowd_report_dispatch: diagnostic.context,
         },
         extra: undefined,
         breadcrumbs: undefined,
         user: undefined,
-      }));
-      Sentry.captureEvent({
-        message: 'Crowd report dispatch request failed',
-        level:
-          failure.status === 207 || failure.status === 503
-            ? 'error'
-            : 'warning',
-        tags: {
-          component: 'crowd-report-dispatch',
-          'http.status_code': String(failure.status),
-          reason: failure.reason,
+        // Preserve exception stacks, but not error messages or cause data that
+        // can contain GitHub response text, SQL parameters, or report content.
+        exception: event.exception && {
+          values: event.exception.values?.map((exception) => ({
+            type:
+              diagnostic.context.errorType === 'ZodError'
+                ? 'ZodError'
+                : 'Error',
+            value: diagnostic.message,
+            stacktrace: exception.stacktrace && {
+              ...exception.stacktrace,
+              frames: exception.stacktrace.frames?.map((frame) => ({
+                ...frame,
+                vars: undefined,
+              })),
+            },
+            mechanism: { type: 'generic', handled: true },
+          })),
         },
-        fingerprint: [
-          'crowd-report-dispatch',
-          String(failure.status),
-          failure.reason,
-        ],
-      });
+      }));
+      if ('error' in diagnostic) {
+        Sentry.captureException(diagnostic.error, metadata);
+      } else {
+        Sentry.captureEvent({ message: diagnostic.message, ...metadata });
+      }
     });
   } catch {
     // Observability must not change the endpoint's response or leak SDK errors.

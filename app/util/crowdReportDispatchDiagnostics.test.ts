@@ -1,7 +1,10 @@
 import * as Sentry from '@sentry/tanstackstart-react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { captureCrowdReportDispatchRequestFailure } from './crowdReportDispatchDiagnostics';
+import {
+  captureCrowdReportDispatchAfterSubmissionFailure,
+  captureCrowdReportDispatchRequestFailure,
+} from './crowdReportDispatchDiagnostics';
 
 const URL = 'https://www.mrtdown.org/internal/api/tasks/crowd-report-dispatch';
 type TestEnvelope = readonly [
@@ -152,5 +155,102 @@ describe('crowd report dispatch diagnostics', () => {
     );
     await Sentry.flush();
     expect(events).toEqual([]);
+  });
+
+  it('reports background exceptions with stacks while excluding the submitting request and error text', async () => {
+    const error = new Error('private-upstream-response', {
+      cause: new Error('private-cause'),
+    });
+    Sentry.withScope((scope) => {
+      scope.setExtra('payload', 'private-report');
+      scope.addBreadcrumb({ message: 'private-log' });
+      scope.addEventProcessor((event) => ({
+        ...event,
+        request: {
+          url: 'https://www.mrtdown.org/api/reports',
+          headers: { authorization: 'Bearer private-token' },
+          data: 'private-body',
+        },
+      }));
+      captureCrowdReportDispatchAfterSubmissionFailure({
+        reason: 'dispatch_exception',
+        error,
+      });
+    });
+    await Sentry.flush();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      level: 'error',
+      tags: {
+        component: 'crowd-report-dispatch',
+        trigger: 'submission',
+        reason: 'dispatch_exception',
+      },
+      contexts: { crowd_report_dispatch: { errorType: 'Error' } },
+    });
+    expect(events[0].request).toBeUndefined();
+    expect(events[0].exception?.values?.[0]).toMatchObject({
+      value: 'Crowd report dispatch after submission failed',
+      stacktrace: { frames: expect.any(Array) },
+    });
+    expect(
+      events[0].exception?.values?.[0].stacktrace?.frames?.length,
+    ).toBeGreaterThan(0);
+    expect(JSON.stringify(events)).not.toContain('private-');
+  });
+
+  it('includes sanitized ingest validation details for rejected background payloads', async () => {
+    const parsed = z
+      .object({
+        content: z.array(
+          z.object({ observedAt: z.iso.datetime({ offset: true }) }),
+        ),
+      })
+      .safeParse({ content: [{ observedAt: 'private-timestamp' }] });
+    if (parsed.success) throw new Error('Expected validation failure');
+    captureCrowdReportDispatchAfterSubmissionFailure({
+      reason: 'dispatch_exception',
+      error: parsed.error,
+    });
+    await Sentry.flush();
+    expect(events[0].contexts?.crowd_report_dispatch).toMatchObject({
+      errorType: 'ZodError',
+      validationIssues: ['invalid_format:content.0.observedAt'],
+    });
+    expect(JSON.stringify(events)).not.toContain('private-timestamp');
+  });
+
+  it.each(['private-thrown-value', { response: 'private-response' }])(
+    'does not expose non-Error rejection values: %j',
+    async (error) => {
+      captureCrowdReportDispatchAfterSubmissionFailure({
+        reason: 'dispatch_exception',
+        error,
+      });
+      await Sentry.flush();
+      expect(events).toHaveLength(1);
+      expect(events[0].contexts?.crowd_report_dispatch).toMatchObject({
+        errorType: 'non_error',
+      });
+      expect(JSON.stringify(events)).not.toContain('private-');
+    },
+  );
+
+  it('reports missing configuration by name without credential values', async () => {
+    captureCrowdReportDispatchAfterSubmissionFailure({
+      reason: 'missing_configuration',
+      missingConfiguration: ['CROWD_REPORT_DISPATCH_GITHUB_TOKEN'],
+    });
+    await Sentry.flush();
+    expect(events[0]).toMatchObject({
+      message: 'Crowd report dispatch after submission failed',
+      tags: { trigger: 'submission', reason: 'missing_configuration' },
+      contexts: {
+        crowd_report_dispatch: {
+          missingConfiguration: ['CROWD_REPORT_DISPATCH_GITHUB_TOKEN'],
+        },
+      },
+    });
   });
 });
