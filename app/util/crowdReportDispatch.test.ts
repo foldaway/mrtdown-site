@@ -66,11 +66,12 @@ function makeFakeClusterCandidateDb(stillHappening = true) {
         stillHappening,
       },
     ],
-  ];
+  ] satisfies [unknown[], unknown[], unknown[], unknown[]];
   let selectCount = 0;
 
   return {
     whereCalls,
+    selectResults,
     db: {
       select() {
         const selectIndex = selectCount;
@@ -434,6 +435,42 @@ describe('getDispatchableCrowdReportCandidates', () => {
       'text',
       expect.stringContaining('no longer happening'),
     );
+  });
+
+  it('counts the reports included in a cluster payload and normalizes Postgres timestamps', async () => {
+    const fake = makeFakeClusterCandidateDb();
+    const cluster = fake.selectResults[0][0];
+    // The old SELECT subquery returned zero despite three eligible reports.
+    cluster.reportCount = 0;
+    cluster.updatedAt = '2026-10-21 00:22:59.482937+00';
+    const reports = fake.selectResults[3];
+    const report = reports[0];
+    report.observedAt = '2026-10-21 00:22:00+00';
+    reports.push(
+      { ...report, id: 'report-2', observedAt: '2026-10-21 00:20:00+00' },
+      { ...report, id: 'report-3', observedAt: '2026-10-21 00:21:00+00' },
+    );
+
+    const candidates = await getDispatchableCrowdReportCandidates(
+      fake.db as never,
+      {
+        kind: 'cluster',
+        limit: 1,
+        rootUrl: 'https://mrtdown.example',
+      },
+    );
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].reportIds).toEqual([
+      'report-1',
+      'report-2',
+      'report-3',
+    ]);
+    expect(candidates[0].payload.content[0]).toMatchObject({
+      reportCount: 3,
+      observedAt: '2026-10-21T00:20:00+00:00',
+      createdAt: '2026-10-21T00:22:59.482937+00:00',
+    });
   });
 
   it('marks only the report IDs included in a cluster dispatch payload', async () => {

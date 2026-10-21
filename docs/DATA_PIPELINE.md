@@ -88,6 +88,10 @@ endpoint builds an
 `mrtdown-data` `repository_dispatch` ingest workflow, and records dispatch
 success or failure on the site-local report rows.
 
+Dispatch converts Postgres timestamp strings to the ISO format required by the
+ingest contract. A cluster's exported report count comes from the same eligible
+report rows as its payload's report IDs, rather than a separate count query.
+
 Configure `CROWD_REPORT_DISPATCH_GITHUB_TOKEN` as a deployed secret. Optional
 overrides are `CROWD_REPORT_DISPATCH_GITHUB_OWNER`,
 `CROWD_REPORT_DISPATCH_GITHUB_REPO`, and

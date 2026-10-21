@@ -1,8 +1,8 @@
 import {
-  IngestContentCrowdReportSource,
-  IngestPayloadSchema,
   type IngestContentCrowdReport,
+  IngestContentCrowdReportSource,
   type IngestPayload,
+  IngestPayloadSchema,
 } from '@mrtdown/ingest-contracts';
 import {
   and,
@@ -19,11 +19,11 @@ import { DateTime } from 'luxon';
 import {
   crowdReportAbuseEventsTable,
   crowdReportClusterLinesTable,
-  crowdReportClustersTable,
   crowdReportClusterStationsTable,
+  crowdReportClustersTable,
   crowdReportLinesTable,
-  crowdReportsTable,
   crowdReportStationsTable,
+  crowdReportsTable,
 } from '~/db/schema';
 import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
 
@@ -118,7 +118,10 @@ export function getCrowdReportDispatchLimit(value: string | undefined) {
 }
 
 function normalizeTimestamp(value: string | Date) {
-  return value instanceof Date ? value.toISOString() : value;
+  if (value instanceof Date) return value.toISOString();
+  // Drizzle's timestamp string mode preserves Postgres's space and +HH offset.
+  // Keep validation in the ingest contract, including rejecting missing offsets.
+  return value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
 }
 
 function hasCrowdReportClusterScope() {
@@ -170,19 +173,6 @@ function getCrowdReportClusterOngoingDistinctIpHashCountSql() {
     where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
       and ${crowdReportsTable.status} in ('accepted', 'duplicate')
       and ${crowdReportsTable.still_happening} is true
-  )`;
-}
-
-function getCrowdReportClusterDispatchReportCountSql() {
-  return sql<number>`(
-    select count(*)::int
-    from ${crowdReportsTable}
-    where ${crowdReportsTable.cluster_id} = ${crowdReportClustersTable.id}
-      and ${crowdReportsTable.status} in ('accepted', 'duplicate')
-      and (
-        ${crowdReportsTable.still_happening} is true
-        or ${crowdReportsTable.producer} <> 'public'
-      )
   )`;
 }
 
@@ -309,7 +299,6 @@ async function getDispatchableCrowdReportClusterCandidates(
     .select({
       id: crowdReportClustersTable.id,
       effect: crowdReportClustersTable.effect,
-      reportCount: getCrowdReportClusterDispatchReportCountSql(),
       windowEndAt: crowdReportClustersTable.window_end_at,
       updatedAt: crowdReportClustersTable.updated_at,
     })
@@ -404,7 +393,7 @@ async function getDispatchableCrowdReportClusterCandidates(
         directionText: representative.directionText,
         effect: cluster.effect,
         delayMinutes: representative.delayMinutes,
-        reportCount: cluster.reportCount,
+        reportCount: reports.length,
         isStillHappening: representative.stillHappening,
         rootUrl: options.rootUrl,
       }),
