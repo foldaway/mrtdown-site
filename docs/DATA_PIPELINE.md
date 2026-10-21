@@ -103,6 +103,16 @@ canonical pull. Use
 `CROWD_REPORT_DISPATCH_LIMIT` to tune the maximum number of dispatch candidates
 processed per scheduled run.
 
+Handled dispatch endpoint failures emit a Sentry event named `Crowd report
+dispatch request failed`, tagged `component:crowd-report-dispatch`, with the HTTP
+status and failure reason. The `crowd_report_dispatch` context includes QStash
+message and schedule IDs, the Cloudflare Ray ID, authorization state (including
+a literal redaction placeholder), and sanitized validation codes and field paths.
+Credentials, signatures, raw bodies, and parser error text are excluded. These
+events cover 400/401 request rejections, 503 configuration failures, and 207
+dispatch failures; unhandled exceptions continue through the existing Sentry
+server instrumentation.
+
 ### Programmatic crowd reports
 
 Registered machine producers submit structured reports to
