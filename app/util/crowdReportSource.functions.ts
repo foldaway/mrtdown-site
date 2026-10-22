@@ -14,6 +14,7 @@ import {
   stationsTable,
 } from '~/db/schema';
 import type { CrowdReportEffect } from './crowdReports';
+import { getCrowdReportClusterDirection } from './crowdReportClustering';
 
 const CrowdReportSourceKindSchema = z.enum(['cluster', 'report']);
 
@@ -48,6 +49,7 @@ export type CrowdReportSource = {
   updatedAt: string;
   dispatchedAt: string | null;
   directionText: string | null;
+  directionStation: CrowdReportSourceStation | null;
   delayMinutes: number | null;
   stillHappening: boolean | null;
   lines: CrowdReportSourceLine[];
@@ -59,6 +61,31 @@ function toIsoString(value: Date | string | null) {
     return null;
   }
   return value instanceof Date ? value.toISOString() : value;
+}
+
+async function getDirectionStation(
+  db: AppDb,
+  directionText: string | null,
+  affectedStations: CrowdReportSourceStation[],
+): Promise<CrowdReportSourceStation | null> {
+  if (!directionText?.startsWith('towards:')) {
+    return null;
+  }
+  const stationId = directionText.slice('towards:'.length);
+  const affectedStation = affectedStations.find(
+    (station) => station.id === stationId,
+  );
+  if (affectedStation != null) {
+    return affectedStation;
+  }
+
+  // A direction's destination can be outside the reported affected area.
+  const [station] = await db
+    .select({ id: stationsTable.id, name: stationsTable.name })
+    .from(stationsTable)
+    .where(eq(stationsTable.id, stationId))
+    .limit(1);
+  return station ?? null;
 }
 
 function hasClusterScopeSql(clusterId: string) {
@@ -167,6 +194,7 @@ async function getClusterSource(
   }
 
   const representative = reports[0];
+  const directionText = getCrowdReportClusterDirection(reports);
   const observedValues = reports.map((report) => report.observedAt);
 
   return {
@@ -189,7 +217,8 @@ async function getClusterSource(
         : cluster.windowEndAt,
     updatedAt: toIsoString(cluster.updatedAt) ?? cluster.windowEndAt,
     dispatchedAt: toIsoString(cluster.dispatchedAt),
-    directionText: representative?.directionText ?? null,
+    directionText,
+    directionStation: await getDirectionStation(db, directionText, stations),
     delayMinutes: representative?.delayMinutes ?? null,
     stillHappening: representative?.stillHappening ?? null,
     lines,
@@ -264,6 +293,11 @@ async function getReportSource(
     updatedAt: toIsoString(report.updatedAt) ?? report.observedAt,
     dispatchedAt: toIsoString(report.dispatchedAt),
     directionText: report.directionText,
+    directionStation: await getDirectionStation(
+      db,
+      report.directionText,
+      stations,
+    ),
     delayMinutes: report.delayMinutes,
     stillHappening: report.stillHappening,
     lines,

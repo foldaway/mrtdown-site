@@ -18,6 +18,7 @@ import {
   useIntl,
 } from 'react-intl';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { getCrowdReportDirectionLabel } from '~/helpers/getCrowdReportDirectionLabel';
 import { buildSeoMetadata } from '~/helpers/seo';
 import { assert } from '~/util/assert';
 import { loadOrNotFound } from '~/util/loadOrNotFound';
@@ -187,10 +188,12 @@ function SourceStatusBadge(props: SourceStatusBadgeProps) {
   );
 }
 
-function FactCard(props: {
+type FactCardProps = {
   label: MessageDescriptor;
   children: React.ReactNode;
-}) {
+};
+
+function FactCard(props: FactCardProps) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
       <dt className="font-medium text-gray-500 text-xs uppercase tracking-wide dark:text-gray-400">
@@ -410,12 +413,7 @@ function CommunityReportSourcePage() {
               />
             </dt>
             <dd className="mt-1 text-gray-900 text-sm dark:text-gray-100">
-              {source.directionText ?? (
-                <FormattedMessage
-                  id="community_report_source.not_provided"
-                  defaultMessage="Not provided"
-                />
-              )}
+              {getCrowdReportDirectionLabel(source, intl)}
             </dd>
           </div>
           <div>

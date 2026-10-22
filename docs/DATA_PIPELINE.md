@@ -79,6 +79,18 @@ migrations and run the canonical pull or authenticated facts rebuild.
 
 ## Crowd Report Dispatch
 
+Before dispatch, reports within 10 minutes of an existing observation join the
+same incident when they identify the same line set, even if they name different
+stations. Reports without line context require the same station set. Unknown
+effects and unspecified directions can join specific reports; conflicting known
+effects or directions stay separate. The cluster retains the union of reported
+stations and adopts a known effect when its original effect was unknown.
+The evidence page and dispatch payload use the latest specified direction, so
+an unspecified direction on a newer report does not erase an earlier one.
+Recent corroborating reports extend the matching window while keeping a direct
+reference to the original report. Dispatched clusters remain closed, and
+existing clusters are not retroactively merged.
+
 Accepted crowdsourced reports and accepted report clusters trigger a
 best-effort dispatch attempt as soon as the submission transaction commits. The
 submission response does not wait for GitHub, and accepted rows stay pending if

@@ -107,7 +107,9 @@ function makeFakeDb(
               },
             };
           }
-          return Promise.resolve();
+          return Object.assign(Promise.resolve(), {
+            onConflictDoNothing: () => Promise.resolve(),
+          });
         },
       };
     },

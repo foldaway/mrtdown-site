@@ -27,6 +27,7 @@ import {
 } from '~/db/schema';
 import { captureCrowdReportDispatchAfterSubmissionFailure } from './crowdReportDispatchDiagnostics';
 import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
+import { getCrowdReportClusterDirection } from './crowdReportClustering';
 
 const DEFAULT_DISPATCH_OWNER = 'foldaway';
 const DEFAULT_DISPATCH_REPO = 'mrtdown-data';
@@ -391,7 +392,7 @@ async function getDispatchableCrowdReportClusterCandidates(
         observedAt,
         lineIds,
         stationIds,
-        directionText: representative.directionText,
+        directionText: getCrowdReportClusterDirection(reports),
         effect: cluster.effect,
         delayMinutes: representative.delayMinutes,
         reportCount: reports.length,
