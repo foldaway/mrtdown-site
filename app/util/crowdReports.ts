@@ -2,18 +2,7 @@ import {
   type IngestContentCrowdReportEffect,
   IngestContentCrowdReportEffectSchema,
 } from '@mrtdown/ingest-contracts';
-import {
-  and,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNull,
-  lte,
-  ne,
-  or,
-  sql,
-} from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
 import {
@@ -34,6 +23,11 @@ import {
   crowdReportStationsTable,
 } from '~/db/schema';
 import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
+import { buildCrowdReportClusteringLockKey } from './crowdReportClustering';
+import {
+  findDuplicateCrowdReport,
+  type DuplicateCrowdReport,
+} from './crowdReportDeduplication';
 import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
 const SG_TIMEZONE = 'Asia/Singapore';
@@ -48,7 +42,6 @@ const DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES = 90;
 const DEFAULT_PUBLIC_SIGNAL_LIMIT = 20;
 const AUTO_REJECT_RESOLVED_STALE_HOURS = 6;
 const AUTO_REJECT_UNCONFIRMED_STALE_HOURS = 12;
-const DUPLICATE_CANDIDATE_PAGE_SIZE = 100;
 export const MAX_CROWD_REPORT_REQUEST_BYTES = 10_000;
 
 export const CrowdReportEffectSchema = IngestContentCrowdReportEffectSchema;
@@ -166,12 +159,6 @@ type ClusterCrowdReportOptions = {
   idFactory?: () => string;
 };
 
-type DuplicateCrowdReport = {
-  id: string;
-  clusterId: string | null;
-  observedAt: string;
-};
-
 type CrowdReportAutomationPolicyResult =
   | { action: 'accept' }
   | { action: 'reject'; reason: string };
@@ -203,32 +190,6 @@ export type TurnstileVerificationOptions = {
 export type TurnstileVerificationResult =
   | { success: true; outcome: 'skipped' | 'passed' }
   | { success: false; outcome: 'missing_token' | 'failed'; error: string };
-
-function normalizeComparableText(value: string | null | undefined) {
-  return value?.trim().toLocaleLowerCase() ?? '';
-}
-
-function normalizeIdSet(values: string[]) {
-  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
-}
-
-function areSameIdSets(left: string[], right: string[]) {
-  const normalizedLeft = normalizeIdSet(left);
-  const normalizedRight = normalizeIdSet(right);
-  return (
-    normalizedLeft.length === normalizedRight.length &&
-    normalizedLeft.every((value, index) => value === normalizedRight[index])
-  );
-}
-
-function buildDuplicateLockKey(submission: CrowdReportSubmission) {
-  return JSON.stringify({
-    effect: submission.effect ?? null,
-    directionText: normalizeComparableText(submission.directionText),
-    lineIds: normalizeIdSet(submission.lineIds),
-    stationIds: normalizeIdSet(submission.stationIds),
-  });
-}
 
 async function lockCrowdReportClusterDispatchInTransaction(
   tx: Pick<CrowdReportTransaction, 'execute'>,
@@ -1092,110 +1053,6 @@ async function findInvalidDirectionStationIds(
     : [submission.directionStationId];
 }
 
-async function findDuplicateCrowdReport(
-  db: CrowdReportReadableDb,
-  reportId: string,
-  submission: CrowdReportSubmission,
-  duplicateWindowMinutes: number,
-) {
-  const observedAt = DateTime.fromISO(submission.observedAt, {
-    setZone: true,
-  });
-  const windowStartAt = observedAt
-    .minus({ minutes: duplicateWindowMinutes })
-    .toUTC()
-    .toISO();
-  const windowEndAt = observedAt
-    .plus({ minutes: duplicateWindowMinutes })
-    .toUTC()
-    .toISO();
-  if (windowStartAt == null || windowEndAt == null) {
-    return undefined;
-  }
-
-  let offset = 0;
-  while (true) {
-    const candidates = await db
-      .select({
-        id: crowdReportsTable.id,
-        observedAt: crowdReportsTable.observed_at,
-        status: crowdReportsTable.status,
-        directionText: crowdReportsTable.direction_text,
-        clusterId: crowdReportsTable.cluster_id,
-      })
-      .from(crowdReportsTable)
-      .where(
-        and(
-          ne(crowdReportsTable.id, reportId),
-          submission.effect == null
-            ? isNull(crowdReportsTable.effect)
-            : eq(crowdReportsTable.effect, submission.effect),
-          eq(crowdReportsTable.status, 'accepted'),
-          gte(crowdReportsTable.observed_at, windowStartAt),
-          lte(crowdReportsTable.observed_at, windowEndAt),
-        ),
-      )
-      .orderBy(desc(crowdReportsTable.created_at))
-      .offset(offset)
-      .limit(DUPLICATE_CANDIDATE_PAGE_SIZE);
-
-    const candidateIds = candidates.map((candidate) => candidate.id);
-    if (candidateIds.length === 0) {
-      return undefined;
-    }
-
-    const [candidateLines, candidateStations] = await Promise.all([
-      db
-        .select({
-          reportId: crowdReportLinesTable.report_id,
-          lineId: crowdReportLinesTable.line_id,
-        })
-        .from(crowdReportLinesTable)
-        .where(inArray(crowdReportLinesTable.report_id, candidateIds))
-        .limit(DUPLICATE_CANDIDATE_PAGE_SIZE * 8),
-      db
-        .select({
-          reportId: crowdReportStationsTable.report_id,
-          stationId: crowdReportStationsTable.station_id,
-        })
-        .from(crowdReportStationsTable)
-        .where(inArray(crowdReportStationsTable.report_id, candidateIds))
-        .limit(DUPLICATE_CANDIDATE_PAGE_SIZE * 16),
-    ]);
-
-    for (const candidate of candidates) {
-      if (candidate.status !== 'accepted') {
-        continue;
-      }
-      if (
-        normalizeComparableText(candidate.directionText) !==
-        normalizeComparableText(submission.directionText)
-      ) {
-        continue;
-      }
-
-      const lineIds = candidateLines
-        .filter((line) => line.reportId === candidate.id)
-        .map((line) => line.lineId);
-      const stationIds = candidateStations
-        .filter((station) => station.reportId === candidate.id)
-        .map((station) => station.stationId);
-
-      if (
-        areSameIdSets(lineIds, submission.lineIds) &&
-        areSameIdSets(stationIds, submission.stationIds)
-      ) {
-        return candidate;
-      }
-    }
-
-    if (candidates.length < DUPLICATE_CANDIDATE_PAGE_SIZE) {
-      return undefined;
-    }
-    offset += DUPLICATE_CANDIDATE_PAGE_SIZE;
-  }
-}
-
 export async function automoderateCrowdReport(
   db: AppDb,
   reportId: string,
@@ -1235,7 +1092,7 @@ async function automoderateCrowdReportInTransaction(
   trustedSubmission = false,
 ) {
   await tx.execute(
-    sql`select pg_advisory_xact_lock(hashtextextended(${buildDuplicateLockKey(submission)}, 0::bigint))`,
+    sql`select pg_advisory_xact_lock(hashtextextended(${buildCrowdReportClusteringLockKey(submission)}, 0::bigint))`,
   );
 
   const policy = assessCrowdReportAutomationPolicy(submission, now);
@@ -1432,18 +1289,27 @@ async function clusterModeratedCrowdReportInTransaction(
     return;
   }
 
-  const clusterId =
-    duplicate.clusterId ??
-    (await createCrowdReportClusterInTransaction(
+  let clusterId = duplicate.clusterId;
+  if (clusterId == null) {
+    // Seed legacy incidents from the original observation's time and scope.
+    clusterId = await createCrowdReportClusterInTransaction(
       tx,
       duplicate.id,
-      { ...submission, observedAt: duplicate.observedAt },
+      {
+        ...submission,
+        observedAt: duplicate.observedAt,
+        lineIds: duplicate.lineIds,
+        stationIds: duplicate.stationIds,
+        effect: duplicate.effect ?? 'unknown',
+        directionText: duplicate.directionText ?? undefined,
+      },
       clusterWindowMinutes,
       idFactory,
       publicSignalMinReports,
       publicSignalMinDistinctIpHashes,
       trustedSubmission,
-    ));
+    );
+  }
   const { windowStartAt, windowEndAt } = getCrowdReportClusterWindow(
     submission.observedAt,
     clusterWindowMinutes,
@@ -1458,9 +1324,29 @@ async function clusterModeratedCrowdReportInTransaction(
     .where(eq(crowdReportsTable.id, reportId))
     .returning({ id: crowdReportsTable.id });
 
+  // Keep every observation's scope on the shared incident while preserving
+  // the original per-report references for provenance.
+  if (submission.stationIds.length > 0) {
+    await tx
+      .insert(crowdReportClusterStationsTable)
+      .values(
+        submission.stationIds.map((stationId) => ({
+          cluster_id: clusterId,
+          station_id: stationId,
+        })),
+      )
+      .onConflictDoNothing();
+  }
+
   await tx
     .update(crowdReportClustersTable)
     .set({
+      effect: sql`case
+        when ${crowdReportClustersTable.effect} is null
+          or ${crowdReportClustersTable.effect} = 'unknown'
+        then ${submission.effect}::crowd_report_effect
+        else ${crowdReportClustersTable.effect}
+      end`,
       report_count: sql`${crowdReportClustersTable.report_count} + 1`,
       status: trustedSubmission
         ? sql`case when ${crowdReportClustersTable.status} = 'pending' then 'accepted'::crowd_report_cluster_status else ${crowdReportClustersTable.status} end`

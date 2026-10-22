@@ -151,7 +151,9 @@ function makeFakeDb(
             };
           }
 
-          return Promise.resolve();
+          return Object.assign(Promise.resolve(), {
+            onConflictDoNothing: () => Promise.resolve(),
+          });
         },
       };
     },
@@ -232,7 +234,9 @@ function makeFakeAutomoderationDb(
       return {
         values(values: unknown) {
           inserts.push({ table, values });
-          return Promise.resolve();
+          return Object.assign(Promise.resolve(), {
+            onConflictDoNothing: () => Promise.resolve(),
+          });
         },
       };
     },
@@ -1429,13 +1433,18 @@ describe('automoderateCrowdReport', () => {
     expect(fake.executes).toHaveLength(1);
   });
 
-  it('marks a same-context report in the duplicate window as duplicate', async () => {
+  it.each([
+    VALID_SUBMISSION,
+    { ...VALID_SUBMISSION, stationIds: ['BP7'] },
+    { ...VALID_SUBMISSION, stationIds: [], effect: 'unknown' as const },
+  ])('clusters a same-line variation: %j', async (submission) => {
     const fake = makeFakeAutomoderationDb(
       [
         [
           {
             id: 'existing-report',
             status: 'accepted',
+            effect: 'delay',
             directionText: 'towards:BP6',
             clusterId: 'cluster-1',
           },
@@ -1452,7 +1461,7 @@ describe('automoderateCrowdReport', () => {
     );
 
     await expect(
-      automoderateCrowdReport(fake.db as never, 'report-1', VALID_SUBMISSION, {
+      automoderateCrowdReport(fake.db as never, 'report-1', submission, {
         idFactory: () => 'event-1',
       }),
     ).resolves.toEqual({
@@ -1484,6 +1493,17 @@ describe('automoderateCrowdReport', () => {
     expect(fake.updates[2]).toMatchObject({
       table: crowdReportClustersTable,
     });
+    const stationInsert = fake.inserts.find(
+      (insert) => insert.table === crowdReportClusterStationsTable,
+    );
+    expect(stationInsert?.values).toEqual(
+      submission.stationIds.length > 0
+        ? submission.stationIds.map((stationId) => ({
+            cluster_id: 'cluster-1',
+            station_id: stationId,
+          }))
+        : undefined,
+    );
 
     const dialect = new PgDialect();
     const clusterLockSql = dialect.sqlToQuery(fake.executes[1] as SQL);
@@ -1553,7 +1573,7 @@ describe('automoderateCrowdReport', () => {
     );
   });
 
-  it('seeds a legacy duplicate cluster from the original accepted report timestamp', async () => {
+  it('preserves the original timestamp and station when seeding a legacy incident', async () => {
     const fake = makeFakeAutomoderationDb(
       [
         [
@@ -1580,7 +1600,7 @@ describe('automoderateCrowdReport', () => {
     await automoderateCrowdReport(
       fake.db as never,
       'report-1',
-      VALID_SUBMISSION,
+      { ...VALID_SUBMISSION, stationIds: ['BP7'] },
       {
         idFactory: () => ids.shift() ?? 'unused-id',
       },
@@ -1594,6 +1614,14 @@ describe('automoderateCrowdReport', () => {
         window_end_at: '2026-05-24T04:35:00.000Z',
       },
     });
+    expect(
+      fake.inserts
+        .filter((insert) => insert.table === crowdReportClusterStationsTable)
+        .map((insert) => insert.values),
+    ).toEqual([
+      [{ cluster_id: 'cluster-1', station_id: 'BP6' }],
+      [{ cluster_id: 'cluster-1', station_id: 'BP7' }],
+    ]);
 
     const dialect = new PgDialect();
     const reportLockSql = dialect.sqlToQuery(fake.executes[1] as SQL);
