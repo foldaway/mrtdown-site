@@ -54,6 +54,7 @@ function makeFakeClusterSourceDb(
     [{ id: 'BPLRT', name: name('Bukit Panjang LRT'), color: '#718472' }],
     [{ id: 'BP6', name: name('Bukit Panjang') }],
     reportRows,
+    [{ id: 'BP1', name: name('Choa Chu Kang') }],
   ];
   let selectCount = 0;
 
@@ -137,6 +138,30 @@ function makeFakeReportSourceDb(
 }
 
 describe('getCrowdReportSource', () => {
+  it('resolves a direction destination outside the affected stations', async () => {
+    const fake = makeFakeClusterSourceDb([
+      {
+        observedAt: '2026-05-24T04:30:00.000Z',
+        directionText: 'towards:BP1',
+        delayMinutes: 10,
+        stillHappening: true,
+      },
+    ]);
+    const source = await getCrowdReportSource(fake.db as never, {
+      kind: 'cluster',
+      sourceId: 'cluster-1',
+    });
+    expect(source?.directionStation).toEqual({
+      id: 'BP1',
+      name: name('Choa Chu Kang'),
+    });
+    expect(source?.stations).toEqual([
+      { id: 'BP6', name: name('Bukit Panjang') },
+    ]);
+    const query = new PgDialect().sqlToQuery(fake.whereCalls[4] as SQL);
+    expect(query.params).toEqual(['BP1']);
+  });
+
   it('builds cluster evidence from ongoing public reports', async () => {
     const fake = makeFakeClusterSourceDb();
 
@@ -237,6 +262,7 @@ describe('getCrowdReportSource', () => {
       updatedAt: '2026-05-24T04:35:00.000Z',
       dispatchedAt: null,
       directionText: 'towards:BP6',
+      directionStation: { id: 'BP6', name: name('Bukit Panjang') },
       delayMinutes: 10,
       stillHappening: true,
       lines: [
