@@ -138,6 +138,35 @@ function makeFakeReportSourceDb(
 }
 
 describe('getCrowdReportSource', () => {
+  it.each([null, 'not-sure', ''])(
+    'retains a known destination when the latest report direction is %j',
+    async (directionText) => {
+      const fake = makeFakeClusterSourceDb([
+        {
+          observedAt: '2026-05-24T04:40:00.000Z',
+          directionText,
+          delayMinutes: 5,
+          stillHappening: true,
+        },
+        {
+          observedAt: '2026-05-24T04:30:00.000Z',
+          directionText: 'towards:BP1',
+          delayMinutes: 10,
+          stillHappening: true,
+        },
+      ]);
+      const source = await getCrowdReportSource(fake.db as never, {
+        kind: 'cluster',
+        sourceId: 'cluster-1',
+      });
+      expect(source).toMatchObject({
+        directionText: 'towards:BP1',
+        directionStation: { id: 'BP1', name: name('Choa Chu Kang') },
+        delayMinutes: 5,
+      });
+    },
+  );
+
   it('resolves a direction destination outside the affected stations', async () => {
     const fake = makeFakeClusterSourceDb([
       {

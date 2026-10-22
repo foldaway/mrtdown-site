@@ -41,7 +41,10 @@ function makeFakeCandidateDb() {
   };
 }
 
-function makeFakeClusterCandidateDb(stillHappening = true) {
+function makeFakeClusterCandidateDb(
+  stillHappening = true,
+  directionText: string | null = 'towards:BP6',
+) {
   const whereCalls: unknown[] = [];
   const selectResults = [
     [
@@ -61,7 +64,7 @@ function makeFakeClusterCandidateDb(stillHappening = true) {
         clusterId: 'cluster-1',
         observedAt: '2026-05-24T04:30:00.000Z',
         text: 'Train stalled near the platform for several minutes.',
-        directionText: 'towards:BP6',
+        directionText,
         delayMinutes: 10,
         stillHappening,
       },
@@ -360,6 +363,30 @@ describe('buildCrowdReportSourceUrl', () => {
 });
 
 describe('getDispatchableCrowdReportCandidates', () => {
+  it.each([null, 'not-sure', ''])(
+    'preserves a known cluster direction when the latest report says %j',
+    async (directionText) => {
+      const fake = makeFakeClusterCandidateDb(true, directionText);
+      const reports = fake.selectResults[3];
+      reports.push({
+        ...reports[0],
+        id: 'older-known-report',
+        observedAt: '2026-05-24T04:25:00.000Z',
+        directionText: 'towards:BP6',
+        delayMinutes: 20,
+      });
+
+      const candidates = await getDispatchableCrowdReportCandidates(
+        fake.db as never,
+        { kind: 'cluster', limit: 1, rootUrl: 'https://mrtdown.example' },
+      );
+      expect(candidates[0]?.payload.content[0]).toMatchObject({
+        directionText: 'towards:BP6',
+        delayMinutes: 10,
+      });
+    },
+  );
+
   it('requires cluster affected-area scope before applying the result limit', async () => {
     const fake = makeFakeCandidateDb();
 

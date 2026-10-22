@@ -25,6 +25,21 @@ export function normalizeCrowdReportDirection(value?: string | null) {
   return direction === 'not-sure' ? '' : direction;
 }
 
+export function getCrowdReportClusterDirection(
+  reportsNewestFirst: ReadonlyArray<{ directionText: string | null }>,
+) {
+  // Source and dispatch queries order eligible reports newest first. A newer
+  // unspecified direction must not erase a known direction from the cluster.
+  const latestSpecified = reportsNewestFirst.find((report) =>
+    normalizeCrowdReportDirection(report.directionText),
+  );
+  return (
+    latestSpecified?.directionText ??
+    reportsNewestFirst[0]?.directionText ??
+    null
+  );
+}
+
 export function buildCrowdReportClusteringLockKey(
   context: CrowdReportClusterContext,
 ) {

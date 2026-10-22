@@ -14,6 +14,7 @@ import {
   stationsTable,
 } from '~/db/schema';
 import type { CrowdReportEffect } from './crowdReports';
+import { getCrowdReportClusterDirection } from './crowdReportClustering';
 
 const CrowdReportSourceKindSchema = z.enum(['cluster', 'report']);
 
@@ -193,6 +194,7 @@ async function getClusterSource(
   }
 
   const representative = reports[0];
+  const directionText = getCrowdReportClusterDirection(reports);
   const observedValues = reports.map((report) => report.observedAt);
 
   return {
@@ -215,12 +217,8 @@ async function getClusterSource(
         : cluster.windowEndAt,
     updatedAt: toIsoString(cluster.updatedAt) ?? cluster.windowEndAt,
     dispatchedAt: toIsoString(cluster.dispatchedAt),
-    directionText: representative?.directionText ?? null,
-    directionStation: await getDirectionStation(
-      db,
-      representative?.directionText ?? null,
-      stations,
-    ),
+    directionText,
+    directionStation: await getDirectionStation(db, directionText, stations),
     delayMinutes: representative?.delayMinutes ?? null,
     stillHappening: representative?.stillHappening ?? null,
     lines,

@@ -85,6 +85,8 @@ stations. Reports without line context require the same station set. Unknown
 effects and unspecified directions can join specific reports; conflicting known
 effects or directions stay separate. The cluster retains the union of reported
 stations and adopts a known effect when its original effect was unknown.
+The evidence page and dispatch payload use the latest specified direction, so
+an unspecified direction on a newer report does not erase an earlier one.
 Recent corroborating reports extend the matching window while keeping a direct
 reference to the original report. Dispatched clusters remain closed, and
 existing clusters are not retroactively merged.
