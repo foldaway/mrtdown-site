@@ -9,13 +9,14 @@ export type TimelineItemUpdate = {
   sourceUrl: Evidence['sourceUrl'];
   createdAt: Evidence['ts'];
   textTranslations: EvidenceRender['text'] | null;
+  isTextRedacted: boolean;
 };
 
-interface Props {
+type TimelineItemProps = {
   update: TimelineItemUpdate;
-}
+};
 
-export const TimelineItem: React.FC<Props> = (props) => {
+export function TimelineItem(props: TimelineItemProps) {
   const { update } = props;
   const intl = useIntl();
   const localizedText = getLocalizedText(update, intl.locale);
@@ -49,7 +50,30 @@ export const TimelineItem: React.FC<Props> = (props) => {
           )}
         </div>
         <div className="mt-2">
-          {localizedText.trim().length > 0 ? (
+          {update.isTextRedacted ? (
+            <p className="text-gray-500 text-sm italic dark:text-gray-400">
+              <FormattedMessage
+                id="issue.update_text_unavailable"
+                defaultMessage="Update text is not available here."
+              />
+              {update.sourceUrl && (
+                <>
+                  {' '}
+                  <a
+                    href={update.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    <FormattedMessage
+                      id="issue.view_original_source"
+                      defaultMessage="View original source"
+                    />
+                  </a>
+                </>
+              )}
+            </p>
+          ) : localizedText.trim().length > 0 ? (
             <p className="text-gray-800 text-sm leading-5 dark:text-gray-200">
               {localizedText}
             </p>
@@ -65,7 +89,7 @@ export const TimelineItem: React.FC<Props> = (props) => {
       </div>
     </div>
   );
-};
+}
 
 function getLocalizedText(update: TimelineItemUpdate, locale: string) {
   if (update.textTranslations == null) {

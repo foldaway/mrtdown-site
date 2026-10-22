@@ -229,6 +229,8 @@
   "issue.subtype.track_work": "轨道施工",
   "issue.subtype.train_fault": "列车故障",
   "issue.subtype.weather": "天气影响",
+  "issue.update_text_unavailable": "此处无法显示更新内容。",
+  "issue.view_original_source": "查看原始来源",
   "issue.whole_service_badge": "全程",
   "line.branch.closed": "于{date}关闭",
   "line.branch.in_service": "正在服务",

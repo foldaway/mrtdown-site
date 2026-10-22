@@ -56,7 +56,13 @@ export function getIssueMarkdown(
     rows: affectedRows,
   });
   const updateItems = data.updates.map((update) => [
-    text(`${formatMarkdownDateTime(update.createdAt)}: ${update.text}`),
+    text(
+      `${formatMarkdownDateTime(update.createdAt)}: ${
+        update.isTextRedacted
+          ? 'Update text is not available here.'
+          : update.text
+      }`,
+    ),
     ...(update.sourceUrl != null
       ? [text(' Source: '), link(update.sourceUrl, update.sourceUrl, rootUrl)]
       : []),

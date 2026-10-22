@@ -4,6 +4,7 @@ import { getDefaultDb, timeDbQuery } from './database';
 import { buildDataset } from './dataset';
 import { selectIncludedEntities } from './includedEntities';
 import { getIssueStaticScope } from './readModelScope';
+import { toIssueUpdate } from './issueEvidence';
 
 export { deriveIssueInitialScope } from './readModelScope';
 
@@ -44,13 +45,7 @@ export async function getIssueReadModel(issueId: string) {
   return {
     data: {
       id: issueId,
-      updates: evidenceRows.map((evidence) => ({
-        type: evidence.type,
-        text: evidence.text,
-        textTranslations: evidence.render?.text ?? null,
-        sourceUrl: evidence.source_url,
-        createdAt: evidence.ts,
-      })),
+      updates: evidenceRows.map(toIssueUpdate),
     },
     included: selectIncludedEntities(dataset.included, dataset.allIssues, {
       issueIds: [issueId],

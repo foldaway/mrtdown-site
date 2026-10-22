@@ -229,6 +229,8 @@
   "issue.subtype.track_work": "தடங்களில் பராமரிப்பு வேலை",
   "issue.subtype.train_fault": "ரயில் கோளாறு",
   "issue.subtype.weather": "வானிலை பாதிப்பு",
+  "issue.update_text_unavailable": "புதுப்பிப்பு உரை இங்கு கிடைக்கவில்லை.",
+  "issue.view_original_source": "அசல் மூலத்தைப் பார்க்கவும்",
   "issue.whole_service_badge": "முழுச் சேவை",
   "line.branch.closed": "{date} அன்று மூடப்பட்டது",
   "line.branch.in_service": "சேவையில் உள்ளது",

@@ -229,6 +229,8 @@
   "issue.subtype.track_work": "Kerja Penyelenggaraan Landasan",
   "issue.subtype.train_fault": "Kerosakan Kereta Api",
   "issue.subtype.weather": "Cuaca Buruk",
+  "issue.update_text_unavailable": "Teks kemas kini tidak tersedia di sini.",
+  "issue.view_original_source": "Lihat sumber asal",
   "issue.whole_service_badge": "Keseluruhan",
   "line.branch.closed": "Ditutup pada {date}",
   "line.branch.in_service": "Dalam Perkhidmatan",

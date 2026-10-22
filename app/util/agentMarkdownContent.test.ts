@@ -91,8 +91,17 @@ describe('agent Markdown content builders', () => {
               type: 'statement.official',
               text: 'Operator update with *markdown-sensitive* text.',
               textTranslations: null,
+              isTextRedacted: false,
               sourceUrl: 'https://example.com/source',
               createdAt: '2026-06-11T09:15:00+08:00',
+            },
+            {
+              type: 'report.public',
+              text: '',
+              textTranslations: null,
+              isTextRedacted: true,
+              sourceUrl: 'https://example.com/original',
+              createdAt: '2026-06-11T09:10:00+08:00',
             },
           ],
         },
@@ -156,6 +165,8 @@ describe('agent Markdown content builders', () => {
       'Operator update with \\*markdown-sensitive\\* text.',
     );
     expect(markdown).toContain('<https://example.com/source>');
+    expect(markdown).toContain('Update text is not available here.');
+    expect(markdown).toContain('<https://example.com/original>');
   });
 
   it('renders line Markdown with facts, branches, interchanges, and community signals', () => {

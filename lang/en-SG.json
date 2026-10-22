@@ -229,6 +229,8 @@
   "issue.subtype.track_work": "Track Work",
   "issue.subtype.train_fault": "Train Fault",
   "issue.subtype.weather": "Weather",
+  "issue.update_text_unavailable": "Update text is not available here.",
+  "issue.view_original_source": "View original source",
   "issue.whole_service_badge": "Whole service",
   "line.branch.closed": "Closed on {date}",
   "line.branch.in_service": "In Service",
