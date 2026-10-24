@@ -46,6 +46,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import { enumToPgEnum, timestampColumns } from './columns.helpers.js';
 
+export { scheduledTimetablesTable } from './scheduledTimetables.schema.js';
+
 /*
  * Pull staging (`*_next`): snapshot of manifest data between workflow steps.
  * Spreads below pair staging with live tables so column definitions stay in sync.
