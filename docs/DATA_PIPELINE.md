@@ -18,8 +18,13 @@ The overhaul introduces a local read model for canonical mrtdown data.
 The `scheduled_timetables` table stores versioned bundles separately from
 canonical entities. Each row retains the seven original files and an import
 receipt. Constraints allow one baseline, one successor per predecessor and
-consistent receipt links. The table is not connected to the pull workflow or
-public arrivals yet; retention and serving eligibility are separate follow-ups.
+consistent receipt links. `retainScheduledTimetable` appends internally verified
+bundles under a transaction lock, validates retained lineage with the shared
+history validator, and requires explicit source-order review. Retries preserve
+the original seven files and receipt. Callers must authenticate the Pages entry
+and verify all seven files before calling; retention does not grant release or
+mapping approval or establish canonical compatibility. The table is not connected
+to the pull workflow or public arrivals yet.
 
 To exercise the migration locally, set `TEST_TIMETABLE_DATABASE_URL` to the
 existing local development database URL when running `npm run verify`. The test
