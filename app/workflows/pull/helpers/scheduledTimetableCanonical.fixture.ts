@@ -8,8 +8,8 @@ import {
 } from '@mrtdown/core';
 import { hashBytes, scheduleTopologyProjection } from '@mrtdown/fs';
 
-// Two stations and one assigned source trip; no GTFS producer fixture needed.
-export function scheduledTimetableCanonicalFixture() {
+// Small canonical path for one assigned source trip; no GTFS producer needed.
+export function scheduledTimetableCanonicalFixture(stationCount = 2) {
   const name = { 'en-SG': 'Test', 'zh-Hans': null, ms: null, ta: null };
   const operators = [
     OperatorSchema.parse({
@@ -34,7 +34,8 @@ export function scheduledTimetableCanonicalFixture() {
       ],
     }),
   ];
-  const stations = [1, 2].map((number) =>
+  const stationNumbers = Array.from({ length: stationCount }, (_, i) => i + 1);
+  const stations = stationNumbers.map((number) =>
     StationSchema.parse({
       id: `station-${number}`,
       name,
@@ -91,7 +92,7 @@ export function scheduledTimetableCanonicalFixture() {
     lineId: 'line',
     serviceId: 'service',
     revisionId: 'revision',
-    destinationStationId: 'station-2',
+    destinationStationId: `station-${stationCount}`,
     stops: stations.map(({ id }, index) => ({
       stationId: id,
       platformIds: [`platform-${index + 1}`],
