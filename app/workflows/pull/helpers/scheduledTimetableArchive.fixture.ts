@@ -14,8 +14,8 @@ const encode = (value: unknown) =>
 
 // Extend the single-trip storage fixture with synthetic bound review records.
 // No source-order review, canonical compatibility or real publication is implied.
-export function scheduledTimetableArchiveFixture() {
-  const bundle = retentionBundle();
+export function scheduledTimetableArchiveFixture(source = 'a') {
+  const bundle = retentionBundle(source);
   const manifest = ScheduledTimetableArtifactManifestSchema.parse(
     JSON.parse(new TextDecoder().decode(bundle.files['manifest.json'])),
   );

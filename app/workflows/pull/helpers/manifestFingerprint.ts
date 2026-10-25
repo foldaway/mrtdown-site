@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
-import type { Manifest } from '@mrtdown/core';
+import {
+  type Manifest,
+  ScheduledTimetablePagesEntrySchema,
+} from '@mrtdown/core';
 import { eq } from 'drizzle-orm';
 import type { getDb } from '~/db';
 import { metadataTable } from '~/db/schema';
@@ -10,7 +13,7 @@ type AppDb = ReturnType<typeof getDb>;
  * Bump this when a pull-pipeline or derived-data change needs one full pull
  * even if the upstream manifest is unchanged.
  */
-const PULL_PIPELINE_VERSION = 1;
+const PULL_PIPELINE_VERSION = 2;
 
 const MANIFEST_FINGERPRINT_METADATA_KEY = `canonical_manifest_fingerprint_v${PULL_PIPELINE_VERSION}`;
 
@@ -23,7 +26,7 @@ function sortRecord(record: Record<string, string>) {
 }
 
 /**
- * Represents the canonical inputs that affect this application's read model.
+ * Represents canonical read-model inputs and optional timetable retention input.
  * `generatedAt` is deliberately excluded: it is publication metadata, not a
  * content change. Stable sorting prevents an upstream JSON key-order change
  * from triggering a full pull.
@@ -39,6 +42,9 @@ export function getCanonicalManifestFingerprint(manifest: Manifest): string {
     operators: sortRecord(manifest.operators),
     services: sortRecord(manifest.services),
     issues: sortRecord(manifest.issues),
+    scheduledTimetable: ScheduledTimetablePagesEntrySchema.optional().parse(
+      manifest.scheduledTimetable,
+    ),
   };
 
   return createHash('sha256')

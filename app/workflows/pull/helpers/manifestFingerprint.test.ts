@@ -1,6 +1,7 @@
 import type { Manifest } from '@mrtdown/core';
 import { describe, expect, it } from 'vitest';
 import { getCanonicalManifestFingerprint } from './manifestFingerprint';
+import { scheduledTimetableArchiveFixture } from './scheduledTimetableArchive.fixture';
 
 function createManifest(overrides: Partial<Manifest> = {}): Manifest {
   return {
@@ -42,5 +43,31 @@ describe('getCanonicalManifestFingerprint', () => {
     expect(getCanonicalManifestFingerprint(changed)).not.toBe(
       getCanonicalManifestFingerprint(original),
     );
+  });
+
+  it('detects timetable-only additions, replacements, release changes and removal', () => {
+    const entry = scheduledTimetableArchiveFixture().entry;
+    const manifests = [
+      createManifest(),
+      createManifest({ scheduledTimetable: entry }),
+      createManifest({
+        scheduledTimetable: scheduledTimetableArchiveFixture('b').entry,
+      }),
+      createManifest({
+        scheduledTimetable: { ...entry, releaseSha256: 'e'.repeat(64) },
+      }),
+    ];
+    expect(new Set(manifests.map(getCanonicalManifestFingerprint)).size).toBe(
+      4,
+    );
+    expect(getCanonicalManifestFingerprint(createManifest())).toBe(
+      getCanonicalManifestFingerprint(manifests[0]),
+    );
+    const reordered = Object.fromEntries(Object.entries(entry).reverse());
+    expect(
+      getCanonicalManifestFingerprint(
+        createManifest({ scheduledTimetable: reordered as typeof entry }),
+      ),
+    ).toBe(getCanonicalManifestFingerprint(manifests[1]));
   });
 });

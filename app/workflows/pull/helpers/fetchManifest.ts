@@ -1,4 +1,4 @@
-import type { Manifest } from '@mrtdown/core';
+import { type Manifest, ManifestSchema } from '@mrtdown/core';
 
 const MANIFEST_FETCH_TIMEOUT_MS = 15_000;
 
@@ -28,8 +28,7 @@ export async function fetchManifest(mrtdownDataUrl: string): Promise<Manifest> {
         `manifest.json returned ${response.status}: ${await response.text()}`,
       );
     }
-    const manifest: Manifest = await response.json();
-    return manifest;
+    return ManifestSchema.parse(await response.json());
   } catch (error) {
     if (isAbortError(error)) {
       throw new Error(
