@@ -7,6 +7,7 @@ import { createWorkflow } from '@upstash/workflow/tanstack';
 import { ZipStore } from '~/helpers/ZipStore.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts.js';
+import { retainScheduledTimetable } from '~/util/dbQueries/retainScheduledTimetable.js';
 import { rebuildSitemapSnapshot } from '~/util/dbQueries/sitemap.js';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics.js';
 import { getDb } from '../../db/index.js';
@@ -17,6 +18,8 @@ import {
   isCanonicalManifestCurrent,
   recordCanonicalManifestFingerprint,
 } from './helpers/manifestFingerprint.js';
+import { type PullParams, PullParamsSchema } from './helpers/pullParams.js';
+import { readScheduledTimetableArchive } from './helpers/readScheduledTimetableArchive.js';
 import {
   acquireOrRenewPullWorkflowLease,
   releasePullWorkflowLease,
@@ -44,13 +47,11 @@ import {
   truncateStagingTables,
 } from './helpers/stagingSync.js';
 
-type Params = Record<string, never>;
-
 const ISSUE_SYNC_BATCH_SIZE = 500;
 const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
 
 async function runPullStep<T>(
-  context: WorkflowContext<Params>,
+  context: WorkflowContext<PullParams>,
   name: string,
   callback: () => Promise<T>,
 ) {
@@ -72,15 +73,29 @@ async function runPullStep<T>(
  * Durable pull pipeline: manifest → parse into staging → promote by domain →
  * truncate staging + metadata. Staging is the handoff between steps (no large step returns).
  */
-async function executePull(context: WorkflowContext<Params>) {
-  const dataUrl = process.env.MRTDOWN_DATA_URL;
-  if (dataUrl == null) {
-    throw new WorkflowNonRetryableError('MRTDOWN_DATA_URL not set');
-  }
-
-  const manifest = await runPullStep(context, 'manifest', async () =>
-    fetchManifest(dataUrl),
+async function executePull(
+  context: WorkflowContext<PullParams>,
+  params: PullParams,
+) {
+  const { manifest, dataUrl, importInstant } = await runPullStep(
+    context,
+    'manifest',
+    async () => {
+      const dataUrl = process.env.MRTDOWN_DATA_URL;
+      if (dataUrl == null) {
+        throw new WorkflowNonRetryableError('MRTDOWN_DATA_URL not set');
+      }
+      const manifest = await fetchManifest(dataUrl);
+      // Persist this clock and trusted root together; retries must not select a
+      // different source or move the admission clock after a failed attempt.
+      return { manifest, dataUrl, importInstant: new Date().toISOString() };
+    },
   );
+  if (params.sourceReview && !manifest.scheduledTimetable) {
+    throw new WorkflowNonRetryableError(
+      'Source review supplied without an advertised scheduled timetable',
+    );
+  }
   const manifestFingerprint = await runPullStep(
     context,
     'manifest-fingerprint',
@@ -104,6 +119,19 @@ async function executePull(context: WorkflowContext<Params>) {
 
     const repo = new MRTDownRepository({ store });
     const db = getDb();
+    const timetable = await readScheduledTimetableArchive(manifest, store);
+    if (timetable) {
+      const result = await retainScheduledTimetable(db, timetable, {
+        sourceReview: params.sourceReview,
+        importInstant,
+      });
+      if (result.status === 'blocked') {
+        throw new WorkflowNonRetryableError(
+          `Scheduled timetable retention blocked: ${result.blockers.join(', ')}`,
+        );
+      }
+      console.log(`[PULL] Scheduled timetable ${result.status}`);
+    }
     await truncateStagingTables(db);
 
     // Stage one repository domain at a time so the workflow does not retain
@@ -358,8 +386,17 @@ async function executePull(context: WorkflowContext<Params>) {
   console.log('[PULL] Pull complete', counts);
 }
 
-export const pullWorkflow = createWorkflow<Params, void>(
+export const pullWorkflow = createWorkflow<PullParams, void>(
   async (context) => {
+    // Scheduled invocations have an empty body; direct signed workflow calls
+    // must validate the same review contract as the authenticated task trigger.
+    const payload: unknown = context.requestPayload;
+    const parsed = PullParamsSchema.safeParse(
+      payload === '' || payload === undefined ? {} : payload,
+    );
+    if (!parsed.success) {
+      throw new WorkflowNonRetryableError('Invalid canonical pull request');
+    }
     const acquired = await context.run('acquire-pull-lease', async () =>
       acquireOrRenewPullWorkflowLease(getDb(), context.workflowRunId),
     );
@@ -369,7 +406,7 @@ export const pullWorkflow = createWorkflow<Params, void>(
       );
     }
 
-    await executePull(context);
+    await executePull(context, parsed.data);
     await context.run('release-pull-lease', async () =>
       releasePullWorkflowLease(getDb(), context.workflowRunId),
     );

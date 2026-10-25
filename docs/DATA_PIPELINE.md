@@ -7,7 +7,8 @@ The overhaul introduces a local read model for canonical mrtdown data.
 `app/workflows/pull/index.ts` defines the Upstash Workflow entrypoint. It:
 
 - fetches the manifest and archive from `MRTDOWN_DATA_URL`;
-- parses archive contents with `ZipStore` and `@mrtdown/fs`;
+- parses archive contents with `ZipStore` and `@mrtdown/fs`, verifies any
+  advertised scheduled timetable and admits it to append-only retention;
 - inserts parsed entities into `*_next` staging tables;
 - promotes changed rows into live tables;
 - deletes orphans after dependents are synchronized;
@@ -23,8 +24,8 @@ bundles under a transaction lock, validates retained lineage with the shared
 history validator, and requires explicit source-order review. Retries preserve
 the original seven files and receipt. Callers must authenticate the Pages entry
 and verify all seven files before calling; retention does not grant release or
-mapping approval or establish canonical compatibility. The table is not connected
-to the pull workflow or public arrivals yet.
+mapping approval or establish canonical compatibility. The canonical pull now
+uses this retention path; public arrivals do not read these bundles.
 
 `readScheduledTimetableArchive` prepares that trusted input from `ZipStore`.
 It uses the optional `scheduledTimetable` entry supplied by the configured Pages
@@ -36,8 +37,39 @@ duplicate files fail closed. The adapter preserves original bytes without JSON
 reserialization, bypasses the inflated ZIP cache and returns no decoded timetable.
 This verifies the published release/mapping bindings, not source-order admission,
 compatibility with the site's canonical data or eligibility to serve departures.
-Pull integration, source review, canonical checks and serving remain follow-up
-work; canonical fingerprints and skip behavior are unchanged.
+
+`POST /internal/api/tasks/pull` accepts an empty body or `{}` as before. To admit
+a new artifact, explicitly supply `{ "sourceReview": <review> }` using the
+shared `ScheduledTimetableSourceReviewSchema`: a `scheduled-timetable-source-review`
+record with `schemaVersion: 1`, a `decision` (`baseline`, `successor`, `correction`
+or `resolve-version-conflict`), exact `predecessor` and `successor` identities
+(`manifestSha256` and source `snapshotSha256`), `reviewer`, `reviewedAt` and
+`reason`. Only a baseline has a null predecessor. The authenticated task trigger
+validates and forwards this record; signed direct workflow requests validate the
+same contract. No review is inferred from release approval, archive contents,
+opaque provider versions or the import clock. Unknown request fields are rejected.
+
+The pull persists the configured data URL, trusted manifest and an import instant
+in its manifest step. Its parse step downloads the archive from that same root,
+verifies all seven files against the persisted entry and calls retention before
+truncating or inserting canonical staging data. Retries reverify downloaded bytes
+against that entry; an upstream replacement cannot silently substitute a different
+bundle. Bundle bytes stay inside the parse step and PostgreSQL, never in workflow
+step outputs. If the upstream archive has changed, retry after restoring that
+bundle or start a new pull against the new root manifest with its exact review.
+
+New artifacts without matching source-order review fail with explicit retention
+blockers. Rejection preserves retained history and leaves staging and the last
+successful fingerprint untouched. Already-retained artifacts need no new review
+and preserve their first receipt. A later canonical failure can leave an admitted
+bundle retained; its receipt records source admission only, and retrying does not
+rewrite it. The existing workflow lease and failure cleanup still apply.
+
+Retention does not establish compatibility with live canonical entities or
+eligibility to serve departures. Canonical compatibility, passenger departure
+queries/API/UI and publication remain separate gates. Real mapping, source and
+release reviews remain explicit upstream/operator work; this integration grants
+none automatically and does not implement rollback serving.
 
 To exercise the migration locally, set `TEST_TIMETABLE_DATABASE_URL` to the
 existing local development database URL when running `npm run verify`. The test
@@ -67,13 +99,19 @@ its database and queues a pull as part of every deployment, so it has no
 recurring schedules.
 
 Each pull first compares a stable fingerprint of the canonical manifest's
-read-model inputs with the fingerprint recorded after the last fully successful
-pull. When it matches, the workflow exits before downloading the archive,
+read-model inputs and complete optional timetable entry with the fingerprint
+recorded after the last fully successful pull. A timetable-only addition,
+replacement, release change or removal therefore triggers a full pull. When the
+fingerprint matches, the workflow exits before downloading the archive,
 staging data, rebuilding facts and snapshots, or purging the public cache.
 The fingerprint deliberately excludes `generatedAt`, which is publication
 metadata rather than a data change. Bump the pull pipeline version in
 `app/workflows/pull/helpers/manifestFingerprint.ts` when a pull or derived-data
 code change requires one full rebuild without an upstream manifest change.
+Version 2 introduces timetable retention and forces one pull after this upgrade.
+The fingerprint is recorded only after retention, canonical promotion, derived
+rebuilds and cache publication succeed. Scheduled requests still carry no review:
+an unseen timetable remains blocked until an operator submits its source review.
 
 Configure `QSTASH_URL`, `QSTASH_TOKEN`, and `INTERNAL_API_TOKEN` as secrets in
 each GitHub deployment environment. The deployment workflow supplies `TIER`
