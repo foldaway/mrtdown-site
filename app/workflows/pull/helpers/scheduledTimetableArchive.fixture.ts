@@ -1,6 +1,8 @@
 import {
+  type ScheduledAssignedTimetable,
   ScheduledAssignedTimetableSchema,
   ScheduledTimetableArtifactManifestSchema,
+  type ScheduledTimetableArtifactMetadata,
   ScheduledTimetableArtifactMetadataSchema,
   type ScheduledTripPattern,
 } from '@mrtdown/core';
@@ -26,6 +28,10 @@ export function scheduledTimetableArchiveFixture(
   allocation?: {
     topology: ReturnType<typeof scheduleTopologyProjection>;
     pattern: ScheduledTripPattern;
+    customize?: (
+      timetable: ScheduledAssignedTimetable,
+      metadata: ScheduledTimetableArtifactMetadata,
+    ) => void;
   },
 ) {
   const bundle = retentionBundle(source);
@@ -36,29 +42,26 @@ export function scheduledTimetableArchiveFixture(
     const timetable = ScheduledAssignedTimetableSchema.parse(
       JSON.parse(new TextDecoder().decode(bundle.files['timetable.json'])),
     );
-    const artifact = prepareScheduledTimetableArtifact(
+    timetable.patterns = [{ id: 'pattern', pattern: allocation.pattern }];
+    timetable.assignments = [
       {
-        ...timetable,
-        patterns: [{ id: 'pattern', pattern: allocation.pattern }],
-        assignments: [
-          {
-            providerTripId: 'trip',
-            patternId: 'pattern',
-            dateRanges: [original.feedRange],
-          },
-        ],
+        providerTripId: 'trip',
+        patternId: 'pattern',
+        dateRanges: [original.feedRange],
       },
-      {
-        ...ScheduledTimetableArtifactMetadataSchema.strip().parse(original),
-        identity: {
-          ...original.identity,
-          topology: {
-            projectionVersion: 1,
-            sha256: hashBytes(Buffer.from(JSON.stringify(allocation.topology))),
-          },
+    ];
+    const metadata = {
+      ...ScheduledTimetableArtifactMetadataSchema.strip().parse(original),
+      identity: {
+        ...original.identity,
+        topology: {
+          projectionVersion: 1 as const,
+          sha256: hashBytes(Buffer.from(JSON.stringify(allocation.topology))),
         },
       },
-    );
+    };
+    allocation.customize?.(timetable, metadata);
+    const artifact = prepareScheduledTimetableArtifact(timetable, metadata);
     bundle.files['manifest.json'] = artifact.manifestBytes;
     bundle.files['timetable.json'] = artifact.timetableBytes;
     bundle.files['NOTICE.txt'] = artifact.noticeBytes;
@@ -80,6 +83,7 @@ export function scheduledTimetableArchiveFixture(
   manifest.mapping.draftSha256 = scopedReviewDraftSha256(draft);
   bundle.files['manifest.json'] = encode(manifest);
   bundle.entry.manifestSha256 = hashBytes(bundle.files['manifest.json']);
+  bundle.entry.feedRange = manifest.feedRange;
   const approval = ScopedReconciliationApprovalSchema.parse({
     schemaVersion: 2,
     documentKind: 'gtfs-scoped-mapping-approval',

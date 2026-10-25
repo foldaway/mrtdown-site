@@ -89,8 +89,8 @@ that variable, the PostgreSQL scenario is skipped.
 ### Indexed scheduled departure storage foundation
 
 Four derived tables prepare indexed reads without parsing the retained timetable
-body on each request. This migration adds storage only; no projector, pull writes
-or passenger reads use these tables yet.
+body on each request. The internal `projectScheduledTimetable` builder writes
+these tables; pull integration and passenger reads remain separate work.
 
 - `scheduled_departure_projections` identifies one retained manifest and projector
   algorithm version. It records the canonical topology fingerprint/version, feed
@@ -120,14 +120,32 @@ or passenger reads use these tables yet.
   preserve missing timing. Non-boardable and terminal occurrences stay in the
   archive. Scope foreign keys prevent rows belonging to another date or scope.
 
-A future writer must verify retained bytes and canonical compatibility, derive
-these values using the shared contracts, validate platform subsets and resolve
-instants with the shared service-day helper. It must publish `completed_at` only
-after all dates, coverage and occurrences are committed and checked. A failed build
-keeps it null; rebuilding the same version must invalidate completion before
-changing rows. A new algorithm version can build alongside the previous one.
-Completion certifies projection materialization, not mapping coverage or approval.
-The database enforces storage relationships, not this future writer protocol.
+`projectScheduledTimetable` requires an exact retained manifest digest, its
+supported algorithm version (currently 1), and an independently trusted canonical
+snapshot directory that the caller keeps immutable throughout the call. It
+rechecks retained metadata lineage, all seven files' artifact/release/mapping
+bindings and canonical compatibility using the shared validators. Retention alone
+does not prove compatibility with this snapshot or the live database. Only the
+selected timetable body is loaded; the existing bundle and canonical validators
+each decode that version, while historical lineage reads metadata only.
+
+The builder uses shared calendar and canonical trip/date resolution helpers. Its
+coverage follows the shared retained selector's used patterns and active revisions;
+boardable rows must belong to that coverage and its platform alternatives. It
+streams dates and resolved trips into batches of at most 500 occurrences, keeping
+untimed candidates and never collecting the date-expanded timetable in memory.
+No download, workflow output or automatic invocation is involved.
+
+A retained-parent row lock serializes concurrent builds, including the first
+build. Every same-identity retry revalidates and rebuilds; a completion timestamp
+alone never bypasses validation or proves existing rows complete. The builder
+invalidates completion before a savepoint, replaces only this projection's derived
+rows and publishes completion in the same transaction as all materialization.
+On a build failure the savepoint rolls back partial writes and the outer transaction
+commits the invalidation before reporting the error. Existing derived rows can
+remain hidden behind null completion until a successful retry; unrelated manifests
+and algorithm versions are untouched. Completion certifies materialization only,
+not complete mapping, upstream approval or serving eligibility.
 
 Future readers must require the expected projector version, completed state and
 current canonical topology fingerprint/version before selection. They must use
