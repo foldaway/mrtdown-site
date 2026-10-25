@@ -1,10 +1,17 @@
-import { ScheduledTimetableArtifactManifestSchema } from '@mrtdown/core';
+import {
+  ScheduledAssignedTimetableSchema,
+  ScheduledTimetableArtifactManifestSchema,
+  ScheduledTimetableArtifactMetadataSchema,
+  type ScheduledTripPattern,
+} from '@mrtdown/core';
 import {
   GtfsTimetableReleaseReviewSchema,
   gtfsTimetableMappingApprovalSha256,
   hashBytes,
+  prepareScheduledTimetableArtifact,
   ScopedReconciliationApprovalSchema,
   ScopedReconciliationDraftSchema,
+  type scheduleTopologyProjection,
   scopedReviewDraftSha256,
 } from '@mrtdown/fs';
 import { retentionBundle } from '~/util/dbQueries/scheduledTimetableRetention.fixture';
@@ -13,9 +20,51 @@ const encode = (value: unknown) =>
   Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
 
 // Extend the single-trip storage fixture with synthetic bound review records.
-// No source-order review, canonical compatibility or real publication is implied.
-export function scheduledTimetableArchiveFixture(source = 'a') {
+// Optional allocation exercises canonical checks; these are not real reviews.
+export function scheduledTimetableArchiveFixture(
+  source = 'a',
+  allocation?: {
+    topology: ReturnType<typeof scheduleTopologyProjection>;
+    pattern: ScheduledTripPattern;
+  },
+) {
   const bundle = retentionBundle(source);
+  if (allocation) {
+    const original = ScheduledTimetableArtifactManifestSchema.parse(
+      JSON.parse(new TextDecoder().decode(bundle.files['manifest.json'])),
+    );
+    const timetable = ScheduledAssignedTimetableSchema.parse(
+      JSON.parse(new TextDecoder().decode(bundle.files['timetable.json'])),
+    );
+    const artifact = prepareScheduledTimetableArtifact(
+      {
+        ...timetable,
+        patterns: [{ id: 'pattern', pattern: allocation.pattern }],
+        assignments: [
+          {
+            providerTripId: 'trip',
+            patternId: 'pattern',
+            dateRanges: [original.feedRange],
+          },
+        ],
+      },
+      {
+        ...ScheduledTimetableArtifactMetadataSchema.strip().parse(original),
+        identity: {
+          ...original.identity,
+          topology: {
+            projectionVersion: 1,
+            sha256: hashBytes(Buffer.from(JSON.stringify(allocation.topology))),
+          },
+        },
+      },
+    );
+    bundle.files['manifest.json'] = artifact.manifestBytes;
+    bundle.files['timetable.json'] = artifact.timetableBytes;
+    bundle.files['NOTICE.txt'] = artifact.noticeBytes;
+    bundle.entry.coverage.assignedTripDateCount = 1;
+    bundle.entry.coverage.missingTripDateCount = 0;
+  }
   const manifest = ScheduledTimetableArtifactManifestSchema.parse(
     JSON.parse(new TextDecoder().decode(bundle.files['manifest.json'])),
   );

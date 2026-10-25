@@ -21,10 +21,6 @@ import {
 import { type PullParams, PullParamsSchema } from './helpers/pullParams.js';
 import { readScheduledTimetableArchive } from './helpers/readScheduledTimetableArchive.js';
 import {
-  acquireOrRenewPullWorkflowLease,
-  releasePullWorkflowLease,
-} from './helpers/workflowLease.js';
-import {
   deleteLineOrphans,
   deleteOperatorsTownsLandmarksOrphans,
   deleteOrphanIssuesBatch,
@@ -46,6 +42,11 @@ import {
   syncStations,
   truncateStagingTables,
 } from './helpers/stagingSync.js';
+import { validateScheduledTimetableCanonicalArchive } from './helpers/validateScheduledTimetableCanonicalArchive.js';
+import {
+  acquireOrRenewPullWorkflowLease,
+  releasePullWorkflowLease,
+} from './helpers/workflowLease.js';
 
 const ISSUE_SYNC_BATCH_SIZE = 500;
 const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
@@ -121,6 +122,11 @@ async function executePull(
     const db = getDb();
     const timetable = await readScheduledTimetableArchive(manifest, store);
     if (timetable) {
+      await validateScheduledTimetableCanonicalArchive(
+        manifest,
+        store,
+        timetable,
+      );
       const result = await retainScheduledTimetable(db, timetable, {
         sourceReview: params.sourceReview,
         importInstant,

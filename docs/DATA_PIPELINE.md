@@ -8,7 +8,8 @@ The overhaul introduces a local read model for canonical mrtdown data.
 
 - fetches the manifest and archive from `MRTDOWN_DATA_URL`;
 - parses archive contents with `ZipStore` and `@mrtdown/fs`, verifies any
-  advertised scheduled timetable and admits it to append-only retention;
+  advertised scheduled timetable against the same canonical archive and admits
+  it to append-only retention;
 - inserts parsed entities into `*_next` staging tables;
 - promotes changed rows into live tables;
 - deletes orphans after dependents are synchronized;
@@ -51,9 +52,16 @@ opaque provider versions or the import clock. Unknown request fields are rejecte
 
 The pull persists the configured data URL, trusted manifest and an import instant
 in its manifest step. Its parse step downloads the archive from that same root,
-verifies all seven files against the persisted entry and calls retention before
-truncating or inserting canonical staging data. Retries reverify downloaded bytes
-against that entry; an upstream replacement cannot silently substitute a different
+verifies all seven files against the persisted entry, checks canonical
+compatibility and calls retention before truncating or inserting canonical
+staging data. The shared `@mrtdown/fs` validator checks topology identity,
+references, platforms/boarding, ordered service paths/revisions and active source
+service dates. A private temporary directory bridges its filesystem API using
+only operators, lines, stations and services from this ZIP. Those files must
+match the trusted root manifest's complete domain inventories and hashes of
+schema-parsed JSON; the directory is removed on success or failure. Timetable
+bytes stay in memory, with no second archive download. Retries reverify downloaded
+bytes against that entry; an upstream replacement cannot silently substitute a different
 bundle. Bundle bytes stay inside the parse step and PostgreSQL, never in workflow
 step outputs. If the upstream archive has changed, retry after restoring that
 bundle or start a new pull against the new root manifest with its exact review.
@@ -61,14 +69,15 @@ bundle or start a new pull against the new root manifest with its exact review.
 New artifacts without matching source-order review fail with explicit retention
 blockers. Rejection preserves retained history and leaves staging and the last
 successful fingerprint untouched. Already-retained artifacts need no new review
-and preserve their first receipt. A later canonical failure can leave an admitted
-bundle retained; its receipt records source admission only, and retrying does not
+and preserve their first receipt, but still undergo compatibility validation
+against this pull's canonical archive. A later canonical failure can leave an
+admitted bundle retained; its receipt records source admission only, and retrying does not
 rewrite it. The existing workflow lease and failure cleanup still apply.
 
-Retention does not establish compatibility with live canonical entities or
-eligibility to serve departures. Canonical compatibility, passenger departure
-queries/API/UI and publication remain separate gates. Real mapping, source and
-release reviews remain explicit upstream/operator work; this integration grants
+Retention does not establish eligibility to serve departures. Compatibility is
+checked against the incoming snapshot, not live database entities. Passenger
+departure queries/API/UI and publication remain separate gates. Real mapping,
+source and release reviews remain explicit upstream/operator work; this integration grants
 none automatically and does not implement rollback serving.
 
 To exercise the migration locally, set `TEST_TIMETABLE_DATABASE_URL` to the
@@ -108,7 +117,8 @@ The fingerprint deliberately excludes `generatedAt`, which is publication
 metadata rather than a data change. Bump the pull pipeline version in
 `app/workflows/pull/helpers/manifestFingerprint.ts` when a pull or derived-data
 code change requires one full rebuild without an upstream manifest change.
-Version 2 introduces timetable retention and forces one pull after this upgrade.
+Version 3 introduces canonical timetable compatibility and forces one pull after
+this upgrade, including for previously retained artifacts.
 The fingerprint is recorded only after retention, canonical promotion, derived
 rebuilds and cache publication succeed. Scheduled requests still carry no review:
 an unseen timetable remains blocked until an operator submits its source review.
