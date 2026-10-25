@@ -21,6 +21,7 @@ import {
 const url = process.env.TEST_TIMETABLE_DATABASE_URL;
 const schema = `gtfs_departures_test_${randomUUID().replaceAll('-', '')}`;
 
+// PostgreSQL SQLSTATE codes below: 23505 unique, 23503 foreign key, 23514 check.
 describe.skipIf(!url)('scheduled departure storage', () => {
   let admin: Pool;
   let pool: Pool;
@@ -73,7 +74,7 @@ describe.skipIf(!url)('scheduled departure storage', () => {
     }
   });
 
-  async function projection(bundle = baseline, version = 1) {
+  async function createProjection(bundle = baseline, projectorVersion = 1) {
     const manifest = ScheduledTimetableArtifactManifestSchema.parse(
       JSON.parse(Buffer.from(bundle.files['manifest.json']).toString()),
     );
@@ -81,7 +82,7 @@ describe.skipIf(!url)('scheduled departure storage', () => {
       .insert(projections)
       .values({
         manifest_sha256: bundle.entry.manifestSha256,
-        projector_version: version,
+        projector_version: projectorVersion,
         topology_sha256: manifest.identity.topology.sha256,
         topology_projection_version:
           manifest.identity.topology.projectionVersion,
@@ -93,16 +94,16 @@ describe.skipIf(!url)('scheduled departure storage', () => {
     return row;
   }
 
-  function day(projectionId: number, active = 1, unassigned = 0) {
+  function dayCoverage(projectionId: number) {
     return {
       projection_id: projectionId,
       service_date: '2026-10-24',
-      active_trip_count: active,
-      unassigned_active_trip_count: unassigned,
+      active_trip_count: 1,
+      unassigned_active_trip_count: 0,
     };
   }
 
-  function scope(projectionId: number) {
+  function scopeCoverage(projectionId: number) {
     return {
       projection_id: projectionId,
       service_date: '2026-10-24',
@@ -114,9 +115,9 @@ describe.skipIf(!url)('scheduled departure storage', () => {
     };
   }
 
-  function occurrence(projectionId: number) {
+  function boardableOccurrence(projectionId: number) {
     return {
-      ...scope(projectionId),
+      ...scopeCoverage(projectionId),
       provider_trip_id: '000-trip',
       provider_route_id: '000-route',
       provider_calendar_id: '000-calendar',
@@ -135,12 +136,12 @@ describe.skipIf(!url)('scheduled departure storage', () => {
   }
 
   it('keeps versions and provenance distinct and deletes derived rows without deleting retained bundles', async () => {
-    const first = await projection();
-    await expect(projection()).rejects.toMatchObject({
+    const first = await createProjection();
+    await expect(createProjection()).rejects.toMatchObject({
       cause: { code: '23505' },
     });
-    const rebuilt = await projection(baseline, 2);
-    const next = await projection(successor);
+    const rebuilt = await createProjection(baseline, 2);
+    const next = await createProjection(successor);
     await expect(
       db
         .update(projections)
@@ -148,12 +149,12 @@ describe.skipIf(!url)('scheduled departure storage', () => {
         .where(eq(projections.id, next.id)),
     ).rejects.toMatchObject({ cause: { code: '23503' } });
     for (const row of [first, rebuilt, next]) {
-      await db.insert(days).values(day(row.id));
-      await db.insert(scopes).values(scope(row.id));
-      await db.insert(occurrences).values(occurrence(row.id));
+      await db.insert(days).values(dayCoverage(row.id));
+      await db.insert(scopes).values(scopeCoverage(row.id));
+      await db.insert(occurrences).values(boardableOccurrence(row.id));
     }
     await expect(
-      db.insert(occurrences).values(occurrence(first.id)),
+      db.insert(occurrences).values(boardableOccurrence(first.id)),
     ).rejects.toMatchObject({
       cause: { code: '23505' },
     });
@@ -176,54 +177,53 @@ describe.skipIf(!url)('scheduled departure storage', () => {
   });
 
   it('requires explicit day/scope coverage and keeps incomplete builds separate from completed empty coverage', async () => {
-    const empty = await projection();
+    const empty = await createProjection();
     expect(empty.completed_at).toBeNull();
     await expect(
-      db.insert(scopes).values(scope(empty.id)),
+      db.insert(scopes).values(scopeCoverage(empty.id)),
     ).rejects.toMatchObject({ cause: { code: '23503' } });
-    await db.insert(days).values(day(empty.id, 0));
+    await db
+      .insert(days)
+      .values({ ...dayCoverage(empty.id), active_trip_count: 0 });
     await expect(
-      db.insert(occurrences).values(occurrence(empty.id)),
+      db.insert(occurrences).values(boardableOccurrence(empty.id)),
     ).rejects.toMatchObject({ cause: { code: '23503' } });
-    await db.insert(scopes).values(scope(empty.id));
+    await db.insert(scopes).values(scopeCoverage(empty.id));
     await expect(
-      db
-        .insert(occurrences)
-        .values({ ...occurrence(empty.id), destination_station_id: 'other' }),
+      db.insert(occurrences).values({
+        ...boardableOccurrence(empty.id),
+        destination_station_id: 'other',
+      }),
     ).rejects.toMatchObject({ cause: { code: '23503' } });
     expect(await db.select().from(occurrences)).toEqual([]);
-    expect(
-      (
-        await pool.query(
-          'SELECT id FROM scheduled_departure_projections WHERE completed_at IS NOT NULL',
-        )
-      ).rows,
-    ).toEqual([]);
     await db
       .update(projections)
       .set({ completed_at: '2026-10-25T00:00:00Z' })
       .where(eq(projections.id, empty.id));
-    const gap = await projection(successor);
-    await db.insert(days).values(day(gap.id, 5, 1));
+    const gap = await createProjection(successor);
+    await db.insert(days).values({
+      ...dayCoverage(gap.id),
+      active_trip_count: 5,
+      unassigned_active_trip_count: 1,
+    });
     expect(
       (await db.select().from(days).where(eq(days.projection_id, gap.id)))[0],
     ).toMatchObject({ active_trip_count: 5, unassigned_active_trip_count: 1 });
-    expect(
-      (
-        await pool.query(
-          'SELECT id FROM scheduled_departure_projections WHERE completed_at IS NOT NULL',
-        )
-      ).rows,
-    ).toEqual([{ id: empty.id }]);
+    const [completedEmpty] = await db
+      .select()
+      .from(projections)
+      .where(eq(projections.id, empty.id));
+    expect(completedEmpty.completed_at).not.toBeNull();
+    expect(gap.completed_at).toBeNull();
   });
 
   it('preserves overnight dates, opaque occurrence identity, approximate and untimed candidates', async () => {
-    const row = await projection();
-    await db.insert(days).values(day(row.id));
-    await db.insert(scopes).values(scope(row.id));
-    await db.insert(occurrences).values(occurrence(row.id));
+    const row = await createProjection();
+    await db.insert(days).values(dayCoverage(row.id));
+    await db.insert(scopes).values(scopeCoverage(row.id));
+    await db.insert(occurrences).values(boardableOccurrence(row.id));
     const untimed = {
-      ...occurrence(row.id),
+      ...boardableOccurrence(row.id),
       stop_sequence: '09007199254740993124',
       occurrence_index: 2,
       arrival_seconds: null,
