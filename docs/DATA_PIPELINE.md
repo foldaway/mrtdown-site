@@ -26,6 +26,19 @@ and verify all seven files before calling; retention does not grant release or
 mapping approval or establish canonical compatibility. The table is not connected
 to the pull workflow or public arrivals yet.
 
+`readScheduledTimetableArchive` prepares that trusted input from `ZipStore`.
+It uses the optional `scheduledTimetable` entry supplied by the configured Pages
+root manifest, never an entry self-advertised inside the ZIP. An absent entry
+returns `null` without reading timetable files. An advertised bundle must pass
+the shared `@mrtdown/fs` artifact, release report and mapping/review binding
+checks for all seven exact `data/scheduled-timetable/` paths; missing, invalid or
+duplicate files fail closed. The adapter preserves original bytes without JSON
+reserialization, bypasses the inflated ZIP cache and returns no decoded timetable.
+This verifies the published release/mapping bindings, not source-order admission,
+compatibility with the site's canonical data or eligibility to serve departures.
+Pull integration, source review, canonical checks and serving remain follow-up
+work; canonical fingerprints and skip behavior are unchanged.
+
 To exercise the migration locally, set `TEST_TIMETABLE_DATABASE_URL` to the
 existing local development database URL when running `npm run verify`. The test
 creates and removes its own schema and applies the migration only there. It
