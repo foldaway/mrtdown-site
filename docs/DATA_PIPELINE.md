@@ -86,6 +86,62 @@ creates and removes its own schema and applies the migration only there. It
 does not migrate application tables or require another database service. Without
 that variable, the PostgreSQL scenario is skipped.
 
+### Indexed scheduled departure storage foundation
+
+Four derived tables prepare indexed reads without parsing the retained timetable
+body on each request. This migration adds storage only; no projector, pull writes
+or passenger reads use these tables yet.
+
+- `scheduled_departure_projections` identifies one retained manifest and projector
+  algorithm version. It records the canonical topology fingerprint/version, feed
+  bounds and maximum departure offset across **all source stops**, including
+  non-boardable stops. These support the shared window helper's candidate service
+  dates, including overnight offsets. The manifest FK preserves access to source
+  capture, correction, retrieval and review provenance; those fields are not copied
+  onto every occurrence. Manifest digests and projector versions are identities,
+  not source ordering. Retained receipt lineage remains authoritative for ordering.
+- `scheduled_departure_days` records every feed date, including zero-active-trip
+  dates, with whole-source active and unassigned-active trip counts. Missing dates
+  are unavailable; zero occurrence rows never establish date coverage. An
+  unassigned active trip anywhere in the source blocks that date conservatively,
+  matching `selectRetainedScheduledTimetable`.
+- `scheduled_departure_scopes` records each date's covered station, line, service
+  and destination, with the union of platform alternatives. Coverage follows the
+  shared selector's used patterns and active canonical revisions, including
+  non-final station occurrences, independently of active trip assignments that
+  day. It is not inferred from departure rows; an optional platform must belong
+  to this coverage as well as each returned occurrence's alternatives.
+- `scheduled_departure_occurrences` preserves boardable occurrences with a
+  downstream alighting stop, including untimed candidates. Provider IDs and stop
+  sequences remain strings; `occurrence_index` preserves source order for ties
+  without numeric conversion of opaque sequences. Original Singapore service
+  dates and bigint offsets retain times beyond 24:00 alongside resolved instants.
+  `timepoint` preserves exact/approximate precision; nullable seconds/instant pairs
+  preserve missing timing. Non-boardable and terminal occurrences stay in the
+  archive. Scope foreign keys prevent rows belonging to another date or scope.
+
+A future writer must verify retained bytes and canonical compatibility, derive
+these values using the shared contracts, validate platform subsets and resolve
+instants with the shared service-day helper. It must publish `completed_at` only
+after all dates, coverage and occurrences are committed and checked. A failed build
+keeps it null; rebuilding the same version must invalidate completion before
+changing rows. A new algorithm version can build alongside the previous one.
+Completion certifies projection materialization, not mapping coverage or approval.
+The database enforces storage relationships, not this future writer protocol.
+
+Future readers must require the expected projector version, completed state and
+current canonical topology fingerprint/version before selection. They must use
+explicit day/scope coverage and source lineage, count selected dates' untimed
+boardable candidates before filtering known instants, and retain the shared
+selector's conservative fallback/completeness semantics. The occurrence index
+supports equality on projection/date/exact scope followed by an instant range
+(or null timing); platform membership filters that bounded set. Primary keys
+index projection identity, dates and scopes. Canonical IDs deliberately have no
+FKs to mutable live entities, so canonical promotion cannot erase retained history.
+Deleting a projection cascades only through its derived rows; no deletion cascades
+into `scheduled_timetables`. Real mapping, source and release approvals, projection
+pull integration, and passenger query/API/UI remain separate work and gates.
+
 ## Public Holiday Workflow
 
 `app/workflows/publicHolidays/index.ts` syncs Singapore public holidays from the
