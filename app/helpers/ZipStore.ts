@@ -163,6 +163,24 @@ class ZipManager {
     return data;
   }
 
+  readExactEntry(path: string): Uint8Array | null {
+    let found = false;
+    const result = fflate.unzipSync(this.zipData, {
+      filter: (file) => {
+        if (file.name !== path) {
+          return false;
+        }
+        if (found) {
+          throw new Error(`Duplicate archive entry: ${path}`);
+        }
+        found = true;
+        return true;
+      },
+    });
+    // Verification owns these bytes; do not also retain them in the ZIP cache.
+    return result[path] ?? null;
+  }
+
   clearCache(): void {
     this.fileDataCache.clear();
     this.cachedInflatedBytes = 0;
@@ -237,6 +255,19 @@ export class ZipStore implements IStore {
 
   constructor(zipData: Buffer<ArrayBufferLike>) {
     this.zipManager = new ZipManager(zipData);
+  }
+
+  /** Read original bytes at an exact data-relative path, without caching. */
+  readBytes(path: string): Uint8Array {
+    const archivePath = toArchivePath(path);
+    if (archivePath !== `${ZIP_DATA_ROOT}/${path}`) {
+      throw new Error(`Expected an exact archive path: ${path}`);
+    }
+    const entry = this.zipManager.readExactEntry(archivePath);
+    if (entry == null) {
+      throw new Error(`ENOENT: no such file or directory, open '${path}'`);
+    }
+    return entry;
   }
 
   readText(path: string): string {

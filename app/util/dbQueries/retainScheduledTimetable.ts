@@ -14,6 +14,12 @@ import type { getDb } from '~/db';
 import { scheduledTimetablesTable } from '~/db/scheduledTimetables.schema';
 import { validateScheduledTimetableHistory } from './scheduledTimetableHistory';
 
+/**
+ * All seven files passed artifact and release/mapping binding verification
+ * against an independently trusted Pages entry. This is retention input, not
+ * serving eligibility: source-order review and canonical compatibility are
+ * separate. Preserve the original bytes, including the parsed review records.
+ */
 export type VerifiedScheduledTimetableBundle = {
   entry: ScheduledTimetablePagesEntry;
   files: Record<
