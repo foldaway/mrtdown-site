@@ -7,6 +7,10 @@ import { createWorkflow } from '@upstash/workflow/tanstack';
 import { ZipStore } from '~/helpers/ZipStore.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts.js';
+import {
+  projectScheduledTimetable,
+  SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
+} from '~/util/dbQueries/projectScheduledTimetable.js';
 import { retainScheduledTimetable } from '~/util/dbQueries/retainScheduledTimetable.js';
 import { rebuildSitemapSnapshot } from '~/util/dbQueries/sitemap.js';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics.js';
@@ -42,7 +46,7 @@ import {
   syncStations,
   truncateStagingTables,
 } from './helpers/stagingSync.js';
-import { validateScheduledTimetableCanonicalArchive } from './helpers/validateScheduledTimetableCanonicalArchive.js';
+import { createValidatedScheduledTimetableCanonicalSnapshot } from './helpers/validateScheduledTimetableCanonicalArchive.js';
 import {
   acquireOrRenewPullWorkflowLease,
   releasePullWorkflowLease,
@@ -122,21 +126,30 @@ async function executePull(
     const db = getDb();
     const timetable = await readScheduledTimetableArchive(manifest, store);
     if (timetable) {
-      await validateScheduledTimetableCanonicalArchive(
+      const snapshot = await createValidatedScheduledTimetableCanonicalSnapshot(
         manifest,
         store,
         timetable,
       );
-      const result = await retainScheduledTimetable(db, timetable, {
-        sourceReview: params.sourceReview,
-        importInstant,
-      });
-      if (result.status === 'blocked') {
-        throw new WorkflowNonRetryableError(
-          `Scheduled timetable retention blocked: ${result.blockers.join(', ')}`,
-        );
+      try {
+        const result = await retainScheduledTimetable(db, timetable, {
+          sourceReview: params.sourceReview,
+          importInstant,
+        });
+        if (result.status === 'blocked') {
+          throw new WorkflowNonRetryableError(
+            `Scheduled timetable retention blocked: ${result.blockers.join(', ')}`,
+          );
+        }
+        console.log(`[PULL] Scheduled timetable ${result.status}`);
+        await projectScheduledTimetable(db, {
+          manifestSha256: timetable.entry.manifestSha256,
+          projectorVersion: SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
+          canonicalDataDir: snapshot.canonicalDataDir,
+        });
+      } finally {
+        await snapshot.dispose();
       }
-      console.log(`[PULL] Scheduled timetable ${result.status}`);
     }
     await truncateStagingTables(db);
 

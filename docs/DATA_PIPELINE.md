@@ -9,7 +9,7 @@ The overhaul introduces a local read model for canonical mrtdown data.
 - fetches the manifest and archive from `MRTDOWN_DATA_URL`;
 - parses archive contents with `ZipStore` and `@mrtdown/fs`, verifies any
   advertised scheduled timetable against the same canonical archive and admits
-  it to append-only retention;
+  it to append-only retention, then projects that version into the departure index;
 - inserts parsed entities into `*_next` staging tables;
 - promotes changed rows into live tables;
 - deletes orphans after dependents are synchronized;
@@ -50,29 +50,33 @@ validates and forwards this record; signed direct workflow requests validate the
 same contract. No review is inferred from release approval, archive contents,
 opaque provider versions or the import clock. Unknown request fields are rejected.
 
-The pull persists the configured data URL, trusted manifest and an import instant
-in its manifest step. Its parse step downloads the archive from that same root,
-verifies all seven files against the persisted entry, checks canonical
-compatibility and calls retention before truncating or inserting canonical
-staging data. The shared `@mrtdown/fs` validator checks topology identity,
-references, platforms/boarding, ordered service paths/revisions and active source
-service dates. A private temporary directory bridges its filesystem API using
-only operators, lines, stations and services from this ZIP. Those files must
-match the trusted root manifest's complete domain inventories and hashes of
-schema-parsed JSON; the directory is removed on success or failure. Timetable
-bytes stay in memory, with no second archive download. Retries reverify downloaded
-bytes against that entry; an upstream replacement cannot silently substitute a different
-bundle. Bundle bytes stay inside the parse step and PostgreSQL, never in workflow
-step outputs. If the upstream archive has changed, retry after restoring that
-bundle or start a new pull against the new root manifest with its exact review.
+The pull persists the configured data URL, trusted manifest and an import
+instant in its manifest step. Its parse step downloads the archive from that
+same root, verifies all seven files against the persisted entry, checks
+canonical compatibility, calls retention and projects the admitted version
+before truncating or inserting canonical staging data. The shared `@mrtdown/fs`
+validator checks topology identity, references, platforms/boarding, ordered
+service paths/revisions and active source service dates. A private temporary
+directory bridges its filesystem API using only operators, lines, stations and
+services from this ZIP. Those files must match the trusted root manifest's
+complete domain inventories and hashes of schema-parsed JSON. This same private
+snapshot stays immutable through retention and projection, then is removed on
+success or failure. Timetable bytes stay in memory, with no second archive
+download. Retries reverify downloaded bytes against that entry; an upstream
+replacement cannot silently substitute a different bundle. Bundle bytes stay
+inside the parse step and PostgreSQL, never in workflow step outputs. If the
+upstream archive has changed, retry after restoring that bundle or start a new
+pull against the new root manifest with its exact review.
 
 New artifacts without matching source-order review fail with explicit retention
-blockers. Rejection preserves retained history and leaves staging and the last
-successful fingerprint untouched. Already-retained artifacts need no new review
-and preserve their first receipt, but still undergo compatibility validation
-against this pull's canonical archive. A later canonical failure can leave an
-admitted bundle retained; its receipt records source admission only, and retrying does not
-rewrite it. The existing workflow lease and failure cleanup still apply.
+blockers and never reach projection. Rejection preserves retained history and
+leaves staging and the last successful fingerprint untouched. Already-retained
+artifacts need no new review and preserve their first receipt, but still undergo
+compatibility validation against this pull's canonical archive. A later
+projection or canonical staging failure can leave an admitted bundle retained;
+its receipt records source admission only, and retrying does not rewrite it.
+Projection failure prevents canonical staging and successful fingerprint
+recording. The existing workflow lease and failure cleanup still apply.
 
 Retention does not establish eligibility to serve departures. Compatibility is
 checked against the incoming snapshot, not live database entities. Passenger
@@ -90,7 +94,7 @@ that variable, the PostgreSQL scenario is skipped.
 
 Four derived tables prepare indexed reads without parsing the retained timetable
 body on each request. The internal `projectScheduledTimetable` builder writes
-these tables; pull integration and passenger reads remain separate work.
+these tables during the canonical pull; passenger reads remain separate work.
 
 - `scheduled_departure_projections` identifies one retained manifest and projector
   algorithm version. It records the canonical topology fingerprint/version, feed
@@ -134,7 +138,10 @@ coverage follows the shared retained selector's used patterns and active revisio
 boardable rows must belong to that coverage and its platform alternatives. It
 streams dates and resolved trips into batches of at most 500 occurrences, keeping
 untimed candidates and never collecting the date-expanded timetable in memory.
-No download, workflow output or automatic invocation is involved.
+The parse step invokes it only for the currently advertised, validated and admitted
+manifest, using the same archive snapshot. GTFS-free pulls do no projection work.
+Historical projections are preserved; the pull does not backfill retained history.
+Projection adds no archive download or large workflow output.
 
 A retained-parent row lock serializes concurrent builds, including the first
 build. Every same-identity retry revalidates and rebuilds; a completion timestamp
@@ -157,8 +164,8 @@ supports equality on projection/date/exact scope followed by an instant range
 index projection identity, dates and scopes. Canonical IDs deliberately have no
 FKs to mutable live entities, so canonical promotion cannot erase retained history.
 Deleting a projection cascades only through its derived rows; no deletion cascades
-into `scheduled_timetables`. Real mapping, source and release approvals, projection
-pull integration, and passenger query/API/UI remain separate work and gates.
+into `scheduled_timetables`. Real mapping, source and release approvals and
+passenger query/API/UI remain separate work and gates.
 
 ## Public Holiday Workflow
 
@@ -191,11 +198,13 @@ The fingerprint deliberately excludes `generatedAt`, which is publication
 metadata rather than a data change. Bump the pull pipeline version in
 `app/workflows/pull/helpers/manifestFingerprint.ts` when a pull or derived-data
 code change requires one full rebuild without an upstream manifest change.
-Version 3 introduces canonical timetable compatibility and forces one pull after
-this upgrade, including for previously retained artifacts.
-The fingerprint is recorded only after retention, canonical promotion, derived
-rebuilds and cache publication succeed. Scheduled requests still carry no review:
-an unseen timetable remains blocked until an operator submits its source review.
+Version 4 adds departure projection to the pull and forces one pull after this
+upgrade, including projection of an already-retained advertised artifact without
+a new source review. It does not backfill other historical artifacts. The
+fingerprint is recorded only after retention, timetable projection, canonical
+promotion, derived rebuilds and cache publication succeed. Scheduled requests
+still carry no review: an unseen timetable remains blocked until an operator
+submits its source review.
 
 Configure `QSTASH_URL`, `QSTASH_TOKEN`, and `INTERNAL_API_TOKEN` as secrets in
 each GitHub deployment environment. The deployment workflow supplies `TIER`
