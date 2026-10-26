@@ -167,6 +167,33 @@ Deleting a projection cascades only through its derived rows; no deletion cascad
 into `scheduled_timetables`. Real mapping, source and release approvals and
 passenger query/API/UI remain separate work and gates.
 
+### Internal indexed date and scope selection
+
+`withSelectedScheduledTimetable` selects one completed, supported projection for
+one service date and exact canonical station/line/service/destination scope,
+including optional platform coverage. It reads retained manifests and receipts
+through the shared metadata-only history validator and follows that validated
+chain newest first. Invalid lineage throws; it never reconstructs ordering from
+provider versions, hashes or import times. It checks artifact bounds, both
+manifest and projection topology identities, projection feed bounds, explicit
+day/scope coverage and whole-source unassigned-active counts, falling back to an
+older eligible version. A covered zero-active date can be selected; missing rows
+cannot establish coverage. No timetable body or occurrence rows are loaded.
+
+The helper owns a read-only repeatable-read transaction. Its trusted internal
+`readCanonicalTopology(tx)` callback must independently establish the current
+canonical topology from that same snapshot (or an immutable snapshot proven to
+represent it), never from a candidate manifest or an external fingerprint.
+Current-topology loading/integration is separate work. The consumer callback
+receives both selection and transaction so a later indexed query can read the
+same snapshot through concurrent canonical changes or projection rebuilds. A
+projection ID retained after the callback ends is provenance, not a reusable
+eligibility token. Selected version/receipt provenance, counts, platform coverage
+and per-candidate reasons distinguish unavailable or incomplete coverage from a
+valid empty date. Time-window reads and untimed-candidate accounting remain
+separate, as do reviewed scoped rollback policy, passenger API/UI, and actual
+mapping/source/release approval and publication gates.
+
 ## Public Holiday Workflow
 
 `app/workflows/publicHolidays/index.ts` syncs Singapore public holidays from the
