@@ -1,0 +1,430 @@
+import { randomUUID } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { hashBytes, queryRetainedScheduledDepartures } from '@mrtdown/fs';
+import { eq, sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+import { relations } from '~/db/relations';
+import {
+  scheduledDepartureDaysTable as days,
+  scheduledDepartureOccurrencesTable as occurrences,
+  scheduledDepartureProjectionsTable as projections,
+} from '~/db/scheduledDepartures.schema';
+import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
+import { scheduledTimetableArchiveFixture } from '~/workflows/pull/helpers/scheduledTimetableArchive.fixture';
+import { scheduledTimetableCanonicalFixture } from '~/workflows/pull/helpers/scheduledTimetableCanonical.fixture';
+import { projectScheduledTimetable } from './projectScheduledTimetable';
+import { queryIndexedScheduledDepartures } from './queryIndexedScheduledDepartures';
+import { retainScheduledTimetable } from './retainScheduledTimetable';
+import { retentionReview } from './scheduledTimetableRetention.fixture';
+
+const url = process.env.TEST_TIMETABLE_DATABASE_URL;
+const schema = `gtfs_window_test_${randomUUID().replaceAll('-', '')}`;
+const canonical = scheduledTimetableCanonicalFixture(3);
+const path = canonical.canonical.services[0].revisions[0].path.stations;
+path.splice(2, 0, { ...path[0] });
+canonical.pattern.stops.splice(2, 0, { ...canonical.pattern.stops[0] });
+const platforms = canonical.canonical.stations[0].layout?.platforms;
+if (!platforms) {
+  throw new Error('Missing fixture platforms');
+}
+platforms.push({ ...platforms[0], id: 'alternative' });
+canonical.pattern.stops[0].platformIds = ['platform-1', 'alternative'];
+canonical.pattern.stops[2].platformIds = ['alternative'];
+const sequences = [
+  '00001',
+  '09007199254740993123',
+  '09007199254740993124',
+  '09007199254740993125',
+];
+const older = scheduledTimetableArchiveFixture('a', {
+  topology: canonical.topology(),
+  pattern: canonical.pattern,
+  customize(timetable, metadata) {
+    // Covers two active dates plus a genuinely covered zero-active date.
+    metadata.feedRange.endDate = '2026-10-26';
+    metadata.sourceFeedInfo[0].feed_end_date = '20261026';
+    timetable.timetable.calendars[0].exceptions.push({
+      date: '2026-10-25',
+      available: true,
+    });
+    timetable.assignments[0].dateRanges = [
+      { startDate: '2026-10-24', endDate: '2026-10-25' },
+    ];
+    const trip = timetable.timetable.trips[0];
+    trip.providerTripId = '000-trip';
+    trip.stopTimes = [87_000, null, 87_600, 88_000].map((seconds, index) => ({
+      ...trip.stopTimes[0],
+      providerTripId: trip.providerTripId,
+      providerStopId: `00-stop-${index}`,
+      stopSequence: sequences[index],
+      arrivalSeconds: seconds,
+      departureSeconds: seconds,
+      timepoint: index === 1 ? 0 : 1,
+    }));
+    timetable.assignments[0].providerTripId = trip.providerTripId;
+  },
+});
+older.entry.coverage = {
+  sourceTripDateCount: 2,
+  assignedTripDateCount: 2,
+  missingTripDateCount: 0,
+};
+const release = JSON.parse(Buffer.from(older.files['release.json']).toString());
+release.coverage = older.entry.coverage;
+older.files['release.json'] = Buffer.from(JSON.stringify(release));
+older.entry.releaseSha256 = hashBytes(older.files['release.json']);
+const newer = scheduledTimetableArchiveFixture('b', {
+  topology: canonical.topology(),
+  pattern: canonical.pattern,
+  customize(timetable, metadata) {
+    metadata.feedRange = { startDate: '2026-10-25', endDate: '2026-10-25' };
+    metadata.sourceFeedInfo[0].feed_start_date = '20261025';
+    metadata.sourceFeedInfo[0].feed_end_date = '20261025';
+    timetable.timetable.calendars[0].exceptions = [
+      { date: '2026-10-25', available: true },
+    ];
+    timetable.assignments[0].dateRanges = [{ ...metadata.feedRange }];
+    const trip = timetable.timetable.trips[0];
+    trip.stopTimes = [900, null, 900, 1000].map((seconds, index) => ({
+      ...trip.stopTimes[0],
+      providerStopId: `00-stop-${index}`,
+      stopSequence: sequences[index],
+      arrivalSeconds: seconds,
+      departureSeconds: seconds,
+      timepoint: index === 3 ? 1 : 0,
+    }));
+  },
+});
+const scope = {
+  stationId: 'station-1',
+  lineId: 'line',
+  serviceId: 'service',
+  destinationStationId: 'station-3',
+};
+const window = {
+  startInstant: '2026-10-25T00:00:00+08:00',
+  endInstant: '2026-10-25T01:00:00+08:00',
+};
+
+describe.skipIf(!url)('indexed departure window', () => {
+  let admin: Pool;
+  let pool: Pool;
+  let directory: string;
+  const db = () => drizzle({ client: pool, relations });
+  const options = () => ({
+    ...window,
+    scope,
+    readCanonicalTopology: async () => canonical.topology(),
+  });
+  const shared = () => ({
+    ...window,
+    scope,
+    storeDir: join(directory, 'store'),
+    dataDir: join(directory, 'data'),
+  });
+
+  beforeAll(async () => {
+    admin = new Pool({ connectionString: url });
+    await admin.query(`CREATE SCHEMA ${schema}`);
+    pool = new Pool({
+      connectionString: url,
+      options: `-c search_path=${schema}`,
+    });
+    for (const migration of [
+      '20261024214325_superb_violations',
+      '20261025200054_violet_energizer',
+    ]) {
+      await pool.query(
+        await readFile(
+          new URL(
+            `../../../drizzle/${migration}/migration.sql`,
+            import.meta.url,
+          ),
+          'utf8',
+        ),
+      );
+    }
+    directory = await mkdtemp(join(tmpdir(), 'mrtdown-window-test-'));
+    for (const [path, bytes] of Object.entries(canonical.archive().files)) {
+      const file = join(directory, path);
+      await mkdir(join(file, '..'), { recursive: true });
+      await writeFile(file, bytes);
+    }
+  });
+  beforeEach(async () => {
+    await pool.query('TRUNCATE scheduled_timetables CASCADE');
+    await rm(join(directory, 'store'), { recursive: true, force: true });
+    for (const bundle of [older, newer]) {
+      const retained = await retainScheduledTimetable(db(), bundle, {
+        importInstant: '2026-10-25T00:03:00Z',
+        sourceReview: retentionReview(
+          bundle,
+          bundle === newer ? older : undefined,
+        ),
+      });
+      if (retained.status === 'blocked') {
+        throw new Error(retained.blockers.join(', '));
+      }
+      await projectScheduledTimetable(db(), {
+        manifestSha256: bundle.entry.manifestSha256,
+        projectorVersion: 1,
+        canonicalDataDir: shared().dataDir,
+      });
+      const version = join(shared().storeDir, bundle.entry.manifestSha256);
+      await mkdir(version, { recursive: true });
+      for (const [name, bytes] of Object.entries(bundle.files)) {
+        await writeFile(join(version, name), bytes);
+      }
+      await writeFile(
+        join(version, 'import.json'),
+        JSON.stringify(retained.record),
+      );
+    }
+  });
+  afterAll(async () => {
+    await pool?.end();
+    if (admin) {
+      await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await admin.end();
+    }
+    if (directory) {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('merges previous-day 24+ and current-day departures before limiting, with date-specific fallback and opaque repeated occurrence order', async () => {
+    const readCanonicalTopology = vi.fn(options().readCanonicalTopology);
+    const result = await queryIndexedScheduledDepartures(db(), {
+      ...options(),
+      readCanonicalTopology,
+    });
+    expect(readCanonicalTopology).toHaveBeenCalledTimes(1);
+    expect(result.complete).toBe(true);
+    expect(result.departures).toEqual(
+      (await queryRetainedScheduledDepartures(shared())).departures,
+    );
+    expect(
+      result.departures.map((row) => [
+        row.serviceDate,
+        row.departureSeconds,
+        row.stopSequence,
+      ]),
+    ).toEqual([
+      ['2026-10-24', 87_000, sequences[0]],
+      ['2026-10-25', 900, sequences[0]],
+      ['2026-10-25', 900, sequences[2]],
+      ['2026-10-24', 87_600, sequences[2]],
+    ]);
+    expect(
+      result.serviceDays.map((day) => [
+        day.serviceDate,
+        day.selected?.version.manifestSha256,
+        day.attempts.map(({ reason }) => reason),
+      ]),
+    ).toEqual([
+      [
+        '2026-10-24',
+        older.entry.manifestSha256,
+        ['outside-feed-range', 'eligible'],
+      ],
+      ['2026-10-25', newer.entry.manifestSha256, ['eligible']],
+    ]);
+    expect(
+      (await queryIndexedScheduledDepartures(db(), { ...options(), limit: 2 }))
+        .departures,
+    ).toEqual(result.departures.slice(0, 2));
+    const fractional = {
+      ...options(),
+      startInstant: '2026-10-25T00:10:00.000000001+08:00',
+      endInstant: '2026-10-25T00:15:00.000000001+08:00',
+    };
+    expect(
+      (await queryIndexedScheduledDepartures(db(), fractional)).departures,
+    ).toEqual(
+      (await queryRetainedScheduledDepartures({ ...shared(), ...fractional }))
+        .departures,
+    );
+    const platform = await queryIndexedScheduledDepartures(db(), {
+      ...options(),
+      scope: { ...scope, platformId: 'platform-1' },
+    });
+    expect(platform.complete).toBe(true);
+    expect(platform.departures).toEqual(
+      result.departures.filter(({ platformIds }) =>
+        platformIds.includes('platform-1'),
+      ),
+    );
+    expect(platform.departures[1]).toMatchObject({
+      basis: 'scheduled',
+      precision: 'approximate',
+      platformIds: ['alternative', 'platform-1'],
+    });
+    expect(
+      (
+        await queryIndexedScheduledDepartures(db(), {
+          ...options(),
+          startInstant: '2026-10-25T00:10:00+08:00',
+          endInstant: '2026-10-25T00:15:00+08:00',
+        })
+      ).departures,
+    ).toEqual(result.departures.slice(0, 1));
+  });
+
+  it('distinguishes untimed, missing, whole-source mapping gaps and covered empty dates without truncating counts', async () => {
+    const untimedScope = { ...scope, stationId: 'station-2' };
+    const untimed = await queryIndexedScheduledDepartures(db(), {
+      ...options(),
+      scope: untimedScope,
+      limit: 1,
+    });
+    expect(untimed).toMatchObject({
+      departures: [],
+      untimedDepartureCount: 2,
+      complete: false,
+    });
+    expect(untimed.untimedDepartureCount).toBe(
+      (
+        await queryRetainedScheduledDepartures({
+          ...shared(),
+          scope: untimedScope,
+        })
+      ).untimedDepartureCount,
+    );
+    const empty = await queryIndexedScheduledDepartures(db(), {
+      ...options(),
+      startInstant: '2026-10-26T12:00:00+08:00',
+      endInstant: '2026-10-26T13:00:00+08:00',
+    });
+    expect(empty).toMatchObject({
+      departures: [],
+      complete: true,
+      untimedDepartureCount: 0,
+    });
+    expect(empty.serviceDays[0].selected?.coverage.activeTripCount).toBe(0);
+    const wrongScope = await queryIndexedScheduledDepartures(db(), {
+      ...options(),
+      scope: { ...scope, destinationStationId: 'station-2' },
+    });
+    expect(wrongScope).toMatchObject({ departures: [], complete: false });
+    expect(
+      wrongScope.serviceDays.every(
+        (day) =>
+          day.selected === null &&
+          day.attempts.at(-1)?.reason === 'scope-not-covered',
+      ),
+    ).toBe(true);
+    const [current] = await db()
+      .select()
+      .from(projections)
+      .where(eq(projections.manifest_sha256, newer.entry.manifestSha256));
+    await db()
+      .update(days)
+      .set({ unassigned_active_trip_count: 1 })
+      .where(eq(days.projection_id, current.id));
+    const fallback = await queryIndexedScheduledDepartures(db(), options());
+    expect(
+      fallback.serviceDays[1].attempts.map(({ reason }) => reason),
+    ).toEqual(['mapping-coverage-gap', 'eligible']);
+    expect(fallback.serviceDays[1].selected?.version.manifestSha256).toBe(
+      older.entry.manifestSha256,
+    );
+    await db().delete(days);
+    const missing = await queryIndexedScheduledDepartures(db(), options());
+    expect(missing).toMatchObject({ departures: [], complete: false });
+    expect(
+      missing.serviceDays.every(
+        (day) =>
+          day.selected === null &&
+          day.attempts.at(-1)?.reason === 'day-not-indexed',
+      ),
+    ).toBe(true);
+    await db().update(projections).set({ completed_at: null });
+    expect(
+      await queryIndexedScheduledDepartures(db(), options()),
+    ).toMatchObject({
+      complete: false,
+      unavailableProjections: [
+        expect.objectContaining({ reason: 'projection-incomplete' }),
+        expect.objectContaining({ reason: 'projection-incomplete' }),
+      ],
+    });
+  });
+
+  it('holds one read-only repeatable-read snapshot across topology promotion, history changes and rebuilt occurrence rows for every candidate date', async () => {
+    const before = await queryIndexedScheduledDepartures(db(), options());
+    await pool.query('CREATE TABLE window_canonical (topology json NOT NULL)');
+    try {
+      await pool.query('INSERT INTO window_canonical VALUES ($1)', [
+        JSON.stringify(canonical.topology()),
+      ]);
+      const result = await queryIndexedScheduledDepartures(db(), {
+        ...options(),
+        readCanonicalTopology: async (tx) => {
+          const isolation = await tx.execute<{ transaction_isolation: string }>(
+            sql`SHOW transaction_isolation`,
+          );
+          const access = await tx.execute<{ transaction_read_only: string }>(
+            sql`SHOW transaction_read_only`,
+          );
+          expect(isolation.rows[0].transaction_isolation).toBe(
+            'repeatable read',
+          );
+          expect(access.rows[0].transaction_read_only).toBe('on');
+          const topology = await tx.execute<{
+            topology: ReturnType<typeof canonical.topology>;
+          }>(sql`SELECT topology FROM window_canonical`);
+          await db().transaction(async (writer) => {
+            await writer.execute(
+              sql`UPDATE window_canonical SET topology = ${JSON.stringify({ ...canonical.topology(), projectionVersion: 2 })}::json`,
+            );
+            await writer
+              .update(projections)
+              .set({ completed_at: null, maximum_departure_seconds: 0 });
+            await writer.delete(occurrences);
+            await writer.delete(days);
+            await writer.delete(projections);
+            await writer.delete(timetables);
+          });
+          return topology.rows[0].topology;
+        },
+      });
+      expect(result).toEqual(before);
+      expect(await db().select().from(occurrences)).toEqual([]);
+      expect(await db().select().from(timetables)).toEqual([]);
+    } finally {
+      await pool.query('DROP TABLE window_canonical');
+    }
+  });
+
+  it('rejects invalid instants, order, duration, limit and strict scope before opening a snapshot', async () => {
+    const database = db();
+    const transaction = vi.spyOn(database, 'transaction');
+    for (const patch of [
+      { startInstant: 'not-an-instant' },
+      { endInstant: window.startInstant },
+      { endInstant: '2026-10-24T00:00:00Z' },
+      { endInstant: '2026-10-26T00:00:01+08:00' },
+      { endInstant: '2026-10-26T00:00:00.000000001+08:00' },
+      { limit: 0 },
+      { limit: 1.5 },
+      { scope: { ...scope, unexpected: true } },
+    ]) {
+      await expect(
+        queryIndexedScheduledDepartures(database, { ...options(), ...patch }),
+      ).rejects.toThrow();
+    }
+    expect(transaction).not.toHaveBeenCalled();
+  });
+});

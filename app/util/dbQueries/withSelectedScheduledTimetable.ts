@@ -35,7 +35,7 @@ type Attempt = Omit<ScheduledTimetableSelectionAttempt, 'reason'> & {
     | 'projection-metadata-mismatch'
     | 'day-not-indexed';
 };
-type Selection = {
+export type ScheduledTimetableSelection = {
   serviceDate: string;
   scope: ScheduledTimetableRequestScope;
   selected: {
@@ -49,8 +49,7 @@ type Selection = {
   } | null;
   attempts: Attempt[];
 };
-type SelectionOptions = {
-  serviceDate: string;
+export type ScheduledTimetableSnapshotOptions = {
   scope: ScheduledTimetableRequestScope;
   readCanonicalTopology: (tx: ReadTransaction) => Promise<Topology>;
 };
@@ -101,21 +100,27 @@ function validateScope(
 }
 
 /**
- * Private server helper, not a serving-approval gate. The trusted internal caller
- * must load independently established current canonical topology through tx (or
- * an immutable snapshot proven to represent that same DB snapshot). Never derive
- * it from a candidate manifest or accept an externally supplied fingerprint.
- *
- * Consume the selection and perform any subsequent indexed reads inside use;
- * projection IDs returned after this transaction closes are provenance only.
- * Repeatable read keeps canonical reads, history and rebuilt rows consistent.
+ * One read-only snapshot for selection and all consumer reads. The trusted
+ * readCanonicalTopology callback must establish live topology through tx or an
+ * immutable snapshot proven to represent it, never a candidate/external hash.
+ * Consume projection IDs within use; afterward they are provenance only.
  */
-export async function withSelectedScheduledTimetable<T>(
+export async function withScheduledTimetableSnapshot<T>(
   db: Database,
-  options: SelectionOptions,
-  use: (tx: ReadTransaction, selection: Selection) => Promise<T>,
+  options: ScheduledTimetableSnapshotOptions,
+  use: (
+    tx: ReadTransaction,
+    snapshot: {
+      scope: ScheduledTimetableRequestScope;
+      maximumDepartureSeconds: number;
+      unavailableProjections: {
+        manifestSha256: string;
+        reason: Attempt['reason'];
+      }[];
+      select: (serviceDate: string) => Promise<ScheduledTimetableSelection>;
+    },
+  ) => Promise<T>,
 ): Promise<T> {
-  const serviceDate = z.iso.date().parse(options.serviceDate);
   const scope = ScheduledTimetableRequestScopeSchema.parse(options.scope);
   return db.transaction(
     async (tx) => {
@@ -144,30 +149,8 @@ export async function withSelectedScheduledTimetable<T>(
           endDate: projections.feed_end_date,
           maximumDepartureSeconds: projections.maximum_departure_seconds,
           completedAt: projections.completed_at,
-          serviceDate: days.service_date,
-          activeTripCount: days.active_trip_count,
-          unassignedActiveTripCount: days.unassigned_active_trip_count,
-          platformIds: scopes.platform_ids,
         })
         .from(projections)
-        .leftJoin(
-          days,
-          and(
-            eq(days.projection_id, projections.id),
-            eq(days.service_date, serviceDate),
-          ),
-        )
-        .leftJoin(
-          scopes,
-          and(
-            eq(scopes.projection_id, days.projection_id),
-            eq(scopes.service_date, days.service_date),
-            eq(scopes.station_id, scope.stationId),
-            eq(scopes.line_id, scope.lineId),
-            eq(scopes.service_id, scope.serviceId),
-            eq(scopes.destination_station_id, scope.destinationStationId),
-          ),
-        )
         .where(
           eq(
             projections.projector_version,
@@ -177,86 +160,187 @@ export async function withSelectedScheduledTimetable<T>(
       const byManifest = new Map(
         indexed.map((row) => [row.manifestSha256, row]),
       );
-      const selection: Selection = {
-        serviceDate,
-        scope,
-        selected: null,
-        attempts: [],
-      };
-      // Only the validated receipt chain establishes newest-to-oldest order.
-      for (const version of [...history].reverse()) {
+      const projectionReason = (
+        version: Version,
+      ): Attempt['reason'] | undefined => {
         const { manifest, manifestSha256 } = version;
         const projection = byManifest.get(manifestSha256);
-        let reason: Attempt['reason'];
-        let coverage: Coverage | undefined;
         if (
-          serviceDate < manifest.feedRange.startDate ||
-          serviceDate > manifest.feedRange.endDate
-        ) {
-          reason = 'outside-feed-range';
-        } else if (
           manifest.identity.topology.sha256 !== fingerprint ||
           manifest.identity.topology.projectionVersion !==
             topology.projectionVersion
         ) {
-          reason = 'topology-mismatch';
-        } else if (!projection) {
-          reason = 'projection-unavailable';
-        } else if (projection.completedAt === null) {
-          reason = 'projection-incomplete';
-        } else if (
+          return 'topology-mismatch';
+        }
+        if (!projection) {
+          return 'projection-unavailable';
+        }
+        if (projection.completedAt === null) {
+          return 'projection-incomplete';
+        }
+        if (
           projection.topologySha256 !== fingerprint ||
           projection.topologyProjectionVersion !== topology.projectionVersion
         ) {
-          reason = 'topology-mismatch';
-        } else if (
+          return 'topology-mismatch';
+        }
+        if (
           projection.startDate !== manifest.feedRange.startDate ||
           projection.endDate !== manifest.feedRange.endDate
         ) {
-          reason = 'projection-metadata-mismatch';
-        } else if (
-          projection.serviceDate === null ||
-          projection.activeTripCount === null ||
-          projection.unassignedActiveTripCount === null
-        ) {
-          reason = 'day-not-indexed';
-        } else if (
-          !projection.platformIds ||
-          (scope.platformId !== undefined &&
-            !projection.platformIds.includes(scope.platformId))
-        ) {
-          reason = 'scope-not-covered';
-        } else {
-          coverage = {
-            activeTripCount: projection.activeTripCount,
-            unassignedActiveTripCount: projection.unassignedActiveTripCount,
-          };
-          reason =
-            coverage.unassignedActiveTripCount > 0
-              ? 'mapping-coverage-gap'
-              : 'eligible';
-          if (reason === 'eligible') {
-            selection.selected = {
-              projectionId: projection.id,
-              projectorVersion: projection.projectorVersion,
-              topology: {
-                sha256: fingerprint,
-                projectionVersion: topology.projectionVersion,
-              },
-              maximumDepartureSeconds: projection.maximumDepartureSeconds,
-              completedAt: projection.completedAt,
-              version,
-              coverage: { ...coverage, platformIds: projection.platformIds },
-            };
-          }
+          return 'projection-metadata-mismatch';
         }
-        selection.attempts.push({ manifestSha256, reason, ...coverage });
-        if (selection.selected) {
-          break;
+      };
+      let maximumDepartureSeconds = 0;
+      const unavailableProjections: {
+        manifestSha256: string;
+        reason: Attempt['reason'];
+      }[] = [];
+      for (const version of history) {
+        const { manifest, manifestSha256 } = version;
+        if (
+          manifest.identity.topology.sha256 !== fingerprint ||
+          manifest.identity.topology.projectionVersion !==
+            topology.projectionVersion
+        ) {
+          continue;
+        }
+        const reason = projectionReason(version);
+        if (reason) {
+          // Unknown source offsets can hide older service dates, even if a fallback is selected.
+          unavailableProjections.push({ manifestSha256, reason });
+        } else {
+          maximumDepartureSeconds = Math.max(
+            maximumDepartureSeconds,
+            byManifest.get(manifestSha256)?.maximumDepartureSeconds ?? 0,
+          );
         }
       }
-      return use(tx, selection);
+      const select = async (
+        input: string,
+      ): Promise<ScheduledTimetableSelection> => {
+        const serviceDate = z.iso.date().parse(input);
+        const coverageRows = await tx
+          .select({
+            projectionId: days.projection_id,
+            serviceDate: days.service_date,
+            activeTripCount: days.active_trip_count,
+            unassignedActiveTripCount: days.unassigned_active_trip_count,
+            platformIds: scopes.platform_ids,
+          })
+          .from(days)
+          .leftJoin(
+            scopes,
+            and(
+              eq(scopes.projection_id, days.projection_id),
+              eq(scopes.service_date, days.service_date),
+              eq(scopes.station_id, scope.stationId),
+              eq(scopes.line_id, scope.lineId),
+              eq(scopes.service_id, scope.serviceId),
+              eq(scopes.destination_station_id, scope.destinationStationId),
+            ),
+          )
+          .where(eq(days.service_date, serviceDate));
+        const byProjection = new Map(
+          coverageRows.map((row) => [row.projectionId, row]),
+        );
+        const selection: ScheduledTimetableSelection = {
+          serviceDate,
+          scope,
+          selected: null,
+          attempts: [],
+        };
+        // Only the validated receipt chain establishes newest-to-oldest order.
+        for (const version of [...history].reverse()) {
+          const { manifest, manifestSha256 } = version;
+          const metadata = byManifest.get(manifestSha256);
+          const projection = metadata && {
+            ...metadata,
+            ...byProjection.get(metadata.id),
+          };
+          const unavailable = projectionReason(version);
+          let reason: Attempt['reason'];
+          let coverage: Coverage | undefined;
+          if (
+            serviceDate < manifest.feedRange.startDate ||
+            serviceDate > manifest.feedRange.endDate
+          ) {
+            reason = 'outside-feed-range';
+          } else if (unavailable) {
+            reason = unavailable;
+          } else if (!projection || projection.completedAt === null) {
+            throw new Error('Eligible projection metadata is missing');
+          } else if (
+            projection.serviceDate == null ||
+            projection.activeTripCount == null ||
+            projection.unassignedActiveTripCount == null
+          ) {
+            reason = 'day-not-indexed';
+          } else if (
+            !projection.platformIds ||
+            (scope.platformId !== undefined &&
+              !projection.platformIds.includes(scope.platformId))
+          ) {
+            reason = 'scope-not-covered';
+          } else {
+            coverage = {
+              activeTripCount: projection.activeTripCount,
+              unassignedActiveTripCount: projection.unassignedActiveTripCount,
+            };
+            reason =
+              coverage.unassignedActiveTripCount > 0
+                ? 'mapping-coverage-gap'
+                : 'eligible';
+            if (reason === 'eligible') {
+              selection.selected = {
+                projectionId: projection.id,
+                projectorVersion: projection.projectorVersion,
+                topology: {
+                  sha256: fingerprint,
+                  projectionVersion: topology.projectionVersion,
+                },
+                maximumDepartureSeconds: projection.maximumDepartureSeconds,
+                completedAt: projection.completedAt,
+                version,
+                coverage: { ...coverage, platformIds: projection.platformIds },
+              };
+            }
+          }
+          selection.attempts.push({ manifestSha256, reason, ...coverage });
+          if (selection.selected) {
+            break;
+          }
+        }
+        return selection;
+      };
+      return use(tx, {
+        scope,
+        maximumDepartureSeconds,
+        unavailableProjections,
+        select,
+      });
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
+  );
+}
+
+/**
+ * Private server helper, not a serving-approval gate. The trusted internal caller
+ * must load independently established current canonical topology through tx (or
+ * an immutable snapshot proven to represent that same DB snapshot). Never derive
+ * it from a candidate manifest or accept an externally supplied fingerprint.
+ * Consume projection IDs inside use; after the snapshot closes they are provenance only.
+ */
+export async function withSelectedScheduledTimetable<T>(
+  db: Database,
+  options: ScheduledTimetableSnapshotOptions & { serviceDate: string },
+  use: (
+    tx: ReadTransaction,
+    selection: ScheduledTimetableSelection,
+  ) => Promise<T>,
+): Promise<T> {
+  const serviceDate = z.iso.date().parse(options.serviceDate);
+  return withScheduledTimetableSnapshot(db, options, async (tx, snapshot) =>
+    use(tx, await snapshot.select(serviceDate)),
   );
 }

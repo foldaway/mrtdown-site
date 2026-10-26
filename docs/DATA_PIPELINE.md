@@ -180,7 +180,9 @@ day/scope coverage and whole-source unassigned-active counts, falling back to an
 older eligible version. A covered zero-active date can be selected; missing rows
 cannot establish coverage. No timetable body or occurrence rows are loaded.
 
-The helper owns a read-only repeatable-read transaction. Its trusted internal
+The helper uses `withScheduledTimetableSnapshot`, which owns a read-only
+repeatable-read transaction and loads topology, validated history and projection
+metadata once for all selections and consumer reads. Its trusted internal
 `readCanonicalTopology(tx)` callback must independently establish the current
 canonical topology from that same snapshot (or an immutable snapshot proven to
 represent it), never from a candidate manifest or an external fingerprint.
@@ -190,9 +192,40 @@ same snapshot through concurrent canonical changes or projection rebuilds. A
 projection ID retained after the callback ends is provenance, not a reusable
 eligibility token. Selected version/receipt provenance, counts, platform coverage
 and per-candidate reasons distinguish unavailable or incomplete coverage from a
-valid empty date. Time-window reads and untimed-candidate accounting remain
-separate, as do reviewed scoped rollback policy, passenger API/UI, and actual
-mapping/source/release approval and publication gates.
+valid empty date. Reviewed scoped rollback policy, passenger API/UI, and actual
+mapping/source/release approval and publication remain separate gates.
+
+### Private indexed departure windows
+
+`queryIndexedScheduledDepartures` validates a strict scope, ordered instants, a
+window of at most 24 hours and an optional positive integer limit before opening
+the database snapshot. Shared core window/service-date helpers enumerate Singapore
+service dates using completed, supported, topology-compatible projection metadata's
+maximum source offset, including 24+ departures. No timetable body is hydrated.
+The trusted same-snapshot `readCanonicalTopology(tx)` callback remains required;
+the actual current-topology database loader is a separate slice.
+
+Each candidate date independently uses the same conservative selector and receipt
+lineage, allowing date-specific fallback. SQL restricts occurrence reads to the
+selected projection/date, exact canonical scope, half-open instant range and
+optional platform membership. All timed rows within those bounds are merged by
+instant/date/trip/source occurrence order before applying the result limit.
+A separate SQL count includes every relevant boardable untimed row on each selected
+service date, regardless of the instant range or result limit; no time is inferred.
+Source provenance, scheduled basis, exact/approximate precision, platform
+alternatives and opaque provider IDs/stop sequences survive the read.
+
+The result includes per-date selections/attempt reasons, untimed count and
+`complete`. Missing dates/scopes and whole-source mapping gaps are unavailable,
+while a selected zero-active date can establish an authoritative empty schedule.
+Missing/incomplete/incompatible projections for current-topology retained artifacts
+also appear in `unavailableProjections` and force incomplete coverage: their unknown
+maximum offsets could hide earlier service dates even when a fallback is selected.
+Topology, candidate enumeration, every selection, counts and departures share one
+read-only repeatable-read transaction across concurrent canonical promotion and
+projection rebuilds. Returned projection IDs are provenance only after it closes.
+This private query grants no serving approval and adds no passenger API/UI, scoped
+rollback policy, real mapping/source/release approval or public publication.
 
 ## Public Holiday Workflow
 
