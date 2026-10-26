@@ -5,9 +5,10 @@ import { join } from 'node:path';
 import {
   hashBytes,
   queryRetainedScheduledDepartures,
+  type ScheduledTimetableRequestScope,
   selectRetainedScheduledTimetable,
 } from '@mrtdown/fs';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -24,6 +25,7 @@ import { scheduledTimetableCanonicalFixture } from '~/workflows/pull/helpers/sch
 import { projectScheduledTimetable } from './projectScheduledTimetable';
 import { retainScheduledTimetable } from './retainScheduledTimetable';
 import { retentionReview } from './scheduledTimetableRetention.fixture';
+import { withSelectedScheduledTimetable } from './withSelectedScheduledTimetable';
 
 const url = process.env.TEST_TIMETABLE_DATABASE_URL;
 const schema = `gtfs_projector_test_${randomUUID().replaceAll('-', '')}`;
@@ -200,6 +202,239 @@ describe.skipIf(!url)('retained timetable projector', () => {
     }
     if (directory) {
       await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  const select = (
+    serviceDate = '2026-10-24',
+    requestScope: ScheduledTimetableRequestScope = scope,
+  ) =>
+    withSelectedScheduledTimetable(
+      db(),
+      {
+        serviceDate,
+        scope: requestScope,
+        readCanonicalTopology: async () => canonical.topology(),
+      },
+      async (_tx, selection) => selection,
+    );
+
+  it('selects indexed versions in reviewed order with shared scope, empty-day and fallback semantics', async () => {
+    await projectScheduledTimetable(db(), options());
+    const newer = scheduledTimetableArchiveFixture('b', {
+      topology: canonical.topology(),
+      pattern: canonical.pattern,
+      customize(timetable) {
+        const trip = timetable.timetable.trips[0];
+        trip.stopTimes = canonical.pattern.stops.map((_, index) => ({
+          ...trip.stopTimes[0],
+          providerStopId: `stop-${index + 1}`,
+          stopSequence: `${index + 1}`,
+          arrivalSeconds: (index + 1) * 60,
+          departureSeconds: (index + 1) * 60,
+        }));
+      },
+    });
+    const admitted = await retainScheduledTimetable(db(), newer, {
+      // Equal import clocks and descending opaque feed versions cannot order these.
+      importInstant: '2026-10-24T00:03:00Z',
+      sourceReview: retentionReview(newer, bundle),
+    });
+    expect(admitted.status).toBe('retained');
+    const newerOptions = {
+      ...options(),
+      manifestSha256: newer.entry.manifestSha256,
+    };
+    const uncovered = { ...scope, platformId: undefined };
+    expect(
+      (await select('2026-10-24', uncovered)).attempts.map(
+        ({ reason }) => reason,
+      ),
+    ).toEqual(['projection-unavailable', 'eligible']);
+    const next = await projectScheduledTimetable(db(), newerOptions);
+    const selected = await select('2026-10-24', uncovered);
+    expect(selected.selected).toMatchObject({
+      projectionId: next.id,
+      version: { manifestSha256: newer.entry.manifestSha256 },
+      coverage: { activeTripCount: 1, unassignedActiveTripCount: 0 },
+    });
+    const fallback = await select();
+    expect(fallback.selected?.version.manifestSha256).toBe(
+      bundle.entry.manifestSha256,
+    );
+    expect(fallback.attempts.map(({ reason }) => reason)).toEqual([
+      'scope-not-covered',
+      'eligible',
+    ]);
+    const empty = await select('2026-10-25');
+    expect(empty.selected?.coverage.activeTripCount).toBe(0);
+    expect(empty.attempts[0].reason).toBe('outside-feed-range');
+    expect(empty.attempts.at(-1)).toEqual(
+      (
+        await selectRetainedScheduledTimetable({
+          ...shared(),
+          serviceDate: '2026-10-25',
+        })
+      ).attempts.at(-1),
+    );
+    const gap = await select('2026-10-26');
+    expect(gap.selected).toBeNull();
+    expect(gap.attempts.at(-1)).toMatchObject({
+      reason: 'mapping-coverage-gap',
+      activeTripCount: 252,
+      unassignedActiveTripCount: 1,
+    });
+    expect(gap.attempts.at(-1)).toEqual(
+      (
+        await selectRetainedScheduledTimetable({
+          ...shared(),
+          serviceDate: '2026-10-26',
+        })
+      ).attempts.at(-1),
+    );
+    expect(
+      (await select('2026-10-24', { ...uncovered, stationId: 'station-3' }))
+        .selected,
+    ).toBeNull();
+    expect(
+      (
+        await select('2026-10-24', {
+          ...uncovered,
+          destinationStationId: 'station-2',
+        })
+      ).attempts.every(({ reason }) => reason === 'scope-not-covered'),
+    ).toBe(true);
+    await expect(select('2026-02-30')).rejects.toThrow();
+    await expect(
+      select('2026-10-24', { ...scope, platformId: 'platform-2' }),
+    ).rejects.toThrow('platform does not belong');
+    await expect(
+      select('2026-10-24', { ...scope, serviceId: 'unknown' }),
+    ).rejects.toThrow('unknown canonical');
+
+    for (const [patch, reason] of [
+      [{ completed_at: null }, 'projection-incomplete'],
+      [{ topology_sha256: 'f'.repeat(64) }, 'topology-mismatch'],
+      [{ topology_projection_version: 2 }, 'topology-mismatch'],
+      [{ projector_version: 2 }, 'projection-unavailable'],
+      [{ feed_end_date: '2026-10-25' }, 'projection-metadata-mismatch'],
+    ] as const) {
+      await db()
+        .update(projections)
+        .set(patch)
+        .where(eq(projections.id, next.id));
+      const result = await select('2026-10-24', uncovered);
+      expect(result.attempts.map(({ reason }) => reason)).toEqual([
+        reason,
+        'eligible',
+      ]);
+      expect(result.selected?.version.manifestSha256).toBe(
+        bundle.entry.manifestSha256,
+      );
+      await db()
+        .update(projections)
+        .set({
+          completed_at: selected.selected?.completedAt,
+          topology_sha256: selected.selected?.topology.sha256,
+          topology_projection_version: 1,
+          projector_version: 1,
+          feed_end_date: '2026-10-24',
+        })
+        .where(eq(projections.id, next.id));
+    }
+    await db()
+      .update(days)
+      .set({ unassigned_active_trip_count: 1 })
+      .where(eq(days.projection_id, next.id));
+    expect(
+      (await select('2026-10-24', uncovered)).attempts.map(
+        ({ reason }) => reason,
+      ),
+    ).toEqual(['mapping-coverage-gap', 'eligible']);
+    await db().delete(days).where(eq(days.projection_id, next.id));
+    expect(
+      (await select('2026-10-24', uncovered)).attempts.map(
+        ({ reason }) => reason,
+      ),
+    ).toEqual(['day-not-indexed', 'eligible']);
+    await db().delete(days);
+    expect((await select('2026-10-25')).selected).toBeNull();
+  });
+
+  it('fails closed on corrupt retained lineage even when a complete projection exists', async () => {
+    await projectScheduledTimetable(db(), options());
+    const [retained] = await db()
+      .select({ receipt: timetables.import_record })
+      .from(timetables);
+    const receipt = structuredClone(retained.receipt) as {
+      sourceReview: { successor: { snapshotSha256: string } };
+    };
+    receipt.sourceReview.successor.snapshotSha256 = 'f'.repeat(64);
+    await db().update(timetables).set({ import_record: receipt });
+    await expect(select()).rejects.toThrow(
+      'Invalid retained timetable source review',
+    );
+  });
+
+  it('keeps canonical, selection and subsequent reads on one snapshot across concurrent canonical change and projection invalidation', async () => {
+    const projection = await projectScheduledTimetable(db(), options());
+    await pool.query(
+      'CREATE TABLE selector_canonical (topology json NOT NULL)',
+    );
+    try {
+      await pool.query('INSERT INTO selector_canonical VALUES ($1)', [
+        JSON.stringify(canonical.topology()),
+      ]);
+      const readCanonicalTopology = async (
+        tx: Parameters<Parameters<ReturnType<typeof db>['transaction']>[0]>[0],
+      ) => {
+        const result = await tx.execute<{
+          topology: ReturnType<typeof canonical.topology>;
+        }>(sql`SELECT topology FROM selector_canonical`);
+        return result.rows[0].topology;
+      };
+      await withSelectedScheduledTimetable(
+        db(),
+        {
+          serviceDate: '2026-10-24',
+          scope,
+          readCanonicalTopology: async (tx) => {
+            const topology = await readCanonicalTopology(tx);
+            await db().transaction(async (writer) => {
+              await writer.execute(
+                sql`UPDATE selector_canonical SET topology = ${JSON.stringify({ ...canonical.topology(), projectionVersion: 2 })}::json`,
+              );
+              await writer
+                .update(projections)
+                .set({ completed_at: null })
+                .where(eq(projections.id, projection.id));
+              await writer
+                .delete(days)
+                .where(eq(days.projection_id, projection.id));
+            });
+            return topology;
+          },
+        },
+        async (tx, selection) => {
+          expect(selection.selected?.projectionId).toBe(projection.id);
+          expect((await readCanonicalTopology(tx)).projectionVersion).toBe(1);
+          expect(await tx.select().from(days)).toHaveLength(3);
+        },
+      );
+      const after = await withSelectedScheduledTimetable(
+        db(),
+        {
+          serviceDate: '2026-10-24',
+          scope,
+          readCanonicalTopology,
+        },
+        async (_tx, selection) => selection,
+      );
+      expect(after.selected).toBeNull();
+      expect(after.attempts[0].reason).toBe('topology-mismatch');
+      expect(await db().select().from(days)).toHaveLength(0);
+    } finally {
+      await pool.query('DROP TABLE selector_canonical');
     }
   });
 
