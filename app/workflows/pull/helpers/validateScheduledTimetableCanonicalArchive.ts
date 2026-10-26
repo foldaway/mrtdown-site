@@ -18,12 +18,12 @@ const domains = [
   ['service', 'services'],
 ] as const;
 
-/** Bind the shared filesystem validator to this pull's trusted archive inputs. */
-export async function validateScheduledTimetableCanonicalArchive(
+/** Caller must dispose this trusted archive snapshot after retention/projection. */
+export async function createValidatedScheduledTimetableCanonicalSnapshot(
   manifest: Manifest,
   store: Pick<ZipStore, 'readBytes' | 'listDir'>,
   bundle: VerifiedScheduledTimetableBundle,
-): Promise<void> {
+) {
   const dataDir = await mkdtemp(join(tmpdir(), 'mrtdown-timetable-'));
   try {
     for (const [collection, key] of domains) {
@@ -66,12 +66,15 @@ export async function validateScheduledTimetableCanonicalArchive(
       },
       { dataDir },
     );
+    return {
+      canonicalDataDir: dataDir,
+      dispose: () => rm(dataDir, { recursive: true, force: true }),
+    };
   } catch (error) {
+    await rm(dataDir, { recursive: true, force: true });
     throw new Error(
       `Scheduled timetable canonical compatibility failed: ${error instanceof Error ? error.message : String(error)}`,
       { cause: error },
     );
-  } finally {
-    await rm(dataDir, { recursive: true, force: true });
   }
 }

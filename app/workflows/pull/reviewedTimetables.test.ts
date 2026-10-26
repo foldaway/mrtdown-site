@@ -17,6 +17,10 @@ import {
 } from 'vitest';
 import { getDb } from '~/db';
 import { relations } from '~/db/relations';
+import {
+  projectScheduledTimetable,
+  SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
+} from '~/util/dbQueries/projectScheduledTimetable';
 import { retainScheduledTimetable } from '~/util/dbQueries/retainScheduledTimetable';
 import { retentionReview } from '~/util/dbQueries/scheduledTimetableRetention.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
@@ -26,7 +30,7 @@ import type { PullParams } from './helpers/pullParams';
 import { scheduledTimetableArchiveFixture } from './helpers/scheduledTimetableArchive.fixture';
 import { scheduledTimetableCanonicalFixture } from './helpers/scheduledTimetableCanonical.fixture';
 import { truncateStagingTables } from './helpers/stagingSync';
-import { validateScheduledTimetableCanonicalArchive } from './helpers/validateScheduledTimetableCanonicalArchive';
+import { createValidatedScheduledTimetableCanonicalSnapshot } from './helpers/validateScheduledTimetableCanonicalArchive';
 import {
   acquireOrRenewPullWorkflowLease,
   releasePullWorkflowLease,
@@ -79,8 +83,8 @@ vi.mock(
         typeof import('./helpers/validateScheduledTimetableCanonicalArchive')
       >();
     return {
-      validateScheduledTimetableCanonicalArchive: vi.fn(
-        actual.validateScheduledTimetableCanonicalArchive,
+      createValidatedScheduledTimetableCanonicalSnapshot: vi.fn(
+        actual.createValidatedScheduledTimetableCanonicalSnapshot,
       ),
     };
   },
@@ -115,6 +119,16 @@ vi.mock('~/util/dbQueries/retainScheduledTimetable', async (original) => {
     retainScheduledTimetable: vi.fn(actual.retainScheduledTimetable),
   };
 });
+vi.mock('~/util/dbQueries/projectScheduledTimetable', async (original) => {
+  const actual =
+    await original<
+      typeof import('~/util/dbQueries/projectScheduledTimetable')
+    >();
+  return {
+    ...actual,
+    projectScheduledTimetable: vi.fn(actual.projectScheduledTimetable),
+  };
+});
 vi.mock('~/util/dbQueries/operationalFacts', () => ({
   rebuildOperationalFactsRange: vi.fn(async () => []),
 }));
@@ -140,6 +154,9 @@ const allocation = {
   pattern: canonical.pattern,
 };
 const baseline = scheduledTimetableArchiveFixture('a', allocation);
+const baselineTopologyHash = JSON.parse(
+  Buffer.from(baseline.files['manifest.json']).toString(),
+).identity.topology.sha256;
 const successor = scheduledTimetableArchiveFixture('b', allocation);
 const manifest: Manifest = {
   manifestVersion: 2,
@@ -221,7 +238,10 @@ describe('pull timetable admission', () => {
       await pull.run();
       expect(truncateStagingTables).toHaveBeenCalledOnce();
       expect(retainScheduledTimetable).not.toHaveBeenCalled();
-      expect(validateScheduledTimetableCanonicalArchive).not.toHaveBeenCalled();
+      expect(projectScheduledTimetable).not.toHaveBeenCalled();
+      expect(
+        createValidatedScheduledTimetableCanonicalSnapshot,
+      ).not.toHaveBeenCalled();
       expect(mkdtemp).not.toHaveBeenCalled();
       expect(recordCanonicalManifestFingerprint).toHaveBeenCalledOnce();
       expect(releasePullWorkflowLease).toHaveBeenCalledWith(
@@ -248,6 +268,7 @@ describe('pull timetable admission', () => {
     expect(truncateStagingTables).not.toHaveBeenCalled();
     expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
     expect(retainScheduledTimetable).not.toHaveBeenCalled();
+    expect(projectScheduledTimetable).not.toHaveBeenCalled();
     await state.failure?.({ context: pull.context });
     expect(releasePullWorkflowLease).toHaveBeenCalledWith(
       expect.anything(),
@@ -298,6 +319,7 @@ describe('pull timetable admission', () => {
         workflow({ sourceReview: retentionReview(bundle) }).run(),
       ).rejects.toThrow(message);
       expect(retainScheduledTimetable).not.toHaveBeenCalled();
+      expect(projectScheduledTimetable).not.toHaveBeenCalled();
       expect(truncateStagingTables).not.toHaveBeenCalled();
       expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
     },
@@ -306,7 +328,7 @@ describe('pull timetable admission', () => {
 
 const url = process.env.TEST_TIMETABLE_DATABASE_URL;
 const schema = `gtfs_pull_test_${randomUUID().replaceAll('-', '')}`;
-describe.skipIf(!url)('pull with PostgreSQL timetable retention', () => {
+describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
   let admin: Pool;
   let pool: Pool;
   beforeAll(async () => {
@@ -316,18 +338,23 @@ describe.skipIf(!url)('pull with PostgreSQL timetable retention', () => {
       connectionString: url,
       options: `-c search_path=${schema}`,
     });
-    await pool.query(
-      await readFile(
-        new URL(
-          '../../../drizzle/20261024214325_superb_violations/migration.sql',
-          import.meta.url,
+    for (const migration of [
+      '20261024214325_superb_violations',
+      '20261025200054_violet_energizer',
+    ]) {
+      await pool.query(
+        await readFile(
+          new URL(
+            `../../../drizzle/${migration}/migration.sql`,
+            import.meta.url,
+          ),
+          'utf8',
         ),
-        'utf8',
-      ),
-    );
+      );
+    }
   });
   beforeEach(async () => {
-    await pool.query('TRUNCATE scheduled_timetables');
+    await pool.query('TRUNCATE scheduled_timetables CASCADE');
     vi.mocked(getDb).mockReturnValue(drizzle({ client: pool, relations }));
     advertise();
   });
@@ -345,10 +372,38 @@ describe.skipIf(!url)('pull with PostgreSQL timetable retention', () => {
       )
     ).rows;
 
-  it('retains reviewed bytes, replays without approval and detects a timetable-only successor', async () => {
+  const projections = async () =>
+    (
+      await pool.query(
+        'SELECT * FROM scheduled_departure_projections ORDER BY manifest_sha256',
+      )
+    ).rows;
+
+  it('projects before staging, replays admission and preserves historical projections', async () => {
     const pull = workflow({ sourceReview: retentionReview(baseline) });
     await pull.run();
     const first = await rows();
+    const [projection] = await projections();
+    expect(projection).toMatchObject({
+      manifest_sha256: baseline.entry.manifestSha256,
+      projector_version: SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
+      topology_sha256: baselineTopologyHash,
+    });
+    expect(projection.completed_at).not.toBeNull();
+    expect(
+      (await pool.query('SELECT * FROM scheduled_departure_days')).rows,
+    ).toHaveLength(1);
+    expect(
+      (await pool.query('SELECT * FROM scheduled_departure_scopes')).rows,
+    ).toHaveLength(1);
+    expect(
+      (await pool.query('SELECT * FROM scheduled_departure_occurrences')).rows,
+    ).toHaveLength(1);
+    expect(
+      vi.mocked(projectScheduledTimetable).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vi.mocked(truncateStagingTables).mock.invocationCallOrder[0],
+    );
     expect(first).toHaveLength(1);
     expect(first[0].import_record.importInstant).toBe(
       (pull.outputs.get('manifest') as { importInstant: string }).importInstant,
@@ -361,22 +416,31 @@ describe.skipIf(!url)('pull with PostgreSQL timetable retention', () => {
     ).toBe(true);
     await workflow().run();
     expect(fetchArchive).toHaveBeenCalledOnce();
+    expect(projectScheduledTimetable).toHaveBeenCalledOnce();
     // Force another parse (e.g. a pipeline rebuild) without a fresh review.
     state.fingerprint = undefined;
     await workflow().run();
     expect(await rows()).toEqual(first);
     expect(retainScheduledTimetable).toHaveBeenCalledTimes(2);
+    const [rebuilt] = await projections();
+    expect(rebuilt.id).toBe(projection.id);
+    expect(rebuilt.completed_at).not.toBeNull();
     advertise(successor);
     await workflow({
       sourceReview: retentionReview(successor, baseline),
     }).run();
     expect(await rows()).toHaveLength(2);
+    expect(await projections()).toHaveLength(2);
+    expect(await projections()).toContainEqual(rebuilt);
+    expect(projectScheduledTimetable).toHaveBeenCalledTimes(3);
+    expect(fetchArchive).toHaveBeenCalledTimes(3);
     expect(truncateStagingTables).toHaveBeenCalledTimes(3);
   });
 
   it('blocks missing or wrong source review while preserving retained data and the successful fingerprint', async () => {
     await workflow({ sourceReview: retentionReview(baseline) }).run();
     const first = await rows();
+    const previousProjections = await projections();
     const fingerprint = state.fingerprint;
     vi.clearAllMocks();
     advertise(successor);
@@ -390,7 +454,9 @@ describe.skipIf(!url)('pull with PostgreSQL timetable retention', () => {
       );
       expect(await rows()).toEqual(first);
     }
+    expect(await projections()).toEqual(previousProjections);
     expect(state.fingerprint).toBe(fingerprint);
+    expect(projectScheduledTimetable).not.toHaveBeenCalled();
     expect(truncateStagingTables).not.toHaveBeenCalled();
     expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
   });
@@ -398,6 +464,7 @@ describe.skipIf(!url)('pull with PostgreSQL timetable retention', () => {
   it('revalidates retained history against changed canonical data without rewriting rows or success', async () => {
     await workflow({ sourceReview: retentionReview(baseline) }).run();
     const first = await rows();
+    const previousProjections = await projections();
     const fingerprint = state.fingerprint;
     vi.clearAllMocks();
     const changed = scheduledTimetableCanonicalFixture();
@@ -405,10 +472,51 @@ describe.skipIf(!url)('pull with PostgreSQL timetable retention', () => {
     advertise(baseline, changed.archive());
     await expect(workflow().run()).rejects.toThrow('topology fingerprint');
     expect(await rows()).toEqual(first);
+    expect(await projections()).toEqual(previousProjections);
     expect(state.fingerprint).toBe(fingerprint);
     expect(retainScheduledTimetable).not.toHaveBeenCalled();
+    expect(projectScheduledTimetable).not.toHaveBeenCalled();
     expect(truncateStagingTables).not.toHaveBeenCalled();
     expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
+  });
+
+  it('leaves admission replayable after projection failure without staging or recording success', async () => {
+    await workflow({ sourceReview: retentionReview(baseline) }).run();
+    const previousProjections = await projections();
+    const fingerprint = state.fingerprint;
+    vi.clearAllMocks();
+    advertise(successor);
+    await pool.query(`ALTER TABLE scheduled_departure_days
+      ADD CONSTRAINT synthetic_projection_failure CHECK (active_trip_count = 0) NOT VALID`);
+    const pull = workflow({
+      sourceReview: retentionReview(successor, baseline),
+    });
+    try {
+      await expect(pull.run()).rejects.toThrow('Failed query');
+    } finally {
+      await pool.query(`ALTER TABLE scheduled_departure_days
+        DROP CONSTRAINT synthetic_projection_failure`);
+    }
+    const first = await rows();
+    expect(first).toHaveLength(2);
+    expect(await projections()).toEqual(previousProjections);
+    expect(state.fingerprint).toBe(fingerprint);
+    expect(truncateStagingTables).not.toHaveBeenCalled();
+    expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
+    await state.failure?.({ context: pull.context });
+    expect(releasePullWorkflowLease).toHaveBeenCalledWith(
+      expect.anything(),
+      pull.context.workflowRunId,
+    );
+    // A fresh invocation has no review, but reuses the committed admission.
+    await workflow().run();
+    expect(await rows()).toEqual(first);
+    const completed = await projections();
+    expect(completed).toHaveLength(2);
+    expect(completed.every((row) => row.completed_at !== null)).toBe(true);
+    expect(truncateStagingTables).toHaveBeenCalledOnce();
+    expect(recordCanonicalManifestFingerprint).toHaveBeenCalledOnce();
+    expect(fetchArchive).toHaveBeenCalledTimes(2);
   });
 
   it('retries with the original root and clock, rejects a swapped bundle and keeps the first receipt after a staging failure', async () => {
