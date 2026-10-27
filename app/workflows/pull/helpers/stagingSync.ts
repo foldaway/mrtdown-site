@@ -71,6 +71,7 @@ import {
   type DbDiagnosticContext,
   withDbDiagnostics as withSharedDbDiagnostics,
 } from '../../../util/dbDiagnostics.js';
+import { MANIFEST_FINGERPRINT_METADATA_KEY } from './manifestFingerprint.js';
 
 /** Max rows per `insert().values()` batch to stay within driver/param limits. */
 const BATCH = 500;
@@ -564,10 +565,15 @@ export async function syncOperatorsTownsLandmarksUpserts(
   db: Db,
 ): Promise<void> {
   await db.transaction(async (tx) => {
-    // Multi-domain promotion is not atomic. Leave this absent on any later failure.
+    // A partial promotion must not serve topology or skip recovery to the previous manifest.
     await tx
       .delete(metadataTable)
-      .where(eq(metadataTable.key, CANONICAL_TOPOLOGY_PROMOTION_KEY));
+      .where(
+        inArray(metadataTable.key, [
+          CANONICAL_TOPOLOGY_PROMOTION_KEY,
+          MANIFEST_FINGERPRINT_METADATA_KEY,
+        ]),
+      );
     await upsertChangedOperators(tx);
     await upsertChangedTowns(tx);
     await upsertChangedLandmarks(tx);

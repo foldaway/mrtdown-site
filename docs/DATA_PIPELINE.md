@@ -216,8 +216,10 @@ path indices throw before history or departure reads. No candidate topology,
 retained body, filesystem snapshot, network read or independent cache is used.
 
 Repeatable read alone can observe an intermediate multi-domain promotion. The first
-parent-upsert transaction clears `canonical_topology_promotion_complete_v1` in
-metadata before changing live entities; finalization restores it in the same
+parent-upsert transaction clears `canonical_topology_promotion_complete_v1` and
+the successful manifest fingerprint in metadata before changing live entities.
+A failed promotion therefore cannot skip recovery if the source returns to the
+previous successful manifest. Finalization restores the promotion marker in the same
 transaction as staging cleanup and the pull timestamp, after all domain promotion
 and orphan cleanup, only when the persisted parse result confirms every canonical
 line was staged. Missing confirmation (including older resumed parse results)
@@ -226,7 +228,7 @@ while absent, including after a failed pull whose lease has been released or
 expired. It still computes topology from live rows; the marker stores no candidate
 fingerprint and grants no timetable approval. Pipeline version 5 forces one full
 pull to initialize this guard on existing installations. This certifies canonical
-promotion only; later derived rebuilds, cache publication and successful pull
+promotion only; later rebuilds of derived data, cache publication and successful pull
 fingerprint recording retain their existing ordering.
 
 Canonical lines may have a null start date or absent operating hours, but the live
@@ -236,7 +238,9 @@ matches an older retained artifact. Scheduled queries remain unavailable after
 finalization; existing retention and projection rows are preserved. The prerequisite
 for supporting these networks is to preserve those canonical lines in the live model
 with their real nullable fields and adapt dependent readers. This PR does not change
-that schema or narrow the producer's canonical topology identity.
+that schema or narrow the producer's canonical topology identity. A finalized
+incomplete pull still records its successful manifest fingerprint, so an unchanged
+source is skipped rather than repeatedly importing an unsupported network.
 
 Each candidate date independently uses the same conservative selector and receipt
 lineage, allowing date-specific fallback. SQL restricts occurrence reads to the

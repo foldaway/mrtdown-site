@@ -30,6 +30,11 @@ import {
   serviceRevisionsTable,
   stationPlatformsTable,
 } from '~/db/schema';
+import {
+  getCanonicalManifestFingerprint,
+  isCanonicalManifestCurrent,
+  recordCanonicalManifestFingerprint,
+} from '~/workflows/pull/helpers/manifestFingerprint';
 import { scheduledTimetableArchiveFixture } from '~/workflows/pull/helpers/scheduledTimetableArchive.fixture';
 import { scheduledTimetableCanonicalFixture } from '~/workflows/pull/helpers/scheduledTimetableCanonical.fixture';
 import {
@@ -162,6 +167,11 @@ const window = {
   startInstant: '2026-10-25T00:00:00+08:00',
   endInstant: '2026-10-25T01:00:00+08:00',
 };
+const hashed = <T extends { id: string }>(rows: T[]) =>
+  rows.map((row) => ({
+    ...row,
+    hash: hashBytes(Buffer.from(JSON.stringify(row))),
+  }));
 
 describe.skipIf(!url)('indexed departure window', () => {
   let admin: Pool;
@@ -223,11 +233,6 @@ describe.skipIf(!url)('indexed departure window', () => {
     await pool.query(
       'TRUNCATE operators, towns, lines, stations, services, metadata CASCADE',
     );
-    const hashed = <T extends { id: string }>(rows: T[]) =>
-      rows.map((row) => ({
-        ...row,
-        hash: hashBytes(Buffer.from(JSON.stringify(row))),
-      }));
     const entities = canonical.canonical;
     await insertOperatorsStaging(db(), hashed(entities.operators));
     await insertTownsStaging(
@@ -532,6 +537,13 @@ describe.skipIf(!url)('indexed departure window', () => {
       await syncOperatorsTownsLandmarksUpserts(db());
       await syncLines(db());
       await finalize();
+      const manifest = canonical.archive().manifest;
+      manifest.lines = Object.fromEntries(
+        incoming.map((line) => [line.id, line.hash]),
+      );
+      const fingerprint = getCanonicalManifestFingerprint(manifest);
+      await recordCanonicalManifestFingerprint(db(), fingerprint);
+      expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(true);
       expect(await db().select({ id: linesTable.id }).from(linesTable)).toEqual(
         [{ id: 'line' }],
       );
@@ -544,6 +556,41 @@ describe.skipIf(!url)('indexed departure window', () => {
     } finally {
       warn.mockRestore();
     }
+  });
+
+  it('reimports a previous successful manifest after an interrupted promotion, then skips it after recovery completes', async () => {
+    const fingerprint = getCanonicalManifestFingerprint(
+      canonical.archive().manifest,
+    );
+    await recordCanonicalManifestFingerprint(db(), fingerprint);
+    expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(true);
+    const before = await queryIndexedScheduledDepartures(db(), options());
+
+    const nextStations = structuredClone(canonical.canonical.stations);
+    for (const station of nextStations) {
+      for (const platform of station.layout?.platforms ?? []) {
+        platform.label = 'Interrupted promotion';
+      }
+    }
+    await insertStationsStaging(db(), hashed(nextStations));
+    await syncOperatorsTownsLandmarksUpserts(db());
+    await syncStations(db());
+    expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(false);
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('completed promotion');
+
+    await pool.query('TRUNCATE stations_next');
+    await insertStationsStaging(db(), hashed(canonical.canonical.stations));
+    await syncStations(db());
+    await syncStationPlatformServices(db());
+    await finalize();
+    expect(await queryIndexedScheduledDepartures(db(), options())).toEqual(
+      before,
+    );
+    expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(false);
+    await recordCanonicalManifestFingerprint(db(), fingerprint);
+    expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(true);
   });
 
   it('fails closed on insufficient revision dates and inconsistent normalized relationships or path order', async () => {
