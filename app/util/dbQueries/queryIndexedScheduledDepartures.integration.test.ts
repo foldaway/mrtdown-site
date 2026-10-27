@@ -56,7 +56,9 @@ import {
   syncStationPlatformServices,
   syncStations,
 } from '~/workflows/pull/helpers/stagingSync';
+import * as database from './database';
 import { buildDataset } from './dataset';
+import { getTownProfileReadModel } from './towns';
 import { buildLineSummary, buildUptimeGraph } from './lineAnalytics';
 import { isLineOperatingNow, isLineFuture } from './serviceOperations';
 import { buildLineOperationalFactRows } from './operationalFacts';
@@ -210,6 +212,7 @@ describe.skipIf(!url)('indexed departure window', () => {
     });
     for (const migration of [
       '20260408231014_absurd_lenny_balinger',
+      '20260518155031_curious_vision',
       '20260521104213_busy_midnight',
       '20260529122429_spicy_zombie',
       '20260721025518_milky_absorbing_man',
@@ -590,6 +593,21 @@ describe.skipIf(!url)('indexed departure window', () => {
       lineRow: { service_seconds: 0 },
       intervalRows: [],
     });
+
+    const defaultDb = vi
+      .spyOn(database, 'getDefaultDb')
+      .mockResolvedValue(db());
+    try {
+      const town = await getTownProfileReadModel('town');
+      expect(town.data.status).toBe('unknown');
+      expect(Object.values(town.data.stationStatuses)).toEqual([
+        'unknown',
+        'unknown',
+        'unknown',
+      ]);
+    } finally {
+      defaultDb.mockRestore();
+    }
 
     const extraLines = hashed([
       {

@@ -30,7 +30,7 @@ import {
   sortIssuesByLatestActivity,
 } from './issueIntervals';
 import { getIssueStaticScope } from './readModelScope';
-import { isLineOperatingNow } from './serviceOperations';
+import { isLineOperatingNow, isLineFuture } from './serviceOperations';
 
 export type TownStationStatus = LineSummaryStatus | 'not_in_service';
 
@@ -79,6 +79,7 @@ export function deriveTownStationStatus(
   activeIssueTypes: readonly IssueType[],
   operatingLineIds: ReadonlySet<string>,
   referenceNow: DateTime,
+  unknownLineIds: ReadonlySet<string> = new Set(),
 ): TownStationStatus {
   const activeMemberships = memberships.filter(
     (membership) =>
@@ -99,11 +100,21 @@ export function deriveTownStationStatus(
     return issueStatus;
   }
 
-  return activeMemberships.some((membership) =>
-    operatingLineIds.has(membership.lineId),
-  )
-    ? 'normal'
-    : 'closed_for_day';
+  if (
+    activeMemberships.some((membership) =>
+      operatingLineIds.has(membership.lineId),
+    )
+  ) {
+    return 'normal';
+  }
+  if (
+    activeMemberships.some((membership) =>
+      unknownLineIds.has(membership.lineId),
+    )
+  ) {
+    return 'unknown';
+  }
+  return 'closed_for_day';
 }
 
 export function deriveTownStatus(
@@ -128,6 +139,9 @@ export function deriveTownStatus(
   }
   if (stationStatuses.includes('normal')) {
     return 'normal';
+  }
+  if (stationStatuses.includes('unknown')) {
+    return 'unknown';
   }
   if (stationStatuses.includes('closed_for_day')) {
     return 'closed_for_day';
@@ -525,6 +539,15 @@ export async function getTownProfileReadModel(townId: string) {
       ),
     ),
   );
+  const unknownLineIds = new Set(
+    lineIds.filter((lineId) => {
+      const line = dataset.included.lines[lineId];
+      return (
+        !isLineFuture(line, referenceNow) &&
+        (line.startedAt == null || line.operatingHours == null)
+      );
+    }),
+  );
   const stationStatuses = Object.fromEntries(
     stationIds.map((stationId) => {
       const station = dataset.included.stations[stationId];
@@ -540,6 +563,7 @@ export async function getTownProfileReadModel(townId: string) {
           stationIssues.map((issue) => issue.type),
           operatingLineIds,
           referenceNow,
+          unknownLineIds,
         ),
       ];
     }),

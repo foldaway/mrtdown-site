@@ -62,6 +62,42 @@ describe('town profile helpers', () => {
     ).toBe('closed_for_day');
   });
 
+  it('carries unknown service windows through station and town status without hiding known service or issues', () => {
+    const membership = TEST_STATION.memberships[0];
+    const unknownLines = new Set([membership.lineId]);
+    const unknownStatus = deriveTownStationStatus(
+      [membership],
+      [],
+      new Set(),
+      REFERENCE_NOW,
+      unknownLines,
+    );
+    expect(unknownStatus).toBe('unknown');
+    expect(deriveTownStatus([unknownStatus, 'closed_for_day'])).toBe('unknown');
+    expect(
+      deriveTownStationStatus(
+        [membership],
+        [],
+        unknownLines,
+        REFERENCE_NOW,
+        unknownLines,
+      ),
+    ).toBe('normal');
+    expect(
+      deriveTownStationStatus(
+        [membership],
+        ['disruption'],
+        new Set(),
+        REFERENCE_NOW,
+        unknownLines,
+      ),
+    ).toBe('ongoing_disruption');
+    expect(deriveTownStatus([unknownStatus, 'normal'])).toBe('normal');
+    expect(deriveTownStatus([unknownStatus, 'ongoing_disruption'])).toBe(
+      'ongoing_disruption',
+    );
+  });
+
   it('marks a future-only town as future service', () => {
     expect(deriveTownStatus(['future_service', 'future_service'])).toBe(
       'future_service',
