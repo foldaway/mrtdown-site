@@ -27,6 +27,7 @@ import {
   or,
   sql,
 } from 'drizzle-orm';
+import { CANONICAL_TOPOLOGY_PROMOTION_KEY } from '../../../db/canonicalTopologyPromotion.js';
 import type { getDb } from '../../../db/index.js';
 import {
   evidencesTable,
@@ -561,6 +562,10 @@ export async function syncOperatorsTownsLandmarksUpserts(
   db: Db,
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    // Multi-domain promotion is not atomic. Leave this absent on any later failure.
+    await tx
+      .delete(metadataTable)
+      .where(eq(metadataTable.key, CANONICAL_TOPOLOGY_PROMOTION_KEY));
     await upsertChangedOperators(tx);
     await upsertChangedTowns(tx);
     await upsertChangedLandmarks(tx);
@@ -1850,5 +1855,9 @@ export async function finalizePull(db: Db): Promise<void> {
         target: [metadataTable.key],
         set: { value: new Date().toISOString() },
       });
+    await tx
+      .insert(metadataTable)
+      .values({ key: CANONICAL_TOPOLOGY_PROMOTION_KEY, value: '1' })
+      .onConflictDoUpdate({ target: metadataTable.key, set: { value: '1' } });
   });
 }

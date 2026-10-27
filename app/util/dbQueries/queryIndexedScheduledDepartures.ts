@@ -43,7 +43,7 @@ function compareText(left: string, right: string) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-/** Private schedule query; live-topology integration and serving approval remain separate gates. */
+/** Private schedule query using live topology by default; serving approval remains separate. */
 export async function queryIndexedScheduledDepartures(
   db: ReturnType<typeof getDb>,
   options: ScheduledTimetableSnapshotOptions & {

@@ -15,6 +15,7 @@ import {
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
 import { SCHEDULED_DEPARTURE_PROJECTOR_VERSION } from './projectScheduledTimetable';
+import { readLiveScheduleTopology } from './readLiveScheduleTopology';
 import { validateScheduledTimetableHistory } from './scheduledTimetableHistory';
 
 type Database = ReturnType<typeof getDb>;
@@ -51,7 +52,8 @@ export type ScheduledTimetableSelection = {
 };
 export type ScheduledTimetableSnapshotOptions = {
   scope: ScheduledTimetableRequestScope;
-  readCanonicalTopology: (tx: ReadTransaction) => Promise<Topology>;
+  // Trusted internal override for tests; never bind this to passenger input.
+  readCanonicalTopology?: (tx: ReadTransaction) => Promise<Topology>;
 };
 
 // The shared selector does not export its canonical request validation.
@@ -101,8 +103,8 @@ function validateScope(
 
 /**
  * One read-only snapshot for selection and all consumer reads. The trusted
- * readCanonicalTopology callback must establish live topology through tx or an
- * immutable snapshot proven to represent it, never a candidate/external hash.
+ * default loader reconstructs live topology through tx after completed promotion.
+ * An internal override must establish that same state, never a candidate/external hash.
  * Consume projection IDs within use; afterward they are provenance only.
  */
 export async function withScheduledTimetableSnapshot<T>(
@@ -124,7 +126,9 @@ export async function withScheduledTimetableSnapshot<T>(
   const scope = ScheduledTimetableRequestScopeSchema.parse(options.scope);
   return db.transaction(
     async (tx) => {
-      const topology = structuredClone(await options.readCanonicalTopology(tx));
+      const topology = structuredClone(
+        await (options.readCanonicalTopology ?? readLiveScheduleTopology)(tx),
+      );
       z.number().int().positive().parse(topology.projectionVersion);
       validateScope(scope, topology);
       const fingerprint = hashBytes(Buffer.from(JSON.stringify(topology)));
@@ -325,10 +329,9 @@ export async function withScheduledTimetableSnapshot<T>(
 }
 
 /**
- * Private server helper, not a serving-approval gate. The trusted internal caller
- * must load independently established current canonical topology through tx (or
- * an immutable snapshot proven to represent that same DB snapshot). Never derive
- * it from a candidate manifest or accept an externally supplied fingerprint.
+ * Private server helper, not a serving-approval gate. Uses live normalized topology
+ * by default. Internal overrides must independently establish the same DB snapshot,
+ * never derive topology from a candidate or accept an external fingerprint.
  * Consume projection IDs inside use; after the snapshot closes they are provenance only.
  */
 export async function withSelectedScheduledTimetable<T>(
