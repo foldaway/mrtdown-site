@@ -175,10 +175,11 @@ export async function insertLandmarksStaging(
   }
 }
 
+/** Returns the staged count so finalization can reject incomplete canonical topology. */
 export async function insertLinesStaging(
   db: Db,
   lines: readonly (Line & { hash: string; endedAt?: string | null })[],
-): Promise<void> {
+): Promise<number> {
   const skippedLines = lines.flatMap((l) => {
     const missing = [
       l.startedAt == null ? 'startedAt' : null,
@@ -219,6 +220,7 @@ export async function insertLinesStaging(
     if (c.length === 0) continue;
     await db.insert(linesNextTable).values(c);
   }
+  return lineRows.length;
 }
 
 export async function insertStationsStaging(
@@ -1839,8 +1841,11 @@ export async function syncIssues(db: Db): Promise<void> {
   }
 }
 
-/** Truncates staging tables and records `manifest_last_pulled_at` in one transaction. */
-export async function finalizePull(db: Db): Promise<void> {
+/** Records pull completion; scheduled topology requires all canonical lines to have staged. */
+export async function finalizePull(
+  db: Db,
+  options: { canonicalTopologyComplete?: boolean } = {},
+): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.execute(
       sql`TRUNCATE ${operatorsNextTable}, ${townsNextTable}, ${landmarksNextTable}, ${linesNextTable}, ${stationsNextTable}, ${servicesNextTable}, ${issuesNextTable} RESTART IDENTITY`,
@@ -1856,8 +1861,12 @@ export async function finalizePull(db: Db): Promise<void> {
         set: { value: new Date().toISOString() },
       });
     await tx
-      .insert(metadataTable)
-      .values({ key: CANONICAL_TOPOLOGY_PROMOTION_KEY, value: '1' })
-      .onConflictDoUpdate({ target: metadataTable.key, set: { value: '1' } });
+      .delete(metadataTable)
+      .where(eq(metadataTable.key, CANONICAL_TOPOLOGY_PROMOTION_KEY));
+    if (options.canonicalTopologyComplete === true) {
+      await tx
+        .insert(metadataTable)
+        .values({ key: CANONICAL_TOPOLOGY_PROMOTION_KEY, value: '1' });
+    }
   });
 }

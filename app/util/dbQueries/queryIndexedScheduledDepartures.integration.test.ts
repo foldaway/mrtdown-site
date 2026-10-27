@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { StationLayoutPlatformSchema } from '@mrtdown/core';
 import { hashBytes, queryRetainedScheduledDepartures } from '@mrtdown/fs';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -24,6 +25,7 @@ import {
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
 import {
   lineServicesTable,
+  linesTable,
   metadataTable,
   serviceRevisionsTable,
   stationPlatformsTable,
@@ -165,7 +167,9 @@ describe.skipIf(!url)('indexed departure window', () => {
   let admin: Pool;
   let pool: Pool;
   let directory: string;
+  let canonicalTopologyComplete = false;
   const db = () => drizzle({ client: pool, relations });
+  const finalize = () => finalizePull(db(), { canonicalTopologyComplete });
   const options = () => ({
     ...window,
     scope,
@@ -230,7 +234,9 @@ describe.skipIf(!url)('indexed departure window', () => {
       db(),
       hashed([{ id: 'town', name: entities.operators[0].name }]),
     );
-    await insertLinesStaging(db(), hashed(entities.lines));
+    canonicalTopologyComplete =
+      (await insertLinesStaging(db(), hashed(entities.lines))) ===
+      entities.lines.length;
     await insertStationsStaging(db(), hashed(entities.stations));
     await insertServicesStaging(db(), hashed(entities.services));
     await syncOperatorsTownsLandmarksUpserts(db());
@@ -238,7 +244,7 @@ describe.skipIf(!url)('indexed departure window', () => {
     await syncStations(db());
     await syncServices(db());
     await syncStationPlatformServices(db());
-    await finalizePull(db());
+    await finalize();
     await rm(join(directory, 'store'), { recursive: true, force: true });
     for (const bundle of [older, newer]) {
       const retained = await retainScheduledTimetable(db(), bundle, {
@@ -482,6 +488,10 @@ describe.skipIf(!url)('indexed departure window', () => {
       queryIndexedScheduledDepartures(db(), options()),
     ).rejects.toThrow('completed promotion');
     await finalizePull(db());
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('completed promotion');
+    await finalize();
     expect(
       (await queryIndexedScheduledDepartures(db(), options())).complete,
     ).toBe(true);
@@ -492,7 +502,7 @@ describe.skipIf(!url)('indexed departure window', () => {
       queryIndexedScheduledDepartures(db(), options()),
     ).rejects.toThrow('completed promotion');
     await db().update(stationPlatformsTable).set({ label: 'Changed' });
-    await finalizePull(db());
+    await finalize();
     const changed = await queryIndexedScheduledDepartures(db(), options());
     expect(changed).toMatchObject({ complete: false, departures: [] });
     expect(changed.serviceDays[0].attempts.map(({ reason }) => reason)).toEqual(
@@ -500,7 +510,61 @@ describe.skipIf(!url)('indexed departure window', () => {
     );
   });
 
+  it('keeps topology unavailable after a finalized pull omits a canonical line, even when older retained topology matches live rows', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const incoming = [
+        ...canonical.canonical.lines,
+        {
+          ...canonical.canonical.lines[0],
+          id: 'future-line',
+          startedAt: null,
+          operatingHours: undefined,
+          serviceIds: [],
+        },
+      ].map((line) => ({
+        ...line,
+        hash: hashBytes(Buffer.from(JSON.stringify(line))),
+      }));
+      canonicalTopologyComplete =
+        (await insertLinesStaging(db(), incoming)) === incoming.length;
+      expect(canonicalTopologyComplete).toBe(false);
+      await syncOperatorsTownsLandmarksUpserts(db());
+      await syncLines(db());
+      await finalize();
+      expect(await db().select({ id: linesTable.id }).from(linesTable)).toEqual(
+        [{ id: 'line' }],
+      );
+      await expect(
+        queryIndexedScheduledDepartures(db(), options()),
+      ).rejects.toThrow('completed promotion');
+      expect(
+        await db().select({ id: projections.id }).from(projections),
+      ).toHaveLength(2);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('fails closed on insufficient revision dates and inconsistent normalized relationships or path order', async () => {
+    const invalidPlatform = {
+      ...platforms[0],
+      boardingStatus: 'alighting_only',
+    };
+    expect(StationLayoutPlatformSchema.safeParse(invalidPlatform).success).toBe(
+      false,
+    );
+    await db()
+      .update(stationPlatformsTable)
+      .set({ boarding_status: 'alighting_only' })
+      .where(eq(stationPlatformsTable.platform_id, 'platform-1'));
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('inconsistent platform services');
+    await db()
+      .update(stationPlatformsTable)
+      .set({ boarding_status: null })
+      .where(eq(stationPlatformsTable.platform_id, 'platform-1'));
     await db()
       .update(serviceRevisionsTable)
       .set({ start_at: null })

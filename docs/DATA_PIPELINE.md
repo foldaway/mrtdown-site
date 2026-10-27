@@ -219,13 +219,24 @@ Repeatable read alone can observe an intermediate multi-domain promotion. The fi
 parent-upsert transaction clears `canonical_topology_promotion_complete_v1` in
 metadata before changing live entities; finalization restores it in the same
 transaction as staging cleanup and the pull timestamp, after all domain promotion
-and orphan cleanup. The loader checks this marker in its own snapshot and throws
+and orphan cleanup, only when the persisted parse result confirms every canonical
+line was staged. Missing confirmation (including older resumed parse results)
+also leaves the marker absent. The loader checks this marker in its own snapshot and throws
 while absent, including after a failed pull whose lease has been released or
 expired. It still computes topology from live rows; the marker stores no candidate
 fingerprint and grants no timetable approval. Pipeline version 5 forces one full
 pull to initialize this guard on existing installations. This certifies canonical
 promotion only; later derived rebuilds, cache publication and successful pull
 fingerprint recording retain their existing ordering.
+
+Canonical lines may have a null start date or absent operating hours, but the live
+line schema requires both. The existing staging filter omits those lines. Such a
+pull cannot certify complete schedule topology, even if the shortened live network
+matches an older retained artifact. Scheduled queries remain unavailable after
+finalization; existing retention and projection rows are preserved. The prerequisite
+for supporting these networks is to preserve those canonical lines in the live model
+with their real nullable fields and adapt dependent readers. This PR does not change
+that schema or narrow the producer's canonical topology identity.
 
 Each candidate date independently uses the same conservative selector and receipt
 lineage, allowing date-specific fallback. SQL restricts occurrence reads to the

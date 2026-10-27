@@ -117,7 +117,7 @@ describe('pull staging inserts', () => {
       },
     ] as Parameters<typeof insertLinesStaging>[1];
 
-    await insertLinesStaging(db, lines);
+    expect(await insertLinesStaging(db, lines)).toBe(1);
     expect(warn).toHaveBeenCalledWith(
       '[PULL] Skipping 1 line(s) missing required fields: missing-hours (operatingHours)',
     );

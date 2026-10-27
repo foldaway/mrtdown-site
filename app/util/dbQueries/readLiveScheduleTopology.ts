@@ -181,6 +181,7 @@ export async function readLiveScheduleTopology(
   }
   for (const { stationId, platformId, serviceId } of platformServiceRows) {
     const platform = parent(platformByKey, key(stationId, platformId));
+    // StationLayoutPlatformSchema forbids serviceIds on non-boardable platforms.
     if (
       parent(serviceById, serviceId).lineId !== platform.lineId ||
       platform.boardingStatus !== null
