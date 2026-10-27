@@ -366,7 +366,7 @@ export async function getTownsData() {
         startedAt: row.started_at,
         platformDoorCount: row.platform_door_count,
         trainCarCounts: row.train_car_counts,
-        operatingHours: row.operating_hours,
+        operatingHours: row.operating_hours ?? undefined,
         operators: (lineOperatorsByLineId.get(row.id) ?? []).map(
           (operator) => ({
             operatorId: operator.operator_id,

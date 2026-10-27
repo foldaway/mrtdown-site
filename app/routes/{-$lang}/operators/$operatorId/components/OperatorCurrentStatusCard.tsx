@@ -11,6 +11,7 @@ const StatusLabels: Record<
   OperatorProfile['currentOperationalStatus'],
   { id: string; defaultMessage: string }
 > = {
+  unknown: { id: 'general.unknown', defaultMessage: 'Unknown' },
   all_operational: {
     id: 'operator.status.all_operational',
     defaultMessage: 'All Lines Operational',
@@ -53,7 +54,8 @@ export const OperatorCurrentStatusCard: React.FC<Props> = (props) => {
               'bg-maintenance-light ring-amber-50 dark:bg-maintenance-dark dark:ring-amber-950/50':
                 currentOperationalStatus === 'some_lines_under_maintenance',
               'bg-gray-400 ring-gray-100 dark:bg-gray-500 dark:ring-gray-700':
-                currentOperationalStatus === 'all_lines_closed_for_day',
+                currentOperationalStatus === 'all_lines_closed_for_day' ||
+                currentOperationalStatus === 'unknown',
             })}
           />
           <span className="font-semibold text-gray-900 text-sm dark:text-white">

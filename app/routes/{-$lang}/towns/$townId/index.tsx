@@ -498,6 +498,7 @@ function StatusDot({ status }: { status: TownStationStatus }) {
         'bg-gray-400 dark:bg-gray-500':
           status === 'closed_for_day' ||
           status === 'future_service' ||
+          status === 'unknown' ||
           status === 'not_in_service',
       })}
       aria-hidden="true"

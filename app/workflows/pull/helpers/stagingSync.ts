@@ -181,42 +181,19 @@ export async function insertLinesStaging(
   db: Db,
   lines: readonly (Line & { hash: string; endedAt?: string | null })[],
 ): Promise<number> {
-  const skippedLines = lines.flatMap((l) => {
-    const missing = [
-      l.startedAt == null ? 'startedAt' : null,
-      l.operatingHours == null ? 'operatingHours' : null,
-    ].filter(Boolean);
-    return missing.length > 0 ? [`${l.id} (${missing.join(', ')})`] : [];
-  });
-  if (skippedLines.length > 0) {
-    const sample = skippedLines.slice(0, 10).join('; ');
-    const suffix =
-      skippedLines.length > 10 ? `; +${skippedLines.length - 10} more` : '';
-    console.warn(
-      `[PULL] Skipping ${skippedLines.length} line(s) missing required fields: ${sample}${suffix}`,
-    );
-  }
-
-  const lineRows = lines.flatMap((l) => {
-    if (l.startedAt == null || l.operatingHours == null) {
-      return [];
-    }
-    return [
-      {
-        id: l.id,
-        hash: l.hash,
-        name: l.name,
-        type: l.type,
-        color: l.color,
-        started_at: l.startedAt,
-        platform_door_count: l.platformDoorCount,
-        train_car_counts: l.trainCarCounts,
-        ended_at: l.endedAt ?? null,
-        operating_hours: l.operatingHours,
-        operators: l.operators,
-      },
-    ];
-  });
+  const lineRows = lines.map((line) => ({
+    id: line.id,
+    hash: line.hash,
+    name: line.name,
+    type: line.type,
+    color: line.color,
+    started_at: line.startedAt,
+    platform_door_count: line.platformDoorCount,
+    train_car_counts: line.trainCarCounts,
+    ended_at: line.endedAt ?? null,
+    operating_hours: line.operatingHours ?? null,
+    operators: line.operators,
+  }));
   for (const c of chunk(lineRows, BATCH)) {
     if (c.length === 0) continue;
     await db.insert(linesNextTable).values(c);

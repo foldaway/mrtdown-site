@@ -547,14 +547,14 @@ export const lineEntitySharedColumns = {
   name: jsonb('name').$type<Translations>().notNull(),
   type: lineTypeEnum().notNull(),
   color: text('color').notNull(),
-  started_at: date('started_at', { mode: 'string' }).notNull(),
+  started_at: date('started_at', { mode: 'string' }),
   platform_door_count: integer('platform_door_count'),
   train_car_counts: jsonb('train_car_counts')
     .$type<Line['trainCarCounts']>()
     .notNull()
     .default([]),
   ended_at: date('ended_at', { mode: 'string' }),
-  operating_hours: jsonb('operating_hours').$type<OperatingHours>().notNull(),
+  operating_hours: jsonb('operating_hours').$type<OperatingHours>(),
   hash: text('hash').notNull(),
 };
 

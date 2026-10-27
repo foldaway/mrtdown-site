@@ -72,6 +72,10 @@ export function buildLineSummary(
       dayType: lineDayType(date, publicHolidaySet),
     };
 
+    if (dayWindow == null) {
+      continue;
+    }
+
     if (!isLineFuture(line, date.endOf('day'))) {
       totalServiceSeconds += dayWindow.seconds;
     }
@@ -151,6 +155,8 @@ export function buildLineSummary(
   let status: LineSummaryStatus = 'normal';
   if (isLineFuture(line, referenceDateTime)) {
     status = 'future_service';
+  } else if (line.startedAt == null || line.operatingHours == null) {
+    status = 'unknown';
   } else if (!isLineOperatingNow(line, publicHolidaySet, referenceDateTime)) {
     status = 'closed_for_day';
   } else if (
@@ -349,6 +355,9 @@ export function buildUptimeGraph(
   publicHolidaySet: Set<string>,
   count: number,
 ): TimeScaleChart {
+  if (line.startedAt == null || line.operatingHours == null) {
+    return buildCountChart(`${count}d`, [], [], makeTimeScale('day', count));
+  }
   const end = nowSg().startOf('day');
   const start = end.minus({ days: count - 1 });
   const data: ChartEntry[] = [];
@@ -362,7 +371,7 @@ export function buildUptimeGraph(
     const downtimeIntervals: IssueIntervalBounds[] = [];
     const downtimeIntervalsByIssueType = createIssueTypeIntervalGroups();
 
-    if (serviceWindow.seconds > 0) {
+    if (serviceWindow != null && serviceWindow.seconds > 0) {
       for (const issue of issues) {
         if (!issueContributesToLineDowntime(issue)) {
           continue;
@@ -390,7 +399,7 @@ export function buildUptimeGraph(
       name: isoDate(date),
       payload: {
         uptimeRatio:
-          serviceWindow.seconds > 0
+          serviceWindow != null && serviceWindow.seconds > 0
             ? Math.max(0, 1 - totalDowntime / serviceWindow.seconds)
             : 1,
         'breakdown.disruption': downtimeSecondsByIssueType.disruption,
@@ -409,7 +418,7 @@ export function buildUptimeGraph(
         line,
         serviceWindowForDate(line, date, publicHolidaySet),
       );
-      if (serviceWindow.seconds <= 0) {
+      if (serviceWindow == null || serviceWindow.seconds <= 0) {
         continue;
       }
       serviceSeconds += serviceWindow.seconds;
@@ -455,6 +464,11 @@ export function buildOperatorUptimeGraph(
   publicHolidaySet: Set<string>,
   count: number,
 ): TimeScaleChart {
+  if (
+    !lines.some((line) => line.startedAt != null && line.operatingHours != null)
+  ) {
+    return buildCountChart(`${count}d`, [], [], makeTimeScale('day', count));
+  }
   const end = nowSg().startOf('day');
   const start = end.minus({ days: count - 1 });
   const data: ChartEntry[] = [];
@@ -476,6 +490,9 @@ export function buildOperatorUptimeGraph(
           date,
           publicHolidaySet,
         );
+        if (serviceWindow == null) {
+          continue;
+        }
         serviceSeconds += serviceWindow.seconds;
         const lineDowntimeIntervals: IssueIntervalBounds[] = [];
 

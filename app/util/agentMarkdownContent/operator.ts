@@ -21,6 +21,7 @@ import { DEFAULT_ROOT_URL, type AgentMarkdownOptions } from './types';
 import type { OperatorProfilePayload } from './types';
 
 const OPERATOR_STATUS_LABELS = {
+  unknown: 'Unknown',
   all_operational: 'All lines operational',
   all_lines_closed_for_day: 'All lines outside service hours',
   some_lines_disrupted: 'Some lines disrupted',

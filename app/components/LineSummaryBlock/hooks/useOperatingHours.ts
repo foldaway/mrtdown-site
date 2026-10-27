@@ -8,6 +8,7 @@ export function getOperatingHours(
   dateTime: DateTime,
   dayType: 'weekday' | 'weekend' | 'public_holiday',
 ) {
+  assert(line.operatingHours != null);
   const { weekdays, weekends } = line.operatingHours;
 
   let startTime = weekdays.start;

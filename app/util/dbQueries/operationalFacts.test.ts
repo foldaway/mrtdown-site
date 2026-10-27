@@ -8,6 +8,31 @@ import {
 import { buildIssue, REFERENCE_NOW, TEST_LINE } from './testFixtures';
 
 describe('buildLineOperationalFactRows', () => {
+  it('preserves issue counts without inventing service or downtime windows for unknown hours', () => {
+    const issue = buildIssue('disruption-1', 'disruption', [
+      {
+        startAt: '2026-02-23T12:00:00+08:00',
+        endAt: '2026-02-23T16:00:00+08:00',
+        status: 'ended',
+      },
+    ]);
+    const facts = buildLineOperationalFactRows(
+      { ...TEST_LINE, operatingHours: undefined },
+      [issue],
+      DateTime.fromISO('2026-02-23', { zone: 'Asia/Singapore' }),
+      new Set(),
+      REFERENCE_NOW,
+    );
+    expect(facts).toMatchObject({
+      lineRow: {
+        service_seconds: 0,
+        downtime_disruption_seconds: 0,
+        issue_count_disruption: 1,
+      },
+      intervalRows: [],
+    });
+  });
+
   it('stores each issue interval clipped to the line service window', () => {
     const facts = buildLineOperationalFactRows(
       TEST_LINE,

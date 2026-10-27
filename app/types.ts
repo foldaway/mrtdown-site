@@ -13,9 +13,7 @@ import type { AffectedServiceRevision } from '~/util/affectedServiceRevisions';
 
 type StationCode = CoreStation['stationCodes'][number];
 
-export type Line = Omit<CoreLine, 'serviceIds' | 'operatingHours'> & {
-  operatingHours: NonNullable<CoreLine['operatingHours']>;
-};
+export type Line = Omit<CoreLine, 'serviceIds'>;
 
 type StationLineMembership = Pick<
   StationCode,
@@ -81,6 +79,7 @@ export type AdvisorySummary = {
 };
 
 export type LineSummaryStatus =
+  | 'unknown'
   | 'future_service'
   | 'closed_for_day'
   | 'ongoing_disruption'

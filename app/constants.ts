@@ -16,6 +16,10 @@ export const LineSummaryStatusLabels: Record<
   LineSummaryStatus,
   MessageDescriptor
 > = {
+  unknown: defineMessage({
+    id: 'general.unknown',
+    defaultMessage: 'Unknown',
+  }),
   ongoing_disruption: defineMessage({
     id: 'status.ongoing_disruption',
     defaultMessage: 'Disruption',

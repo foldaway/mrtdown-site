@@ -122,7 +122,8 @@ export const OperatorLinePerformanceCard: React.FC<Props> = (props) => {
                         performance.status === 'normal',
                       'text-gray-500 dark:text-gray-400':
                         performance.status === 'closed_for_day' ||
-                        performance.status === 'future_service',
+                        performance.status === 'future_service' ||
+                        performance.status === 'unknown',
                     },
                   )}
                 >
@@ -138,7 +139,8 @@ export const OperatorLinePerformanceCard: React.FC<Props> = (props) => {
                         performance.status === 'normal',
                       'bg-gray-400 dark:bg-gray-500':
                         performance.status === 'closed_for_day' ||
-                        performance.status === 'future_service',
+                        performance.status === 'future_service' ||
+                        performance.status === 'unknown',
                     })}
                   />
                   <FormattedMessage

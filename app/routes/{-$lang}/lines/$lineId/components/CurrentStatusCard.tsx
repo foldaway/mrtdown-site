@@ -30,7 +30,9 @@ export const CurrentStatusCard: React.FC<Props> = (props) => {
             'bg-operational-light dark:bg-operational-dark':
               status === 'normal',
             'bg-gray-400 dark:bg-gray-500':
-              status === 'closed_for_day' || status === 'future_service',
+              status === 'closed_for_day' ||
+              status === 'future_service' ||
+              status === 'unknown',
             'ring-red-50 dark:ring-red-950/50': status === 'ongoing_disruption',
             'ring-amber-50 dark:ring-amber-950/50':
               status === 'ongoing_maintenance',
@@ -38,7 +40,9 @@ export const CurrentStatusCard: React.FC<Props> = (props) => {
               status === 'ongoing_infra',
             'ring-emerald-50 dark:ring-emerald-950/50': status === 'normal',
             'ring-gray-100 dark:ring-gray-700':
-              status === 'closed_for_day' || status === 'future_service',
+              status === 'closed_for_day' ||
+              status === 'future_service' ||
+              status === 'unknown',
           })}
         />
         <span className="font-medium text-sm">

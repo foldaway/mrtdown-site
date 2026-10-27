@@ -314,6 +314,11 @@ function ComponentPage() {
                       month="long"
                       year="numeric"
                     />
+                  ) : line.startedAt == null ? (
+                    <FormattedMessage
+                      id="general.unknown"
+                      defaultMessage="Unknown"
+                    />
                   ) : (
                     <FormattedMessage
                       id="line.summary.future_service"
@@ -401,6 +406,11 @@ function ComponentPage() {
                     ),
                     issueTypeCountString,
                   }}
+                />
+              ) : line.startedAt == null ? (
+                <FormattedMessage
+                  id="general.unknown"
+                  defaultMessage="Unknown"
                 />
               ) : (
                 <FormattedMessage

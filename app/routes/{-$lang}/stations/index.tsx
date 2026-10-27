@@ -672,6 +672,10 @@ function LiveStatusIcon({ status }: { status: LineSummaryStatus }) {
   const intl = useIntl();
   const { Icon, className } = (
     {
+      unknown: {
+        Icon: SolidClockIcon,
+        className: 'text-gray-400 dark:text-gray-500',
+      },
       ongoing_disruption: {
         Icon: ExclamationTriangleIcon,
         className: 'text-disruption-light dark:text-disruption-dark',
