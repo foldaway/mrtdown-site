@@ -27,6 +27,7 @@ import {
   or,
   sql,
 } from 'drizzle-orm';
+import { CANONICAL_TOPOLOGY_PROMOTION_KEY } from '../../../db/canonicalTopologyPromotion.js';
 import type { getDb } from '../../../db/index.js';
 import {
   evidencesTable,
@@ -70,6 +71,7 @@ import {
   type DbDiagnosticContext,
   withDbDiagnostics as withSharedDbDiagnostics,
 } from '../../../util/dbDiagnostics.js';
+import { MANIFEST_FINGERPRINT_METADATA_KEY } from './manifestFingerprint.js';
 
 /** Max rows per `insert().values()` batch to stay within driver/param limits. */
 const BATCH = 500;
@@ -174,10 +176,11 @@ export async function insertLandmarksStaging(
   }
 }
 
+/** Returns the staged count so finalization can reject incomplete canonical topology. */
 export async function insertLinesStaging(
   db: Db,
   lines: readonly (Line & { hash: string; endedAt?: string | null })[],
-): Promise<void> {
+): Promise<number> {
   const skippedLines = lines.flatMap((l) => {
     const missing = [
       l.startedAt == null ? 'startedAt' : null,
@@ -218,6 +221,7 @@ export async function insertLinesStaging(
     if (c.length === 0) continue;
     await db.insert(linesNextTable).values(c);
   }
+  return lineRows.length;
 }
 
 export async function insertStationsStaging(
@@ -561,6 +565,15 @@ export async function syncOperatorsTownsLandmarksUpserts(
   db: Db,
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    // A partial promotion must not serve topology or skip recovery to the previous manifest.
+    await tx
+      .delete(metadataTable)
+      .where(
+        inArray(metadataTable.key, [
+          CANONICAL_TOPOLOGY_PROMOTION_KEY,
+          MANIFEST_FINGERPRINT_METADATA_KEY,
+        ]),
+      );
     await upsertChangedOperators(tx);
     await upsertChangedTowns(tx);
     await upsertChangedLandmarks(tx);
@@ -1834,8 +1847,11 @@ export async function syncIssues(db: Db): Promise<void> {
   }
 }
 
-/** Truncates staging tables and records `manifest_last_pulled_at` in one transaction. */
-export async function finalizePull(db: Db): Promise<void> {
+/** Records pull completion; scheduled topology requires all canonical lines to have staged. */
+export async function finalizePull(
+  db: Db,
+  options: { canonicalTopologyComplete?: boolean } = {},
+): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.execute(
       sql`TRUNCATE ${operatorsNextTable}, ${townsNextTable}, ${landmarksNextTable}, ${linesNextTable}, ${stationsNextTable}, ${servicesNextTable}, ${issuesNextTable} RESTART IDENTITY`,
@@ -1850,5 +1866,13 @@ export async function finalizePull(db: Db): Promise<void> {
         target: [metadataTable.key],
         set: { value: new Date().toISOString() },
       });
+    await tx
+      .delete(metadataTable)
+      .where(eq(metadataTable.key, CANONICAL_TOPOLOGY_PROMOTION_KEY));
+    if (options.canonicalTopologyComplete === true) {
+      await tx
+        .insert(metadataTable)
+        .values({ key: CANONICAL_TOPOLOGY_PROMOTION_KEY, value: '1' });
+    }
   });
 }

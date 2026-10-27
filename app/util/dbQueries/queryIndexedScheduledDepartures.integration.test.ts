@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { StationLayoutPlatformSchema } from '@mrtdown/core';
 import { hashBytes, queryRetainedScheduledDepartures } from '@mrtdown/fs';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -22,24 +23,73 @@ import {
   scheduledDepartureProjectionsTable as projections,
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
+import {
+  lineServicesTable,
+  linesTable,
+  metadataTable,
+  serviceRevisionsTable,
+  stationPlatformsTable,
+} from '~/db/schema';
+import {
+  getCanonicalManifestFingerprint,
+  isCanonicalManifestCurrent,
+  recordCanonicalManifestFingerprint,
+} from '~/workflows/pull/helpers/manifestFingerprint';
 import { scheduledTimetableArchiveFixture } from '~/workflows/pull/helpers/scheduledTimetableArchive.fixture';
 import { scheduledTimetableCanonicalFixture } from '~/workflows/pull/helpers/scheduledTimetableCanonical.fixture';
+import {
+  finalizePull,
+  insertLinesStaging,
+  insertOperatorsStaging,
+  insertServicesStaging,
+  insertStationsStaging,
+  insertTownsStaging,
+  syncLines,
+  syncOperatorsTownsLandmarksUpserts,
+  syncServices,
+  syncStationPlatformServices,
+  syncStations,
+} from '~/workflows/pull/helpers/stagingSync';
 import { projectScheduledTimetable } from './projectScheduledTimetable';
 import { queryIndexedScheduledDepartures } from './queryIndexedScheduledDepartures';
+import { readLiveScheduleTopology } from './readLiveScheduleTopology';
 import { retainScheduledTimetable } from './retainScheduledTimetable';
 import { retentionReview } from './scheduledTimetableRetention.fixture';
 
 const url = process.env.TEST_TIMETABLE_DATABASE_URL;
 const schema = `gtfs_window_test_${randomUUID().replaceAll('-', '')}`;
 const canonical = scheduledTimetableCanonicalFixture(3);
+canonical.canonical.lines[0].operatingHours =
+  canonical.canonical.services[0].revisions[0].operatingHours;
 const path = canonical.canonical.services[0].revisions[0].path.stations;
 path.splice(2, 0, { ...path[0] });
+canonical.canonical.services[0].revisions.push({
+  ...structuredClone(canonical.canonical.services[0].revisions[0]),
+  id: 'historical',
+  startAt: '1990-01-01',
+  endAt: '1999-12-31',
+});
+canonical.canonical.operators.push({
+  ...canonical.canonical.operators[0],
+  id: 'former-operator',
+});
+canonical.canonical.lines[0].operators.push({
+  operatorId: 'former-operator',
+  startedAt: null,
+  endedAt: '1999-12-31',
+});
 canonical.pattern.stops.splice(2, 0, { ...canonical.pattern.stops[0] });
 const platforms = canonical.canonical.stations[0].layout?.platforms;
 if (!platforms) {
   throw new Error('Missing fixture platforms');
 }
 platforms.push({ ...platforms[0], id: 'alternative' });
+platforms.push({
+  ...platforms[0],
+  id: 'alighting',
+  boardingStatus: 'alighting_only',
+});
+platforms[0].serviceIds = ['service'];
 canonical.pattern.stops[0].platformIds = ['platform-1', 'alternative'];
 canonical.pattern.stops[2].platformIds = ['alternative'];
 const sequences = [
@@ -117,16 +167,22 @@ const window = {
   startInstant: '2026-10-25T00:00:00+08:00',
   endInstant: '2026-10-25T01:00:00+08:00',
 };
+const hashed = <T extends { id: string }>(rows: T[]) =>
+  rows.map((row) => ({
+    ...row,
+    hash: hashBytes(Buffer.from(JSON.stringify(row))),
+  }));
 
 describe.skipIf(!url)('indexed departure window', () => {
   let admin: Pool;
   let pool: Pool;
   let directory: string;
+  let canonicalTopologyComplete = false;
   const db = () => drizzle({ client: pool, relations });
+  const finalize = () => finalizePull(db(), { canonicalTopologyComplete });
   const options = () => ({
     ...window,
     scope,
-    readCanonicalTopology: async () => canonical.topology(),
   });
   const shared = () => ({
     ...window,
@@ -140,20 +196,29 @@ describe.skipIf(!url)('indexed departure window', () => {
     await admin.query(`CREATE SCHEMA ${schema}`);
     pool = new Pool({
       connectionString: url,
-      options: `-c search_path=${schema}`,
+      options: `-c search_path=${schema},public`,
     });
     for (const migration of [
+      '20260408231014_absurd_lenny_balinger',
+      '20260521104213_busy_midnight',
+      '20260529122429_spicy_zombie',
+      '20260721025518_milky_absorbing_man',
+      '20260721032337_soft_crystal',
+      '20260721035821_sloppy_lady_deathstrike',
+      '20260721133009_late_angel',
       '20261024214325_superb_violations',
       '20261025200054_violet_energizer',
     ]) {
       await pool.query(
-        await readFile(
-          new URL(
-            `../../../drizzle/${migration}/migration.sql`,
-            import.meta.url,
-          ),
-          'utf8',
-        ),
+        (
+          await readFile(
+            new URL(
+              `../../../drizzle/${migration}/migration.sql`,
+              import.meta.url,
+            ),
+            'utf8',
+          )
+        ).replaceAll('"public".', `"${schema}".`),
       );
     }
     directory = await mkdtemp(join(tmpdir(), 'mrtdown-window-test-'));
@@ -165,6 +230,26 @@ describe.skipIf(!url)('indexed departure window', () => {
   });
   beforeEach(async () => {
     await pool.query('TRUNCATE scheduled_timetables CASCADE');
+    await pool.query(
+      'TRUNCATE operators, towns, lines, stations, services, metadata CASCADE',
+    );
+    const entities = canonical.canonical;
+    await insertOperatorsStaging(db(), hashed(entities.operators));
+    await insertTownsStaging(
+      db(),
+      hashed([{ id: 'town', name: entities.operators[0].name }]),
+    );
+    canonicalTopologyComplete =
+      (await insertLinesStaging(db(), hashed(entities.lines))) ===
+      entities.lines.length;
+    await insertStationsStaging(db(), hashed(entities.stations));
+    await insertServicesStaging(db(), hashed(entities.services));
+    await syncOperatorsTownsLandmarksUpserts(db());
+    await syncLines(db());
+    await syncStations(db());
+    await syncServices(db());
+    await syncStationPlatformServices(db());
+    await finalize();
     await rm(join(directory, 'store'), { recursive: true, force: true });
     for (const bundle of [older, newer]) {
       const retained = await retainScheduledTimetable(db(), bundle, {
@@ -205,12 +290,15 @@ describe.skipIf(!url)('indexed departure window', () => {
   });
 
   it('merges previous-day 24+ and current-day departures before limiting, with date-specific fallback and opaque repeated occurrence order', async () => {
-    const readCanonicalTopology = vi.fn(options().readCanonicalTopology);
+    const readCanonicalTopology = vi.fn(readLiveScheduleTopology);
     const result = await queryIndexedScheduledDepartures(db(), {
       ...options(),
       readCanonicalTopology,
     });
     expect(readCanonicalTopology).toHaveBeenCalledTimes(1);
+    expect(
+      JSON.stringify(await readCanonicalTopology.mock.results[0].value),
+    ).toBe(JSON.stringify(canonical.topology()));
     expect(result.complete).toBe(true);
     expect(result.departures).toEqual(
       (await queryRetainedScheduledDepartures(shared())).departures,
@@ -364,48 +452,194 @@ describe.skipIf(!url)('indexed departure window', () => {
 
   it('holds one read-only repeatable-read snapshot across topology promotion, history changes and rebuilt occurrence rows for every candidate date', async () => {
     const before = await queryIndexedScheduledDepartures(db(), options());
-    await pool.query('CREATE TABLE window_canonical (topology json NOT NULL)');
+    const result = await queryIndexedScheduledDepartures(db(), {
+      ...options(),
+      readCanonicalTopology: async (tx) => {
+        const isolation = await tx.execute<{ transaction_isolation: string }>(
+          sql`SHOW transaction_isolation`,
+        );
+        const access = await tx.execute<{ transaction_read_only: string }>(
+          sql`SHOW transaction_read_only`,
+        );
+        expect(isolation.rows[0].transaction_isolation).toBe('repeatable read');
+        expect(access.rows[0].transaction_read_only).toBe('on');
+        const topology = await readLiveScheduleTopology(tx);
+        await syncOperatorsTownsLandmarksUpserts(db());
+        await db().transaction(async (writer) => {
+          await writer.update(stationPlatformsTable).set({ label: 'Changed' });
+          await writer
+            .update(projections)
+            .set({ completed_at: null, maximum_departure_seconds: 0 });
+          await writer.delete(occurrences);
+          await writer.delete(days);
+          await writer.delete(projections);
+          await writer.delete(timetables);
+        });
+        expect(await readLiveScheduleTopology(tx)).toEqual(topology);
+        return topology;
+      },
+    });
+    expect(result).toEqual(before);
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('completed promotion');
+    expect(await db().select().from(occurrences)).toEqual([]);
+    expect(await db().select().from(timetables)).toEqual([]);
+  });
+
+  it('rejects partial or failed promotions even with matching candidate topology, and compares actual live state after finalization', async () => {
+    await db().delete(metadataTable);
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('completed promotion');
+    await finalizePull(db());
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('completed promotion');
+    await finalize();
+    expect(
+      (await queryIndexedScheduledDepartures(db(), options())).complete,
+    ).toBe(true);
+    // The first real promotion phase invalidates eligibility in the same commit.
+    // An expired/deleted workflow lease cannot restore it after a later failure.
+    await syncOperatorsTownsLandmarksUpserts(db());
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('completed promotion');
+    await db().update(stationPlatformsTable).set({ label: 'Changed' });
+    await finalize();
+    const changed = await queryIndexedScheduledDepartures(db(), options());
+    expect(changed).toMatchObject({ complete: false, departures: [] });
+    expect(changed.serviceDays[0].attempts.map(({ reason }) => reason)).toEqual(
+      ['topology-mismatch', 'topology-mismatch'],
+    );
+  });
+
+  it('keeps topology unavailable after a finalized pull omits a canonical line, even when older retained topology matches live rows', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      await pool.query('INSERT INTO window_canonical VALUES ($1)', [
-        JSON.stringify(canonical.topology()),
-      ]);
-      const result = await queryIndexedScheduledDepartures(db(), {
-        ...options(),
-        readCanonicalTopology: async (tx) => {
-          const isolation = await tx.execute<{ transaction_isolation: string }>(
-            sql`SHOW transaction_isolation`,
-          );
-          const access = await tx.execute<{ transaction_read_only: string }>(
-            sql`SHOW transaction_read_only`,
-          );
-          expect(isolation.rows[0].transaction_isolation).toBe(
-            'repeatable read',
-          );
-          expect(access.rows[0].transaction_read_only).toBe('on');
-          const topology = await tx.execute<{
-            topology: ReturnType<typeof canonical.topology>;
-          }>(sql`SELECT topology FROM window_canonical`);
-          await db().transaction(async (writer) => {
-            await writer.execute(
-              sql`UPDATE window_canonical SET topology = ${JSON.stringify({ ...canonical.topology(), projectionVersion: 2 })}::json`,
-            );
-            await writer
-              .update(projections)
-              .set({ completed_at: null, maximum_departure_seconds: 0 });
-            await writer.delete(occurrences);
-            await writer.delete(days);
-            await writer.delete(projections);
-            await writer.delete(timetables);
-          });
-          return topology.rows[0].topology;
+      const incoming = [
+        ...canonical.canonical.lines,
+        {
+          ...canonical.canonical.lines[0],
+          id: 'future-line',
+          startedAt: null,
+          operatingHours: undefined,
+          serviceIds: [],
         },
-      });
-      expect(result).toEqual(before);
-      expect(await db().select().from(occurrences)).toEqual([]);
-      expect(await db().select().from(timetables)).toEqual([]);
+      ].map((line) => ({
+        ...line,
+        hash: hashBytes(Buffer.from(JSON.stringify(line))),
+      }));
+      canonicalTopologyComplete =
+        (await insertLinesStaging(db(), incoming)) === incoming.length;
+      expect(canonicalTopologyComplete).toBe(false);
+      await syncOperatorsTownsLandmarksUpserts(db());
+      await syncLines(db());
+      await finalize();
+      const manifest = canonical.archive().manifest;
+      manifest.lines = Object.fromEntries(
+        incoming.map((line) => [line.id, line.hash]),
+      );
+      const fingerprint = getCanonicalManifestFingerprint(manifest);
+      await recordCanonicalManifestFingerprint(db(), fingerprint);
+      expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(true);
+      expect(await db().select({ id: linesTable.id }).from(linesTable)).toEqual(
+        [{ id: 'line' }],
+      );
+      await expect(
+        queryIndexedScheduledDepartures(db(), options()),
+      ).rejects.toThrow('completed promotion');
+      expect(
+        await db().select({ id: projections.id }).from(projections),
+      ).toHaveLength(2);
     } finally {
-      await pool.query('DROP TABLE window_canonical');
+      warn.mockRestore();
     }
+  });
+
+  it('reimports a previous successful manifest after an interrupted promotion, then skips it after recovery completes', async () => {
+    const fingerprint = getCanonicalManifestFingerprint(
+      canonical.archive().manifest,
+    );
+    await recordCanonicalManifestFingerprint(db(), fingerprint);
+    expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(true);
+    const before = await queryIndexedScheduledDepartures(db(), options());
+
+    const nextStations = structuredClone(canonical.canonical.stations);
+    for (const station of nextStations) {
+      for (const platform of station.layout?.platforms ?? []) {
+        platform.label = 'Interrupted promotion';
+      }
+    }
+    await insertStationsStaging(db(), hashed(nextStations));
+    await syncOperatorsTownsLandmarksUpserts(db());
+    await syncStations(db());
+    expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(false);
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('completed promotion');
+
+    await pool.query('TRUNCATE stations_next');
+    await insertStationsStaging(db(), hashed(canonical.canonical.stations));
+    await syncStations(db());
+    await syncStationPlatformServices(db());
+    await finalize();
+    expect(await queryIndexedScheduledDepartures(db(), options())).toEqual(
+      before,
+    );
+    expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(false);
+    await recordCanonicalManifestFingerprint(db(), fingerprint);
+    expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(true);
+  });
+
+  it('fails closed on insufficient revision dates and inconsistent normalized relationships or path order', async () => {
+    const invalidPlatform = {
+      ...platforms[0],
+      boardingStatus: 'alighting_only',
+    };
+    expect(StationLayoutPlatformSchema.safeParse(invalidPlatform).success).toBe(
+      false,
+    );
+    await db()
+      .update(stationPlatformsTable)
+      .set({ boarding_status: 'alighting_only' })
+      .where(eq(stationPlatformsTable.platform_id, 'platform-1'));
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('inconsistent platform services');
+    await db()
+      .update(stationPlatformsTable)
+      .set({ boarding_status: null })
+      .where(eq(stationPlatformsTable.platform_id, 'platform-1'));
+    await db()
+      .update(serviceRevisionsTable)
+      .set({ start_at: null })
+      .where(eq(serviceRevisionsTable.id, 'revision'));
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow();
+    await db()
+      .update(serviceRevisionsTable)
+      .set({ start_at: '2000-01-01' })
+      .where(eq(serviceRevisionsTable.id, 'revision'));
+    await pool.query(
+      'UPDATE service_revision_path_station_entries SET path_index = 10 WHERE path_index = 1',
+    );
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('path order');
+    await pool.query(
+      'UPDATE service_revision_path_station_entries SET path_index = 1 WHERE path_index = 10',
+    );
+    await db().delete(lineServicesTable);
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('missing a line service');
+    await pool.query('TRUNCATE operators CASCADE');
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('requires operators');
   });
 
   it('rejects invalid instants, order, duration, limit and strict scope before opening a snapshot', async () => {

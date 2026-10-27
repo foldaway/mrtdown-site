@@ -190,12 +190,14 @@ async function executePull(
     store.clearCache();
 
     let linesCount = 0;
+    let canonicalTopologyComplete = false;
     {
       const lines = repo.lines.list().map((line) => ({
         ...line,
         hash: manifest.lines[line.id] ?? '',
       }));
-      await insertLinesStaging(db, lines);
+      const stagedLinesCount = await insertLinesStaging(db, lines);
+      canonicalTopologyComplete = stagedLinesCount === lines.length;
       linesCount = lines.length;
     }
     store.clearCache();
@@ -246,6 +248,7 @@ async function executePull(
       towns: townsCount,
       landmarks: landmarksCount,
       lines: linesCount,
+      canonicalTopologyComplete,
       stations: stationsCount,
       services: servicesCount,
       issues: issuesCount,
@@ -352,7 +355,9 @@ async function executePull(
   await runPullStep(context, 'finalize', async () => {
     const db = getDb();
     console.log('Finalizing pull...');
-    await finalizePull(db);
+    await finalizePull(db, {
+      canonicalTopologyComplete: counts.canonicalTopologyComplete,
+    });
   });
 
   const facts = await runPullStep(

@@ -182,11 +182,12 @@ cannot establish coverage. No timetable body or occurrence rows are loaded.
 
 The helper uses `withScheduledTimetableSnapshot`, which owns a read-only
 repeatable-read transaction and loads topology, validated history and projection
-metadata once for all selections and consumer reads. Its trusted internal
-`readCanonicalTopology(tx)` callback must independently establish the current
-canonical topology from that same snapshot (or an immutable snapshot proven to
-represent it), never from a candidate manifest or an external fingerprint.
-Current-topology loading/integration is separate work. The consumer callback
+metadata once for all selections and consumer reads. Its default
+`readLiveScheduleTopology(tx)` loader reconstructs the shared canonical v1 projection
+from live normalized tables in that snapshot. An optional trusted internal
+`readCanonicalTopology(tx)` override remains for focused tests; it must establish
+that same canonical state, never candidate topology or an external fingerprint.
+The consumer callback
 receives both selection and transaction so a later indexed query can read the
 same snapshot through concurrent canonical changes or projection rebuilds. A
 projection ID retained after the callback ends is provenance, not a reusable
@@ -202,8 +203,44 @@ window of at most 24 hours and an optional positive integer limit before opening
 the database snapshot. Shared core window/service-date helpers enumerate Singapore
 service dates using completed, supported, topology-compatible projection metadata's
 maximum source offset, including 24+ departures. No timetable body is hydrated.
-The trusted same-snapshot `readCanonicalTopology(tx)` callback remains required;
-the actual current-topology database loader is a separate slice.
+Internal callers provide scope/window/limit and use the live loader by default.
+
+The loader uses eleven explicit-column queries for operators, lines, line operators
+and services, stations, codes, platforms and platform services, services, revisions
+and ordered paths. It preserves repeated visits, nullable operator dates and
+revision ends, absent boarding statuses and empty service lists. JSON property and
+array ordering match `@mrtdown/fs`'s `scheduleTopologyProjection` v1; the full-entity
+projector would require unrelated geography, names and operating hours. Empty
+entity domains, inconsistent relationships, null revision starts or ambiguous/gapped
+path indices throw before history or departure reads. No candidate topology,
+retained body, filesystem snapshot, network read or independent cache is used.
+
+Repeatable read alone can observe an intermediate multi-domain promotion. The first
+parent-upsert transaction clears `canonical_topology_promotion_complete_v1` and
+the successful manifest fingerprint in metadata before changing live entities.
+A failed promotion therefore cannot skip recovery if the source returns to the
+previous successful manifest. Finalization restores the promotion marker in the same
+transaction as staging cleanup and the pull timestamp, after all domain promotion
+and orphan cleanup, only when the persisted parse result confirms every canonical
+line was staged. Missing confirmation (including older resumed parse results)
+also leaves the marker absent. The loader checks this marker in its own snapshot and throws
+while absent, including after a failed pull whose lease has been released or
+expired. It still computes topology from live rows; the marker stores no candidate
+fingerprint and grants no timetable approval. Pipeline version 5 forces one full
+pull to initialize this guard on existing installations. This certifies canonical
+promotion only; later rebuilds of derived data, cache publication and successful pull
+fingerprint recording retain their existing ordering.
+
+Canonical lines may have a null start date or absent operating hours, but the live
+line schema requires both. The existing staging filter omits those lines. Such a
+pull cannot certify complete schedule topology, even if the shortened live network
+matches an older retained artifact. Scheduled queries remain unavailable after
+finalization; existing retention and projection rows are preserved. The prerequisite
+for supporting these networks is to preserve those canonical lines in the live model
+with their real nullable fields and adapt dependent readers. This PR does not change
+that schema or narrow the producer's canonical topology identity. A finalized
+incomplete pull still records its successful manifest fingerprint, so an unchanged
+source is skipped rather than repeatedly importing an unsupported network.
 
 Each candidate date independently uses the same conservative selector and receipt
 lineage, allowing date-specific fallback. SQL restricts occurrence reads to the
@@ -258,9 +295,10 @@ The fingerprint deliberately excludes `generatedAt`, which is publication
 metadata rather than a data change. Bump the pull pipeline version in
 `app/workflows/pull/helpers/manifestFingerprint.ts` when a pull or derived-data
 code change requires one full rebuild without an upstream manifest change.
-Version 4 adds departure projection to the pull and forces one pull after this
-upgrade, including projection of an already-retained advertised artifact without
-a new source review. It does not backfill other historical artifacts. The
+Version 4 added departure projection to the pull. Version 5 forces one full pull
+to initialize the completed canonical promotion marker for live topology reads,
+including projection of an already-retained advertised artifact without a new
+source review. It does not backfill other historical artifacts. The
 fingerprint is recorded only after retention, timetable projection, canonical
 promotion, derived rebuilds and cache publication succeed. Scheduled requests
 still carry no review: an unseen timetable remains blocked until an operator
