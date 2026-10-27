@@ -14,7 +14,9 @@ import { buildIssue, REFERENCE_NOW, TEST_LINE } from './testFixtures';
 
 describe('buildLineSummary', () => {
   it('keeps unknown service windows distinct from future and operating lines', () => {
-    const referenceNow = DateTime.fromISO('2026-02-23T12:00:00+08:00');
+    const referenceNow = DateTime.fromISO('2026-02-23T12:00:00+08:00', {
+      zone: 'Asia/Singapore',
+    });
     const holidays = new Set<string>();
     const unknownLines = [
       { ...TEST_LINE, startedAt: null },

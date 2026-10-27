@@ -561,7 +561,9 @@ describe.skipIf(!url)('indexed departure window', () => {
     expect(
       (await queryIndexedScheduledDepartures(db(), options())).complete,
     ).toBe(true);
-    const referenceNow = DateTime.fromISO('2026-10-25T12:00:00+08:00');
+    const referenceNow = DateTime.fromISO('2026-10-25T12:00:00+08:00', {
+      zone: 'Asia/Singapore',
+    });
     const dataset = await buildDataset(referenceNow, db(), []);
     const line = dataset.included.lines.line;
     expect(line.startedAt).toBeNull();
