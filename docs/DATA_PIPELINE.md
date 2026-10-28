@@ -82,7 +82,7 @@ Retention does not establish eligibility to serve departures. Compatibility is
 checked against the incoming snapshot, not live database entities. Passenger
 departure queries/API/UI and publication remain separate gates. Real mapping,
 source and release reviews remain explicit upstream/operator work; this integration grants
-none automatically and does not implement rollback serving.
+none automatically.
 
 To exercise the migration locally, set `TEST_TIMETABLE_DATABASE_URL` to the
 existing local development database URL when running `npm run verify`. The test
@@ -193,8 +193,36 @@ same snapshot through concurrent canonical changes or projection rebuilds. A
 projection ID retained after the callback ends is provenance, not a reusable
 eligibility token. Selected version/receipt provenance, counts, platform coverage
 and per-candidate reasons distinguish unavailable or incomplete coverage from a
-valid empty date. Reviewed scoped rollback policy, passenger API/UI, and actual
-mapping/source/release approval and publication remain separate gates.
+valid empty date. Passenger API/UI and actual mapping/source/release approval
+and publication remain separate gates.
+
+Trusted internal callers may pass `rollback: { review, selectionInstant }` through
+this selector, the indexed window query or `readStationArrivalSource`. Published
+`@mrtdown/fs` alpha.44 supplies the strict review/options schemas and assessment
+type; core remains alpha.39. The review binds exact from/to manifest and source
+snapshot hashes, an inclusive service-date range, exact station/line/service/
+destination scope and optional platform equality (absence is not a wildcard),
+reviewer, reason and review time. Callers must authenticate this operator decision
+and supply the selection clock independently of passenger input. There is no
+review storage, admin/public endpoint or inferred review.
+
+Each date first determines its normal eligible selection in validated receipt
+lineage. An applicable review must name that current selection and a strictly
+older retained target with exact source identities; its time cannot precede the
+current import or exceed the selection instant. The SQL metadata adaptation is
+checked against the public shared selector using tiny retained fixtures, without
+hydrating historical timetable bodies in serving code. The target then passes
+all existing supported/completed projection, current topology, feed/date, exact
+scope/platform and whole-source mapping checks in the same repeatable-read
+snapshot. A stale review or ineligible target rejects that date with no selected
+timetable; it never silently resumes normal selection or tries another target.
+A nonapplicable review preserves normal selection. Per-date `rollback` assessments
+(`applied`, `rejected`, `not-applicable`, or null without a review) retain the
+review, selection instant and blockers through the window query, scheduled adapter
+and private reader. Rejection forces incomplete/unavailable and blocks frequency
+fallback even when every normal attempt is an ordinary coverage gap. History,
+receipts, archived bytes and derived projection rows are unchanged; source
+admission and real approval/publication remain separate.
 
 ### Private indexed departure windows
 
@@ -267,8 +295,8 @@ maximum offsets could hide earlier service dates even when a fallback is selecte
 Topology, candidate enumeration, every selection, counts and departures share one
 read-only repeatable-read transaction across concurrent canonical promotion and
 projection rebuilds. Returned projection IDs are provenance only after it closes.
-This private query grants no serving approval and adds no passenger API/UI, scoped
-rollback policy, real mapping/source/release approval or public publication.
+This private query grants no serving approval and adds no passenger API/UI, real
+mapping/source/release approval or public publication.
 
 ### Internal scheduled station-arrivals adapter
 
@@ -297,11 +325,10 @@ when timing groups are empty. `complete` describes query coverage, not whether a
 limited result exhausts the window or whether serving is approved. Complete empty
 coverage remains distinct from incomplete/unavailable coverage; an empty group
 list alone cannot trigger frequency fallback. The private source policy below
-consumes this evidence; API/UI selection and crowd overlays remain follow-ups. Reviewed
-scoped rollback and its shared package release remain serving gates; the current
-core alpha.39/fs alpha.43 packages lack those contracts. Actual mapping/source/
-release approvals and publication also remain separate. Existing frequency/crowd
-consumers are unchanged; this adapter is not selected by current page responses.
+consumes this evidence; API/UI selection and crowd overlays remain follow-ups.
+Actual mapping/source/release approvals and publication also remain separate.
+Existing frequency/crowd consumers are unchanged; this adapter is not selected by
+current page responses.
 
 ### Private station-arrivals source policy
 
@@ -335,8 +362,8 @@ context. Platform-specific fallback is unavailable because frequency timings
 carry platform labels, not canonical platform IDs. Frequency departures retain
 their existing basis, confidence, headways and crowd evidence. Crowd reports never
 shift scheduled times here. This internal decision grants no serving approval;
-public API/UI, scheduled crowd overlay, reviewed rollback/shared package release,
-actual mapping/source/release approvals and publication remain separate gates.
+public API/UI, scheduled crowd overlay, actual mapping/source/release approvals
+and publication remain separate gates.
 
 ### Private exact-scope station-arrivals reader
 
@@ -366,10 +393,8 @@ revision transitions across those dates. It returns at most the estimator's next
 estimates, filters them to the declared window and applies the optional limit; an
 empty result produces no candidate. Platform-specific fallback remains unavailable.
 Crowd phase anchors affect frequency estimates only. This private reader grants no
-serving approval: passenger API/UI wiring, scheduled crowd overlay, reviewed scoped
-rollback and its shared package release, real source/mapping/release approvals and
-publication remain prerequisites. Published core alpha.39/fs alpha.43 still lack
-the rollback contracts.
+serving approval: passenger API/UI wiring, scheduled crowd overlay, real source/
+mapping/release approvals and publication remain prerequisites.
 
 ## Public Holiday Workflow
 

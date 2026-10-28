@@ -4,6 +4,9 @@ import {
   type ScheduledTimetableRequestScope,
   ScheduledTimetableRequestScopeSchema,
   type ScheduledTimetableSelectionAttempt,
+  type ScheduledTimetableRollbackAssessment,
+  type ScheduledTimetableRollbackOptions,
+  ScheduledTimetableRollbackOptionsSchema,
 } from '@mrtdown/fs';
 import { and, eq } from 'drizzle-orm';
 import z from 'zod';
@@ -14,6 +17,7 @@ import {
   scheduledDepartureScopesTable as scopes,
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
+import { assessIndexedTimetableRollback } from './assessIndexedTimetableRollback';
 import { SCHEDULED_DEPARTURE_PROJECTOR_VERSION } from './projectScheduledTimetable';
 import { readLiveScheduleTopology } from './readLiveScheduleTopology';
 import { validateScheduledTimetableHistory } from './scheduledTimetableHistory';
@@ -51,9 +55,12 @@ export type ScheduledTimetableSelection = {
     coverage: Coverage & { platformIds: string[] };
   } | null;
   attempts: Attempt[];
+  rollback: ScheduledTimetableRollbackAssessment | null;
 };
 export type ScheduledTimetableSnapshotOptions = {
   scope: ScheduledTimetableRequestScope;
+  // Trusted operator review and explicit selection clock; never passenger input.
+  rollback?: ScheduledTimetableRollbackOptions;
   // Trusted internal override for tests; never bind this to passenger input.
   readCanonicalTopology?: (tx: ReadTransaction) => Promise<Topology>;
 };
@@ -127,6 +134,9 @@ export async function withScheduledTimetableSnapshot<T>(
   ) => Promise<T>,
 ): Promise<T> {
   const scope = ScheduledTimetableRequestScopeSchema.parse(options.scope);
+  const rollback = ScheduledTimetableRollbackOptionsSchema.optional().parse(
+    options.rollback,
+  );
   return db.transaction(
     async (tx) => {
       const topology = structuredClone(
@@ -223,8 +233,9 @@ export async function withScheduledTimetableSnapshot<T>(
           );
         }
       }
-      const select = async (
+      const selectEligible = async (
         input: string,
+        versions: readonly Version[],
       ): Promise<ScheduledTimetableSelection> => {
         const serviceDate = z.iso.date().parse(input);
         const coverageRows = await tx
@@ -256,9 +267,10 @@ export async function withScheduledTimetableSnapshot<T>(
           scope,
           selected: null,
           attempts: [],
+          rollback: null,
         };
         // Only the validated receipt chain establishes newest-to-oldest order.
-        for (const version of [...history].reverse()) {
+        for (const version of [...versions].reverse()) {
           const { manifest, manifestSha256 } = version;
           const metadata = byManifest.get(manifestSha256);
           const projection = metadata && {
@@ -309,7 +321,10 @@ export async function withScheduledTimetableSnapshot<T>(
                 maximumDepartureSeconds: projection.maximumDepartureSeconds,
                 completedAt: projection.completedAt,
                 version,
-                coverage: { ...coverage, platformIds: projection.platformIds },
+                coverage: {
+                  ...coverage,
+                  platformIds: projection.platformIds,
+                },
               };
             }
           }
@@ -319,6 +334,44 @@ export async function withScheduledTimetableSnapshot<T>(
           }
         }
         return selection;
+      };
+      const select = async (
+        serviceDate: string,
+      ): Promise<ScheduledTimetableSelection> => {
+        const normal = await selectEligible(serviceDate, history);
+        if (!rollback) {
+          return normal;
+        }
+        const assessment = assessIndexedTimetableRollback(
+          rollback,
+          normal,
+          history,
+        );
+        if (assessment.status === 'not-applicable') {
+          return { ...normal, rollback: assessment };
+        }
+        if (assessment.status === 'rejected') {
+          return { ...normal, selected: null, rollback: assessment };
+        }
+        // Reuse every normal eligibility check, restricted to the exact reviewed target.
+        const overridden = await selectEligible(
+          serviceDate,
+          history.filter(
+            (version) =>
+              version.manifestSha256 === rollback.review.to.manifestSha256,
+          ),
+        );
+        return {
+          ...overridden,
+          attempts: [...normal.attempts, ...overridden.attempts],
+          rollback: overridden.selected
+            ? assessment
+            : {
+                ...assessment,
+                status: 'rejected',
+                blockers: ['rollback-target-is-not-eligible'],
+              },
+        };
       };
       return use(tx, {
         scope,
