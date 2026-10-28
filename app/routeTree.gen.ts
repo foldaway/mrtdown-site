@@ -55,6 +55,7 @@ import { Route as ApiStationsStationIdArrivalsRouteImport } from './routes/api.s
 import { Route as Char123LangChar125HistoryPagePageNumIndexRouteImport } from './routes/{-$lang}/history/page/$pageNum/index'
 import { Route as Char123LangChar125HistoryYearMonthIndexRouteImport } from './routes/{-$lang}/history/$year/$month/index'
 import { Route as Char123LangChar125CommunityReportsKindSourceIdIndexRouteImport } from './routes/{-$lang}/community-reports/$kind/$sourceId/index'
+import { Route as ApiStationsStationIdArrivalsV2RouteImport } from './routes/api.stations.$stationId.arrivals.v2'
 
 const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
   id: '/llms.txt',
@@ -317,6 +318,12 @@ const Char123LangChar125CommunityReportsKindSourceIdIndexRoute =
     path: '/community-reports/$kind/$sourceId/',
     getParentRoute: () => Char123LangChar125RouteRoute,
   } as any)
+const ApiStationsStationIdArrivalsV2Route =
+  ApiStationsStationIdArrivalsV2RouteImport.update({
+    id: '/v2',
+    path: '/v2',
+    getParentRoute: () => ApiStationsStationIdArrivalsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/{-$lang}': typeof Char123LangChar125RouteRouteWithChildren
@@ -346,7 +353,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns/': typeof Char123LangChar125TownsIndexRoute
   '/{-$lang}/weekly/': typeof Char123LangChar125WeeklyIndexRoute
-  '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRoute
+  '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRouteWithChildren
   '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
@@ -362,6 +369,7 @@ export interface FileRoutesByFullPath {
   '/{-$lang}/stations/$stationId/': typeof Char123LangChar125StationsStationIdIndexRoute
   '/{-$lang}/status/$lineId/': typeof Char123LangChar125StatusLineIdIndexRoute
   '/{-$lang}/towns/$townId/': typeof Char123LangChar125TownsTownIdIndexRoute
+  '/api/stations/$stationId/arrivals/v2': typeof ApiStationsStationIdArrivalsV2Route
   '/{-$lang}/community-reports/$kind/$sourceId/': typeof Char123LangChar125CommunityReportsKindSourceIdIndexRoute
   '/{-$lang}/history/$year/$month/': typeof Char123LangChar125HistoryYearMonthIndexRoute
   '/{-$lang}/history/page/$pageNum/': typeof Char123LangChar125HistoryPagePageNumIndexRoute
@@ -393,7 +401,7 @@ export interface FileRoutesByTo {
   '/{-$lang}/system-map': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns': typeof Char123LangChar125TownsIndexRoute
   '/{-$lang}/weekly': typeof Char123LangChar125WeeklyIndexRoute
-  '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRoute
+  '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRouteWithChildren
   '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
@@ -409,6 +417,7 @@ export interface FileRoutesByTo {
   '/{-$lang}/stations/$stationId': typeof Char123LangChar125StationsStationIdIndexRoute
   '/{-$lang}/status/$lineId': typeof Char123LangChar125StatusLineIdIndexRoute
   '/{-$lang}/towns/$townId': typeof Char123LangChar125TownsTownIdIndexRoute
+  '/api/stations/$stationId/arrivals/v2': typeof ApiStationsStationIdArrivalsV2Route
   '/{-$lang}/community-reports/$kind/$sourceId': typeof Char123LangChar125CommunityReportsKindSourceIdIndexRoute
   '/{-$lang}/history/$year/$month': typeof Char123LangChar125HistoryYearMonthIndexRoute
   '/{-$lang}/history/page/$pageNum': typeof Char123LangChar125HistoryPagePageNumIndexRoute
@@ -442,7 +451,7 @@ export interface FileRoutesById {
   '/{-$lang}/system-map/': typeof Char123LangChar125SystemMapIndexRoute
   '/{-$lang}/towns/': typeof Char123LangChar125TownsIndexRoute
   '/{-$lang}/weekly/': typeof Char123LangChar125WeeklyIndexRoute
-  '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRoute
+  '/api/stations/$stationId/arrivals': typeof ApiStationsStationIdArrivalsRouteWithChildren
   '/internal/api/reference-catalog/v1': typeof InternalApiReferenceCatalogV1Route
   '/internal/api/tasks/crowd-report-dispatch': typeof InternalApiTasksCrowdReportDispatchRoute
   '/internal/api/tasks/facts': typeof InternalApiTasksFactsRoute
@@ -458,6 +467,7 @@ export interface FileRoutesById {
   '/{-$lang}/stations/$stationId/': typeof Char123LangChar125StationsStationIdIndexRoute
   '/{-$lang}/status/$lineId/': typeof Char123LangChar125StatusLineIdIndexRoute
   '/{-$lang}/towns/$townId/': typeof Char123LangChar125TownsTownIdIndexRoute
+  '/api/stations/$stationId/arrivals/v2': typeof ApiStationsStationIdArrivalsV2Route
   '/{-$lang}/community-reports/$kind/$sourceId/': typeof Char123LangChar125CommunityReportsKindSourceIdIndexRoute
   '/{-$lang}/history/$year/$month/': typeof Char123LangChar125HistoryYearMonthIndexRoute
   '/{-$lang}/history/page/$pageNum/': typeof Char123LangChar125HistoryPagePageNumIndexRoute
@@ -508,6 +518,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/stations/$stationId/'
     | '/{-$lang}/status/$lineId/'
     | '/{-$lang}/towns/$townId/'
+    | '/api/stations/$stationId/arrivals/v2'
     | '/{-$lang}/community-reports/$kind/$sourceId/'
     | '/{-$lang}/history/$year/$month/'
     | '/{-$lang}/history/page/$pageNum/'
@@ -555,6 +566,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/stations/$stationId'
     | '/{-$lang}/status/$lineId'
     | '/{-$lang}/towns/$townId'
+    | '/api/stations/$stationId/arrivals/v2'
     | '/{-$lang}/community-reports/$kind/$sourceId'
     | '/{-$lang}/history/$year/$month'
     | '/{-$lang}/history/page/$pageNum'
@@ -603,6 +615,7 @@ export interface FileRouteTypes {
     | '/{-$lang}/stations/$stationId/'
     | '/{-$lang}/status/$lineId/'
     | '/{-$lang}/towns/$townId/'
+    | '/api/stations/$stationId/arrivals/v2'
     | '/{-$lang}/community-reports/$kind/$sourceId/'
     | '/{-$lang}/history/$year/$month/'
     | '/{-$lang}/history/page/$pageNum/'
@@ -623,7 +636,7 @@ export interface RootRouteChildren {
   LinesLineIdIndexDotmdRoute: typeof LinesLineIdIndexDotmdRoute
   OperatorsOperatorIdIndexDotmdRoute: typeof OperatorsOperatorIdIndexDotmdRoute
   StationsStationIdIndexDotmdRoute: typeof StationsStationIdIndexDotmdRoute
-  ApiStationsStationIdArrivalsRoute: typeof ApiStationsStationIdArrivalsRoute
+  ApiStationsStationIdArrivalsRoute: typeof ApiStationsStationIdArrivalsRouteWithChildren
   InternalApiReferenceCatalogV1Route: typeof InternalApiReferenceCatalogV1Route
   InternalApiTasksCrowdReportDispatchRoute: typeof InternalApiTasksCrowdReportDispatchRoute
   InternalApiTasksFactsRoute: typeof InternalApiTasksFactsRoute
@@ -956,6 +969,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char123LangChar125CommunityReportsKindSourceIdIndexRouteImport
       parentRoute: typeof Char123LangChar125RouteRoute
     }
+    '/api/stations/$stationId/arrivals/v2': {
+      id: '/api/stations/$stationId/arrivals/v2'
+      path: '/v2'
+      fullPath: '/api/stations/$stationId/arrivals/v2'
+      preLoaderRoute: typeof ApiStationsStationIdArrivalsV2RouteImport
+      parentRoute: typeof ApiStationsStationIdArrivalsRoute
+    }
   }
 }
 
@@ -1035,6 +1055,20 @@ const Char123LangChar125RouteRouteWithChildren =
     Char123LangChar125RouteRouteChildren,
   )
 
+interface ApiStationsStationIdArrivalsRouteChildren {
+  ApiStationsStationIdArrivalsV2Route: typeof ApiStationsStationIdArrivalsV2Route
+}
+
+const ApiStationsStationIdArrivalsRouteChildren: ApiStationsStationIdArrivalsRouteChildren =
+  {
+    ApiStationsStationIdArrivalsV2Route: ApiStationsStationIdArrivalsV2Route,
+  }
+
+const ApiStationsStationIdArrivalsRouteWithChildren =
+  ApiStationsStationIdArrivalsRoute._addFileChildren(
+    ApiStationsStationIdArrivalsRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   Char123LangChar125RouteRoute: Char123LangChar125RouteRouteWithChildren,
   HealthzRoute: HealthzRoute,
@@ -1050,7 +1084,8 @@ const rootRouteChildren: RootRouteChildren = {
   LinesLineIdIndexDotmdRoute: LinesLineIdIndexDotmdRoute,
   OperatorsOperatorIdIndexDotmdRoute: OperatorsOperatorIdIndexDotmdRoute,
   StationsStationIdIndexDotmdRoute: StationsStationIdIndexDotmdRoute,
-  ApiStationsStationIdArrivalsRoute: ApiStationsStationIdArrivalsRoute,
+  ApiStationsStationIdArrivalsRoute:
+    ApiStationsStationIdArrivalsRouteWithChildren,
   InternalApiReferenceCatalogV1Route: InternalApiReferenceCatalogV1Route,
   InternalApiTasksCrowdReportDispatchRoute:
     InternalApiTasksCrowdReportDispatchRoute,

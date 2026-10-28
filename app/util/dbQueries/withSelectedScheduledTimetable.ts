@@ -65,6 +65,8 @@ export type ScheduledTimetableSnapshotOptions = {
   readCanonicalTopology?: (tx: ReadTransaction) => Promise<Topology>;
 };
 
+export class InvalidStationArrivalScopeError extends Error {}
+
 // The shared selector does not export its canonical request validation.
 function validateScope(
   scope: ScheduledTimetableRequestScope,
@@ -77,12 +79,14 @@ function validateScope(
     ({ id }) => id === scope.destinationStationId,
   );
   if (!line || !service || !station || !destination) {
-    throw new Error(
+    throw new InvalidStationArrivalScopeError(
       'Timetable request references an unknown canonical station, line or service',
     );
   }
   if (service.lineId !== line.id || !line.serviceIds.includes(service.id)) {
-    throw new Error('Timetable request service does not belong to its line');
+    throw new InvalidStationArrivalScopeError(
+      'Timetable request service does not belong to its line',
+    );
   }
   if (
     !service.revisions.some(
@@ -91,7 +95,9 @@ function validateScope(
         revision.stations.some(({ stationId }) => stationId === destination.id),
     )
   ) {
-    throw new Error('Timetable request stations do not belong to its service');
+    throw new InvalidStationArrivalScopeError(
+      'Timetable request stations do not belong to its service',
+    );
   }
   if (scope.platformId !== undefined) {
     const platforms = station.platforms.filter(
@@ -103,7 +109,7 @@ function validateScope(
       (platforms[0].serviceIds.length > 0 &&
         !platforms[0].serviceIds.includes(service.id))
     ) {
-      throw new Error(
+      throw new InvalidStationArrivalScopeError(
         'Timetable request platform does not belong to its station, line and service',
       );
     }
