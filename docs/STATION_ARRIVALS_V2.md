@@ -11,7 +11,7 @@ checked inside the private reader's database snapshot.
 
 The server chooses one request instant and queries the half-open interval
 `[now, now + 60 minutes)`, returning at most 20 departures across all scheduled
-platform groups (frequency fallback currently supplies at most two). Passengers
+platform groups. Passengers
 cannot choose a clock, horizon, result limit, topology, rollback or source review,
 or internal test callback. These bounds constrain the requested scope/window and
 response; the reader still validates retained history and merges candidate dates
@@ -38,21 +38,15 @@ and serializer live in `app/util/stationArrivalsV2.ts`.
   Singapore `serviceDate`, opaque `providerTripId`, `providerStopId` and string
   `stopSequence`. Several alternative platforms describe one departure, not
   several trains. Crowd reports never shift these timestamps.
-- `source: "frequency"`: `reason: "coverage-gap"`; `timing` carries canonical
-  display names, destination code, platform labels and estimated departures.
-  Their existing `basis` (`first_train`, `frequency_estimate`, `crowd_report` or
-  `last_train`), confidence, headway/range in seconds, crowd-report count and
-  disagreement flag are preserved. Platform IDs cannot be inferred from labels;
-  platform-specific requests do not use frequency fallback.
 - `source: "unavailable"`: no timing/departure payload. `reason` is
-  `timetable-unavailable`, `frequency-unavailable`, or
-  `frequency-scope-or-window-mismatch`; `coverage` explains the missing coverage.
+  `timetable-unavailable`; `coverage` explains the missing coverage. This includes
+  absent artifacts and uncovered scopes. There is no frequency-estimate fallback.
 
 `coverage.complete` describes scheduled coverage, not result exhaustion or full
 service-day bounds. A complete empty schedule is authoritative. Untimed counts
 cover the selected service dates and scope, because rows without a time cannot
 be assigned to the query window. Partial scheduled coverage stays scheduled;
-whole-window frequency estimates never fill its gaps. Rejected rollback and
+no estimated times fill its gaps. Rejected rollback and
 projection failures remain unavailable. First/last-day bounds are not inferred.
 
 Invalid syntax or unknown/inconsistent canonical scope returns HTTP 400 with
@@ -61,7 +55,26 @@ promotion and other unexpected failures are logged server-side and return HTTP
 500 with `{ success: false, error: "Arrival refresh failed" }`. Such failures
 never become successful coverage gaps or expose exception strings.
 
-This endpoint adds API capability only. The legacy arrivals endpoint and UI
-remain unchanged. UI integration and any scheduled crowd overlay are later work;
-real producer publication and mapping/source/release approvals remain independent
-gates. This API neither grants approvals nor publishes or backfills GTFS data.
+The station guide refreshes this endpoint once per unique canonical branch,
+using SSR canonical identity/display metadata without estimating departures or
+guessing destination or platform IDs. Refreshes run every 30 seconds with at
+most two concurrent requests and a 15-second batch timeout. Station changes
+invalidate older work. Refresh failures mark retained responses as last known.
+Before the first response, the guide shows a loading state with no arrival time.
+
+The existing guide layout distinguishes scheduled and approximate scheduled
+clock times, incomplete coverage, empty query windows and unavailable results.
+Platform alternatives stay grouped with one departure. No first/last train or
+service-day bounds are inferred from the limited window.
+
+The frequency estimator, SSR estimates, frequency response variant and arrival
+calibration controls are retired. `GET /api/stations/$stationId/arrivals` and
+`POST /api/arrival-reports` return HTTP 410 with no database reads or writes.
+Existing stored reports are preserved. Older frequency responses are rejected by
+the client validator rather than displayed. There is no scheduled crowd overlay,
+and scheduled timestamps are never shifted by crowd reports.
+
+Where the published source has no timetable, arrivals are unavailable even if
+canonical frequency metadata exists. Real producer publication,
+mapping/source/release approvals and later realtime integration remain separate
+work. This UI neither grants approvals nor publishes or backfills GTFS data.

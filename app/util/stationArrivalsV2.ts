@@ -1,6 +1,5 @@
 import type { Station } from '@mrtdown/core';
 import type { ScheduledTimetableSelection } from './dbQueries/withSelectedScheduledTimetable';
-import type { EstimatedArrivalDeparture } from './estimatedArrivals';
 import type { StationArrivalSourceDecision } from './stationArrivalSourcePolicy';
 
 export const STATION_ARRIVALS_V2_LIMIT = 20;
@@ -60,19 +59,8 @@ export type StationArrivalsV2 = {
       })[];
     }
   | {
-      source: 'frequency';
-      reason: 'coverage-gap';
-      timing: ArrivalDisplay & {
-        platformLabels: string[];
-        departures: EstimatedArrivalDeparture[];
-      };
-    }
-  | {
       source: 'unavailable';
-      reason:
-        | 'timetable-unavailable'
-        | 'frequency-unavailable'
-        | 'frequency-scope-or-window-mismatch';
+      reason: 'timetable-unavailable';
     }
 );
 
@@ -157,32 +145,6 @@ export function serializeStationArrivalsV2(
           })),
         ),
       };
-    case 'frequency': {
-      const { timing } = decision.frequency;
-      return {
-        ...common,
-        source: 'frequency',
-        reason: decision.reason,
-        timing: {
-          serviceName: timing.serviceName,
-          destinationName: timing.destinationName,
-          destinationCode: timing.destinationCode,
-          platformLabels: [...timing.platformLabels],
-          departures: timing.departures.map((departure) => ({
-            time: departure.time,
-            basis: departure.basis,
-            confidence: departure.confidence,
-            headwaySeconds: departure.headwaySeconds,
-            headwayRangeSeconds: {
-              min: departure.headwayRangeSeconds.min,
-              max: departure.headwayRangeSeconds.max,
-            },
-            crowdReportCount: departure.crowdReportCount,
-            crowdReportsDisagree: departure.crowdReportsDisagree,
-          })),
-        },
-      };
-    }
     case 'unavailable':
       return { ...common, source: 'unavailable', reason: decision.reason };
   }

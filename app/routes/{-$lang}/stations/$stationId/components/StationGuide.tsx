@@ -1,145 +1,31 @@
 import { Popover } from '@base-ui/react/popover';
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { FormattedMessage } from 'react-intl';
 import { BetaBadge } from '~/components/BetaBadge';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { ExitSign } from './StationGuideSigns';
 import type { ArrivalLine, StationExit } from './stationGuide.types';
 import { useHoverPopover } from './useHoverPopover';
+import { arrivalBranchKey } from './stationArrivalRefresh';
+import { useStationArrivals } from './useStationArrivals';
 
 type StationGuideProps = {
   arrivalLines: ArrivalLine[];
   exits: StationExit[];
-  isHydrated: boolean;
   lineColors: Record<string, string>;
   lineNames: Record<string, string>;
   stationId: string;
 };
 
-type RefreshArrivalLinesOptions = {
-  afterReport?: boolean;
-};
-
-const REFRESH_TIMEOUT_MILLIS = 15_000;
-
 export function StationGuide({
   arrivalLines,
   exits,
-  isHydrated,
   lineColors,
   lineNames,
   stationId,
 }: StationGuideProps) {
-  const [liveArrivalLines, setLiveArrivalLines] = useState(arrivalLines);
-  const activeStationIdRef = useRef<string | null>(null);
-  const arrivalLinesRef = useRef(arrivalLines);
-  const refreshAbortControllerRef = useRef<AbortController | null>(null);
-  const refreshInFlightRef = useRef<Promise<void> | null>(null);
-  const refreshTimeoutRef = useRef<number | null>(null);
-
-  const refreshArrivalLines = useCallback(
-    async ({ afterReport = false }: RefreshArrivalLinesOptions = {}) => {
-      if (activeStationIdRef.current !== stationId) {
-        return;
-      }
-      if (refreshInFlightRef.current != null) {
-        if (!afterReport) {
-          await refreshInFlightRef.current;
-          return;
-        }
-        refreshAbortControllerRef.current?.abort();
-        await refreshInFlightRef.current;
-        if (activeStationIdRef.current !== stationId) {
-          return;
-        }
-      }
-
-      const abortController = new AbortController();
-      const refresh = (async () => {
-        try {
-          const response = await fetch(
-            `/api/stations/${encodeURIComponent(stationId)}/arrivals`,
-            { cache: 'no-store', signal: abortController.signal },
-          );
-          if (!response.ok) {
-            return;
-          }
-          const payload = (await response.json()) as {
-            data?: ArrivalLine[];
-            success?: boolean;
-          };
-          if (
-            payload.success === true &&
-            payload.data != null &&
-            activeStationIdRef.current === stationId
-          ) {
-            setLiveArrivalLines(payload.data);
-          }
-        } catch {
-          // Keep the latest available estimates when the refresh is unavailable.
-        }
-      })();
-      refreshAbortControllerRef.current = abortController;
-      refreshInFlightRef.current = refresh;
-      const timeout = window.setTimeout(
-        () => abortController.abort(),
-        REFRESH_TIMEOUT_MILLIS,
-      );
-      refreshTimeoutRef.current = timeout;
-      try {
-        await refresh;
-      } finally {
-        if (refreshTimeoutRef.current === timeout) {
-          window.clearTimeout(timeout);
-          refreshTimeoutRef.current = null;
-        }
-        if (refreshAbortControllerRef.current === abortController) {
-          refreshAbortControllerRef.current = null;
-        }
-        if (refreshInFlightRef.current === refresh) {
-          refreshInFlightRef.current = null;
-        }
-      }
-    },
-    [stationId],
-  );
-
-  useEffect(() => {
-    arrivalLinesRef.current = arrivalLines;
-  }, [arrivalLines]);
-
-  useEffect(() => {
-    activeStationIdRef.current = stationId;
-    setLiveArrivalLines(arrivalLinesRef.current);
-    return () => {
-      activeStationIdRef.current = null;
-      refreshAbortControllerRef.current?.abort();
-      refreshAbortControllerRef.current = null;
-      if (refreshTimeoutRef.current != null) {
-        window.clearTimeout(refreshTimeoutRef.current);
-        refreshTimeoutRef.current = null;
-      }
-      refreshInFlightRef.current = null;
-    };
-  }, [stationId]);
-
-  useEffect(() => {
-    void refreshArrivalLines();
-    const interval = window.setInterval(
-      () => void refreshArrivalLines(),
-      30_000,
-    );
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [refreshArrivalLines]);
-
-  const refreshArrivalLinesAfterReport = useCallback(
-    () => refreshArrivalLines({ afterReport: true }),
-    [refreshArrivalLines],
-  );
+  const states = useStationArrivals(stationId, arrivalLines);
 
   return (
     <section
@@ -156,20 +42,20 @@ export function StationGuide({
             defaultMessage="Station guide"
           />
         </h2>
-        <ArrivalEstimatorInfo />
+        <ArrivalInfo />
       </div>
-      {liveArrivalLines.length > 0 && (
+      {arrivalLines.length > 0 && (
         <section
           aria-labelledby="station-arrivals-title"
           className="border-gray-200 border-t dark:border-gray-700"
         >
           <h3 className="sr-only" id="station-arrivals-title">
             <FormattedMessage
-              id="station.arrival_timings.title"
-              defaultMessage="Estimated arrivals"
+              id="station.arrivals.title"
+              defaultMessage="Arrivals"
             />
           </h3>
-          {liveArrivalLines.map((line) => (
+          {arrivalLines.map((line) => (
             <section
               aria-labelledby={`arrival-line-${line.lineId}`}
               className="border-gray-200 border-t dark:border-gray-700"
@@ -199,11 +85,21 @@ export function StationGuide({
                 {line.arrivalTimings.map((arrivalTiming) => (
                   <ServiceArrivalSummary
                     arrivalTiming={arrivalTiming}
-                    isHydrated={isHydrated}
-                    key={arrivalTiming.serviceId}
+                    key={arrivalBranchKey(
+                      line.lineId,
+                      arrivalTiming.serviceId,
+                      arrivalTiming.destinationStationId,
+                    )}
+                    arrivalState={
+                      states[
+                        arrivalBranchKey(
+                          line.lineId,
+                          arrivalTiming.serviceId,
+                          arrivalTiming.destinationStationId,
+                        )
+                      ]
+                    }
                     lineColor={lineColors[line.lineId]}
-                    onArrivalReportSubmitted={refreshArrivalLinesAfterReport}
-                    stationId={stationId}
                   />
                 ))}
               </ul>
@@ -247,7 +143,7 @@ export function StationGuide({
   );
 }
 
-function ArrivalEstimatorInfo() {
+function ArrivalInfo() {
   const { closeAfterHover, isOpen, openOnHover, setIsOpen } = useHoverPopover();
 
   return (
@@ -280,16 +176,16 @@ function ArrivalEstimatorInfo() {
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-semibold">
                 <FormattedMessage
-                  id="station.arrival_timings.explainer_label"
-                  defaultMessage="How estimated arrivals work"
+                  id="station.arrivals.explainer_label"
+                  defaultMessage="How arrivals work"
                 />
               </p>
               <BetaBadge />
             </div>
             <p className="mt-1 text-gray-600 dark:text-gray-300">
               <FormattedMessage
-                id="station.arrival_timings.explainer"
-                defaultMessage="Calculated from the station's published first and last train times and representative frequency. These are planning estimates, not live train-tracking predictions. Open a service's details for its typical headway and published range."
+                id="station.arrivals.explainer"
+                defaultMessage="Times come from a published timetable. Approximate scheduled times are less precise. These are not live train predictions, and timetable coverage can be incomplete. When a timetable is unavailable, no arrival estimate is shown."
               />
             </p>
             <Popover.Arrow className="fill-white dark:fill-gray-800" />

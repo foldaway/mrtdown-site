@@ -1,5 +1,4 @@
-import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { EstimatedArrivalDeparture } from './estimatedArrivals';
+import { describe, expect, it } from 'vitest';
 import {
   departure,
   display,
@@ -50,9 +49,7 @@ describe('scheduled station arrivals adapter', () => {
     expect(single.platformIds).toEqual(['a']);
     expect(single.departures).toHaveLength(1);
     expect(arrivals.lines[0].arrivalTimings).toHaveLength(2);
-    expectTypeOf(
-      alternatives.departures[0],
-    ).not.toExtend<EstimatedArrivalDeparture>();
+    expect(alternatives.departures[0]).not.toHaveProperty('headwaySeconds');
     expect(input).toEqual(before);
   });
 

@@ -219,8 +219,7 @@ timetable; it never silently resumes normal selection or tries another target.
 A nonapplicable review preserves normal selection. Per-date `rollback` assessments
 (`applied`, `rejected`, `not-applicable`, or null without a review) retain the
 review, selection instant and blockers through the window query, scheduled adapter
-and private reader. Rejection forces incomplete/unavailable and blocks frequency
-fallback even when every normal attempt is an ordinary coverage gap. History,
+and private reader. Rejection forces incomplete/unavailable; no estimated fallback is served. History,
 receipts, archived bytes and derived projection rows are unchanged; source
 admission and real approval/publication remain separate.
 
@@ -302,7 +301,7 @@ mapping/source/release approval or public publication.
 
 `buildScheduledStationArrivalLines` purely maps one validated
 `queryIndexedScheduledDepartures` result into line groups and service/destination
-timings. Its `basis: 'scheduled'` contract is separate from estimated arrivals:
+timings. Its `basis: 'scheduled'` contract never includes frequency estimates:
 departures add `time` as an alias of `departureInstant` and retain all original
 scheduled fields, including exact/approximate precision, original service date,
 opaque provider IDs/stop sequence, revision, manifest/source snapshot hashes,
@@ -324,90 +323,55 @@ retained receipts, unavailable projection reasons and untimed counts, including
 when timing groups are empty. `complete` describes query coverage, not whether a
 limited result exhausts the window or whether serving is approved. Complete empty
 coverage remains distinct from incomplete/unavailable coverage; an empty group
-list alone cannot trigger frequency fallback. The private source policy below
-consumes this evidence; API/UI selection and crowd overlays remain follow-ups.
-Actual mapping/source/release approvals and publication also remain separate.
-Existing frequency/crowd consumers are unchanged; this adapter is not selected by
-current page responses.
+list alone cannot establish timetable coverage. The private source policy below
+consumes this evidence. Actual mapping/source/release approvals, publication and
+any future scheduled crowd overlay remain separate.
 
 ### Private station-arrivals source policy
 
-`selectStationArrivalSource` consumes the validated scheduled adapter result and
-an optional existing frequency timing for one independently covered canonical
-branch. Complete coverage is authoritative, including empty or limited results
-and approximate scheduled times. Untimed rows keep their scheduled basis and
-incomplete status. Neither departure counts nor timing-group emptiness establish
-a coverage gap.
+`selectStationArrivalSource` consumes only the validated scheduled adapter result.
+Complete coverage is authoritative, including empty or limited results and
+approximate scheduled times. Partial multi-date coverage and untimed rows keep
+their scheduled basis and incomplete status. No frequency candidate is computed
+or substituted. Missing artifacts and uncovered scopes return `unavailable`.
 
-Only unselected dates with no retained artifact (no attempts), or exclusively
-`outside-feed-range`, `scope-not-covered` or `mapping-coverage-gap` attempts permit
-frequency fallback. Any unavailable projection or other unselected-date reason
-returns `unavailable`, retaining the scheduled object as evidence. Projection
-absence/incompleteness/metadata mismatch, missing indexed dates and topology
-uncertainty are failures, not ordinary gaps. Query exceptions such as invalid
-lineage or incomplete canonical promotion propagate before this policy; callers
-must not convert them or rejected rollbacks into a no-artifact result.
-
-Partial multi-date coverage keeps usable scheduled results and `complete: false`.
-Whole-window frequency estimates cannot safely fill its gaps without a separate
-interval algorithm, so this policy never merges them. Every decision retains the
-original scheduled object, including ordering, provenance and all diagnostics.
-
-The frequency candidate must come from independently known canonical service
-coverage, not a synthesized empty timing or names matched to scheduled results.
-Its station ID and timing's line/service/destination IDs must match; its declared
-window must match by instant and every supplied estimate must lie within that
-half-open window. Callers must bind that window to the estimate's actual query
-context. Platform-specific fallback is unavailable because frequency timings
-carry platform labels, not canonical platform IDs. Frequency departures retain
-their existing basis, confidence, headways and crowd evidence. Crowd reports never
-shift scheduled times here. This internal decision grants no serving approval;
-public API/UI, scheduled crowd overlay, actual mapping/source/release approvals
-and publication remain separate gates.
+Unavailable projections, invalid indexed dates and rejected rollbacks remain
+unavailable. Query exceptions such as invalid lineage or incomplete canonical
+promotion propagate before the policy. Every decision retains the original
+scheduled object, including ordering, provenance and diagnostics.
 
 ### Private exact-scope station-arrivals reader
 
-`readStationArrivalSource` composes the indexed query, scheduled adapter and source
-policy for one canonical station/line/service/destination (optional platform).
-`referenceInstant` is the single request clock and half-open window start;
-`endInstant` and optional positive `limit` use the indexed query's existing
-validation, including its 24-hour maximum. Existing station pages and the legacy
-arrivals API remain unchanged.
+`readStationArrivalSource` composes the indexed query, scheduled adapter and
+source policy for one canonical station/line/service/destination (optional
+platform). `referenceInstant` is the single request clock and half-open window
+start; `endInstant` and optional positive `limit` use the indexed query's existing
+validation, including its 24-hour maximum.
 
-`withIndexedScheduledDepartures` keeps the reader callback inside the query's
-read-only repeatable-read transaction. Canonical topology, display names, destination
-code, platform labels, revision/profile, station first/last times, holidays and
-current crowd reports therefore share the eligibility snapshot. Crowd reports are
-bounded at the reference instant before choosing each reporter's latest report.
-Destination display comes from the requested canonical destination and its line
-code at the reference date; it is never inferred from a different revision or
-matched by name. Query and
-promotion/lineage failures propagate. Complete empty schedules remain authoritative;
-partial schedules retain their diagnostics and never merge whole-window estimates.
-
-Only the existing policy's documented gaps reach the current
-`getEstimatedStationArrivalTimings` estimator and crowd-report reader.
-Fallback requires the selected active canonical revision's actual path to contain
-the station and end at the requested destination. Because the existing estimator
-uses one profile for yesterday/today/tomorrow, fallback conservatively declines
-revision transitions across those dates. It returns at most the estimator's next two
-estimates, filters them to the declared window and applies the optional limit; an
-empty result produces no candidate. Platform-specific fallback remains unavailable.
-Crowd phase anchors affect frequency estimates only. This private reader grants no
-serving approval itself. The versioned API below adds public capability; legacy
-API/UI integration, scheduled crowd overlay, real source/mapping/release approvals
-and publication remain separate work.
+`withIndexedScheduledDepartures` keeps canonical topology, display names,
+destination code and platform labels inside the query's read-only repeatable-read
+transaction. Destination display comes from the requested canonical destination
+and its line code at the reference date. The reader never reads frequency
+profiles, first/last train times, holidays or crowd calibration reports.
 
 ### Versioned public exact-scope arrivals
 
-`GET /api/stations/$stationId/arrivals/v2` now wraps the private reader with strict
+`GET /api/stations/$stationId/arrivals/v2` wraps the private reader with strict
 passenger scope validation, a server-owned 60-minute window and 20-result limit,
-and an explicit compact scheduled/frequency/unavailable response. See
-[the API contract](STATION_ARRIVALS_V2.md) for coverage and provenance semantics.
-The legacy endpoint and station UI remain unchanged. This adds API capability;
-UI integration, scheduled crowd overlays and real producer publication and
-mapping/source/release approvals remain separate work. No source review or
-rollback authority is accepted from query parameters.
+and an explicit scheduled/unavailable response. The station guide refreshes
+that endpoint using canonical branch metadata from SSR; SSR computes no arrival
+estimates. See [the API contract](STATION_ARRIVALS_V2.md) for coverage and
+provenance semantics.
+
+The frequency estimator, crowd calibration implementation and unused legacy
+arrival server function have been removed. The legacy arrivals endpoint and
+arrival-calibration submission endpoint return HTTP 410 without database access.
+Stored calibration reports remain intact; no destructive schema cleanup is part
+of this retirement. Canonical frequency metadata remains source data, but is
+not used to generate arrival predictions.
+
+Real producer publication and mapping/source/release approvals remain separate
+work. No source review or rollback authority is accepted from query parameters.
 
 ## Public Holiday Workflow
 

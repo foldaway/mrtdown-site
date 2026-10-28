@@ -1,15 +1,10 @@
-import type { EstimatedArrivalTiming } from '~/util/estimatedArrivals';
+import type { StationArrivalBranch } from '~/util/stationArrivalBranches';
 
-export type ArrivalTiming = EstimatedArrivalTiming & {
-  platformLabels: string[];
-};
+export type ArrivalTiming = StationArrivalBranch;
 
 export type ArrivalLine = {
   lineId: string;
   arrivalTimings: ArrivalTiming[];
 };
 
-export type StationExit = {
-  id: number;
-  label: string;
-};
+export type StationExit = { id: number; label: string };

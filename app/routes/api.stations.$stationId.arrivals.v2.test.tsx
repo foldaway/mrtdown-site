@@ -69,7 +69,7 @@ describe('station arrivals v2 contract', () => {
       },
       display,
     );
-    mocks.read.mockResolvedValue(selectStationArrivalSource(scheduled, null));
+    mocks.read.mockResolvedValue(selectStationArrivalSource(scheduled));
     const response = await request(`${query}&platformId=a`);
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
@@ -158,7 +158,6 @@ describe('station arrivals v2 contract', () => {
       mocks.read.mockResolvedValue(
         selectStationArrivalSource(
           buildScheduledStationArrivalLines(input, display),
-          null,
         ),
       );
       const response = await request();
@@ -174,44 +173,29 @@ describe('station arrivals v2 contract', () => {
     }
   });
 
-  it('preserves frequency basis, confidence, headways and aggregate crowd evidence only', async () => {
-    const frequencyDeparture = {
-      time: departure.departureInstant,
-      basis: 'crowd_report' as const,
-      confidence: 'medium' as const,
-      headwaySeconds: 300,
-      headwayRangeSeconds: { min: 240, max: 360 },
-      crowdReportCount: 2,
-      crowdReportsDisagree: true,
-    };
-    mocks.read.mockResolvedValue({
-      scheduled: buildScheduledStationArrivalLines(
-        { ...result, complete: false },
-        display,
+  it('returns unavailable when no timetable artifact covers the branch', async () => {
+    mocks.read.mockResolvedValue(
+      selectStationArrivalSource(
+        buildScheduledStationArrivalLines(
+          {
+            ...result,
+            complete: false,
+            serviceDays: [
+              { ...result.serviceDays[0], selected: null, attempts: [] },
+            ],
+          },
+          display,
+        ),
       ),
-      source: 'frequency',
-      reason: 'coverage-gap',
-      frequency: {
-        stationId: scope.stationId,
-        window: result.window,
-        timing: {
-          ...scope,
-          ...display,
-          platformLabels: ['Platform'],
-          departures: [{ ...frequencyDeparture, reporterRows: ['private'] }],
-        },
-      },
+    );
+    const response = await request();
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(data).toMatchObject({
+      source: 'unavailable',
+      reason: 'timetable-unavailable',
     });
-    const { data } = await (await request()).json();
-    expect(data.source).toBe('frequency');
-    expect(data.reason).toBe('coverage-gap');
-    expect(data.timing).toEqual({
-      serviceName: display.serviceName,
-      destinationName: display.destinationName,
-      destinationCode: display.destinationCode,
-      platformLabels: ['Platform'],
-      departures: [frequencyDeparture],
-    });
+    expect(data).not.toHaveProperty('timing');
     expect(data).not.toHaveProperty('timings');
   });
 
@@ -244,7 +228,7 @@ describe('station arrivals v2 contract', () => {
         reason: 'Private review',
       },
     };
-    mocks.read.mockResolvedValue(selectStationArrivalSource(scheduled, null));
+    mocks.read.mockResolvedValue(selectStationArrivalSource(scheduled));
     const response = await request();
     const body = await response.json();
     expect(response.status).toBe(200);
