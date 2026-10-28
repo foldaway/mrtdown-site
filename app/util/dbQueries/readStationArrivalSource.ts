@@ -170,6 +170,7 @@ export async function readStationArrivalSource(
         reportedAtOrAfter: isoDateTime(
           referenceNow.minus({ minutes: MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES }),
         ),
+        reportedAtOrBefore: isoDateTime(referenceNow),
       });
       const [timing] = getEstimatedStationArrivalTimings({
         station: {

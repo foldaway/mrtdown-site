@@ -349,9 +349,11 @@ validation, including its 24-hour maximum. Public station pages/APIs remain unch
 `withIndexedScheduledDepartures` keeps the reader callback inside the query's
 read-only repeatable-read transaction. Canonical topology, display names, destination
 code, platform labels, revision/profile, station first/last times, holidays and
-current crowd reports therefore share the eligibility snapshot. Destination display
-comes from the requested canonical destination and its line code at the reference
-date; it is never inferred from a different revision or matched by name. Query and
+current crowd reports therefore share the eligibility snapshot. Crowd reports are
+bounded at the reference instant before choosing each reporter's latest report.
+Destination display comes from the requested canonical destination and its line
+code at the reference date; it is never inferred from a different revision or
+matched by name. Query and
 promotion/lineage failures propagate. Complete empty schedules remain authoritative;
 partial schedules retain their diagnostics and never merge whole-window estimates.
 

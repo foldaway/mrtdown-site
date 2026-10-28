@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
 import type { getDb } from '~/db';
@@ -31,6 +31,7 @@ export function getLatestCrowdArrivalReports(input: {
   stationId: string;
   serviceIds: readonly string[];
   reportedAtOrAfter: string;
+  reportedAtOrBefore?: string;
 }) {
   return input.db
     .selectDistinctOn(
@@ -53,6 +54,9 @@ export function getLatestCrowdArrivalReports(input: {
         inArray(crowdArrivalReportsTable.service_id, input.serviceIds),
         eq(crowdArrivalReportsTable.status, 'accepted'),
         gte(crowdArrivalReportsTable.reported_at, input.reportedAtOrAfter),
+        input.reportedAtOrBefore == null
+          ? undefined
+          : lte(crowdArrivalReportsTable.reported_at, input.reportedAtOrBefore),
       ),
     )
     .orderBy(

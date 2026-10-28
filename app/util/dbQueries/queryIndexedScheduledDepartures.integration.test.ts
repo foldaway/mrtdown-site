@@ -422,14 +422,26 @@ describe.skipIf(!url)('indexed departure window', () => {
       holiday_name: 'Test holiday',
       hash: 'test',
     });
-    await db().insert(crowdArrivalReportsTable).values({
-      id: 'phase',
-      station_id: request.scope.stationId,
-      service_id: scope.serviceId,
-      reported_at: '2026-10-26T06:03:00+08:00',
-      minutes_to_arrival: 3,
-      reporter_hash: 'test',
-    });
+    await db()
+      .insert(crowdArrivalReportsTable)
+      .values([
+        {
+          id: 'phase',
+          station_id: request.scope.stationId,
+          service_id: scope.serviceId,
+          reported_at: request.referenceInstant,
+          minutes_to_arrival: 2,
+          reporter_hash: 'test',
+        },
+        {
+          id: 'future-phase',
+          station_id: request.scope.stationId,
+          service_id: scope.serviceId,
+          reported_at: '2026-10-26T06:05:00+08:00',
+          minutes_to_arrival: 0,
+          reporter_hash: 'test',
+        },
+      ]);
     const fallback = await readStationArrivalSource(db(), {
       ...request,
       readCanonicalTopology: async (tx) => {
