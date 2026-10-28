@@ -371,7 +371,8 @@ and publication remain separate gates.
 policy for one canonical station/line/service/destination (optional platform).
 `referenceInstant` is the single request clock and half-open window start;
 `endInstant` and optional positive `limit` use the indexed query's existing
-validation, including its 24-hour maximum. Public station pages/APIs remain unchanged.
+validation, including its 24-hour maximum. Existing station pages and the legacy
+arrivals API remain unchanged.
 
 `withIndexedScheduledDepartures` keeps the reader callback inside the query's
 read-only repeatable-read transaction. Canonical topology, display names, destination
@@ -393,8 +394,20 @@ revision transitions across those dates. It returns at most the estimator's next
 estimates, filters them to the declared window and applies the optional limit; an
 empty result produces no candidate. Platform-specific fallback remains unavailable.
 Crowd phase anchors affect frequency estimates only. This private reader grants no
-serving approval: passenger API/UI wiring, scheduled crowd overlay, real source/
-mapping/release approvals and publication remain prerequisites.
+serving approval itself. The versioned API below adds public capability; legacy
+API/UI integration, scheduled crowd overlay, real source/mapping/release approvals
+and publication remain separate work.
+
+### Versioned public exact-scope arrivals
+
+`GET /api/stations/$stationId/arrivals/v2` now wraps the private reader with strict
+passenger scope validation, a server-owned 60-minute window and 20-result limit,
+and an explicit compact scheduled/frequency/unavailable response. See
+[the API contract](STATION_ARRIVALS_V2.md) for coverage and provenance semantics.
+The legacy endpoint and station UI remain unchanged. This adds API capability;
+UI integration, scheduled crowd overlays and real producer publication and
+mapping/source/release approvals remain separate work. No source review or
+rollback authority is accepted from query parameters.
 
 ## Public Holiday Workflow
 
