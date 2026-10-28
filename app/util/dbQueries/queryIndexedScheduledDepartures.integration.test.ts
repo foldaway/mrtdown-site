@@ -29,6 +29,10 @@ import {
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
 import {
+  crowdArrivalReportsTable,
+  publicHolidaysTable,
+  stationsTable,
+  servicesTable,
   lineServicesTable,
   linesNextTable,
   linesTable,
@@ -64,6 +68,7 @@ import { isLineOperatingNow, isLineFuture } from './serviceOperations';
 import { buildLineOperationalFactRows } from './operationalFacts';
 import { projectScheduledTimetable } from './projectScheduledTimetable';
 import { queryIndexedScheduledDepartures } from './queryIndexedScheduledDepartures';
+import { readStationArrivalSource } from './readStationArrivalSource';
 import { readLiveScheduleTopology } from './readLiveScheduleTopology';
 import { retainScheduledTimetable } from './retainScheduledTimetable';
 import { retentionReview } from './scheduledTimetableRetention.fixture';
@@ -73,6 +78,35 @@ const schema = `gtfs_window_test_${randomUUID().replaceAll('-', '')}`;
 const canonical = scheduledTimetableCanonicalFixture(3);
 canonical.canonical.lines[0].operatingHours =
   canonical.canonical.services[0].revisions[0].operatingHours;
+canonical.canonical.services[0].revisions[0].estimatedFrequency = {
+  source: {
+    url: 'https://example.com/frequency',
+    description: 'Test profile',
+    retrievedAt: '2026-10-24',
+  },
+  defaultHeadway: {
+    minSeconds: 600,
+    maxSeconds: 600,
+    representativeSeconds: 600,
+  },
+  periods: [],
+};
+canonical.canonical.stations[0].firstLastTrain = {
+  services: [
+    {
+      serviceId: 'service',
+      times: {
+        weekday: { firstTrain: '05:00:00', lastTrain: '06:00:00' },
+        sunday_public_holiday: {
+          firstTrain: '06:00:00',
+          lastTrain: '07:00:00',
+        },
+      },
+    },
+  ],
+};
+canonical.canonical.stations[1].firstLastTrain =
+  canonical.canonical.stations[0].firstLastTrain;
 const path = canonical.canonical.services[0].revisions[0].path.stations;
 path.splice(2, 0, { ...path[0] });
 canonical.canonical.services[0].revisions.push({
@@ -219,6 +253,7 @@ describe.skipIf(!url)('indexed departure window', () => {
       '20260721032337_soft_crystal',
       '20260721035821_sloppy_lady_deathstrike',
       '20260721133009_late_angel',
+      '20260725161225_needy_mentallo',
       '20261024214325_superb_violations',
       '20261025200054_violet_energizer',
       '20261027152337_early_lilith',
@@ -243,7 +278,7 @@ describe.skipIf(!url)('indexed departure window', () => {
     }
   });
   beforeEach(async () => {
-    await pool.query('TRUNCATE scheduled_timetables CASCADE');
+    await pool.query('TRUNCATE scheduled_timetables, public_holidays CASCADE');
     await pool.query(
       'TRUNCATE operators, towns, lines, stations, services, metadata CASCADE',
     );
@@ -301,6 +336,223 @@ describe.skipIf(!url)('indexed departure window', () => {
     if (directory) {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it('reads real scheduled arrivals and display metadata in the same snapshot, including complete empty coverage', async () => {
+    const request = {
+      scope,
+      referenceInstant: window.startInstant,
+      endInstant: window.endInstant,
+    };
+    const before = await readStationArrivalSource(db(), request);
+    expect(before).toMatchObject({ source: 'scheduled', reason: 'complete' });
+    const timings = before.scheduled.lines[0].arrivalTimings;
+    expect(timings).toHaveLength(2);
+    expect(timings[0]).toMatchObject({
+      destinationCode: 'T3',
+      destinationName: canonical.canonical.stations[2].name,
+      platformIds: ['alternative', 'platform-1'],
+      platformLabels: ['A', 'A'],
+    });
+    expect(timings[0].departures[1]).toMatchObject({
+      basis: 'scheduled',
+      precision: 'approximate',
+      time: '2026-10-24T16:15:00Z',
+      manifestSha256: newer.entry.manifestSha256,
+    });
+    expect(timings.flatMap(({ departures }) => departures)).toHaveLength(4);
+    expect(
+      await readStationArrivalSource(db(), {
+        scope,
+        referenceInstant: '2026-10-26T12:00:00+08:00',
+        endInstant: '2026-10-26T13:00:00+08:00',
+      }),
+    ).toMatchObject({
+      source: 'scheduled',
+      reason: 'complete',
+      scheduled: { lines: [{ arrivalTimings: [] }] },
+    });
+    const concurrent = await readStationArrivalSource(db(), {
+      ...request,
+      readCanonicalTopology: async (tx) => {
+        const topology = await readLiveScheduleTopology(tx);
+        await db()
+          .update(stationsTable)
+          .set({
+            name: {
+              ...canonical.canonical.stations[0].name,
+              'en-SG': 'Changed destination',
+            },
+          });
+        await db()
+          .update(servicesTable)
+          .set({
+            name: {
+              ...canonical.canonical.services[0].name,
+              'en-SG': 'Changed service',
+            },
+          });
+        await db()
+          .update(stationPlatformsTable)
+          .set({ label: 'Changed platform' });
+        await db().delete(projections);
+        await db().delete(timetables);
+        return topology;
+      },
+    });
+    expect(concurrent).toEqual(before);
+  });
+
+  it('uses the actual revision, holiday times and current crowd phase for no-artifact fallback within the request window', async () => {
+    await db().delete(projections);
+    await db().delete(timetables);
+    const request = {
+      scope: { ...scope, stationId: 'station-2' },
+      referenceInstant: '2026-10-25T22:04:00Z',
+      endInstant: '2026-10-26T06:16:00+08:00',
+    };
+    // The weekday service has ended; tomorrow's first estimates are outside this window.
+    expect(await readStationArrivalSource(db(), request)).toMatchObject({
+      source: 'unavailable',
+      reason: 'frequency-unavailable',
+    });
+    await db().insert(publicHolidaysTable).values({
+      id: 'test-holiday',
+      date: '2026-10-26',
+      holiday_name: 'Test holiday',
+      hash: 'test',
+    });
+    await db()
+      .insert(crowdArrivalReportsTable)
+      .values([
+        {
+          id: 'phase',
+          station_id: request.scope.stationId,
+          service_id: scope.serviceId,
+          reported_at: request.referenceInstant,
+          minutes_to_arrival: 2,
+          reporter_hash: 'test',
+        },
+        {
+          id: 'future-phase',
+          station_id: request.scope.stationId,
+          service_id: scope.serviceId,
+          reported_at: '2026-10-26T06:05:00+08:00',
+          minutes_to_arrival: 0,
+          reporter_hash: 'test',
+        },
+      ]);
+    const fallback = await readStationArrivalSource(db(), {
+      ...request,
+      readCanonicalTopology: async (tx) => {
+        const topology = await readLiveScheduleTopology(tx);
+        await db()
+          .update(serviceRevisionsTable)
+          .set({ estimated_frequency: null });
+        await db().delete(publicHolidaysTable);
+        await db().delete(crowdArrivalReportsTable);
+        return topology;
+      },
+    });
+    expect(fallback.source).toBe('frequency');
+    if (fallback.source !== 'frequency') {
+      throw new Error('Expected frequency fallback');
+    }
+    expect(
+      fallback.scheduled.serviceDays.every(
+        ({ attempts }) => attempts.length === 0,
+      ),
+    ).toBe(true);
+    expect(fallback.frequency).toMatchObject({
+      stationId: request.scope.stationId,
+      window: {
+        startInstant: request.referenceInstant,
+        endInstant: request.endInstant,
+      },
+      timing: {
+        serviceId: scope.serviceId,
+        lineId: scope.lineId,
+        destinationStationId: scope.destinationStationId,
+        firstTrainTime: '06:00:00',
+        lastTrainTime: '07:00:00',
+        departures: [
+          {
+            time: '2026-10-26T06:06:00.000+08:00',
+            basis: 'crowd_report',
+            crowdReportCount: 1,
+            headwaySeconds: 600,
+          },
+        ],
+      },
+    });
+    expect(fallback.frequency.timing.departures).toHaveLength(1);
+  });
+
+  it('keeps partial schedules, rejects unavailable projections and unsupported fallback contexts, and propagates promotion errors', async () => {
+    const request = {
+      scope,
+      referenceInstant: window.startInstant,
+      endInstant: window.endInstant,
+    };
+    await db()
+      .update(days)
+      .set({ unassigned_active_trip_count: 1 })
+      .where(eq(days.service_date, '2026-10-24'));
+    const partial = await readStationArrivalSource(db(), request);
+    expect(partial).toMatchObject({
+      source: 'scheduled',
+      reason: 'incomplete',
+      scheduled: { complete: false },
+    });
+    expect(
+      partial.scheduled.lines[0].arrivalTimings.flatMap(
+        ({ departures }) => departures,
+      ),
+    ).toHaveLength(2);
+    await db().update(projections).set({ completed_at: null });
+    expect(await readStationArrivalSource(db(), request)).toMatchObject({
+      source: 'unavailable',
+      reason: 'timetable-unavailable',
+    });
+    await db()
+      .update(timetables)
+      .set({ manifest_bytes: Buffer.from('{}') });
+    await expect(readStationArrivalSource(db(), request)).rejects.toThrow();
+    await db().delete(projections);
+    await db().delete(timetables);
+    expect(
+      await readStationArrivalSource(db(), {
+        ...request,
+        scope: { ...scope, platformId: 'platform-1' },
+      }),
+    ).toMatchObject({ source: 'unavailable', reason: 'frequency-unavailable' });
+    const morning = {
+      ...request,
+      scope: { ...scope, stationId: 'station-2' },
+      referenceInstant: '2026-10-26T05:04:00+08:00',
+      endInstant: '2026-10-26T05:30:00+08:00',
+    };
+    expect(
+      await readStationArrivalSource(db(), {
+        ...morning,
+        scope: { ...morning.scope, destinationStationId: 'station-1' },
+      }),
+    ).toMatchObject({ source: 'unavailable', reason: 'frequency-unavailable' });
+    expect(await readStationArrivalSource(db(), morning)).toMatchObject({
+      source: 'frequency',
+    });
+    await db()
+      .update(serviceRevisionsTable)
+      .set({ start_at: '2026-10-26' })
+      .where(eq(serviceRevisionsTable.id, 'revision'));
+    expect(await readStationArrivalSource(db(), morning)).toMatchObject({
+      source: 'unavailable',
+      reason: 'frequency-unavailable',
+    });
+    await db().delete(metadataTable);
+    await expect(readStationArrivalSource(db(), morning)).rejects.toThrow(
+      'completed promotion',
+    );
   });
 
   it('merges previous-day 24+ and current-day departures before limiting, with date-specific fallback and opaque repeated occurrence order', async () => {

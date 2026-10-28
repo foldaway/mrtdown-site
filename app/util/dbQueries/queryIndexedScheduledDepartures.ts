@@ -10,6 +10,8 @@ import z from 'zod';
 import type { getDb } from '~/db';
 import { scheduledDepartureOccurrencesTable as occurrences } from '~/db/scheduledDepartures.schema';
 import {
+  type ReadTransaction,
+  type Topology,
   type ScheduledTimetableSelection,
   type ScheduledTimetableSnapshotOptions,
   withScheduledTimetableSnapshot,
@@ -43,15 +45,47 @@ function compareText(left: string, right: string) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+type IndexedDepartureOptions = ScheduledTimetableSnapshotOptions & {
+  startInstant: string;
+  endInstant: string;
+  limit?: number;
+};
+
+type IndexedDepartures = {
+  scope: ScheduledTimetableSnapshotOptions['scope'];
+  window: { startInstant: string; endInstant: string };
+  serviceDays: ScheduledTimetableSelection[];
+  unavailableProjections: {
+    manifestSha256: string;
+    reason: ScheduledTimetableSelection['attempts'][number]['reason'];
+  }[];
+  untimedDepartureCount: number;
+  complete: boolean;
+  departures: RetainedScheduledDeparture[];
+};
+
 /** Private schedule query using live topology by default; serving approval remains separate. */
-export async function queryIndexedScheduledDepartures(
+export function queryIndexedScheduledDepartures(
   db: ReturnType<typeof getDb>,
-  options: ScheduledTimetableSnapshotOptions & {
-    startInstant: string;
-    endInstant: string;
-    limit?: number;
-  },
+  options: IndexedDepartureOptions,
 ) {
+  return withIndexedScheduledDepartures(
+    db,
+    options,
+    async (_tx, result) => result,
+  );
+}
+
+/** Keep dependent canonical reads inside the query's read-only snapshot. */
+export async function withIndexedScheduledDepartures<T>(
+  db: ReturnType<typeof getDb>,
+  options: IndexedDepartureOptions,
+  use: (
+    tx: ReadTransaction,
+    result: IndexedDepartures,
+    topology: Topology,
+  ) => Promise<T>,
+): Promise<T> {
   const { startInstant, endInstant } = options;
   const limit = z.number().int().positive().optional().parse(options.limit);
   const window = { startInstant, endInstant };
@@ -184,7 +218,7 @@ export async function queryIndexedScheduledDepartures(
         ) ||
         left.occurrenceIndex - right.occurrenceIndex,
     );
-    return {
+    const result: IndexedDepartures = {
       scope,
       window,
       serviceDays,
@@ -199,5 +233,6 @@ export async function queryIndexedScheduledDepartures(
         : departures.slice(0, limit)
       ).map(({ departure }) => departure),
     };
+    return use(tx, result, snapshot.topology);
   });
 }
