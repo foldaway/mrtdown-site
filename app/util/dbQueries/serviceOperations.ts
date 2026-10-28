@@ -24,6 +24,9 @@ export function serviceWindowForDate(
   date: DateTime,
   publicHolidaySet: Set<string>,
 ) {
+  if (line.startedAt == null || line.operatingHours == null) {
+    return null;
+  }
   const dayType = lineDayType(date, publicHolidaySet);
   const hours =
     dayType === 'weekday'
@@ -53,7 +56,7 @@ export function serviceWindowForDate(
 }
 
 function serviceWindowContains(
-  serviceWindow: ReturnType<typeof serviceWindowForDate>,
+  serviceWindow: NonNullable<ReturnType<typeof serviceWindowForDate>>,
   date: DateTime,
 ) {
   return date >= serviceWindow.start && date <= serviceWindow.end;
@@ -61,10 +64,10 @@ function serviceWindowContains(
 
 function serviceWindowIsAfterLineStart(
   line: Line,
-  serviceWindow: ReturnType<typeof serviceWindowForDate>,
+  serviceWindow: NonNullable<ReturnType<typeof serviceWindowForDate>>,
 ) {
   if (line.startedAt == null) {
-    return true;
+    return false;
   }
 
   return serviceWindow.start.startOf('day') >= parseDateTime(line.startedAt);
@@ -74,10 +77,13 @@ export function serviceWindowAfterLineStart(
   line: Line,
   serviceWindow: ReturnType<typeof serviceWindowForDate>,
 ) {
-  const windowStart =
-    line.startedAt == null
-      ? serviceWindow.start
-      : DateTime.max(serviceWindow.start, parseDateTime(line.startedAt));
+  if (serviceWindow == null || line.startedAt == null) {
+    return null;
+  }
+  const windowStart = DateTime.max(
+    serviceWindow.start,
+    parseDateTime(line.startedAt),
+  );
   const seconds = Math.max(
     0,
     serviceWindow.end.diff(windowStart, 'seconds').seconds,
@@ -101,19 +107,16 @@ export function isLineOperatingNow(
   publicHolidaySet: Set<string>,
   referenceNow = nowSg(),
 ) {
-  if (isLineFuture(line, referenceNow)) {
+  if (
+    line.startedAt == null ||
+    line.operatingHours == null ||
+    isLineFuture(line, referenceNow)
+  ) {
     return false;
   }
 
-  if (line.startedAt != null) {
-    const start = parseDateTime(line.startedAt);
-    if (referenceNow < start) {
-      return false;
-    }
-  }
-
   const window = serviceWindowForDate(line, referenceNow, publicHolidaySet);
-  if (serviceWindowContains(window, referenceNow)) {
+  if (window != null && serviceWindowContains(window, referenceNow)) {
     return true;
   }
 
@@ -123,6 +126,7 @@ export function isLineOperatingNow(
     publicHolidaySet,
   );
   return (
+    previousWindow != null &&
     serviceWindowIsAfterLineStart(line, previousWindow) &&
     serviceWindowContains(previousWindow, referenceNow)
   );

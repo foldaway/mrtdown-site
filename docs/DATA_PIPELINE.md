@@ -226,21 +226,27 @@ line was staged. Missing confirmation (including older resumed parse results)
 also leaves the marker absent. The loader checks this marker in its own snapshot and throws
 while absent, including after a failed pull whose lease has been released or
 expired. It still computes topology from live rows; the marker stores no candidate
-fingerprint and grants no timetable approval. Pipeline version 5 forces one full
-pull to initialize this guard on existing installations. This certifies canonical
-promotion only; later rebuilds of derived data, cache publication and successful pull
+fingerprint and grants no timetable approval. Pipeline version 5 introduced this
+guard; version 6 forces a full pull that also retains lines with unknown dates/hours
+on existing installations. This certifies canonical promotion only; later rebuilds of derived data, cache publication and successful pull
 fingerprint recording retain their existing ordering.
 
-Canonical lines may have a null start date or absent operating hours, but the live
-line schema requires both. The existing staging filter omits those lines. Such a
-pull cannot certify complete schedule topology, even if the shortened live network
-matches an older retained artifact. Scheduled queries remain unavailable after
-finalization; existing retention and projection rows are preserved. The prerequisite
-for supporting these networks is to preserve those canonical lines in the live model
-with their real nullable fields and adapt dependent readers. This PR does not change
-that schema or narrow the producer's canonical topology identity. A finalized
-incomplete pull still records its successful manifest fingerprint, so an unchanged
-source is skipped rather than repeatedly importing an unsupported network.
+Canonical lines with a null start date or absent operating hours are retained in
+both staging and live tables, including their operator and service relationships.
+Database null hours map back to the canonical optional field; null start dates
+remain unknown rather than being inferred from service branches. Complete staging
+can therefore certify promotion without narrowing the shared topology projection.
+The staged line count and explicit completeness confirmation remain required;
+missing confirmation from an older resumed parse result still fails closed.
+
+Readers that require an operating window skip unknown start dates/hours. They do
+not mark these lines operational or invent hours, dates, uptime or frequency
+estimates. Line summaries distinguish unknown service information from a known
+future opening or known off hours; quick facts display unknown hours. Operational
+facts retain issue counts but contribute no service-window seconds or clipped
+downtime intervals when the window is unknown. SQL predicates that require a known
+start date continue to exclude unknown starts conservatively. This supports valid
+canonical inputs; it does not imply current production lines are missing fields.
 
 Each candidate date independently uses the same conservative selector and receipt
 lineage, allowing date-specific fallback. SQL restricts occurrence reads to the
@@ -295,8 +301,9 @@ The fingerprint deliberately excludes `generatedAt`, which is publication
 metadata rather than a data change. Bump the pull pipeline version in
 `app/workflows/pull/helpers/manifestFingerprint.ts` when a pull or derived-data
 code change requires one full rebuild without an upstream manifest change.
-Version 4 added departure projection to the pull. Version 5 forces one full pull
-to initialize the completed canonical promotion marker for live topology reads,
+Version 4 added departure projection to the pull. Version 5 initialized the
+completed canonical promotion marker for live topology reads. Version 6 forces
+one full pull to retain previously omitted lines with unknown start dates or hours,
 including projection of an already-retained advertised artifact without a new
 source review. It does not backfill other historical artifacts. The
 fingerprint is recorded only after retention, timetable projection, canonical

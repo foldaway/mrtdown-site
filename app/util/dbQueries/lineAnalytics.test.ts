@@ -1,9 +1,55 @@
 import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
-import { buildLineSummary } from './lineAnalytics';
+import {
+  buildLineSummary,
+  buildUptimeGraph,
+  buildOperatorUptimeGraph,
+} from './lineAnalytics';
+import {
+  isLineOperatingNow,
+  isLineFuture,
+  serviceWindowForDate,
+} from './serviceOperations';
 import { buildIssue, REFERENCE_NOW, TEST_LINE } from './testFixtures';
 
 describe('buildLineSummary', () => {
+  it('keeps unknown service windows distinct from future and operating lines', () => {
+    const referenceNow = DateTime.fromISO('2026-02-23T12:00:00+08:00', {
+      zone: 'Asia/Singapore',
+    });
+    const holidays = new Set<string>();
+    const unknownLines = [
+      { ...TEST_LINE, startedAt: null },
+      { ...TEST_LINE, operatingHours: undefined },
+    ];
+    for (const line of unknownLines) {
+      expect(isLineFuture(line, referenceNow)).toBe(false);
+      expect(isLineOperatingNow(line, holidays, referenceNow)).toBe(false);
+      expect(serviceWindowForDate(line, referenceNow, holidays)).toBeNull();
+      expect(
+        buildLineSummary(line, [], 1, holidays, referenceNow),
+      ).toMatchObject({
+        status: 'unknown',
+        uptimeRatio: null,
+        totalServiceSeconds: null,
+      });
+      expect(buildUptimeGraph(line, [], holidays, 7).data).toEqual([]);
+    }
+    expect(
+      buildOperatorUptimeGraph(unknownLines, {}, holidays, 7).data,
+    ).toEqual([]);
+    expect(
+      buildLineSummary(
+        { ...TEST_LINE, startedAt: '2027-01-01', operatingHours: undefined },
+        [],
+        1,
+        holidays,
+        referenceNow,
+      ).status,
+    ).toBe('future_service');
+    expect(isLineOperatingNow(TEST_LINE, holidays, referenceNow)).toBe(true);
+  });
+
   it('merges overlapping same-type issue durations in daily breakdowns', () => {
     const summary = buildLineSummary(
       TEST_LINE,

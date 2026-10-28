@@ -55,7 +55,9 @@ export const LineItem: React.FC<Props> = (props) => {
               'bg-operational-light dark:bg-operational-dark':
                 status === 'normal',
               'bg-gray-400 dark:bg-gray-500':
-                status === 'closed_for_day' || status === 'future_service',
+                status === 'closed_for_day' ||
+                status === 'future_service' ||
+                status === 'unknown',
             })}
           />
           <span
@@ -69,7 +71,9 @@ export const LineItem: React.FC<Props> = (props) => {
               'text-operational-light dark:text-operational-dark':
                 status === 'normal',
               'text-gray-500 dark:text-gray-400':
-                status === 'closed_for_day' || status === 'future_service',
+                status === 'closed_for_day' ||
+                status === 'future_service' ||
+                status === 'unknown',
             })}
           >
             <FormattedMessage {...LineSummaryStatusLabels[status]} />

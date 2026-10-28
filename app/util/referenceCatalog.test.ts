@@ -20,6 +20,7 @@ describe('buildReferenceCatalog', () => {
       datasetVersion: '2026-07-19T00:00:00.000Z',
       referenceDate: '2026-07-19',
       lines: [
+        { id: 'UNKNOWN', startedAt: null, endedAt: null },
         { id: 'FUTURE', startedAt: '2027-01-01', endedAt: null },
         { id: 'ACTIVE', startedAt: '2020-01-01', endedAt: null },
         { id: 'ENDED', startedAt: '2010-01-01', endedAt: '2025-12-31' },

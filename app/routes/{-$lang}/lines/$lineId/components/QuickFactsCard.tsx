@@ -125,36 +125,40 @@ export const QuickFactsCard: React.FC<Props> = (props) => {
         </Tooltip.Provider>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-        <span className="text-gray-600 text-sm dark:text-gray-400">
-          <FormattedMessage id="general.weekdays" defaultMessage="Weekdays" />
-        </span>
-        <span className="justify-self-end text-sm">
-          <FormattedDateTimeRange
-            from={generateFakeDateTime(
-              line.operatingHours.weekdays.start,
-            ).toMillis()}
-            to={generateFakeDateTime(
-              line.operatingHours.weekdays.end,
-            ).toMillis()}
-            timeStyle="short"
-          />
-        </span>
-        <span className="text-gray-600 text-sm dark:text-gray-400">
-          <FormattedMessage id="general.weekends" defaultMessage="Weekends" />
-        </span>
-        <span className="justify-self-end text-sm">
-          <FormattedDateTimeRange
-            from={generateFakeDateTime(
-              line.operatingHours.weekends.start,
-            ).toMillis()}
-            to={generateFakeDateTime(
-              line.operatingHours.weekends.end,
-            ).toMillis()}
-            timeStyle="short"
-          />
-        </span>
-      </div>
+      {line.operatingHours == null ? (
+        <FormattedMessage id="general.unknown" defaultMessage="Unknown" />
+      ) : (
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          <span className="text-gray-600 text-sm dark:text-gray-400">
+            <FormattedMessage id="general.weekdays" defaultMessage="Weekdays" />
+          </span>
+          <span className="justify-self-end text-sm">
+            <FormattedDateTimeRange
+              from={generateFakeDateTime(
+                line.operatingHours.weekdays.start,
+              ).toMillis()}
+              to={generateFakeDateTime(
+                line.operatingHours.weekdays.end,
+              ).toMillis()}
+              timeStyle="short"
+            />
+          </span>
+          <span className="text-gray-600 text-sm dark:text-gray-400">
+            <FormattedMessage id="general.weekends" defaultMessage="Weekends" />
+          </span>
+          <span className="justify-self-end text-sm">
+            <FormattedDateTimeRange
+              from={generateFakeDateTime(
+                line.operatingHours.weekends.start,
+              ).toMillis()}
+              to={generateFakeDateTime(
+                line.operatingHours.weekends.end,
+              ).toMillis()}
+              timeStyle="short"
+            />
+          </span>
+        </div>
+      )}
     </section>
   );
 };

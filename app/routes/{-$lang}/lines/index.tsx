@@ -138,7 +138,8 @@ function LinesPage() {
     () =>
       [...data.lines].sort((first, second) => {
         if (first.operationalState !== second.operationalState) {
-          return first.operationalState === 'current' ? -1 : 1;
+          const order = { current: 0, future: 1, unknown: 2 };
+          return order[first.operationalState] - order[second.operationalState];
         }
         return getLocalizedTranslation(
           included.lines[first.lineId].name,
@@ -158,6 +159,9 @@ function LinesPage() {
   );
   const futureLines = sortedLines.filter(
     (line) => line.operationalState === 'future',
+  );
+  const unknownLines = sortedLines.filter(
+    (line) => line.operationalState === 'unknown',
   );
   const mrtCount = data.lines.filter((line) => line.type !== 'lrt').length;
   const lrtCount = data.lines.length - mrtCount;
@@ -284,6 +288,19 @@ function LinesPage() {
           })}
           tone="current"
         />
+
+        {unknownLines.length > 0 && (
+          <LineGroup
+            entries={unknownLines}
+            included={included}
+            label={intl.formatMessage({
+              id: 'general.unknown',
+              defaultMessage: 'Unknown',
+            })}
+            description=""
+            tone="future"
+          />
+        )}
 
         {futureLines.length > 0 && (
           <LineGroup
@@ -582,7 +599,9 @@ function StatusLabel({ status }: { status: LineSummaryStatus }) {
           'text-operational-light dark:text-operational-dark':
             status === 'normal',
           'text-gray-500 dark:text-gray-400':
-            status === 'closed_for_day' || status === 'future_service',
+            status === 'closed_for_day' ||
+            status === 'future_service' ||
+            status === 'unknown',
         },
       )}
     >
@@ -595,7 +614,9 @@ function StatusLabel({ status }: { status: LineSummaryStatus }) {
           'bg-infra-light dark:bg-infra-dark': status === 'ongoing_infra',
           'bg-operational-light dark:bg-operational-dark': status === 'normal',
           'bg-gray-400 dark:bg-gray-500':
-            status === 'closed_for_day' || status === 'future_service',
+            status === 'closed_for_day' ||
+            status === 'future_service' ||
+            status === 'unknown',
         })}
       />
       <FormattedMessage {...LineSummaryStatusLabels[status]} />

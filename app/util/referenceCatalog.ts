@@ -16,7 +16,7 @@ type AppDb = ReturnType<typeof getDb>;
 
 type ReferenceCatalogLineRow = {
   id: string;
-  startedAt: string;
+  startedAt: string | null;
   endedAt: string | null;
 };
 
@@ -50,10 +50,11 @@ function compareText(left: string, right: string) {
 }
 
 function isActiveOnDate(
-  item: { startedAt: string; endedAt: string | null },
+  item: { startedAt: string | null; endedAt: string | null },
   referenceDate: string,
 ) {
   return (
+    item.startedAt != null &&
     item.startedAt <= referenceDate &&
     (item.endedAt == null || item.endedAt >= referenceDate)
   );
@@ -78,7 +79,9 @@ export function buildReferenceCatalog({
   memberships,
 }: BuildReferenceCatalogInput) {
   const activeLines = lines
-    .filter((line) => isActiveOnDate(line, referenceDate))
+    .filter((line): line is ReferenceCatalogLineRow & { startedAt: string } =>
+      isActiveOnDate(line, referenceDate),
+    )
     .sort((left, right) => compareText(left.id, right.id));
   const activeLineIds = new Set(activeLines.map((line) => line.id));
   const activeMemberships = memberships

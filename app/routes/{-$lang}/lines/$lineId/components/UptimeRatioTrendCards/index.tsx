@@ -36,6 +36,9 @@ export const UptimeRatioTrendCards: React.FC<Props> = (props) => {
     [intl, graph],
   );
 
+  const currentUptime = graph.dataCumulative[0]?.payload.uptimeRatio;
+  const previousUptime = graph.dataCumulative[1]?.payload.uptimeRatio;
+
   return (
     <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white text-gray-800 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
       <div className="border-gray-200 border-b px-4 py-2.5 sm:px-5 sm:py-3 dark:border-gray-700">
@@ -63,73 +66,78 @@ export const UptimeRatioTrendCards: React.FC<Props> = (props) => {
       </div>
       <div className="px-4 py-3 sm:px-5 sm:py-4">
         <span className="font-bold text-2xl tracking-tight sm:text-3xl">
-          <FormattedNumber
-            value={graph.dataCumulative[0].payload.uptimeRatio}
-            style="percent"
-            maximumFractionDigits={2}
-          />
+          {currentUptime == null ? (
+            <FormattedMessage id="general.unknown" defaultMessage="Unknown" />
+          ) : (
+            <FormattedNumber
+              value={currentUptime}
+              style="percent"
+              maximumFractionDigits={2}
+            />
+          )}
         </span>
-        <span className="text-gray-500 text-xs dark:text-gray-400">
-          <FormattedMessage
-            id="general.change_since_previous"
-            defaultMessage="{change} vs previous"
-            values={{
-              change: (
-                <FormattedNumber
-                  value={
-                    (graph.dataCumulative[0].payload.uptimeRatio as number) -
-                    (graph.dataCumulative[1].payload.uptimeRatio as number)
-                  }
-                  signDisplay="always"
-                  style="percent"
-                  maximumFractionDigits={2}
-                />
-              ),
-            }}
-          />
-        </span>
-        <div className="mt-3 h-40 sm:h-44">
-          <ResponsiveContainer>
-            <LineChart
-              accessibilityLayer
-              data={graph.data}
-              layout="horizontal"
-              margin={{ top: 30, left: 5, right: 5, bottom: 5 }}
-            >
-              <CartesianGrid
-                vertical={false}
-                className="stroke-gray-300 dark:stroke-gray-600"
-              />
-              <XAxis
-                type="category"
-                dataKey="name"
-                className="text-gray-700 text-sm dark:text-gray-200"
-                tickFormatter={tickFormatter}
-                tick={{ fontSize: 12, fontWeight: 500 }}
-                axisLine={{ stroke: 'currentColor', strokeWidth: 1 }}
-                tickLine={{ stroke: 'currentColor', strokeWidth: 1 }}
-                height={50}
-              />
-              <Line
-                dataKey="payload.uptimeRatio"
-                className="stroke-sky-600 dark:stroke-sky-700"
-                stroke=""
-                radius={5}
-                type="monotone"
-                strokeWidth={2}
-              />
-              <Tooltip
-                content={(tooltipProps) => (
-                  // @ts-expect-error typing issue
-                  <CustomTooltip
-                    {...tooltipProps}
-                    granularity={graph.dataTimeScale.granularity}
+        {currentUptime != null && previousUptime != null && (
+          <span className="text-gray-500 text-xs dark:text-gray-400">
+            <FormattedMessage
+              id="general.change_since_previous"
+              defaultMessage="{change} vs previous"
+              values={{
+                change: (
+                  <FormattedNumber
+                    value={currentUptime - previousUptime}
+                    signDisplay="always"
+                    style="percent"
+                    maximumFractionDigits={2}
                   />
-                )}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+                ),
+              }}
+            />
+          </span>
+        )}
+        {graph.data.length > 0 && (
+          <div className="mt-3 h-40 sm:h-44">
+            <ResponsiveContainer>
+              <LineChart
+                accessibilityLayer
+                data={graph.data}
+                layout="horizontal"
+                margin={{ top: 30, left: 5, right: 5, bottom: 5 }}
+              >
+                <CartesianGrid
+                  vertical={false}
+                  className="stroke-gray-300 dark:stroke-gray-600"
+                />
+                <XAxis
+                  type="category"
+                  dataKey="name"
+                  className="text-gray-700 text-sm dark:text-gray-200"
+                  tickFormatter={tickFormatter}
+                  tick={{ fontSize: 12, fontWeight: 500 }}
+                  axisLine={{ stroke: 'currentColor', strokeWidth: 1 }}
+                  tickLine={{ stroke: 'currentColor', strokeWidth: 1 }}
+                  height={50}
+                />
+                <Line
+                  dataKey="payload.uptimeRatio"
+                  className="stroke-sky-600 dark:stroke-sky-700"
+                  stroke=""
+                  radius={5}
+                  type="monotone"
+                  strokeWidth={2}
+                />
+                <Tooltip
+                  content={(tooltipProps) => (
+                    // @ts-expect-error typing issue
+                    <CustomTooltip
+                      {...tooltipProps}
+                      granularity={graph.dataTimeScale.granularity}
+                    />
+                  )}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
         <div className="mt-3 overflow-x-auto pb-0.5">
           <div className="flex w-max items-center divide-x divide-gray-200 rounded-lg border border-gray-200 bg-gray-50 shadow-sm dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-900/50">
             {graphs.map((graph, index) => (

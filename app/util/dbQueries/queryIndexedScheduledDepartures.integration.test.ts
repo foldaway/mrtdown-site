@@ -3,7 +3,12 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { StationLayoutPlatformSchema } from '@mrtdown/core';
-import { hashBytes, queryRetainedScheduledDepartures } from '@mrtdown/fs';
+import {
+  hashBytes,
+  queryRetainedScheduledDepartures,
+  scheduleTopologyProjection,
+} from '@mrtdown/fs';
+import { DateTime } from 'luxon';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
@@ -25,6 +30,7 @@ import {
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
 import {
   lineServicesTable,
+  linesNextTable,
   linesTable,
   metadataTable,
   serviceRevisionsTable,
@@ -50,6 +56,12 @@ import {
   syncStationPlatformServices,
   syncStations,
 } from '~/workflows/pull/helpers/stagingSync';
+import * as database from './database';
+import { buildDataset } from './dataset';
+import { getTownProfileReadModel } from './towns';
+import { buildLineSummary, buildUptimeGraph } from './lineAnalytics';
+import { isLineOperatingNow, isLineFuture } from './serviceOperations';
+import { buildLineOperationalFactRows } from './operationalFacts';
 import { projectScheduledTimetable } from './projectScheduledTimetable';
 import { queryIndexedScheduledDepartures } from './queryIndexedScheduledDepartures';
 import { readLiveScheduleTopology } from './readLiveScheduleTopology';
@@ -200,6 +212,7 @@ describe.skipIf(!url)('indexed departure window', () => {
     });
     for (const migration of [
       '20260408231014_absurd_lenny_balinger',
+      '20260518155031_curious_vision',
       '20260521104213_busy_midnight',
       '20260529122429_spicy_zombie',
       '20260721025518_milky_absorbing_man',
@@ -208,6 +221,7 @@ describe.skipIf(!url)('indexed departure window', () => {
       '20260721133009_late_angel',
       '20261024214325_superb_violations',
       '20261025200054_violet_energizer',
+      '20261027152337_early_lilith',
     ]) {
       await pool.query(
         (
@@ -515,53 +529,137 @@ describe.skipIf(!url)('indexed departure window', () => {
     );
   });
 
-  it('keeps topology unavailable after a finalized pull omits a canonical line, even when older retained topology matches live rows', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const incoming = [
-        ...canonical.canonical.lines,
-        {
-          ...canonical.canonical.lines[0],
-          id: 'future-line',
-          startedAt: null,
-          operatingHours: undefined,
-          serviceIds: [],
-        },
-      ].map((line) => ({
+  it('promotes unknown line fields and preserves the full shared topology and conservative readers', async () => {
+    const incoming = hashed(
+      canonical.canonical.lines.map((line) => ({
         ...line,
-        hash: hashBytes(Buffer.from(JSON.stringify(line))),
-      }));
-      canonicalTopologyComplete =
-        (await insertLinesStaging(db(), incoming)) === incoming.length;
-      expect(canonicalTopologyComplete).toBe(false);
-      await syncOperatorsTownsLandmarksUpserts(db());
-      await syncLines(db());
-      await finalize();
-      const manifest = canonical.archive().manifest;
-      manifest.lines = Object.fromEntries(
-        incoming.map((line) => [line.id, line.hash]),
-      );
-      const fingerprint = getCanonicalManifestFingerprint(manifest);
-      await recordCanonicalManifestFingerprint(db(), fingerprint);
-      expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(true);
-      expect(await db().select({ id: linesTable.id }).from(linesTable)).toEqual(
-        [{ id: 'line' }],
-      );
-      await expect(
-        queryIndexedScheduledDepartures(db(), options()),
-      ).rejects.toThrow('completed promotion');
-      expect(
-        await db().select({ id: projections.id }).from(projections),
-      ).toHaveLength(2);
+        startedAt: null,
+        operatingHours: undefined,
+      })),
+    );
+    canonicalTopologyComplete =
+      (await insertLinesStaging(db(), incoming)) === incoming.length;
+    expect(canonicalTopologyComplete).toBe(true);
+    expect(await db().select().from(linesNextTable)).toMatchObject([
+      {
+        id: 'line',
+        started_at: null,
+        operating_hours: null,
+        operators: incoming[0].operators,
+      },
+    ]);
+    await syncOperatorsTownsLandmarksUpserts(db());
+    await syncLines(db());
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('completed promotion');
+    await finalize();
+    expect(await db().select().from(linesTable)).toMatchObject([
+      { id: 'line', started_at: null, operating_hours: null },
+    ]);
+    await db().transaction(async (tx) => {
+      expect(await readLiveScheduleTopology(tx)).toEqual(canonical.topology());
+    });
+    // Top-level dates/hours are not part of the producer's topology identity.
+    expect(
+      (await queryIndexedScheduledDepartures(db(), options())).complete,
+    ).toBe(true);
+    const referenceNow = DateTime.fromISO('2026-10-25T12:00:00+08:00', {
+      zone: 'Asia/Singapore',
+    });
+    const dataset = await buildDataset(referenceNow, db(), []);
+    const line = dataset.included.lines.line;
+    expect(line.startedAt).toBeNull();
+    expect(line.operatingHours).toBeUndefined();
+    expect(isLineFuture(line, referenceNow)).toBe(false);
+    expect(isLineOperatingNow(line, new Set(), referenceNow)).toBe(false);
+    expect(
+      buildLineSummary(line, [], 1, new Set(), referenceNow),
+    ).toMatchObject({
+      status: 'unknown',
+      uptimeRatio: null,
+      totalServiceSeconds: null,
+    });
+    expect(buildUptimeGraph(line, [], new Set(), 7).data).toEqual([]);
+    expect(
+      buildLineOperationalFactRows(
+        line,
+        [],
+        referenceNow.startOf('day'),
+        new Set(),
+        referenceNow,
+      ),
+    ).toMatchObject({
+      lineRow: { service_seconds: 0 },
+      intervalRows: [],
+    });
+
+    const defaultDb = vi
+      .spyOn(database, 'getDefaultDb')
+      .mockResolvedValue(db());
+    try {
+      const town = await getTownProfileReadModel('town');
+      expect(town.data.status).toBe('unknown');
+      expect(Object.values(town.data.stationStatuses)).toEqual([
+        'unknown',
+        'unknown',
+        'unknown',
+      ]);
     } finally {
-      warn.mockRestore();
+      defaultDb.mockRestore();
     }
+
+    const extraLines = hashed([
+      {
+        ...incoming[0],
+        id: 'unknown-start',
+        operatingHours: canonical.canonical.lines[0].operatingHours,
+        serviceIds: [],
+      },
+      {
+        ...canonical.canonical.lines[0],
+        id: 'unknown-hours',
+        operatingHours: undefined,
+        serviceIds: [],
+      },
+    ]);
+    const allLines = [...incoming, ...extraLines];
+    canonicalTopologyComplete =
+      (await insertLinesStaging(db(), allLines)) === allLines.length;
+    await syncOperatorsTownsLandmarksUpserts(db());
+    await syncLines(db());
+    // Missing or false confirmation must still fail closed, even with all lines retained.
+    await finalizePull(db(), { canonicalTopologyComplete: false });
+    await expect(
+      queryIndexedScheduledDepartures(db(), options()),
+    ).rejects.toThrow('completed promotion');
+    await finalizePull(db(), { canonicalTopologyComplete });
+    await db().transaction(async (tx) => {
+      expect(await readLiveScheduleTopology(tx)).toEqual(
+        scheduleTopologyProjection({
+          ...canonical.canonical,
+          lines: allLines,
+        }),
+      );
+    });
+    const changed = await queryIndexedScheduledDepartures(db(), options());
+    expect(changed).toMatchObject({ complete: false, departures: [] });
+    expect(changed.serviceDays[0].attempts.map(({ reason }) => reason)).toEqual(
+      ['topology-mismatch', 'topology-mismatch'],
+    );
+    expect(
+      await db().select({ id: projections.id }).from(projections),
+    ).toHaveLength(2);
   });
 
   it('reimports a previous successful manifest after an interrupted promotion, then skips it after recovery completes', async () => {
     const fingerprint = getCanonicalManifestFingerprint(
       canonical.archive().manifest,
     );
+    await db()
+      .insert(metadataTable)
+      .values({ key: 'canonical_manifest_fingerprint_v5', value: fingerprint });
+    expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(false);
     await recordCanonicalManifestFingerprint(db(), fingerprint);
     expect(await isCanonicalManifestCurrent(db(), fingerprint)).toBe(true);
     const before = await queryIndexedScheduledDepartures(db(), options());

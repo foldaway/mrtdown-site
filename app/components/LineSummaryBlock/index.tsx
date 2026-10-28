@@ -5,6 +5,7 @@ import {
   Cog8ToothIcon,
   CubeIcon,
   ExclamationTriangleIcon,
+  QuestionMarkCircleIcon,
 } from '@heroicons/react/24/solid';
 import { Link } from '@tanstack/react-router';
 import classNames from 'classnames';
@@ -44,6 +45,10 @@ const DATE_CARD_DETAILS_PANEL_CLASS_NAME =
   'mt-3 flex flex-col rounded-lg border border-gray-200 border-t-4 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900';
 
 const STATUS_ICON_CONFIG = {
+  unknown: {
+    Icon: QuestionMarkCircleIcon,
+    className: 'text-gray-400 dark:text-gray-500',
+  },
   ongoing_disruption: {
     Icon: ExclamationTriangleIcon,
     className: classNames('text-disruption-light dark:text-disruption-dark'),
@@ -99,7 +104,9 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
   const serviceStartToday = useMemo(() => {
     const todayDayType =
       breakdownByDates[now.toISODate() ?? '']?.dayType ?? 'weekday';
-    return getOperatingHours(line, now, todayDayType).start;
+    return line.operatingHours == null
+      ? null
+      : getOperatingHours(line, now, todayDayType).start;
   }, [breakdownByDates, line, now]);
 
   const isHydrated = useHydrated();
@@ -201,6 +208,7 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
           {dateTimes.map((dateTime) => {
             const dateTimeIsoDate = dateTime.toISODate();
             if (
+              line.operatingHours == null ||
               componentStartedAtDateTime == null ||
               dateTime < componentStartedAtDateTime
             ) {
@@ -209,6 +217,7 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
             if (
               dateTime.hasSame(now, 'day') &&
               status === 'closed_for_day' &&
+              serviceStartToday != null &&
               now < serviceStartToday
             ) {
               const isoDate = dateTime.toISODate();
@@ -294,7 +303,9 @@ export const LineSummaryBlock: React.FC<Props> = (props) => {
           </span>
         </div>
 
-        {hasActivePanel &&
+        {line.operatingHours != null &&
+          line.startedAt != null &&
+          hasActivePanel &&
           activeDateCard != null &&
           activeDateTime != null &&
           (activeDateCard.type === 'date' && activeDateRecord != null ? (

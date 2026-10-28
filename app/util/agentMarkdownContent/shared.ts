@@ -25,6 +25,7 @@ export const ISSUE_TYPE_LABELS = {
 } satisfies Record<IssueType, string>;
 
 export const LINE_STATUS_LABELS = {
+  unknown: 'Unknown',
   future_service: 'Under development',
   closed_for_day: 'Outside service hours',
   ongoing_disruption: 'Disruption',

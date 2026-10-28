@@ -708,7 +708,7 @@ export async function buildDataset(
         startedAt: row.started_at,
         platformDoorCount: row.platform_door_count,
         trainCarCounts: row.train_car_counts,
-        operatingHours: row.operating_hours,
+        operatingHours: row.operating_hours ?? undefined,
         operators: operatorIdsByLineId[row.id] ?? [],
       };
       return [row.id, line];
@@ -955,7 +955,7 @@ export async function buildDataset(
     );
     branchesByLineId[lineId] = sortedBranches;
     const line = linesById[lineId];
-    if (line != null) {
+    if (line?.startedAt != null) {
       line.startedAt = deriveLineStartedAtFromBranches(
         line.startedAt,
         sortedBranches,
@@ -973,14 +973,16 @@ export async function buildDataset(
           `${entry.stationId}::${lineId}::${entry.displayCode}`,
         );
 
+        const startedAt = codeInfo?.started_at ?? linesById[lineId]?.startedAt;
+        if (startedAt == null) {
+          return;
+        }
+
         const membership = {
           lineId,
           branchId: branch.id,
           code: entry.displayCode,
-          startedAt:
-            codeInfo?.started_at ??
-            linesById[lineId]?.startedAt ??
-            '1970-01-01',
+          startedAt,
           endedAt: resolveStationMembershipEndedAt(
             codeInfo?.ended_at ?? null,
             referenceDate,

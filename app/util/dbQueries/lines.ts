@@ -284,16 +284,18 @@ export async function getLinesDirectoryData(days: number) {
     if (summary == null) {
       throw new Error(`Line summary missing for ${line.id}`);
     }
-    const operationalState =
-      line.startedAt == null || line.startedAt > referenceDate
-        ? 'future'
-        : 'current';
+    const operationalState: 'unknown' | 'future' | 'current' =
+      line.startedAt == null
+        ? 'unknown'
+        : line.startedAt > referenceDate
+          ? 'future'
+          : 'current';
 
     return {
       lineId: line.id,
       status: summary.status,
       stationCount: countLineStations(dataset.included.stations, line.id, {
-        includePlanned: operationalState === 'future',
+        includePlanned: operationalState !== 'current',
         referenceDate,
       }),
       operatorIds: [

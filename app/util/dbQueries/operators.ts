@@ -27,6 +27,7 @@ import {
 import { getIssueStaticScope } from './readModelScope';
 
 type OperatorOperationalStatus =
+  | 'unknown'
   | 'all_operational'
   | 'some_lines_disrupted'
   | 'some_lines_under_maintenance'
@@ -298,6 +299,13 @@ export async function getOperatorProfileReadModel(
     )
   ) {
     currentOperationalStatus = 'some_lines_under_maintenance';
+  }
+
+  if (
+    currentOperationalStatus === 'all_operational' &&
+    activeSummaries.some((summary) => summary.status === 'unknown')
+  ) {
+    currentOperationalStatus = 'unknown';
   }
 
   const totalServiceSeconds = activeSummaries.reduce(

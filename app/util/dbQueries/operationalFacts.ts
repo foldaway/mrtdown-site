@@ -115,7 +115,7 @@ export function buildLineOperationalFactRows(
       addIssueTypeCount(issueCounts, issue.type, 1);
     }
 
-    if (lineFuture) {
+    if (lineFuture || serviceWindow == null) {
       continue;
     }
 
@@ -155,7 +155,9 @@ export function buildLineOperationalFactRows(
       date: isoDate(normalizedDate),
       line_id: line.id,
       as_of: isoDateTime(asOf),
-      service_seconds: Math.round(lineFuture ? 0 : serviceWindow.seconds),
+      service_seconds: Math.round(
+        lineFuture ? 0 : (serviceWindow?.seconds ?? 0),
+      ),
       downtime_disruption_seconds: Math.round(downtimeSeconds.disruption),
       downtime_maintenance_seconds: Math.round(downtimeSeconds.maintenance),
       downtime_infra_seconds: Math.round(downtimeSeconds.infra),

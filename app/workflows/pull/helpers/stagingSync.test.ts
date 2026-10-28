@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   linesNextTable,
   operatorsNextTable,
   stationsNextTable,
 } from '../../../db/schema.js';
+import { scheduledTimetableCanonicalFixture } from './scheduledTimetableCanonical.fixture';
 import {
   insertLinesStaging,
   insertOperatorsStaging,
@@ -74,79 +75,35 @@ describe('pull staging inserts', () => {
     expect(inserts[1].rows).toHaveLength(1);
   });
 
-  it('stages only lines with read-model required fields', async () => {
+  it('stages canonical lines without inventing missing dates or hours', async () => {
     const { db, inserts } = createInsertDb();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { canonical } = scheduledTimetableCanonicalFixture();
+    const line = canonical.lines[0];
     const lines = [
       {
-        id: 'BPLRT',
-        hash: 'changed',
-        name: translation,
-        type: 'lrt',
-        color: '#748274',
-        startedAt: '1999-11-06',
-        platformDoorCount: null,
-        trainCarCounts: [1],
-        endedAt: null,
-        operatingHours: {
-          weekdays: { start: '05:30', end: '23:30' },
-          weekends: { start: '05:30', end: '23:30' },
-        },
-        serviceIds: ['BPLRT-service'],
-        operators: [
-          {
-            operatorId: 'smrt',
-            startedAt: '1999-11-06',
-            endedAt: null,
-          },
-        ],
+        ...line,
+        hash: 'normal',
+        operatingHours: canonical.services[0].revisions[0].operatingHours,
       },
-      {
-        id: 'missing-hours',
-        hash: 'skipped',
-        name: translation,
-        type: 'mrt',
-        color: '#000000',
-        startedAt: '2026-01-01',
-        platformDoorCount: 1,
-        trainCarCounts: [1],
-        endedAt: null,
-        operatingHours: null,
-        serviceIds: [],
-        operators: [],
-      },
-    ] as Parameters<typeof insertLinesStaging>[1];
+      { ...line, id: 'unknown', hash: 'unknown', startedAt: null },
+    ];
 
-    expect(await insertLinesStaging(db, lines)).toBe(1);
-    expect(warn).toHaveBeenCalledWith(
-      '[PULL] Skipping 1 line(s) missing required fields: missing-hours (operatingHours)',
-    );
-    warn.mockRestore();
-    expect(inserts).toEqual([
+    expect(await insertLinesStaging(db, lines)).toBe(2);
+    expect(inserts).toMatchObject([
       {
         table: linesNextTable,
         rows: [
           {
-            id: 'BPLRT',
-            hash: 'changed',
-            name: translation,
-            type: 'lrt',
-            color: '#748274',
-            started_at: '1999-11-06',
-            platform_door_count: null,
-            train_car_counts: [1],
-            ended_at: null,
-            operating_hours: {
-              weekdays: { start: '05:30', end: '23:30' },
-              weekends: { start: '05:30', end: '23:30' },
-            },
-            operators: [
-              {
-                operatorId: 'smrt',
-                startedAt: '1999-11-06',
-                endedAt: null,
-              },
-            ],
+            id: 'line',
+            started_at: '2000-01-01',
+            operating_hours: lines[0].operatingHours,
+            operators: line.operators,
+          },
+          {
+            id: 'unknown',
+            started_at: null,
+            operating_hours: null,
+            operators: line.operators,
           },
         ],
       },
