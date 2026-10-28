@@ -78,37 +78,8 @@ const responseSchema: z.ZodType<StationArrivalsV2> = z.discriminatedUnion(
     }),
     z.object({
       ...common,
-      source: z.literal('frequency'),
-      reason: z.literal('coverage-gap'),
-      timing: z.object({
-        ...display,
-        platformLabels: z.array(z.string()),
-        departures: z.array(
-          z.object({
-            time: instant,
-            basis: z.enum([
-              'first_train',
-              'frequency_estimate',
-              'crowd_report',
-              'last_train',
-            ]),
-            confidence: z.enum(['high', 'medium', 'low']),
-            headwaySeconds: z.number(),
-            headwayRangeSeconds: z.object({ min: z.number(), max: z.number() }),
-            crowdReportCount: z.number().int().nonnegative(),
-            crowdReportsDisagree: z.boolean(),
-          }),
-        ),
-      }),
-    }),
-    z.object({
-      ...common,
       source: z.literal('unavailable'),
-      reason: z.enum([
-        'timetable-unavailable',
-        'frequency-unavailable',
-        'frequency-scope-or-window-mismatch',
-      ]),
+      reason: z.literal('timetable-unavailable'),
     }),
   ],
 );

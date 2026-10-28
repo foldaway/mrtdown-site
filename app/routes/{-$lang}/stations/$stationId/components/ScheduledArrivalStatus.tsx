@@ -131,7 +131,7 @@ export function ArrivalRefreshNotice({
       {!hasScope ? (
         <FormattedMessage
           id="station.arrivals.missing_scope"
-          defaultMessage="Initial estimate only. Arrival refresh is unavailable for this service."
+          defaultMessage="Timetable refresh is unavailable for this service."
         />
       ) : state?.status === 'error' ? (
         state.data ? (
@@ -141,8 +141,8 @@ export function ArrivalRefreshNotice({
           />
         ) : (
           <FormattedMessage
-            id="station.arrivals.initial_failed"
-            defaultMessage="Refresh failed. Initial estimates may be out of date."
+            id="station.arrivals.refresh_failed"
+            defaultMessage="Couldn’t refresh the timetable. Please check station displays."
           />
         )
       ) : state?.status === 'loading' || !state ? (
@@ -153,8 +153,8 @@ export function ArrivalRefreshNotice({
           />
         ) : (
           <FormattedMessage
-            id="station.arrivals.initial_loading"
-            defaultMessage="Initial estimates · Checking timetable…"
+            id="station.arrivals.loading"
+            defaultMessage="Checking timetable…"
           />
         )
       ) : null}

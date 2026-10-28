@@ -1,13 +1,8 @@
-import { Popover } from '@base-ui/react/popover';
-import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
-import { DateTime } from 'luxon';
-import { useEffect, useState } from 'react';
-import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
+import { FormattedMessage, useIntl } from 'react-intl';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { PlatformSign } from './StationGuideSigns';
 import type { ArrivalTiming } from './stationGuide.types';
-import { useHoverPopover } from './useHoverPopover';
 import type { BranchArrivalState } from './stationArrivalRefresh';
 import {
   ArrivalRefreshNotice,
@@ -17,40 +12,35 @@ import {
 type ServiceArrivalSummaryProps = {
   arrivalTiming: ArrivalTiming;
   arrivalState?: BranchArrivalState;
-  isHydrated: boolean;
   lineColor: string;
-  onArrivalReportSubmitted: () => Promise<void>;
-  stationId: string;
 };
 
 export function ServiceArrivalSummary({
-  arrivalTiming: initialTiming,
+  arrivalTiming,
   arrivalState,
-  isHydrated,
   lineColor,
-  onArrivalReportSubmitted,
-  stationId,
 }: ServiceArrivalSummaryProps) {
   const intl = useIntl();
-  const now = useCurrentTime(isHydrated);
   const data = arrivalState?.data;
-  const frequency = data?.source === 'frequency' ? data.timing : null;
-  const arrivalTiming: ArrivalTiming = frequency
-    ? {
-        ...initialTiming,
-        ...frequency,
-        firstTrainTime: null,
-        lastTrainTime: null,
-        isServiceEnded: false,
-        nextServiceStart: null,
-      }
-    : initialTiming;
-  const showEstimate = data == null || data.source === 'frequency';
   const destinationName =
     arrivalTiming.destinationName == null
       ? null
       : getLocalizedTranslation(arrivalTiming.destinationName, intl.locale);
-
+  const identity = (
+    <>
+      <span
+        className="shrink-0 rounded-md px-1.5 py-0.5 font-bold text-[11px] text-white leading-none shadow-sm"
+        style={{ backgroundColor: lineColor }}
+      >
+        {arrivalTiming.destinationCode}
+      </span>
+      {destinationName != null && (
+        <span className="truncate font-medium text-gray-800 text-sm group-hover:underline dark:text-gray-200">
+          {destinationName}
+        </span>
+      )}
+    </>
+  );
   return (
     <li className="px-4 py-2.5 sm:px-6">
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -63,551 +53,52 @@ export function ServiceArrivalSummary({
               />
             </span>
             {arrivalTiming.destinationStationId == null ? (
-              <DestinationIdentity
-                code={arrivalTiming.destinationCode}
-                color={lineColor}
-                name={destinationName}
-              />
+              identity
             ) : (
               <Link
                 className="group flex min-w-0 items-center gap-1.5"
                 params={{ stationId: arrivalTiming.destinationStationId }}
                 to="/{-$lang}/stations/$stationId"
               >
-                <DestinationIdentity
-                  code={arrivalTiming.destinationCode}
-                  color={lineColor}
-                  name={destinationName}
-                />
+                {identity}
               </Link>
             )}
-            {showEstimate && (
-              <ServiceDetailsTooltip
-                estimate={arrivalTiming.departures[0] ?? null}
-                firstTrainTime={arrivalTiming.firstTrainTime}
-                lastTrainTime={arrivalTiming.lastTrainTime}
-                serviceName={arrivalTiming.serviceName}
-              />
-            )}
           </div>
-          {showEstimate && arrivalTiming.platformLabels.length > 0 && (
-            <ul className="mt-1.5 flex flex-wrap gap-1">
-              {arrivalTiming.platformLabels.map((label) => (
-                <li key={label}>
-                  <PlatformBadge color={lineColor} label={label} />
-                </li>
-              ))}
-            </ul>
-          )}
+          {data?.source !== 'scheduled' &&
+            arrivalTiming.platformLabels.length > 0 && (
+              <ul className="mt-1.5 flex flex-wrap gap-1">
+                {arrivalTiming.platformLabels.map((label) => (
+                  <li key={label} className="inline-flex">
+                    <PlatformSign color={lineColor} label={label} />
+                    <span className="sr-only">
+                      <FormattedMessage
+                        id="station.arrival_timings.platform"
+                        defaultMessage="Platform {label}"
+                        values={{ label }}
+                      />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
         </div>
         {data?.source === 'scheduled' ? (
           <ScheduledArrivalStatus data={data} lineColor={lineColor} />
-        ) : showEstimate ? (
-          <ArrivalStatus
-            arrivalTiming={arrivalTiming}
-            intl={intl}
-            now={arrivalState?.status === 'error' ? null : now}
-          />
-        ) : (
+        ) : data?.source === 'unavailable' ||
+          arrivalState?.status === 'error' ||
+          arrivalTiming.destinationStationId == null ? (
           <p className="text-gray-600 text-sm dark:text-gray-300">
             <FormattedMessage
               id="station.arrivals.unavailable"
               defaultMessage="Arrivals unavailable. Please check station displays."
             />
           </p>
-        )}
+        ) : null}
       </div>
       <ArrivalRefreshNotice
         state={arrivalState}
-        hasScope={initialTiming.destinationStationId != null}
+        hasScope={arrivalTiming.destinationStationId != null}
       />
-      {showEstimate &&
-        arrivalState?.status !== 'error' &&
-        !arrivalTiming.isServiceEnded &&
-        arrivalTiming.departures[0] != null && (
-          <CrowdArrivalReportButton
-            onSubmitted={onArrivalReportSubmitted}
-            serviceId={arrivalTiming.serviceId}
-            stationId={stationId}
-          />
-        )}
     </li>
   );
-}
-
-type CrowdArrivalReportButtonProps = {
-  onSubmitted: () => Promise<void>;
-  serviceId: string;
-  stationId: string;
-};
-
-function CrowdArrivalReportButton({
-  onSubmitted,
-  serviceId,
-  stationId,
-}: CrowdArrivalReportButtonProps) {
-  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>(
-    'idle',
-  );
-  const submit = async (minutesToArrival: number) => {
-    setStatus('sending');
-    try {
-      const response = await fetch('/api/arrival-reports', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ stationId, serviceId, minutesToArrival }),
-      });
-      if (!response.ok) {
-        setStatus('error');
-        return;
-      }
-      await onSubmitted();
-      setStatus('sent');
-    } catch {
-      setStatus('error');
-    }
-  };
-  if (status === 'sent') {
-    return (
-      <p className="mt-2 text-emerald-700 text-xs dark:text-emerald-300">
-        <FormattedMessage
-          id="station.arrival_report.thanks"
-          defaultMessage="Thanks—your report will help calibrate arrival estimates for the current service day."
-        />
-      </p>
-    );
-  }
-  return (
-    <details className="mt-2 text-xs">
-      <summary className="w-fit cursor-pointer rounded px-1 text-blue-700 hover:bg-blue-50 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300 dark:hover:bg-blue-950">
-        <FormattedMessage
-          id="station.arrival_report.summary"
-          defaultMessage="Help improve this estimate"
-        />
-      </summary>
-      <div className="mt-2 max-w-lg rounded-lg bg-blue-50 px-3 py-2.5 text-gray-700 dark:bg-blue-950/30 dark:text-gray-200">
-        <p>
-          <FormattedMessage
-            id="station.arrival_report.explainer"
-            defaultMessage="At this station now? Share the arrival time you can see. Community reports help calibrate arrival estimates for the current service day; they are not official train tracking."
-          />
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {[0, 1, 3, 5].map((minutes) => (
-            <button
-              className="rounded-md border border-blue-300 bg-white px-2 py-1 font-medium text-blue-800 hover:border-blue-600 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-700 dark:bg-gray-900 dark:text-blue-200 dark:hover:bg-blue-900"
-              disabled={status === 'sending'}
-              key={minutes}
-              onClick={() => void submit(minutes)}
-              type="button"
-            >
-              {minutes === 0 ? (
-                <FormattedMessage
-                  id="station.arrival_report.arriving_now"
-                  defaultMessage="Arriving now"
-                />
-              ) : (
-                <FormattedMessage
-                  id="station.arrival_report.minutes"
-                  defaultMessage="{minutes} min away"
-                  values={{ minutes }}
-                />
-              )}
-            </button>
-          ))}
-        </div>
-        {status === 'error' && (
-          <p className="mt-2 text-red-700 dark:text-red-300">
-            <FormattedMessage
-              id="station.arrival_report.error"
-              defaultMessage="Couldn’t send your report. Please try again."
-            />
-          </p>
-        )}
-      </div>
-    </details>
-  );
-}
-
-function useCurrentTime(isHydrated: boolean) {
-  const [now, setNow] = useState<DateTime | null>(null);
-
-  useEffect(() => {
-    if (!isHydrated) {
-      return;
-    }
-    const updateNow = () => setNow(DateTime.now().setZone('Asia/Singapore'));
-    updateNow();
-    const interval = window.setInterval(updateNow, 30_000);
-    return () => window.clearInterval(interval);
-  }, [isHydrated]);
-
-  return now;
-}
-
-type StationPillProps = { color: string; code: string };
-function StationPill({ color, code }: StationPillProps) {
-  return (
-    <span
-      className="shrink-0 rounded-md px-1.5 py-0.5 font-bold text-[11px] text-white leading-none shadow-sm"
-      style={{ backgroundColor: color }}
-    >
-      {code}
-    </span>
-  );
-}
-
-type DestinationIdentityProps = {
-  code: string;
-  color: string;
-  name: string | null;
-};
-function DestinationIdentity({ code, color, name }: DestinationIdentityProps) {
-  return (
-    <>
-      <StationPill color={color} code={code} />
-      {name != null && (
-        <span className="truncate font-medium text-gray-800 text-sm group-hover:underline dark:text-gray-200">
-          {name}
-        </span>
-      )}
-    </>
-  );
-}
-
-type PlatformBadgeProps = { color: string; label: string };
-function PlatformBadge({ color, label }: PlatformBadgeProps) {
-  return (
-    <span className="inline-flex">
-      <PlatformSign color={color} label={label} />
-      <span className="sr-only">
-        <FormattedMessage
-          id="station.arrival_timings.platform"
-          defaultMessage="Platform {label}"
-          values={{ label }}
-        />
-      </span>
-    </span>
-  );
-}
-
-type ArrivalStatusProps = {
-  arrivalTiming: ArrivalTiming;
-  intl: IntlShape;
-  now: DateTime | null;
-};
-function ArrivalStatus({ arrivalTiming, intl, now }: ArrivalStatusProps) {
-  if (arrivalTiming.isServiceEnded) {
-    const firstTrain = arrivalTiming.nextServiceStart;
-    return (
-      <div className="shrink-0 rounded-md bg-gray-50 px-3 py-2 text-left sm:min-w-44 dark:bg-gray-900/30">
-        <p className="font-semibold text-gray-800 text-sm dark:text-gray-200">
-          <FormattedMessage
-            id="station.arrival_timings.service_ended"
-            defaultMessage="Service ended"
-          />
-        </p>
-        {firstTrain != null && (
-          <p className="mt-0.5 text-gray-600 text-xs tabular-nums dark:text-gray-300">
-            <FormattedMessage
-              id="station.arrival_timings.first_train"
-              defaultMessage="First train {time}"
-              values={{ time: formatTime(firstTrain, intl) }}
-            />
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  const [nextDeparture, followingDeparture] = arrivalTiming.departures;
-  if (nextDeparture == null) {
-    return (
-      <span className="shrink-0 rounded-md border border-gray-300 border-dashed px-2 py-1 font-semibold text-gray-500 text-xs dark:border-gray-600 dark:text-gray-400">
-        <FormattedMessage
-          id="station.arrival_timings.unavailable"
-          defaultMessage="N/A"
-        />
-      </span>
-    );
-  }
-
-  return (
-    <div className="grid shrink-0 grid-cols-[auto_auto] gap-x-4 text-left tabular-nums sm:min-w-44">
-      <p className="font-bold text-gray-900 text-sm leading-tight dark:text-gray-100">
-        <ArrivalTimingValue departure={nextDeparture} intl={intl} now={now} />
-      </p>
-      {followingDeparture != null && (
-        <p className="font-medium text-gray-700 text-sm leading-tight dark:text-gray-200">
-          <FormattedMessage
-            id="station.arrival_timings.then"
-            defaultMessage="then {time}"
-            values={{
-              time: formatRelativeTime(followingDeparture.time, intl, now),
-            }}
-          />
-        </p>
-      )}
-      <p className="text-gray-500 text-xs leading-tight dark:text-gray-400">
-        <EstimateBasis departure={nextDeparture} /> ·{' '}
-        {formatTime(nextDeparture.time, intl)}
-      </p>
-      {followingDeparture != null && (
-        <p className="text-gray-500 text-xs leading-tight dark:text-gray-400">
-          <EstimateBasis departure={followingDeparture} /> ·{' '}
-          {formatTime(followingDeparture.time, intl)}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function formatHeadway(seconds: number, intl: IntlShape) {
-  return intl.formatNumber(seconds / 60, {
-    style: 'unit',
-    unit: 'minute',
-    unitDisplay: 'short',
-    maximumFractionDigits: seconds % 60 === 0 ? 0 : 1,
-  });
-}
-
-function formatHeadwayRange(
-  range: ArrivalTiming['departures'][number]['headwayRangeSeconds'],
-  intl: IntlShape,
-) {
-  const minimum = formatHeadway(range.min, intl);
-  return range.min === range.max
-    ? minimum
-    : `${minimum}–${formatHeadway(range.max, intl)}`;
-}
-
-type ServiceDetailsTooltipProps = {
-  estimate: ArrivalTiming['departures'][number] | null;
-  firstTrainTime: string | null;
-  lastTrainTime: string | null;
-  serviceName: ArrivalTiming['serviceName'];
-};
-function ServiceDetailsTooltip({
-  estimate,
-  firstTrainTime,
-  lastTrainTime,
-  serviceName,
-}: ServiceDetailsTooltipProps) {
-  const intl = useIntl();
-  const { closeAfterHover, isOpen, openOnHover, setIsOpen } = useHoverPopover();
-  const label = intl.formatMessage({
-    id: 'station.arrival_timings.service_details_label',
-    defaultMessage: 'Service details',
-  });
-  const localizedServiceName = getLocalizedTranslation(
-    serviceName,
-    intl.locale,
-  );
-
-  return (
-    <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
-      <Popover.Trigger
-        render={
-          <button
-            aria-label={label}
-            className="-m-1 shrink-0 rounded-full p-1 text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 dark:hover:text-gray-200"
-            onMouseEnter={openOnHover}
-            onMouseLeave={closeAfterHover}
-            type="button"
-          />
-        }
-      >
-        <InformationCircleIcon aria-hidden={true} className="size-4" />
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Positioner
-          collisionPadding={16}
-          onMouseEnter={openOnHover}
-          onMouseLeave={closeAfterHover}
-          sideOffset={8}
-        >
-          <Popover.Popup className="z-50 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-700 text-xs shadow-gray-900/15 shadow-xl outline-none ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:shadow-black/30 dark:ring-white/10">
-            <p className="font-semibold">{label}</p>
-            <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-gray-600 dark:text-gray-300">
-              <dt className="text-gray-400 dark:text-gray-400">
-                <FormattedMessage
-                  id="station.arrival_timings.service_label"
-                  defaultMessage="Service"
-                />
-              </dt>
-              <dd className="min-w-0">{localizedServiceName}</dd>
-              {firstTrainTime != null && lastTrainTime != null && (
-                <>
-                  <dt className="text-gray-400 dark:text-gray-400">
-                    <FormattedMessage
-                      id="station.arrival_timings.service_hours_label"
-                      defaultMessage="Service hours"
-                    />
-                  </dt>
-                  <dd className="tabular-nums">
-                    <FormattedMessage
-                      id="station.arrival_timings.service_hours"
-                      defaultMessage="First {firstTrain} · Last {lastTrain} (Singapore time)"
-                      values={{
-                        firstTrain: formatServiceTime(firstTrainTime, intl),
-                        lastTrain: formatServiceTime(lastTrainTime, intl),
-                      }}
-                    />
-                  </dd>
-                </>
-              )}
-              {estimate?.basis === 'frequency_estimate' && (
-                <>
-                  <dt className="text-gray-400 dark:text-gray-400">
-                    <FormattedMessage
-                      id="station.arrival_timings.estimate_label"
-                      defaultMessage="Estimate"
-                    />
-                  </dt>
-                  <dd className="tabular-nums">
-                    <FormattedMessage
-                      id="station.arrival_timings.estimate_details"
-                      defaultMessage="Typical {typical} · Published range {range}"
-                      values={{
-                        typical: formatHeadway(estimate.headwaySeconds, intl),
-                        range: formatHeadwayRange(
-                          estimate.headwayRangeSeconds,
-                          intl,
-                        ),
-                      }}
-                    />
-                  </dd>
-                </>
-              )}
-            </dl>
-            <Popover.Arrow className="fill-white dark:fill-gray-800" />
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
-    </Popover.Root>
-  );
-}
-
-function formatServiceTime(time: string, intl: IntlShape) {
-  const dateTime = DateTime.fromFormat(
-    time,
-    time.length === 5 ? 'HH:mm' : 'HH:mm:ss',
-    {
-      zone: 'Asia/Singapore',
-    },
-  );
-  return dateTime.isValid
-    ? intl.formatTime(dateTime.toJSDate(), {
-        hour: 'numeric',
-        hour12: true,
-        minute: '2-digit',
-        timeZone: 'Asia/Singapore',
-      })
-    : time;
-}
-
-type ArrivalTimingValueProps = {
-  departure: ArrivalTiming['departures'][number];
-  intl: IntlShape;
-  now: DateTime | null;
-};
-function ArrivalTimingValue({ departure, intl, now }: ArrivalTimingValueProps) {
-  const departureTime = DateTime.fromISO(departure.time, { setZone: true });
-  if (now == null || !departureTime.isValid) {
-    return formatTime(departure.time, intl);
-  }
-
-  return formatRelativeTime(departure.time, intl, now);
-}
-
-function formatRelativeTime(
-  departure: string,
-  intl: IntlShape,
-  now: DateTime | null,
-) {
-  const departureTime = DateTime.fromISO(departure, { setZone: true });
-  if (now == null || !departureTime.isValid) {
-    return formatTime(departure, intl);
-  }
-  const minutes = Math.max(0, Math.ceil(departureTime.diff(now).as('minutes')));
-  return minutes === 0
-    ? intl.formatMessage({
-        id: 'station.arrival_timings.now',
-        defaultMessage: 'Now',
-      })
-    : minutes >= 60
-      ? intl.formatMessage(
-          {
-            id: 'station.arrival_timings.hours_and_minutes',
-            defaultMessage: '{hours, number}h {minutes, number}m',
-          },
-          {
-            hours: Math.floor(minutes / 60),
-            minutes: minutes % 60,
-          },
-        )
-      : intl.formatMessage(
-          {
-            id: 'station.arrival_timings.compact_minutes',
-            defaultMessage: '{minutes, number} min',
-          },
-          { minutes },
-        );
-}
-
-function formatTime(departure: string, intl: IntlShape) {
-  const departureTime = DateTime.fromISO(departure, { setZone: true });
-  return departureTime.isValid
-    ? intl.formatTime(departureTime.toJSDate(), {
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZone: 'Asia/Singapore',
-      })
-    : departure;
-}
-
-type EstimateBasisProps = { departure: ArrivalTiming['departures'][number] };
-function EstimateBasis({ departure }: EstimateBasisProps) {
-  switch (departure.basis) {
-    case 'crowd_report':
-      return (
-        <>
-          <FormattedMessage
-            id="station.arrivals.crowd_estimate"
-            defaultMessage="Community estimate"
-          />
-          {departure.crowdReportsDisagree && (
-            <>
-              {' '}
-              ·{' '}
-              <FormattedMessage
-                id="station.arrivals.reports_disagree"
-                defaultMessage="Reports differ"
-              />
-            </>
-          )}
-        </>
-      );
-    case 'first_train':
-      return (
-        <FormattedMessage
-          id="station.arrivals.first_estimate"
-          defaultMessage="First train estimate"
-        />
-      );
-    case 'last_train':
-      return (
-        <FormattedMessage
-          id="station.arrivals.last_estimate"
-          defaultMessage="Last train estimate"
-        />
-      );
-    case 'frequency_estimate':
-      return (
-        <FormattedMessage
-          id="station.arrivals.frequency_estimate"
-          defaultMessage="Frequency estimate"
-        />
-      );
-  }
 }

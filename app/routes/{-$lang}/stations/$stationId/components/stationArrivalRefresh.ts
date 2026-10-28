@@ -48,14 +48,13 @@ export function createArrivalRefresh(
     null;
   let generation = 0;
   let disposed = false;
-  const refresh = (afterReport = false): Promise<void> => {
+  const refresh = (): Promise<void> => {
     if (disposed) {
       return Promise.resolve();
     }
-    if (active && !afterReport) {
+    if (active) {
       return active.promise;
     }
-    active?.controller.abort();
     const currentGeneration = ++generation;
     const controller = new AbortController();
     const isCurrent = () => !disposed && generation === currentGeneration;

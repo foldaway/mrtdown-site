@@ -51,21 +51,6 @@ const timing: ArrivalLine['arrivalTimings'][number] = {
   ...display,
   ...scheduled.scope,
   platformLabels: ['A', 'B'],
-  firstTrainTime: null,
-  lastTrainTime: null,
-  nextServiceStart: null,
-  isServiceEnded: false,
-  departures: [
-    {
-      time: departure.departureInstant,
-      basis: 'frequency_estimate',
-      confidence: 'low',
-      headwaySeconds: 600,
-      headwayRangeSeconds: { min: 600, max: 600 },
-      crowdReportCount: 0,
-      crowdReportsDisagree: false,
-    },
-  ],
 };
 const lines = [{ lineId: timing.lineId, arrivalTimings: [timing, timing] }];
 const key = arrivalBranchKey(
@@ -75,17 +60,14 @@ const key = arrivalBranchKey(
 );
 function renderRow(
   data: StationArrivalsV2 | null,
-  status: 'ready' | 'error' = 'ready',
+  status: 'ready' | 'error' | 'loading' = 'ready',
 ) {
   return renderToStaticMarkup(
     <IntlProvider locale="en-SG">
       <ServiceArrivalSummary
         arrivalTiming={timing}
         arrivalState={{ data, status }}
-        isHydrated={false}
         lineColor="#123456"
-        onArrivalReportSubmitted={async () => {}}
-        stationId={scheduled.scope.stationId}
       />
     </IntlProvider>,
   );
@@ -118,7 +100,7 @@ describe('station guide arrival sources', () => {
     expect(html).not.toContain(departure.providerTripId);
   });
 
-  it('keeps empty, partial, unavailable and stale responses distinct from SSR estimates', () => {
+  it('keeps empty, partial, unavailable and stale responses distinct without SSR estimates', () => {
     if (scheduled.source !== 'scheduled') {
       throw new Error('fixture');
     }
@@ -149,7 +131,7 @@ describe('station guide arrival sources', () => {
       'Showing the last known response',
     );
     expect(renderRow(null, 'error')).toContain(
-      'Initial estimates may be out of date',
+      'Couldn’t refresh the timetable',
     );
     // Exercise the standalone status components used by all service rows.
     expect(
@@ -162,27 +144,17 @@ describe('station guide arrival sources', () => {
     ).toContain('refresh is unavailable');
   });
 
-  it('preserves frequency/crowd basis and calibration controls only on estimate branches', () => {
-    const frequency: StationArrivalsV2 = {
-      ...scheduled,
-      source: 'frequency',
-      reason: 'coverage-gap',
-      timing: {
-        ...timing,
-        departures: [
-          {
-            ...timing.departures[0],
-            basis: 'crowd_report',
-            crowdReportsDisagree: true,
-          },
-        ],
-      },
-    };
-    expect(renderRow(frequency)).toContain('Community estimate');
-    expect(renderRow(frequency)).toContain('Reports differ');
-    expect(renderRow(frequency)).toContain('Help improve this estimate');
-    expect(renderRow({ ...frequency, timing })).toContain('Frequency estimate');
-    expect(renderRow(frequency)).not.toContain('Scheduled');
+  it('renders SSR/loading without an estimated time or calibration control', () => {
+    const html = renderToStaticMarkup(
+      <IntlProvider locale="en-SG">
+        <ServiceArrivalSummary arrivalTiming={timing} lineColor="#123456" />
+      </IntlProvider>,
+    );
+    expect(html).toContain('Checking timetable');
+    expect(html).not.toContain('estimate');
+    expect(html).not.toContain('Help improve');
+    expect(html).not.toContain('Service ended');
+    expect(html).not.toContain('First train');
   });
 });
 
@@ -234,7 +206,7 @@ describe('station guide refresh session', () => {
     session.dispose();
   });
 
-  it('rejects late pre-report and old-station work, and retains explicitly stale data on refresh failure', async () => {
+  it('ignores disposed station work and retains explicitly stale schedules on refresh failure', async () => {
     const old = deferred();
     const newer = {
       ...scheduled,
@@ -256,19 +228,26 @@ describe('station guide refresh session', () => {
       fetcher,
     );
     const first = session.refresh();
-    await session.refresh(true);
+    session.dispose();
+    const nextStationSession = createArrivalRefresh(
+      scheduled.scope.stationId,
+      lines,
+      update,
+      fetcher,
+    );
+    await nextStationSession.refresh();
     expect((fetcher.mock.calls[0][1]?.signal as AbortSignal).aborted).toBe(
       true,
     );
     old.resolve(response());
     await first;
     expect(states[key].data).toEqual(newer);
-    await session.refresh();
+    await nextStationSession.refresh();
     expect(states[key]).toEqual({ data: newer, status: 'error' });
     const late = deferred();
     fetcher.mockReturnValueOnce(late.promise);
-    const beforeNavigation = session.refresh();
-    session.dispose();
+    const beforeNavigation = nextStationSession.refresh();
+    nextStationSession.dispose();
     const calls = update.mock.calls.length;
     late.resolve(response());
     await beforeNavigation;
@@ -281,6 +260,17 @@ describe('station guide refresh session', () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(new Response('', { status: 500 }))
       .mockResolvedValueOnce(Response.json({ success: true, data: {} }))
+      .mockResolvedValueOnce(
+        Response.json({
+          success: true,
+          data: {
+            ...scheduled,
+            source: 'frequency',
+            reason: 'coverage-gap',
+            timing: { departures: [] },
+          },
+        }),
+      )
       .mockResolvedValueOnce(
         response({
           ...scheduled,
@@ -295,7 +285,7 @@ describe('station guide refresh session', () => {
       },
       fetcher,
     );
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 4; attempt++) {
       await session.refresh();
       expect(states[key]).toEqual({ data: null, status: 'error' });
     }

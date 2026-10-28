@@ -6,37 +6,8 @@ import {
   result,
   scope,
 } from './scheduledStationArrivals.fixture';
-import {
-  type FrequencyArrivalCandidate,
-  selectStationArrivalSource,
-} from './stationArrivalSourcePolicy';
+import { selectStationArrivalSource } from './stationArrivalSourcePolicy';
 
-const frequency: FrequencyArrivalCandidate = {
-  stationId: scope.stationId,
-  window: result.window,
-  timing: {
-    ...scope,
-    serviceName: display.serviceName,
-    destinationCode: display.destinationCode,
-    destinationName: display.destinationName,
-    platformLabels: ['Platform'],
-    firstTrainTime: null,
-    lastTrainTime: null,
-    isServiceEnded: false,
-    nextServiceStart: null,
-    departures: [
-      {
-        time: departure.departureInstant,
-        basis: 'crowd_report',
-        confidence: 'medium',
-        headwaySeconds: 300,
-        headwayRangeSeconds: { min: 240, max: 360 },
-        crowdReportCount: 1,
-        crowdReportsDisagree: false,
-      },
-    ],
-  },
-};
 const gapDay = {
   ...result.serviceDays[0],
   selected: null,
@@ -52,7 +23,7 @@ const gap = buildScheduledStationArrivalLines(
 describe('private station arrival source policy', () => {
   it('keeps empty, approximate and untimed schedules without frequency substitution', () => {
     const empty = buildScheduledStationArrivalLines(result, display);
-    expect(selectStationArrivalSource(empty, frequency)).toEqual({
+    expect(selectStationArrivalSource(empty)).toEqual({
       source: 'scheduled',
       reason: 'complete',
       scheduled: empty,
@@ -64,37 +35,26 @@ describe('private station arrival source policy', () => {
       },
       display,
     );
-    expect(selectStationArrivalSource(approximate, frequency)).toEqual({
+    expect(selectStationArrivalSource(approximate)).toEqual({
       source: 'scheduled',
       reason: 'complete',
       scheduled: approximate,
     });
     const untimed = { ...empty, complete: false, untimedDepartureCount: 1 };
-    expect(selectStationArrivalSource(untimed, frequency)).toEqual({
+    expect(selectStationArrivalSource(untimed)).toEqual({
       source: 'scheduled',
       reason: 'incomplete',
       scheduled: untimed,
     });
   });
 
-  it('permits coverage-gap fallback only for the same canonical branch and window', () => {
-    const decision = selectStationArrivalSource(gap, frequency);
-    expect(decision).toEqual({
-      source: 'frequency',
-      reason: 'coverage-gap',
-      scheduled: gap,
-      frequency,
+  it('returns unavailable for uncovered branches and absent artifacts', () => {
+    expect(selectStationArrivalSource(gap)).toMatchObject({
+      source: 'unavailable',
+      reason: 'timetable-unavailable',
     });
-    if (decision.source === 'frequency') {
-      expect(decision.frequency).toBe(frequency);
-    }
     const noArtifact = { ...gap, serviceDays: [{ ...gapDay, attempts: [] }] };
-    expect(selectStationArrivalSource(noArtifact, frequency).source).toBe(
-      'frequency',
-    );
-    expect(selectStationArrivalSource(gap, null).reason).toBe(
-      'frequency-unavailable',
-    );
+    expect(selectStationArrivalSource(noArtifact).source).toBe('unavailable');
     const rejected = {
       ...gap,
       serviceDays: [
@@ -128,27 +88,11 @@ describe('private station arrival source policy', () => {
         },
       ],
     };
-    expect(selectStationArrivalSource(rejected, frequency)).toEqual({
+    expect(selectStationArrivalSource(rejected)).toEqual({
       source: 'unavailable',
       reason: 'timetable-unavailable',
       scheduled: rejected,
     });
-    const unrelated = {
-      ...frequency,
-      timing: { ...frequency.timing, destinationStationId: 'another' },
-    };
-    expect(selectStationArrivalSource(gap, unrelated).source).toBe(
-      'unavailable',
-    );
-    const later = {
-      ...frequency,
-      window: { ...frequency.window, startInstant: departure.departureInstant },
-    };
-    expect(selectStationArrivalSource(gap, later).source).toBe('unavailable');
-    const platform = { ...gap, scope: { ...scope, platformId: 'a' } };
-    expect(selectStationArrivalSource(platform, frequency).source).toBe(
-      'unavailable',
-    );
   });
 
   it('retains partial results and exposes integrity failures without mixing sources', () => {
@@ -164,7 +108,7 @@ describe('private station arrival source policy', () => {
       },
       display,
     );
-    expect(selectStationArrivalSource(partial, frequency)).toEqual({
+    expect(selectStationArrivalSource(partial)).toEqual({
       source: 'scheduled',
       reason: 'incomplete',
       scheduled: partial,
@@ -178,7 +122,7 @@ describe('private station arrival source policy', () => {
         },
       ],
     };
-    expect(selectStationArrivalSource(failed, frequency)).toEqual({
+    expect(selectStationArrivalSource(failed)).toEqual({
       source: 'unavailable',
       reason: 'timetable-unavailable',
       scheduled: failed,
@@ -197,8 +141,6 @@ describe('private station arrival source policy', () => {
         },
       ],
     };
-    expect(selectStationArrivalSource(missingDay, frequency).source).toBe(
-      'unavailable',
-    );
+    expect(selectStationArrivalSource(missingDay).source).toBe('unavailable');
   });
 });

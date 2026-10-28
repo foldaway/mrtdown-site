@@ -25,13 +25,7 @@ import {
   townsTable,
 } from '~/db/schema';
 import type { LineSummaryStatus, Station } from '~/types';
-import {
-  filterCurrentCrowdArrivalReports,
-  MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES,
-  type EstimatedArrivalTiming,
-  getEstimatedStationArrivalTimings,
-} from '~/util/estimatedArrivals';
-import { getLatestCrowdArrivalReports } from '~/util/crowdArrivalReports';
+import type { StationArrivalBranch } from '~/util/stationArrivalBranches';
 import {
   type CommunitySignalOptions,
   getPageCommunitySignals,
@@ -435,95 +429,29 @@ export async function getStationProfileReadModel(
       destinationCode: destination?.displayCode ?? branch.id,
       destinationName:
         destinationNameByStationId[destination?.stationId ?? ''] ?? null,
-      revision: {
-        path: {
-          stations: branch.entries.map((entry) => ({
-            stationId: entry.stationId,
-            displayCode: entry.displayCode,
-          })),
-        },
-        estimatedFrequency: branch.estimatedFrequency,
-      },
     };
   });
-  const freshCrowdArrivalRows =
-    arrivalServices.length > 0
-      ? await timeDbQuery('station_profile_q_crowd_arrivals', () =>
-          getLatestCrowdArrivalReports({
-            db,
-            stationId: station.id,
-            serviceIds: arrivalServices.map((service) => service.serviceId),
-            reportedAtOrAfter:
-              referenceNow
-                .minus({
-                  minutes: MAX_CROWD_ARRIVAL_REPORT_AGE_MINUTES,
-                })
-                .toISO() ?? '',
-          }),
-        )
-      : [];
-  // SQL retains each reporter's latest observation per service, so a reporter
-  // may correct an estimate without manufacturing consensus through repeats.
-  const currentCrowdArrivalReports = filterCurrentCrowdArrivalReports(
-    freshCrowdArrivalRows,
-    referenceNow,
-  );
-  const arrivalTimingsByServiceId = new Map(
-    getEstimatedStationArrivalTimings({
-      station,
-      services: arrivalServices,
-      referenceNow,
-      publicHolidayDates: dataset.publicHolidaySet,
-      crowdReports: currentCrowdArrivalReports,
-    })
-      .map((timing) => ({
-        ...timing,
-        platformLabels: [
-          ...new Set(
-            boardablePlatformLabelsByServiceId.get(timing.serviceId) ?? [],
-          ),
-        ].sort((a, b) => a.localeCompare(b)),
-      }))
-      .map((timing) => [timing.serviceId, timing] as const),
-  );
-  const arrivalLinesById = new Map<
-    string,
-    Array<EstimatedArrivalTiming & { platformLabels: string[] }>
-  >();
+  const arrivalLinesById = new Map<string, StationArrivalBranch[]>();
   for (const service of arrivalServices) {
-    const timing = arrivalTimingsByServiceId.get(service.serviceId) ?? {
-      serviceId: service.serviceId,
-      lineId: service.lineId,
-      serviceName: service.serviceName,
-      destinationStationId: service.destinationStationId,
-      destinationCode: service.destinationCode,
-      destinationName: service.destinationName,
-      firstTrainTime: null,
-      lastTrainTime: null,
-      isServiceEnded: false,
-      nextServiceStart: null,
+    const timings = arrivalLinesById.get(service.lineId) ?? [];
+    timings.push({
+      ...service,
       platformLabels: [
         ...new Set(
           boardablePlatformLabelsByServiceId.get(service.serviceId) ?? [],
         ),
       ].sort((a, b) => a.localeCompare(b)),
-      departures: [],
-    };
-    const timings = arrivalLinesById.get(service.lineId) ?? [];
-    timings.push(timing);
+    });
     arrivalLinesById.set(service.lineId, timings);
   }
   const arrivalLines = [...arrivalLinesById]
     .map(([lineId, arrivalTimings]) => ({
       lineId,
-      arrivalTimings: arrivalTimings.toSorted((a, b) => {
-        const nextDepartureDiff =
-          Date.parse(a.departures[0]?.time ?? '') -
-          Date.parse(b.departures[0]?.time ?? '');
-        return nextDepartureDiff !== 0
-          ? nextDepartureDiff
-          : a.destinationCode.localeCompare(b.destinationCode);
-      }),
+      arrivalTimings: arrivalTimings.toSorted(
+        (a, b) =>
+          a.destinationCode.localeCompare(b.destinationCode) ||
+          a.serviceId.localeCompare(b.serviceId),
+      ),
     }))
     .sort((a, b) => a.lineId.localeCompare(b.lineId));
   return {

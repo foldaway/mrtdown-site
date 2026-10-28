@@ -13,7 +13,6 @@ import { useStationArrivals } from './useStationArrivals';
 type StationGuideProps = {
   arrivalLines: ArrivalLine[];
   exits: StationExit[];
-  isHydrated: boolean;
   lineColors: Record<string, string>;
   lineNames: Record<string, string>;
   stationId: string;
@@ -22,12 +21,11 @@ type StationGuideProps = {
 export function StationGuide({
   arrivalLines,
   exits,
-  isHydrated,
   lineColors,
   lineNames,
   stationId,
 }: StationGuideProps) {
-  const { states, afterReport } = useStationArrivals(stationId, arrivalLines);
+  const states = useStationArrivals(stationId, arrivalLines);
 
   return (
     <section
@@ -44,7 +42,7 @@ export function StationGuide({
             defaultMessage="Station guide"
           />
         </h2>
-        <ArrivalEstimatorInfo />
+        <ArrivalInfo />
       </div>
       {arrivalLines.length > 0 && (
         <section
@@ -87,7 +85,6 @@ export function StationGuide({
                 {line.arrivalTimings.map((arrivalTiming) => (
                   <ServiceArrivalSummary
                     arrivalTiming={arrivalTiming}
-                    isHydrated={isHydrated}
                     key={arrivalBranchKey(
                       line.lineId,
                       arrivalTiming.serviceId,
@@ -103,8 +100,6 @@ export function StationGuide({
                       ]
                     }
                     lineColor={lineColors[line.lineId]}
-                    onArrivalReportSubmitted={afterReport}
-                    stationId={stationId}
                   />
                 ))}
               </ul>
@@ -148,7 +143,7 @@ export function StationGuide({
   );
 }
 
-function ArrivalEstimatorInfo() {
+function ArrivalInfo() {
   const { closeAfterHover, isOpen, openOnHover, setIsOpen } = useHoverPopover();
 
   return (
@@ -190,7 +185,7 @@ function ArrivalEstimatorInfo() {
             <p className="mt-1 text-gray-600 dark:text-gray-300">
               <FormattedMessage
                 id="station.arrivals.explainer"
-                defaultMessage="Scheduled times come from a published timetable; approximate scheduled times are less precise. Frequency estimates use published service times and typical headways, and may use community reports. Neither is live train tracking. Timetable coverage can be incomplete."
+                defaultMessage="Times come from a published timetable. Approximate scheduled times are less precise. These are not live train predictions, and timetable coverage can be incomplete. When a timetable is unavailable, no arrival estimate is shown."
               />
             </p>
             <Popover.Arrow className="fill-white dark:fill-gray-800" />

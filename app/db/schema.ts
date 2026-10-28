@@ -200,8 +200,8 @@ export const crowdArrivalReportStatusEnum = pgEnum(
   ['accepted', 'rejected'],
 );
 
-// Arrival reports are short-lived estimator inputs, not canonical disruption
-// evidence, so they must never share the crowd_reports dispatch path.
+// Historical calibration reports are retained after estimator retirement.
+// They are not canonical disruption evidence and never enter crowd_reports dispatch.
 export const crowdArrivalReportsTable = pgTable(
   'crowd_arrival_reports',
   {

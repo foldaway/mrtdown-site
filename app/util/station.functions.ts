@@ -4,7 +4,6 @@ import {
   getStationProfileReadModel,
   getStationsDirectoryData,
 } from './dbQueries/stations';
-import { getStationArrivalLinesReadModel } from './dbQueries/stationArrivals';
 import { timeServerSpan } from './serverTiming';
 
 const InputSchema = z.object({
@@ -18,10 +17,6 @@ export const getStationProfileFn = createServerFn({ method: 'GET' })
       includeCommunitySignals: true,
     }),
   );
-
-export const getStationArrivalLinesFn = createServerFn({ method: 'GET' })
-  .inputValidator((val) => InputSchema.parse(val))
-  .handler((val) => getStationArrivalLinesReadModel(val.data.stationId));
 
 export const getStationsDirectoryFn = createServerFn({ method: 'GET' }).handler(
   () =>

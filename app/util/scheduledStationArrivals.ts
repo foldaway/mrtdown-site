@@ -1,15 +1,15 @@
 import type { RetainedScheduledDeparture } from '@mrtdown/fs';
 import type { queryIndexedScheduledDepartures } from './dbQueries/queryIndexedScheduledDepartures';
-import type { EstimatedArrivalTiming } from './estimatedArrivals';
+import type { Station } from '@mrtdown/core';
 
 type IndexedDepartures = Awaited<
   ReturnType<typeof queryIndexedScheduledDepartures>
 >;
 
-export type ScheduledArrivalDisplay = Pick<
-  EstimatedArrivalTiming,
-  'serviceName' | 'destinationCode' | 'destinationName'
-> & {
+export type ScheduledArrivalDisplay = {
+  serviceName: Station['name'];
+  destinationCode: string;
+  destinationName: Station['name'] | null;
   platformLabelsById: ReadonlyMap<string, string>;
 };
 

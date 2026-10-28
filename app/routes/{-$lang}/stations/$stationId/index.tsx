@@ -652,7 +652,6 @@ function StationPage() {
             <StationGuideSection
               arrivalLines={stationProfile.arrivalLines}
               exits={stationProfile.exits}
-              isHydrated={isHydrated}
               lineColors={lineColors}
               lineNames={Object.fromEntries(
                 Object.entries(included.lines).map(([lineId, line]) => [
