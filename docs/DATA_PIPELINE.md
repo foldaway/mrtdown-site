@@ -296,12 +296,47 @@ retained receipts, unavailable projection reasons and untimed counts, including
 when timing groups are empty. `complete` describes query coverage, not whether a
 limited result exhausts the window or whether serving is approved. Complete empty
 coverage remains distinct from incomplete/unavailable coverage; an empty group
-list alone cannot trigger frequency fallback. A later integration must explicitly
-decide fallback and crowd evidence overlays and wire API/UI consumers. Reviewed
+list alone cannot trigger frequency fallback. The private source policy below
+consumes this evidence; API/UI selection and crowd overlays remain follow-ups. Reviewed
 scoped rollback and its shared package release remain serving gates; the current
 core alpha.39/fs alpha.43 packages lack those contracts. Actual mapping/source/
 release approvals and publication also remain separate. Existing frequency/crowd
 consumers are unchanged; this adapter is not selected by current page responses.
+
+### Private station-arrivals source policy
+
+`selectStationArrivalSource` consumes the validated scheduled adapter result and
+an optional existing frequency timing for one independently covered canonical
+branch. Complete coverage is authoritative, including empty or limited results
+and approximate scheduled times. Untimed rows keep their scheduled basis and
+incomplete status. Neither departure counts nor timing-group emptiness establish
+a coverage gap.
+
+Only unselected dates with no retained artifact (no attempts), or exclusively
+`outside-feed-range`, `scope-not-covered` or `mapping-coverage-gap` attempts permit
+frequency fallback. Any unavailable projection or other unselected-date reason
+returns `unavailable`, retaining the scheduled object as evidence. Projection
+absence/incompleteness/metadata mismatch, missing indexed dates and topology
+uncertainty are failures, not ordinary gaps. Query exceptions such as invalid
+lineage or incomplete canonical promotion propagate before this policy; callers
+must not convert them or rejected rollbacks into a no-artifact result.
+
+Partial multi-date coverage keeps usable scheduled results and `complete: false`.
+Whole-window frequency estimates cannot safely fill its gaps without a separate
+interval algorithm, so this policy never merges them. Every decision retains the
+original scheduled object, including ordering, provenance and all diagnostics.
+
+The frequency candidate must come from independently known canonical service
+coverage, not a synthesized empty timing or names matched to scheduled results.
+Its station ID and timing's line/service/destination IDs must match; its declared
+window must match by instant and every supplied estimate must lie within that
+half-open window. Callers must bind that window to the estimate's actual query
+context. Platform-specific fallback is unavailable because frequency timings
+carry platform labels, not canonical platform IDs. Frequency departures retain
+their existing basis, confidence, headways and crowd evidence. Crowd reports never
+shift scheduled times here. This internal decision grants no serving approval;
+public API/UI, scheduled crowd overlay, reviewed rollback/shared package release,
+actual mapping/source/release approvals and publication remain separate gates.
 
 ## Public Holiday Workflow
 
