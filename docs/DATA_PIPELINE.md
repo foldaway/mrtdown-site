@@ -270,6 +270,39 @@ projection rebuilds. Returned projection IDs are provenance only after it closes
 This private query grants no serving approval and adds no passenger API/UI, scoped
 rollback policy, real mapping/source/release approval or public publication.
 
+### Internal scheduled station-arrivals adapter
+
+`buildScheduledStationArrivalLines` purely maps one validated
+`queryIndexedScheduledDepartures` result into line groups and service/destination
+timings. Its `basis: 'scheduled'` contract is separate from estimated arrivals:
+departures add `time` as an alias of `departureInstant` and retain all original
+scheduled fields, including exact/approximate precision, original service date,
+opaque provider IDs/stop sequence, revision, manifest/source snapshot hashes,
+retrieval time and correction revision. Manifest hash, service date, provider trip
+ID and stop sequence distinguish occurrence/version identity. `timepoint: 0`
+remains approximate scheduled time. No confidence, headway, crowd phase anchor or
+first/last service-day bounds are inferred from the returned window.
+
+Each call covers one exact station/line/service/destination scope. Timing groups
+use the full set of alternative platform IDs; one departure appears once, even
+when several platforms are possible. Group order follows the first occurrence
+and departures retain query order within each group. Display names, destination
+code and platform labels must come from independently trusted canonical metadata
+for that exact scope, not a destination inferred from a latest revision. Labels
+only decorate platform IDs (missing labels display the ID); they grant no eligibility.
+
+The adapter preserves `scope`, `window`, `complete`, per-date selections/attempts,
+retained receipts, unavailable projection reasons and untimed counts, including
+when timing groups are empty. `complete` describes query coverage, not whether a
+limited result exhausts the window or whether serving is approved. Complete empty
+coverage remains distinct from incomplete/unavailable coverage; an empty group
+list alone cannot trigger frequency fallback. A later integration must explicitly
+decide fallback and crowd evidence overlays and wire API/UI consumers. Reviewed
+scoped rollback and its shared package release remain serving gates; the current
+core alpha.39/fs alpha.43 packages lack those contracts. Actual mapping/source/
+release approvals and publication also remain separate. Existing frequency/crowd
+consumers are unchanged; this adapter is not selected by current page responses.
+
 ## Public Holiday Workflow
 
 `app/workflows/publicHolidays/index.ts` syncs Singapore public holidays from the
