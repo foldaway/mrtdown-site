@@ -19,8 +19,10 @@ import { readLiveScheduleTopology } from './readLiveScheduleTopology';
 import { validateScheduledTimetableHistory } from './scheduledTimetableHistory';
 
 type Database = ReturnType<typeof getDb>;
-type ReadTransaction = Parameters<Parameters<Database['transaction']>[0]>[0];
-type Topology = Awaited<ReturnType<typeof readScheduleTopology>>;
+export type ReadTransaction = Parameters<
+  Parameters<Database['transaction']>[0]
+>[0];
+export type Topology = Awaited<ReturnType<typeof readScheduleTopology>>;
 type Version = Awaited<
   ReturnType<typeof validateScheduledTimetableHistory>
 >[number];
@@ -114,6 +116,7 @@ export async function withScheduledTimetableSnapshot<T>(
     tx: ReadTransaction,
     snapshot: {
       scope: ScheduledTimetableRequestScope;
+      topology: Topology;
       maximumDepartureSeconds: number;
       unavailableProjections: {
         manifestSha256: string;
@@ -319,6 +322,7 @@ export async function withScheduledTimetableSnapshot<T>(
       };
       return use(tx, {
         scope,
+        topology,
         maximumDepartureSeconds,
         unavailableProjections,
         select,

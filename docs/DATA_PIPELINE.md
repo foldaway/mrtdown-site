@@ -338,6 +338,37 @@ shift scheduled times here. This internal decision grants no serving approval;
 public API/UI, scheduled crowd overlay, reviewed rollback/shared package release,
 actual mapping/source/release approvals and publication remain separate gates.
 
+### Private exact-scope station-arrivals reader
+
+`readStationArrivalSource` composes the indexed query, scheduled adapter and source
+policy for one canonical station/line/service/destination (optional platform).
+`referenceInstant` is the single request clock and half-open window start;
+`endInstant` and optional positive `limit` use the indexed query's existing
+validation, including its 24-hour maximum. Public station pages/APIs remain unchanged.
+
+`withIndexedScheduledDepartures` keeps the reader callback inside the query's
+read-only repeatable-read transaction. Canonical topology, display names, destination
+code, platform labels, revision/profile, station first/last times, holidays and
+current crowd reports therefore share the eligibility snapshot. Destination display
+comes from the requested canonical destination and its line code at the reference
+date; it is never inferred from a different revision or matched by name. Query and
+promotion/lineage failures propagate. Complete empty schedules remain authoritative;
+partial schedules retain their diagnostics and never merge whole-window estimates.
+
+Only the existing policy's documented gaps reach the current
+`getEstimatedStationArrivalTimings` estimator and crowd-report reader.
+Fallback requires the selected active canonical revision's actual path to contain
+the station and end at the requested destination. Because the existing estimator
+uses one profile for yesterday/today/tomorrow, fallback conservatively declines
+revision transitions across those dates. It returns at most the estimator's next two
+estimates, filters them to the declared window and applies the optional limit; an
+empty result produces no candidate. Platform-specific fallback remains unavailable.
+Crowd phase anchors affect frequency estimates only. This private reader grants no
+serving approval: passenger API/UI wiring, scheduled crowd overlay, reviewed scoped
+rollback and its shared package release, real source/mapping/release approvals and
+publication remain prerequisites. Published core alpha.39/fs alpha.43 still lack
+the rollback contracts.
+
 ## Public Holiday Workflow
 
 `app/workflows/publicHolidays/index.ts` syncs Singapore public holidays from the

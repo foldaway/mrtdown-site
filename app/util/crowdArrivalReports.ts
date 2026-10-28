@@ -27,7 +27,7 @@ export type CrowdArrivalReportSubmission = z.infer<
 type AppDb = ReturnType<typeof getDb>;
 
 export function getLatestCrowdArrivalReports(input: {
-  db: AppDb;
+  db: Pick<AppDb, 'selectDistinctOn'>;
   stationId: string;
   serviceIds: readonly string[];
   reportedAtOrAfter: string;
