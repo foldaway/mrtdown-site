@@ -8,9 +8,15 @@ import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import { PlatformSign } from './StationGuideSigns';
 import type { ArrivalTiming } from './stationGuide.types';
 import { useHoverPopover } from './useHoverPopover';
+import type { BranchArrivalState } from './stationArrivalRefresh';
+import {
+  ArrivalRefreshNotice,
+  ScheduledArrivalStatus,
+} from './ScheduledArrivalStatus';
 
 type ServiceArrivalSummaryProps = {
   arrivalTiming: ArrivalTiming;
+  arrivalState?: BranchArrivalState;
   isHydrated: boolean;
   lineColor: string;
   onArrivalReportSubmitted: () => Promise<void>;
@@ -18,7 +24,8 @@ type ServiceArrivalSummaryProps = {
 };
 
 export function ServiceArrivalSummary({
-  arrivalTiming,
+  arrivalTiming: initialTiming,
+  arrivalState,
   isHydrated,
   lineColor,
   onArrivalReportSubmitted,
@@ -26,6 +33,19 @@ export function ServiceArrivalSummary({
 }: ServiceArrivalSummaryProps) {
   const intl = useIntl();
   const now = useCurrentTime(isHydrated);
+  const data = arrivalState?.data;
+  const frequency = data?.source === 'frequency' ? data.timing : null;
+  const arrivalTiming: ArrivalTiming = frequency
+    ? {
+        ...initialTiming,
+        ...frequency,
+        firstTrainTime: null,
+        lastTrainTime: null,
+        isServiceEnded: false,
+        nextServiceStart: null,
+      }
+    : initialTiming;
+  const showEstimate = data == null || data.source === 'frequency';
   const destinationName =
     arrivalTiming.destinationName == null
       ? null
@@ -61,14 +81,16 @@ export function ServiceArrivalSummary({
                 />
               </Link>
             )}
-            <ServiceDetailsTooltip
-              estimate={arrivalTiming.departures[0] ?? null}
-              firstTrainTime={arrivalTiming.firstTrainTime}
-              lastTrainTime={arrivalTiming.lastTrainTime}
-              serviceName={arrivalTiming.serviceName}
-            />
+            {showEstimate && (
+              <ServiceDetailsTooltip
+                estimate={arrivalTiming.departures[0] ?? null}
+                firstTrainTime={arrivalTiming.firstTrainTime}
+                lastTrainTime={arrivalTiming.lastTrainTime}
+                serviceName={arrivalTiming.serviceName}
+              />
+            )}
           </div>
-          {arrivalTiming.platformLabels.length > 0 && (
+          {showEstimate && arrivalTiming.platformLabels.length > 0 && (
             <ul className="mt-1.5 flex flex-wrap gap-1">
               {arrivalTiming.platformLabels.map((label) => (
                 <li key={label}>
@@ -78,15 +100,37 @@ export function ServiceArrivalSummary({
             </ul>
           )}
         </div>
-        <ArrivalStatus arrivalTiming={arrivalTiming} intl={intl} now={now} />
+        {data?.source === 'scheduled' ? (
+          <ScheduledArrivalStatus data={data} lineColor={lineColor} />
+        ) : showEstimate ? (
+          <ArrivalStatus
+            arrivalTiming={arrivalTiming}
+            intl={intl}
+            now={arrivalState?.status === 'error' ? null : now}
+          />
+        ) : (
+          <p className="text-gray-600 text-sm dark:text-gray-300">
+            <FormattedMessage
+              id="station.arrivals.unavailable"
+              defaultMessage="Arrivals unavailable. Please check station displays."
+            />
+          </p>
+        )}
       </div>
-      {!arrivalTiming.isServiceEnded && arrivalTiming.departures[0] != null && (
-        <CrowdArrivalReportButton
-          onSubmitted={onArrivalReportSubmitted}
-          serviceId={arrivalTiming.serviceId}
-          stationId={stationId}
-        />
-      )}
+      <ArrivalRefreshNotice
+        state={arrivalState}
+        hasScope={initialTiming.destinationStationId != null}
+      />
+      {showEstimate &&
+        arrivalState?.status !== 'error' &&
+        !arrivalTiming.isServiceEnded &&
+        arrivalTiming.departures[0] != null && (
+          <CrowdArrivalReportButton
+            onSubmitted={onArrivalReportSubmitted}
+            serviceId={arrivalTiming.serviceId}
+            stationId={stationId}
+          />
+        )}
     </li>
   );
 }
@@ -201,7 +245,8 @@ function useCurrentTime(isHydrated: boolean) {
   return now;
 }
 
-function StationPill({ color, code }: { color: string; code: string }) {
+type StationPillProps = { color: string; code: string };
+function StationPill({ color, code }: StationPillProps) {
   return (
     <span
       className="shrink-0 rounded-md px-1.5 py-0.5 font-bold text-[11px] text-white leading-none shadow-sm"
@@ -212,15 +257,12 @@ function StationPill({ color, code }: { color: string; code: string }) {
   );
 }
 
-function DestinationIdentity({
-  code,
-  color,
-  name,
-}: {
+type DestinationIdentityProps = {
   code: string;
   color: string;
   name: string | null;
-}) {
+};
+function DestinationIdentity({ code, color, name }: DestinationIdentityProps) {
   return (
     <>
       <StationPill color={color} code={code} />
@@ -233,9 +275,10 @@ function DestinationIdentity({
   );
 }
 
-function PlatformBadge({ color, label }: { color: string; label: string }) {
+type PlatformBadgeProps = { color: string; label: string };
+function PlatformBadge({ color, label }: PlatformBadgeProps) {
   return (
-    <span className="inline-flex" title={`Platform ${label}`}>
+    <span className="inline-flex">
       <PlatformSign color={color} label={label} />
       <span className="sr-only">
         <FormattedMessage
@@ -248,15 +291,12 @@ function PlatformBadge({ color, label }: { color: string; label: string }) {
   );
 }
 
-function ArrivalStatus({
-  arrivalTiming,
-  intl,
-  now,
-}: {
+type ArrivalStatusProps = {
   arrivalTiming: ArrivalTiming;
   intl: IntlShape;
   now: DateTime | null;
-}) {
+};
+function ArrivalStatus({ arrivalTiming, intl, now }: ArrivalStatusProps) {
   if (arrivalTiming.isServiceEnded) {
     const firstTrain = arrivalTiming.nextServiceStart;
     return (
@@ -309,10 +349,12 @@ function ArrivalStatus({
         </p>
       )}
       <p className="text-gray-500 text-xs leading-tight dark:text-gray-400">
+        <EstimateBasis departure={nextDeparture} /> ·{' '}
         {formatTime(nextDeparture.time, intl)}
       </p>
       {followingDeparture != null && (
         <p className="text-gray-500 text-xs leading-tight dark:text-gray-400">
+          <EstimateBasis departure={followingDeparture} /> ·{' '}
           {formatTime(followingDeparture.time, intl)}
         </p>
       )}
@@ -339,17 +381,18 @@ function formatHeadwayRange(
     : `${minimum}–${formatHeadway(range.max, intl)}`;
 }
 
+type ServiceDetailsTooltipProps = {
+  estimate: ArrivalTiming['departures'][number] | null;
+  firstTrainTime: string | null;
+  lastTrainTime: string | null;
+  serviceName: ArrivalTiming['serviceName'];
+};
 function ServiceDetailsTooltip({
   estimate,
   firstTrainTime,
   lastTrainTime,
   serviceName,
-}: {
-  estimate: ArrivalTiming['departures'][number] | null;
-  firstTrainTime: string | null;
-  lastTrainTime: string | null;
-  serviceName: ArrivalTiming['serviceName'];
-}) {
+}: ServiceDetailsTooltipProps) {
   const intl = useIntl();
   const { closeAfterHover, isOpen, openOnHover, setIsOpen } = useHoverPopover();
   const label = intl.formatMessage({
@@ -463,15 +506,12 @@ function formatServiceTime(time: string, intl: IntlShape) {
     : time;
 }
 
-function ArrivalTimingValue({
-  departure,
-  intl,
-  now,
-}: {
+type ArrivalTimingValueProps = {
   departure: ArrivalTiming['departures'][number];
   intl: IntlShape;
   now: DateTime | null;
-}) {
+};
+function ArrivalTimingValue({ departure, intl, now }: ArrivalTimingValueProps) {
   const departureTime = DateTime.fromISO(departure.time, { setZone: true });
   if (now == null || !departureTime.isValid) {
     return formatTime(departure.time, intl);
@@ -524,4 +564,50 @@ function formatTime(departure: string, intl: IntlShape) {
         timeZone: 'Asia/Singapore',
       })
     : departure;
+}
+
+type EstimateBasisProps = { departure: ArrivalTiming['departures'][number] };
+function EstimateBasis({ departure }: EstimateBasisProps) {
+  switch (departure.basis) {
+    case 'crowd_report':
+      return (
+        <>
+          <FormattedMessage
+            id="station.arrivals.crowd_estimate"
+            defaultMessage="Community estimate"
+          />
+          {departure.crowdReportsDisagree && (
+            <>
+              {' '}
+              ·{' '}
+              <FormattedMessage
+                id="station.arrivals.reports_disagree"
+                defaultMessage="Reports differ"
+              />
+            </>
+          )}
+        </>
+      );
+    case 'first_train':
+      return (
+        <FormattedMessage
+          id="station.arrivals.first_estimate"
+          defaultMessage="First train estimate"
+        />
+      );
+    case 'last_train':
+      return (
+        <FormattedMessage
+          id="station.arrivals.last_estimate"
+          defaultMessage="Last train estimate"
+        />
+      );
+    case 'frequency_estimate':
+      return (
+        <FormattedMessage
+          id="station.arrivals.frequency_estimate"
+          defaultMessage="Frequency estimate"
+        />
+      );
+  }
 }

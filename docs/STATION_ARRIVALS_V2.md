@@ -61,7 +61,19 @@ promotion and other unexpected failures are logged server-side and return HTTP
 500 with `{ success: false, error: "Arrival refresh failed" }`. Such failures
 never become successful coverage gaps or expose exception strings.
 
-This endpoint adds API capability only. The legacy arrivals endpoint and UI
-remain unchanged. UI integration and any scheduled crowd overlay are later work;
-real producer publication and mapping/source/release approvals remain independent
-gates. This API neither grants approvals nor publishes or backfills GTFS data.
+The station guide refreshes this endpoint once per unique canonical branch,
+using the existing SSR branch metadata without guessing destination or platform
+IDs. SSR frequency estimates remain labeled initial estimates until a validated
+v2 response replaces them. Refreshes run every 30 seconds with at most two
+concurrent requests and a 15-second batch timeout; station changes and report
+refreshes invalidate older work. Refresh failures mark retained responses as
+last known rather than silently restoring SSR estimates.
+
+The existing guide layout distinguishes scheduled, approximate scheduled,
+frequency/community estimates, incomplete coverage, empty query windows and
+unavailable results. Platform alternatives stay grouped with one departure.
+Estimate calibration controls are confined to frequency/initial estimate rows;
+there is no scheduled crowd overlay and scheduled times are never shifted.
+The legacy endpoint remains available. Real producer publication,
+mapping/source/release approvals and later realtime integration remain separate
+work. This UI neither grants approvals nor publishes or backfills GTFS data.
