@@ -95,6 +95,44 @@ describe('private station arrival source policy', () => {
     expect(selectStationArrivalSource(gap, null).reason).toBe(
       'frequency-unavailable',
     );
+    const rejected = {
+      ...gap,
+      serviceDays: [
+        {
+          ...gapDay,
+          rollback: {
+            status: 'rejected' as const,
+            review: {
+              schemaVersion: 1 as const,
+              documentKind: 'scheduled-timetable-rollback-review' as const,
+              from: {
+                manifestSha256: 'a'.repeat(64),
+                snapshotSha256: 'b'.repeat(64),
+              },
+              to: {
+                manifestSha256: 'c'.repeat(64),
+                snapshotSha256: 'd'.repeat(64),
+              },
+              dateRange: {
+                startDate: gapDay.serviceDate,
+                endDate: gapDay.serviceDate,
+              },
+              scope,
+              reviewer: 'test reviewer',
+              reviewedAt: result.window.startInstant,
+              reason: 'Synthetic rollback review',
+            },
+            selectionInstant: result.window.startInstant,
+            blockers: ['rollback-from-is-not-current-selection'],
+          },
+        },
+      ],
+    };
+    expect(selectStationArrivalSource(rejected, frequency)).toEqual({
+      source: 'unavailable',
+      reason: 'timetable-unavailable',
+      scheduled: rejected,
+    });
     const unrelated = {
       ...frequency,
       timing: { ...frequency.timing, destinationStationId: 'another' },

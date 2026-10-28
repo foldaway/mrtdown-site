@@ -41,14 +41,15 @@ export function selectStationArrivalSource(
     return { source: 'scheduled', reason: 'complete', scheduled };
   }
   const hasFailure = scheduled.serviceDays.some(
-    ({ selected, attempts }) =>
-      selected === null &&
-      attempts.some(
-        ({ reason }) =>
-          reason !== 'outside-feed-range' &&
-          reason !== 'scope-not-covered' &&
-          reason !== 'mapping-coverage-gap',
-      ),
+    ({ selected, attempts, rollback }) =>
+      rollback?.status === 'rejected' ||
+      (selected === null &&
+        attempts.some(
+          ({ reason }) =>
+            reason !== 'outside-feed-range' &&
+            reason !== 'scope-not-covered' &&
+            reason !== 'mapping-coverage-gap',
+        )),
   );
   if (
     scheduled.unavailableProjections.length > 0 ||

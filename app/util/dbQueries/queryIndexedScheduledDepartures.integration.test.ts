@@ -7,9 +7,11 @@ import {
   hashBytes,
   queryRetainedScheduledDepartures,
   scheduleTopologyProjection,
+  selectRetainedScheduledTimetable,
+  type ScheduledTimetableRollbackOptions,
 } from '@mrtdown/fs';
 import { DateTime } from 'luxon';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import {
@@ -212,6 +214,26 @@ const scope = {
 const window = {
   startInstant: '2026-10-25T00:00:00+08:00',
   endInstant: '2026-10-25T01:00:00+08:00',
+};
+const rollback: ScheduledTimetableRollbackOptions = {
+  review: {
+    schemaVersion: 1,
+    documentKind: 'scheduled-timetable-rollback-review',
+    from: {
+      manifestSha256: newer.entry.manifestSha256,
+      snapshotSha256: newer.entry.capture.sha256,
+    },
+    to: {
+      manifestSha256: older.entry.manifestSha256,
+      snapshotSha256: older.entry.capture.sha256,
+    },
+    dateRange: { startDate: '2026-10-25', endDate: '2026-10-25' },
+    scope,
+    reviewer: 'test reviewer',
+    reviewedAt: '2026-10-25T00:04:00Z',
+    reason: 'Synthetic exact-scope rollback review',
+  },
+  selectionInstant: '2026-10-25T00:05:00Z',
 };
 const hashed = <T extends { id: string }>(rows: T[]) =>
   rows.map((row) => ({
@@ -634,6 +656,232 @@ describe.skipIf(!url)('indexed departure window', () => {
         })
       ).departures,
     ).toEqual(result.departures.slice(0, 1));
+  });
+
+  it('applies only the exact reviewed date/scope and preserves overnight audit and shared selector behavior', async () => {
+    const before = await db().select().from(timetables);
+    const result = await queryIndexedScheduledDepartures(db(), {
+      ...options(),
+      rollback,
+    });
+    const expected = await queryRetainedScheduledDepartures({
+      ...shared(),
+      rollback,
+    });
+    expect(result.complete).toBe(true);
+    expect(result.departures).toEqual(expected.departures);
+    expect(
+      result.serviceDays.map((day) => ({
+        serviceDate: day.serviceDate,
+        manifestSha256: day.selected?.version.manifestSha256 ?? null,
+        attempts: day.attempts,
+        rollback: day.rollback,
+      })),
+    ).toEqual(expected.serviceDays);
+    expect(result.serviceDays.map((day) => day.rollback?.status)).toEqual([
+      'not-applicable',
+      'applied',
+    ]);
+    expect(result.departures.map(({ serviceDate }) => serviceDate)).toEqual([
+      '2026-10-24',
+      '2026-10-24',
+    ]);
+    const reader = await readStationArrivalSource(db(), {
+      scope,
+      referenceInstant: window.startInstant,
+      endInstant: window.endInstant,
+      rollback,
+      limit: 1,
+    });
+    expect(reader.source).toBe('scheduled');
+    expect(reader.scheduled.serviceDays).toEqual(result.serviceDays);
+    expect(reader.scheduled.lines[0].arrivalTimings[0].departures).toHaveLength(
+      1,
+    );
+    for (const changedScope of [
+      { ...scope, platformId: 'platform-1' },
+      { ...scope, stationId: 'station-2' },
+      { ...scope, destinationStationId: 'station-2' },
+    ]) {
+      const normal = await queryIndexedScheduledDepartures(db(), {
+        ...options(),
+        scope: changedScope,
+      });
+      const nonapplicable = await queryIndexedScheduledDepartures(db(), {
+        ...options(),
+        scope: changedScope,
+        rollback,
+      });
+      expect(nonapplicable).toEqual({
+        ...normal,
+        serviceDays: normal.serviceDays.map((day) => ({
+          ...day,
+          rollback: { ...rollback, status: 'not-applicable', blockers: [] },
+        })),
+      });
+      const sharedSelection = await selectRetainedScheduledTimetable({
+        ...shared(),
+        scope: changedScope,
+        serviceDate: '2026-10-25',
+        rollback,
+      });
+      expect(nonapplicable.serviceDays[1].rollback).toEqual(
+        sharedSelection.rollback,
+      );
+    }
+    const platform = { ...scope, platformId: 'platform-1' };
+    const platformRollback = {
+      ...rollback,
+      review: { ...rollback.review, scope: platform },
+    };
+    expect(
+      (
+        await queryIndexedScheduledDepartures(db(), {
+          ...options(),
+          scope: platform,
+          rollback: platformRollback,
+        })
+      ).serviceDays[1].rollback?.status,
+    ).toBe('applied');
+    expect(
+      (
+        await queryIndexedScheduledDepartures(db(), {
+          ...options(),
+          rollback: platformRollback,
+        })
+      ).serviceDays[1].rollback?.status,
+    ).toBe('not-applicable');
+    expect(await db().select().from(timetables)).toEqual(before);
+  });
+
+  it('rejects stale identities, ordering and review clocks with public-selector parity and no substituted selection', async () => {
+    for (const review of [
+      { ...rollback.review, from: rollback.review.to },
+      { ...rollback.review, to: rollback.review.from },
+      {
+        ...rollback.review,
+        to: { ...rollback.review.to, manifestSha256: 'c'.repeat(64) },
+      },
+      {
+        ...rollback.review,
+        from: { ...rollback.review.from, snapshotSha256: 'd'.repeat(64) },
+      },
+      {
+        ...rollback.review,
+        to: { ...rollback.review.to, snapshotSha256: 'd'.repeat(64) },
+      },
+      { ...rollback.review, reviewedAt: '2026-10-25T00:02:59Z' },
+      { ...rollback.review, reviewedAt: '2026-10-25T00:05:01Z' },
+    ]) {
+      const invalid = { ...rollback, review };
+      const sharedSelection = await selectRetainedScheduledTimetable({
+        ...shared(),
+        serviceDate: '2026-10-25',
+        rollback: invalid,
+      });
+      const result = await readStationArrivalSource(db(), {
+        scope,
+        referenceInstant: window.startInstant,
+        endInstant: window.endInstant,
+        rollback: invalid,
+      });
+      expect(result).toMatchObject({
+        source: 'unavailable',
+        reason: 'timetable-unavailable',
+        scheduled: { complete: false },
+      });
+      expect(result.scheduled.serviceDays[1]).toMatchObject({
+        selected: null,
+        rollback: sharedSelection.rollback,
+        attempts: sharedSelection.attempts,
+      });
+      expect(result.scheduled.serviceDays[1].rollback?.status).toBe('rejected');
+    }
+  });
+
+  it('rechecks the exact older projection and refuses frequency fallback even when all normal attempts are gaps', async () => {
+    const [target] = await db()
+      .select()
+      .from(projections)
+      .where(eq(projections.manifest_sha256, older.entry.manifestSha256));
+    for (const patch of [
+      { completed_at: null },
+      { projector_version: 2 },
+      { topology_sha256: 'e'.repeat(64) },
+      { feed_end_date: '2026-10-24' },
+    ]) {
+      await db()
+        .update(projections)
+        .set(patch)
+        .where(eq(projections.id, target.id));
+      const result = await queryIndexedScheduledDepartures(db(), {
+        ...options(),
+        rollback,
+      });
+      expect(
+        result.serviceDays.find(
+          ({ serviceDate }) => serviceDate === '2026-10-25',
+        ),
+      ).toMatchObject({
+        selected: null,
+        rollback: {
+          status: 'rejected',
+          blockers: ['rollback-target-is-not-eligible'],
+        },
+      });
+      expect(result.complete).toBe(false);
+      await db()
+        .update(projections)
+        .set({
+          completed_at: target.completed_at,
+          projector_version: target.projector_version,
+          topology_sha256: target.topology_sha256,
+          feed_end_date: target.feed_end_date,
+        })
+        .where(eq(projections.id, target.id));
+    }
+    await db()
+      .update(days)
+      .set({ unassigned_active_trip_count: 1 })
+      .where(
+        and(eq(days.projection_id, target.id), eq(days.active_trip_count, 1)),
+      );
+    const ineligible = await queryIndexedScheduledDepartures(db(), {
+      ...options(),
+      rollback,
+    });
+    expect(ineligible.serviceDays[1]).toMatchObject({
+      selected: null,
+      rollback: {
+        status: 'rejected',
+        blockers: ['rollback-target-is-not-eligible'],
+      },
+    });
+    expect(
+      ineligible.serviceDays[1].attempts.map(({ reason }) => reason),
+    ).toEqual(['eligible', 'mapping-coverage-gap']);
+    await db()
+      .update(days)
+      .set({ unassigned_active_trip_count: 1 })
+      .where(eq(days.active_trip_count, 1));
+    const result = await readStationArrivalSource(db(), {
+      scope,
+      referenceInstant: window.startInstant,
+      endInstant: window.endInstant,
+      rollback,
+    });
+    expect(result).toMatchObject({
+      source: 'unavailable',
+      reason: 'timetable-unavailable',
+      scheduled: { complete: false, lines: [{ arrivalTimings: [] }] },
+    });
+    expect(
+      result.scheduled.serviceDays[1].attempts.map(({ reason }) => reason),
+    ).toEqual(['mapping-coverage-gap', 'mapping-coverage-gap']);
+    expect(result.scheduled.serviceDays[1].rollback).toMatchObject({
+      status: 'rejected',
+      blockers: ['rollback-from-is-not-current-selection'],
+    });
   });
 
   it('distinguishes untimed, missing, whole-source mapping gaps and covered empty dates without truncating counts', async () => {

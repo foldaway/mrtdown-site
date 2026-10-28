@@ -40,7 +40,7 @@
     "@heroicons/react": "^2.2.0",
     "@js-temporal/polyfill": "^0.5.1",
     "@mrtdown/core": "^2.0.0-alpha.39",
-    "@mrtdown/fs": "^2.0.0-alpha.43",
+    "@mrtdown/fs": "^2.0.0-alpha.44",
     "@mrtdown/ingest-contracts": "^2.0.0-alpha.31",
     "@posthog/react": "^1.8.3",
     "@sentry/tanstackstart-react": "^10.47.0",

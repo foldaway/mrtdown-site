@@ -59,6 +59,7 @@ export const result: Awaited<
           },
         },
       },
+      rollback: null,
       attempts: [
         { manifestSha256: bundle.entry.manifestSha256, reason: 'eligible' },
       ],
