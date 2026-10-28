@@ -23,10 +23,9 @@ import {
 } from './stationArrivalRefresh';
 import type { ArrivalLine } from './stationGuide.types';
 
+type MockLinkProps = { children: React.ReactNode };
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children }: { children: React.ReactNode }) => (
-    <span>{children}</span>
-  ),
+  Link: ({ children }: MockLinkProps) => <span>{children}</span>,
 }));
 const scheduled = serializeStationArrivalsV2({
   source: 'scheduled',

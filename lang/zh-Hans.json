@@ -400,7 +400,7 @@
   "station.arrivals.approximate_scheduled": "计划时刻（约）",
   "station.arrivals.crowd_estimate": "社区估算",
   "station.arrivals.empty_window": "{start} 至 {end}（新加坡时间）之间没有计划发车。",
-  "station.arrivals.explainer": "计划时刻来自已发布的时刻表；约定时刻的精确度较低。班次间隔估算使用公布的服务时间和通常的班次间隔，也可能参考社区报告。两者都不是实时列车追踪。时刻表覆盖可能不完整。",
+  "station.arrivals.explainer": "计划时刻来自已发布的时刻表；“计划时刻（约）”的精确度较低。班次间隔估算使用公布的服务时间和通常的班次间隔，也可能参考社区报告。两者都不是实时列车追踪。时刻表覆盖可能不完整。",
   "station.arrivals.explainer_label": "到站时间说明",
   "station.arrivals.first_estimate": "首班车估算",
   "station.arrivals.frequency_estimate": "班次间隔估算",
