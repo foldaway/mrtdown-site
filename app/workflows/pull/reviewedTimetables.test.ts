@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { access, mkdtemp, readFile } from 'node:fs/promises';
-import type { Manifest } from '@mrtdown/core';
+import type { Manifest, ScheduledTimetableSourceReview } from '@mrtdown/core';
+import {
+  projectCombinedTimetableServiceDay,
+  verifyCombinedTimetableReleaseBundle,
+} from '@mrtdown/fs';
 import type { WorkflowContext } from '@upstash/workflow';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { zipSync } from 'fflate';
@@ -23,6 +27,7 @@ import {
 } from '~/util/dbQueries/projectScheduledTimetable';
 import { retainScheduledTimetable } from '~/util/dbQueries/retainScheduledTimetable';
 import { retentionReview } from '~/util/dbQueries/scheduledTimetableRetention.fixture';
+import { combinedTimetableArchiveFixture } from './helpers/combinedTimetableArchive.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
 import { fetchManifest } from './helpers/fetchManifest';
 import { recordCanonicalManifestFingerprint } from './helpers/manifestFingerprint';
@@ -158,6 +163,7 @@ const baselineTopologyHash = JSON.parse(
   Buffer.from(baseline.files['manifest.json']).toString(),
 ).identity.topology.sha256;
 const successor = scheduledTimetableArchiveFixture('b', allocation);
+const combined = combinedTimetableArchiveFixture();
 const manifest: Manifest = {
   manifestVersion: 2,
   generatedAt: '2026-10-24T00:00:00Z',
@@ -184,6 +190,25 @@ function advertise(bundle = baseline, snapshot = canonical.archive()) {
             `data/scheduled-timetable/${name}`,
             bytes,
           ]),
+        ),
+      }),
+    ),
+  );
+}
+function advertiseCombined({
+  snapshot = combined.snapshot,
+  releaseBytes = combined.files.releaseBytes,
+} = {}) {
+  vi.mocked(fetchManifest).mockResolvedValue(snapshot.manifest);
+  vi.mocked(fetchArchive).mockResolvedValue(
+    Buffer.from(
+      zipSync({
+        ...snapshot.files,
+        'data/combined-timetable/manifest.json': combined.files.manifestBytes,
+        'data/combined-timetable/timetable.json': combined.files.timetableBytes,
+        'data/combined-timetable/release.json': releaseBytes,
+        'data/combined-timetable/release-index.json': Buffer.from(
+          JSON.stringify(combined.index),
         ),
       }),
     ),
@@ -231,6 +256,26 @@ afterEach(async () => {
 });
 
 describe('pull timetable admission', () => {
+  it('requires a trusted index even when the combined archive contains its own index', async () => {
+    advertiseCombined();
+    await expect(workflow().run()).rejects.toThrow(
+      'independently trusted release index',
+    );
+    expect(truncateStagingTables).not.toHaveBeenCalled();
+  });
+
+  it('rejects changed evidence and a different canonical topology before staging', async () => {
+    const payload = { combinedReleaseIndex: combined.index };
+    advertiseCombined({ releaseBytes: Buffer.from('{}') });
+    await expect(workflow(payload).run()).rejects.toThrow('expected SHA-256');
+    advertiseCombined({ snapshot: canonical.archive() });
+    await expect(workflow(payload).run()).rejects.toThrow(
+      'topology differs from canonical data',
+    );
+    expect(truncateStagingTables).not.toHaveBeenCalled();
+    expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
+  });
+
   it.each([undefined, '', {}])(
     'keeps empty GTFS-free pulls working: %s',
     async (payload) => {
@@ -341,6 +386,7 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     for (const migration of [
       '20261024214325_superb_violations',
       '20261025200054_violet_energizer',
+      '20261108020149_combined_timetable_retention',
     ]) {
       await pool.query(
         await readFile(
@@ -378,6 +424,79 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
         'SELECT * FROM scheduled_departure_projections ORDER BY manifest_sha256',
       )
     ).rows;
+
+  it('retains a combined successor once and preserves the effective Singapore date and overnight shared departure', async () => {
+    await workflow({ sourceReview: retentionReview(baseline) }).run();
+    const first = await rows();
+    const legacyProjections = await projections();
+    advertiseCombined();
+    const combinedReleaseIndex = combined.index;
+    await expect(workflow({ combinedReleaseIndex }).run()).rejects.toThrow(
+      'source-review-required',
+    );
+    expect(await rows()).toEqual(first);
+
+    const sourceReview: ScheduledTimetableSourceReview = {
+      ...retentionReview(successor, baseline),
+      successor: {
+        manifestSha256: combined.index.manifestSha256,
+        snapshotSha256: combined.capture.sha256,
+      },
+      reviewedAt: '2026-11-03T00:00:00Z',
+    };
+    await workflow({ combinedReleaseIndex, sourceReview }).run();
+    const retained = await rows();
+    expect(retained).toHaveLength(2);
+    const row = retained.find(
+      ({ manifest_sha256 }) =>
+        manifest_sha256 === combined.index.manifestSha256,
+    );
+    expect(row).toMatchObject({
+      predecessor_sha256: baseline.entry.manifestSha256,
+      combined_release: { index: combined.index },
+      manifest_bytes: combined.files.manifestBytes,
+      timetable_bytes: combined.files.timetableBytes,
+      release_bytes: combined.files.releaseBytes,
+      pages_entry: null,
+      notice_bytes: null,
+      import_record: { sourceReview },
+    });
+    expect(await projections()).toEqual(legacyProjections);
+    const { artifact } = verifyCombinedTimetableReleaseBundle(
+      row.combined_release.index,
+      {
+        manifestBytes: row.manifest_bytes,
+        timetableBytes: row.timetable_bytes,
+        releaseBytes: row.release_bytes,
+      },
+      combined.topology,
+    );
+    const day = projectCombinedTimetableServiceDay(artifact, '2026-11-30');
+    expect(day?.activeTripCount).toBe(1);
+    expect([...(day?.departures ?? [])]).toMatchObject([
+      {
+        providerTripId: 'trip',
+        stopSequence: '9007199254740993',
+        serviceDate: '2026-11-30',
+        departureInstant: '2026-11-30T17:00:00Z',
+        boardingByService: [
+          { serviceId: 'service', platformIds: ['platform-1'] },
+          { serviceId: 'service-shared', platformIds: ['platform-1'] },
+        ],
+      },
+    ]);
+    expect(
+      projectCombinedTimetableServiceDay(artifact, '2026-11-29')
+        ?.activeTripCount,
+    ).toBe(0);
+    expect(
+      projectCombinedTimetableServiceDay(artifact, '2026-12-01'),
+    ).toBeNull();
+
+    state.fingerprint = undefined;
+    await workflow({ combinedReleaseIndex }).run();
+    expect(await rows()).toEqual(retained);
+  });
 
   it('projects before staging, replays admission and preserves historical projections', async () => {
     const pull = workflow({ sourceReview: retentionReview(baseline) });

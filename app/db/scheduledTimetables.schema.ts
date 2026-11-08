@@ -21,19 +21,38 @@ export const scheduledTimetablesTable = pgTable(
       (): AnyPgColumn => scheduledTimetablesTable.manifest_sha256,
     ),
     import_record: jsonb('import_record').notNull(),
-    pages_entry: jsonb('pages_entry').notNull(),
+    pages_entry: jsonb('pages_entry'),
+    combined_release: jsonb('combined_release'),
     manifest_bytes: bytes('manifest_bytes').notNull(),
     timetable_bytes: bytes('timetable_bytes').notNull(),
-    notice_bytes: bytes('notice_bytes').notNull(),
+    notice_bytes: bytes('notice_bytes'),
     release_bytes: bytes('release_bytes').notNull(),
-    mapping_draft_bytes: bytes('mapping_draft_bytes').notNull(),
-    mapping_approval_bytes: bytes('mapping_approval_bytes').notNull(),
-    release_review_bytes: bytes('release_review_bytes').notNull(),
+    mapping_draft_bytes: bytes('mapping_draft_bytes'),
+    mapping_approval_bytes: bytes('mapping_approval_bytes'),
+    release_review_bytes: bytes('release_review_bytes'),
   },
   (table) => [
     unique('scheduled_timetables_predecessor_unique')
       .on(table.predecessor_sha256)
       .nullsNotDistinct(),
+    check(
+      'scheduled_timetables_bundle_format',
+      sql`(
+        ${table.combined_release} IS NULL
+        AND ${table.pages_entry} IS NOT NULL
+        AND ${table.notice_bytes} IS NOT NULL
+        AND ${table.mapping_draft_bytes} IS NOT NULL
+        AND ${table.mapping_approval_bytes} IS NOT NULL
+        AND ${table.release_review_bytes} IS NOT NULL
+      ) OR (
+        ${table.combined_release} IS NOT NULL
+        AND ${table.pages_entry} IS NULL
+        AND ${table.notice_bytes} IS NULL
+        AND ${table.mapping_draft_bytes} IS NULL
+        AND ${table.mapping_approval_bytes} IS NULL
+        AND ${table.release_review_bytes} IS NULL
+      )`,
+    ),
     check(
       'scheduled_timetables_manifest_digest',
       sql`${table.manifest_sha256} ~ '^[a-f0-9]{64}$'`,

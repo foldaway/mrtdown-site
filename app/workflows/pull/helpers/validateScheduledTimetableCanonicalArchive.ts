@@ -22,7 +22,7 @@ const domains = [
 export async function createValidatedScheduledTimetableCanonicalSnapshot(
   manifest: Manifest,
   store: Pick<ZipStore, 'readBytes' | 'listDir'>,
-  bundle: VerifiedScheduledTimetableBundle,
+  bundle?: VerifiedScheduledTimetableBundle,
 ) {
   const dataDir = await mkdtemp(join(tmpdir(), 'mrtdown-timetable-'));
   try {
@@ -57,15 +57,17 @@ export async function createValidatedScheduledTimetableCanonicalSnapshot(
       }
     }
     // Only canonical domains go to disk. Reuse the verified timetable bytes.
-    await verifyScheduledTimetableForCanonicalData(
-      bundle.files['manifest.json'],
-      bundle.entry.manifestSha256,
-      {
-        timetableBytes: bundle.files['timetable.json'],
-        noticeBytes: bundle.files['NOTICE.txt'],
-      },
-      { dataDir },
-    );
+    if (bundle) {
+      await verifyScheduledTimetableForCanonicalData(
+        bundle.files['manifest.json'],
+        bundle.entry.manifestSha256,
+        {
+          timetableBytes: bundle.files['timetable.json'],
+          noticeBytes: bundle.files['NOTICE.txt'],
+        },
+        { dataDir },
+      );
+    }
     return {
       canonicalDataDir: dataDir,
       dispose: () => rm(dataDir, { recursive: true, force: true }),

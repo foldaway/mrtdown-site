@@ -16,6 +16,22 @@ const schema = `gtfs_test_${randomUUID().replaceAll('-', '')}`;
 describe.skipIf(!url)('scheduled timetable migration', () => {
   let admin: Pool;
   let pool: Pool;
+  async function migrate() {
+    for (const migration of [
+      '20261024214325_superb_violations',
+      '20261108020149_combined_timetable_retention',
+    ]) {
+      await pool.query(
+        await readFile(
+          new URL(
+            `../../../drizzle/${migration}/migration.sql`,
+            import.meta.url,
+          ),
+          'utf8',
+        ),
+      );
+    }
+  }
   beforeAll(async () => {
     admin = new Pool({ connectionString: url });
     await admin.query(`CREATE SCHEMA ${schema}`);
@@ -23,15 +39,7 @@ describe.skipIf(!url)('scheduled timetable migration', () => {
       connectionString: url,
       options: `-c search_path=${schema}`,
     });
-    await pool.query(
-      await readFile(
-        new URL(
-          '../../../drizzle/20261024214325_superb_violations/migration.sql',
-          import.meta.url,
-        ),
-        'utf8',
-      ),
-    );
+    await migrate();
   });
   afterAll(async () => {
     await pool?.end();
@@ -125,15 +133,7 @@ describe.skipIf(!url)('scheduled timetable migration', () => {
     beforeEach(async () => {
       // Recreate only this test's isolated table, including after corruption cases.
       await pool.query('DROP TABLE scheduled_timetables');
-      await pool.query(
-        await readFile(
-          new URL(
-            '../../../drizzle/20261024214325_superb_violations/migration.sql',
-            import.meta.url,
-          ),
-          'utf8',
-        ),
-      );
+      await migrate();
     });
 
     it('requires baseline review and preserves all seven bytes and the first receipt on retries', async () => {

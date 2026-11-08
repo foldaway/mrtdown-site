@@ -18,6 +18,8 @@ Use plans for:
 
 ## Active
 
+- [Combined timetable departure index](active/combined-timetable-index.md) for
+  effective Singapore service dates and shared journeys.
 - [Dynamic system map](active/dynamic-system-map.md): canonical schematic map
   data and data-driven site rendering.
 - [Production performance](active/production-performance.md): public route

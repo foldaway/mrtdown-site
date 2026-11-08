@@ -7,23 +7,18 @@ import { createWorkflow } from '@upstash/workflow/tanstack';
 import { ZipStore } from '~/helpers/ZipStore.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts.js';
-import {
-  projectScheduledTimetable,
-  SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
-} from '~/util/dbQueries/projectScheduledTimetable.js';
-import { retainScheduledTimetable } from '~/util/dbQueries/retainScheduledTimetable.js';
 import { rebuildSitemapSnapshot } from '~/util/dbQueries/sitemap.js';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics.js';
 import { getDb } from '../../db/index.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
+import { importScheduledTimetableArchive } from './helpers/importScheduledTimetableArchive.js';
 import {
   getCanonicalManifestFingerprint,
   isCanonicalManifestCurrent,
   recordCanonicalManifestFingerprint,
 } from './helpers/manifestFingerprint.js';
 import { type PullParams, PullParamsSchema } from './helpers/pullParams.js';
-import { readScheduledTimetableArchive } from './helpers/readScheduledTimetableArchive.js';
 import {
   deleteLineOrphans,
   deleteOperatorsTownsLandmarksOrphans,
@@ -46,7 +41,6 @@ import {
   syncStations,
   truncateStagingTables,
 } from './helpers/stagingSync.js';
-import { createValidatedScheduledTimetableCanonicalSnapshot } from './helpers/validateScheduledTimetableCanonicalArchive.js';
 import {
   acquireOrRenewPullWorkflowLease,
   releasePullWorkflowLease,
@@ -96,7 +90,13 @@ async function executePull(
       return { manifest, dataUrl, importInstant: new Date().toISOString() };
     },
   );
-  if (params.sourceReview && !manifest.scheduledTimetable) {
+  const { combinedReleaseIndex, sourceReview } = params;
+  if (combinedReleaseIndex && manifest.scheduledTimetable) {
+    throw new WorkflowNonRetryableError(
+      'Pull must specify only one scheduled timetable format',
+    );
+  }
+  if (sourceReview && !manifest.scheduledTimetable && !combinedReleaseIndex) {
     throw new WorkflowNonRetryableError(
       'Source review supplied without an advertised scheduled timetable',
     );
@@ -104,7 +104,7 @@ async function executePull(
   const manifestFingerprint = await runPullStep(
     context,
     'manifest-fingerprint',
-    async () => getCanonicalManifestFingerprint(manifest),
+    async () => getCanonicalManifestFingerprint(manifest, combinedReleaseIndex),
   );
   const manifestIsCurrent = await runPullStep(
     context,
@@ -124,33 +124,11 @@ async function executePull(
 
     const repo = new MRTDownRepository({ store });
     const db = getDb();
-    const timetable = await readScheduledTimetableArchive(manifest, store);
-    if (timetable) {
-      const snapshot = await createValidatedScheduledTimetableCanonicalSnapshot(
-        manifest,
-        store,
-        timetable,
-      );
-      try {
-        const result = await retainScheduledTimetable(db, timetable, {
-          sourceReview: params.sourceReview,
-          importInstant,
-        });
-        if (result.status === 'blocked') {
-          throw new WorkflowNonRetryableError(
-            `Scheduled timetable retention blocked: ${result.blockers.join(', ')}`,
-          );
-        }
-        console.log(`[PULL] Scheduled timetable ${result.status}`);
-        await projectScheduledTimetable(db, {
-          manifestSha256: timetable.entry.manifestSha256,
-          projectorVersion: SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
-          canonicalDataDir: snapshot.canonicalDataDir,
-        });
-      } finally {
-        await snapshot.dispose();
-      }
-    }
+    await importScheduledTimetableArchive(db, manifest, store, {
+      combinedReleaseIndex,
+      sourceReview,
+      importInstant,
+    });
     await truncateStagingTables(db);
 
     // Stage one repository domain at a time so the workflow does not retain
