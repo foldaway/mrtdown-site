@@ -49,9 +49,6 @@ function combinedCoveragePatterns(artifact: Artifact, topology: Topology) {
   const services = new Map(
     topology.services.map((service) => [service.id, service]),
   );
-  const stations = new Map(
-    topology.stations.map((station) => [station.id, station]),
-  );
   const usedPatternIds = new Set(
     artifact.assignments.map(({ patternId }) => patternId),
   );
@@ -84,23 +81,6 @@ function combinedCoveragePatterns(artifact: Artifact, topology: Topology) {
             )
             .map(({ platformId }) => platformId);
           if (!platformIds.length) continue;
-          const station = stations.get(call.stationId);
-          for (const id of platformIds) {
-            const platform = station?.platforms.find(
-              (platform) => platform.id === id,
-            );
-            if (
-              !platform ||
-              platform.lineId !== pattern.lineId ||
-              platform.boardingStatus ||
-              (platform.serviceIds.length &&
-                !platform.serviceIds.includes(serviceId))
-            ) {
-              throw new Error(
-                'Combined timetable boarding access differs from canonical topology',
-              );
-            }
-          }
           scopes.push({
             station_id: call.stationId,
             line_id: pattern.lineId,
@@ -134,7 +114,7 @@ function combinedCoveragePatterns(artifact: Artifact, topology: Topology) {
   return [...coverage.values()].flat();
 }
 
-/** Coverage follows used patterns and active revisions, even on empty dates. */
+/** Project a verified release. Coverage follows used patterns and active revisions. */
 export function* combinedDepartureRows(artifact: Artifact, topology: Topology) {
   const { startDate, endDateExclusive } =
     artifact.applicabilityPolicy.serviceDateRange;

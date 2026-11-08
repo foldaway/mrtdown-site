@@ -7,7 +7,7 @@ import {
   ScheduledTimetableRollbackOptionsSchema,
   type ScheduledTimetableSelectionAttempt,
 } from '@mrtdown/fs';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, arrayContains, count, eq, inArray } from 'drizzle-orm';
 import z from 'zod';
 import type { getDb } from '~/db';
 import {
@@ -122,22 +122,21 @@ function validateScope(scope: IndexedTimetableScope, topology: Topology) {
         'Timetable request stations do not belong to its service',
       );
     }
-    if (scope.platformId !== undefined) {
-      const platforms = station.platforms.filter(
-        ({ id }) => id === scope.platformId,
-      );
-      if (
-        platforms.length !== 1 ||
-        platforms[0].lineId !== line.id ||
-        (platforms[0].serviceIds.length > 0 &&
-          !platforms[0].serviceIds.includes(service.id))
-      ) {
-        throw new InvalidStationArrivalScopeError(
-          'Timetable request platform does not belong to its station, line and service',
-        );
-      }
-    }
   }
+  if (scope.platformId === undefined) return true;
+  const platforms = station.platforms.filter(
+    ({ id }) => id === scope.platformId,
+  );
+  if (platforms.length !== 1 || platforms[0].lineId !== line.id) {
+    throw new InvalidStationArrivalScopeError(
+      'Timetable request platform does not belong to its station and line',
+    );
+  }
+  const { serviceIds } = platforms[0];
+  return (
+    !serviceIds.length ||
+    indexedServiceIds(scope).every((id) => serviceIds.includes(id))
+  );
 }
 
 /**
@@ -182,7 +181,7 @@ export async function withScheduledTimetableSnapshot<
         await (options.readCanonicalTopology ?? readLiveScheduleTopology)(tx),
       );
       z.number().int().positive().parse(topology.projectionVersion);
-      validateScope(scope, topology);
+      const matchesPlatformDefaults = validateScope(scope, topology);
       const fingerprint = hashBytes(Buffer.from(JSON.stringify(topology)));
       // Check the full source chain before considering derived projections.
       const history = validateScheduledTimetableHistory(
@@ -252,6 +251,40 @@ export async function withScheduledTimetableSnapshot<
           return 'projection-metadata-mismatch';
         }
       };
+      // A combined projection can establish an explicitly reviewed service/platform scope.
+      if (!matchesPlatformDefaults && scope.platformId !== undefined) {
+        const combinedProjectionIds = history.flatMap((version) => {
+          const projection = projectionFor(version);
+          return version.format === 'combined' &&
+            projection &&
+            !projectionReason(version)
+            ? [projection.id]
+            : [];
+        });
+        const [covered] = combinedProjectionIds.length
+          ? await tx
+              .select({ projectionId: scopes.projection_id })
+              .from(scopes)
+              .where(
+                and(
+                  inArray(scopes.projection_id, combinedProjectionIds),
+                  eq(scopes.station_id, scope.stationId),
+                  eq(scopes.line_id, scope.lineId),
+                  eq(scopes.destination_station_id, scope.destinationStationId),
+                  inArray(scopes.service_id, serviceIds),
+                  arrayContains(scopes.platform_ids, [scope.platformId]),
+                ),
+              )
+              .groupBy(scopes.projection_id, scopes.service_date)
+              .having(eq(count(), serviceIds.length))
+              .limit(1)
+          : [];
+        if (!covered) {
+          throw new InvalidStationArrivalScopeError(
+            'Timetable request platform does not belong to its station, line and service',
+          );
+        }
+      }
       let maximumDepartureSeconds = 0;
       const unavailableProjections: {
         manifestSha256: string;

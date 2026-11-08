@@ -133,9 +133,13 @@ export function combinedTimetableArchiveFixture() {
           platformId,
           boardingStatus: platform.boardingStatus ?? null,
           accessByService: serviceMemberships.map((member) => {
+            const reviewedAllocation =
+              platformId === 'platform-1' &&
+              member.serviceId === 'service-shared';
             const serviceScope = !platform.serviceIds.length
               ? 'unspecified'
-              : platform.serviceIds.includes(member.serviceId)
+              : platform.serviceIds.includes(member.serviceId) ||
+                  reviewedAllocation
                 ? 'listed'
                 : 'excluded';
             const canAccess =
@@ -181,6 +185,7 @@ export function combinedTimetableArchiveFixture() {
       dateBasis: 'service-date',
       timezone: 'Asia/Singapore',
       serviceDateRange,
+      captureServiceDate: '2026-11-02',
       basis: 'Synthetic holiday-adjusted service dates',
     },
     trips: [
