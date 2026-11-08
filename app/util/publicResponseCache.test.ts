@@ -1,9 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import {
+  requestHandler,
+  setResponseHeader,
+} from '@tanstack/react-start/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyPublicDataCacheHeaders,
   getPublicDataCacheTag,
   PUBLIC_BROWSER_CACHE_CONTROL,
   PUBLIC_CLOUDFLARE_CACHE_CONTROL,
+  STATION_PROFILE_FRESH_UNTIL_HEADER,
 } from './publicResponseCache';
 
 function request(init?: RequestInit) {
@@ -58,21 +63,39 @@ describe('public response cache policy', () => {
     'https://www.mrtdown.org/stations/NS1',
     'https://www.mrtdown.org/stations/NS1/',
     'https://www.mrtdown.org/en-SG/stations/NS1',
-  ])('keeps live station profile HTML uncached at %s', (url) => {
-    const stationResponse = applyPublicDataCacheHeaders(
-      new Request(url),
-      response('text/html; charset=utf-8'),
-    );
+  ])(
+    'keeps station HTML without a freshness deadline uncached at %s',
+    (url) => {
+      const stationResponse = applyPublicDataCacheHeaders(
+        new Request(url),
+        response('text/html; charset=utf-8'),
+      );
 
-    expect(stationResponse.headers.get('cache-control')).toBe('no-store');
-    expect(
-      stationResponse.headers.get('cloudflare-cdn-cache-control'),
-    ).toBeNull();
-    expect(stationResponse.headers.get('cache-tag')).toBeNull();
-    expect(stationResponse.headers.get('x-mrtdown-cache')).toBe(
-      'dynamic-station',
-    );
-  });
+      expect(stationResponse.headers.get('cache-control')).toBe('no-store');
+      expect(
+        stationResponse.headers.get('cloudflare-cdn-cache-control'),
+      ).toBeNull();
+      expect(stationResponse.headers.get('cache-tag')).toBeNull();
+      expect(stationResponse.headers.get('x-mrtdown-cache')).toBe(
+        'dynamic-station',
+      );
+    },
+  );
+
+  it.each([404, 500])(
+    'opts out station HTML with status %s and no deadline',
+    (status) => {
+      const error = applyPublicDataCacheHeaders(
+        new Request('https://www.mrtdown.org/zh-Hans/stations/UNKNOWN'),
+        response('text/html', { status }),
+      );
+
+      expect(error.status).toBe(status);
+      expect(error.headers.get('cache-control')).toBe('no-store');
+      expect(error.headers.has('cloudflare-cdn-cache-control')).toBe(false);
+      expect(error.headers.has('cache-tag')).toBe(false);
+    },
+  );
 
   it('marks successful public JSON read responses as cacheable', () => {
     const serverFunction = applyPublicDataCacheHeaders(
@@ -108,12 +131,20 @@ describe('public response cache policy', () => {
         response('text/html', { status: 404 }),
       ).headers.get('x-mrtdown-cache'),
     ).toBeNull();
+    const stationWithCookie = applyPublicDataCacheHeaders(
+      new Request('https://www.mrtdown.org/stations/ADM'),
+      response('text/html', {
+        headers: {
+          'set-cookie': 'sid=1',
+          [STATION_PROFILE_FRESH_UNTIL_HEADER]: String(Date.now() + 60_000),
+        },
+      }),
+    );
+    expect(stationWithCookie.headers.get('set-cookie')).toBe('sid=1');
+    expect(stationWithCookie.headers.get('x-mrtdown-cache')).toBeNull();
     expect(
-      applyPublicDataCacheHeaders(
-        request(),
-        response('text/html', { headers: { 'set-cookie': 'sid=1' } }),
-      ).headers.get('x-mrtdown-cache'),
-    ).toBeNull();
+      stationWithCookie.headers.has(STATION_PROFILE_FRESH_UNTIL_HEADER),
+    ).toBe(false);
     expect(
       applyPublicDataCacheHeaders(
         request(),
@@ -141,6 +172,58 @@ describe('public response cache policy', () => {
     expect(getPublicDataCacheTag('Preview Branch')).toBe(
       'mrtdown-preview-branch-data',
     );
+  });
+});
+
+describe('station profile edge caching', () => {
+  const now = Date.parse('2026-11-08T10:00:00Z');
+  const station = new Request('https://www.mrtdown.org/zh-Hans/stations/ADM');
+  const navigation = new Request('https://www.mrtdown.org/_serverFn/station', {
+    headers: { 'x-tsr-serverfn': 'true' },
+  });
+
+  beforeEach(() => vi.spyOn(Date, 'now').mockReturnValue(now));
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each([
+    [station, 'text/html', 'public-html'],
+    [navigation, 'application/json', 'public-server-function'],
+  ])(
+    'caches %s only until the supplied deadline',
+    async (req, contentType, marker) => {
+      const render = requestHandler(() => {
+        setResponseHeader(
+          STATION_PROFILE_FRESH_UNTIL_HEADER,
+          String(now + 179_999),
+        );
+        return response(contentType);
+      });
+      const cached = applyPublicDataCacheHeaders(req, await render(req, {}));
+
+      expect(cached.headers.get('cloudflare-cdn-cache-control')).toBe(
+        'public, max-age=179, must-revalidate, stale-if-error=0',
+      );
+      expect(cached.headers.get('cache-control')).toBe(
+        PUBLIC_BROWSER_CACHE_CONTROL,
+      );
+      expect(cached.headers.get('cache-tag')).toBe(getPublicDataCacheTag());
+      expect(cached.headers.get('x-mrtdown-cache')).toBe(marker);
+      expect(cached.headers.has(STATION_PROFILE_FRESH_UNTIL_HEADER)).toBe(
+        false,
+      );
+    },
+  );
+
+  it('bypasses caching when the deadline passes before the response is sent', () => {
+    const expired = applyPublicDataCacheHeaders(
+      navigation,
+      response('application/json', {
+        headers: { [STATION_PROFILE_FRESH_UNTIL_HEADER]: String(now - 1) },
+      }),
+    );
+    expect(expired.headers.get('cache-control')).toBe('no-store');
+    expect(expired.headers.has('cloudflare-cdn-cache-control')).toBe(false);
+    expect(expired.headers.has(STATION_PROFILE_FRESH_UNTIL_HEADER)).toBe(false);
   });
 });
 

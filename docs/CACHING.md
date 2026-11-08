@@ -27,6 +27,12 @@ successfully generated sitemap. It respects `Set-Cookie`, `private`, and
 `no-store` opt-outs. Route eligibility belongs exclusively to the Cloudflare
 Cache Rule below.
 
+Station profile HTML and its client navigation response use up to one hour at
+the edge, ending sooner at the next Singapore midnight, incident transition,
+or community signal expiry. Cloudflare must revalidate at expiry, including
+during origin errors. Station departures load after hydration through a separate
+`no-store` API.
+
 ## Required Cloudflare Rules
 
 Create a Cache Rule for each proxied application hostname with these logical
@@ -70,10 +76,10 @@ After a purge, the next Cloudflare MISS therefore reads current Postgres data
 and cannot refill the edge from stale Fly process memory.
 
 Public-holiday changes use the same publication sequence. Successful crowd
-report submissions also purge the tag because public signals appear on cached
-home, line, and station pages. A crowd-report purge failure is logged without
-turning an already-committed submission into a retryable client failure; the
-bounded edge TTL remains the fallback.
+report submissions and successful cluster dispatches also purge the tag because
+public signals appear on cached home, line, and station pages. A crowd-report
+purge failure is logged after commit. The edge TTL bounds how long those cached
+responses can stay fresh.
 
 Configure these server-only Fly secrets before enabling the Cache Rule:
 
@@ -89,7 +95,8 @@ published fresh cached data. Local development logs and skips invalidation.
 
 ## Verification
 
-After deployment:
+After deploying a change to station profiles, purge the tier's data tag once
+the new app is serving traffic. Include a station profile when checking HTML.
 
 1. Request a representative HTML, Markdown, and sitemap URL twice.
 2. Confirm the first response is `MISS` and the second is `HIT` or `UPDATING`.

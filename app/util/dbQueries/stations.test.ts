@@ -1,11 +1,47 @@
 import { describe, expect, it } from 'vitest';
+import { isoDateTime } from './dateTime';
 import {
   deriveStationDirectoryOperationalState,
   deriveStationDirectoryStatus,
+  getStationProfileFreshUntil,
   mergeStationReadModelScope,
   resolveStationProfileStationId,
 } from './stations';
 import { buildIssue, REFERENCE_NOW, TEST_STATION } from './testFixtures';
+
+describe('station profile freshness', () => {
+  const now = REFERENCE_NOW.startOf('day').plus({ hours: 12 });
+  const horizon = now.plus({ hours: 1 });
+  const issue = buildIssue('overlapping', 'disruption', [
+    {
+      startAt: isoDateTime(now.minus({ hours: 2 })),
+      endAt: isoDateTime(now.plus({ minutes: 20 })),
+      status: 'ongoing',
+    },
+    {
+      startAt: isoDateTime(now.plus({ minutes: 10 })),
+      endAt: isoDateTime(horizon),
+      status: 'future',
+    },
+  ]);
+
+  it('uses the first incident transition, including one in an overlapping interval', () => {
+    expect(getStationProfileFreshUntil(now, horizon, [issue], [])).toBe(
+      now.plus({ minutes: 10 }).toMillis(),
+    );
+  });
+
+  it('shortens the deadline when a community signal expires first', () => {
+    expect(
+      getStationProfileFreshUntil(
+        now,
+        horizon,
+        [issue],
+        [{ windowEndAt: isoDateTime(now.minus({ minutes: 88 })) }],
+      ),
+    ).toBe(now.plus({ minutes: 2 }).toMillis());
+  });
+});
 
 describe('resolveStationProfileStationId', () => {
   it('keeps canonical station ids unchanged', () => {
