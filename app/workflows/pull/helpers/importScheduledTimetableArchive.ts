@@ -4,6 +4,7 @@ import { WorkflowNonRetryableError } from '@upstash/workflow';
 import type { getDb } from '~/db';
 import type { ZipStore } from '~/helpers/ZipStore';
 import {
+  COMBINED_DEPARTURE_PROJECTOR_VERSION,
   projectScheduledTimetable,
   SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
 } from '~/util/dbQueries/projectScheduledTimetable';
@@ -65,13 +66,15 @@ export async function importScheduledTimetableArchive(
       );
     }
     console.log(`[PULL] Scheduled timetable ${result.status}`);
-    if ('entry' in bundle) {
-      await projectScheduledTimetable(db, {
-        manifestSha256: bundle.entry.manifestSha256,
-        projectorVersion: SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
-        canonicalDataDir: snapshot.canonicalDataDir,
-      });
-    }
+    await projectScheduledTimetable(db, {
+      manifestSha256:
+        'entry' in bundle ? bundle.entry.manifestSha256 : bundle.manifestSha256,
+      projectorVersion:
+        'entry' in bundle
+          ? SCHEDULED_DEPARTURE_PROJECTOR_VERSION
+          : COMBINED_DEPARTURE_PROJECTOR_VERSION,
+      canonicalDataDir: snapshot.canonicalDataDir,
+    });
   } finally {
     await snapshot.dispose();
   }

@@ -7,6 +7,7 @@ import { CombinedTimetableReleaseIndexSchema } from '@mrtdown/fs';
 import { eq } from 'drizzle-orm';
 import type { getDb } from '~/db';
 import { metadataTable } from '~/db/schema';
+import { COMBINED_DEPARTURE_PROJECTOR_VERSION } from '~/util/dbQueries/projectScheduledTimetable';
 import type { PullParams } from './pullParams';
 
 type AppDb = ReturnType<typeof getDb>;
@@ -50,6 +51,8 @@ export function getCanonicalManifestFingerprint(
     scheduledTimetable: ScheduledTimetablePagesEntrySchema.optional().parse(
       manifest.scheduledTimetable,
     ),
+    combinedDepartureProjectorVersion:
+      combinedReleaseIndex && COMBINED_DEPARTURE_PROJECTOR_VERSION,
     combinedReleaseIndex:
       CombinedTimetableReleaseIndexSchema.optional().parse(
         combinedReleaseIndex,

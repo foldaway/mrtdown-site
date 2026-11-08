@@ -1,6 +1,7 @@
 import type { ScheduledDepartureWithPattern } from '@mrtdown/core';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   bigint,
   check,
   date,
@@ -120,11 +121,8 @@ export const scheduledDepartureScopesTable = pgTable(
 
 type Departure = ScheduledDepartureWithPattern;
 
-// Only boardable occurrences with a downstream alighting stop belong here.
-// Null timing preserves untimed candidates without manufacturing departures.
-export const scheduledDepartureOccurrencesTable = pgTable(
-  'scheduled_departure_occurrences',
-  {
+function departureIdentityColumns() {
+  return {
     projection_id: integer('projection_id').notNull(),
     service_date: date('service_date').notNull(),
     provider_trip_id: text('provider_trip_id').notNull(),
@@ -135,10 +133,11 @@ export const scheduledDepartureOccurrencesTable = pgTable(
     occurrence_index: integer('occurrence_index').notNull(),
     station_id: text('station_id').notNull(),
     line_id: text('line_id').notNull(),
-    service_id: text('service_id').notNull(),
-    revision_id: text('revision_id').notNull(),
-    destination_station_id: text('destination_station_id').notNull(),
-    platform_ids: text('platform_ids').array().notNull(),
+  };
+}
+
+function departureTimingColumns() {
+  return {
     arrival_seconds: bigint('arrival_seconds', { mode: 'number' }),
     departure_seconds: bigint('departure_seconds', { mode: 'number' }),
     arrival_instant: timestamp('arrival_instant', {
@@ -156,6 +155,20 @@ export const scheduledDepartureOccurrencesTable = pgTable(
       .$type<Departure['dropOffType']>()
       .notNull(),
     timepoint: integer('timepoint').$type<Departure['timepoint']>().notNull(),
+  };
+}
+
+// Only boardable occurrences with a downstream alighting stop belong here.
+// Null timing preserves untimed candidates without manufacturing departures.
+export const scheduledDepartureOccurrencesTable = pgTable(
+  'scheduled_departure_occurrences',
+  {
+    ...departureIdentityColumns(),
+    service_id: text('service_id').notNull(),
+    revision_id: text('revision_id').notNull(),
+    destination_station_id: text('destination_station_id').notNull(),
+    platform_ids: text('platform_ids').array().notNull(),
+    ...departureTimingColumns(),
   },
   (table) => [
     primaryKey({
@@ -198,18 +211,115 @@ export const scheduledDepartureOccurrencesTable = pgTable(
       'scheduled_departure_occurrences_identity',
       sql`${table.stop_sequence} ~ '^[0-9]+$' AND ${table.occurrence_index} >= 0 AND cardinality(${table.platform_ids}) > 0`,
     ),
+    ...departureTimingChecks('scheduled_departure_occurrences', table),
+  ],
+);
+
+function departureTimingChecks(
+  prefix: string,
+  table: Record<keyof ReturnType<typeof departureTimingColumns>, AnyPgColumn>,
+) {
+  return [
     check(
-      'scheduled_departure_occurrences_access',
+      `${prefix}_access`,
       sql`${table.pickup_type} IN (0, 2, 3) AND ${table.drop_off_type} BETWEEN 0 AND 3 AND ${table.timepoint} IN (0, 1)`,
     ),
     check(
-      'scheduled_departure_occurrences_timing',
+      `${prefix}_timing`,
       sql`(${table.arrival_seconds} IS NULL) = (${table.arrival_instant} IS NULL)
         AND (${table.departure_seconds} IS NULL) = (${table.departure_instant} IS NULL)
         AND (${table.arrival_seconds} IS NULL OR ${table.arrival_seconds} BETWEEN 0 AND 9007199254740991)
         AND (${table.departure_seconds} IS NULL OR ${table.departure_seconds} BETWEEN 0 AND 9007199254740991)
         AND (${table.arrival_seconds} IS NULL OR ${table.departure_seconds} IS NULL OR ${table.departure_seconds} >= ${table.arrival_seconds})
         AND (${table.timepoint} = 0 OR (${table.arrival_seconds} IS NOT NULL AND ${table.departure_seconds} IS NOT NULL))`,
+    ),
+  ];
+}
+
+export const combinedDepartureOccurrencesTable = pgTable(
+  'combined_departure_occurrences',
+  {
+    ...departureIdentityColumns(),
+    destination_station_id: text('destination_station_id').notNull(),
+    platform_semantics: text('platform_semantics', {
+      enum: ['distinct-platform-associations', 'complete-source-alternatives'],
+    }).notNull(),
+    ...departureTimingColumns(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.projection_id,
+        table.service_date,
+        table.provider_trip_id,
+        table.stop_sequence,
+      ],
+    }),
+    foreignKey({
+      name: 'combined_departure_occurrences_day_fk',
+      columns: [table.projection_id, table.service_date],
+      foreignColumns: [
+        scheduledDepartureDaysTable.projection_id,
+        scheduledDepartureDaysTable.service_date,
+      ],
+    }).onDelete('cascade'),
+    index('combined_departure_occurrences_window_idx').on(
+      table.projection_id,
+      table.service_date,
+      table.station_id,
+      table.line_id,
+      table.destination_station_id,
+      table.departure_instant,
+    ),
+    check(
+      'combined_departure_occurrences_identity',
+      sql`${table.stop_sequence} ~ '^[0-9]+$' AND ${table.occurrence_index} >= 0
+        AND ${table.platform_semantics} IN ('distinct-platform-associations', 'complete-source-alternatives')`,
+    ),
+    ...departureTimingChecks('combined_departure_occurrences', table),
+  ],
+);
+
+export const combinedDepartureMembershipsTable = pgTable(
+  'combined_departure_memberships',
+  {
+    projection_id: integer('projection_id').notNull(),
+    service_date: date('service_date').notNull(),
+    provider_trip_id: text('provider_trip_id').notNull(),
+    stop_sequence: text('stop_sequence').notNull(),
+    service_id: text('service_id').notNull(),
+    revision_id: text('revision_id').notNull(),
+    platform_ids: text('platform_ids').array().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.projection_id,
+        table.service_date,
+        table.provider_trip_id,
+        table.stop_sequence,
+        table.service_id,
+        table.revision_id,
+      ],
+    }),
+    foreignKey({
+      name: 'combined_departure_memberships_occurrence_fk',
+      columns: [
+        table.projection_id,
+        table.service_date,
+        table.provider_trip_id,
+        table.stop_sequence,
+      ],
+      foreignColumns: [
+        combinedDepartureOccurrencesTable.projection_id,
+        combinedDepartureOccurrencesTable.service_date,
+        combinedDepartureOccurrencesTable.provider_trip_id,
+        combinedDepartureOccurrencesTable.stop_sequence,
+      ],
+    }).onDelete('cascade'),
+    check(
+      'combined_departure_memberships_platforms',
+      sql`cardinality(${table.platform_ids}) > 0`,
     ),
   ],
 );

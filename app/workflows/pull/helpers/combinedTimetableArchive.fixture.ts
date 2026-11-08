@@ -23,8 +23,27 @@ function sortedJson(value: unknown): string {
 /** Synthetic wire-format bundle for importer tests. Every digest binds exact fixture bytes. */
 export function combinedTimetableArchiveFixture() {
   const canonical = scheduledTimetableCanonicalFixture();
-  const { services, lines } = canonical.canonical;
-  services.push({ ...services[0], id: 'service-shared' });
+  const { services, lines, stations } = canonical.canonical;
+  const path = services[0].revisions[0].path.stations;
+  path.splice(1, 0, { ...path[0] }, { ...path[0] });
+  services.push({
+    ...services[0],
+    id: 'service-shared',
+    revisions: [{ ...services[0].revisions[0], id: 'shared-revision' }],
+  });
+  const platforms = stations[0].layout?.platforms;
+  if (!platforms?.length) throw new Error('Missing fixture platforms');
+  const basePlatform = { ...platforms[0] };
+  platforms[0].serviceIds = ['service'];
+  platforms.push(
+    { ...basePlatform, id: 'platform-shared', serviceIds: ['service-shared'] },
+    { ...basePlatform, id: 'platform-common' },
+    {
+      ...basePlatform,
+      id: 'platform-closed',
+      boardingStatus: 'not_in_service',
+    },
+  );
   lines[0].serviceIds.push('service-shared');
   const topology = canonical.topology();
   const snapshot = canonical.archive();
@@ -68,10 +87,25 @@ export function combinedTimetableArchiveFixture() {
     startDate: '2026-11-29',
     endDateExclusive: '2026-12-01',
   };
-  const serviceMemberships = services.map(({ id }) => ({
+  const serviceMemberships = services.map(({ id, revisions }) => ({
     serviceId: id,
-    revisionId: 'revision',
+    revisionId: revisions[0].id,
   }));
+  const stationCalls = [
+    {
+      stationId: 'station-1',
+      platformIds: ['platform-1', 'platform-shared', 'platform-closed'],
+    },
+    { stationId: 'station-1', platformIds: ['platform-common'] },
+    { stationId: 'station-1', platformIds: ['platform-common'] },
+    { stationId: 'station-2', platformIds: ['platform-2'] },
+  ];
+  const sequences = [
+    '9007199254740993',
+    '09007199254740994',
+    '9007199254740995',
+    '9007199254740996',
+  ];
   const pattern = {
     providerPatternId: digest,
     lineId: 'line',
@@ -84,21 +118,38 @@ export function combinedTimetableArchiveFixture() {
       providerAgencyId: 'agency',
       operatorId: 'operator',
     },
-    calls: [1, 2].map((stop) => ({
-      stationId: `station-${stop}`,
-      platformSemantics: 'complete-source-alternatives',
-      platforms: [
-        {
-          platformId: `platform-${stop}`,
-          boardingStatus: null,
-          accessByService: serviceMemberships.map((member) => ({
-            ...member,
-            serviceScope: 'unspecified',
-            passengerBoardingEligible: stop === 1,
-            passengerAlightingEligible: stop === 2,
-          })),
-        },
-      ],
+    calls: stationCalls.map(({ stationId, platformIds }, index) => ({
+      stationId,
+      platformSemantics:
+        index === 0
+          ? 'distinct-platform-associations'
+          : 'complete-source-alternatives',
+      platforms: platformIds.map((platformId) => {
+        const platform = topology.stations
+          .find(({ id }) => id === stationId)
+          ?.platforms.find(({ id }) => id === platformId);
+        if (!platform) throw new Error('Missing fixture call platform');
+        return {
+          platformId,
+          boardingStatus: platform.boardingStatus ?? null,
+          accessByService: serviceMemberships.map((member) => {
+            const serviceScope = !platform.serviceIds.length
+              ? 'unspecified'
+              : platform.serviceIds.includes(member.serviceId)
+                ? 'listed'
+                : 'excluded';
+            const canAccess =
+              serviceScope !== 'excluded' && !platform.boardingStatus;
+            return {
+              ...member,
+              serviceScope,
+              passengerBoardingEligible:
+                canAccess && index < stationCalls.length - 1,
+              passengerAlightingEligible: canAccess,
+            };
+          }),
+        };
+      }),
     })),
   };
   const patternId = hashBytes(Buffer.from(JSON.stringify(pattern)));
@@ -137,15 +188,15 @@ export function combinedTimetableArchiveFixture() {
         providerTripId: 'trip',
         providerRouteId: 'route',
         providerCalendarId: 'calendar',
-        stopTimes: [1, 2].map((stop) => ({
+        stopTimes: [90_000, 90_000, null, 90_060].map((seconds, index) => ({
           providerTripId: 'trip',
-          providerStopId: `stop-${stop}`,
-          stopSequence: String(9007199254740992n + BigInt(stop)),
-          arrivalSeconds: 90_000 + (stop - 1) * 60,
-          departureSeconds: 90_000 + (stop - 1) * 60,
+          providerStopId: index === 3 ? 'stop-2' : 'stop-1',
+          stopSequence: sequences[index],
+          arrivalSeconds: seconds,
+          departureSeconds: seconds,
           pickupType: 0,
           dropOffType: 0,
-          timepoint: 1,
+          timepoint: index === 0 || index === 3 ? 1 : 0,
         })),
       },
     ],
@@ -212,6 +263,8 @@ export function combinedTimetableArchiveFixture() {
   const index = { manifestSha256, releaseSha256: hashBytes(releaseBytes) };
   return {
     index,
+    canonical,
+    sequences,
     topology,
     capture,
     snapshot,

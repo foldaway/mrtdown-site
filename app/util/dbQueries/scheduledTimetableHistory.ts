@@ -30,6 +30,7 @@ type HistoryRow = {
 type Version = {
   manifestSha256: string;
   manifest: ScheduledTimetableArtifactManifest;
+  serviceDateRange: ScheduledTimetableArtifactManifest['feedRange'];
   record: ScheduledTimetableImportRecord;
   format: 'legacy' | 'combined';
 };
@@ -56,9 +57,8 @@ export function validateScheduledTimetableHistory(rows: HistoryRow[]) {
         `Retained timetable manifest does not match its row: ${row.hash}`,
       );
     }
-    const format = row.combinedRelease === null ? 'legacy' : 'combined';
-    const manifest =
-      format === 'legacy'
+    const legacyManifest =
+      row.combinedRelease === null
         ? ScheduledTimetableArtifactManifestSchema.parse(
             JSON.parse(
               new TextDecoder('utf-8', { fatal: true }).decode(
@@ -66,17 +66,20 @@ export function validateScheduledTimetableHistory(rows: HistoryRow[]) {
               ),
             ),
           )
-        : readCombinedTimetableAdmissionManifest(
-            row.hash,
-            row.manifestBytes,
-            row.combinedRelease,
-          );
+        : undefined;
+    const source = legacyManifest
+      ? { manifest: legacyManifest, serviceDateRange: legacyManifest.feedRange }
+      : readCombinedTimetableAdmissionManifest(
+          row.hash,
+          row.manifestBytes,
+          row.combinedRelease,
+        );
     identities.add(row.hash);
     successors.set(row.predecessor, {
       manifestSha256: row.hash,
-      manifest,
+      ...source,
       record,
-      format,
+      format: legacyManifest ? 'legacy' : 'combined',
     });
   }
 

@@ -1,10 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { access, mkdtemp, readFile } from 'node:fs/promises';
+import { access, mkdtemp, readdir, readFile } from 'node:fs/promises';
 import type { Manifest, ScheduledTimetableSourceReview } from '@mrtdown/core';
-import {
-  projectCombinedTimetableServiceDay,
-  verifyCombinedTimetableReleaseBundle,
-} from '@mrtdown/fs';
+import { hashBytes, type ScheduledTimetableRollbackOptions } from '@mrtdown/fs';
 import type { WorkflowContext } from '@upstash/workflow';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { zipSync } from 'fflate';
@@ -21,12 +18,16 @@ import {
 } from 'vitest';
 import { getDb } from '~/db';
 import { relations } from '~/db/relations';
+import { ZipStore } from '~/helpers/ZipStore';
 import {
+  COMBINED_DEPARTURE_PROJECTOR_VERSION,
   projectScheduledTimetable,
   SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
 } from '~/util/dbQueries/projectScheduledTimetable';
+import { queryIndexedScheduledDepartures } from '~/util/dbQueries/queryIndexedScheduledDepartures';
 import { retainScheduledTimetable } from '~/util/dbQueries/retainScheduledTimetable';
 import { retentionReview } from '~/util/dbQueries/scheduledTimetableRetention.fixture';
+import { withSelectedScheduledTimetable } from '~/util/dbQueries/withSelectedScheduledTimetable';
 import { combinedTimetableArchiveFixture } from './helpers/combinedTimetableArchive.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
 import { fetchManifest } from './helpers/fetchManifest';
@@ -381,22 +382,18 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     await admin.query(`CREATE SCHEMA ${schema}`);
     pool = new Pool({
       connectionString: url,
-      options: `-c search_path=${schema}`,
+      options: `-c search_path=${schema},public`,
     });
-    for (const migration of [
-      '20261024214325_superb_violations',
-      '20261025200054_violet_energizer',
-      '20261108020149_combined_timetable_retention',
-    ]) {
-      await pool.query(
-        await readFile(
-          new URL(
-            `../../../drizzle/${migration}/migration.sql`,
-            import.meta.url,
-          ),
-          'utf8',
-        ),
+    const migrations = new URL('../../../drizzle/', import.meta.url);
+    for (const migration of (await readdir(migrations, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map(({ name }) => name)
+      .sort()) {
+      const sql = await readFile(
+        new URL(`${migration}/migration.sql`, migrations),
+        'utf8',
       );
+      await pool.query(sql.replaceAll('"public".', `"${schema}".`));
     }
   });
   beforeEach(async () => {
@@ -425,10 +422,24 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       )
     ).rows;
 
-  it('retains a combined successor once and preserves the effective Singapore date and overnight shared departure', async () => {
-    await workflow({ sourceReview: retentionReview(baseline) }).run();
+  it('indexes an admitted combined successor against live topology and retains the legacy rollback target', async () => {
+    const legacy = scheduledTimetableArchiveFixture('a', {
+      topology: combined.topology,
+      pattern: combined.canonical.pattern,
+      customize(timetable, metadata) {
+        const date = '2026-11-30';
+        metadata.feedRange = { startDate: date, endDate: date };
+        metadata.sourceFeedInfo[0].feed_start_date = '20261130';
+        metadata.sourceFeedInfo[0].feed_end_date = '20261130';
+        timetable.timetable.calendars[0].exceptions[0].date = date;
+        timetable.assignments[0].dateRanges = [metadata.feedRange];
+      },
+    });
+    advertise(legacy, combined.snapshot);
+    await workflow({ sourceReview: retentionReview(legacy) }).run();
     const first = await rows();
-    const legacyProjections = await projections();
+    const [legacyProjection] = await projections();
+
     advertiseCombined();
     const combinedReleaseIndex = combined.index;
     await expect(workflow({ combinedReleaseIndex }).run()).rejects.toThrow(
@@ -437,7 +448,7 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     expect(await rows()).toEqual(first);
 
     const sourceReview: ScheduledTimetableSourceReview = {
-      ...retentionReview(successor, baseline),
+      ...retentionReview(successor, legacy),
       successor: {
         manifestSha256: combined.index.manifestSha256,
         snapshotSha256: combined.capture.sha256,
@@ -452,7 +463,7 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
         manifest_sha256 === combined.index.manifestSha256,
     );
     expect(row).toMatchObject({
-      predecessor_sha256: baseline.entry.manifestSha256,
+      predecessor_sha256: legacy.entry.manifestSha256,
       combined_release: { index: combined.index },
       manifest_bytes: combined.files.manifestBytes,
       timetable_bytes: combined.files.timetableBytes,
@@ -461,41 +472,270 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       notice_bytes: null,
       import_record: { sourceReview },
     });
-    expect(await projections()).toEqual(legacyProjections);
-    const { artifact } = verifyCombinedTimetableReleaseBundle(
-      row.combined_release.index,
-      {
-        manifestBytes: row.manifest_bytes,
-        timetableBytes: row.timetable_bytes,
-        releaseBytes: row.release_bytes,
-      },
-      combined.topology,
+    const projected = await projections();
+    expect(projected).toContainEqual(legacyProjection);
+    const projection = projected.find(
+      (row) => row.manifest_sha256 === combined.index.manifestSha256,
     );
-    const day = projectCombinedTimetableServiceDay(artifact, '2026-11-30');
-    expect(day?.activeTripCount).toBe(1);
-    expect([...(day?.departures ?? [])]).toMatchObject([
+    expect(projection).toMatchObject({
+      projector_version: COMBINED_DEPARTURE_PROJECTOR_VERSION,
+      maximum_departure_seconds: '90060',
+    });
+    expect(projection.completed_at).not.toBeNull();
+    expect(
+      (
+        await pool.query(
+          'SELECT stop_sequence FROM combined_departure_occurrences ORDER BY occurrence_index',
+        )
+      ).rows,
+    ).toEqual(
+      combined.sequences
+        .slice(0, 3)
+        .map((stop_sequence) => ({ stop_sequence })),
+    );
+    expect(
+      (
+        await pool.query(
+          'SELECT platform_ids FROM combined_departure_memberships ORDER BY service_id, stop_sequence',
+        )
+      ).rows,
+    ).toHaveLength(6);
+
+    // Promote the synthetic archive into the isolated live schema. The
+    // workflow harness mocks staging; the reader uses its real default loader.
+    const staging = await vi.importActual<
+      typeof import('./helpers/stagingSync')
+    >('./helpers/stagingSync');
+    const database = getDb();
+    const { operators, lines, stations, services } =
+      combined.canonical.canonical;
+    const hashed = <T extends { id: string }>(entities: T[]) =>
+      entities.map((entity) => ({
+        ...entity,
+        hash: hashBytes(Buffer.from(JSON.stringify(entity))),
+      }));
+    await staging.insertOperatorsStaging(database, hashed(operators));
+    await staging.insertTownsStaging(
+      database,
+      hashed([{ id: 'town', name: operators[0].name }]),
+    );
+    const stagedLines = await staging.insertLinesStaging(
+      database,
+      hashed(lines),
+    );
+    await staging.insertStationsStaging(database, hashed(stations));
+    await staging.insertServicesStaging(database, hashed(services));
+    await staging.syncOperatorsTownsLandmarksUpserts(database);
+    await staging.syncLines(database);
+    await staging.syncStations(database);
+    await staging.syncServices(database);
+    await staging.syncStationPlatformServices(database);
+    await staging.finalizePull(database, {
+      canonicalTopologyComplete: stagedLines === lines.length,
+    });
+
+    const scope = {
+      stationId: 'station-1',
+      lineId: 'line',
+      destinationStationId: 'station-2',
+    };
+    const multi = { ...scope, serviceIds: ['service-shared', 'service'] };
+    const exact = { ...scope, serviceId: 'service' };
+    const window = {
+      startInstant: '2026-12-01T00:59:59+08:00',
+      endInstant: '2026-12-01T01:00:01+08:00',
+    };
+    const selectDate = (serviceDate: string) =>
+      withSelectedScheduledTimetable(
+        database,
+        { scope: multi, serviceDate },
+        async (_tx, selection) => selection,
+      );
+    const empty = await selectDate('2026-11-29');
+    expect(empty.selected?.coverage).toMatchObject({ activeTripCount: 0 });
+    expect((await selectDate('2026-11-28')).attempts[0].reason).toBe(
+      'outside-feed-range',
+    );
+    expect((await selectDate('2026-12-01')).attempts[0].reason).toBe(
+      'outside-feed-range',
+    );
+
+    expect(
+      await queryIndexedScheduledDepartures(database, {
+        startInstant: '2026-11-29T12:00:00+08:00',
+        endInstant: '2026-11-29T13:00:00+08:00',
+        scope: multi,
+      }),
+    ).toMatchObject({
+      complete: true,
+      untimedDepartureCount: 0,
+      departures: [],
+    });
+
+    const overnight = await queryIndexedScheduledDepartures(database, {
+      ...window,
+      scope: multi,
+    });
+    expect(overnight.untimedDepartureCount).toBe(1);
+    expect(overnight.departures).toMatchObject([
       {
+        manifestSha256: combined.index.manifestSha256,
         providerTripId: 'trip',
-        stopSequence: '9007199254740993',
+        stopSequence: combined.sequences[0],
         serviceDate: '2026-11-30',
+        departureSeconds: 90_000,
         departureInstant: '2026-11-30T17:00:00Z',
+        precision: 'exact',
+        platformSemantics: 'distinct-platform-associations',
+        platformIds: ['platform-1', 'platform-shared'],
         boardingByService: [
-          { serviceId: 'service', platformIds: ['platform-1'] },
-          { serviceId: 'service-shared', platformIds: ['platform-1'] },
+          {
+            serviceId: 'service',
+            revisionId: 'revision',
+            platformIds: ['platform-1'],
+          },
+          {
+            serviceId: 'service-shared',
+            revisionId: 'shared-revision',
+            platformIds: ['platform-shared'],
+          },
         ],
       },
+      {
+        stopSequence: combined.sequences[1],
+        precision: 'approximate',
+        platformSemantics: 'complete-source-alternatives',
+        platformIds: ['platform-common'],
+      },
     ]);
+    const common = await queryIndexedScheduledDepartures(database, {
+      ...window,
+      scope: { ...multi, platformId: 'platform-common' },
+    });
+    expect(common.departures.map(({ stopSequence }) => stopSequence)).toEqual([
+      combined.sequences[1],
+    ]);
+    expect(common.untimedDepartureCount).toBe(1);
+    const single = await queryIndexedScheduledDepartures(database, {
+      ...window,
+      scope: { ...exact, platformId: 'platform-1' },
+    });
     expect(
-      projectCombinedTimetableServiceDay(artifact, '2026-11-29')
-        ?.activeTripCount,
-    ).toBe(0);
+      single.departures.map(({ serviceId, stopSequence }) => [
+        serviceId,
+        stopSequence,
+      ]),
+    ).toEqual([['service', combined.sequences[0]]]);
+    expect(single.untimedDepartureCount).toBe(0);
     expect(
-      projectCombinedTimetableServiceDay(artifact, '2026-12-01'),
-    ).toBeNull();
+      (
+        await queryIndexedScheduledDepartures(database, {
+          ...window,
+          scope: { ...multi, platformId: 'platform-closed' },
+        })
+      ).departures,
+    ).toEqual([]);
+
+    const exactSelection = (rollback?: ScheduledTimetableRollbackOptions) =>
+      withSelectedScheduledTimetable(
+        database,
+        {
+          scope: exact,
+          serviceDate: '2026-11-30',
+          rollback,
+        },
+        async (_tx, selection) => selection,
+      );
+    expect((await exactSelection()).selected?.version.format).toBe('combined');
+    const rollback: ScheduledTimetableRollbackOptions = {
+      selectionInstant: row.import_record.importInstant,
+      review: {
+        schemaVersion: 1,
+        documentKind: 'scheduled-timetable-rollback-review',
+        from: sourceReview.successor,
+        to: {
+          manifestSha256: legacy.entry.manifestSha256,
+          snapshotSha256: legacy.entry.capture.sha256,
+        },
+        dateRange: { startDate: '2026-11-30', endDate: '2026-11-30' },
+        scope: exact,
+        reviewedAt: row.import_record.importInstant,
+        reviewer: 'Synthetic rollback reviewer',
+        reason: 'Verify legacy rollback',
+      },
+    };
+    expect(await exactSelection(rollback)).toMatchObject({
+      selected: { version: { format: 'legacy' } },
+      rollback: { status: 'applied' },
+    });
+
+    const multiRollback = await withSelectedScheduledTimetable(
+      database,
+      {
+        scope: multi,
+        serviceDate: '2026-11-30',
+        rollback: { ...rollback, review: { ...rollback.review, scope: multi } },
+      },
+      async (_tx, selection) => selection,
+    );
+    expect(multiRollback).toMatchObject({
+      selected: null,
+      rollback: {
+        status: 'rejected',
+        blockers: ['rollback-target-is-not-eligible'],
+      },
+    });
+
+    await pool.query(
+      'DELETE FROM scheduled_departure_days WHERE projection_id = $1 AND service_date = $2',
+      [projection.id, '2026-11-30'],
+    );
+    expect((await selectDate('2026-11-30')).attempts[0].reason).toBe(
+      'day-not-indexed',
+    );
 
     state.fingerprint = undefined;
     await workflow({ combinedReleaseIndex }).run();
     expect(await rows()).toEqual(retained);
+    expect((await selectDate('2026-11-30')).selected?.projectionId).toBe(
+      projection.id,
+    );
+    await pool.query(
+      "UPDATE station_platforms SET label = 'Different canonical label' WHERE platform_id = 'platform-1'",
+    );
+    expect((await selectDate('2026-11-30')).attempts[0].reason).toBe(
+      'topology-mismatch',
+    );
+    await pool.query(
+      "UPDATE station_platforms SET label = 'A' WHERE platform_id = 'platform-1'",
+    );
+
+    const snapshot = await createValidatedScheduledTimetableCanonicalSnapshot(
+      combined.snapshot.manifest,
+      new ZipStore(Buffer.from(zipSync(combined.snapshot.files))),
+    );
+    try {
+      await pool.query(
+        'UPDATE scheduled_timetables SET release_bytes = $1 WHERE manifest_sha256 = $2',
+        [
+          Buffer.alloc(combined.files.releaseBytes.length),
+          combined.index.manifestSha256,
+        ],
+      );
+      await expect(
+        projectScheduledTimetable(database, {
+          manifestSha256: combined.index.manifestSha256,
+          projectorVersion: COMBINED_DEPARTURE_PROJECTOR_VERSION,
+          canonicalDataDir: snapshot.canonicalDataDir,
+        }),
+      ).rejects.toThrow('expected SHA-256');
+      expect(await exactSelection()).toMatchObject({
+        selected: { version: { format: 'legacy' } },
+        attempts: [{ reason: 'projection-incomplete' }, { reason: 'eligible' }],
+      });
+    } finally {
+      await snapshot.dispose();
+    }
   });
 
   it('projects before staging, replays admission and preserves historical projections', async () => {

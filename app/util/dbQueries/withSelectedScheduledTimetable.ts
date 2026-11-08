@@ -7,7 +7,7 @@ import {
   ScheduledTimetableRollbackOptionsSchema,
   type ScheduledTimetableSelectionAttempt,
 } from '@mrtdown/fs';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import z from 'zod';
 import type { getDb } from '~/db';
 import {
@@ -17,7 +17,10 @@ import {
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
 import { assessIndexedTimetableRollback } from './assessIndexedTimetableRollback';
-import { SCHEDULED_DEPARTURE_PROJECTOR_VERSION } from './projectScheduledTimetable';
+import {
+  COMBINED_DEPARTURE_PROJECTOR_VERSION,
+  SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
+} from './projectScheduledTimetable';
 import { readLiveScheduleTopology } from './readLiveScheduleTopology';
 import {
   scheduledTimetableHistoryColumns,
@@ -30,8 +33,11 @@ export type ReadTransaction = Parameters<
 >[0];
 export type Topology = Awaited<ReturnType<typeof readScheduleTopology>>;
 type Version = ReturnType<typeof validateScheduledTimetableHistory>[number];
-export type IndexedTimetableScope = Extract<
-  z.infer<typeof ScheduledTimetableRequestScopeSchema>,
+export type IndexedTimetableScope = z.infer<
+  typeof ScheduledTimetableRequestScopeSchema
+>;
+export type ExactTimetableScope = Extract<
+  IndexedTimetableScope,
   { serviceId: string }
 >;
 type Coverage = { activeTripCount: number; unassignedActiveTripCount: number };
@@ -46,9 +52,11 @@ type Attempt = Omit<ScheduledTimetableSelectionAttempt, 'reason'> & {
     | 'projection-metadata-mismatch'
     | 'day-not-indexed';
 };
-export type ScheduledTimetableSelection = {
+export type ScheduledTimetableSelection<
+  Scope extends IndexedTimetableScope = ExactTimetableScope,
+> = {
   serviceDate: string;
-  scope: IndexedTimetableScope;
+  scope: Scope;
   selected: {
     projectionId: number;
     projectorVersion: number;
@@ -61,8 +69,10 @@ export type ScheduledTimetableSelection = {
   attempts: Attempt[];
   rollback: ScheduledTimetableRollbackAssessment | null;
 };
-export type ScheduledTimetableSnapshotOptions = {
-  scope: IndexedTimetableScope;
+export type ScheduledTimetableSnapshotOptions<
+  Scope extends IndexedTimetableScope = ExactTimetableScope,
+> = {
+  scope: Scope;
   // Trusted operator review and explicit selection clock; never passenger input.
   rollback?: ScheduledTimetableRollbackOptions;
   // Trusted internal override for tests; never bind this to passenger input.
@@ -71,48 +81,61 @@ export type ScheduledTimetableSnapshotOptions = {
 
 export class InvalidStationArrivalScopeError extends Error {}
 
+export function indexedServiceIds(scope: IndexedTimetableScope) {
+  return scope.serviceId === undefined ? scope.serviceIds : [scope.serviceId];
+}
+
 // The shared selector does not export its canonical request validation.
 function validateScope(scope: IndexedTimetableScope, topology: Topology) {
   const line = topology.lines.find(({ id }) => id === scope.lineId);
-  const service = topology.services.find(({ id }) => id === scope.serviceId);
   const station = topology.stations.find(({ id }) => id === scope.stationId);
   const destination = topology.stations.find(
     ({ id }) => id === scope.destinationStationId,
   );
-  if (!line || !service || !station || !destination) {
+  if (!line || !station || !destination) {
     throw new InvalidStationArrivalScopeError(
       'Timetable request references an unknown canonical station, line or service',
     );
   }
-  if (service.lineId !== line.id || !line.serviceIds.includes(service.id)) {
-    throw new InvalidStationArrivalScopeError(
-      'Timetable request service does not belong to its line',
-    );
-  }
-  if (
-    !service.revisions.some(
-      (revision) =>
-        revision.stations.some(({ stationId }) => stationId === station.id) &&
-        revision.stations.some(({ stationId }) => stationId === destination.id),
-    )
-  ) {
-    throw new InvalidStationArrivalScopeError(
-      'Timetable request stations do not belong to its service',
-    );
-  }
-  if (scope.platformId !== undefined) {
-    const platforms = station.platforms.filter(
-      ({ id }) => id === scope.platformId,
-    );
+  for (const serviceId of indexedServiceIds(scope)) {
+    const service = topology.services.find(({ id }) => id === serviceId);
+    if (!service) {
+      throw new InvalidStationArrivalScopeError(
+        'Timetable request references an unknown canonical station, line or service',
+      );
+    }
+    if (service.lineId !== line.id || !line.serviceIds.includes(service.id)) {
+      throw new InvalidStationArrivalScopeError(
+        'Timetable request service does not belong to its line',
+      );
+    }
     if (
-      platforms.length !== 1 ||
-      platforms[0].lineId !== line.id ||
-      (platforms[0].serviceIds.length > 0 &&
-        !platforms[0].serviceIds.includes(service.id))
+      !service.revisions.some(
+        (revision) =>
+          revision.stations.some(({ stationId }) => stationId === station.id) &&
+          revision.stations.some(
+            ({ stationId }) => stationId === destination.id,
+          ),
+      )
     ) {
       throw new InvalidStationArrivalScopeError(
-        'Timetable request platform does not belong to its station, line and service',
+        'Timetable request stations do not belong to its service',
       );
+    }
+    if (scope.platformId !== undefined) {
+      const platforms = station.platforms.filter(
+        ({ id }) => id === scope.platformId,
+      );
+      if (
+        platforms.length !== 1 ||
+        platforms[0].lineId !== line.id ||
+        (platforms[0].serviceIds.length > 0 &&
+          !platforms[0].serviceIds.includes(service.id))
+      ) {
+        throw new InvalidStationArrivalScopeError(
+          'Timetable request platform does not belong to its station, line and service',
+        );
+      }
     }
   }
 }
@@ -123,29 +146,33 @@ function validateScope(scope: IndexedTimetableScope, topology: Topology) {
  * An internal override must establish that same state, never a candidate/external hash.
  * Consume projection IDs within use; afterward they are provenance only.
  */
-export async function withScheduledTimetableSnapshot<T>(
+export async function withScheduledTimetableSnapshot<
+  Scope extends IndexedTimetableScope,
+  T,
+>(
   db: Database,
-  options: ScheduledTimetableSnapshotOptions,
+  options: ScheduledTimetableSnapshotOptions<Scope>,
   use: (
     tx: ReadTransaction,
     snapshot: {
-      scope: IndexedTimetableScope;
+      scope: Scope;
       topology: Topology;
       maximumDepartureSeconds: number;
       unavailableProjections: {
         manifestSha256: string;
         reason: Attempt['reason'];
       }[];
-      select: (serviceDate: string) => Promise<ScheduledTimetableSelection>;
+      select: (
+        serviceDate: string,
+      ) => Promise<ScheduledTimetableSelection<Scope>>;
     },
   ) => Promise<T>,
 ): Promise<T> {
-  const scope = ScheduledTimetableRequestScopeSchema.parse(options.scope);
-  if (scope.serviceId === undefined) {
-    throw new InvalidStationArrivalScopeError(
-      'The legacy timetable index requires exactly one service',
-    );
-  }
+  // Parsing preserves the exact-service or service-set variant.
+  const scope = ScheduledTimetableRequestScopeSchema.parse(
+    options.scope,
+  ) as Scope;
+  const serviceIds = indexedServiceIds(scope);
   const rollback = ScheduledTimetableRollbackOptionsSchema.optional().parse(
     options.rollback,
   );
@@ -157,10 +184,10 @@ export async function withScheduledTimetableSnapshot<T>(
       z.number().int().positive().parse(topology.projectionVersion);
       validateScope(scope, topology);
       const fingerprint = hashBytes(Buffer.from(JSON.stringify(topology)));
-      // Check the full source chain before exposing the versions supported by v1.
+      // Check the full source chain before considering derived projections.
       const history = validateScheduledTimetableHistory(
         await tx.select(scheduledTimetableHistoryColumns).from(timetables),
-      ).filter(({ format }) => format === 'legacy');
+      );
       const indexed = await tx
         .select({
           id: projections.id,
@@ -175,19 +202,30 @@ export async function withScheduledTimetableSnapshot<T>(
         })
         .from(projections)
         .where(
-          eq(
-            projections.projector_version,
+          inArray(projections.projector_version, [
             SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
-          ),
+            COMBINED_DEPARTURE_PROJECTOR_VERSION,
+          ]),
         );
-      const byManifest = new Map(
-        indexed.map((row) => [row.manifestSha256, row]),
+      const byIdentity = new Map(
+        indexed.map((row) => [
+          `${row.manifestSha256}:${row.projectorVersion}`,
+          row,
+        ]),
       );
+      const projectionFor = (version: Version) =>
+        byIdentity.get(
+          `${version.manifestSha256}:${
+            version.format === 'combined'
+              ? COMBINED_DEPARTURE_PROJECTOR_VERSION
+              : SCHEDULED_DEPARTURE_PROJECTOR_VERSION
+          }`,
+        );
       const projectionReason = (
         version: Version,
       ): Attempt['reason'] | undefined => {
-        const { manifest, manifestSha256 } = version;
-        const projection = byManifest.get(manifestSha256);
+        const { manifest, serviceDateRange } = version;
+        const projection = projectionFor(version);
         if (
           manifest.identity.topology.sha256 !== fingerprint ||
           manifest.identity.topology.projectionVersion !==
@@ -208,8 +246,8 @@ export async function withScheduledTimetableSnapshot<T>(
           return 'topology-mismatch';
         }
         if (
-          projection.startDate !== manifest.feedRange.startDate ||
-          projection.endDate !== manifest.feedRange.endDate
+          projection.startDate !== serviceDateRange.startDate ||
+          projection.endDate !== serviceDateRange.endDate
         ) {
           return 'projection-metadata-mismatch';
         }
@@ -235,14 +273,14 @@ export async function withScheduledTimetableSnapshot<T>(
         } else {
           maximumDepartureSeconds = Math.max(
             maximumDepartureSeconds,
-            byManifest.get(manifestSha256)?.maximumDepartureSeconds ?? 0,
+            projectionFor(version)?.maximumDepartureSeconds ?? 0,
           );
         }
       }
       const selectEligible = async (
         input: string,
         versions: readonly Version[],
-      ): Promise<ScheduledTimetableSelection> => {
+      ): Promise<ScheduledTimetableSelection<Scope>> => {
         const serviceDate = z.iso.date().parse(input);
         const coverageRows = await tx
           .select({
@@ -250,6 +288,7 @@ export async function withScheduledTimetableSnapshot<T>(
             serviceDate: days.service_date,
             activeTripCount: days.active_trip_count,
             unassignedActiveTripCount: days.unassigned_active_trip_count,
+            serviceId: scopes.service_id,
             platformIds: scopes.platform_ids,
           })
           .from(days)
@@ -260,15 +299,18 @@ export async function withScheduledTimetableSnapshot<T>(
               eq(scopes.service_date, days.service_date),
               eq(scopes.station_id, scope.stationId),
               eq(scopes.line_id, scope.lineId),
-              eq(scopes.service_id, scope.serviceId),
+              inArray(scopes.service_id, serviceIds),
               eq(scopes.destination_station_id, scope.destinationStationId),
             ),
           )
           .where(eq(days.service_date, serviceDate));
-        const byProjection = new Map(
-          coverageRows.map((row) => [row.projectionId, row]),
-        );
-        const selection: ScheduledTimetableSelection = {
+        const byProjection = new Map<number, (typeof coverageRows)[number][]>();
+        for (const row of coverageRows) {
+          const group = byProjection.get(row.projectionId);
+          if (group) group.push(row);
+          else byProjection.set(row.projectionId, [row]);
+        }
+        const selection: ScheduledTimetableSelection<Scope> = {
           serviceDate,
           scope,
           selected: null,
@@ -277,40 +319,35 @@ export async function withScheduledTimetableSnapshot<T>(
         };
         // Only the validated receipt chain establishes newest-to-oldest order.
         for (const version of [...versions].reverse()) {
-          const { manifest, manifestSha256 } = version;
-          const metadata = byManifest.get(manifestSha256);
-          const projection = metadata && {
-            ...metadata,
-            ...byProjection.get(metadata.id),
-          };
+          const { serviceDateRange, manifestSha256 } = version;
+          const projection = projectionFor(version);
+          const rows = projection && byProjection.get(projection.id);
+          const coveredScopes = rows?.filter(
+            (row) =>
+              row.platformIds !== null &&
+              (scope.platformId === undefined ||
+                row.platformIds.includes(scope.platformId)),
+          );
           const unavailable = projectionReason(version);
           let reason: Attempt['reason'];
           let coverage: Coverage | undefined;
           if (
-            serviceDate < manifest.feedRange.startDate ||
-            serviceDate > manifest.feedRange.endDate
+            serviceDate < serviceDateRange.startDate ||
+            serviceDate > serviceDateRange.endDate
           ) {
             reason = 'outside-feed-range';
           } else if (unavailable) {
             reason = unavailable;
           } else if (!projection || projection.completedAt === null) {
             throw new Error('Eligible projection metadata is missing');
-          } else if (
-            projection.serviceDate == null ||
-            projection.activeTripCount == null ||
-            projection.unassignedActiveTripCount == null
-          ) {
+          } else if (!rows?.length) {
             reason = 'day-not-indexed';
-          } else if (
-            !projection.platformIds ||
-            (scope.platformId !== undefined &&
-              !projection.platformIds.includes(scope.platformId))
-          ) {
+          } else if (coveredScopes?.length !== serviceIds.length) {
             reason = 'scope-not-covered';
           } else {
             coverage = {
-              activeTripCount: projection.activeTripCount,
-              unassignedActiveTripCount: projection.unassignedActiveTripCount,
+              activeTripCount: rows[0].activeTripCount,
+              unassignedActiveTripCount: rows[0].unassignedActiveTripCount,
             };
             reason =
               coverage.unassignedActiveTripCount > 0
@@ -329,7 +366,11 @@ export async function withScheduledTimetableSnapshot<T>(
                 version,
                 coverage: {
                   ...coverage,
-                  platformIds: projection.platformIds,
+                  platformIds: [
+                    ...new Set(
+                      coveredScopes.flatMap((row) => row.platformIds ?? []),
+                    ),
+                  ].sort(),
                 },
               };
             }
@@ -343,7 +384,7 @@ export async function withScheduledTimetableSnapshot<T>(
       };
       const select = async (
         serviceDate: string,
-      ): Promise<ScheduledTimetableSelection> => {
+      ): Promise<ScheduledTimetableSelection<Scope>> => {
         const normal = await selectEligible(serviceDate, history);
         if (!rollback) {
           return normal;
@@ -397,12 +438,15 @@ export async function withScheduledTimetableSnapshot<T>(
  * never derive topology from a candidate or accept an external fingerprint.
  * Consume projection IDs inside use; after the snapshot closes they are provenance only.
  */
-export async function withSelectedScheduledTimetable<T>(
+export async function withSelectedScheduledTimetable<
+  Scope extends IndexedTimetableScope,
+  T,
+>(
   db: Database,
-  options: ScheduledTimetableSnapshotOptions & { serviceDate: string },
+  options: ScheduledTimetableSnapshotOptions<Scope> & { serviceDate: string },
   use: (
     tx: ReadTransaction,
-    selection: ScheduledTimetableSelection,
+    selection: ScheduledTimetableSelection<Scope>,
   ) => Promise<T>,
 ): Promise<T> {
   const serviceDate = z.iso.date().parse(options.serviceDate);

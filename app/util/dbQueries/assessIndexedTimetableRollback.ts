@@ -2,7 +2,10 @@ import type {
   ScheduledTimetableRollbackAssessment,
   ScheduledTimetableRollbackOptions,
 } from '@mrtdown/fs';
-import type { ScheduledTimetableSelection } from './withSelectedScheduledTimetable';
+import type {
+  IndexedTimetableScope,
+  ScheduledTimetableSelection,
+} from './withSelectedScheduledTimetable';
 
 type Version = NonNullable<ScheduledTimetableSelection['selected']>['version'];
 
@@ -10,7 +13,7 @@ type Version = NonNullable<ScheduledTimetableSelection['selected']>['version'];
 // without hydrating historical bodies; parity is checked against its public selector.
 export function assessIndexedTimetableRollback(
   rollback: ScheduledTimetableRollbackOptions,
-  selection: ScheduledTimetableSelection,
+  selection: ScheduledTimetableSelection<IndexedTimetableScope>,
   history: readonly Version[],
 ): ScheduledTimetableRollbackAssessment {
   const { review, selectionInstant } = rollback;
@@ -20,7 +23,8 @@ export function assessIndexedTimetableRollback(
     serviceDate > review.dateRange.endDate ||
     scope.stationId !== review.scope.stationId ||
     scope.lineId !== review.scope.lineId ||
-    scope.serviceId !== review.scope.serviceId ||
+    JSON.stringify(scope.serviceIds ?? [scope.serviceId]) !==
+      JSON.stringify(review.scope.serviceIds ?? [review.scope.serviceId]) ||
     scope.destinationStationId !== review.scope.destinationStationId ||
     scope.platformId !== review.scope.platformId
   ) {

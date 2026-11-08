@@ -5,11 +5,30 @@ import {
   scheduledServiceDatesForWindow,
 } from '@mrtdown/core';
 import type { RetainedScheduledDeparture } from '@mrtdown/fs';
-import { and, arrayContains, count, eq, gte, isNull, lt } from 'drizzle-orm';
+import {
+  and,
+  arrayContains,
+  count,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+} from 'drizzle-orm';
 import z from 'zod';
 import type { getDb } from '~/db';
-import { scheduledDepartureOccurrencesTable as occurrences } from '~/db/scheduledDepartures.schema';
 import {
+  type combinedDepartureOccurrencesTable,
+  scheduledDepartureOccurrencesTable as occurrences,
+} from '~/db/scheduledDepartures.schema';
+import {
+  type BoardingMembership,
+  readCombinedDepartureRows,
+} from './readCombinedDepartureRows';
+import {
+  type ExactTimetableScope,
+  type IndexedTimetableScope,
+  indexedServiceIds,
   type ReadTransaction,
   type ScheduledTimetableSelection,
   type ScheduledTimetableSnapshotOptions,
@@ -45,49 +64,122 @@ function compareText(left: string, right: string) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-type IndexedDepartureOptions = ScheduledTimetableSnapshotOptions & {
+type IndexedDepartureOptions<
+  Scope extends IndexedTimetableScope = ExactTimetableScope,
+> = ScheduledTimetableSnapshotOptions<Scope> & {
   startInstant: string;
   endInstant: string;
   limit?: number;
 };
 
+type PlatformSemantics =
+  (typeof combinedDepartureOccurrencesTable.$inferSelect)['platform_semantics'];
+
 export type IndexedScheduledDeparture = RetainedScheduledDeparture & {
   serviceId: string;
   revisionId: string;
+  platformSemantics?: PlatformSemantics;
+  boardingByService?: BoardingMembership[];
 };
 
-type IndexedDepartures = {
-  scope: ScheduledTimetableSnapshotOptions['scope'];
+type IndexedServiceSetDeparture = RetainedScheduledDeparture & {
+  platformSemantics?: PlatformSemantics;
+  boardingByService: BoardingMembership[];
+};
+
+type ServiceSetScope = Extract<IndexedTimetableScope, { serviceIds: string[] }>;
+
+type IndexedDepartures<
+  Scope extends IndexedTimetableScope = ExactTimetableScope,
+  Departure = IndexedScheduledDeparture,
+> = {
+  scope: Scope;
   window: { startInstant: string; endInstant: string };
-  serviceDays: ScheduledTimetableSelection[];
+  serviceDays: ScheduledTimetableSelection<Scope>[];
   unavailableProjections: {
     manifestSha256: string;
     reason: ScheduledTimetableSelection['attempts'][number]['reason'];
   }[];
   untimedDepartureCount: number;
   complete: boolean;
-  departures: IndexedScheduledDeparture[];
+  departures: Departure[];
 };
+
+function exactServiceDeparture(
+  departure: IndexedServiceSetDeparture,
+): IndexedScheduledDeparture {
+  const { boardingByService, platformSemantics, ...timing } = departure;
+  const [member] = boardingByService;
+  if (boardingByService.length !== 1) {
+    throw new Error('Exact-service departure requires one boarding membership');
+  }
+  return {
+    ...timing,
+    ...member,
+    ...(platformSemantics === undefined
+      ? {}
+      : { boardingByService, platformSemantics }),
+  };
+}
 
 /** Private schedule query using live topology by default; serving approval remains separate. */
 export function queryIndexedScheduledDepartures(
   db: ReturnType<typeof getDb>,
+  options: IndexedDepartureOptions<ServiceSetScope>,
+): Promise<IndexedDepartures<ServiceSetScope, IndexedServiceSetDeparture>>;
+export function queryIndexedScheduledDepartures(
+  db: ReturnType<typeof getDb>,
   options: IndexedDepartureOptions,
+): Promise<IndexedDepartures>;
+export function queryIndexedScheduledDepartures(
+  db: ReturnType<typeof getDb>,
+  options: IndexedDepartureOptions<IndexedTimetableScope>,
 ) {
+  const { scope } = options;
+  if (scope.serviceId === undefined) {
+    return readIndexedScheduledDepartures(
+      db,
+      { ...options, scope },
+      (departure) => departure,
+      async (_tx, result) => result,
+    );
+  }
   return withIndexedScheduledDepartures(
     db,
-    options,
+    { ...options, scope },
     async (_tx, result) => result,
   );
 }
 
 /** Keep dependent canonical reads inside the query's read-only snapshot. */
-export async function withIndexedScheduledDepartures<T>(
+export function withIndexedScheduledDepartures<T>(
   db: ReturnType<typeof getDb>,
   options: IndexedDepartureOptions,
   use: (
     tx: ReadTransaction,
     result: IndexedDepartures,
+    topology: Topology,
+  ) => Promise<T>,
+) {
+  return readIndexedScheduledDepartures(
+    db,
+    options,
+    exactServiceDeparture,
+    use,
+  );
+}
+
+async function readIndexedScheduledDepartures<
+  Scope extends IndexedTimetableScope,
+  Departure extends RetainedScheduledDeparture,
+  T,
+>(
+  db: ReturnType<typeof getDb>,
+  options: IndexedDepartureOptions<Scope>,
+  mapDeparture: (departure: IndexedServiceSetDeparture) => Departure,
+  use: (
+    tx: ReadTransaction,
+    result: IndexedDepartures<Scope, Departure>,
     topology: Topology,
   ) => Promise<T>,
 ): Promise<T> {
@@ -129,9 +221,9 @@ export async function withIndexedScheduledDepartures<T>(
         ),
       ]),
     ].sort();
-    const serviceDays: ScheduledTimetableSelection[] = [];
+    const serviceDays: ScheduledTimetableSelection<Scope>[] = [];
     const departures: {
-      departure: IndexedScheduledDeparture;
+      departure: Departure;
       occurrenceIndex: number;
     }[] = [];
     let untimedDepartureCount = 0;
@@ -142,42 +234,36 @@ export async function withIndexedScheduledDepartures<T>(
       if (!selected) {
         continue;
       }
-      const scopeFilter = and(
-        eq(occurrences.projection_id, selected.projectionId),
-        eq(occurrences.service_date, serviceDate),
-        eq(occurrences.station_id, scope.stationId),
-        eq(occurrences.line_id, scope.lineId),
-        eq(occurrences.service_id, scope.serviceId),
-        eq(occurrences.destination_station_id, scope.destinationStationId),
-        scope.platformId === undefined
-          ? undefined
-          : arrayContains(occurrences.platform_ids, [scope.platformId]),
-      );
-      // Untimed boardable rows cannot be assigned to the instant window. Count
-      // the entire selected date/scope independently of the timed result limit.
-      const [untimed] = await tx
-        .select({ count: count() })
-        .from(occurrences)
-        .where(and(scopeFilter, isNull(occurrences.departure_instant)));
+      const { rows, untimed } =
+        selected.version.format === 'combined'
+          ? await readCombinedDepartureRows(
+              tx,
+              scope,
+              selected.projectionId,
+              serviceDate,
+              lowerBound,
+              upperBound,
+            )
+          : await readLegacyDepartureRows(
+              tx,
+              scope,
+              selected.projectionId,
+              serviceDate,
+              lowerBound,
+              upperBound,
+            );
       untimedDepartureCount += untimed.count;
-      const rows = await tx
-        .select()
-        .from(occurrences)
-        .where(
-          and(
-            scopeFilter,
-            gte(occurrences.departure_instant, lowerBound),
-            lt(occurrences.departure_instant, upperBound),
-          ),
-        );
       const { manifest, manifestSha256 } = selected.version;
       for (const row of rows) {
         if (row.departure_instant === null) {
           throw new Error('Timed departure query returned an untimed row');
         }
+        const boardingByService = row.boardingByService;
+        const platformSemantics =
+          'platform_semantics' in row ? row.platform_semantics : undefined;
         departures.push({
           occurrenceIndex: row.occurrence_index,
-          departure: {
+          departure: mapDeparture({
             providerTripId: row.provider_trip_id,
             providerRouteId: row.provider_route_id,
             providerCalendarId: row.provider_calendar_id,
@@ -186,10 +272,14 @@ export async function withIndexedScheduledDepartures<T>(
             serviceDate: row.service_date,
             stationId: row.station_id,
             lineId: row.line_id,
-            serviceId: row.service_id,
-            revisionId: row.revision_id,
             destinationStationId: row.destination_station_id,
-            platformIds: row.platform_ids,
+            platformIds: [
+              ...new Set(
+                boardingByService.flatMap((member) => member.platformIds),
+              ),
+            ],
+            boardingByService,
+            ...(platformSemantics === undefined ? {} : { platformSemantics }),
             arrivalSeconds: row.arrival_seconds,
             departureSeconds: row.departure_seconds,
             arrivalInstant:
@@ -206,7 +296,7 @@ export async function withIndexedScheduledDepartures<T>(
             snapshotSha256: manifest.capture.sha256,
             retrievedAt: manifest.capture.retrieved_at,
             correctionRevision: manifest.correctionRevision,
-          },
+          }),
         });
       }
     }
@@ -223,7 +313,7 @@ export async function withIndexedScheduledDepartures<T>(
         ) ||
         left.occurrenceIndex - right.occurrenceIndex,
     );
-    const result: IndexedDepartures = {
+    const result: IndexedDepartures<Scope, Departure> = {
       scope,
       window,
       serviceDays,
@@ -240,4 +330,54 @@ export async function withIndexedScheduledDepartures<T>(
     };
     return use(tx, result, snapshot.topology);
   });
+}
+
+async function readLegacyDepartureRows(
+  tx: ReadTransaction,
+  scope: IndexedTimetableScope,
+  projectionId: number,
+  serviceDate: string,
+  lowerBound: string,
+  upperBound: string,
+) {
+  const scopeFilter = and(
+    eq(occurrences.projection_id, projectionId),
+    eq(occurrences.service_date, serviceDate),
+    eq(occurrences.station_id, scope.stationId),
+    eq(occurrences.line_id, scope.lineId),
+    inArray(occurrences.service_id, indexedServiceIds(scope)),
+    eq(occurrences.destination_station_id, scope.destinationStationId),
+    scope.platformId === undefined
+      ? undefined
+      : arrayContains(occurrences.platform_ids, [scope.platformId]),
+  );
+  // Untimed boardable rows cannot be assigned to the instant window. Count
+  // the entire selected date/scope independently of the timed result limit.
+  const [untimed] = await tx
+    .select({ count: count() })
+    .from(occurrences)
+    .where(and(scopeFilter, isNull(occurrences.departure_instant)));
+  const rows = await tx
+    .select()
+    .from(occurrences)
+    .where(
+      and(
+        scopeFilter,
+        gte(occurrences.departure_instant, lowerBound),
+        lt(occurrences.departure_instant, upperBound),
+      ),
+    );
+  return {
+    untimed,
+    rows: rows.map((row) => ({
+      ...row,
+      boardingByService: [
+        {
+          serviceId: row.service_id,
+          revisionId: row.revision_id,
+          platformIds: row.platform_ids,
+        },
+      ],
+    })),
+  };
 }
