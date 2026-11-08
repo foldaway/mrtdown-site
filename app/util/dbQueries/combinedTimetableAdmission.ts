@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'node:util';
+import { Temporal } from '@js-temporal/polyfill';
 import {
   ScheduledTimetableArtifactManifestSchema,
   ScheduledTimetableArtifactMetadataSchema,
@@ -26,6 +28,12 @@ const combinedManifest = z.object({
   reviewDraftSha256: manifestShape.mapping.shape.draftSha256,
   assignmentsSha256: manifestShape.mapping.shape.assignmentsSha256,
   timetable: manifestShape.timetable,
+  serviceDateRange: z
+    .strictObject({
+      startDate: z.iso.date(),
+      endDateExclusive: z.iso.date(),
+    })
+    .refine(({ startDate, endDateExclusive }) => startDate < endDateExclusive),
 });
 
 const combinedReleaseMetadata = z.strictObject({
@@ -56,7 +64,7 @@ export function prepareCombinedTimetableAdmission(
       verified.index.manifestSha256,
       files.manifestBytes,
       metadata,
-    ),
+    ).manifest,
     files: {
       pages_entry: null,
       combined_release: metadata,
@@ -96,7 +104,7 @@ export function readCombinedTimetableAdmissionManifest(
   // The shared source-order assessor accepts the legacy manifest shape. Its
   // source checks use capture, correction, source manifest and provider feed
   // fields. The other identities below describe the real combined release files.
-  return ScheduledTimetableArtifactManifestSchema.parse({
+  const manifest = ScheduledTimetableArtifactManifestSchema.parse({
     schemaVersion: release.schemaVersion,
     documentKind: 'scheduled-timetable-artifact',
     correctionRevision: release.correctionRevision,
@@ -117,4 +125,45 @@ export function readCombinedTimetableAdmissionManifest(
     timetable: release.timetable,
     notice: { sha256: index.releaseSha256, byteLength: releaseByteLength },
   });
+  return {
+    manifest,
+    serviceDateRange: combinedServiceDateRange(release.serviceDateRange),
+  };
+}
+
+export function combinedServiceDateRange(range: {
+  startDate: string;
+  endDateExclusive: string;
+}) {
+  return {
+    startDate: range.startDate,
+    endDate: Temporal.PlainDate.from(range.endDateExclusive)
+      .subtract({ days: 1 })
+      .toString(),
+  };
+}
+
+export function verifyRetainedCombinedTimetable(
+  hash: string,
+  metadata: unknown,
+  files: BundleFiles,
+  topology: Topology,
+) {
+  const { index, sourceFeedInfo, releaseByteLength } =
+    combinedReleaseMetadata.parse(metadata);
+  if (
+    index.manifestSha256 !== hash ||
+    releaseByteLength !== files.releaseBytes.byteLength
+  ) {
+    throw new Error(
+      'Retained combined release disagrees with its index metadata',
+    );
+  }
+  const verified = verifyCombinedTimetableReleaseBundle(index, files, topology);
+  if (!isDeepStrictEqual(sourceFeedInfo, verified.artifact.sourceFeedInfo)) {
+    throw new Error(
+      'Retained combined release disagrees with its source feed metadata',
+    );
+  }
+  return verified;
 }

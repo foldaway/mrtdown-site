@@ -48,6 +48,7 @@ export const result: Awaited<
         },
         version: {
           format: 'legacy',
+          serviceDateRange: manifest.feedRange,
           manifestSha256: bundle.entry.manifestSha256,
           manifest,
           record: {

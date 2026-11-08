@@ -1,7 +1,9 @@
 # Combined timetable departure index
 
 The pull verifies and retains combined releases in the same source lineage as
-legacy timetables. The existing indexed reader accepts legacy versions.
+legacy timetables. Projector version 2 materializes combined releases during the same pull.
+The indexed reader selects both formats by retained lineage, live topology and
+explicit coverage. Legacy releases use projector version 1.
 
 ## Materialize effective Singapore service days
 
@@ -30,3 +32,12 @@ legacy timetables. The existing indexed reader accepts legacy versions.
 - Verify a shared journey appears once across services, including when platform
   access differs. Cover zero-active dates, untimed departures, the last day's
   overnight tail and rejected incomplete or incompatible projections.
+
+
+## Validation
+
+The isolated PostGIS handoff test imports a synthetic approved successor and
+reads it through the live topology loader. It covers shared and repeated calls,
+restricted platforms, untimed departures, a covered zero-active date, the last
+day's overnight tail, failed revalidation, retry and rollback to a legacy
+projection.

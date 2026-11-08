@@ -106,28 +106,26 @@ locked retention chain and the same source admission rules. The combined row
 keeps the original bytes, trusted index, provider feed metadata and first import
 receipt. The provider-declared bounds are used for source admission. The compact
 artifact retains its own effective Singapore service dates and overnight times.
-Both index digests participate in the pull fingerprint.
+Both index digests and the combined projector version participate in the pull
+fingerprint when a trusted combined index is supplied.
 
-The existing departure index continues to serve eligible legacy versions.
-Combined releases are retained for the separate
-[combined departure indexing phase](plans/active/combined-timetable-index.md).
+### Indexed scheduled departure storage
 
-### Indexed scheduled departure storage foundation
-
-Four derived tables prepare indexed reads without parsing the retained timetable
-body on each request. The internal `projectScheduledTimetable` builder writes
-these tables during the canonical pull; passenger reads remain separate work.
+The internal `projectScheduledTimetable` builder writes derived tables during
+the canonical pull. Readers use these tables without parsing retained timetable
+bodies. Legacy and combined releases share projection metadata and coverage
+tables and use separate occurrence tables.
 
 - `scheduled_departure_projections` identifies one retained manifest and projector
-  algorithm version. It records the canonical topology fingerprint/version, feed
-  bounds and maximum departure offset across **all source stops**, including
+  algorithm version. It records the canonical topology fingerprint/version,
+  inclusive indexed service-date bounds and maximum departure offset across **all source stops**, including
   non-boardable stops. These support the shared window helper's candidate service
   dates, including overnight offsets. The manifest FK preserves access to source
   capture, correction, retrieval and review provenance; those fields are not copied
   onto every occurrence. Manifest digests and projector versions are identities,
   not source ordering. Retained receipt lineage remains authoritative for ordering.
-- `scheduled_departure_days` records every feed date, including zero-active-trip
-  dates, with whole-source active and unassigned-active trip counts. Missing dates
+- `scheduled_departure_days` records every supported date, including
+  zero-active-trip dates, with whole-source active and unassigned-active trip counts. Missing dates
   are unavailable; zero occurrence rows never establish date coverage. An
   unassigned active trip anywhere in the source blocks that date conservatively,
   matching `selectRetainedScheduledTimetable`.
@@ -135,8 +133,9 @@ these tables during the canonical pull; passenger reads remain separate work.
   and destination, with the union of platform alternatives. Coverage follows the
   shared selector's used patterns and active canonical revisions, including
   non-final station occurrences, independently of active trip assignments that
-  day. It is not inferred from departure rows; an optional platform must belong
-  to this coverage as well as each returned occurrence's alternatives.
+  day. Combined coverage includes each service's eligible boarding platforms.
+  An optional platform must belong to the requested scope coverage and the
+  boarding membership of each returned occurrence.
 - `scheduled_departure_occurrences` preserves boardable occurrences with a
   downstream alighting stop, including untimed candidates. Provider IDs and stop
   sequences remain strings; `occurrence_index` preserves source order for ties
@@ -145,21 +144,22 @@ these tables during the canonical pull; passenger reads remain separate work.
   `timepoint` preserves exact/approximate precision; nullable seconds/instant pairs
   preserve missing timing. Non-boardable and terminal occurrences stay in the
   archive. Scope foreign keys prevent rows belonging to another date or scope.
+- `combined_departure_occurrences` stores the same source timing and the platform
+  semantics for each boardable occurrence. `combined_departure_memberships` ties
+  that occurrence to each boarding service, revision and eligible platform set.
+  Distinct physical associations and complete source alternatives retain their
+  original meanings.
 
-`projectScheduledTimetable` requires an exact retained manifest digest, its
-supported algorithm version (currently 1), and an independently trusted canonical
-snapshot directory that the caller keeps immutable throughout the call. It
-rechecks retained metadata lineage, all seven files' artifact/release/mapping
-bindings and canonical compatibility using the shared validators. Retention alone
-does not prove compatibility with this snapshot or the live database. Only the
-selected timetable body is loaded; the existing bundle and canonical validators
-each decode that version, while historical lineage reads metadata only.
-
-The builder uses shared calendar and canonical trip/date resolution helpers. Its
-coverage follows the shared retained selector's used patterns and active revisions;
-boardable rows must belong to that coverage and its platform alternatives. It
-streams dates and resolved trips into batches of at most 500 occurrences, keeping
-untimed candidates and never collecting the date-expanded timetable in memory.
+`projectScheduledTimetable` requires a retained manifest digest, the matching
+projector version (1 for legacy, 2 for combined), and an independently trusted
+canonical snapshot directory that stays immutable during the build. It validates
+the retained lineage and rechecks the selected bundle's bytes, release evidence
+and canonical compatibility. Combined builds use the retained trusted index and
+`projectCombinedTimetableServiceDay` to project explicit effective dates within
+the half-open applicability range. Provider feed bounds still govern source
+admission. Legacy builds use the shared calendar and trip/date resolution helpers.
+The builder streams one service day at a time and inserts rows in batches of at
+most 500.
 The parse step invokes it only for the currently advertised, validated and admitted
 manifest, using the same archive snapshot. GTFS-free pulls do no projection work.
 Historical projections are preserved; the pull does not backfill retained history.
@@ -192,8 +192,9 @@ passenger query/API/UI remain separate work and gates.
 ### Internal indexed date and scope selection
 
 `withSelectedScheduledTimetable` selects one completed, supported projection for
-one service date and exact canonical station/line/service/destination scope,
-including optional platform coverage. It reads retained manifests and receipts
+one service date and canonical station, line and destination. The request can
+name one service or a set of services and an optional platform. Every requested
+service must have scope coverage. It reads retained manifests and receipts
 through the shared metadata-only history validator and follows that validated
 chain newest first. Invalid lineage throws; it never reconstructs ordering from
 provider versions, hashes or import times. It checks artifact bounds, both
@@ -299,8 +300,10 @@ canonical inputs; it does not imply current production lines are missing fields.
 
 Each candidate date independently uses the same conservative selector and receipt
 lineage, allowing date-specific fallback. SQL restricts occurrence reads to the
-selected projection/date, exact canonical scope, half-open instant range and
-optional platform membership. All timed rows within those bounds are merged by
+selected projection/date, canonical scope, half-open instant range and optional
+platform. Combined queries filter by boarding memberships and return each
+qualifying occurrence once, with the matching services, revisions and eligible
+platforms. All timed rows within those bounds are merged by
 instant/date/trip/source occurrence order before applying the result limit.
 A separate SQL count includes every relevant boardable untimed row on each selected
 service date, regardless of the instant range or result limit; no time is inferred.

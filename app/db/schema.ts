@@ -46,13 +46,15 @@ import {
 } from 'drizzle-orm/pg-core';
 import { enumToPgEnum, timestampColumns } from './columns.helpers.js';
 
-export { scheduledTimetablesTable } from './scheduledTimetables.schema.js';
 export {
+  combinedDepartureMembershipsTable,
+  combinedDepartureOccurrencesTable,
   scheduledDepartureDaysTable,
   scheduledDepartureOccurrencesTable,
   scheduledDepartureProjectionsTable,
   scheduledDepartureScopesTable,
 } from './scheduledDepartures.schema.js';
+export { scheduledTimetablesTable } from './scheduledTimetables.schema.js';
 
 /*
  * Pull staging (`*_next`): snapshot of manifest data between workflow steps.
