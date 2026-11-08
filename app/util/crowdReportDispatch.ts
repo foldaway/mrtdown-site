@@ -25,6 +25,7 @@ import {
   crowdReportStationsTable,
   crowdReportsTable,
 } from '~/db/schema';
+import { purgePublicDataCache } from './cloudflareCache';
 import { captureCrowdReportDispatchAfterSubmissionFailure } from './crowdReportDispatchDiagnostics';
 import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
 import { getCrowdReportClusterDirection } from './crowdReportClustering';
@@ -807,6 +808,24 @@ export async function dispatchPendingCrowdReports(
         success: false,
         error: error instanceof Error ? error.message : String(error),
       });
+    }
+  }
+
+  if (
+    results.some(
+      (result) =>
+        result.kind === 'cluster' && result.success && !result.skipped,
+    )
+  ) {
+    try {
+      await purgePublicDataCache();
+    } catch (error) {
+      console.error(
+        'Failed to purge public cache after crowd report dispatch',
+        {
+          error,
+        },
+      );
     }
   }
 

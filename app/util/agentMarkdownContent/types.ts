@@ -14,8 +14,9 @@ export type OverviewPayload = Awaited<ReturnType<typeof getOverviewData>>;
 export type LineProfilePayload = Awaited<
   ReturnType<typeof getLineProfileReadModel>
 >;
-export type StationProfilePayload = Awaited<
-  ReturnType<typeof getStationProfileReadModel>
+export type StationProfilePayload = Pick<
+  Awaited<ReturnType<typeof getStationProfileReadModel>>,
+  'data' | 'included'
 >;
 export type OperatorProfilePayload = Awaited<
   ReturnType<typeof getOperatorProfileReadModel>

@@ -91,6 +91,7 @@ export type BaseDataset = {
   publicHolidaySet: Set<string>;
   allIssues: Record<string, IssueWithOperationalEffects>;
   issuesByLineId: Record<string, IssueWithOperationalEffects[]>;
+  issueFreshUntil?: DateTime;
 };
 
 export type CompleteDatasetCaller =
@@ -105,6 +106,7 @@ export type DatasetStaticScope = {
   townIds?: readonly string[];
   landmarkIds?: readonly string[];
   includePublicHolidays?: boolean;
+  issueTransitionHorizon?: DateTime;
 };
 
 function omitAuditTimestamps<TColumns extends Record<string, unknown>>(
@@ -1166,6 +1168,7 @@ export async function buildDataset(
   ) as Record<string, DateTime | null>;
 
   const allIssues: Record<string, IssueWithOperationalEffects> = {};
+  let issueFreshUntil = staticScope?.issueTransitionHorizon;
   for (const row of issueRows) {
     const title = parseTranslations(row.title);
     const latestEventByType = latestEventByTypeByIssueId[row.id] ?? {};
@@ -1197,15 +1200,36 @@ export async function buildDataset(
     const canonicalPeriods = periodEvents.flatMap((event) => {
       return periodsByImpactEventId[event.id] ?? [];
     });
-    const latestEvidenceAt = latestEvidenceAtByIssueId[row.id];
+    const latestEvidenceAt =
+      row.type === 'infra' ? null : latestEvidenceAtByIssueId[row.id];
+    const periodRows = canonicalPeriods.map((period) => ({
+      start_at: period.start_at,
+      end_at: period.end_at,
+    }));
     const intervals = resolveOperationalIssueIntervals(
-      canonicalPeriods.map((period) => ({
-        start_at: period.start_at,
-        end_at: period.end_at,
-      })),
-      row.type === 'infra' ? null : latestEvidenceAt,
+      periodRows,
+      latestEvidenceAt,
       referenceNow,
     );
+    if (
+      issueFreshUntil != null &&
+      latestEvidenceAt != null &&
+      intervals.some((interval) => interval.endAt == null)
+    ) {
+      // The operational resolver keeps an inferred end open until it passes.
+      // Resolve at the cache horizon as well to find upcoming inferred ends.
+      for (const interval of resolveOperationalIssueIntervals(
+        periodRows.filter((period) => period.end_at == null),
+        latestEvidenceAt,
+        issueFreshUntil,
+      )) {
+        if (interval.endAt == null) continue;
+        const end = parseDateTime(interval.endAt);
+        if (end > referenceNow && end < issueFreshUntil) {
+          issueFreshUntil = end;
+        }
+      }
+    }
 
     const serviceScopeEvents = selectLatestServiceEvents(
       impactEventsByIssueId[row.id] ?? [],
@@ -1396,6 +1420,7 @@ export async function buildDataset(
     publicHolidaySet,
     allIssues,
     issuesByLineId,
+    issueFreshUntil,
   };
 }
 

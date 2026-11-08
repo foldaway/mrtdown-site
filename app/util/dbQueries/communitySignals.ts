@@ -1,3 +1,4 @@
+import type { DateTime } from 'luxon';
 import { getPublicCrowdReportSignals } from '~/util/crowdReports';
 import { getDefaultDb } from './database';
 
@@ -10,7 +11,7 @@ export type CommunitySignalOptions = {
 
 export async function getPageCommunitySignals(
   options: CommunitySignalOptions,
-  scope: { lineId?: string; stationId?: string } = {},
+  scope: { lineId?: string; stationId?: string; now?: DateTime } = {},
 ) {
   if (!options.includeCommunitySignals) {
     return [];

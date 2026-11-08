@@ -8,6 +8,7 @@ import {
   isNull,
   or,
 } from 'drizzle-orm';
+import { DateTime } from 'luxon';
 import {
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
@@ -24,7 +25,11 @@ import {
   stationsTable,
   townsTable,
 } from '~/db/schema';
-import type { LineSummaryStatus, Station } from '~/types';
+import type { Issue, LineSummaryStatus, Station } from '~/types';
+import {
+  DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES,
+  type PublicCrowdReportSignal,
+} from '~/util/crowdReports';
 import type { StationArrivalBranch } from '~/util/stationArrivalBranches';
 import {
   type CommunitySignalOptions,
@@ -32,7 +37,7 @@ import {
 } from './communitySignals';
 import { getDefaultDb, timeDbQuery } from './database';
 import { buildDataset, parseTranslations } from './dataset';
-import { isoDate, nowSg } from './dateTime';
+import { isoDate, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
 import {
@@ -177,11 +182,41 @@ export function mergeStationReadModelScope(input: {
   };
 }
 
+export function getStationProfileFreshUntil(
+  referenceNow: DateTime,
+  horizon: DateTime,
+  issues: readonly Pick<Issue, 'intervals'>[],
+  communitySignals: readonly Pick<PublicCrowdReportSignal, 'windowEndAt'>[],
+) {
+  let freshUntil = horizon.toMillis();
+  for (const issue of issues) {
+    for (const interval of issue.intervals) {
+      for (const boundary of [interval.startAt, interval.endAt]) {
+        if (boundary == null) continue;
+        const at = parseDateTime(boundary);
+        if (at > referenceNow) freshUntil = Math.min(freshUntil, at.toMillis());
+      }
+    }
+  }
+  for (const signal of communitySignals) {
+    const expiresAt = parseDateTime(signal.windowEndAt).plus({
+      minutes: DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES,
+    });
+    freshUntil = Math.min(freshUntil, expiresAt.toMillis());
+  }
+  return freshUntil;
+}
+
 export async function getStationProfileReadModel(
   stationId: string,
   options: CommunitySignalOptions = {},
 ) {
   const referenceNow = nowSg();
+  // Station codes and service revisions are selected by Singapore date.
+  const cacheHorizon = DateTime.min(
+    referenceNow.plus({ hours: 1 }),
+    referenceNow.startOf('day').plus({ days: 1 }),
+  );
   const { db, stationId: resolvedStationId } =
     await resolveStationProfileStationIdFromDb(stationId);
   if (resolvedStationId == null) {
@@ -212,7 +247,10 @@ export async function getStationProfileReadModel(
   const stationServiceIds = stationServiceRows.map((row) => row.id);
   const [candidateIssueIds, communitySignals] = await Promise.all([
     getStationCandidateIssueIds(resolvedStationId, stationServiceIds, db),
-    getPageCommunitySignals(options, { stationId: resolvedStationId }),
+    getPageCommunitySignals(options, {
+      stationId: resolvedStationId,
+      now: referenceNow,
+    }),
   ]);
   const issueScope = await getIssueStaticScope(
     candidateIssueIds,
@@ -281,6 +319,7 @@ export async function getStationProfileReadModel(
     townIds: [...new Set(scopedStationRows.map((row) => row.townId))],
     landmarkIds: [...new Set(stationLandmarkRows.map((row) => row.landmarkId))],
     includePublicHolidays: true,
+    issueTransitionHorizon: cacheHorizon,
   });
   const station = dataset.included.stations[resolvedStationId];
   if (station == null) {
@@ -294,7 +333,9 @@ export async function getStationProfileReadModel(
       branch.stationIds.includes(resolvedStationId),
     ),
   );
-  const activeNow = issues.filter((issue) => issueActiveNow(issue));
+  const activeNow = issues.filter((issue) =>
+    issueActiveNow(issue, referenceNow),
+  );
 
   let status: LineSummaryStatus = 'normal';
   if (activeNow.some((issue) => issue.type === 'disruption')) {
@@ -455,6 +496,12 @@ export async function getStationProfileReadModel(
     }))
     .sort((a, b) => a.lineId.localeCompare(b.lineId));
   return {
+    freshUntil: getStationProfileFreshUntil(
+      referenceNow,
+      dataset.issueFreshUntil ?? cacheHorizon,
+      issues,
+      communitySignals,
+    ),
     data: {
       stationId: resolvedStationId,
       status,
