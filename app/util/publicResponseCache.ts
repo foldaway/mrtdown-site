@@ -82,46 +82,46 @@ export function applyPublicDataCacheHeaders(
   response: Response,
 ) {
   const kind = getResponseKind(request, response);
+  const pathname = new URL(request.url).pathname;
+  const isStationHtml = kind === 'html' && isStationProfilePath(pathname);
   const freshUntil = response.headers.get(STATION_PROFILE_FRESH_UNTIL_HEADER);
   const cacheable =
     (request.method === 'GET' || request.method === 'HEAD') &&
     response.status === 200 &&
     kind != null &&
     !hasSharedCacheOptOut(response);
-  if (!cacheable && freshUntil == null) {
+  if (!cacheable && freshUntil == null && !isStationHtml) {
     return response;
   }
 
   const headers = new Headers(response.headers);
   headers.delete(STATION_PROFILE_FRESH_UNTIL_HEADER);
-  if (cacheable) {
-    const pathname = new URL(request.url).pathname;
-    const isStationProfile =
-      (kind === 'html' && isStationProfilePath(pathname)) ||
-      (kind === 'server-function' && freshUntil != null);
-    if (isStationProfile) {
-      // Subtract the time spent assembling and rendering the response.
-      const expiresAt = Number(freshUntil ?? Number.NaN);
-      const ttl = Math.floor((expiresAt - Date.now()) / 1000);
-      if (Number.isFinite(ttl) && ttl > 0) {
-        setPublicDataCacheHeaders(
-          headers,
-          kind,
-          `public, max-age=${ttl}, must-revalidate, stale-if-error=0`,
-        );
-      } else {
-        headers.set('Cache-Control', 'no-store');
-        headers.delete('Cloudflare-CDN-Cache-Control');
-        headers.delete('Cache-Tag');
-        headers.set('X-MRTDown-Cache', 'dynamic-station');
-      }
-    } else {
+  if (
+    isStationHtml ||
+    (cacheable && kind === 'server-function' && freshUntil != null)
+  ) {
+    // Subtract the time spent assembling and rendering the response.
+    const expiresAt = Number(freshUntil ?? Number.NaN);
+    const ttl = Math.floor((expiresAt - Date.now()) / 1000);
+    if (cacheable && Number.isFinite(ttl) && ttl > 0) {
       setPublicDataCacheHeaders(
         headers,
         kind,
-        kind === 'html' ? getReportCacheControl(pathname) : undefined,
+        `public, max-age=${ttl}, must-revalidate, stale-if-error=0`,
       );
+    } else {
+      // An eligible path can otherwise inherit Cloudflare's default status TTL.
+      headers.set('Cache-Control', 'no-store');
+      headers.delete('Cloudflare-CDN-Cache-Control');
+      headers.delete('Cache-Tag');
+      if (cacheable) headers.set('X-MRTDown-Cache', 'dynamic-station');
     }
+  } else if (cacheable) {
+    setPublicDataCacheHeaders(
+      headers,
+      kind,
+      kind === 'html' ? getReportCacheControl(pathname) : undefined,
+    );
   }
 
   return new Response(response.body, {

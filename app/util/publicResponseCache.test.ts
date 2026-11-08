@@ -82,6 +82,21 @@ describe('public response cache policy', () => {
     },
   );
 
+  it.each([404, 500])(
+    'opts out station HTML with status %s and no deadline',
+    (status) => {
+      const error = applyPublicDataCacheHeaders(
+        new Request('https://www.mrtdown.org/zh-Hans/stations/UNKNOWN'),
+        response('text/html', { status }),
+      );
+
+      expect(error.status).toBe(status);
+      expect(error.headers.get('cache-control')).toBe('no-store');
+      expect(error.headers.has('cloudflare-cdn-cache-control')).toBe(false);
+      expect(error.headers.has('cache-tag')).toBe(false);
+    },
+  );
+
   it('marks successful public JSON read responses as cacheable', () => {
     const serverFunction = applyPublicDataCacheHeaders(
       request({ headers: { 'x-tsr-serverfn': 'true' } }),
