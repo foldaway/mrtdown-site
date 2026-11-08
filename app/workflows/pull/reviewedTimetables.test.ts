@@ -597,7 +597,7 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
           {
             serviceId: 'service-shared',
             revisionId: 'shared-revision',
-            platformIds: ['platform-shared'],
+            platformIds: ['platform-1', 'platform-shared'],
           },
         ],
       },
@@ -627,6 +627,24 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       ]),
     ).toEqual([['service', combined.sequences[0]]]);
     expect(single.untimedDepartureCount).toBe(0);
+    const reviewed = await queryIndexedScheduledDepartures(database, {
+      ...window,
+      scope: {
+        ...scope,
+        serviceId: 'service-shared',
+        platformId: 'platform-1',
+      },
+    });
+    expect(reviewed.departures).toMatchObject([
+      { serviceId: 'service-shared', stopSequence: combined.sequences[0] },
+    ]);
+    await expect(
+      queryIndexedScheduledDepartures(database, {
+        ...window,
+        scope: { ...exact, platformId: 'platform-shared' },
+      }),
+    ).rejects.toThrow('Timetable request platform does not belong');
+
     expect(
       (
         await queryIndexedScheduledDepartures(database, {
