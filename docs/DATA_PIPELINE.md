@@ -84,11 +84,11 @@ departure queries/API/UI and publication remain separate gates. Real mapping,
 source and release reviews remain explicit upstream/operator work; this integration grants
 none automatically.
 
-To exercise the migration locally, set `TEST_TIMETABLE_DATABASE_URL` to the
-existing local development database URL when running `npm run verify`. The test
-creates and removes its own schema and applies the migration only there. It
-does not migrate application tables or require another database service. Without
-that variable, the PostgreSQL scenario is skipped.
+The Verify job runs the timetable database tests against a disposable PostGIS
+service using synthetic fixtures. To run them locally, set
+`TEST_TIMETABLE_DATABASE_URL` to your local PostGIS database URL when running
+`npm run verify`. The tests create and remove their own schemas and apply
+migrations only there. Local runs without that variable skip these tests.
 
 ### Combined timetable imports
 
