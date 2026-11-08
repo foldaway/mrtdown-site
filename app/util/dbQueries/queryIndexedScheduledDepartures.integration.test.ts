@@ -278,6 +278,7 @@ describe.skipIf(!url)('indexed departure window', () => {
       '20261024214325_superb_violations',
       '20261025200054_violet_energizer',
       '20261027152337_early_lilith',
+      '20261108020149_combined_timetable_retention',
     ]) {
       await pool.query(
         (

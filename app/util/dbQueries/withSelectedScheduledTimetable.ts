@@ -1,12 +1,11 @@
 import {
   hashBytes,
   type readScheduleTopology,
-  type ScheduledTimetableRequestScope,
   ScheduledTimetableRequestScopeSchema,
-  type ScheduledTimetableSelectionAttempt,
   type ScheduledTimetableRollbackAssessment,
   type ScheduledTimetableRollbackOptions,
   ScheduledTimetableRollbackOptionsSchema,
+  type ScheduledTimetableSelectionAttempt,
 } from '@mrtdown/fs';
 import { and, eq } from 'drizzle-orm';
 import z from 'zod';
@@ -20,16 +19,21 @@ import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables
 import { assessIndexedTimetableRollback } from './assessIndexedTimetableRollback';
 import { SCHEDULED_DEPARTURE_PROJECTOR_VERSION } from './projectScheduledTimetable';
 import { readLiveScheduleTopology } from './readLiveScheduleTopology';
-import { validateScheduledTimetableHistory } from './scheduledTimetableHistory';
+import {
+  scheduledTimetableHistoryColumns,
+  validateScheduledTimetableHistory,
+} from './scheduledTimetableHistory';
 
 type Database = ReturnType<typeof getDb>;
 export type ReadTransaction = Parameters<
   Parameters<Database['transaction']>[0]
 >[0];
 export type Topology = Awaited<ReturnType<typeof readScheduleTopology>>;
-type Version = Awaited<
-  ReturnType<typeof validateScheduledTimetableHistory>
->[number];
+type Version = ReturnType<typeof validateScheduledTimetableHistory>[number];
+export type IndexedTimetableScope = Extract<
+  z.infer<typeof ScheduledTimetableRequestScopeSchema>,
+  { serviceId: string }
+>;
 type Coverage = { activeTripCount: number; unassignedActiveTripCount: number };
 type Attempt = Omit<ScheduledTimetableSelectionAttempt, 'reason'> & {
   reason:
@@ -44,7 +48,7 @@ type Attempt = Omit<ScheduledTimetableSelectionAttempt, 'reason'> & {
 };
 export type ScheduledTimetableSelection = {
   serviceDate: string;
-  scope: ScheduledTimetableRequestScope;
+  scope: IndexedTimetableScope;
   selected: {
     projectionId: number;
     projectorVersion: number;
@@ -58,7 +62,7 @@ export type ScheduledTimetableSelection = {
   rollback: ScheduledTimetableRollbackAssessment | null;
 };
 export type ScheduledTimetableSnapshotOptions = {
-  scope: ScheduledTimetableRequestScope;
+  scope: IndexedTimetableScope;
   // Trusted operator review and explicit selection clock; never passenger input.
   rollback?: ScheduledTimetableRollbackOptions;
   // Trusted internal override for tests; never bind this to passenger input.
@@ -68,10 +72,7 @@ export type ScheduledTimetableSnapshotOptions = {
 export class InvalidStationArrivalScopeError extends Error {}
 
 // The shared selector does not export its canonical request validation.
-function validateScope(
-  scope: ScheduledTimetableRequestScope,
-  topology: Topology,
-) {
+function validateScope(scope: IndexedTimetableScope, topology: Topology) {
   const line = topology.lines.find(({ id }) => id === scope.lineId);
   const service = topology.services.find(({ id }) => id === scope.serviceId);
   const station = topology.stations.find(({ id }) => id === scope.stationId);
@@ -128,7 +129,7 @@ export async function withScheduledTimetableSnapshot<T>(
   use: (
     tx: ReadTransaction,
     snapshot: {
-      scope: ScheduledTimetableRequestScope;
+      scope: IndexedTimetableScope;
       topology: Topology;
       maximumDepartureSeconds: number;
       unavailableProjections: {
@@ -140,6 +141,11 @@ export async function withScheduledTimetableSnapshot<T>(
   ) => Promise<T>,
 ): Promise<T> {
   const scope = ScheduledTimetableRequestScopeSchema.parse(options.scope);
+  if (scope.serviceId === undefined) {
+    throw new InvalidStationArrivalScopeError(
+      'The legacy timetable index requires exactly one service',
+    );
+  }
   const rollback = ScheduledTimetableRollbackOptionsSchema.optional().parse(
     options.rollback,
   );
@@ -151,16 +157,10 @@ export async function withScheduledTimetableSnapshot<T>(
       z.number().int().positive().parse(topology.projectionVersion);
       validateScope(scope, topology);
       const fingerprint = hashBytes(Buffer.from(JSON.stringify(topology)));
-      const history = await validateScheduledTimetableHistory(
-        await tx
-          .select({
-            hash: timetables.manifest_sha256,
-            predecessor: timetables.predecessor_sha256,
-            receipt: timetables.import_record,
-            manifestBytes: timetables.manifest_bytes,
-          })
-          .from(timetables),
-      );
+      // Check the full source chain before exposing the versions supported by v1.
+      const history = validateScheduledTimetableHistory(
+        await tx.select(scheduledTimetableHistoryColumns).from(timetables),
+      ).filter(({ format }) => format === 'legacy');
       const indexed = await tx
         .select({
           id: projections.id,

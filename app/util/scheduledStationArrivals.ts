@@ -1,6 +1,8 @@
-import type { RetainedScheduledDeparture } from '@mrtdown/fs';
-import type { queryIndexedScheduledDepartures } from './dbQueries/queryIndexedScheduledDepartures';
 import type { Station } from '@mrtdown/core';
+import type {
+  IndexedScheduledDeparture,
+  queryIndexedScheduledDepartures,
+} from './dbQueries/queryIndexedScheduledDepartures';
 
 type IndexedDepartures = Awaited<
   ReturnType<typeof queryIndexedScheduledDepartures>
@@ -13,7 +15,7 @@ export type ScheduledArrivalDisplay = {
   platformLabelsById: ReadonlyMap<string, string>;
 };
 
-export type ScheduledArrivalDeparture = RetainedScheduledDeparture & {
+export type ScheduledArrivalDeparture = IndexedScheduledDeparture & {
   time: string;
 };
 

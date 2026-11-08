@@ -9,7 +9,7 @@ The overhaul introduces a local read model for canonical mrtdown data.
 - fetches the manifest and archive from `MRTDOWN_DATA_URL`;
 - parses archive contents with `ZipStore` and `@mrtdown/fs`, verifies any
   advertised scheduled timetable against the same canonical archive and admits
-  it to append-only retention, then projects that version into the departure index;
+  it to append-only retention, then projects legacy versions into the departure index;
 - inserts parsed entities into `*_next` staging tables;
 - promotes changed rows into live tables;
 - deletes orphans after dependents are synchronized;
@@ -18,7 +18,7 @@ The overhaul introduces a local read model for canonical mrtdown data.
 ## Scheduled timetable storage
 
 The `scheduled_timetables` table stores versioned bundles separately from
-canonical entities. Each row retains the seven original files and an import
+canonical entities. Legacy rows retain the seven original files and an import
 receipt. Constraints allow one baseline, one successor per predecessor and
 consistent receipt links. `retainScheduledTimetable` appends internally verified
 bundles under a transaction lock, validates retained lineage with the shared
@@ -84,11 +84,33 @@ departure queries/API/UI and publication remain separate gates. Real mapping,
 source and release reviews remain explicit upstream/operator work; this integration grants
 none automatically.
 
-To exercise the migration locally, set `TEST_TIMETABLE_DATABASE_URL` to the
-existing local development database URL when running `npm run verify`. The test
-creates and removes its own schema and applies the migration only there. It
-does not migrate application tables or require another database service. Without
-that variable, the PostgreSQL scenario is skipped.
+The Verify job runs the timetable database tests against a disposable PostGIS
+service using synthetic fixtures. To run them locally, set
+`TEST_TIMETABLE_DATABASE_URL` to your local PostGIS database URL when running
+`npm run verify`. The tests create and remove their own schemas and apply
+migrations only there. Local runs without that variable skip these tests.
+
+### Combined timetable imports
+
+For a combined release, put the producer's `manifest.json`, `timetable.json`
+and `release.json` at the exact `data/combined-timetable/` paths in the canonical
+ZIP. Submit the independently obtained `release-index.json` contents as
+`combinedReleaseIndex` on the authenticated pull request. An index inside the ZIP
+cannot authorize import. Supply the same `sourceReview` used for a legacy
+baseline, successor or correction when admitting a new version. One pull
+accepts one timetable format.
+
+The pull verifies the three files using `@mrtdown/fs` and the topology built
+from the independently hash-checked canonical archive. Both formats share one
+locked retention chain and the same source admission rules. The combined row
+keeps the original bytes, trusted index, provider feed metadata and first import
+receipt. The provider-declared bounds are used for source admission. The compact
+artifact retains its own effective Singapore service dates and overnight times.
+Both index digests participate in the pull fingerprint.
+
+The existing departure index continues to serve eligible legacy versions.
+Combined releases are retained for the separate
+[combined departure indexing phase](plans/active/combined-timetable-index.md).
 
 ### Indexed scheduled departure storage foundation
 

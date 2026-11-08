@@ -11,9 +11,9 @@ import type { getDb } from '~/db';
 import { scheduledDepartureOccurrencesTable as occurrences } from '~/db/scheduledDepartures.schema';
 import {
   type ReadTransaction,
-  type Topology,
   type ScheduledTimetableSelection,
   type ScheduledTimetableSnapshotOptions,
+  type Topology,
   withScheduledTimetableSnapshot,
 } from './withSelectedScheduledTimetable';
 
@@ -51,6 +51,11 @@ type IndexedDepartureOptions = ScheduledTimetableSnapshotOptions & {
   limit?: number;
 };
 
+export type IndexedScheduledDeparture = RetainedScheduledDeparture & {
+  serviceId: string;
+  revisionId: string;
+};
+
 type IndexedDepartures = {
   scope: ScheduledTimetableSnapshotOptions['scope'];
   window: { startInstant: string; endInstant: string };
@@ -61,7 +66,7 @@ type IndexedDepartures = {
   }[];
   untimedDepartureCount: number;
   complete: boolean;
-  departures: RetainedScheduledDeparture[];
+  departures: IndexedScheduledDeparture[];
 };
 
 /** Private schedule query using live topology by default; serving approval remains separate. */
@@ -126,7 +131,7 @@ export async function withIndexedScheduledDepartures<T>(
     ].sort();
     const serviceDays: ScheduledTimetableSelection[] = [];
     const departures: {
-      departure: RetainedScheduledDeparture;
+      departure: IndexedScheduledDeparture;
       occurrenceIndex: number;
     }[] = [];
     let untimedDepartureCount = 0;

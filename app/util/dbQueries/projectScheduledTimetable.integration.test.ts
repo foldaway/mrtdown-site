@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import {
   hashBytes,
   queryRetainedScheduledDepartures,
-  type ScheduledTimetableRequestScope,
   selectRetainedScheduledTimetable,
 } from '@mrtdown/fs';
 import { eq, sql } from 'drizzle-orm';
@@ -25,7 +24,10 @@ import { scheduledTimetableCanonicalFixture } from '~/workflows/pull/helpers/sch
 import { projectScheduledTimetable } from './projectScheduledTimetable';
 import { retainScheduledTimetable } from './retainScheduledTimetable';
 import { retentionReview } from './scheduledTimetableRetention.fixture';
-import { withSelectedScheduledTimetable } from './withSelectedScheduledTimetable';
+import {
+  type IndexedTimetableScope,
+  withSelectedScheduledTimetable,
+} from './withSelectedScheduledTimetable';
 
 const url = process.env.TEST_TIMETABLE_DATABASE_URL;
 const schema = `gtfs_projector_test_${randomUUID().replaceAll('-', '')}`;
@@ -157,6 +159,7 @@ describe.skipIf(!url)('retained timetable projector', () => {
     for (const migration of [
       '20261024214325_superb_violations',
       '20261025200054_violet_energizer',
+      '20261108020149_combined_timetable_retention',
     ]) {
       await pool.query(
         await readFile(
@@ -207,7 +210,7 @@ describe.skipIf(!url)('retained timetable projector', () => {
 
   const select = (
     serviceDate = '2026-10-24',
-    requestScope: ScheduledTimetableRequestScope = scope,
+    requestScope: IndexedTimetableScope = scope,
   ) =>
     withSelectedScheduledTimetable(
       db(),

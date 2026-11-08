@@ -15,7 +15,10 @@ import {
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
 import { scheduledDepartureRows } from './scheduledDepartureRows';
-import { validateScheduledTimetableHistory } from './scheduledTimetableHistory';
+import {
+  scheduledTimetableHistoryColumns,
+  validateScheduledTimetableHistory,
+} from './scheduledTimetableHistory';
 
 export const SCHEDULED_DEPARTURE_PROJECTOR_VERSION = 1;
 const batchSize = 500;
@@ -59,14 +62,26 @@ export async function projectScheduledTimetable(
     try {
       const projection = await tx.transaction(async (build) => {
         const history = await build
-          .select({
-            hash: timetables.manifest_sha256,
-            predecessor: timetables.predecessor_sha256,
-            receipt: timetables.import_record,
-            manifestBytes: timetables.manifest_bytes,
-          })
+          .select(scheduledTimetableHistoryColumns)
           .from(timetables);
-        await validateScheduledTimetableHistory(history);
+        validateScheduledTimetableHistory(history);
+        const {
+          notice_bytes,
+          mapping_draft_bytes,
+          mapping_approval_bytes,
+          release_review_bytes,
+        } = retained;
+        if (
+          retained.combined_release !== null ||
+          !notice_bytes ||
+          !mapping_draft_bytes ||
+          !mapping_approval_bytes ||
+          !release_review_bytes
+        ) {
+          throw new Error(
+            'Legacy departure projector requires a legacy timetable bundle',
+          );
+        }
         const entry = ScheduledTimetablePagesEntrySchema.parse(
           retained.pages_entry,
         );
@@ -78,14 +93,11 @@ export async function projectScheduledTimetable(
         const files: Record<string, Uint8Array> = {
           'scheduled-timetable/manifest.json': retained.manifest_bytes,
           'scheduled-timetable/timetable.json': retained.timetable_bytes,
-          'scheduled-timetable/NOTICE.txt': retained.notice_bytes,
+          'scheduled-timetable/NOTICE.txt': notice_bytes,
           'scheduled-timetable/release.json': retained.release_bytes,
-          'scheduled-timetable/mapping-draft.json':
-            retained.mapping_draft_bytes,
-          'scheduled-timetable/mapping-approval.json':
-            retained.mapping_approval_bytes,
-          'scheduled-timetable/release-review.json':
-            retained.release_review_bytes,
+          'scheduled-timetable/mapping-draft.json': mapping_draft_bytes,
+          'scheduled-timetable/mapping-approval.json': mapping_approval_bytes,
+          'scheduled-timetable/release-review.json': release_review_bytes,
         };
         // Shared bundle and canonical validators each decode this selected
         // version; no historical timetable bodies are fetched or decoded.
@@ -96,7 +108,7 @@ export async function projectScheduledTimetable(
             manifestSha256,
             {
               timetableBytes: retained.timetable_bytes,
-              noticeBytes: retained.notice_bytes,
+              noticeBytes: notice_bytes,
             },
             { dataDir: canonicalDataDir },
           );

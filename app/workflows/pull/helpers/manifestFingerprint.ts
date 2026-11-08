@@ -3,9 +3,11 @@ import {
   type Manifest,
   ScheduledTimetablePagesEntrySchema,
 } from '@mrtdown/core';
+import { CombinedTimetableReleaseIndexSchema } from '@mrtdown/fs';
 import { eq } from 'drizzle-orm';
 import type { getDb } from '~/db';
 import { metadataTable } from '~/db/schema';
+import type { PullParams } from './pullParams';
 
 type AppDb = ReturnType<typeof getDb>;
 
@@ -31,7 +33,10 @@ function sortRecord(record: Record<string, string>) {
  * content change. Stable sorting prevents an upstream JSON key-order change
  * from triggering a full pull.
  */
-export function getCanonicalManifestFingerprint(manifest: Manifest): string {
+export function getCanonicalManifestFingerprint(
+  manifest: Manifest,
+  combinedReleaseIndex?: PullParams['combinedReleaseIndex'],
+): string {
   const canonicalInput = {
     pipelineVersion: PULL_PIPELINE_VERSION,
     manifestVersion: manifest.manifestVersion,
@@ -45,6 +50,10 @@ export function getCanonicalManifestFingerprint(manifest: Manifest): string {
     scheduledTimetable: ScheduledTimetablePagesEntrySchema.optional().parse(
       manifest.scheduledTimetable,
     ),
+    combinedReleaseIndex:
+      CombinedTimetableReleaseIndexSchema.optional().parse(
+        combinedReleaseIndex,
+      ),
   };
 
   return createHash('sha256')

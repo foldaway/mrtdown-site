@@ -57,9 +57,10 @@ describe('getCanonicalManifestFingerprint', () => {
         scheduledTimetable: { ...entry, releaseSha256: 'e'.repeat(64) },
       }),
     ];
-    expect(new Set(manifests.map(getCanonicalManifestFingerprint)).size).toBe(
-      4,
-    );
+    expect(
+      new Set(manifests.map((input) => getCanonicalManifestFingerprint(input)))
+        .size,
+    ).toBe(4);
     expect(getCanonicalManifestFingerprint(createManifest())).toBe(
       getCanonicalManifestFingerprint(manifests[0]),
     );
@@ -69,5 +70,26 @@ describe('getCanonicalManifestFingerprint', () => {
         createManifest({ scheduledTimetable: reordered as typeof entry }),
       ),
     ).toBe(getCanonicalManifestFingerprint(manifests[1]));
+  });
+
+  it('includes both digests from the trusted combined release index', () => {
+    const manifest = createManifest();
+    const index = {
+      manifestSha256: 'a'.repeat(64),
+      releaseSha256: 'b'.repeat(64),
+    };
+    const fingerprints = [
+      getCanonicalManifestFingerprint(manifest),
+      getCanonicalManifestFingerprint(manifest, index),
+      getCanonicalManifestFingerprint(manifest, {
+        ...index,
+        releaseSha256: 'c'.repeat(64),
+      }),
+      getCanonicalManifestFingerprint(manifest, {
+        ...index,
+        manifestSha256: 'd'.repeat(64),
+      }),
+    ];
+    expect(new Set(fingerprints).size).toBe(4);
   });
 });

@@ -1,5 +1,6 @@
 import {
   assessScheduledTimetableSourceChange,
+  type ScheduledTimetableArtifactManifest,
   type ScheduledTimetablePagesEntry,
   ScheduledTimetablePagesEntrySchema,
   type ScheduledTimetableSourceReview,
@@ -12,7 +13,11 @@ import {
 import { sql } from 'drizzle-orm';
 import type { getDb } from '~/db';
 import { scheduledTimetablesTable } from '~/db/scheduledTimetables.schema';
-import { validateScheduledTimetableHistory } from './scheduledTimetableHistory';
+import { prepareCombinedTimetableAdmission } from './combinedTimetableAdmission';
+import {
+  scheduledTimetableHistoryColumns,
+  validateScheduledTimetableHistory,
+} from './scheduledTimetableHistory';
 
 /**
  * All seven files passed artifact and release/mapping binding verification
@@ -52,13 +57,10 @@ export async function retainScheduledTimetable(
   options: RetentionOptions,
 ) {
   const entry = ScheduledTimetablePagesEntrySchema.parse(bundle.entry);
-  const sourceReview = options.sourceReview
-    ? ScheduledTimetableSourceReviewSchema.parse(options.sourceReview)
-    : undefined;
-  const importInstant = options.importInstant;
   // Own the buffers across transaction waits so caller mutation cannot change
   // the bytes after validation or while waiting for the predecessor lock.
   const files = {
+    pages_entry: entry,
     manifest_bytes: Buffer.from(bundle.files['manifest.json']),
     timetable_bytes: Buffer.from(bundle.files['timetable.json']),
     notice_bytes: Buffer.from(bundle.files['NOTICE.txt']),
@@ -68,26 +70,62 @@ export async function retainScheduledTimetable(
     release_review_bytes: Buffer.from(bundle.files['release-review.json']),
   };
   const hash = entry.manifestSha256;
-  const { manifest } = verifyScheduledTimetableArtifact(
+  const { manifest, timetable } = verifyScheduledTimetableArtifact(
     files.manifest_bytes,
     hash,
     { timetableBytes: files.timetable_bytes, noticeBytes: files.notice_bytes },
   );
+  if (
+    timetable.patterns.some(({ pattern }) => pattern.serviceId === undefined)
+  ) {
+    throw new Error(
+      'Legacy timetable retention requires single-service patterns',
+    );
+  }
+  return retainTimetable(db, { hash, manifest, files }, options);
+}
 
+/** Verify all combined release bindings before using the shared admission path. */
+export async function retainCombinedTimetable(
+  db: ReturnType<typeof getDb>,
+  ...[index, files, topology, options]: [
+    ...Parameters<typeof prepareCombinedTimetableAdmission>,
+    RetentionOptions,
+  ]
+) {
+  return retainTimetable(
+    db,
+    prepareCombinedTimetableAdmission(index, files, topology),
+    options,
+  );
+}
+
+async function retainTimetable(
+  db: ReturnType<typeof getDb>,
+  candidate: {
+    hash: string;
+    manifest: ScheduledTimetableArtifactManifest;
+    files: Omit<
+      typeof scheduledTimetablesTable.$inferInsert,
+      'manifest_sha256' | 'predecessor_sha256' | 'import_record'
+    >;
+  },
+  options: RetentionOptions,
+) {
+  const { hash, manifest, files } = candidate;
+  const sourceReview = options.sourceReview
+    ? ScheduledTimetableSourceReviewSchema.parse(options.sourceReview)
+    : undefined;
+  const importInstant = options.importInstant;
   return db.transaction(
     async (tx) => {
       // Table lock also serializes ordinary SQL writers, not just helper callers.
       // Acquire before reading: a waiting worker must see the committed successor.
       await tx.execute(sql`LOCK TABLE scheduled_timetables IN EXCLUSIVE MODE`);
       const rows = await tx
-        .select({
-          hash: scheduledTimetablesTable.manifest_sha256,
-          predecessor: scheduledTimetablesTable.predecessor_sha256,
-          receipt: scheduledTimetablesTable.import_record,
-          manifestBytes: scheduledTimetablesTable.manifest_bytes,
-        })
+        .select(scheduledTimetableHistoryColumns)
         .from(scheduledTimetablesTable);
-      const history = await validateScheduledTimetableHistory(rows);
+      const history = validateScheduledTimetableHistory(rows);
       const retained = history.find(
         (version) => version.manifestSha256 === hash,
       );
@@ -137,7 +175,6 @@ export async function retainScheduledTimetable(
         manifest_sha256: hash,
         predecessor_sha256: record.predecessorSha256,
         import_record: record,
-        pages_entry: entry,
         ...files,
       });
       return { status: 'retained' as const, record };

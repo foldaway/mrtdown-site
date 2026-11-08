@@ -1,38 +1,129 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import {
-  readScheduledTimetableHistory,
+  assessScheduledTimetableSourceChange,
+  type ScheduledTimetableArtifactManifest,
+  ScheduledTimetableArtifactManifestSchema,
+} from '@mrtdown/core';
+import {
+  hashBytes,
+  type ScheduledTimetableImportRecord,
   ScheduledTimetableImportRecordSchema,
 } from '@mrtdown/fs';
+import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
+import { readCombinedTimetableAdmissionManifest } from './combinedTimetableAdmission';
+
+export const scheduledTimetableHistoryColumns = {
+  hash: timetables.manifest_sha256,
+  predecessor: timetables.predecessor_sha256,
+  receipt: timetables.import_record,
+  manifestBytes: timetables.manifest_bytes,
+  combinedRelease: timetables.combined_release,
+};
 
 type HistoryRow = {
   hash: string;
   predecessor: string | null;
   receipt: unknown;
   manifestBytes: Buffer;
+  combinedRelease: unknown;
 };
 
-export async function validateScheduledTimetableHistory(rows: HistoryRow[]) {
-  // The shared validator currently accepts directories only. Adapt metadata,
-  // never the old timetable bodies, and let it order and validate the lineage.
-  const directory = await mkdtemp(join(tmpdir(), 'mrtdown-timetable-history-'));
-  try {
-    for (const row of rows) {
-      const receipt = ScheduledTimetableImportRecordSchema.parse(row.receipt);
-      if (
-        receipt.manifestSha256 !== row.hash ||
-        receipt.predecessorSha256 !== row.predecessor
-      ) {
-        throw new Error('Retained timetable receipt disagrees with its row');
-      }
-      const version = join(directory, receipt.manifestSha256);
-      await mkdir(version);
-      await writeFile(join(version, 'manifest.json'), row.manifestBytes);
-      await writeFile(join(version, 'import.json'), JSON.stringify(receipt));
+type Version = {
+  manifestSha256: string;
+  manifest: ScheduledTimetableArtifactManifest;
+  record: ScheduledTimetableImportRecord;
+  format: 'legacy' | 'combined';
+};
+
+/** Validate the one source-admission chain across both formats using metadata only. */
+export function validateScheduledTimetableHistory(rows: HistoryRow[]) {
+  const successors = new Map<string | null, Version>();
+  const identities = new Set<string>();
+  for (const row of rows) {
+    const record = ScheduledTimetableImportRecordSchema.parse(row.receipt);
+    if (
+      record.manifestSha256 !== row.hash ||
+      record.predecessorSha256 !== row.predecessor
+    ) {
+      throw new Error('Retained timetable receipt disagrees with its row');
     }
-    return await readScheduledTimetableHistory(directory);
-  } finally {
-    await rm(directory, { recursive: true, force: true });
+    if (successors.has(row.predecessor) || identities.has(row.hash)) {
+      throw new Error(
+        'Retained timetable history has a conflicting identity or predecessor',
+      );
+    }
+    if (hashBytes(row.manifestBytes) !== row.hash) {
+      throw new Error(
+        `Retained timetable manifest does not match its row: ${row.hash}`,
+      );
+    }
+    const format = row.combinedRelease === null ? 'legacy' : 'combined';
+    const manifest =
+      format === 'legacy'
+        ? ScheduledTimetableArtifactManifestSchema.parse(
+            JSON.parse(
+              new TextDecoder('utf-8', { fatal: true }).decode(
+                row.manifestBytes,
+              ),
+            ),
+          )
+        : readCombinedTimetableAdmissionManifest(
+            row.hash,
+            row.manifestBytes,
+            row.combinedRelease,
+          );
+    identities.add(row.hash);
+    successors.set(row.predecessor, {
+      manifestSha256: row.hash,
+      manifest,
+      record,
+      format,
+    });
   }
+
+  const history: Version[] = [];
+  const seenSources = new Set<string>();
+  let predecessor: Version | undefined;
+  while (successors.size > 0) {
+    const version = successors.get(predecessor?.manifestSha256 ?? null);
+    if (!version) {
+      throw new Error('Retained timetable history is incomplete or cyclic');
+    }
+    const { manifestSha256, manifest, record } = version;
+    if (
+      predecessor &&
+      Date.parse(record.importInstant) <
+        Date.parse(predecessor.record.importInstant)
+    ) {
+      throw new Error(
+        'Retained timetable import time precedes its predecessor',
+      );
+    }
+    if (
+      seenSources.has(manifest.capture.sha256) &&
+      predecessor?.manifest.capture.sha256 !== manifest.capture.sha256
+    ) {
+      throw new Error(
+        'Retained timetable history reintroduces an older source snapshot',
+      );
+    }
+    const assessment = assessScheduledTimetableSourceChange({
+      candidate: { manifestSha256, manifest },
+      incumbent: predecessor && {
+        manifestSha256: predecessor.manifestSha256,
+        manifest: predecessor.manifest,
+      },
+      review: record.sourceReview,
+      importInstant: record.importInstant,
+    });
+    if (!assessment.sourceEligible) {
+      throw new Error(
+        `Invalid retained timetable source review: ${assessment.blockers.join(', ')}`,
+      );
+    }
+    successors.delete(record.predecessorSha256);
+    history.push(version);
+    seenSources.add(manifest.capture.sha256);
+    predecessor = version;
+  }
+  return history;
 }

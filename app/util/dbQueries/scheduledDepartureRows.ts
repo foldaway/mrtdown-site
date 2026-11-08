@@ -42,6 +42,11 @@ function dateScopes(
   const used = new Set(timetable.assignments.map(({ patternId }) => patternId));
   const scopes = new Map<string, Scope>();
   for (const { id, pattern } of timetable.patterns) {
+    if (pattern.serviceId === undefined) {
+      throw new Error(
+        'Legacy departure index requires single-service patterns',
+      );
+    }
     const revision = topology.services
       .find(({ id }) => id === pattern.serviceId)
       ?.revisions.find(({ id }) => id === pattern.revisionId);
@@ -158,7 +163,11 @@ export function* scheduledDepartureRows(
           ],
           serviceDate,
         );
-        if (!resolved) {
+        if (
+          !resolved ||
+          resolved.serviceId === undefined ||
+          resolved.revisionId === undefined
+        ) {
           throw new Error('Verified active trip did not resolve');
         }
         const lastAlighting = resolved.stopTimes.findLastIndex(

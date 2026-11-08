@@ -1,8 +1,8 @@
-import {
-  type RetainedScheduledDeparture,
-  verifyScheduledTimetableArtifact,
-} from '@mrtdown/fs';
-import type { queryIndexedScheduledDepartures } from './dbQueries/queryIndexedScheduledDepartures';
+import { verifyScheduledTimetableArtifact } from '@mrtdown/fs';
+import type {
+  IndexedScheduledDeparture,
+  queryIndexedScheduledDepartures,
+} from './dbQueries/queryIndexedScheduledDepartures';
 import {
   retentionBundle,
   retentionReview,
@@ -47,6 +47,7 @@ export const result: Awaited<
           platformIds: ['a', 'b'],
         },
         version: {
+          format: 'legacy',
           manifestSha256: bundle.entry.manifestSha256,
           manifest,
           record: {
@@ -70,7 +71,7 @@ export const result: Awaited<
   complete: true,
   departures: [],
 };
-export const departure: RetainedScheduledDeparture = {
+export const departure: IndexedScheduledDeparture = {
   ...scope,
   revisionId: 'dated-revision',
   providerTripId: '000-trip',
