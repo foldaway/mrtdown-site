@@ -134,9 +134,15 @@ export function serializeStationArrivalsV2(
         ) {
           continue;
         }
-        attributions.set(capture.sha256, {
-          source: capture.attribution,
-          retrievedAt: capture.retrieved_at,
+        const { attribution: source, retrieved_at: retrievedAt } = capture;
+        const key = JSON.stringify([
+          source,
+          retrievedAt,
+          currentLicenceReference,
+        ]);
+        attributions.set(key, {
+          source,
+          retrievedAt,
           licenceUrl: currentLicenceReference,
         });
       }
