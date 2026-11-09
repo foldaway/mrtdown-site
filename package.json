@@ -54,7 +54,6 @@
     "html-entities": "^2.6.0",
     "ioredis": "^5.11.1",
     "isbot": "^5",
-    "jose": "5.10.0",
     "json-nd": "^1.0.0",
     "luxon": "^3.5.0",
     "mdast-util-gfm": "^3.1.0",
