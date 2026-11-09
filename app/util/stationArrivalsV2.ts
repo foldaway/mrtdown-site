@@ -8,6 +8,11 @@ export const STATION_ARRIVALS_V2_HORIZON_MINUTES = 60;
 type CoverageReason = ScheduledTimetableSelection['attempts'][number]['reason'];
 type Rollback = NonNullable<ScheduledTimetableSelection['rollback']>;
 type SourceIdentity = { manifestSha256: string; snapshotSha256: string };
+type TimetableAttribution = {
+  source: string;
+  retrievedAt: string;
+  licenceUrl: string;
+};
 type ArrivalDisplay = {
   serviceName: Station['name'];
   destinationCode: string;
@@ -53,6 +58,7 @@ export type StationArrivalsV2 = {
   | {
       source: 'scheduled';
       reason: 'complete' | 'incomplete';
+      attributions?: TimetableAttribution[];
       timings: (ArrivalDisplay & {
         platforms: { id: string; label: string }[];
         departures: ScheduledDeparture[];
@@ -116,11 +122,29 @@ export function serializeStationArrivalsV2(
     },
   };
   switch (decision.source) {
-    case 'scheduled':
+    case 'scheduled': {
+      const attributions = new Map<string, TimetableAttribution>();
+      for (const { selected } of scheduled.serviceDays) {
+        if (!selected) continue;
+        const { capture, currentLicenceReference } = selected.version.manifest;
+        const licenceUrl = new URL(currentLicenceReference);
+        if (
+          licenceUrl.protocol !== 'https:' &&
+          licenceUrl.protocol !== 'http:'
+        ) {
+          continue;
+        }
+        attributions.set(capture.sha256, {
+          source: capture.attribution,
+          retrievedAt: capture.retrieved_at,
+          licenceUrl: currentLicenceReference,
+        });
+      }
       return {
         ...common,
         source: 'scheduled',
         reason: decision.reason,
+        attributions: [...attributions.values()],
         timings: scheduled.lines.flatMap(({ arrivalTimings }) =>
           arrivalTimings.map((timing) => ({
             serviceName: timing.serviceName,
@@ -145,6 +169,7 @@ export function serializeStationArrivalsV2(
           })),
         ),
       };
+    }
     case 'unavailable':
       return { ...common, source: 'unavailable', reason: decision.reason };
   }

@@ -12,6 +12,7 @@ swap_size_mb = 512
 [env]
   MRTDOWN_DATA_URL = 'https://data.mrtdown.org/mrtdown-data'
   TIER = 'staging'
+  STAGING_ACCESS_AUDIENCE = 'c2ce753e150461a75b948189cb148ccf9e8996d2ea5b11e694a7b018fb132379'
   VITE_ROOT_URL = 'https://staging.mrtdown.org'
 
 [http_service]

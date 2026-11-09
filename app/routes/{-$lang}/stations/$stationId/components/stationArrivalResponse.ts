@@ -56,6 +56,15 @@ const responseSchema: z.ZodType<StationArrivalsV2> = z.discriminatedUnion(
       ...common,
       source: z.literal('scheduled'),
       reason: z.enum(['complete', 'incomplete']),
+      attributions: z
+        .array(
+          z.object({
+            source: z.string(),
+            retrievedAt: instant,
+            licenceUrl: z.url({ protocol: /^https?$/ }),
+          }),
+        )
+        .optional(),
       timings: z.array(
         z.object({
           ...display,

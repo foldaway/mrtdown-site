@@ -9,8 +9,19 @@ import {
   addSentryAnonymousUserCookie,
   getSentryAnonymousUser,
 } from './util/sentryAnonymousUser';
+import { permitsStagingRequest } from './util/stagingAccess';
 
 async function appFetch(request: Request) {
+  if (
+    process.env.TIER === 'staging' &&
+    !(await permitsStagingRequest(request, process.env.STAGING_ACCESS_AUDIENCE))
+  ) {
+    return new Response('Cloudflare Access authentication required', {
+      status: 401,
+      headers: { 'cache-control': 'private, no-store' },
+    });
+  }
+
   const startedAt = performance.now();
   const sentryAnonymousUser = getSentryAnonymousUser(request);
   Sentry.setUser({

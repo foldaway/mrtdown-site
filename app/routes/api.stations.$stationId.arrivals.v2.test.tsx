@@ -82,6 +82,7 @@ describe('station arrivals v2 contract', () => {
     });
     const { data } = await response.json();
     expect(Object.keys(data).sort()).toEqual([
+      'attributions',
       'coverage',
       'reason',
       'schemaVersion',
@@ -89,6 +90,14 @@ describe('station arrivals v2 contract', () => {
       'source',
       'timings',
       'window',
+    ]);
+    const manifest = result.serviceDays[0].selected?.version.manifest;
+    expect(data.attributions).toEqual([
+      {
+        source: manifest?.capture.attribution,
+        retrievedAt: manifest?.capture.retrieved_at,
+        licenceUrl: manifest?.currentLicenceReference,
+      },
     ]);
     expect(data.scope).toEqual({ ...scope, platformId: 'a' });
     expect(data.window).toEqual({ ...result.window, limit: 20 });

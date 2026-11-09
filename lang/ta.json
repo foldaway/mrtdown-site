@@ -379,6 +379,7 @@
   "station.arrival_timings.platform": "நடைமேடை {label}",
   "station.arrival_timings.towards_label": "நோக்கி",
   "station.arrivals.approximate_scheduled": "தோராயமான அட்டவணை நேரம்",
+  "station.arrivals.attribution": "{source} வழங்கிய GTFS அட்டவணைத் தரவு, {date} அன்று பெறப்பட்டது. <licence>தரவுத்தொகுப்பு உரிமம்</licence>",
   "station.arrivals.empty_window": "{start} முதல் {end} வரை (சிங்கப்பூர் நேரம்) திட்டமிடப்பட்ட புறப்பாடுகள் இல்லை.",
   "station.arrivals.explainer": "நேரங்கள் வெளியிடப்பட்ட கால அட்டவணையிலிருந்து பெறப்படுகின்றன. தோராயமான அட்டவணை நேரங்களின் துல்லியம் குறைவாக இருக்கும். இவை நேரடி ரயில் கணிப்புகள் அல்ல; கால அட்டவணைத் தகவல்கள் முழுமையடையாமல் இருக்கலாம். கால அட்டவணை கிடைக்காதபோது வருகை மதிப்பீடு காட்டப்படாது.",
   "station.arrivals.explainer_label": "வருகை நேரங்கள் பற்றிய விளக்கம்",

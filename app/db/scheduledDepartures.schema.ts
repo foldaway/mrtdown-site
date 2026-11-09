@@ -264,11 +264,11 @@ export const combinedDepartureOccurrencesTable = pgTable(
       ],
     }).onDelete('cascade'),
     index('combined_departure_occurrences_window_idx').on(
-      table.projection_id,
-      table.service_date,
       table.station_id,
       table.line_id,
       table.destination_station_id,
+      table.projection_id,
+      table.service_date,
       table.departure_instant,
     ),
     check(

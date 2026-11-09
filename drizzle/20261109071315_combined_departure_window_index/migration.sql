@@ -1,0 +1,2 @@
+DROP INDEX "combined_departure_occurrences_window_idx";--> statement-breakpoint
+CREATE INDEX "combined_departure_occurrences_window_idx" ON "combined_departure_occurrences" ("station_id","line_id","destination_station_id","projection_id","service_date","departure_instant");
