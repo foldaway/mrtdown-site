@@ -379,6 +379,7 @@
   "station.arrival_timings.platform": "{label}号站台",
   "station.arrival_timings.towards_label": "开往",
   "station.arrivals.approximate_scheduled": "计划时刻（约）",
+  "station.arrivals.attribution": "GTFS 时刻表数据来自 {source}，获取日期为 {date}。<licence>数据集许可证</licence>",
   "station.arrivals.empty_window": "{start} 至 {end}（新加坡时间）之间没有计划发车。",
   "station.arrivals.explainer": "时间来自已发布的时刻表。“计划时刻（约）”的精确度较低。这些时间不是实时列车预测，时刻表覆盖也可能不完整。时刻表不可用时，不会显示到站估算。",
   "station.arrivals.explainer_label": "到站时间说明",

@@ -111,6 +111,26 @@ export function ScheduledArrivalStatus({
           </ol>
         </div>
       ))}
+      {data.attributions?.map(({ source, retrievedAt, licenceUrl }) => (
+        <p key={JSON.stringify([source, retrievedAt, licenceUrl])}>
+          <FormattedMessage
+            id="station.arrivals.attribution"
+            defaultMessage="GTFS schedule data from {source}, accessed {date}. <licence>Dataset licence</licence>"
+            values={{
+              source,
+              date: intl.formatDate(retrievedAt, {
+                dateStyle: 'medium',
+                timeZone: 'Asia/Singapore',
+              }),
+              licence: (label) => (
+                <a className="underline" href={licenceUrl}>
+                  {label}
+                </a>
+              ),
+            }}
+          />
+        </p>
+      ))}
     </div>
   );
 }

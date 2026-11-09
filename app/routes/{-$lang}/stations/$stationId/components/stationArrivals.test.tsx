@@ -93,6 +93,8 @@ describe('station guide arrival sources', () => {
     expect(html).toContain('Scheduled');
     expect(html).toContain('Approximate scheduled');
     expect(html).toContain('Alternative platforms for the same train');
+    expect(html).toContain('GTFS schedule data from');
+    expect(html).toContain('href="https://example.com/licence"');
     expect(html.match(/<ol/g)).toHaveLength(1);
     expect(html).not.toContain('Frequency estimate');
     expect(html).not.toContain('Help improve');

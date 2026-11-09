@@ -379,6 +379,7 @@
   "station.arrival_timings.platform": "Platform {label}",
   "station.arrival_timings.towards_label": "Ke arah",
   "station.arrivals.approximate_scheduled": "Jadual anggaran",
+  "station.arrivals.attribution": "Data jadual GTFS daripada {source}, diakses pada {date}. <licence>Lesen set data</licence>",
   "station.arrivals.empty_window": "Tiada pelepasan berjadual antara {start} dan {end} (waktu Singapura).",
   "station.arrivals.explainer": "Waktu diambil daripada jadual yang diterbitkan. Jadual anggaran kurang tepat. Ini bukan ramalan tren secara langsung, dan liputan jadual mungkin tidak lengkap. Tiada anggaran ketibaan dipaparkan apabila jadual tidak tersedia.",
   "station.arrivals.explainer_label": "Tentang waktu ketibaan",

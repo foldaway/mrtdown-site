@@ -82,6 +82,7 @@ describe('station arrivals v2 contract', () => {
     });
     const { data } = await response.json();
     expect(Object.keys(data).sort()).toEqual([
+      'attributions',
       'coverage',
       'reason',
       'schemaVersion',
@@ -89,6 +90,14 @@ describe('station arrivals v2 contract', () => {
       'source',
       'timings',
       'window',
+    ]);
+    const manifest = result.serviceDays[0].selected?.version.manifest;
+    expect(data.attributions).toEqual([
+      {
+        source: manifest?.capture.attribution,
+        retrievedAt: manifest?.capture.retrieved_at,
+        licenceUrl: manifest?.currentLicenceReference,
+      },
     ]);
     expect(data.scope).toEqual({ ...scope, platformId: 'a' });
     expect(data.window).toEqual({ ...result.window, limit: 20 });
@@ -134,6 +143,36 @@ describe('station arrivals v2 contract', () => {
     expect(data.source).toBe('scheduled');
     expect(data.reason).toBe('complete');
     expect(data.schemaVersion).toBe(2);
+  });
+
+  it('retains distinct credits across service dates that select the same capture', async () => {
+    const originalDay = result.serviceDays[0];
+    const correctedDay = structuredClone(originalDay);
+    correctedDay.serviceDate = '2026-10-25';
+    if (!correctedDay.selected) throw new Error('Missing timetable fixture');
+
+    const { version } = correctedDay.selected;
+    version.manifestSha256 = 'f'.repeat(64);
+    version.manifest.correctionRevision += 1;
+    const originalLicence = version.manifest.currentLicenceReference;
+    version.manifest.currentLicenceReference =
+      'https://example.com/new-licence';
+
+    const scheduled = buildScheduledStationArrivalLines(
+      { ...result, serviceDays: [originalDay, correctedDay] },
+      display,
+    );
+    mocks.read.mockResolvedValue(selectStationArrivalSource(scheduled));
+
+    const { data } = await (await request()).json();
+    const credit = {
+      source: version.manifest.capture.attribution,
+      retrievedAt: version.manifest.capture.retrieved_at,
+    };
+    expect(data.attributions).toEqual([
+      { ...credit, licenceUrl: originalLicence },
+      { ...credit, licenceUrl: version.manifest.currentLicenceReference },
+    ]);
   });
 
   it('keeps complete empty, partial and untimed scheduled coverage distinct', async () => {
