@@ -22,7 +22,11 @@ export async function importScheduledTimetableArchive(
   db: ReturnType<typeof getDb>,
   manifest: Manifest,
   store: ZipStore,
-  { combinedReleaseIndex, ...options }: PullParams & { importInstant: string },
+  {
+    combinedReleaseIndex,
+    rebuildScheduledTimetableProjection,
+    ...options
+  }: PullParams & { importInstant: string },
 ) {
   if (!combinedReleaseIndex && store.exists(combinedDirectory)) {
     throw new WorkflowNonRetryableError(
@@ -74,6 +78,7 @@ export async function importScheduledTimetableArchive(
           ? SCHEDULED_DEPARTURE_PROJECTOR_VERSION
           : COMBINED_DEPARTURE_PROJECTOR_VERSION,
       canonicalDataDir: snapshot.canonicalDataDir,
+      reuseCompleted: !rebuildScheduledTimetableProjection,
     });
   } finally {
     await snapshot.dispose();

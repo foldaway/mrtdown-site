@@ -31,7 +31,11 @@ import { withSelectedScheduledTimetable } from '~/util/dbQueries/withSelectedSch
 import { combinedTimetableArchiveFixture } from './helpers/combinedTimetableArchive.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
 import { fetchManifest } from './helpers/fetchManifest';
-import { recordCanonicalManifestFingerprint } from './helpers/manifestFingerprint';
+import {
+  getCanonicalManifestFingerprint,
+  MANIFEST_FINGERPRINT_METADATA_KEY,
+  recordCanonicalManifestFingerprint,
+} from './helpers/manifestFingerprint';
 import type { PullParams } from './helpers/pullParams';
 import { scheduledTimetableArchiveFixture } from './helpers/scheduledTimetableArchive.fixture';
 import { scheduledTimetableCanonicalFixture } from './helpers/scheduledTimetableCanonical.fixture';
@@ -242,6 +246,7 @@ function workflow(requestPayload?: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('MRTDOWN_DATA_URL', 'https://data.example.com');
+  vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', undefined);
   state.fingerprint = undefined;
   vi.mocked(getDb).mockReturnValue({} as ReturnType<typeof getDb>);
   vi.mocked(fetchManifest).mockResolvedValue(manifest);
@@ -273,6 +278,75 @@ describe('pull timetable admission', () => {
     await expect(workflow(payload).run()).rejects.toThrow(
       'topology differs from canonical data',
     );
+    expect(truncateStagingTables).not.toHaveBeenCalled();
+    expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
+  });
+
+  it.each(['manifestSha256', 'releaseSha256'] as const)(
+    'rejects a requested index with a different %s even if the pull could skip',
+    async (field) => {
+      advertiseCombined();
+      vi.stubEnv(
+        'MRTDOWN_COMBINED_RELEASE_INDEX',
+        JSON.stringify(combined.index),
+      );
+      state.fingerprint = getCanonicalManifestFingerprint(
+        combined.snapshot.manifest,
+        combined.index,
+      );
+      await expect(
+        workflow({
+          combinedReleaseIndex: { ...combined.index, [field]: '0'.repeat(64) },
+        }).run(),
+      ).rejects.toThrow('differs from MRTDOWN_COMBINED_RELEASE_INDEX');
+      expect(fetchManifest).not.toHaveBeenCalled();
+      expect(fetchArchive).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects invalid deployment pins without falling back to a signed index', async () => {
+    vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', '{}');
+    await expect(
+      workflow({ combinedReleaseIndex: combined.index }).run(),
+    ).rejects.toThrow('Invalid MRTDOWN_COMBINED_RELEASE_INDEX');
+    expect(fetchManifest).not.toHaveBeenCalled();
+  });
+
+  it('keeps the original pin across callbacks and checks a rotated pin despite unchanged canonical data', async () => {
+    advertiseCombined();
+    vi.stubEnv(
+      'MRTDOWN_COMBINED_RELEASE_INDEX',
+      JSON.stringify(combined.index),
+    );
+    state.fingerprint = getCanonicalManifestFingerprint(
+      combined.snapshot.manifest,
+    );
+    const pull = workflow('');
+    vi.mocked(fetchArchive).mockRejectedValueOnce(new Error('download failed'));
+    await expect(pull.run()).rejects.toThrow('download failed');
+
+    const releaseBytes = Buffer.concat([
+      combined.files.releaseBytes,
+      Buffer.from('\n'),
+    ]);
+    const rotated = {
+      ...combined.index,
+      releaseSha256: hashBytes(releaseBytes),
+    };
+    vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', JSON.stringify(rotated));
+    advertiseCombined({ releaseBytes });
+    await expect(pull.run()).rejects.toThrow('expected SHA-256');
+    expect(fetchManifest).toHaveBeenCalledOnce();
+
+    // A new run sees the deployment pin. Even a successful old combined
+    // fingerprint cannot make a stale archive acceptable after rotation.
+    advertiseCombined();
+    state.fingerprint = getCanonicalManifestFingerprint(
+      combined.snapshot.manifest,
+      combined.index,
+    );
+    await expect(workflow('').run()).rejects.toThrow('expected SHA-256');
+    expect(fetchManifest).toHaveBeenCalledTimes(2);
     expect(truncateStagingTables).not.toHaveBeenCalled();
     expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
   });
@@ -421,6 +495,99 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
         'SELECT * FROM scheduled_departure_projections ORDER BY manifest_sha256',
       )
     ).rows;
+
+  it('finishes an empty signed pull using the pinned, previously projected release without rewriting departures', async () => {
+    advertiseCombined();
+    vi.stubEnv(
+      'MRTDOWN_COMBINED_RELEASE_INDEX',
+      JSON.stringify(combined.index),
+    );
+    await expect(workflow('').run()).rejects.toThrow('source-review-required');
+    expect(await rows()).toEqual([]);
+
+    const sourceReview: ScheduledTimetableSourceReview = {
+      ...retentionReview(baseline),
+      successor: {
+        manifestSha256: combined.index.manifestSha256,
+        snapshotSha256: combined.capture.sha256,
+      },
+      reviewedAt: '2026-11-03T00:00:00Z',
+    };
+    vi.mocked(truncateStagingTables).mockRejectedValueOnce(
+      new Error('callback did not finish'),
+    );
+    await expect(
+      workflow({ combinedReleaseIndex: combined.index, sourceReview }).run(),
+    ).rejects.toThrow('callback did not finish');
+    const retained = await rows();
+    const completed = await projections();
+    expect(completed).toHaveLength(1);
+    expect(completed[0].completed_at).not.toBeNull();
+    expect(state.fingerprint).toBeUndefined();
+
+    const tables = [
+      'combined_departure_occurrences',
+      'combined_departure_memberships',
+    ];
+    await pool.query(`CREATE FUNCTION reject_departure_write()
+      RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+        RAISE EXCEPTION 'unexpected departure rewrite';
+      END $$`);
+    for (const table of tables) {
+      await pool.query(`CREATE TRIGGER reject_departure_write
+        BEFORE INSERT OR UPDATE OR DELETE ON ${table}
+        FOR EACH STATEMENT EXECUTE FUNCTION reject_departure_write()`);
+    }
+    const actual = await vi.importActual<
+      typeof import('./helpers/manifestFingerprint')
+    >('./helpers/manifestFingerprint');
+    vi.mocked(recordCanonicalManifestFingerprint).mockImplementationOnce(
+      actual.recordCanonicalManifestFingerprint,
+    );
+    const replay = workflow('');
+    try {
+      await replay.run();
+    } finally {
+      await pool.query('DROP FUNCTION reject_departure_write() CASCADE');
+    }
+    expect(await rows()).toEqual(retained);
+    expect(await projections()).toEqual(completed);
+    expect(replay.outputs.has('release-pull-lease')).toBe(true);
+    const fingerprint = getCanonicalManifestFingerprint(
+      combined.snapshot.manifest,
+      combined.index,
+    );
+    expect(await actual.isCanonicalManifestCurrent(getDb(), fingerprint)).toBe(
+      true,
+    );
+
+    // A second valid release-evidence encoding for the same manifest cannot
+    // silently reuse the receipt and projection under a different release pin.
+    const releaseBytes = Buffer.concat([
+      combined.files.releaseBytes,
+      Buffer.from('\n'),
+    ]);
+    const changedEvidence = {
+      ...combined.index,
+      releaseSha256: hashBytes(releaseBytes),
+    };
+    advertiseCombined({ releaseBytes });
+    vi.stubEnv(
+      'MRTDOWN_COMBINED_RELEASE_INDEX',
+      JSON.stringify(changedEvidence),
+    );
+    await expect(workflow('').run()).rejects.toThrow(
+      'retained-combined-release-index-mismatch',
+    );
+    expect(await projections()).toEqual(completed);
+    expect(await rows()).toEqual(retained);
+    expect(await actual.isCanonicalManifestCurrent(getDb(), fingerprint)).toBe(
+      true,
+    );
+    await pool.query('DELETE FROM metadata WHERE key = $1', [
+      MANIFEST_FINGERPRINT_METADATA_KEY,
+    ]);
+  });
 
   it('indexes an admitted combined successor against live topology and retains the legacy rollback target', async () => {
     const legacy = scheduledTimetableArchiveFixture('a', {
@@ -718,6 +885,20 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     expect((await selectDate('2026-11-30')).selected?.projectionId).toBe(
       projection.id,
     );
+    // An intentional rebuild bypasses even the successful same-input fingerprint.
+    await pool.query(
+      "UPDATE scheduled_departure_projections SET completed_at = '2000-01-01 00:00:00+00' WHERE id = $1",
+      [projection.id],
+    );
+    const beforeRebuild = await projections();
+    await workflow({
+      combinedReleaseIndex,
+      rebuildScheduledTimetableProjection: true,
+    }).run();
+    expect(await projections()).not.toEqual(beforeRebuild);
+    expect((await selectDate('2026-11-30')).selected?.projectionId).toBe(
+      projection.id,
+    );
     await pool.query(
       "UPDATE station_platforms SET label = 'Different canonical label' WHERE platform_id = 'platform-1'",
     );
@@ -799,16 +980,15 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     await workflow().run();
     expect(await rows()).toEqual(first);
     expect(retainScheduledTimetable).toHaveBeenCalledTimes(2);
-    const [rebuilt] = await projections();
-    expect(rebuilt.id).toBe(projection.id);
-    expect(rebuilt.completed_at).not.toBeNull();
+    const [reused] = await projections();
+    expect(reused).toEqual(projection);
     advertise(successor);
     await workflow({
       sourceReview: retentionReview(successor, baseline),
     }).run();
     expect(await rows()).toHaveLength(2);
     expect(await projections()).toHaveLength(2);
-    expect(await projections()).toContainEqual(rebuilt);
+    expect(await projections()).toContainEqual(reused);
     expect(projectScheduledTimetable).toHaveBeenCalledTimes(3);
     expect(fetchArchive).toHaveBeenCalledTimes(3);
     expect(truncateStagingTables).toHaveBeenCalledTimes(3);

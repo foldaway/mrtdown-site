@@ -94,11 +94,27 @@ migrations only there. Local runs without that variable skip these tests.
 
 For a combined release, put the producer's `manifest.json`, `timetable.json`
 and `release.json` at the exact `data/combined-timetable/` paths in the canonical
-ZIP. Submit the independently obtained `release-index.json` contents as
-`combinedReleaseIndex` on the authenticated pull request. An index inside the ZIP
-cannot authorize import. Supply the same `sourceReview` used for a legacy
-baseline, successor or correction when admitting a new version. One pull
-accepts one timetable format.
+ZIP. Set the staging or production GitHub deployment environment variable
+`MRTDOWN_COMBINED_RELEASE_INDEX` to the independently approved release index
+JSON (only `manifestSha256` and `releaseSha256`). Deploy passes the value to
+the Fly app at runtime, so the managed daily QStash pull keeps its empty body
+and schedule sync leaves the pin in place. Leave the variable unset for a
+canonical-only source. An authenticated one-off pull can supply
+`combinedReleaseIndex` when no deployment pin is set. When both are present,
+both digests must match. An index from the archive or its origin cannot
+authorize import. One pull accepts one timetable format.
+
+The workflow snapshots the resolved index with the source URL, canonical
+manifest and import clock so callbacks keep the same inputs across a deploy.
+Rotate the configured pin and source together after draining active pulls. An
+old signed request conflicts with a new pin; a stale archive fails verification
+when parsed under the new pin. If neither the pin nor the canonical manifest
+changes after a successful pull, the workflow skips the archive download. A pin
+change itself changes the fingerprint. Every unseen release still requires a
+separately authorized `sourceReview` for that environment's retained lineage.
+Never put review or artifact contents in deployment variables or schedule
+bodies. See the [rollout plan](plans/active/combined-timetable-pull-rollout.md)
+for staging acceptance and preview options.
 
 The pull verifies the three files using `@mrtdown/fs` and the topology built
 from the independently hash-checked canonical archive. Both formats share one
@@ -165,16 +181,25 @@ manifest, using the same archive snapshot. GTFS-free pulls do no projection work
 Historical projections are preserved; the pull does not backfill retained history.
 Projection adds no archive download or large workflow output.
 
-A retained-parent row lock serializes concurrent builds, including the first
-build. Every same-identity retry revalidates and rebuilds; a completion timestamp
-alone never bypasses validation or proves existing rows complete. The builder
-invalidates completion before a savepoint, replaces only this projection's derived
-rows and publishes completion in the same transaction as all materialization.
-On a build failure the savepoint rolls back partial writes and the outer transaction
-commits the invalidation before reporting the error. Existing derived rows can
-remain hidden behind null completion until a successful retry; unrelated manifests
-and algorithm versions are untouched. Completion certifies materialization only,
-not complete mapping, upstream approval or serving eligibility.
+A retained-parent row lock serializes verification and builds. After verifying
+the retained lineage, bytes and compatibility, the pull can reuse a committed
+projection with the same manifest, projector version, topology digest and
+version, service-date bounds and maximum departure offset. It also checks that
+the day table covers exactly the verified date range, including zero-trip days.
+A successful reuse leaves projection metadata and all derived rows untouched.
+The completion marker comes from the transaction that wrote the derived rows;
+this check does not rescan the occurrence or membership tables.
+
+If metadata or day coverage fails the check during parse, the builder replaces
+the projection. For intentional repair, send
+`"rebuildScheduledTimetableProjection": true` on an authenticated pull to
+bypass both the manifest fingerprint skip and projection reuse. The internal
+builder also rebuilds by default when called directly. A build publishes
+completion with all materialization in one transaction. On failure the savepoint
+rolls back partial writes and the outer transaction commits invalidation before
+reporting the error. Existing rows can remain hidden behind null completion
+until a successful retry; other manifests and algorithm versions are untouched.
+Completion certifies materialization only.
 
 Future readers must require the expected projector version, completed state and
 current canonical topology fingerprint/version before selection. They must use

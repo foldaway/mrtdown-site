@@ -5,7 +5,7 @@ import {
   readScheduleTopology,
   verifyScheduledTimetableForCanonicalData,
 } from '@mrtdown/fs';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import type { getDb } from '~/db';
 import {
   combinedDepartureMembershipsTable as combinedMemberships,
@@ -37,6 +37,7 @@ type ProjectionOptions = {
     | typeof SCHEDULED_DEPARTURE_PROJECTOR_VERSION
     | typeof COMBINED_DEPARTURE_PROJECTOR_VERSION;
   canonicalDataDir: string;
+  reuseCompleted?: boolean;
 };
 
 /**
@@ -71,7 +72,6 @@ export async function projectScheduledTimetable(
     if (!retained) {
       throw new Error('Scheduled timetable manifest is not retained');
     }
-    await tx.update(projections).set({ completed_at: null }).where(identity);
     try {
       const projection = await tx.transaction(async (build) => {
         const history = await build
@@ -92,6 +92,44 @@ export async function projectScheduledTimetable(
           maximum_departure_seconds: source.maximumDepartureSeconds,
           completed_at: null,
         };
+        if (options.reuseCompleted) {
+          const [completed] = await build
+            .select({ id: projections.id })
+            .from(projections)
+            .where(
+              and(
+                identity,
+                isNotNull(projections.completed_at),
+                eq(projections.topology_sha256, metadata.topology_sha256),
+                eq(
+                  projections.topology_projection_version,
+                  metadata.topology_projection_version,
+                ),
+                eq(projections.feed_start_date, metadata.feed_start_date),
+                eq(projections.feed_end_date, metadata.feed_end_date),
+                eq(
+                  projections.maximum_departure_seconds,
+                  metadata.maximum_departure_seconds,
+                ),
+              ),
+            );
+          if (completed) {
+            // Completion is committed with all derived rows. The day PK
+            // makes matching count and endpoints proof of exact coverage,
+            // including zero-trip days, without scanning departure rows.
+            const [coverage] = await build
+              .select({
+                complete: sql<boolean>`
+                  count(*) = (${source.range.endDate}::date - ${source.range.startDate}::date + 1)
+                  and min(${days.service_date}) = ${source.range.startDate}::date
+                  and max(${days.service_date}) = ${source.range.endDate}::date
+                `,
+              })
+              .from(days)
+              .where(eq(days.projection_id, completed.id));
+            if (coverage.complete) return completed;
+          }
+        }
         const [projection] = await build
           .insert(projections)
           .values(metadata)
@@ -162,8 +200,9 @@ export async function projectScheduledTimetable(
       });
       return { projection };
     } catch (error) {
-      // Roll back partial materialization to the savepoint, but commit the
-      // invalidation so an unsuccessful rebuild cannot expose stale completion.
+      // The savepoint rolled back partial writes. Commit invalidation so an
+      // unsuccessful verification or rebuild cannot expose stale completion.
+      await tx.update(projections).set({ completed_at: null }).where(identity);
       return { error };
     }
   });
