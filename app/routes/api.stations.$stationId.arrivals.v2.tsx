@@ -18,6 +18,7 @@ import {
 const querySchema = z.strictObject({
   ...arrivalBranchQueryFields,
   platformId: arrivalScopeId.optional(),
+  loop: z.literal('true').optional(),
 });
 const headers = { 'cache-control': 'no-store' };
 
@@ -46,10 +47,12 @@ export const Route = createFileRoute('/api/stations/$stationId/arrivals/v2')({
         try {
           const reference = Temporal.Now.instant();
           const db = getDb();
-          const scope = { stationId: params.stationId, ...parsed.data };
+          const { loop, ...queryScope } = parsed.data;
+          const scope = { stationId: params.stationId, ...queryScope };
           const referenceInstant = reference.toString();
           const decision = await readStationArrivalSource(db, {
             scope,
+            ...(loop && { loop: true }),
             referenceInstant,
             endInstant: reference
               .add({ minutes: STATION_ARRIVALS_V2_HORIZON_MINUTES })

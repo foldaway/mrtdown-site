@@ -186,6 +186,19 @@ describe('station arrivals v2 contract', () => {
     expect(fallback.data.timings).toEqual(data.timings);
   });
 
+  it('passes loop requests to the reader with the canonical anchor in scope', async () => {
+    mocks.read.mockResolvedValue(
+      selectStationArrivalSource(
+        buildScheduledStationArrivalLines(result, display),
+      ),
+    );
+    expect((await request(`${query}&loop=true`)).status).toBe(200);
+    expect(mocks.read).toHaveBeenCalledWith(
+      'database',
+      expect.objectContaining({ scope, loop: true }),
+    );
+  });
+
   it('retains distinct credits across service dates that select the same capture', async () => {
     const originalDay = result.serviceDays[0];
     const correctedDay = structuredClone(originalDay);
@@ -337,6 +350,8 @@ describe('station arrivals v2 contract', () => {
       query.replace('lineId=line', 'lineId='),
       query.replace('serviceId=service', 'serviceId=bad%20id'),
       `${query}&platformId=`,
+      `${query}&loop=false`,
+      `${query}&loop=true&loop=true`,
       `${query}&lineId=other`,
       `${query}&stationId=other`,
       `${query}&limit=999`,

@@ -30,6 +30,7 @@ export type BoardingMembership = {
 export async function readCombinedDepartureRows(
   tx: ReadTransaction,
   scope: IndexedTimetableScope,
+  destinationIds: string[],
   projectionId: number,
   serviceDate: string,
   lowerBound: string,
@@ -50,7 +51,7 @@ export async function readCombinedDepartureRows(
     eq(occurrences.service_date, serviceDate),
     eq(occurrences.station_id, scope.stationId),
     eq(occurrences.line_id, scope.lineId),
-    eq(occurrences.destination_station_id, scope.destinationStationId),
+    inArray(occurrences.destination_station_id, destinationIds),
     exists(
       tx.select({ one: sql`1` }).from(memberships).where(membershipFilter),
     ),

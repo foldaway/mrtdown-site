@@ -29,7 +29,16 @@ export function combinedTimetableArchiveFixture() {
   services.push({
     ...services[0],
     id: 'service-shared',
-    revisions: [{ ...services[0].revisions[0], id: 'shared-revision' }],
+    revisions: [
+      {
+        ...services[0].revisions[0],
+        id: 'shared-revision',
+        path: {
+          ...services[0].revisions[0].path,
+          stations: [...path, path[0]],
+        },
+      },
+    ],
   });
   const platforms = stations[0].layout?.platforms;
   if (!platforms?.length) throw new Error('Missing fixture platforms');

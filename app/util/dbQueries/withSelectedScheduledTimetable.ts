@@ -7,7 +7,7 @@ import {
   ScheduledTimetableRollbackOptionsSchema,
   type ScheduledTimetableSelectionAttempt,
 } from '@mrtdown/fs';
-import { and, arrayContains, count, eq, inArray } from 'drizzle-orm';
+import { and, arrayContains, countDistinct, eq, inArray } from 'drizzle-orm';
 import z from 'zod';
 import type { getDb } from '~/db';
 import {
@@ -16,6 +16,7 @@ import {
   scheduledDepartureScopesTable as scopes,
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
+import { isLoopPath } from '~/util/stationArrivalBranches';
 import { assessIndexedTimetableRollback } from './assessIndexedTimetableRollback';
 import {
   COMBINED_DEPARTURE_PROJECTOR_VERSION,
@@ -65,6 +66,7 @@ export type ScheduledTimetableSelection<
     completedAt: string;
     version: Version;
     coverage: Coverage & { platformIds: string[] };
+    loopDestinationIds?: string[];
   } | null;
   attempts: Attempt[];
   rollback: ScheduledTimetableRollbackAssessment | null;
@@ -73,6 +75,7 @@ export type ScheduledTimetableSnapshotOptions<
   Scope extends IndexedTimetableScope = ExactTimetableScope,
 > = {
   scope: Scope;
+  loop?: true;
   // Trusted operator review and explicit selection clock; never passenger input.
   rollback?: ScheduledTimetableRollbackOptions;
   // Trusted internal override for tests; never bind this to passenger input.
@@ -182,6 +185,27 @@ export async function withScheduledTimetableSnapshot<
       );
       z.number().int().positive().parse(topology.projectionVersion);
       const matchesPlatformDefaults = validateScope(scope, topology);
+      const loopRevisions = options.loop
+        ? serviceIds.map((serviceId) =>
+            topology.services
+              .find(({ id }) => id === serviceId)
+              ?.revisions.filter(
+                ({ stations }) =>
+                  isLoopPath(stations, scope.destinationStationId) &&
+                  stations
+                    .slice(0, -1)
+                    .some(({ stationId }) => stationId === scope.stationId),
+              ),
+          )
+        : [];
+      if (loopRevisions.some((revisions) => !revisions?.length)) {
+        throw new InvalidStationArrivalScopeError(
+          'Loop timetable requests require a canonical loop and its anchor',
+        );
+      }
+      const destinationFilter = options.loop
+        ? undefined
+        : eq(scopes.destination_station_id, scope.destinationStationId);
       const fingerprint = hashBytes(Buffer.from(JSON.stringify(topology)));
       // Check the full source chain before considering derived projections.
       const history = validateScheduledTimetableHistory(
@@ -270,13 +294,13 @@ export async function withScheduledTimetableSnapshot<
                   inArray(scopes.projection_id, combinedProjectionIds),
                   eq(scopes.station_id, scope.stationId),
                   eq(scopes.line_id, scope.lineId),
-                  eq(scopes.destination_station_id, scope.destinationStationId),
+                  destinationFilter,
                   inArray(scopes.service_id, serviceIds),
                   arrayContains(scopes.platform_ids, [scope.platformId]),
                 ),
               )
               .groupBy(scopes.projection_id, scopes.service_date)
-              .having(eq(count(), serviceIds.length))
+              .having(eq(countDistinct(scopes.service_id), serviceIds.length))
               .limit(1)
           : [];
         if (!covered) {
@@ -322,6 +346,7 @@ export async function withScheduledTimetableSnapshot<
             activeTripCount: days.active_trip_count,
             unassignedActiveTripCount: days.unassigned_active_trip_count,
             serviceId: scopes.service_id,
+            destinationId: scopes.destination_station_id,
             platformIds: scopes.platform_ids,
           })
           .from(days)
@@ -333,7 +358,7 @@ export async function withScheduledTimetableSnapshot<
               eq(scopes.station_id, scope.stationId),
               eq(scopes.line_id, scope.lineId),
               inArray(scopes.service_id, serviceIds),
-              eq(scopes.destination_station_id, scope.destinationStationId),
+              destinationFilter,
             ),
           )
           .where(eq(days.service_date, serviceDate));
@@ -350,6 +375,12 @@ export async function withScheduledTimetableSnapshot<
           attempts: [],
           rollback: null,
         };
+        const loopActive = loopRevisions.every((revisions) =>
+          revisions?.some(
+            ({ startAt, endAt }) =>
+              startAt <= serviceDate && (endAt == null || serviceDate < endAt),
+          ),
+        );
         // Only the validated receipt chain establishes newest-to-oldest order.
         for (const version of [...versions].reverse()) {
           const { serviceDateRange, manifestSha256 } = version;
@@ -375,7 +406,12 @@ export async function withScheduledTimetableSnapshot<
             throw new Error('Eligible projection metadata is missing');
           } else if (!rows?.length) {
             reason = 'day-not-indexed';
-          } else if (coveredScopes?.length !== serviceIds.length) {
+          } else if (
+            !loopActive ||
+            !coveredScopes ||
+            new Set(coveredScopes.map(({ serviceId }) => serviceId)).size !==
+              serviceIds.length
+          ) {
             reason = 'scope-not-covered';
           } else {
             coverage = {
@@ -397,6 +433,15 @@ export async function withScheduledTimetableSnapshot<
                 maximumDepartureSeconds: projection.maximumDepartureSeconds,
                 completedAt: projection.completedAt,
                 version,
+                ...(options.loop && {
+                  loopDestinationIds: [
+                    ...new Set(
+                      coveredScopes.flatMap(({ destinationId }) =>
+                        destinationId === null ? [] : [destinationId],
+                      ),
+                    ),
+                  ],
+                }),
                 coverage: {
                   ...coverage,
                   platformIds: [
@@ -419,7 +464,8 @@ export async function withScheduledTimetableSnapshot<
         serviceDate: string,
       ): Promise<ScheduledTimetableSelection<Scope>> => {
         const normal = await selectEligible(serviceDate, history);
-        if (!rollback) {
+        // Exact-destination rollback reviews do not apply to loop-wide reads.
+        if (!rollback || options.loop) {
           return normal;
         }
         const assessment = assessIndexedTimetableRollback(

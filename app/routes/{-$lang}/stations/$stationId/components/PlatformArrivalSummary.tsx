@@ -58,24 +58,37 @@ export function ServiceArrivalSummary({
       <div className="grid items-start gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] sm:gap-4">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1.5">
-            <span className="shrink-0 text-gray-500 text-sm dark:text-gray-400">
-              <FormattedMessage
-                id="station.arrival_timings.towards_label"
-                defaultMessage="Towards"
-              />
-            </span>
-            {arrivalTiming.destinationStationId == null ? (
-              identity
+            {arrivalTiming.isLoop ? (
+              <span className="font-medium text-gray-800 text-sm dark:text-gray-200">
+                {getLocalizedTranslation(
+                  arrivalTiming.serviceName,
+                  intl.locale,
+                )}
+              </span>
             ) : (
-              <Link
-                className="group flex min-w-0 items-center gap-1.5"
-                params={{ stationId: arrivalTiming.destinationStationId }}
-                to="/{-$lang}/stations/$stationId"
-              >
-                {identity}
-              </Link>
+              <>
+                <span className="shrink-0 text-gray-500 text-sm dark:text-gray-400">
+                  <FormattedMessage
+                    id="station.arrival_timings.towards_label"
+                    defaultMessage="Towards"
+                  />
+                </span>
+                {arrivalTiming.destinationStationId == null ? (
+                  identity
+                ) : (
+                  <Link
+                    className="group flex min-w-0 items-center gap-1.5"
+                    params={{ stationId: arrivalTiming.destinationStationId }}
+                    to="/{-$lang}/stations/$stationId"
+                  >
+                    {identity}
+                  </Link>
+                )}
+                <ServiceDetailsPopover
+                  serviceName={arrivalTiming.serviceName}
+                />
+              </>
             )}
-            <ServiceDetailsPopover serviceName={arrivalTiming.serviceName} />
           </div>
           {data?.source !== 'scheduled' &&
             arrivalTiming.platformLabels.length > 0 && (

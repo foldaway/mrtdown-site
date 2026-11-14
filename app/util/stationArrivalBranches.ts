@@ -9,4 +9,16 @@ export type StationArrivalBranch = {
   destinationCode: string;
   destinationName: Station['name'] | null;
   platformLabels: string[];
+  isLoop?: true;
 };
+
+export function isLoopPath(
+  path: readonly { stationId: string }[],
+  anchor: string,
+) {
+  return (
+    path.length > 2 &&
+    path[0].stationId === anchor &&
+    path.at(-1)?.stationId === anchor
+  );
+}

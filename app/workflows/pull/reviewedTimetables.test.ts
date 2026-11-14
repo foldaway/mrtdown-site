@@ -27,6 +27,7 @@ import {
 import { queryIndexedScheduledDepartures } from '~/util/dbQueries/queryIndexedScheduledDepartures';
 import { retainScheduledTimetable } from '~/util/dbQueries/retainScheduledTimetable';
 import { retentionReview } from '~/util/dbQueries/scheduledTimetableRetention.fixture';
+import { getStationProfileReadModel } from '~/util/dbQueries/stations';
 import { withSelectedScheduledTimetable } from '~/util/dbQueries/withSelectedScheduledTimetable';
 import { combinedTimetableArchiveFixture } from './helpers/combinedTimetableArchive.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
@@ -806,6 +807,53 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     expect(reviewed.departures).toMatchObject([
       { serviceId: 'service-shared', stopSequence: combined.sequences[0] },
     ]);
+    const loopScope = {
+      ...scope,
+      serviceId: 'service-shared',
+      destinationStationId: scope.stationId,
+    };
+    const profile = await getStationProfileReadModel(scope.stationId);
+    expect(profile.data.arrivalLines[0].arrivalTimings).toContainEqual(
+      expect.objectContaining({
+        serviceId: loopScope.serviceId,
+        destinationStationId: loopScope.destinationStationId,
+        isLoop: true,
+      }),
+    );
+    expect(
+      await queryIndexedScheduledDepartures(database, {
+        ...window,
+        scope: loopScope,
+      }),
+    ).toMatchObject({ departures: [], complete: false });
+    const loop = await queryIndexedScheduledDepartures(database, {
+      ...window,
+      scope: loopScope,
+      loop: true,
+    });
+    expect(loop.departures).toMatchObject([
+      {
+        serviceId: 'service-shared',
+        destinationStationId: 'station-2',
+        stopSequence: combined.sequences[0],
+      },
+      { stopSequence: combined.sequences[1] },
+    ]);
+    expect(loop.untimedDepartureCount).toBe(1);
+    const emptyLoop = await queryIndexedScheduledDepartures(database, {
+      startInstant: '2026-11-29T12:00:00+08:00',
+      endInstant: '2026-11-29T13:00:00+08:00',
+      scope: loopScope,
+      loop: true,
+    });
+    expect(emptyLoop).toMatchObject({ departures: [], complete: true });
+    await expect(
+      queryIndexedScheduledDepartures(database, {
+        ...window,
+        scope: exact,
+        loop: true,
+      }),
+    ).rejects.toThrow('Loop timetable requests require a canonical loop');
     await expect(
       queryIndexedScheduledDepartures(database, {
         ...window,

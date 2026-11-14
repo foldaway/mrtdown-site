@@ -22,7 +22,10 @@ export function createArrivalRefresh(
   onChange: (states: ArrivalStates) => void,
   fetchResponse: typeof fetch = fetch,
 ) {
-  const branches = new Map<string, StationArrivalsV2['scope']>();
+  const branches = new Map<
+    string,
+    { scope: StationArrivalsV2['scope']; isLoop?: true }
+  >();
   for (const line of lines) {
     for (const timing of line.arrivalTimings) {
       if (timing.destinationStationId == null) {
@@ -35,10 +38,13 @@ export function createArrivalRefresh(
           timing.destinationStationId,
         ),
         {
-          stationId,
-          lineId: line.lineId,
-          serviceId: timing.serviceId,
-          destinationStationId: timing.destinationStationId,
+          scope: {
+            stationId,
+            lineId: line.lineId,
+            serviceId: timing.serviceId,
+            destinationStationId: timing.destinationStationId,
+          },
+          isLoop: timing.isLoop,
         },
       );
     }
@@ -84,13 +90,14 @@ export function createArrivalRefresh(
         if (!branch) {
           return;
         }
-        const [key, scope] = branch;
+        const [key, { scope, isLoop }] = branch;
         try {
           const query = new URLSearchParams({
             lineId: scope.lineId,
             serviceId: scope.serviceId,
             destinationStationId: scope.destinationStationId,
           });
+          if (isLoop) query.set('loop', 'true');
           const response = await fetchResponse(
             `/api/stations/${encodeURIComponent(stationId)}/arrivals/v2?${query}`,
             {

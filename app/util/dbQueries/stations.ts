@@ -30,7 +30,10 @@ import {
   DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES,
   type PublicCrowdReportSignal,
 } from '~/util/crowdReports';
-import type { StationArrivalBranch } from '~/util/stationArrivalBranches';
+import {
+  isLoopPath,
+  type StationArrivalBranch,
+} from '~/util/stationArrivalBranches';
 import {
   type CommunitySignalOptions,
   getPageCommunitySignals,
@@ -473,6 +476,9 @@ export async function getStationProfileReadModel(
       destinationCode: destination?.displayCode ?? branch.id,
       destinationName:
         destinationNameByStationId[destination?.stationId ?? ''] ?? null,
+      ...(destination && isLoopPath(branch.entries, destination.stationId)
+        ? { isLoop: true as const }
+        : {}),
     };
   });
   const arrivalLinesById = new Map<string, StationArrivalBranch[]>();
