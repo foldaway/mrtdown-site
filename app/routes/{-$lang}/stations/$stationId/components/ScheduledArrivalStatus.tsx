@@ -23,32 +23,45 @@ export function ScheduledArrivalStatus({
   );
   return (
     <div className="min-w-0 space-y-2 text-gray-700 text-xs dark:text-gray-300">
-      {!data.coverage.complete && (
-        <p aria-live="polite">
-          <FormattedMessage
-            id="station.arrivals.incomplete"
-            defaultMessage="Incomplete timetable. Some departures may be missing or have no time."
-          />
-        </p>
-      )}
-      {!hasDepartures && (
-        <p>
+      {!hasDepartures ? (
+        <div aria-live="polite">
           {data.coverage.complete ? (
-            <FormattedMessage
-              id="station.arrivals.empty_window"
-              defaultMessage="No scheduled departures between {start} and {end} (Singapore time)."
-              values={{
-                start: formatClockTime(data.window.startInstant, intl),
-                end: formatClockTime(data.window.endInstant, intl),
-              }}
-            />
+            <>
+              <p className="text-sm">
+                <FormattedMessage
+                  id="station.arrivals.empty_window"
+                  defaultMessage="No scheduled departures"
+                />
+              </p>
+              <p className="text-gray-500 dark:text-gray-400">
+                <FormattedMessage
+                  id="station.arrivals.empty_window_range"
+                  defaultMessage="{start}–{end} (Singapore time)"
+                  values={{
+                    start: formatClockTime(data.window.startInstant, intl),
+                    end: formatClockTime(data.window.endInstant, intl),
+                  }}
+                />
+              </p>
+            </>
           ) : (
-            <FormattedMessage
-              id="station.arrivals.no_timed_departures"
-              defaultMessage="No timed departures available in this window. Please check station displays."
-            />
+            <p className="text-sm">
+              <FormattedMessage
+                id="station.arrivals.no_timed_departures"
+                defaultMessage="Incomplete timetable. No departure times."
+              />
+            </p>
           )}
-        </p>
+        </div>
+      ) : (
+        !data.coverage.complete && (
+          <p aria-live="polite">
+            <FormattedMessage
+              id="station.arrivals.incomplete"
+              defaultMessage="Incomplete timetable"
+            />
+          </p>
+        )
       )}
       {data.timings.map((timing) => (
         <div
@@ -76,29 +89,6 @@ export function ScheduledArrivalStatus({
           )}
           <PlatformDepartures departures={timing.departures} now={now} />
         </div>
-      ))}
-      {data.attributions?.map(({ source, retrievedAt, licenceUrl }) => (
-        <p
-          className="text-gray-500 dark:text-gray-400"
-          key={JSON.stringify([source, retrievedAt, licenceUrl])}
-        >
-          <FormattedMessage
-            id="station.arrivals.attribution"
-            defaultMessage="GTFS schedule data from {source}, accessed {date}. <licence>Dataset licence</licence>"
-            values={{
-              source,
-              date: intl.formatDate(retrievedAt, {
-                dateStyle: 'medium',
-                timeZone: 'Asia/Singapore',
-              }),
-              licence: (label) => (
-                <a className="underline" href={licenceUrl}>
-                  {label}
-                </a>
-              ),
-            }}
-          />
-        </p>
       ))}
     </div>
   );
