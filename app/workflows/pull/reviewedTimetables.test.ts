@@ -33,6 +33,7 @@ import { fetchArchive } from './helpers/fetchArchive';
 import { fetchManifest } from './helpers/fetchManifest';
 import {
   getCanonicalManifestFingerprint,
+  isCanonicalManifestCurrent,
   MANIFEST_FINGERPRINT_METADATA_KEY,
   recordCanonicalManifestFingerprint,
 } from './helpers/manifestFingerprint';
@@ -1035,6 +1036,63 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     expect(projectScheduledTimetable).not.toHaveBeenCalled();
     expect(truncateStagingTables).not.toHaveBeenCalled();
     expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
+  });
+
+  it('lets an ordinary pull repair a failed explicit rebuild of a current manifest', async () => {
+    const actual = await vi.importActual<
+      typeof import('./helpers/manifestFingerprint')
+    >('./helpers/manifestFingerprint');
+    const fingerprint = getCanonicalManifestFingerprint({
+      ...canonical.archive().manifest,
+      scheduledTimetable: baseline.entry,
+    });
+    vi.mocked(recordCanonicalManifestFingerprint).mockImplementationOnce(
+      actual.recordCanonicalManifestFingerprint,
+    );
+    await workflow({ sourceReview: retentionReview(baseline) }).run();
+    expect(await actual.isCanonicalManifestCurrent(getDb(), fingerprint)).toBe(
+      true,
+    );
+    const [projection] = await projections();
+
+    await pool.query(`ALTER TABLE scheduled_departure_days
+      ADD CONSTRAINT synthetic_projection_failure CHECK (active_trip_count = 0) NOT VALID`);
+    try {
+      vi.mocked(isCanonicalManifestCurrent).mockImplementationOnce(
+        actual.isCanonicalManifestCurrent,
+      );
+      await expect(
+        workflow({ rebuildScheduledTimetableProjection: true }).run(),
+      ).rejects.toThrow('Failed query');
+    } finally {
+      await pool.query(`ALTER TABLE scheduled_departure_days
+        DROP CONSTRAINT synthetic_projection_failure`);
+    }
+    expect(await projections()).toEqual([
+      { ...projection, completed_at: null },
+    ]);
+    expect(await actual.isCanonicalManifestCurrent(getDb(), fingerprint)).toBe(
+      false,
+    );
+    expect(recordCanonicalManifestFingerprint).toHaveBeenCalledOnce();
+
+    vi.mocked(isCanonicalManifestCurrent).mockImplementationOnce(
+      actual.isCanonicalManifestCurrent,
+    );
+    vi.mocked(recordCanonicalManifestFingerprint).mockImplementationOnce(
+      actual.recordCanonicalManifestFingerprint,
+    );
+    await workflow().run();
+    const [repaired] = await projections();
+    expect(repaired.id).toBe(projection.id);
+    expect(repaired.completed_at).not.toBeNull();
+    expect(await actual.isCanonicalManifestCurrent(getDb(), fingerprint)).toBe(
+      true,
+    );
+    expect(fetchArchive).toHaveBeenCalledTimes(3);
+    await pool.query('DELETE FROM metadata WHERE key = $1', [
+      MANIFEST_FINGERPRINT_METADATA_KEY,
+    ]);
   });
 
   it('leaves admission replayable after projection failure without staging or recording success', async () => {

@@ -14,6 +14,7 @@ import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
 import { importScheduledTimetableArchive } from './helpers/importScheduledTimetableArchive.js';
 import {
+  clearCanonicalManifestFingerprint,
   getCanonicalManifestFingerprint,
   isCanonicalManifestCurrent,
   recordCanonicalManifestFingerprint,
@@ -142,6 +143,10 @@ async function executePull(
 
     const repo = new MRTDownRepository({ store });
     const db = getDb();
+    if (rebuildScheduledTimetableProjection) {
+      // A failed rebuild can invalidate the projection before promotion.
+      await clearCanonicalManifestFingerprint(db);
+    }
     await importScheduledTimetableArchive(db, manifest, store, {
       combinedReleaseIndex,
       sourceReview,
