@@ -29,11 +29,14 @@ export function ServiceArrivalSummary({
   const report = data?.recentCrowdArrival;
   const recentReport =
     report && now != null && now < Date.parse(report.expiresAt) ? report : null;
+  const hasScheduledDepartures =
+    data?.source === 'scheduled' &&
+    data.timings.some(({ departures }) => departures.length > 0);
   const reportable =
     data &&
-    (data.scope.stationId !== data.scope.destinationStationId ||
-      (data.source === 'scheduled' &&
-        data.timings.some(({ departures }) => departures.length > 0)));
+    (hasScheduledDepartures ||
+      (data.scope.stationId !== data.scope.destinationStationId &&
+        (data.source === 'unavailable' || !data.coverage.complete)));
   const destinationName =
     arrivalTiming.destinationName == null
       ? null
