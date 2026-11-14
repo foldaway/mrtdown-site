@@ -1,6 +1,6 @@
 import type { StationArrivalsV2 } from '~/util/stationArrivalsV2';
-import type { ArrivalLine } from './stationGuide.types';
 import { parseArrivalResponse } from './stationArrivalResponse';
+import type { ArrivalLine } from './stationGuide.types';
 
 export type BranchArrivalState = {
   data: StationArrivalsV2 | null;
@@ -130,6 +130,11 @@ export function createArrivalRefresh(
   };
   return {
     refresh,
+    async refreshAfterReport() {
+      // A poll already in flight may have read before the report was saved.
+      await active?.promise;
+      await refresh();
+    },
     dispose() {
       disposed = true;
       generation++;

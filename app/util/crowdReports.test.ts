@@ -5,21 +5,21 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   crowdReportAbuseEventsTable,
   crowdReportClusterLinesTable,
-  crowdReportClustersTable,
   crowdReportClusterStationsTable,
+  crowdReportClustersTable,
   crowdReportLinesTable,
   crowdReportModerationEventsTable,
   crowdReportRateLimitsTable,
-  crowdReportsTable,
   crowdReportStationsTable,
+  crowdReportsTable,
 } from '~/db/schema';
 import {
   assessCrowdReportAutomationPolicy,
   automoderateCrowdReport,
   buildCrowdReportStorageText,
   CrowdReportRateLimitError,
+  type CrowdReportSubmission,
   findMissingCrowdReportReferences,
-  getClientIp,
   getCrowdReportRateLimitBucketStart,
   getPublicCrowdReportSignals,
   parseCrowdReportJsonBody,
@@ -27,7 +27,6 @@ import {
   persistCrowdReport,
   validateCrowdReportSubmission,
   verifyTurnstileToken,
-  type CrowdReportSubmission,
 } from './crowdReports';
 
 const NOW = DateTime.fromISO('2026-05-24T12:34:00+08:00', {
@@ -45,20 +44,6 @@ const VALID_SUBMISSION: CrowdReportSubmission = {
   delayMinutes: 10,
   isStillHappening: true,
 };
-
-describe('getClientIp', () => {
-  it('prefers the trusted Fly client address over forwarded headers', () => {
-    const request = new Request('https://example.com/api/reports', {
-      headers: {
-        'fly-client-ip': '203.0.113.10',
-        'x-forwarded-for': '198.51.100.5',
-        'x-real-ip': '198.51.100.6',
-      },
-    });
-
-    expect(getClientIp(request)).toBe('203.0.113.10');
-  });
-});
 
 function makeStreamingRequest(body: string) {
   const stream = new ReadableStream({

@@ -1,23 +1,35 @@
-export function PlatformSign({
-  color,
-  label,
-}: {
+import { FormattedMessage } from 'react-intl';
+
+type PlatformSignProps = {
   color: string;
   label: string;
-}) {
+};
+
+export function PlatformSign({ color, label }: PlatformSignProps) {
   return (
-    <span
-      aria-hidden="true"
-      className="flex h-7 min-w-6 shrink-0 flex-col items-center justify-center rounded-xs px-0.5 text-white shadow-sm"
-      style={{ backgroundColor: color }}
-    >
-      <span className="font-bold text-sm leading-none">{label}</span>
-      <span className="mt-0.5 h-1.5 w-4 rounded-xs bg-white/90" />
+    <span className="inline-flex">
+      <span
+        aria-hidden="true"
+        className="flex h-7 min-w-6 shrink-0 flex-col items-center justify-center rounded-xs px-0.5 text-white shadow-sm"
+        style={{ backgroundColor: color }}
+      >
+        <span className="font-bold text-sm leading-none">{label}</span>
+        <span className="mt-0.5 h-1.5 w-4 rounded-xs bg-white/90" />
+      </span>
+      <span className="sr-only">
+        <FormattedMessage
+          id="station.arrival_timings.platform"
+          defaultMessage="Platform {label}"
+          values={{ label }}
+        />
+      </span>
     </span>
   );
 }
 
-export function ExitSign({ label }: { label: string }) {
+type ExitSignProps = { label: string };
+
+export function ExitSign({ label }: ExitSignProps) {
   return (
     <span
       aria-hidden="true"

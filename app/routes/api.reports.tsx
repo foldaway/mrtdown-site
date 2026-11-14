@@ -2,13 +2,13 @@ import { createFileRoute } from '@tanstack/react-router';
 import { RateLimiterRes } from 'rate-limiter-flexible';
 import { getDb } from '~/db';
 import { getCrowdReportRateLimiter } from '~/limiters/crowdReport';
+import { getClientIp } from '~/util/clientIp';
 import { purgePublicDataCache } from '~/util/cloudflareCache';
 import { triggerCrowdReportDispatchAfterSubmission } from '~/util/crowdReportDispatch';
 import {
   buildCrowdReportAbuseContext,
   CrowdReportRateLimitError,
   findMissingCrowdReportReferences,
-  getClientIp,
   parseCrowdReportJsonBody,
   persistAutomoderatedCrowdReport,
   validateCrowdReportSubmission,

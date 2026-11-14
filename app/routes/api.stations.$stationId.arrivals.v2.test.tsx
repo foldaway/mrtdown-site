@@ -10,11 +10,18 @@ import {
 } from '~/util/scheduledStationArrivals.fixture';
 import { selectStationArrivalSource } from '~/util/stationArrivalSourcePolicy';
 
-const mocks = vi.hoisted(() => ({ getDb: vi.fn(), read: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  getDb: vi.fn(),
+  read: vi.fn(),
+  readCrowdArrival: vi.fn(),
+}));
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: () => (options: unknown) => ({ options }),
 }));
 vi.mock('~/db', () => ({ getDb: mocks.getDb }));
+vi.mock('~/util/crowdArrivalReports', () => ({
+  getRecentCrowdArrival: mocks.readCrowdArrival,
+}));
 vi.mock('~/util/dbQueries/readStationArrivalSource', () => ({
   readStationArrivalSource: mocks.read,
 }));
@@ -49,6 +56,7 @@ describe('station arrivals v2 contract', () => {
       Temporal.Instant.from(result.window.startInstant),
     );
     mocks.getDb.mockReturnValue('database');
+    mocks.readCrowdArrival.mockReset().mockResolvedValue(undefined);
   });
 
   it('uses one bounded server clock and serializes scheduled groups, precision and occurrence identity', async () => {
@@ -100,6 +108,7 @@ describe('station arrivals v2 contract', () => {
       },
     ]);
     expect(data.scope).toEqual({ ...scope, platformId: 'a' });
+    expect(mocks.readCrowdArrival).not.toHaveBeenCalled();
     expect(data.window).toEqual({ ...result.window, limit: 20 });
     expect(data.coverage).toEqual({
       complete: true,
@@ -143,6 +152,38 @@ describe('station arrivals v2 contract', () => {
     expect(data.source).toBe('scheduled');
     expect(data.reason).toBe('complete');
     expect(data.schemaVersion).toBe(2);
+  });
+
+  it('includes rider reports as optional branch-level data and serves schedules when reports fail', async () => {
+    const scheduled = buildScheduledStationArrivalLines(
+      { ...result, departures: [departure] },
+      display,
+    );
+    mocks.read.mockResolvedValue(selectStationArrivalSource(scheduled));
+    const report = {
+      reportedAt: '2026-10-24T15:59:00Z',
+      expectedAt: '2026-10-24T16:02:00Z',
+      expiresAt: '2026-10-24T16:03:00Z',
+    };
+    mocks.readCrowdArrival.mockResolvedValueOnce(report);
+    const { data } = await (await request()).json();
+    expect(mocks.readCrowdArrival).toHaveBeenCalledWith(
+      'database',
+      scope,
+      result.window.startInstant,
+    );
+    expect(data.recentCrowdArrival).toEqual(report);
+    expect(data.timings[0].departures[0].time).toBe(departure.departureInstant);
+
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.readCrowdArrival.mockRejectedValueOnce(
+      new Error('report store offline'),
+    );
+    const response = await request();
+    expect(response.status).toBe(200);
+    const fallback = await response.json();
+    expect(fallback.data.recentCrowdArrival).toBeUndefined();
+    expect(fallback.data.timings).toEqual(data.timings);
   });
 
   it('retains distinct credits across service dates that select the same capture', async () => {
