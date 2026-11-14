@@ -234,11 +234,15 @@ async function readIndexedScheduledDepartures<
       if (!selected) {
         continue;
       }
+      const destinationIds = selected.loopDestinationIds ?? [
+        scope.destinationStationId,
+      ];
       const { rows, untimed } =
         selected.version.format === 'combined'
           ? await readCombinedDepartureRows(
               tx,
               scope,
+              destinationIds,
               selected.projectionId,
               serviceDate,
               lowerBound,
@@ -247,6 +251,7 @@ async function readIndexedScheduledDepartures<
           : await readLegacyDepartureRows(
               tx,
               scope,
+              destinationIds,
               selected.projectionId,
               serviceDate,
               lowerBound,
@@ -335,6 +340,7 @@ async function readIndexedScheduledDepartures<
 async function readLegacyDepartureRows(
   tx: ReadTransaction,
   scope: IndexedTimetableScope,
+  destinationIds: string[],
   projectionId: number,
   serviceDate: string,
   lowerBound: string,
@@ -346,7 +352,7 @@ async function readLegacyDepartureRows(
     eq(occurrences.station_id, scope.stationId),
     eq(occurrences.line_id, scope.lineId),
     inArray(occurrences.service_id, indexedServiceIds(scope)),
-    eq(occurrences.destination_station_id, scope.destinationStationId),
+    inArray(occurrences.destination_station_id, destinationIds),
     scope.platformId === undefined
       ? undefined
       : arrayContains(occurrences.platform_ids, [scope.platformId]),

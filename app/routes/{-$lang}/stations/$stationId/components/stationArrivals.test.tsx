@@ -265,6 +265,44 @@ describe('station guide arrival sources', () => {
 });
 
 describe('station guide refresh session', () => {
+  it('requests departures by direction for a loop and renders its service name', async () => {
+    const loopTiming = {
+      ...timing,
+      isLoop: true as const,
+      serviceName: {
+        ...timing.serviceName,
+        'en-SG': 'Loop Service (Clockwise)',
+      },
+    };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response());
+    const session = createArrivalRefresh(
+      scheduled.scope.stationId,
+      [{ lineId: timing.lineId, arrivalTimings: [loopTiming] }],
+      () => {},
+      fetcher,
+    );
+    await session.refresh();
+    const url = new URL(String(fetcher.mock.calls[0][0]), 'http://localhost');
+    expect(url.searchParams.get('loop')).toBe('true');
+    expect(url.searchParams.get('destinationStationId')).toBe(
+      timing.destinationStationId,
+    );
+    session.dispose();
+
+    const html = renderToStaticMarkup(
+      <IntlProvider locale="en-SG" defaultLocale="en-SG">
+        <ServiceArrivalSummary
+          arrivalTiming={loopTiming}
+          arrivalState={{ data: scheduled, status: 'ready' }}
+          lineColor="#123456"
+          now={null}
+        />
+      </IntlProvider>,
+    );
+    expect(html).toContain('Loop Service (Clockwise)');
+    expect(html).not.toContain('Towards');
+    expect(html).toContain('Scheduled');
+  });
   it('makes a fresh request after a report even when a poll was in flight', async () => {
     const pending = deferred();
     const fetcher = vi

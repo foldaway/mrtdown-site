@@ -2,12 +2,14 @@
 
 `GET /api/stations/{stationId}/arrivals/v2?lineId={lineId}&serviceId={serviceId}&destinationStationId={destinationStationId}`
 
-The path station ID and three required query IDs identify one exact canonical
-branch. Optional `platformId` further restricts it to a canonical platform at that
-station. IDs are case-sensitive, 1–128 ASCII letters, digits, underscores or
-hyphens. All other query fields, duplicate keys, empty values and URLs longer
-than 2048 characters are rejected. Canonical existence and relationships are
-checked inside the private reader's database snapshot.
+The path station ID and three required query IDs identify a canonical branch.
+Optional `platformId` further restricts it to a canonical platform at that
+station. With `loop=true`, the destination ID identifies the common start and
+end of the canonical loop path. The query returns departures for that service
+direction across its timetable termini. IDs are case-sensitive, 1–128 ASCII
+letters, digits, underscores or hyphens. All other query fields, duplicate keys,
+empty values and URLs longer than 2048 characters are rejected. Canonical
+existence and relationships are checked inside the reader's database snapshot.
 
 The server chooses one request instant and queries the half-open interval
 `[now, now + 60 minutes)`, returning at most 20 departures across all scheduled
