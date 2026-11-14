@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import {
+  type ArrivalBranchScope,
   CROWD_ARRIVAL_COOLDOWN_SECONDS,
   type CrowdArrivalSubmission,
   type RecentCrowdArrival as RecentReport,
@@ -36,7 +37,7 @@ export function RecentCrowdArrival({ report }: RecentCrowdArrivalProps) {
 }
 
 type CrowdArrivalReportProps = {
-  scope: Omit<CrowdArrivalSubmission, 'minutesToArrival'>;
+  scope: ArrivalBranchScope;
   onSubmitted: () => Promise<void>;
 };
 
@@ -58,7 +59,9 @@ export function CrowdArrivalReport({
     return () => window.clearTimeout(timeout);
   }, [coolingDown]);
 
-  async function submit(minutesToArrival: number) {
+  async function submit(
+    minutesToArrival: CrowdArrivalSubmission['minutesToArrival'],
+  ) {
     setStatus('sending');
     const controller = new AbortController();
     const timeout = window.setTimeout(

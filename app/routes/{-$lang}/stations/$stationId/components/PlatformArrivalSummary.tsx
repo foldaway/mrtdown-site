@@ -1,11 +1,9 @@
 import { Link } from '@tanstack/react-router';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { ArrivalRefreshNotice } from './ArrivalRefreshNotice';
 import { CrowdArrivalReport, RecentCrowdArrival } from './CrowdArrivalReport';
-import {
-  ArrivalRefreshNotice,
-  ScheduledArrivalStatus,
-} from './ScheduledArrivalStatus';
+import { ScheduledArrivalStatus } from './ScheduledArrivalStatus';
 import { ServiceDetailsPopover } from './ServiceDetailsPopover';
 import { PlatformSign } from './StationGuideSigns';
 import type { BranchArrivalState } from './stationArrivalRefresh';
@@ -83,15 +81,8 @@ export function ServiceArrivalSummary({
             arrivalTiming.platformLabels.length > 0 && (
               <ul className="mt-1.5 flex flex-wrap gap-1">
                 {arrivalTiming.platformLabels.map((label) => (
-                  <li key={label} className="inline-flex">
+                  <li key={label}>
                     <PlatformSign color={lineColor} label={label} />
-                    <span className="sr-only">
-                      <FormattedMessage
-                        id="station.arrival_timings.platform"
-                        defaultMessage="Platform {label}"
-                        values={{ label }}
-                      />
-                    </span>
                   </li>
                 ))}
               </ul>

@@ -96,28 +96,23 @@ export function StationGuide({
                 </Link>
               </h4>
               <ul className="mt-1 divide-y divide-gray-200 dark:divide-gray-700">
-                {line.arrivalTimings.map((arrivalTiming) => (
-                  <ServiceArrivalSummary
-                    arrivalTiming={arrivalTiming}
-                    key={arrivalBranchKey(
-                      line.lineId,
-                      arrivalTiming.serviceId,
-                      arrivalTiming.destinationStationId,
-                    )}
-                    arrivalState={
-                      states[
-                        arrivalBranchKey(
-                          line.lineId,
-                          arrivalTiming.serviceId,
-                          arrivalTiming.destinationStationId,
-                        )
-                      ]
-                    }
-                    lineColor={lineColors[line.lineId]}
-                    now={now}
-                    onArrivalReported={refreshAfterReport}
-                  />
-                ))}
+                {line.arrivalTimings.map((arrivalTiming) => {
+                  const branchKey = arrivalBranchKey(
+                    line.lineId,
+                    arrivalTiming.serviceId,
+                    arrivalTiming.destinationStationId,
+                  );
+                  return (
+                    <ServiceArrivalSummary
+                      arrivalTiming={arrivalTiming}
+                      key={branchKey}
+                      arrivalState={states[branchKey]}
+                      lineColor={lineColors[line.lineId]}
+                      now={now}
+                      onArrivalReported={refreshAfterReport}
+                    />
+                  );
+                })}
               </ul>
             </section>
           ))}

@@ -7,6 +7,7 @@ import {
   servicesTable as services,
 } from '~/db/schema';
 import {
+  type ArrivalBranchScope,
   CROWD_ARRIVAL_COOLDOWN_SECONDS,
   type CrowdArrivalSubmission,
   type RecentCrowdArrival,
@@ -21,11 +22,10 @@ const MAX_REPORT_AGE_MS = 5 * 60_000;
 const POST_ARRIVAL_GRACE_MS = 60_000;
 
 type Db = ReturnType<typeof getDb>;
-type ReportScope = Omit<CrowdArrivalSubmission, 'minutesToArrival'>;
 
 async function isReportableArrivalScope(
   db: Pick<Db, 'select'>,
-  scope: ReportScope,
+  scope: ArrivalBranchScope,
   referenceInstant: string,
 ) {
   const serviceRevisions = await db
@@ -65,7 +65,7 @@ async function isReportableArrivalScope(
 
 export async function getRecentCrowdArrival(
   db: Db,
-  scope: ReportScope,
+  scope: ArrivalBranchScope,
   referenceInstant: string,
 ): Promise<RecentCrowdArrival | undefined> {
   const now = Date.parse(referenceInstant);
@@ -130,19 +130,18 @@ export async function submitCrowdArrival(
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`crowd-arrival:${reporterHash}`}, 0::bigint))`,
     );
-    const reportedAt = new Date().toISOString();
+    const receivedAt = new Date();
+    const reportedAt = receivedAt.toISOString();
+    const cooldownStart = new Date(
+      receivedAt.getTime() - CROWD_ARRIVAL_COOLDOWN_SECONDS * 1000,
+    );
     const [recent] = await tx
       .select({ id: reports.id })
       .from(reports)
       .where(
         and(
           eq(reports.reporter_hash, reporterHash),
-          gte(
-            reports.created_at,
-            new Date(
-              Date.parse(reportedAt) - CROWD_ARRIVAL_COOLDOWN_SECONDS * 1000,
-            ),
-          ),
+          gte(reports.created_at, cooldownStart),
         ),
       )
       .limit(1);
@@ -156,7 +155,7 @@ export async function submitCrowdArrival(
       service_id: submission.serviceId,
       minutes_to_arrival: submission.minutesToArrival,
       reported_at: reportedAt,
-      created_at: new Date(reportedAt),
+      created_at: receivedAt,
       reporter_hash: reporterHash,
       status: 'accepted',
     });

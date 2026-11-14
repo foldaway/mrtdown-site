@@ -11,11 +11,9 @@ import {
   type StationArrivalsV2,
   serializeStationArrivalsV2,
 } from '~/util/stationArrivalsV2';
+import { ArrivalRefreshNotice } from './ArrivalRefreshNotice';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
-import {
-  ArrivalRefreshNotice,
-  ScheduledArrivalStatus,
-} from './ScheduledArrivalStatus';
+import { ScheduledArrivalStatus } from './ScheduledArrivalStatus';
 import {
   type ArrivalStates,
   arrivalBranchKey,

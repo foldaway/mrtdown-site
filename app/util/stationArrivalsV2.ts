@@ -1,5 +1,8 @@
 import type { Station } from '@mrtdown/core';
-import type { RecentCrowdArrival } from './crowdArrivalReportContract';
+import type {
+  ArrivalBranchScope,
+  RecentCrowdArrival,
+} from './crowdArrivalReportContract';
 import type { ScheduledTimetableSelection } from './dbQueries/withSelectedScheduledTimetable';
 import type { StationArrivalSourceDecision } from './stationArrivalSourcePolicy';
 
@@ -33,13 +36,7 @@ type ScheduledDeparture = SourceIdentity & {
 export type StationArrivalsV2 = {
   schemaVersion: 2;
   recentCrowdArrival?: RecentCrowdArrival;
-  scope: {
-    stationId: string;
-    lineId: string;
-    serviceId: string;
-    destinationStationId: string;
-    platformId?: string;
-  };
+  scope: ArrivalBranchScope & { platformId?: string };
   window: {
     startInstant: string;
     endInstant: string;

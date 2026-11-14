@@ -2,7 +2,10 @@ import { Temporal } from '@js-temporal/polyfill';
 import { createFileRoute } from '@tanstack/react-router';
 import z from 'zod';
 import { getDb } from '~/db';
-import { arrivalScopeId } from '~/util/crowdArrivalReportContract';
+import {
+  arrivalBranchQueryFields,
+  arrivalScopeId,
+} from '~/util/crowdArrivalReportContract';
 import { getRecentCrowdArrival } from '~/util/crowdArrivalReports';
 import { readStationArrivalSource } from '~/util/dbQueries/readStationArrivalSource';
 import { InvalidStationArrivalScopeError } from '~/util/dbQueries/withSelectedScheduledTimetable';
@@ -13,9 +16,7 @@ import {
 } from '~/util/stationArrivalsV2';
 
 const querySchema = z.strictObject({
-  lineId: arrivalScopeId,
-  serviceId: arrivalScopeId,
-  destinationStationId: arrivalScopeId,
+  ...arrivalBranchQueryFields,
   platformId: arrivalScopeId.optional(),
 });
 const headers = { 'cache-control': 'no-store' };

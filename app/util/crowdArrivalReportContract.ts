@@ -8,11 +8,19 @@ export const arrivalScopeId = z
   .max(128)
   .regex(/^[A-Za-z0-9_-]+$/);
 
-export const crowdArrivalSubmissionSchema = z.strictObject({
-  stationId: arrivalScopeId,
+export const arrivalBranchQueryFields = {
   lineId: arrivalScopeId,
   serviceId: arrivalScopeId,
   destinationStationId: arrivalScopeId,
+};
+
+const arrivalBranchScope = z.object({
+  stationId: arrivalScopeId,
+  ...arrivalBranchQueryFields,
+});
+
+export const crowdArrivalSubmissionSchema = z.strictObject({
+  ...arrivalBranchScope.shape,
   minutesToArrival: z.number().int().min(0).max(30),
 });
 
@@ -22,6 +30,7 @@ export const recentCrowdArrivalSchema = z.object({
   expiresAt: z.iso.datetime({ offset: true }),
 });
 
+export type ArrivalBranchScope = z.infer<typeof arrivalBranchScope>;
 export type CrowdArrivalSubmission = z.infer<
   typeof crowdArrivalSubmissionSchema
 >;
