@@ -8,19 +8,18 @@ type ScheduledDeparture =
 
 type ScheduledArrivalStatusProps = {
   data: ScheduledResponse;
+  hasDepartures: boolean;
   lineColor: string;
   now: number | null;
 };
 
 export function ScheduledArrivalStatus({
   data,
+  hasDepartures,
   lineColor,
   now,
 }: ScheduledArrivalStatusProps) {
   const intl = useIntl();
-  const hasDepartures = data.timings.some(
-    (timing) => timing.departures.length > 0,
-  );
   return (
     <div className="min-w-0 space-y-2 text-gray-700 text-xs dark:text-gray-300">
       {!hasDepartures ? (

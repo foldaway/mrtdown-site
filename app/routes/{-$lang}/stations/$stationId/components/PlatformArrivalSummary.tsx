@@ -29,12 +29,12 @@ export function ServiceArrivalSummary({
   const report = data?.recentCrowdArrival;
   const recentReport =
     report && now != null && now < Date.parse(report.expiresAt) ? report : null;
-  const hasScheduledDepartures =
+  const hasDepartures =
     data?.source === 'scheduled' &&
     data.timings.some(({ departures }) => departures.length > 0);
   const reportable =
     data &&
-    (hasScheduledDepartures ||
+    (hasDepartures ||
       (data.scope.stationId !== data.scope.destinationStationId &&
         (data.source === 'unavailable' || !data.coverage.complete)));
   const destinationName =
@@ -107,6 +107,7 @@ export function ServiceArrivalSummary({
         {data?.source === 'scheduled' ? (
           <ScheduledArrivalStatus
             data={data}
+            hasDepartures={hasDepartures}
             lineColor={lineColor}
             now={arrivalState?.status === 'error' ? null : now}
           />
