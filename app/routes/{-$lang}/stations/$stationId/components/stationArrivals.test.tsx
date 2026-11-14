@@ -11,15 +11,14 @@ import {
   type StationArrivalsV2,
   serializeStationArrivalsV2,
 } from '~/util/stationArrivalsV2';
-import { ArrivalRefreshNotice } from './ArrivalRefreshNotice';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
-import { ScheduledArrivalStatus } from './ScheduledArrivalStatus';
 import {
   type ArrivalStates,
   arrivalBranchKey,
   createArrivalRefresh,
 } from './stationArrivalRefresh';
 import type { ArrivalLine } from './stationGuide.types';
+import { TimetableSources } from './TimetableSources';
 
 type MockLinkProps = { children: React.ReactNode };
 vi.mock('@tanstack/react-router', () => ({
@@ -61,6 +60,11 @@ const timing: ArrivalLine['arrivalTimings'][number] = {
   ...display,
   ...scheduled.scope,
   platformLabels: ['A', 'B'],
+};
+const recentCrowdArrival = {
+  reportedAt: '2026-10-24T16:08:00Z',
+  expectedAt: '2026-10-24T16:11:00Z',
+  expiresAt: '2026-10-24T16:12:00Z',
 };
 const lines = [{ lineId: timing.lineId, arrivalTimings: [timing, timing] }];
 const key = arrivalBranchKey(
@@ -110,8 +114,7 @@ describe('station guide arrival sources', () => {
     expect(html).toContain('Approximate scheduled');
     expect(html).toContain('Service details');
     expect(html).toContain('Alternative platforms for the same train');
-    expect(html).toContain('GTFS schedule data from');
-    expect(html).toContain('href="https://example.com/licence"');
+    expect(html).not.toContain('Dataset licence');
     expect(html.match(/<ol/g)).toHaveLength(3);
     expect(html.match(/<time/g)).toHaveLength(4);
     expect(html).toContain('Later departures</summary>');
@@ -140,25 +143,11 @@ describe('station guide arrival sources', () => {
   });
 
   it('shows recent reports separately from the timetable and expires them on the client', () => {
-    const recent = {
-      ...scheduled,
-      recentCrowdArrival: {
-        reportedAt: '2026-10-24T16:08:00Z',
-        expectedAt: '2026-10-24T16:11:00Z',
-        expiresAt: '2026-10-24T16:12:00Z',
-      },
-    };
+    const recent = { ...scheduled, recentCrowdArrival };
     const html = renderRow(recent, 'ready', undefined, async () => {});
     expect(html).toContain('Rider-reported arrival');
     expect(html).toContain('2 min');
     expect(html).toContain('Report an arrival');
-    const unavailable = renderRow({
-      ...recent,
-      source: 'unavailable',
-      reason: 'timetable-unavailable',
-    });
-    expect(unavailable).toContain('Timetable unavailable');
-    expect(unavailable).toContain('Rider-reported arrival');
     const expired = renderRow(
       recent,
       'ready',
@@ -173,42 +162,88 @@ describe('station guide arrival sources', () => {
     }
     const empty = { ...scheduled, timings: [] };
     const html = renderRow(empty);
-    expect(html).toContain('No scheduled departures between');
+    expect(html).toContain('No scheduled departures');
+    expect(html).toMatch(/12:00 am–1:00 am \(Singapore time\)/i);
     expect(html).not.toContain('Service ended');
     expect(html).not.toContain('Frequency estimate');
-    const partial = renderRow({
+    const partial = {
       ...empty,
-      reason: 'incomplete',
+      reason: 'incomplete' as const,
       coverage: {
         ...empty.coverage,
         complete: false,
         untimedDepartureCount: 2,
       },
-    });
-    expect(partial).toContain('Incomplete timetable');
-    expect(partial).toContain('No timed departures available');
-    const unavailable = renderRow({
+    };
+    const unavailable = {
       ...empty,
-      source: 'unavailable',
-      reason: 'timetable-unavailable',
+      source: 'unavailable' as const,
+      reason: 'timetable-unavailable' as const,
+    };
+    for (const [data, message] of [
+      [empty, 'No scheduled departures'],
+      [partial, 'Incomplete timetable. No departure times.'],
+      [unavailable, 'Timetable unavailable'],
+    ] as const) {
+      expect(renderRow(data)).toContain(message);
+      const withReport = renderRow({ ...data, recentCrowdArrival });
+      expect(withReport).toContain(message);
+      expect(withReport).toContain('Rider-reported arrival');
+      expect(withReport).not.toContain('Frequency estimate');
+    }
+    const partialWithTimes = renderRow({
+      ...partial,
+      timings: scheduled.timings,
     });
-    expect(unavailable).toContain('Arrivals unavailable');
-    expect(unavailable).not.toContain('Frequency estimate');
+    expect(partialWithTimes).toContain('Incomplete timetable');
+    expect(partialWithTimes).toContain('2 min');
+    expect(partialWithTimes).not.toContain('No departure times');
     expect(renderRow(empty, 'error')).toContain(
       'Showing the last known response',
     );
-    expect(renderRow(null, 'error')).toContain(
-      'Couldn’t refresh the timetable',
+    const failed = renderRow(null, 'error');
+    expect(failed).toContain('Couldn’t load timetable');
+    expect(failed).not.toContain('Timetable unavailable');
+  });
+
+  it('lists each distinct credit once across service rows, including stale schedules', () => {
+    if (scheduled.source !== 'scheduled' || !scheduled.attributions?.[0]) {
+      throw new Error('Missing fixture attribution');
+    }
+    const [credit] = scheduled.attributions;
+    const html = renderToStaticMarkup(
+      <IntlProvider locale="en-SG" defaultLocale="en-SG">
+        <TimetableSources
+          states={{
+            east: { data: scheduled, status: 'ready' },
+            west: {
+              status: 'error',
+              data: {
+                ...scheduled,
+                timings: [],
+                attributions: [
+                  credit,
+                  { ...credit, retrievedAt: '2026-10-23T17:00:00Z' },
+                  {
+                    ...credit,
+                    licenceUrl: 'https://example.com/other-licence',
+                  },
+                  { ...credit, retrievedAt: '2026-10-25T00:00:00Z' },
+                  { ...credit, source: 'Another provider' },
+                ],
+              },
+            },
+          }}
+        />
+      </IntlProvider>,
     );
-    // Exercise the standalone status components used by all service rows.
-    expect(
-      renderToStaticMarkup(
-        <IntlProvider locale="en-SG" defaultLocale="en-SG">
-          <ScheduledArrivalStatus data={empty} lineColor="#123456" now={null} />
-          <ArrivalRefreshNotice hasScope={false} />
-        </IntlProvider>,
-      ),
-    ).toContain('refresh is unavailable');
+    expect(html).toContain('Timetable sources</summary>');
+    expect(html).toContain(credit.source);
+    expect(html).toContain('24 Oct 2026');
+    expect(html).toContain('25 Oct 2026');
+    expect(html).toContain('Another provider');
+    expect(html).toContain('href="https://example.com/other-licence"');
+    expect(html.match(/Dataset licence/g)).toHaveLength(4);
   });
 
   it('renders SSR/loading without an estimated time or calibration control', () => {

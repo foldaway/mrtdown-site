@@ -95,27 +95,18 @@ export function ServiceArrivalSummary({
             now={arrivalState?.status === 'error' ? null : now}
           />
         ) : data?.source === 'unavailable' ||
-          arrivalState?.status === 'error' ||
           arrivalTiming.destinationStationId == null ? (
-          <p className="text-gray-600 text-sm dark:text-gray-300">
-            {recentReport ? (
-              <FormattedMessage
-                id="station.arrivals.timetable_unavailable"
-                defaultMessage="Timetable unavailable. Please check station displays."
-              />
-            ) : (
-              <FormattedMessage
-                id="station.arrivals.unavailable"
-                defaultMessage="Arrivals unavailable. Please check station displays."
-              />
-            )}
+          <p className="text-gray-700 text-sm dark:text-gray-300">
+            <FormattedMessage
+              id="station.arrivals.timetable_unavailable"
+              defaultMessage="Timetable unavailable"
+            />
           </p>
         ) : null}
       </div>
-      <ArrivalRefreshNotice
-        state={arrivalState}
-        hasScope={arrivalTiming.destinationStationId != null}
-      />
+      {arrivalTiming.destinationStationId != null && (
+        <ArrivalRefreshNotice state={arrivalState} />
+      )}
       {recentReport && <RecentCrowdArrival report={recentReport} />}
       {reportable && onArrivalReported && (
         <CrowdArrivalReport

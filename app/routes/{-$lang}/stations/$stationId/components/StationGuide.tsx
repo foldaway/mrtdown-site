@@ -8,6 +8,7 @@ import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { ExitSign } from './StationGuideSigns';
 import { arrivalBranchKey } from './stationArrivalRefresh';
 import type { ArrivalLine, StationExit } from './stationGuide.types';
+import { TimetableSources } from './TimetableSources';
 import { useHoverPopover } from './useHoverPopover';
 import { useStationArrivals } from './useStationArrivals';
 
@@ -116,6 +117,7 @@ export function StationGuide({
               </ul>
             </section>
           ))}
+          <TimetableSources states={states} />
         </section>
       )}
       {exits.length > 0 && (
@@ -196,7 +198,7 @@ function ArrivalInfo() {
             <p className="mt-1 text-gray-600 dark:text-gray-300">
               <FormattedMessage
                 id="station.arrivals.explainer"
-                defaultMessage="Times come from a published timetable. Approximate scheduled times are less precise. These are not live train predictions, and timetable coverage can be incomplete. When a timetable is unavailable, no arrival estimate is shown."
+                defaultMessage="Times come from a published timetable. Approximate scheduled times are less precise, and timetables may be incomplete. Check station displays for live times."
               />
             </p>
             <Popover.Arrow className="fill-white dark:fill-gray-800" />
