@@ -6,6 +6,8 @@ import {
   type RecentCrowdArrival as RecentReport,
 } from '~/util/crowdArrivalReportContract';
 
+const SUBMISSION_TIMEOUT_MS = 10_000;
+
 type RecentCrowdArrivalProps = { report: RecentReport };
 
 export function RecentCrowdArrival({ report }: RecentCrowdArrivalProps) {
@@ -58,11 +60,17 @@ export function CrowdArrivalReport({
 
   async function submit(minutesToArrival: number) {
     setStatus('sending');
+    const controller = new AbortController();
+    const timeout = window.setTimeout(
+      () => controller.abort(),
+      SUBMISSION_TIMEOUT_MS,
+    );
     try {
       const response = await fetch('/api/arrival-reports', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ ...scope, minutesToArrival }),
+        signal: controller.signal,
       });
       if (!response.ok) {
         setStatus(response.status === 429 ? 'rate-limited' : 'error');
@@ -71,6 +79,8 @@ export function CrowdArrivalReport({
     } catch {
       setStatus('error');
       return;
+    } finally {
+      window.clearTimeout(timeout);
     }
     setStatus('sent');
     await onSubmitted();
@@ -120,6 +130,12 @@ export function CrowdArrivalReport({
           </>
         )}
         <div aria-live="polite">
+          {status === 'sending' && (
+            <FormattedMessage
+              id="report.submitting"
+              defaultMessage="Submitting"
+            />
+          )}
           {status === 'sent' && (
             <FormattedMessage
               id="station.arrival_report.thanks"

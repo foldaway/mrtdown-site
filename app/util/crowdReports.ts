@@ -8,11 +8,12 @@ import { z } from 'zod';
 import {
   crowdReportAbuseEventsTable,
   crowdReportClusterLinesTable,
-  crowdReportClustersTable,
   crowdReportClusterStationsTable,
+  crowdReportClustersTable,
   crowdReportLinesTable,
   crowdReportModerationEventsTable,
   crowdReportRateLimitsTable,
+  crowdReportStationsTable,
   crowdReportsTable,
   linesTable,
   serviceRevisionPathStationEntriesTable,
@@ -20,14 +21,14 @@ import {
   servicesTable,
   stationCodesTable,
   stationsTable,
-  crowdReportStationsTable,
 } from '~/db/schema';
-import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
+import { getClientIp } from './clientIp';
 import { buildCrowdReportClusteringLockKey } from './crowdReportClustering';
 import {
-  findDuplicateCrowdReport,
   type DuplicateCrowdReport,
+  findDuplicateCrowdReport,
 } from './crowdReportDeduplication';
+import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
 import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
 const SG_TIMEZONE = 'Asia/Singapore';
@@ -513,17 +514,6 @@ export function getCrowdReportRateLimitBucketStart(
     throw new Error('Unable to calculate crowd report rate-limit bucket');
   }
   return value;
-}
-
-export function getClientIp(request: Request) {
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  return (
-    request.headers.get('fly-client-ip') ??
-    request.headers.get('cf-connecting-ip') ??
-    request.headers.get('x-real-ip') ??
-    forwardedFor?.split(',')[0]?.trim() ??
-    'unknown'
-  );
 }
 
 export function buildCrowdReportStorageText(

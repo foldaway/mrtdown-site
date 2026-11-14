@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { getDb } from '~/db';
+import { getClientIp } from '~/util/clientIp';
 import {
   CROWD_ARRIVAL_COOLDOWN_SECONDS,
   crowdArrivalSubmissionSchema,
@@ -10,7 +11,6 @@ import {
   submitCrowdArrival,
 } from '~/util/crowdArrivalReports';
 import {
-  getClientIp,
   hashCrowdReportValue,
   parseCrowdReportJsonBody,
 } from '~/util/crowdReports';
