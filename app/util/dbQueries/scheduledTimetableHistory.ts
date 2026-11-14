@@ -33,6 +33,9 @@ type Version = {
   serviceDateRange: ScheduledTimetableArtifactManifest['feedRange'];
   record: ScheduledTimetableImportRecord;
   format: 'legacy' | 'combined';
+  combinedReleaseIndex?: ReturnType<
+    typeof readCombinedTimetableAdmissionManifest
+  >['combinedReleaseIndex'];
 };
 
 /** Validate the one source-admission chain across both formats using metadata only. */

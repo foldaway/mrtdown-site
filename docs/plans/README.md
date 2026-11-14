@@ -18,6 +18,8 @@ Use plans for:
 
 ## Active
 
+- [Combined timetable pull rollout](active/combined-timetable-pull-rollout.md):
+  verify safe projection reuse and deploy-managed pins before cutover.
 - [Dynamic system map](active/dynamic-system-map.md): canonical schematic map
   data and data-driven site rendering.
 - [Production performance](active/production-performance.md): public route

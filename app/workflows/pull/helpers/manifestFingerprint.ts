@@ -76,6 +76,12 @@ export async function isCanonicalManifestCurrent(
   return rows[0]?.value === fingerprint;
 }
 
+export async function clearCanonicalManifestFingerprint(db: AppDb) {
+  await db
+    .delete(metadataTable)
+    .where(eq(metadataTable.key, MANIFEST_FINGERPRINT_METADATA_KEY));
+}
+
 /**
  * Mark the canonical input current only after every pull side effect,
  * including cache publication, has completed successfully.

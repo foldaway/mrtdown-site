@@ -60,6 +60,7 @@ export function prepareCombinedTimetableAdmission(
   });
   return {
     hash: verified.index.manifestSha256,
+    combinedReleaseIndex: verified.index,
     manifest: readCombinedTimetableAdmissionManifest(
       verified.index.manifestSha256,
       files.manifestBytes,
@@ -126,6 +127,7 @@ export function readCombinedTimetableAdmissionManifest(
     notice: { sha256: index.releaseSha256, byteLength: releaseByteLength },
   });
   return {
+    combinedReleaseIndex: index,
     manifest,
     serviceDateRange: combinedServiceDateRange(release.serviceDateRange),
   };

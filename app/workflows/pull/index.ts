@@ -14,11 +14,16 @@ import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
 import { importScheduledTimetableArchive } from './helpers/importScheduledTimetableArchive.js';
 import {
+  clearCanonicalManifestFingerprint,
   getCanonicalManifestFingerprint,
   isCanonicalManifestCurrent,
   recordCanonicalManifestFingerprint,
 } from './helpers/manifestFingerprint.js';
-import { type PullParams, PullParamsSchema } from './helpers/pullParams.js';
+import {
+  type PullParams,
+  PullParamsSchema,
+  resolveCombinedReleaseIndex,
+} from './helpers/pullParams.js';
 import {
   deleteLineOrphans,
   deleteOperatorsTownsLandmarksOrphans,
@@ -76,7 +81,7 @@ async function executePull(
   context: WorkflowContext<PullParams>,
   params: PullParams,
 ) {
-  const { manifest, dataUrl, importInstant } = await runPullStep(
+  const { manifest, dataUrl, importInstant, pinnedIndex } = await runPullStep(
     context,
     'manifest',
     async () => {
@@ -84,21 +89,35 @@ async function executePull(
       if (dataUrl == null) {
         throw new WorkflowNonRetryableError('MRTDOWN_DATA_URL not set');
       }
+      const pinnedIndex = resolveCombinedReleaseIndex(
+        process.env.MRTDOWN_COMBINED_RELEASE_INDEX,
+        params.combinedReleaseIndex,
+      );
       const manifest = await fetchManifest(dataUrl);
       // Persist this clock and trusted root together; retries must not select a
       // different source or move the admission clock after a failed attempt.
-      return { manifest, dataUrl, importInstant: new Date().toISOString() };
+      return {
+        manifest,
+        dataUrl,
+        importInstant: new Date().toISOString(),
+        pinnedIndex,
+      };
     },
   );
-  const { combinedReleaseIndex, sourceReview } = params;
+  const combinedReleaseIndex = pinnedIndex ?? params.combinedReleaseIndex;
+  const { sourceReview, rebuildScheduledTimetableProjection } = params;
   if (combinedReleaseIndex && manifest.scheduledTimetable) {
     throw new WorkflowNonRetryableError(
       'Pull must specify only one scheduled timetable format',
     );
   }
-  if (sourceReview && !manifest.scheduledTimetable && !combinedReleaseIndex) {
+  if (
+    (sourceReview || rebuildScheduledTimetableProjection) &&
+    !manifest.scheduledTimetable &&
+    !combinedReleaseIndex
+  ) {
     throw new WorkflowNonRetryableError(
-      'Source review supplied without an advertised scheduled timetable',
+      'Source review or projection rebuild supplied without an advertised scheduled timetable',
     );
   }
   const manifestFingerprint = await runPullStep(
@@ -111,7 +130,7 @@ async function executePull(
     'check-manifest-fingerprint',
     async () => isCanonicalManifestCurrent(getDb(), manifestFingerprint),
   );
-  if (manifestIsCurrent) {
+  if (manifestIsCurrent && !rebuildScheduledTimetableProjection) {
     console.log('[PULL] Canonical manifest unchanged; skipping pull');
     return;
   }
@@ -124,9 +143,14 @@ async function executePull(
 
     const repo = new MRTDownRepository({ store });
     const db = getDb();
+    if (rebuildScheduledTimetableProjection) {
+      // A failed rebuild can invalidate the projection before promotion.
+      await clearCanonicalManifestFingerprint(db);
+    }
     await importScheduledTimetableArchive(db, manifest, store, {
       combinedReleaseIndex,
       sourceReview,
+      rebuildScheduledTimetableProjection,
       importInstant,
     });
     await truncateStagingTables(db);

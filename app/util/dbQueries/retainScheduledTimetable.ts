@@ -105,6 +105,9 @@ async function retainTimetable(
   candidate: {
     hash: string;
     manifest: ScheduledTimetableArtifactManifest;
+    combinedReleaseIndex?: ReturnType<
+      typeof prepareCombinedTimetableAdmission
+    >['combinedReleaseIndex'];
     files: Omit<
       typeof scheduledTimetablesTable.$inferInsert,
       'manifest_sha256' | 'predecessor_sha256' | 'import_record'
@@ -130,6 +133,16 @@ async function retainTimetable(
         (version) => version.manifestSha256 === hash,
       );
       if (retained) {
+        if (
+          candidate.combinedReleaseIndex &&
+          retained.combinedReleaseIndex?.releaseSha256 !==
+            candidate.combinedReleaseIndex.releaseSha256
+        ) {
+          return {
+            status: 'blocked' as const,
+            blockers: ['retained-combined-release-index-mismatch'],
+          };
+        }
         return { status: 'already-retained' as const, record: retained.record };
       }
       const predecessor = history.at(-1);
