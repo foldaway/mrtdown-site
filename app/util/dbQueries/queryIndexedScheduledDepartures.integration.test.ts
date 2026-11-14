@@ -37,6 +37,7 @@ import {
   linesNextTable,
   linesTable,
   metadataTable,
+  serviceRevisionPathStationEntriesTable,
   serviceRevisionsTable,
   stationPlatformsTable,
 } from '~/db/schema';
@@ -461,6 +462,35 @@ describe.skipIf(!url)('indexed departure window', () => {
         expect(branch).not.toHaveProperty('firstTrainTime');
         expect(branch).not.toHaveProperty('isServiceEnded');
       }
+    } finally {
+      defaultDb.mockRestore();
+    }
+  });
+
+  it('lists departures only where the service continues past the station', async () => {
+    const defaultDb = vi
+      .spyOn(database, 'getDefaultDb')
+      .mockResolvedValue(db());
+    try {
+      const terminal = await getStationProfileReadModel('T3');
+      expect(terminal.data.arrivalLines).toEqual([]);
+
+      const firstStop = await getStationProfileReadModel(scope.stationId);
+      expect(firstStop.data.arrivalLines[0].arrivalTimings).toMatchObject([
+        { destinationStationId: scope.destinationStationId },
+      ]);
+
+      await db().insert(serviceRevisionPathStationEntriesTable).values({
+        service_revision_id: canonical.canonical.services[0].revisions[0].id,
+        service_id: scope.serviceId,
+        station_id: scope.stationId,
+        display_code: 'T1',
+        path_index: path.length,
+      });
+      const loop = await getStationProfileReadModel(scope.stationId);
+      expect(loop.data.arrivalLines[0].arrivalTimings).toMatchObject([
+        { destinationStationId: scope.stationId },
+      ]);
     } finally {
       defaultDb.mockRestore();
     }

@@ -350,11 +350,14 @@ export async function getStationProfileReadModel(
     issues.map((issue) => issue.id),
     dataset.allIssues,
   ).slice(0, 15);
+  // A loop can serve the station before returning to it as the final stop.
   const arrivalBranches = Object.values(dataset.branchByServiceId).filter(
     (branch) =>
       branch.startedAt != null &&
       branch.endedAt == null &&
-      branch.entries.some((entry) => entry.stationId === station.id),
+      branch.entries
+        .slice(0, -1)
+        .some((entry) => entry.stationId === station.id),
   );
   const platformRows = await timeDbQuery('station_profile_q_platforms', () =>
     db
