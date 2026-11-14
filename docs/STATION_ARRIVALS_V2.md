@@ -30,6 +30,9 @@ and serializer live in `app/util/stationArrivalsV2.ts`.
   raw manifests, reviews, projection IDs or reporter rows are returned.
   Empty per-date `reasons` means no artifact was attempted; rollback status is
   recorded independently.
+- Optional `recentCrowdArrival` contains only `reportedAt`, `expectedAt` and
+  `expiresAt` for the latest accepted rider report on the branch. It can appear
+  with either timetable source and is omitted for platform-specific requests.
 - `source: "scheduled"`: `reason` is `complete` or `incomplete`. `timings`
   groups carry canonical service/destination display names, destination code,
   alternative platform IDs and labels, and scheduled departures. Each departure
@@ -67,12 +70,17 @@ clock times, incomplete coverage, empty query windows and unavailable results.
 Platform alternatives stay grouped with one departure. No first/last train or
 service-day bounds are inferred from the limited window.
 
-The frequency estimator, SSR estimates, frequency response variant and arrival
-calibration controls are retired. `GET /api/stations/$stationId/arrivals` and
-`POST /api/arrival-reports` return HTTP 410 with no database reads or writes.
-Existing stored reports are preserved. Older frequency responses are rejected by
-the client validator rather than displayed. There is no scheduled crowd overlay,
-and scheduled timestamps are never shifted by crowd reports.
+The legacy frequency endpoint `GET /api/stations/$stationId/arrivals` returns
+HTTP 410. The station guide presents rider reports separately from the timetable
+and refreshes the branch after a successful submission. A failed report read
+leaves the timetable response usable.
+
+`POST /api/arrival-reports` accepts `stationId`, `lineId`, `serviceId`,
+`destinationStationId` and integer `minutesToArrival` from 0 through 30. The
+server checks the current canonical branch and records its receipt time. It
+returns `201` on success and `429` during the per-reporter 30-second cooldown.
+A report expires five minutes after receipt or one minute after its reported
+arrival, whichever comes first.
 
 Where the published source has no timetable, arrivals are unavailable even if
 canonical frequency metadata exists. Real producer publication,

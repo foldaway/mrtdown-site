@@ -1,5 +1,6 @@
 import { StationSchema } from '@mrtdown/core';
 import { z } from 'zod';
+import { recentCrowdArrivalSchema } from '~/util/crowdArrivalReportContract';
 import type { StationArrivalsV2 } from '~/util/stationArrivalsV2';
 
 const instant = z.iso.datetime({ offset: true });
@@ -18,6 +19,7 @@ const reason = z.custom<
 >((value) => typeof value === 'string');
 const common = {
   schemaVersion: z.literal(2),
+  recentCrowdArrival: recentCrowdArrivalSchema.optional(),
   scope: z.object({
     stationId: z.string(),
     lineId: z.string(),

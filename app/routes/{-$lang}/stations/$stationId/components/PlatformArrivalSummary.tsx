@@ -1,27 +1,41 @@
 import { Link } from '@tanstack/react-router';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import { PlatformSign } from './StationGuideSigns';
-import type { ArrivalTiming } from './stationGuide.types';
-import type { BranchArrivalState } from './stationArrivalRefresh';
+import { CrowdArrivalReport, RecentCrowdArrival } from './CrowdArrivalReport';
 import {
   ArrivalRefreshNotice,
   ScheduledArrivalStatus,
 } from './ScheduledArrivalStatus';
+import { ServiceDetailsPopover } from './ServiceDetailsPopover';
+import { PlatformSign } from './StationGuideSigns';
+import type { BranchArrivalState } from './stationArrivalRefresh';
+import type { ArrivalTiming } from './stationGuide.types';
 
 type ServiceArrivalSummaryProps = {
   arrivalTiming: ArrivalTiming;
   arrivalState?: BranchArrivalState;
   lineColor: string;
+  now: number | null;
+  onArrivalReported?: () => Promise<void>;
 };
 
 export function ServiceArrivalSummary({
   arrivalTiming,
   arrivalState,
   lineColor,
+  now,
+  onArrivalReported,
 }: ServiceArrivalSummaryProps) {
   const intl = useIntl();
   const data = arrivalState?.data;
+  const report = data?.recentCrowdArrival;
+  const recentReport =
+    report && now != null && now < Date.parse(report.expiresAt) ? report : null;
+  const reportable =
+    data &&
+    (data.scope.stationId !== data.scope.destinationStationId ||
+      (data.source === 'scheduled' &&
+        data.timings.some(({ departures }) => departures.length > 0)));
   const destinationName =
     arrivalTiming.destinationName == null
       ? null
@@ -43,7 +57,7 @@ export function ServiceArrivalSummary({
   );
   return (
     <li className="px-4 py-2.5 sm:px-6">
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+      <div className="grid items-start gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] sm:gap-4">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1.5">
             <span className="shrink-0 text-gray-500 text-sm dark:text-gray-400">
@@ -63,6 +77,7 @@ export function ServiceArrivalSummary({
                 {identity}
               </Link>
             )}
+            <ServiceDetailsPopover serviceName={arrivalTiming.serviceName} />
           </div>
           {data?.source !== 'scheduled' &&
             arrivalTiming.platformLabels.length > 0 && (
@@ -83,15 +98,26 @@ export function ServiceArrivalSummary({
             )}
         </div>
         {data?.source === 'scheduled' ? (
-          <ScheduledArrivalStatus data={data} lineColor={lineColor} />
+          <ScheduledArrivalStatus
+            data={data}
+            lineColor={lineColor}
+            now={arrivalState?.status === 'error' ? null : now}
+          />
         ) : data?.source === 'unavailable' ||
           arrivalState?.status === 'error' ||
           arrivalTiming.destinationStationId == null ? (
           <p className="text-gray-600 text-sm dark:text-gray-300">
-            <FormattedMessage
-              id="station.arrivals.unavailable"
-              defaultMessage="Arrivals unavailable. Please check station displays."
-            />
+            {recentReport ? (
+              <FormattedMessage
+                id="station.arrivals.timetable_unavailable"
+                defaultMessage="Timetable unavailable. Please check station displays."
+              />
+            ) : (
+              <FormattedMessage
+                id="station.arrivals.unavailable"
+                defaultMessage="Arrivals unavailable. Please check station displays."
+              />
+            )}
           </p>
         ) : null}
       </div>
@@ -99,6 +125,19 @@ export function ServiceArrivalSummary({
         state={arrivalState}
         hasScope={arrivalTiming.destinationStationId != null}
       />
+      {recentReport && <RecentCrowdArrival report={recentReport} />}
+      {reportable && onArrivalReported && (
+        <CrowdArrivalReport
+          key={JSON.stringify(data.scope)}
+          scope={{
+            stationId: data.scope.stationId,
+            lineId: data.scope.lineId,
+            serviceId: data.scope.serviceId,
+            destinationStationId: data.scope.destinationStationId,
+          }}
+          onSubmitted={onArrivalReported}
+        />
+      )}
     </li>
   );
 }

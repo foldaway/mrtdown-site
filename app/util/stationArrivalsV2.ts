@@ -1,4 +1,5 @@
 import type { Station } from '@mrtdown/core';
+import type { RecentCrowdArrival } from './crowdArrivalReportContract';
 import type { ScheduledTimetableSelection } from './dbQueries/withSelectedScheduledTimetable';
 import type { StationArrivalSourceDecision } from './stationArrivalSourcePolicy';
 
@@ -31,6 +32,7 @@ type ScheduledDeparture = SourceIdentity & {
 
 export type StationArrivalsV2 = {
   schemaVersion: 2;
+  recentCrowdArrival?: RecentCrowdArrival;
   scope: {
     stationId: string;
     lineId: string;
@@ -73,14 +75,22 @@ export type StationArrivalsV2 = {
 /** Public allowlist: never serialize the private decision or spread its records. */
 export function serializeStationArrivalsV2(
   decision: StationArrivalSourceDecision,
+  recentCrowdArrival?: RecentCrowdArrival,
 ): StationArrivalsV2 {
   const { scheduled } = decision;
   const { scope, window } = scheduled;
   const common: Pick<
     StationArrivalsV2,
-    'schemaVersion' | 'scope' | 'window' | 'coverage'
+    'schemaVersion' | 'scope' | 'window' | 'coverage' | 'recentCrowdArrival'
   > = {
     schemaVersion: 2,
+    ...(recentCrowdArrival && {
+      recentCrowdArrival: {
+        reportedAt: recentCrowdArrival.reportedAt,
+        expectedAt: recentCrowdArrival.expectedAt,
+        expiresAt: recentCrowdArrival.expiresAt,
+      },
+    }),
     scope: {
       stationId: scope.stationId,
       lineId: scope.lineId,

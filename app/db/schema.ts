@@ -202,8 +202,7 @@ export const crowdArrivalReportStatusEnum = pgEnum(
   ['accepted', 'rejected'],
 );
 
-// Historical calibration reports are retained after estimator retirement.
-// They are not canonical disruption evidence and never enter crowd_reports dispatch.
+// Station arrival reports stay separate from disruption evidence and dispatch.
 export const crowdArrivalReportsTable = pgTable(
   'crowd_arrival_reports',
   {

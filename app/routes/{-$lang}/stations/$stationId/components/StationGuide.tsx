@@ -1,13 +1,14 @@
 import { Popover } from '@base-ui/react/popover';
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
+import { useEffect, useState } from 'react';
 import { FormattedMessage } from 'react-intl';
 import { BetaBadge } from '~/components/BetaBadge';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { ExitSign } from './StationGuideSigns';
+import { arrivalBranchKey } from './stationArrivalRefresh';
 import type { ArrivalLine, StationExit } from './stationGuide.types';
 import { useHoverPopover } from './useHoverPopover';
-import { arrivalBranchKey } from './stationArrivalRefresh';
 import { useStationArrivals } from './useStationArrivals';
 
 type StationGuideProps = {
@@ -25,7 +26,20 @@ export function StationGuide({
   lineNames,
   stationId,
 }: StationGuideProps) {
-  const states = useStationArrivals(stationId, arrivalLines);
+  const { states, refreshAfterReport } = useStationArrivals(
+    stationId,
+    arrivalLines,
+  );
+  const [now, setNow] = useState<number | null>(null);
+  const hasArrivals = arrivalLines.length > 0;
+
+  useEffect(() => {
+    if (!hasArrivals) return;
+    const updateNow = () => setNow(Date.now());
+    updateNow();
+    const interval = window.setInterval(updateNow, 15_000);
+    return () => window.clearInterval(interval);
+  }, [hasArrivals]);
 
   return (
     <section
@@ -44,7 +58,7 @@ export function StationGuide({
         </h2>
         <ArrivalInfo />
       </div>
-      {arrivalLines.length > 0 && (
+      {hasArrivals && (
         <section
           aria-labelledby="station-arrivals-title"
           className="border-gray-200 border-t dark:border-gray-700"
@@ -100,6 +114,8 @@ export function StationGuide({
                       ]
                     }
                     lineColor={lineColors[line.lineId]}
+                    now={now}
+                    onArrivalReported={refreshAfterReport}
                   />
                 ))}
               </ul>

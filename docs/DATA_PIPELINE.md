@@ -413,12 +413,11 @@ that endpoint using canonical branch metadata from SSR; SSR computes no arrival
 estimates. See [the API contract](STATION_ARRIVALS_V2.md) for coverage and
 provenance semantics.
 
-The frequency estimator, crowd calibration implementation and unused legacy
-arrival server function have been removed. The legacy arrivals endpoint and
-arrival-calibration submission endpoint return HTTP 410 without database access.
-Stored calibration reports remain intact; no destructive schema cleanup is part
-of this retirement. Canonical frequency metadata remains source data, but is
-not used to generate arrival predictions.
+The legacy frequency arrivals endpoint returns HTTP 410. The v2 API can attach a
+recent rider report from the separate `crowd_arrival_reports` table to a
+branch-level response. These reports use receipt time and expire
+quickly. They appear alongside the timetable as rider reports and do not enter
+the timetable reader, import pipeline or disruption report dispatch.
 
 Real producer publication and mapping/source/release approvals remain separate
 work. No source review or rollback authority is accepted from query parameters.

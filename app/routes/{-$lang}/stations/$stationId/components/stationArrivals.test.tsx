@@ -8,17 +8,17 @@ import {
   result,
 } from '~/util/scheduledStationArrivals.fixture';
 import {
-  serializeStationArrivalsV2,
   type StationArrivalsV2,
+  serializeStationArrivalsV2,
 } from '~/util/stationArrivalsV2';
+import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import {
   ArrivalRefreshNotice,
   ScheduledArrivalStatus,
 } from './ScheduledArrivalStatus';
-import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import {
-  arrivalBranchKey,
   type ArrivalStates,
+  arrivalBranchKey,
   createArrivalRefresh,
 } from './stationArrivalRefresh';
 import type { ArrivalLine } from './stationGuide.types';
@@ -38,9 +38,21 @@ const scheduled = serializeStationArrivalsV2({
         departure,
         {
           ...departure,
+          departureInstant: '2026-10-24T16:15:00Z',
           precision: 'approximate',
           timepoint: 0,
           stopSequence: '002',
+        },
+        {
+          ...departure,
+          departureInstant: '2026-10-24T16:20:00Z',
+          stopSequence: '003',
+        },
+        {
+          ...departure,
+          departureInstant: '2026-10-24T16:12:00Z',
+          platformIds: ['c'],
+          stopSequence: '004',
         },
       ],
     },
@@ -61,13 +73,17 @@ const key = arrivalBranchKey(
 function renderRow(
   data: StationArrivalsV2 | null,
   status: 'ready' | 'error' | 'loading' = 'ready',
+  now = Date.parse('2026-10-24T16:08:30Z'),
+  onArrivalReported?: () => Promise<void>,
 ) {
   return renderToStaticMarkup(
-    <IntlProvider locale="en-SG">
+    <IntlProvider locale="en-SG" defaultLocale="en-SG">
       <ServiceArrivalSummary
         arrivalTiming={timing}
         arrivalState={{ data, status }}
         lineColor="#123456"
+        now={now}
+        onArrivalReported={onArrivalReported}
       />
     </IntlProvider>,
   );
@@ -88,18 +104,69 @@ afterEach(() => {
 });
 
 describe('station guide arrival sources', () => {
-  it('renders exact and approximate scheduled clock times once per train, without calibration controls', () => {
+  it('highlights the next two departures per platform group and keeps later times available', () => {
     const html = renderRow(scheduled);
+    expect(html).toContain('2 min');
+    expect(html).toContain('then 7 min');
     expect(html).toContain('Scheduled');
     expect(html).toContain('Approximate scheduled');
+    expect(html).toContain('Service details');
     expect(html).toContain('Alternative platforms for the same train');
     expect(html).toContain('GTFS schedule data from');
     expect(html).toContain('href="https://example.com/licence"');
-    expect(html.match(/<ol/g)).toHaveLength(1);
+    expect(html.match(/<ol/g)).toHaveLength(3);
+    expect(html.match(/<time/g)).toHaveLength(4);
+    expect(html).toContain('Later departures</summary>');
+    expect(html).toMatch(
+      /<time[^>]+datetime="2026-10-24T16:10:00Z"[^>]*>12:10 am<\/time>/i,
+    );
     expect(html).not.toContain('Frequency estimate');
     expect(html).not.toContain('Help improve');
     expect(html).not.toContain(departure.manifestSha256);
     expect(html).not.toContain(departure.providerTripId);
+  });
+
+  it('uses clock times for stale responses and departures whose scheduled time has passed', () => {
+    const stale = renderRow(scheduled, 'error');
+    expect(stale).toContain('Showing the last known response');
+    expect(stale).not.toContain('2 min');
+    expect(stale).not.toContain('then 7 min');
+    const elapsed = renderRow(
+      scheduled,
+      'ready',
+      Date.parse('2026-10-24T16:10:15Z'),
+    );
+    expect(elapsed).not.toContain('0 min');
+    expect(elapsed).toContain('then 5 min');
+    expect(elapsed.match(/<time/g)).toHaveLength(4);
+  });
+
+  it('shows recent reports separately from the timetable and expires them on the client', () => {
+    const recent = {
+      ...scheduled,
+      recentCrowdArrival: {
+        reportedAt: '2026-10-24T16:08:00Z',
+        expectedAt: '2026-10-24T16:11:00Z',
+        expiresAt: '2026-10-24T16:12:00Z',
+      },
+    };
+    const html = renderRow(recent, 'ready', undefined, async () => {});
+    expect(html).toContain('Rider-reported arrival');
+    expect(html).toContain('2 min');
+    expect(html).toContain('Report an arrival');
+    const unavailable = renderRow({
+      ...recent,
+      source: 'unavailable',
+      reason: 'timetable-unavailable',
+    });
+    expect(unavailable).toContain('Timetable unavailable');
+    expect(unavailable).toContain('Rider-reported arrival');
+    const expired = renderRow(
+      recent,
+      'ready',
+      Date.parse(recent.recentCrowdArrival.expiresAt),
+    );
+    expect(expired).not.toContain('Rider-reported arrival');
   });
 
   it('keeps empty, partial, unavailable and stale responses distinct without SSR estimates', () => {
@@ -138,8 +205,8 @@ describe('station guide arrival sources', () => {
     // Exercise the standalone status components used by all service rows.
     expect(
       renderToStaticMarkup(
-        <IntlProvider locale="en-SG">
-          <ScheduledArrivalStatus data={empty} lineColor="#123456" />
+        <IntlProvider locale="en-SG" defaultLocale="en-SG">
+          <ScheduledArrivalStatus data={empty} lineColor="#123456" now={null} />
           <ArrivalRefreshNotice hasScope={false} />
         </IntlProvider>,
       ),
@@ -148,8 +215,12 @@ describe('station guide arrival sources', () => {
 
   it('renders SSR/loading without an estimated time or calibration control', () => {
     const html = renderToStaticMarkup(
-      <IntlProvider locale="en-SG">
-        <ServiceArrivalSummary arrivalTiming={timing} lineColor="#123456" />
+      <IntlProvider locale="en-SG" defaultLocale="en-SG">
+        <ServiceArrivalSummary
+          arrivalTiming={timing}
+          lineColor="#123456"
+          now={null}
+        />
       </IntlProvider>,
     );
     expect(html).toContain('Checking timetable');
@@ -161,6 +232,28 @@ describe('station guide arrival sources', () => {
 });
 
 describe('station guide refresh session', () => {
+  it('makes a fresh request after a report even when a poll was in flight', async () => {
+    const pending = deferred();
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockReturnValueOnce(pending.promise)
+      .mockImplementation(async () => response());
+    const session = createArrivalRefresh(
+      scheduled.scope.stationId,
+      lines,
+      () => {},
+      fetcher,
+    );
+    const poll = session.refresh();
+    const refresh = session.refreshAfterReport();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    pending.resolve(response());
+    await poll;
+    await refresh;
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    session.dispose();
+  });
+
   it('deduplicates alternatives, bounds concurrency and joins interval refreshes', async () => {
     const pending = deferred();
     let states: ArrivalStates = {};
