@@ -1,5 +1,93 @@
 # SEO Remediation Plan
 
+## Purpose
+
+### Goals
+
+- Ensure every URL emitted in the XML sitemap is crawlable and returns `200`
+  without redirects.
+- Add consistent canonical links and `hreflang` alternates to public HTML pages.
+- Keep localized canonical URLs, Open Graph URLs, and sitemap URLs in agreement.
+- Remove placeholder text from issue metadata.
+- Add useful meta descriptions to static and history pages.
+- Preserve existing Markdown routes and `llms.txt` behavior unless a phase
+  explicitly changes discovery.
+- Add tests or smoke checks that prevent sitemap and metadata regressions.
+
+### Non-Goals
+
+- This plan does not redesign the public UI.
+- This plan does not change the data pull workflow except where sitemap safety
+  requires checking available read-model coverage.
+- This plan does not add Markdown routes to the XML sitemap. Markdown discovery
+  remains owned by `llms.txt`.
+- This plan does not optimize every slow page generally; it only addresses
+  performance issues that block crawlable sitemap URLs.
+
+## Progress
+
+- [x] Run the local sitemap crawl and add the SEO smoke command (2026-06-21).
+- [x] Remove rolling fact coverage as a dependency for sitemap history URLs
+  (2026-07-16).
+- [ ] Run `npm run seo:check` against the target deployment and record the
+  sitemap and representative page results before closeout.
+
+### Progress log
+
+- 2026-06-21: Local SEO audit completed and plan created. `npm run verify`
+  passed after rerunning outside the sandbox because the first sandboxed run
+  failed when `tsx` could not create its IPC pipe.
+- 2026-06-21: Started Phase 1 and Phase 3 remediation. Sitemap generation now
+  omits the redirect-only `/history` URL and skips historical month URLs when
+  operational fact coverage is missing and the legacy fallback cannot render the
+  route. Static/history pages now emit meta descriptions and `og:description`,
+  the history year route uses the concrete year in `og:url`, and issue
+  descriptions no longer emit the `WIP` period placeholder.
+- 2026-06-21: Local sitemap crawl against the Vite dev server checked 47
+  sitemap URLs with redirects disabled and a 25-second per-URL timeout. Every
+  URL returned `200`, with no redirects or timeouts.
+- 2026-06-21: Continued Phase 2 by adding a shared SEO helper for canonical
+  URLs, Open Graph URLs, locale alternates, and head links. Home, static,
+  history, entity, report, and community report pages now emit canonical links
+  and full `hreflang` alternates from the same route path policy. XML sitemap
+  alternates now use the same helper and include `en-SG` plus `x-default`.
+- 2026-06-21: Started Phase 4 by adding `npm run seo:check`. The check expects
+  a running app, fetches `/sitemap.xml`, verifies each sitemap `<loc>` returns
+  `200` without redirects, and validates representative HTML pages for title,
+  meta description, canonical link, `hreflang` alternates, `og:url`, and the
+  known `WIP` description placeholder.
+- 2026-07-16: Decoupled year, month, and day history reads from operational
+  facts. History now selects issues from canonical period events, discards stale
+  superseded period revisions, and builds only the matching issue/entity
+  dataset. Sitemap history URLs no longer depend on rolling fact coverage.
+
+## Surprises & Discoveries
+
+The initial local crawl found redirects, server errors, and timeouts in the
+sitemap. The crawl results and suspected causes are recorded in the context
+below.
+
+## Decision Log
+
+- 2026-06-21: Keep Markdown routes out of the XML sitemap. They remain
+  discoverable through `llms.txt`, matching the existing `sitemap.functions`
+  tests and avoiding duplicate search crawl surfaces.
+- 2026-06-21: Treat crawl-clean sitemap output as the first phase because search
+  engines should not be directed to redirects, errors, or very slow pages.
+- 2026-06-21: Exclude historical month URLs from the XML sitemap when the month
+  is before today, lacks full operational fact coverage, and is not before the
+  operational fact coverage start date. This mirrors the history route's
+  degraded-render fallback and avoids advertising known `500` month pages.
+- 2026-07-16: Supersede the fact-coverage sitemap rule above. Incident history
+  is canonical issue data, while operational facts are a rolling statistics
+  read model; history availability and sitemap inclusion must not depend on the
+  operational-fact retention window.
+
+## Outcomes & Retrospective
+
+The local rerun on June 21 verified 47 sitemap URLs without redirects or
+timeouts. Verify the target deployment against the acceptance checks below.
+
 ## Context
 
 An SEO audit of the local development instance on 2026-06-21 found that the site
@@ -47,29 +135,7 @@ Relevant code:
 - `app/routes/__root.tsx`
 - `app/helpers/buildLocaleAwareLink.ts`
 
-## Goals
-
-- Ensure every URL emitted in the XML sitemap is crawlable and returns `200`
-  without redirects.
-- Add consistent canonical links and `hreflang` alternates to public HTML pages.
-- Keep localized canonical URLs, Open Graph URLs, and sitemap URLs in agreement.
-- Remove placeholder text from issue metadata.
-- Add useful meta descriptions to static and history pages.
-- Preserve existing Markdown routes and `llms.txt` behavior unless a phase
-  explicitly changes discovery.
-- Add tests or smoke checks that prevent sitemap and metadata regressions.
-
-## Non-Goals
-
-- This plan does not redesign the public UI.
-- This plan does not change the data pull workflow except where sitemap safety
-  requires checking available read-model coverage.
-- This plan does not add Markdown routes to the XML sitemap. Markdown discovery
-  remains owned by `llms.txt`.
-- This plan does not optimize every slow page generally; it only addresses
-  performance issues that block crawlable sitemap URLs.
-
-## Phases
+## Plan of Work
 
 ### Phase 1: Make Sitemap URLs Crawl-Clean
 
@@ -160,52 +226,7 @@ Exit criteria:
   and known placeholder regressions.
 - `npm run verify` passes.
 
-## Progress Log
-
-- 2026-06-21: Local SEO audit completed and plan created. `npm run verify`
-  passed after rerunning outside the sandbox because the first sandboxed run
-  failed when `tsx` could not create its IPC pipe.
-- 2026-06-21: Started Phase 1 and Phase 3 remediation. Sitemap generation now
-  omits the redirect-only `/history` URL and skips historical month URLs when
-  operational fact coverage is missing and the legacy fallback cannot render the
-  route. Static/history pages now emit meta descriptions and `og:description`,
-  the history year route uses the concrete year in `og:url`, and issue
-  descriptions no longer emit the `WIP` period placeholder.
-- 2026-06-21: Local sitemap crawl against the Vite dev server checked 47
-  sitemap URLs with redirects disabled and a 25-second per-URL timeout. Every
-  URL returned `200`, with no redirects or timeouts.
-- 2026-06-21: Continued Phase 2 by adding a shared SEO helper for canonical
-  URLs, Open Graph URLs, locale alternates, and head links. Home, static,
-  history, entity, report, and community report pages now emit canonical links
-  and full `hreflang` alternates from the same route path policy. XML sitemap
-  alternates now use the same helper and include `en-SG` plus `x-default`.
-- 2026-06-21: Started Phase 4 by adding `npm run seo:check`. The check expects
-  a running app, fetches `/sitemap.xml`, verifies each sitemap `<loc>` returns
-  `200` without redirects, and validates representative HTML pages for title,
-  meta description, canonical link, `hreflang` alternates, `og:url`, and the
-  known `WIP` description placeholder.
-- 2026-07-16: Decoupled year, month, and day history reads from operational
-  facts. History now selects issues from canonical period events, discards stale
-  superseded period revisions, and builds only the matching issue/entity
-  dataset. Sitemap history URLs no longer depend on rolling fact coverage.
-
-## Decision Log
-
-- 2026-06-21: Keep Markdown routes out of the XML sitemap. They remain
-  discoverable through `llms.txt`, matching the existing `sitemap.functions`
-  tests and avoiding duplicate search crawl surfaces.
-- 2026-06-21: Treat crawl-clean sitemap output as the first phase because search
-  engines should not be directed to redirects, errors, or very slow pages.
-- 2026-06-21: Exclude historical month URLs from the XML sitemap when the month
-  is before today, lacks full operational fact coverage, and is not before the
-  operational fact coverage start date. This mirrors the history route's
-  degraded-render fallback and avoids advertising known `500` month pages.
-- 2026-07-16: Supersede the fact-coverage sitemap rule above. Incident history
-  is canonical issue data, while operational facts are a rolling statistics
-  read model; history availability and sitemap inclusion must not depend on the
-  operational-fact retention window.
-
-## Validation
+## Validation and Acceptance
 
 Before handing back implementation work for this plan:
 

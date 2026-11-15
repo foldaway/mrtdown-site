@@ -60,8 +60,9 @@ populated from data archives by durable Upstash Workflows.
 - `npm run lint`: run Biome linting.
 - `npm run format:check`: check formatting across the repository.
 - `npm run test:run`: run Vitest once.
-- `npm run verify`: run typecheck, lint, formatting check, migration drift
-  check, and tests.
+- `npm run check:docs` checks local documentation links and plan structure.
+- `npm run verify` runs the docs check, typecheck, lint, formatting check,
+  migration drift check, and tests.
 - `npm run db:generate`: generate Drizzle migrations after schema changes.
 - `npm run db:generate:check`: verify schema changes do not require a new
   migration.
@@ -85,7 +86,7 @@ populated from data archives by durable Upstash Workflows.
 - `.github/scripts/syncQstashSchedules.mjs`: idempotent QStash schedule
   provisioning used by deployment workflows.
 - `app/components`: reusable UI and page-level components.
-- `docs`: architecture, data pipeline, quality, and generated-file notes.
+- [`docs/`](docs/README.md) contains the documentation index.
 
 ## Data Flow
 
@@ -108,23 +109,12 @@ produced diff.
 - `app/components/StationMap/components/Map*.tsx`: mechanically converted
   station map snapshots.
 
-See `docs/GENERATED_FILES.md` for more detail.
+See the [generated files guide](docs/development/generated-files.md) for more detail.
 
 ## Documentation
 
-- `docs/ARCHITECTURE.md`: current app architecture and deployment branch
-  mapping.
-- `docs/DATA_PIPELINE.md`: canonical data pull and read model flow.
-- `docs/CACHING.md`: Cloudflare edge-cache policy, invalidation, and required
-  deployment configuration.
-- `docs/QUALITY.md`: verification harness and current test gaps.
-- `docs/OVERHAUL_BASELINE.md`: historical baseline for the read-model
-  migration.
-- `docs/plans/README.md`: conventions for checked-in execution plans.
-- `docs/plans/active/`: active multi-phase work, including read-model overhaul
-  and production performance plans.
-- `docs/investigations/`: dated investigation notes that inform plans and
-  architecture docs.
+Use the [documentation index](docs/README.md) to find subject guides and the
+[execution plan index](docs/plans/README.md) to find current work.
 
 ## Contributions
 

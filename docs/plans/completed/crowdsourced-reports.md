@@ -3,7 +3,7 @@
 > Historical note: platform references in this completed plan describe the
 > Cloudflare deployment used when the feature was implemented. The current app
 > runs on Fly.io with Redis rate limiting and QStash scheduling; see
-> `docs/ARCHITECTURE.md` and `docs/DATA_PIPELINE.md`.
+> `docs/architecture/overview.md` and `docs/architecture/data-pipeline.md`.
 
 ## Context
 
@@ -23,9 +23,9 @@ Paired data-side plan:
 
 Related references:
 
-- `docs/ARCHITECTURE.md`
-- `docs/DATA_PIPELINE.md`
-- `docs/QUALITY.md`
+- `docs/architecture/overview.md`
+- `docs/architecture/data-pipeline.md`
+- `docs/development/quality.md`
 - `app/db/schema.ts`
 - `app/routes/internal.api.tasks.pull.ts`
 

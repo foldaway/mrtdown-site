@@ -1,25 +1,47 @@
-# Plans
+# Execution Plans
 
-Plans are checked-in execution notes for work that spans multiple changes or
-needs durable context across agent runs. Keep small, single-turn changes in the
-conversation instead of creating a plan file.
+## When to write a plan
 
-Use plans for:
+Use an in-session checklist or the PR description for bounded work with a clear
+path to implementation and verification. Routine bug fixes, documentation
+updates, and changes covered by an existing runbook usually fit this approach.
 
-- Cross-cutting migrations.
-- Multi-phase performance, reliability, or data-model work.
-- Work with decisions that future agents need to preserve.
-- Tasks that are paused and resumed across branches or sessions.
+Write a versioned plan when ordered milestones span PRs or repositories, when
+a migration or production cutover needs coordinated validation and recovery,
+or when decisions, open questions, or blockers must survive a handoff. A
+routine deploy can follow the existing procedure. A timetable source cutover
+that coordinates release pins, approvals, and workflow schedules needs a plan.
+Update an existing plan when it covers the work. Start one if a checklist grows
+into work that needs durable context.
 
-## Structure
+## Maintaining a plan
 
-- `active/`: plans that describe current or paused work.
-- `completed/`: plans that are finished and kept for history.
+1. Copy the [shared template](template.md) to `active/<topic>.md` and link it
+   below. Keep its second-level headings in order. Use lower-level headings
+   for subject-specific detail.
+2. Describe observable acceptance criteria. Give a contributor enough context
+   to resume from a fresh checkout, including file paths, commands, dependencies,
+   and assumptions to verify. For rollout work, record the applicable gates and
+   recovery steps.
+3. Update the checklist as milestones land or work pauses. Date completed steps,
+   capture validation evidence, and make the next step and any blocker explicit.
+   Record discoveries and the reasons for decisions as they occur.
+4. After acceptance, record the outcome and verification, move the plan to
+   `completed/`, and update the index and inbound links. Carry lasting
+   operating guidance to its subject guide. Link issues or active plans for
+   deferred work. Keep completed plans as historical records.
+
+Run `npm run check:docs` to check local links, plan index entries, and the
+section order of active plans. The same check runs with `npm run verify`.
+
+The repository map and living plans follow OpenAI’s
+[Harness Engineering approach](https://openai.com/index/harness-engineering/)
+and [execution plan guide](https://developers.openai.com/cookbook/articles/codex_exec_plans).
 
 ## Active
 
 - [Combined timetable pull rollout](active/combined-timetable-pull-rollout.md):
-  verify safe projection reuse and deploy-managed pins before cutover.
+  records the November cutover and tracks safe successor projection builds.
 - [Dynamic system map](active/dynamic-system-map.md): canonical schematic map
   data and data-driven site rendering.
 - [Production performance](active/production-performance.md): public route
@@ -35,6 +57,8 @@ Use plans for:
 
 ## Completed
 
+- [Crowd-reported arrivals](completed/crowd-reported-arrivals.md) restored
+  short-lived branch-level rider reports beside scheduled departures.
 - [Combined timetable departure index](completed/combined-timetable-index.md)
   indexes effective Singapore service dates and shared journeys with
   per-service boarding access.
@@ -52,44 +76,3 @@ Use plans for:
   app-owned Markdown alternatives for agents and scrapers.
 - [Overhaul read model](completed/overhaul-read-model.md): local
   Postgres-backed read model migration.
-
-## Template
-
-```md
-# Plan Title
-
-## Context
-
-What prompted the work, what exists today, and links to the source-of-truth docs
-or investigations.
-
-## Goals
-
-- Concrete outcomes the work must achieve.
-
-## Non-Goals
-
-- Boundaries that keep the work scoped.
-
-## Phases
-
-### Phase 1: Name
-
-- Task or checkpoint.
-
-Exit criteria:
-
-- Observable condition that proves the phase is complete.
-
-## Progress Log
-
-- YYYY-MM-DD: Notable status update.
-
-## Decision Log
-
-- YYYY-MM-DD: Decision and reason.
-
-## Validation
-
-- Commands, checks, production probes, or manual QA required before handoff.
-```

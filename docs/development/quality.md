@@ -4,6 +4,7 @@ Use `npm run verify` as the default branch check.
 
 The default verification script currently runs:
 
+- `npm run check:docs`
 - `npm run typecheck`
 - `npm run lint`
 - `npm run format:check`
@@ -12,7 +13,11 @@ The default verification script currently runs:
 
 `npm run format:check` uses Biome's non-writing check mode across the repository. This keeps local verification aligned with CI and catches uncommitted formatting issues before a branch is pushed.
 
-Generated files listed in `docs/GENERATED_FILES.md` are excluded from normal Biome checks in `biome.json`.
+The docs check validates repository-relative Markdown link targets, plan index
+coverage, and the [template](../plans/template.md) headings in active plans.
+
+Some [generated files](generated-files.md), including the route tree and
+Drizzle artifacts, are excluded from normal Biome checks in `biome.json`.
 
 `npm run verify:strict` currently mirrors the default verification script so existing references continue to work during the overhaul.
 

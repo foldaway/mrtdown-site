@@ -1,10 +1,12 @@
 # Crowd-Reported Arrivals
 
+> Both phases shipped in [PR #302](https://github.com/foldaway/mrtdown-site/pull/302).
+
 ## Context
 
 The timetable rollout retired frequency calibration and the original arrival
 report form. A short-lived report from a station display can supplement the
-published timetable. The [arrivals API contract](../../STATION_ARRIVALS_V2.md)
+published timetable. The [arrivals API contract](../../api/station-arrivals-v2.md)
 describes both sources.
 
 ## Goals

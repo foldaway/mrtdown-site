@@ -22,9 +22,9 @@ surface.
 
 Current source-of-truth references:
 
-- `docs/ARCHITECTURE.md`
-- `docs/DATA_PIPELINE.md`
-- `docs/QUALITY.md`
+- `docs/architecture/overview.md`
+- `docs/architecture/data-pipeline.md`
+- `docs/development/quality.md`
 - `fly.preview.toml`
 - `fly.staging.toml`
 - `fly.production.toml`

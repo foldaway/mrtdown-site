@@ -1,6 +1,6 @@
 # Data Pipeline
 
-The overhaul introduces a local read model for canonical mrtdown data.
+The site imports canonical mrtdown data into a local Postgres read model.
 
 ## Pull Workflow
 
@@ -113,7 +113,7 @@ changes after a successful pull, the workflow skips the archive download. A pin
 change itself changes the fingerprint. Every unseen release still requires a
 separately authorized `sourceReview` for that environment's retained lineage.
 Never put review or artifact contents in deployment variables or schedule
-bodies. See the [rollout plan](plans/active/combined-timetable-pull-rollout.md)
+bodies. See the [timetable rollout plan](../plans/active/combined-timetable-pull-rollout.md)
 for staging acceptance and preview options.
 
 The pull verifies the three files using `@mrtdown/fs` and the topology built
@@ -410,7 +410,7 @@ profiles, first/last train times, holidays or crowd calibration reports.
 passenger scope validation, a server-owned 60-minute window and 20-result limit,
 and an explicit scheduled/unavailable response. The station guide refreshes
 that endpoint using canonical branch metadata from SSR; SSR computes no arrival
-estimates. See [the API contract](STATION_ARRIVALS_V2.md) for coverage and
+estimates. See [the API contract](../api/station-arrivals-v2.md) for coverage and
 provenance semantics.
 
 The legacy frequency arrivals endpoint returns HTTP 410. The v2 API can attach a

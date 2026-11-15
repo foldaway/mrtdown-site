@@ -1,24 +1,55 @@
 # Combined timetable pull rollout
 
+## Purpose
+
+Keep Fly’s scheduled pulls reliable when an approved combined timetable is
+released. Verify reuse of retained projections and measure the fresh-build path
+for successor releases. Give each environment a deploy-managed index and retain
+source review for releases that environment has never imported.
+
+## Progress
+
+- [x] Verify retained November projection replay in staging (2026-11-12).
+- [x] Verify retained projection replay in production and publish the approved
+  November release to Pages (2026-11-12).
+- [ ] Measure a fresh projection build in staging while preparing the
+  successor to the November 9–30 release. Use the result to scope bounded,
+  resumable writes for fresh releases and missing-date repairs.
+
+## Surprises & Discoveries
+
+The production November projection committed before QStash timed out. Callback
+retry repeated the expensive writes. The canonical-only and combined archives
+can share canonical manifest inputs, so an empty-body scheduled pull also
+needs the approved release pin to distinguish their fingerprints.
+
+## Decision Log
+
+- 2026-11-12 — Use an independently approved deploy-managed pin per environment.
+  Source review still governs admission of an unseen release, as described in the
+  [data pipeline guide](../../architecture/data-pipeline.md).
+- 2026-11-12 — Keep preview on its existing source for the November release.
+
+## Outcomes & Retrospective
+
+[PR #301](https://github.com/foldaway/mrtdown-site/pull/301) enabled reuse of
+verified retained projections. Both staging and production replays reached
+`RUN_SUCCESS`, preserved departure writes, and skipped parse on a repeat pull.
+The [Pages publication run](https://github.com/foldaway/mrtdown-data/actions/runs/43579812606)
+published 22 Singapore service dates with 149,256 assigned trip/date pairs
+and zero unassigned. Daily staging and production schedules were verified
+active after publication.
+
 ## Context
 
-The November 9–30, 2026 Singapore release committed its production departure
-projection, but QStash reported failure after the parse callback timed out.
-The expensive writes ran again on callback retry. The canonical-only and
-combined archives can have identical canonical manifest inputs, so the managed
-empty-body pull also needs an independent release pin before it can tell the
-fingerprints apart.
+The [data pipeline guide](../../architecture/data-pipeline.md) describes the
+importer, approved pin, retained receipts, and departure index. The replay
+procedure below uses the November 9–30, 2026 Singapore release as its reference
+fixture. Use the corresponding approved archive and provenance for a successor.
 
-## Goals
+## Plan of Work
 
-- Complete a signed staging pull for the exact retained release on normal
-  Fly sizing, record the combined fingerprint and leave departures untouched.
-- Give each environment its own deploy-managed index and keep source review
-  mandatory when that environment has never retained the release.
-
-## Phases
-
-### Verify staging replay
+### Verify staging replay (November procedure)
 
 1. Confirm the deployed revision, source URL, retained receipt, both release
    index digests and projector metadata. Verify the release's 22 Singapore
@@ -73,8 +104,18 @@ fingerprints apart.
   its database, so neither staging's successor review nor a previous preview
   receipt can serve as the baseline. Validate fresh-build runtime on that path.
 
-## Follow-up
+### Successor releases and repairs
 
 Fresh releases and missing-date repairs can still require a large transaction.
 Design bounded, resumable writes for those builds after verifying the retained
 release replay.
+
+## Validation and Acceptance
+
+- Run `npm run verify` after changes to the importer or projector.
+- For replay, require `RUN_SUCCESS`, the expected fingerprint, and unchanged
+  receipt, projection ID, service-day totals, and write counters. A repeat
+  empty pull should skip parse.
+- For a fresh build or date repair, capture runtime and retry behavior in
+  staging. Compare service-date coverage and assigned trip/date counts with
+  the approved release and probe representative station departures.
