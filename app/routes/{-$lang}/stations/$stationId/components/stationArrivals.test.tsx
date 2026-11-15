@@ -180,12 +180,15 @@ describe('station guide arrival sources', () => {
       source: 'unavailable' as const,
       reason: 'timetable-unavailable' as const,
     };
-    for (const [data, message] of [
-      [empty, 'No scheduled departures'],
-      [partial, 'Incomplete timetable. No departure times.'],
-      [unavailable, 'Timetable unavailable'],
+    const onArrivalReported = async () => {};
+    for (const [data, message, canReport] of [
+      [empty, 'No scheduled departures', false],
+      [partial, 'Incomplete timetable. No departure times.', true],
+      [unavailable, 'Timetable unavailable', true],
     ] as const) {
-      expect(renderRow(data)).toContain(message);
+      const row = renderRow(data, 'ready', undefined, onArrivalReported);
+      expect(row).toContain(message);
+      expect(row.includes('Report an arrival')).toBe(canReport);
       const withReport = renderRow({ ...data, recentCrowdArrival });
       expect(withReport).toContain(message);
       expect(withReport).toContain('Rider-reported arrival');
