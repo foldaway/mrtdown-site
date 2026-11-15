@@ -19,7 +19,9 @@ See the [project README](../README.md) for setup and the
 
 ## Development
 
-- [Quality harness](development/quality.md) lists local and CI checks.
+- [Writing docs and proposals](development/writing.md) covers what to write
+  down and when to link to the source.
+- [Quality harness](development/quality.md) explains local verification.
 - [Generated files](development/generated-files.md) lists regeneration commands
   and the files they own.
 

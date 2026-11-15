@@ -1,94 +1,51 @@
 # Data Pipeline
 
-The site imports canonical mrtdown data into a local Postgres read model.
+The site imports canonical mrtdown archives into Postgres. Server functions
+read the normalized tables through [feature queries](../../app/util/dbQueries).
 
-## Pull Workflow
+## Canonical pull
 
-`app/workflows/pull/index.ts` defines the Upstash Workflow entrypoint. It:
+The [pull workflow](../../app/workflows/pull/index.ts) snapshots the source
+manifest, verifies any advertised timetable, stages canonical entities in
+`*_next` tables, and promotes them before refreshing derived data. Staging
+passes data between workflow steps without putting large payloads into QStash
+step outputs.
 
-- fetches the manifest and archive from `MRTDOWN_DATA_URL`;
-- parses archive contents with `ZipStore` and `@mrtdown/fs`, verifies any
-  advertised scheduled timetable against the same canonical archive and admits
-  it to append-only retention, then projects legacy versions into the departure index;
-- inserts parsed entities into `*_next` staging tables;
-- promotes changed rows into live tables;
-- deletes orphans after dependents are synchronized;
-- finalizes metadata for the completed pull.
+The [pull fingerprint](../../app/workflows/pull/helpers/manifestFingerprint.ts)
+lets an unchanged pull skip the archive download and rebuilds. It ignores the
+manifest's publication time and is saved only after the pull succeeds.
+Bump the pipeline version when a code change requires a full pull with
+unchanged upstream data.
 
-## Scheduled timetable storage
+Live topology readers require the completed-promotion marker even inside a
+repeatable-read transaction. Promotion spans multiple transactions, so a
+reader can otherwise see a stable snapshot of a partially promoted network.
+A failed promotion keeps the marker and successful fingerprint cleared so a
+retry can repair the state. See the
+[live topology loader](../../app/util/dbQueries/readLiveScheduleTopology.ts).
 
-The `scheduled_timetables` table stores versioned bundles separately from
-canonical entities. Legacy rows retain the seven original files and an import
-receipt. Constraints allow one baseline, one successor per predecessor and
-consistent receipt links. `retainScheduledTimetable` appends internally verified
-bundles under a transaction lock, validates retained lineage with the shared
-history validator, and requires explicit source-order review. Retries preserve
-the original seven files and receipt. Callers must authenticate the Pages entry
-and verify all seven files before calling; retention does not grant release or
-mapping approval or establish canonical compatibility. The canonical pull now
-uses this retention path; public arrivals do not read these bundles.
+## Timetable admission
 
-`readScheduledTimetableArchive` prepares that trusted input from `ZipStore`.
-It uses the optional `scheduledTimetable` entry supplied by the configured Pages
-root manifest, never an entry self-advertised inside the ZIP. An absent entry
-returns `null` without reading timetable files. An advertised bundle must pass
-the shared `@mrtdown/fs` artifact, release report and mapping/review binding
-checks for all seven exact `data/scheduled-timetable/` paths; missing, invalid or
-duplicate files fail closed. The adapter preserves original bytes without JSON
-reserialization, bypasses the inflated ZIP cache and returns no decoded timetable.
-This verifies the published release/mapping bindings, not source-order admission,
-compatibility with the site's canonical data or eligibility to serve departures.
+Three checks apply to each new release:
 
-`POST /internal/api/tasks/pull` accepts an empty body or `{}` as before. To admit
-a new artifact, explicitly supply `{ "sourceReview": <review> }` using the
-shared `ScheduledTimetableSourceReviewSchema`: a `scheduled-timetable-source-review`
-record with `schemaVersion: 1`, a `decision` (`baseline`, `successor`, `correction`
-or `resolve-version-conflict`), exact `predecessor` and `successor` identities
-(`manifestSha256` and source `snapshotSha256`), `reviewer`, `reviewedAt` and
-`reason`. Only a baseline has a null predecessor. The authenticated task trigger
-validates and forwards this record; signed direct workflow requests validate the
-same contract. No review is inferred from release approval, archive contents,
-opaque provider versions or the import clock. Unknown request fields are rejected.
+1. **Release identity.** Verify a legacy bundle under
+   `data/scheduled-timetable/` against the entry in the configured Pages
+   manifest. Combined releases use the approved pin below.
+2. **Canonical compatibility.** The importer checks against the canonical
+   data from the same archive before staging or projecting the timetable.
+3. **Source order.** Start the pull with an authenticated
+   `POST /internal/api/tasks/pull` and `{ "sourceReview": <review> }`.
+   Use the exact retained predecessor and advertised successor for the
+   environment. See the [request schema](../../app/workflows/pull/helpers/pullParams.ts).
+   The recurring pull sends an empty body.
 
-The pull persists the configured data URL, trusted manifest and an import
-instant in its manifest step. Its parse step downloads the archive from that
-same root, verifies all seven files against the persisted entry, checks
-canonical compatibility, calls retention and projects the admitted version
-before truncating or inserting canonical staging data. The shared `@mrtdown/fs`
-validator checks topology identity, references, platforms/boarding, ordered
-service paths/revisions and active source service dates. A private temporary
-directory bridges its filesystem API using only operators, lines, stations and
-services from this ZIP. Those files must match the trusted root manifest's
-complete domain inventories and hashes of schema-parsed JSON. This same private
-snapshot stays immutable through retention and projection, then is removed on
-success or failure. Timetable bytes stay in memory, with no second archive
-download. Retries reverify downloaded bytes against that entry; an upstream
-replacement cannot silently substitute a different bundle. Bundle bytes stay
-inside the parse step and PostgreSQL, never in workflow step outputs. If the
-upstream archive has changed, retry after restoring that bundle or start a new
-pull against the new root manifest with its exact review.
-
-New artifacts without matching source-order review fail with explicit retention
-blockers and never reach projection. Rejection preserves retained history and
-leaves staging and the last successful fingerprint untouched. Already-retained
-artifacts need no new review and preserve their first receipt, but still undergo
-compatibility validation against this pull's canonical archive. A later
-projection or canonical staging failure can leave an admitted bundle retained;
-its receipt records source admission only, and retrying does not rewrite it.
-Projection failure prevents canonical staging and successful fingerprint
-recording. The existing workflow lease and failure cleanup still apply.
-
-Retention does not establish eligibility to serve departures. Compatibility is
-checked against the incoming snapshot, not live database entities. Passenger
-departure queries/API/UI and publication remain separate gates. Real mapping,
-source and release reviews remain explicit upstream/operator work; this integration grants
-none automatically.
-
-The Verify job runs the timetable database tests against a disposable PostGIS
-service using synthetic fixtures. To run them locally, set
-`TEST_TIMETABLE_DATABASE_URL` to your local PostGIS database URL when running
-`npm run verify`. The tests create and remove their own schemas and apply
-migrations only there. Local runs without that variable skip these tests.
+[Retention](../../app/util/dbQueries/retainScheduledTimetable.ts) preserves
+original bytes and the first receipt. An already-retained release preserves
+its receipt and still requires a compatibility check. If projection or
+canonical staging fails after admission, the retained receipt can survive.
+It records admission only. If the upstream archive changed between workflow
+steps, restore the expected archive for a retry or start a new pull using the
+new manifest and its review.
 
 ### Combined timetable imports
 
@@ -107,320 +64,55 @@ authorize import. One pull accepts one timetable format.
 The workflow snapshots the resolved index with the source URL, canonical
 manifest and import clock so callbacks keep the same inputs across a deploy.
 Rotate the configured pin and source together after draining active pulls. An
-old signed request conflicts with a new pin; a stale archive fails verification
-when parsed under the new pin. If neither the pin nor the canonical manifest
-changes after a successful pull, the workflow skips the archive download. A pin
-change itself changes the fingerprint. Every unseen release still requires a
-separately authorized `sourceReview` for that environment's retained lineage.
-Never put review or artifact contents in deployment variables or schedule
+old signed request can conflict with a new pin, and a stale archive fails
+verification. A pin change forces the next pull to download the archive.
+Keep review and artifact contents out of deployment variables and schedule
 bodies. See the [timetable rollout plan](../plans/active/combined-timetable-pull-rollout.md)
 for staging acceptance and preview options.
 
-The pull verifies the three files using `@mrtdown/fs` and the topology built
-from the independently hash-checked canonical archive. Both formats share one
-locked retention chain and the same source admission rules. The combined row
-keeps the original bytes, trusted index, provider feed metadata and first import
-receipt. The provider-declared bounds are used for source admission. The compact
-artifact retains its own effective Singapore service dates and overnight times.
-Both index digests and the combined projector version participate in the pull
-fingerprint when a trusted combined index is supplied.
+### Projection and repair
 
-### Indexed scheduled departure storage
+The [projector](../../app/util/dbQueries/projectScheduledTimetable.ts) builds
+departure rows and date/scope coverage separately from retained archives.
+The [projection schema](../../app/db/scheduledDepartures.schema.ts) defines
+storage for legacy and combined formats. The retained receipt chain determines
+source ordering.
 
-The internal `projectScheduledTimetable` builder writes derived tables during
-the canonical pull. Readers use these tables without parsing retained timetable
-bodies. Legacy and combined releases share projection metadata and coverage
-tables and use separate occurrence tables.
+A pull can reuse a completed projection when the release, projector version,
+topology, and date coverage still match. Reuse leaves the stored departures
+untouched. The [rollout plan](../plans/active/combined-timetable-pull-rollout.md)
+records the checks that verified replay.
 
-- `scheduled_departure_projections` identifies one retained manifest and projector
-  algorithm version. It records the canonical topology fingerprint/version,
-  inclusive indexed service-date bounds and maximum departure offset across **all source stops**, including
-  non-boardable stops. These support the shared window helper's candidate service
-  dates, including overnight offsets. The manifest FK preserves access to source
-  capture, correction, retrieval and review provenance; those fields are not copied
-  onto every occurrence. Manifest digests and projector versions are identities,
-  not source ordering. Retained receipt lineage remains authoritative for ordering.
-- `scheduled_departure_days` records every supported date, including
-  zero-active-trip dates, with whole-source active and unassigned-active trip counts. Missing dates
-  are unavailable; zero occurrence rows never establish date coverage. An
-  unassigned active trip anywhere in the source blocks that date conservatively,
-  matching `selectRetainedScheduledTimetable`.
-- `scheduled_departure_scopes` records each date's covered station, line, service
-  and destination, with the union of platform alternatives. Coverage follows the
-  shared selector's used patterns and active canonical revisions, including
-  non-final station occurrences, independently of active trip assignments that
-  day. Combined coverage includes each service's eligible boarding platforms.
-  An optional platform must belong to the requested scope coverage and the
-  boarding membership of each returned occurrence.
-- `scheduled_departure_occurrences` preserves boardable occurrences with a
-  downstream alighting stop, including untimed candidates. Provider IDs and stop
-  sequences remain strings; `occurrence_index` preserves source order for ties
-  without numeric conversion of opaque sequences. Original Singapore service
-  dates and bigint offsets retain times beyond 24:00 alongside resolved instants.
-  `timepoint` preserves exact/approximate precision; nullable seconds/instant pairs
-  preserve missing timing. Non-boardable and terminal occurrences stay in the
-  archive. Scope foreign keys prevent rows belonging to another date or scope.
-- `combined_departure_occurrences` stores the same source timing and the platform
-  semantics for each boardable occurrence. `combined_departure_memberships` ties
-  that occurrence to each boarding service, revision and eligible platform set.
-  Distinct physical associations and complete source alternatives retain their
-  original meanings.
+For intentional repair, send `{ "rebuildScheduledTimetableProjection": true }`
+on an authenticated pull. It bypasses the fingerprint skip and projection
+reuse. When the projector fails, it rolls back partial writes and marks the
+projection incomplete. A successful retry restores it.
 
-`projectScheduledTimetable` requires a retained manifest digest, the matching
-projector version (1 for legacy, 2 for combined), and an independently trusted
-canonical snapshot directory that stays immutable during the build. It validates
-the retained lineage and rechecks the selected bundle's bytes, release evidence
-and canonical compatibility. Combined builds use the retained trusted index and
-`projectCombinedTimetableServiceDay` to project explicit effective dates within
-the half-open applicability range. Provider feed bounds still govern source
-admission. Legacy builds use the shared calendar and trip/date resolution helpers.
-The builder streams one service day at a time and inserts rows in batches of at
-most 500.
-The parse step invokes it only for the currently advertised, validated and admitted
-manifest, using the same archive snapshot. GTFS-free pulls do no projection work.
-Historical projections are preserved; the pull does not backfill retained history.
-Projection adds no archive download or large workflow output.
+### Departure selection
 
-A retained-parent row lock serializes verification and builds. After verifying
-the retained lineage, bytes and compatibility, the pull can reuse a committed
-projection with the same manifest, projector version, topology digest and
-version, service-date bounds and maximum departure offset. It also checks that
-the day table covers exactly the verified date range, including zero-trip days.
-A successful reuse leaves projection metadata and all derived rows untouched.
-The completion marker comes from the transaction that wrote the derived rows;
-this check does not rescan the occurrence or membership tables.
+The [selector](../../app/util/dbQueries/withSelectedScheduledTimetable.ts) and
+[window reader](../../app/util/dbQueries/queryIndexedScheduledDepartures.ts)
+read live topology, coverage, and departures in one database snapshot. Use
+the selection within that snapshot. An ID obtained from it serves as
+provenance afterward.
 
-If metadata or day coverage fails the check during parse, the builder replaces
-the projection. For intentional repair, send
-`"rebuildScheduledTimetableProjection": true` on an authenticated pull to
-bypass both the manifest fingerprint skip and projection reuse. The internal
-builder also rebuilds by default when called directly. A build publishes
-completion with all materialization in one transaction. On failure the savepoint
-rolls back partial writes and the outer transaction commits invalidation before
-reporting the error. Existing rows can remain hidden behind null completion
-until a successful retry; other manifests and algorithm versions are untouched.
-Completion certifies materialization only.
+- Each Singapore service date can fall back to an older eligible release in
+  the retained chain. A covered date with zero active trips can establish an
+  authoritative empty result. A missing date or scope, or an unassigned
+  active trip, cannot establish coverage.
+- Overnight offsets can bring an earlier service date into the query window.
+  An unavailable projection can hide such dates even when an older release
+  supplies some departures. Untimed boardable stops count toward incomplete
+  coverage because they cannot be assigned to an instant.
+- An operator rollback needs an authenticated review and an independently
+  supplied selection clock. It binds the current and older release, dates,
+  and exact scope. A review without a platform applies only to branch-wide
+  requests, and exact-destination reviews do not apply to loop-wide queries.
+  A rejected applicable review makes the affected dates unavailable. Review
+  application leaves the retained releases and projections intact.
 
-Future readers must require the expected projector version, completed state and
-current canonical topology fingerprint/version before selection. They must use
-explicit day/scope coverage and source lineage, count selected dates' untimed
-boardable candidates before filtering known instants, and retain the shared
-selector's conservative fallback/completeness semantics. The occurrence index
-supports equality on projection/date/exact scope followed by an instant range
-(or null timing); platform membership filters that bounded set. Primary keys
-index projection identity, dates and scopes. Canonical IDs deliberately have no
-FKs to mutable live entities, so canonical promotion cannot erase retained history.
-Deleting a projection cascades only through its derived rows; no deletion cascades
-into `scheduled_timetables`. Real mapping, source and release approvals and
-passenger query/API/UI remain separate work and gates.
-
-### Internal indexed date and scope selection
-
-`withSelectedScheduledTimetable` selects one completed, supported projection for
-one service date and canonical station, line and destination. The request can
-name one service or a set of services and an optional platform. Every requested
-service must have scope coverage. It reads retained manifests and receipts
-through the shared metadata-only history validator and follows that validated
-chain newest first. Invalid lineage throws; it never reconstructs ordering from
-provider versions, hashes or import times. It checks artifact bounds, both
-manifest and projection topology identities, projection feed bounds, explicit
-day/scope coverage and whole-source unassigned-active counts, falling back to an
-older eligible version. A covered zero-active date can be selected; missing rows
-cannot establish coverage. No timetable body or occurrence rows are loaded.
-
-The helper uses `withScheduledTimetableSnapshot`, which owns a read-only
-repeatable-read transaction and loads topology, validated history and projection
-metadata once for all selections and consumer reads. Its default
-`readLiveScheduleTopology(tx)` loader reconstructs the shared canonical v1 projection
-from live normalized tables in that snapshot. An optional trusted internal
-`readCanonicalTopology(tx)` override remains for focused tests; it must establish
-that same canonical state, never candidate topology or an external fingerprint.
-The consumer callback
-receives both selection and transaction so a later indexed query can read the
-same snapshot through concurrent canonical changes or projection rebuilds. A
-projection ID retained after the callback ends is provenance, not a reusable
-eligibility token. Selected version/receipt provenance, counts, platform coverage
-and per-candidate reasons distinguish unavailable or incomplete coverage from a
-valid empty date. Passenger API/UI and actual mapping/source/release approval
-and publication remain separate gates.
-
-Trusted internal callers may pass `rollback: { review, selectionInstant }` through
-this selector, the indexed window query or `readStationArrivalSource`. Published
-`@mrtdown/fs` alpha.44 supplies the strict review/options schemas and assessment
-type; core remains alpha.39. The review binds exact from/to manifest and source
-snapshot hashes, an inclusive service-date range, exact station/line/service/
-destination scope and optional platform equality (absence is not a wildcard),
-reviewer, reason and review time. Callers must authenticate this operator decision
-and supply the selection clock independently of passenger input. There is no
-review storage, admin/public endpoint or inferred review.
-
-Each date first determines its normal eligible selection in validated receipt
-lineage. An applicable review must name that current selection and a strictly
-older retained target with exact source identities; its time cannot precede the
-current import or exceed the selection instant. The SQL metadata adaptation is
-checked against the public shared selector using tiny retained fixtures, without
-hydrating historical timetable bodies in serving code. The target then passes
-all existing supported/completed projection, current topology, feed/date, exact
-scope/platform and whole-source mapping checks in the same repeatable-read
-snapshot. A stale review or ineligible target rejects that date with no selected
-timetable; it never silently resumes normal selection or tries another target.
-A nonapplicable review preserves normal selection. Per-date `rollback` assessments
-(`applied`, `rejected`, `not-applicable`, or null without a review) retain the
-review, selection instant and blockers through the window query, scheduled adapter
-and private reader. Rejection forces incomplete/unavailable; no estimated fallback is served. History,
-receipts, archived bytes and derived projection rows are unchanged; source
-admission and real approval/publication remain separate.
-
-### Private indexed departure windows
-
-`queryIndexedScheduledDepartures` validates a strict scope, ordered instants, a
-window of at most 24 hours and an optional positive integer limit before opening
-the database snapshot. Shared core window/service-date helpers enumerate Singapore
-service dates using completed, supported, topology-compatible projection metadata's
-maximum source offset, including 24+ departures. No timetable body is hydrated.
-Internal callers provide scope/window/limit and use the live loader by default.
-
-The loader uses eleven explicit-column queries for operators, lines, line operators
-and services, stations, codes, platforms and platform services, services, revisions
-and ordered paths. It preserves repeated visits, nullable operator dates and
-revision ends, absent boarding statuses and empty service lists. JSON property and
-array ordering match `@mrtdown/fs`'s `scheduleTopologyProjection` v1; the full-entity
-projector would require unrelated geography, names and operating hours. Empty
-entity domains, inconsistent relationships, null revision starts or ambiguous/gapped
-path indices throw before history or departure reads. No candidate topology,
-retained body, filesystem snapshot, network read or independent cache is used.
-
-Repeatable read alone can observe an intermediate multi-domain promotion. The first
-parent-upsert transaction clears `canonical_topology_promotion_complete_v1` and
-the successful manifest fingerprint in metadata before changing live entities.
-A failed promotion therefore cannot skip recovery if the source returns to the
-previous successful manifest. Finalization restores the promotion marker in the same
-transaction as staging cleanup and the pull timestamp, after all domain promotion
-and orphan cleanup, only when the persisted parse result confirms every canonical
-line was staged. Missing confirmation (including older resumed parse results)
-also leaves the marker absent. The loader checks this marker in its own snapshot and throws
-while absent, including after a failed pull whose lease has been released or
-expired. It still computes topology from live rows; the marker stores no candidate
-fingerprint and grants no timetable approval. Pipeline version 5 introduced this
-guard; version 6 forces a full pull that also retains lines with unknown dates/hours
-on existing installations. This certifies canonical promotion only; later rebuilds of derived data, cache publication and successful pull
-fingerprint recording retain their existing ordering.
-
-Canonical lines with a null start date or absent operating hours are retained in
-both staging and live tables, including their operator and service relationships.
-Database null hours map back to the canonical optional field; null start dates
-remain unknown rather than being inferred from service branches. Complete staging
-can therefore certify promotion without narrowing the shared topology projection.
-The staged line count and explicit completeness confirmation remain required;
-missing confirmation from an older resumed parse result still fails closed.
-
-Readers that require an operating window skip unknown start dates/hours. They do
-not mark these lines operational or invent hours, dates, uptime or frequency
-estimates. Line summaries distinguish unknown service information from a known
-future opening or known off hours; quick facts display unknown hours. Operational
-facts retain issue counts but contribute no service-window seconds or clipped
-downtime intervals when the window is unknown. SQL predicates that require a known
-start date continue to exclude unknown starts conservatively. This supports valid
-canonical inputs; it does not imply current production lines are missing fields.
-
-Each candidate date independently uses the same conservative selector and receipt
-lineage, allowing date-specific fallback. SQL restricts occurrence reads to the
-selected projection/date, canonical scope, half-open instant range and optional
-platform. Combined queries filter by boarding memberships and return each
-qualifying occurrence once, with the matching services, revisions and eligible
-platforms. All timed rows within those bounds are merged by
-instant/date/trip/source occurrence order before applying the result limit.
-A separate SQL count includes every relevant boardable untimed row on each selected
-service date, regardless of the instant range or result limit; no time is inferred.
-Source provenance, scheduled basis, exact/approximate precision, platform
-alternatives and opaque provider IDs/stop sequences survive the read.
-
-The result includes per-date selections/attempt reasons, untimed count and
-`complete`. Missing dates/scopes and whole-source mapping gaps are unavailable,
-while a selected zero-active date can establish an authoritative empty schedule.
-Missing/incomplete/incompatible projections for current-topology retained artifacts
-also appear in `unavailableProjections` and force incomplete coverage: their unknown
-maximum offsets could hide earlier service dates even when a fallback is selected.
-Topology, candidate enumeration, every selection, counts and departures share one
-read-only repeatable-read transaction across concurrent canonical promotion and
-projection rebuilds. Returned projection IDs are provenance only after it closes.
-This private query grants no serving approval and adds no passenger API/UI, real
-mapping/source/release approval or public publication.
-
-### Internal scheduled station-arrivals adapter
-
-`buildScheduledStationArrivalLines` purely maps one validated
-`queryIndexedScheduledDepartures` result into line groups and service/destination
-timings. Its `basis: 'scheduled'` contract never includes frequency estimates:
-departures add `time` as an alias of `departureInstant` and retain all original
-scheduled fields, including exact/approximate precision, original service date,
-opaque provider IDs/stop sequence, revision, manifest/source snapshot hashes,
-retrieval time and correction revision. Manifest hash, service date, provider trip
-ID and stop sequence distinguish occurrence/version identity. `timepoint: 0`
-remains approximate scheduled time. No confidence, headway, crowd phase anchor or
-first/last service-day bounds are inferred from the returned window.
-
-Each call covers one exact station/line/service/destination scope. Timing groups
-use the full set of alternative platform IDs; one departure appears once, even
-when several platforms are possible. Group order follows the first occurrence
-and departures retain query order within each group. Display names, destination
-code and platform labels must come from independently trusted canonical metadata
-for that exact scope, not a destination inferred from a latest revision. Labels
-only decorate platform IDs (missing labels display the ID); they grant no eligibility.
-
-The adapter preserves `scope`, `window`, `complete`, per-date selections/attempts,
-retained receipts, unavailable projection reasons and untimed counts, including
-when timing groups are empty. `complete` describes query coverage, not whether a
-limited result exhausts the window or whether serving is approved. Complete empty
-coverage remains distinct from incomplete/unavailable coverage; an empty group
-list alone cannot establish timetable coverage. The private source policy below
-consumes this evidence. Actual mapping/source/release approvals, publication and
-any future scheduled crowd overlay remain separate.
-
-### Private station-arrivals source policy
-
-`selectStationArrivalSource` consumes only the validated scheduled adapter result.
-Complete coverage is authoritative, including empty or limited results and
-approximate scheduled times. Partial multi-date coverage and untimed rows keep
-their scheduled basis and incomplete status. No frequency candidate is computed
-or substituted. Missing artifacts and uncovered scopes return `unavailable`.
-
-Unavailable projections, invalid indexed dates and rejected rollbacks remain
-unavailable. Query exceptions such as invalid lineage or incomplete canonical
-promotion propagate before the policy. Every decision retains the original
-scheduled object, including ordering, provenance and diagnostics.
-
-### Private exact-scope station-arrivals reader
-
-`readStationArrivalSource` composes the indexed query, scheduled adapter and
-source policy for one canonical station/line/service/destination (optional
-platform). `referenceInstant` is the single request clock and half-open window
-start; `endInstant` and optional positive `limit` use the indexed query's existing
-validation, including its 24-hour maximum.
-
-`withIndexedScheduledDepartures` keeps canonical topology, display names,
-destination code and platform labels inside the query's read-only repeatable-read
-transaction. Destination display comes from the requested canonical destination
-and its line code at the reference date. The reader never reads frequency
-profiles, first/last train times, holidays or crowd calibration reports.
-
-### Versioned public exact-scope arrivals
-
-`GET /api/stations/$stationId/arrivals/v2` wraps the private reader with strict
-passenger scope validation, a server-owned 60-minute window and 20-result limit,
-and an explicit scheduled/unavailable response. The station guide refreshes
-that endpoint using canonical branch metadata from SSR; SSR computes no arrival
-estimates. See [the API contract](../api/station-arrivals-v2.md) for coverage and
-provenance semantics.
-
-The legacy frequency arrivals endpoint returns HTTP 410. The v2 API can attach a
-recent rider report from the separate `crowd_arrival_reports` table to a
-branch-level response. These reports use receipt time and expire
-quickly. They appear alongside the timetable as rider reports and do not enter
-the timetable reader, import pipeline or disruption report dispatch.
-
-Real producer publication and mapping/source/release approvals remain separate
-work. No source review or rollback authority is accepted from query parameters.
+See the [station arrivals API](../api/station-arrivals-v2.md) for passenger
+window and coverage semantics.
 
 ## Public Holiday Workflow
 
@@ -443,26 +135,6 @@ Canonical pulls run daily at 00:00 UTC in those environments. Preview resets
 its database and queues a pull as part of every deployment, so it has no
 recurring schedules.
 
-Each pull first compares a stable fingerprint of the canonical manifest's
-read-model inputs and complete optional timetable entry with the fingerprint
-recorded after the last fully successful pull. A timetable-only addition,
-replacement, release change or removal therefore triggers a full pull. When the
-fingerprint matches, the workflow exits before downloading the archive,
-staging data, rebuilding facts and snapshots, or purging the public cache.
-The fingerprint deliberately excludes `generatedAt`, which is publication
-metadata rather than a data change. Bump the pull pipeline version in
-`app/workflows/pull/helpers/manifestFingerprint.ts` when a pull or derived-data
-code change requires one full rebuild without an upstream manifest change.
-Version 4 added departure projection to the pull. Version 5 initialized the
-completed canonical promotion marker for live topology reads. Version 6 forces
-one full pull to retain previously omitted lines with unknown start dates or hours,
-including projection of an already-retained advertised artifact without a new
-source review. It does not backfill other historical artifacts. The
-fingerprint is recorded only after retention, timetable projection, canonical
-promotion, derived rebuilds and cache publication succeed. Scheduled requests
-still carry no review: an unseen timetable remains blocked until an operator
-submits its source review.
-
 Configure `QSTASH_URL`, `QSTASH_TOKEN`, and `INTERNAL_API_TOKEN` as secrets in
 each GitHub deployment environment. The deployment workflow supplies `TIER`
 and `VITE_ROOT_URL`; `INTERNAL_API_TOKEN` must match one of the target app's
@@ -476,20 +148,15 @@ run:
 npm run qstash:schedules:sync -- --dry-run
 ```
 
-The sync only manages its three deterministic schedule IDs; it does not delete
-other QStash schedules. Cron expressions use UTC, matching the former
-Cloudflare schedules.
+The [sync script](../../.github/scripts/syncQstashSchedules.mjs) manages
+only its three schedule IDs. Cron expressions use UTC.
 
 ## Operational Facts
 
-Daily fact rebuilds write aggregate service, downtime, and issue counts to
-`line_day_facts`. They also write each issue interval clipped to the applicable
-line service window to `line_day_issue_intervals`. The interval rows are derived,
-rebuildable data used when a read needs exact placement or overlapping impact
-lanes rather than aggregate durations alone. The same rebuild refreshes
-`station_issue_facts`, an exact issue-to-station projection used for compact
-station status and latest-disruption reads without reconstructing impact-event
-history on a public request.
+[Operational facts](../../app/util/dbQueries/operationalFacts.ts) precompute
+service time, downtime, and issue summaries for public reads. Facts keep the
+issue counts for lines with unknown start dates or hours. They skip
+service-window and clipped downtime calculations when those inputs are unknown.
 
 After operational facts, the canonical pull refreshes the persisted statistics
 and sitemap snapshots before purging the public edge-cache tag. Statistics and
@@ -499,30 +166,11 @@ migrations and run the canonical pull or authenticated facts rebuild.
 
 ## Crowd Report Dispatch
 
-Before dispatch, reports within 10 minutes of an existing observation join the
-same incident when they identify the same line set, even if they name different
-stations. Reports without line context require the same station set. Unknown
-effects and unspecified directions can join specific reports; conflicting known
-effects or directions stay separate. The cluster retains the union of reported
-stations and adopts a known effect when its original effect was unknown.
-The evidence page and dispatch payload use the latest specified direction, so
-an unspecified direction on a newer report does not erase an earlier one.
-Recent corroborating reports extend the matching window while keeping a direct
-reference to the original report. Dispatched clusters remain closed, and
-existing clusters are not retroactively merged.
-
-Accepted crowdsourced reports and accepted report clusters trigger a
-best-effort dispatch attempt as soon as the submission transaction commits. The
-submission response does not wait for GitHub, and accepted rows stay pending if
-that attempt cannot complete. The `/internal/api/tasks/crowd-report-dispatch`
-endpoint builds an
-`@mrtdown/ingest-contracts` `crowd-report` payload, posts it to the
-`mrtdown-data` `repository_dispatch` ingest workflow, and records dispatch
-success or failure on the site-local report rows.
-
-Dispatch converts Postgres timestamp strings to the ISO format required by the
-ingest contract. A cluster's exported report count comes from the same eligible
-report rows as its payload's report IDs, rather than a separate count query.
+Accepted reports trigger a best-effort dispatch after commit. Pending reports
+can retry through `/internal/api/tasks/crowd-report-dispatch`, which sends
+canonical evidence to the `mrtdown-data` ingest workflow. See the
+[clustering rules](../../app/util/crowdReportClustering.ts) and
+[dispatch implementation](../../app/util/crowdReportDispatch.ts).
 
 Configure `CROWD_REPORT_DISPATCH_GITHUB_TOKEN` as a deployed secret. Optional
 overrides are `CROWD_REPORT_DISPATCH_GITHUB_OWNER`,
@@ -539,23 +187,10 @@ canonical pull. Use
 `CROWD_REPORT_DISPATCH_LIMIT` to tune the maximum number of dispatch candidates
 processed per scheduled run.
 
-Handled dispatch endpoint failures emit a Sentry event named `Crowd report
-dispatch request failed`, tagged `component:crowd-report-dispatch`, with the HTTP
-status and failure reason. The `crowd_report_dispatch` context includes QStash
-message and schedule IDs, the Cloudflare Ray ID, a safe `headerFormat` enum
-(including a literal redaction placeholder), and sanitized validation codes and
-field paths. The enum's key avoids authorization-related names that Sentry scrubs.
-Credentials, signatures, raw bodies, and parser error text are excluded. These
-events cover 400/401 request rejections, 503 configuration failures, and 207
-dispatch failures; unhandled exceptions continue through the existing Sentry
-server instrumentation.
-
-Immediate dispatch after a submission also reports missing configuration, failed
-candidate counts, and caught background exceptions to Sentry with
-`component:crowd-report-dispatch` and `trigger:submission`. Exception stacks and
-sanitized ingest validation paths are retained; original error messages and the
-submitting request's body, headers, and breadcrumbs are excluded. Reporting does
-not make the submission wait for dispatch or remove the scheduled retry backstop.
+For failures, look in Sentry for `component:crowd-report-dispatch` and the
+`crowd_report_dispatch` context. Scheduled delivery diagnostics include
+QStash message and schedule IDs. Submission-triggered failures carry
+`trigger:submission`. Validation details are sanitized.
 
 ### Programmatic crowd reports
 
@@ -610,13 +245,3 @@ Consumers should cache the catalog briefly, reject unknown identifiers before
 delivery, and refresh after a dataset-version change. The submission endpoint
 remains authoritative and still validates references against each report's
 `observedAt` date.
-
-## Staging Tables
-
-Staging tables are named with a `_next` suffix. They are the durable handoff between workflow steps and avoid returning large parsed payloads between Upstash Workflow steps.
-
-## Live Reads
-
-Server functions call feature modules under `app/util/dbQueries`, which read
-normalized live tables through the shared dataset layer and return the
-source-owned shapes in `app/types.ts`.

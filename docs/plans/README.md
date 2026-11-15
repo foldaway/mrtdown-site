@@ -16,16 +16,17 @@ into work that needs durable context.
 
 ## Maintaining a plan
 
+Follow the [writing policy](../development/writing.md). Keep the purpose and
+next step easy to find.
+
 1. Copy the [shared template](template.md) to `active/<topic>.md` and link it
    below. Keep its second-level headings in order. Use lower-level headings
    for subject-specific detail.
-2. Describe observable acceptance criteria. Give a contributor enough context
-   to resume from a fresh checkout, including file paths, commands, dependencies,
-   and assumptions to verify. For rollout work, record the applicable gates and
-   recovery steps.
-3. Update the checklist as milestones land or work pauses. Date completed steps,
-   capture validation evidence, and make the next step and any blocker explicit.
-   Record discoveries and the reasons for decisions as they occur.
+2. Write milestones someone can verify from a fresh checkout. Include enough
+   context and links to run the checks and recognize success.
+3. Update progress, discoveries, decisions, and outcomes as the work proceeds.
+   A handoff should identify the last verified result, the next step, and any
+   blocker.
 4. After acceptance, record the outcome and verification, move the plan to
    `completed/`, and update the index and inbound links. Carry lasting
    operating guidance to its subject guide. Link issues or active plans for

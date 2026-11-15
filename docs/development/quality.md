@@ -1,35 +1,17 @@
 # Quality Harness
 
-Use `npm run verify` as the default branch check.
+Run `npm run verify` before handing off or publishing a change. CI runs the
+[same command](../../.github/workflows/validate.yml). Check
+[`package.json`](../../package.json) for the current script sequence.
 
-The default verification script currently runs:
-
-- `npm run check:docs`
-- `npm run typecheck`
-- `npm run lint`
-- `npm run format:check`
-- `npm run db:generate:check`
-- `npm run test:run`
-
-`npm run format:check` uses Biome's non-writing check mode across the repository. This keeps local verification aligned with CI and catches uncommitted formatting issues before a branch is pushed.
-
-The docs check validates repository-relative Markdown link targets, plan index
-coverage, and the [template](../plans/template.md) headings in active plans.
-
-Some [generated files](generated-files.md), including the route tree and
-Drizzle artifacts, are excluded from normal Biome checks in `biome.json`.
-
-`npm run verify:strict` currently mirrors the default verification script so existing references continue to work during the overhaul.
-
-`npm run db:generate:check` runs Drizzle Kit against a temporary copy of the migration folder and fails when schema changes would generate a new migration. If it fails, run `npm run db:generate` and commit the generated files.
-
-Generated files are excluded from normal Biome checks. If a generated file changes, review the generation source and the produced diff rather than making hand edits.
-
-## Current Gaps
-
-The overhaul has guardrail tests for pull staging row mapping and pull
-promotion step ordering.
-
-The remaining known cleanup work is to broaden coverage around DB query
-behavior, operational facts, i18n route handling, smoke coverage for the main
-public pages, and to decide which generated/config files Biome should own.
+- **Docs.** Run `npm run check:docs` while editing guides or plans. Fix the
+  relative link, plan index entry, or [template](../plans/template.md) heading
+  named in the error.
+- **Migration drift.** If `npm run db:generate:check` reports a schema change,
+  run `npm run db:generate` and review the generated SQL and metadata. See
+  [generated files](generated-files.md) for the owning tools.
+- **Timetable integration tests.** Set `TEST_TIMETABLE_DATABASE_URL` to a
+  disposable Postgres database with PostGIS and UTC as its default time zone.
+  The tests create and drop their own schemas. A connection URL with an
+  `options` parameter can override their schema selection. Local runs without
+  the variable skip these tests.
