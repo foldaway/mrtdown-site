@@ -178,7 +178,7 @@ describe('station guide arrival sources', () => {
     expect(expired).not.toContain('Rider-reported arrival');
   });
 
-  it('places one report action inside the timetable when a service has one platform group', () => {
+  it('keeps one report action visible when a service timetable is collapsed', () => {
     if (scheduled.source !== 'scheduled') {
       throw new Error('fixture');
     }
@@ -189,9 +189,7 @@ describe('station guide arrival sources', () => {
       async () => {},
     );
     expect(html.match(/Report an arrival/g)).toHaveLength(1);
-    expect(html).toMatch(
-      /<section[^>]* hidden=""[^>]*>.*Report an arrival.*<\/section>/,
-    );
+    expect(html).toMatch(/<\/section>.*<summary[^>]*>.*Report an arrival/);
   });
 
   it('keeps empty, partial, unavailable and stale responses distinct without SSR estimates', () => {

@@ -34,8 +34,6 @@ export function ServiceArrivalSummary({
     (hasDepartures ||
       (data.scope.stationId !== data.scope.destinationStationId &&
         (data.source === 'unavailable' || !data.coverage.complete)));
-  const reportInTimetable =
-    data?.source === 'scheduled' && hasDepartures && data.timings.length === 1;
   const reportAction =
     reportable && onArrivalReported ? (
       <CrowdArrivalReport
@@ -59,7 +57,6 @@ export function ServiceArrivalSummary({
           heading={heading}
           lineColor={lineColor}
           now={arrivalState?.status === 'error' ? null : now}
-          reportAction={reportInTimetable ? reportAction : null}
         />
       ) : (
         <ArrivalServiceRow
@@ -81,9 +78,7 @@ export function ServiceArrivalSummary({
         <ArrivalRefreshNotice state={arrivalState} />
       )}
       {recentReport && <RecentCrowdArrival report={recentReport} />}
-      {!reportInTimetable && reportAction && (
-        <div className="ms-8 mt-1 sm:ms-9">{reportAction}</div>
-      )}
+      {reportAction && <div className="ms-8 mt-1 sm:ms-9">{reportAction}</div>}
     </li>
   );
 }

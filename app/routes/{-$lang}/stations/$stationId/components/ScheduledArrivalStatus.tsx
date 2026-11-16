@@ -14,7 +14,6 @@ type ScheduledArrivalStatusProps = {
   heading: ReactNode;
   lineColor: string;
   now: number | null;
-  reportAction?: ReactNode;
 };
 
 export function ScheduledArrivalStatus({
@@ -23,7 +22,6 @@ export function ScheduledArrivalStatus({
   heading,
   lineColor,
   now,
-  reportAction,
 }: ScheduledArrivalStatusProps) {
   const intl = useIntl();
   if (!hasDepartures) {
@@ -83,7 +81,6 @@ export function ScheduledArrivalStatus({
             platformLabels={[
               ...new Set(timing.platforms.map(({ label }) => label)),
             ]}
-            reportAction={reportAction}
           />
         </div>
       ))}
@@ -97,13 +94,11 @@ type PlatformDeparturesProps = Omit<
 > & {
   departures: ScheduledDeparture[];
   now: number | null;
-  reportAction?: ReactNode;
 };
 
 function PlatformDepartures({
   departures,
   now,
-  reportAction,
   ...row
 }: PlatformDeparturesProps) {
   const intl = useIntl();
@@ -177,11 +172,6 @@ function PlatformDepartures({
             </li>
           ))}
         </ol>
-        {reportAction && (
-          <div className="mt-2 border-gray-200 border-t pt-2 dark:border-gray-700">
-            {reportAction}
-          </div>
-        )}
       </section>
     </>
   );
