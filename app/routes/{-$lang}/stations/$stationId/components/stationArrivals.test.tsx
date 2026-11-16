@@ -178,6 +178,22 @@ describe('station guide arrival sources', () => {
     expect(expired).not.toContain('Rider-reported arrival');
   });
 
+  it('places one report action inside the timetable when a service has one platform group', () => {
+    if (scheduled.source !== 'scheduled') {
+      throw new Error('fixture');
+    }
+    const html = renderRow(
+      { ...scheduled, timings: scheduled.timings.slice(0, 1) },
+      'ready',
+      undefined,
+      async () => {},
+    );
+    expect(html.match(/Report an arrival/g)).toHaveLength(1);
+    expect(html).toMatch(
+      /<section[^>]* hidden=""[^>]*>.*Report an arrival.*<\/section>/,
+    );
+  });
+
   it('keeps empty, partial, unavailable and stale responses distinct without SSR estimates', () => {
     if (scheduled.source !== 'scheduled') {
       throw new Error('fixture');
@@ -207,7 +223,7 @@ describe('station guide arrival sources', () => {
     const onArrivalReported = async () => {};
     for (const [data, message, canReport] of [
       [empty, 'No departures in this window', false],
-      [partial, 'Incomplete timetable. No departure times.', true],
+      [partial, 'Timetable unavailable', true],
       [unavailable, 'Timetable unavailable', true],
     ] as const) {
       const row = renderRow(data, 'ready', undefined, onArrivalReported);
@@ -222,9 +238,9 @@ describe('station guide arrival sources', () => {
       ...partial,
       timings: scheduled.timings,
     });
-    expect(partialWithTimes).toContain('Incomplete timetable');
+    expect(partialWithTimes).not.toContain('Incomplete timetable');
     expect(partialWithTimes).toContain('2 min');
-    expect(partialWithTimes).not.toContain('No departure times');
+    expect(partialWithTimes).not.toContain('Timetable unavailable');
     expect(renderRow(empty, 'error')).toContain(
       'Showing the last known response',
     );

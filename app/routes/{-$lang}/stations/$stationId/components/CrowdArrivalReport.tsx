@@ -1,4 +1,4 @@
-import { ChevronRightIcon } from '@heroicons/react/16/solid';
+import { PencilSquareIcon } from '@heroicons/react/16/solid';
 import { useEffect, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import {
@@ -91,12 +91,9 @@ export function CrowdArrivalReport({
   }
 
   return (
-    <details className="group/report ms-8 mt-0.5 text-xs sm:ms-9">
-      <summary className="flex min-h-7 w-fit cursor-pointer list-none items-center gap-1 rounded text-gray-600 hover:text-blue-700 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-gray-400 dark:hover:text-blue-300 [&::-webkit-details-marker]:hidden">
-        <ChevronRightIcon
-          aria-hidden="true"
-          className="size-3.5 shrink-0 group-open/report:rotate-90"
-        />
+    <details className="text-xs">
+      <summary className="flex min-h-8 w-fit cursor-pointer list-none items-center gap-1.5 rounded-md border border-gray-200 px-2 font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-white/5 [&::-webkit-details-marker]:hidden">
+        <PencilSquareIcon aria-hidden="true" className="size-4 shrink-0" />
         <FormattedMessage
           id="station.arrival_report.summary"
           defaultMessage="Report an arrival"

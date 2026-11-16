@@ -1,4 +1,4 @@
-import { ChevronDownIcon } from '@heroicons/react/16/solid';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { type ComponentProps, type ReactNode, useId, useState } from 'react';
 import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
 import type { StationArrivalsV2 } from '~/util/stationArrivalsV2';
@@ -14,6 +14,7 @@ type ScheduledArrivalStatusProps = {
   heading: ReactNode;
   lineColor: string;
   now: number | null;
+  reportAction?: ReactNode;
 };
 
 export function ScheduledArrivalStatus({
@@ -22,6 +23,7 @@ export function ScheduledArrivalStatus({
   heading,
   lineColor,
   now,
+  reportAction,
 }: ScheduledArrivalStatusProps) {
   const intl = useIntl();
   if (!hasDepartures) {
@@ -56,8 +58,8 @@ export function ScheduledArrivalStatus({
             </details>
           ) : (
             <FormattedMessage
-              id="station.arrivals.no_timed_departures"
-              defaultMessage="Incomplete timetable. No departure times."
+              id="station.arrivals.timetable_unavailable"
+              defaultMessage="Timetable unavailable"
             />
           )
         }
@@ -66,38 +68,26 @@ export function ScheduledArrivalStatus({
   }
 
   return (
-    <>
-      <div className="space-y-2">
-        {data.timings.map((timing) => (
-          <div
-            className="border-gray-200 dark:border-gray-700 [&+&]:border-t [&+&]:pt-2"
-            key={JSON.stringify(timing.platforms.map(({ id }) => id))}
-          >
-            <PlatformDepartures
-              departures={timing.departures}
-              now={now}
-              alternativePlatforms={timing.platforms.length > 1}
-              heading={heading}
-              lineColor={lineColor}
-              platformLabels={[
-                ...new Set(timing.platforms.map(({ label }) => label)),
-              ]}
-            />
-          </div>
-        ))}
-      </div>
-      {!data.coverage.complete && (
-        <p
-          aria-live="polite"
-          className="ms-8 mt-1 text-gray-600 text-xs sm:ms-9 dark:text-gray-400"
+    <div className="space-y-2">
+      {data.timings.map((timing) => (
+        <div
+          className="border-gray-200 dark:border-gray-700 [&+&]:border-t [&+&]:pt-2"
+          key={JSON.stringify(timing.platforms.map(({ id }) => id))}
         >
-          <FormattedMessage
-            id="station.arrivals.incomplete"
-            defaultMessage="Incomplete timetable"
+          <PlatformDepartures
+            departures={timing.departures}
+            now={now}
+            alternativePlatforms={timing.platforms.length > 1}
+            heading={heading}
+            lineColor={lineColor}
+            platformLabels={[
+              ...new Set(timing.platforms.map(({ label }) => label)),
+            ]}
+            reportAction={reportAction}
           />
-        </p>
-      )}
-    </>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -107,11 +97,13 @@ type PlatformDeparturesProps = Omit<
 > & {
   departures: ScheduledDeparture[];
   now: number | null;
+  reportAction?: ReactNode;
 };
 
 function PlatformDepartures({
   departures,
   now,
+  reportAction,
   ...row
 }: PlatformDeparturesProps) {
   const intl = useIntl();
@@ -126,7 +118,7 @@ function PlatformDepartures({
         <button
           aria-controls={panelId}
           aria-expanded={expanded}
-          className="group flex min-h-11 cursor-pointer items-center justify-end gap-1 rounded-md px-0.5 text-end hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-blue-500 sm:gap-2 sm:px-1 dark:hover:bg-white/5"
+          className="group flex min-h-11 cursor-pointer items-center justify-end gap-0.5 rounded-md px-0.5 text-end hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-blue-500 sm:gap-2 sm:px-1 dark:hover:bg-white/5"
           onClick={() => setExpanded((open) => !open)}
           type="button"
         >
@@ -144,7 +136,8 @@ function PlatformDepartures({
           </span>
           <ChevronDownIcon
             aria-hidden="true"
-            className="size-3.5 shrink-0 text-gray-500 group-aria-expanded:rotate-180 dark:text-gray-400"
+            className="size-4.5 shrink-0 text-gray-500 group-aria-expanded:rotate-180 sm:size-5 dark:text-gray-400"
+            strokeWidth={2}
           />
         </button>
       </ArrivalServiceRow>
@@ -184,6 +177,11 @@ function PlatformDepartures({
             </li>
           ))}
         </ol>
+        {reportAction && (
+          <div className="mt-2 border-gray-200 border-t pt-2 dark:border-gray-700">
+            {reportAction}
+          </div>
+        )}
       </section>
     </>
   );

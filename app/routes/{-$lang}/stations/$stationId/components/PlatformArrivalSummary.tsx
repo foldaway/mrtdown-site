@@ -34,6 +34,21 @@ export function ServiceArrivalSummary({
     (hasDepartures ||
       (data.scope.stationId !== data.scope.destinationStationId &&
         (data.source === 'unavailable' || !data.coverage.complete)));
+  const reportInTimetable =
+    data?.source === 'scheduled' && hasDepartures && data.timings.length === 1;
+  const reportAction =
+    reportable && onArrivalReported ? (
+      <CrowdArrivalReport
+        key={JSON.stringify(data.scope)}
+        scope={{
+          stationId: data.scope.stationId,
+          lineId: data.scope.lineId,
+          serviceId: data.scope.serviceId,
+          destinationStationId: data.scope.destinationStationId,
+        }}
+        onSubmitted={onArrivalReported}
+      />
+    ) : null;
   const heading = <ArrivalServiceHeading timing={arrivalTiming} />;
   return (
     <li className="py-2">
@@ -44,6 +59,7 @@ export function ServiceArrivalSummary({
           heading={heading}
           lineColor={lineColor}
           now={arrivalState?.status === 'error' ? null : now}
+          reportAction={reportInTimetable ? reportAction : null}
         />
       ) : (
         <ArrivalServiceRow
@@ -65,17 +81,8 @@ export function ServiceArrivalSummary({
         <ArrivalRefreshNotice state={arrivalState} />
       )}
       {recentReport && <RecentCrowdArrival report={recentReport} />}
-      {reportable && onArrivalReported && (
-        <CrowdArrivalReport
-          key={JSON.stringify(data.scope)}
-          scope={{
-            stationId: data.scope.stationId,
-            lineId: data.scope.lineId,
-            serviceId: data.scope.serviceId,
-            destinationStationId: data.scope.destinationStationId,
-          }}
-          onSubmitted={onArrivalReported}
-        />
+      {!reportInTimetable && reportAction && (
+        <div className="ms-8 mt-1 sm:ms-9">{reportAction}</div>
       )}
     </li>
   );
