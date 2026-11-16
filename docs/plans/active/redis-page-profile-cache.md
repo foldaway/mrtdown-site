@@ -16,6 +16,7 @@ response shapes, and report behavior.
   from production (2026-11-15).
 - [x] Confirm continuous Neon activity in the production usage window
   (2026-11-15).
+- [x] Implement the opt-in Navigation reader and canonical-pull publication.
 - [ ] Publish and serve Navigation from Redis in staging.
 - [ ] Add cache fills for completed Issue Profiles in staging and verify
   import and retry behavior.
@@ -47,6 +48,10 @@ response shapes, and report behavior.
 - 2026-11-15, Codex — Pilot Navigation and completed Issue Profiles in the
   existing Redis deployment. Keep Postgres as the relational read model and
   build cache entries from the same public loader data.
+- 2026-11-15, Codex — Seed Navigation through the authenticated pull task.
+  It takes the existing lease and requires the successful manifest fingerprint,
+  which is cleared at the start of live promotion. The publish-only setting
+  allows an operator to warm and inspect the key before enabling reads.
 
 ## Outcomes & Retrospective
 
@@ -101,7 +106,8 @@ adds Redis publication after the pull rebuilds the read model.
 3. Prepopulate the key from a verified completed staging import before
    enabling the reader, including when the next scheduled pull would skip
    an unchanged manifest. Validate a cold Fly process and a Cloudflare miss.
-   A warm Redis key must serve both with zero Navigation SQL queries.
+   A warm Redis key must serve both with zero Navigation SQL queries. Follow
+   the [bootstrap procedure](../../operations/edge-caching.md#redis-navigation-bootstrap).
    [Root loader](../../../app/util/root.functions.ts) ·
    [Pull workflow](../../../app/workflows/pull/index.ts)
 

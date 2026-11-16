@@ -68,12 +68,14 @@ The canonical pull publishes updated data in this order:
 
 1. Promote staged canonical data.
 2. Rebuild operational facts plus the statistics and sitemap snapshots.
-3. Purge `mrtdown-<tier>-data` through the Cloudflare API.
-4. Release the pull-workflow lease.
+3. Publish Navigation to Redis when configured.
+4. Purge `mrtdown-<tier>-data` through the Cloudflare API.
+5. Record the successful manifest fingerprint and release the pull lease.
 
-The application does not retain public read models in a process-local cache.
-After a purge, the next Cloudflare MISS therefore reads current Postgres data
-and cannot refill the edge from stale Fly process memory.
+Each Fly process reads the same Redis Navigation entry. A miss or a Redis
+failure falls back to Postgres and marks the response `no-store` when the
+reader is enabled. The last completed generation stays available while the
+next canonical pull runs.
 
 Public-holiday changes use the same publication sequence. Successful crowd
 report submissions and successful cluster dispatches also purge the tag because
@@ -92,6 +94,24 @@ The API token should be scoped to the application zone with only the
 `Cache Purge` permission. Preview, staging, and production publication steps
 fail if either value is missing, so a deployment cannot silently claim that it
 published fresh cached data. Local development logs and skips invalidation.
+
+## Redis Navigation Bootstrap
+
+Set `REDIS_NAVIGATION_CACHE=publish` on the target Fly app and use the
+existing `REDIS_URL`. Send an authenticated `POST /internal/api/tasks/pull`
+with `{"seedNavigationCache":true}`. The workflow takes the canonical pull
+lease and requires the successful manifest fingerprint before it builds
+Navigation from Postgres. It can seed the key even if a scheduled pull
+would skip an unchanged manifest. Wait for the workflow to complete and
+confirm it published `mrtdown:<tier>:page-profiles:v1:navigation`.
+
+Set `REDIS_NAVIGATION_CACHE=enabled` and purge the tier's Cloudflare data tag
+after the new configuration is serving traffic. A staging origin fill reports
+`X-MRTDown-Navigation-Source: redis` when it serves Navigation from Redis and
+`sql` when it falls back. Check the header on a Cloudflare `MISS` because an
+edge hit replays the origin fill's header. To roll back, unset
+`REDIS_NAVIGATION_CACHE` and purge the tier's data tag. Seed again before
+re-enabling the reader if a pull ran while publication was disabled.
 
 ## Verification
 
