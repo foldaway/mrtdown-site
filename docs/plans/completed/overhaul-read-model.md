@@ -1,8 +1,8 @@
 # Overhaul Read Model Plan
 
 > Historical note: this completed plan predates the move from Cloudflare
-> Workers to Fly.io and Upstash Workflow. See `docs/ARCHITECTURE.md` and
-> `docs/DATA_PIPELINE.md` for the current platform architecture.
+> Workers to Fly.io and Upstash Workflow. See `docs/architecture/overview.md` and
+> `docs/architecture/data-pipeline.md` for the current platform architecture.
 
 ## Context
 
@@ -12,11 +12,11 @@ archives.
 
 Source-of-truth references:
 
-- `docs/OVERHAUL_BASELINE.md`
-- `docs/ARCHITECTURE.md`
-- `docs/DATA_PIPELINE.md`
-- `docs/GENERATED_FILES.md`
-- `docs/QUALITY.md`
+- `docs/history/overhaul-baseline.md`
+- `docs/architecture/overview.md`
+- `docs/architecture/data-pipeline.md`
+- `docs/development/generated-files.md`
+- `docs/development/quality.md`
 
 ## Goals
 
@@ -49,7 +49,7 @@ Exit criteria:
 - No route or server function depends on the retired generated API client.
 - Remaining shared read-model types are intentional and documented.
 
-Status: complete. `docs/ARCHITECTURE.md` documents the retired generated API
+Status: complete. `docs/architecture/overview.md` documents the retired generated API
 client boundary and `app/types.ts` as the temporary source-owned read-model
 boundary. A source scan on completion found no route or server-function
 dependencies on the retired generated client.
@@ -72,8 +72,8 @@ facts after finalizing a successful pull.
 
 ### Phase 3: Cleanup And Guardrails
 
-- Move durable lessons into `docs/ARCHITECTURE.md`, `docs/DATA_PIPELINE.md`, or
-  `docs/QUALITY.md` instead of growing `AGENTS.md`.
+- Move durable lessons into `docs/architecture/overview.md`, `docs/architecture/data-pipeline.md`, or
+  `docs/development/quality.md` instead of growing `AGENTS.md`.
 - Keep migration changes generated through Drizzle CLI.
 - Keep generated route and station map artifacts out of manual edits.
 

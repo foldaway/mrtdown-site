@@ -1,5 +1,86 @@
 # Programmatic Crowd Reports For Reddit Monitoring
 
+## Purpose
+
+### Goals
+
+- Accept structured crowd reports from a small number of registered machine
+  producers without Turnstile or public IP-based rate limiting.
+- Reuse the existing crowd-report schema and downstream behavior wherever the
+  public and programmatic paths have the same semantics.
+- Make producer retries safe with one stable external report ID.
+- Retain enough generic provenance to identify the producer and inspect the
+  upstream source when permitted.
+- Give machine producers a compact canonical line and station catalog for
+  validating parsed identifiers before submission.
+- Keep route names, validation, database fields, and downstream code independent
+  of Reddit.
+- Preserve the existing crawler until the monitor demonstrates equivalent
+  discovery coverage and successful reply monitoring.
+
+### Non-Goals
+
+- Store Reddit threads, comments, usernames, conversation trees, polling state,
+  or Reddit credentials in `mrtdown-site`.
+- Introduce community claims, claim versions, support aggregation, or a second
+  signal lifecycle.
+- Add a separate canonical `community-signal` ingest contract.
+- Reconstruct conversations or correlate Reddit authors in the site.
+- Batch reports in the first version.
+- Publish an npm package or generated OpenAPI client for this small initial
+  boundary.
+- Replace the public human-report endpoint or weaken its Turnstile, abuse, and
+  rate-limit protections.
+- Make Reddit authoritative; the monitor still decides only whether a source
+  object is useful enough to submit as a community report.
+
+## Progress
+
+- [x] Add the authenticated programmatic report endpoint (2026-07-18).
+- [x] Add the reference catalog for producers (2026-07-19).
+- [ ] Integrate the monitor in shadow mode and compare its results with the
+  existing Reddit crawler before cutover.
+
+## Surprises & Discoveries
+
+### Measured Workload and Initial Cadence
+
+A 2026-07-17 sample found approximately 54 new posts per day across the two
+target subreddits and about 2.65 daily matches for a deliberately broad rail
+keyword query. Manual sampling suggested only roughly one to three genuinely
+live operational threads per month.
+
+Reply traffic was front-loaded in representative disruption threads: roughly
+77% to 88% of sampled replies arrived within three hours. This supports a small
+fixed workflow schedule rather than a general polling scheduler or adaptive
+watch queue. Start with four polls during the first hour, followed by polls at
+three, six, and 24 hours. Change the cadence only after observing missed useful
+updates or unnecessary request volume.
+
+## Decision Log
+
+- 2026-07-17: Use a dedicated Worker because frequent mostly-empty Reddit
+  discovery is a better fit for Cloudflare scheduling than waking the
+  scale-to-zero site.
+- 2026-07-18: Keep Reddit discovery in the existing crawler until the new
+  monitor demonstrates equivalent coverage.
+- 2026-07-18: Supersede the community-observation and community-claim designs
+  with a programmatic crowd-report endpoint feeding the existing site pipeline.
+- 2026-07-18: Keep conversations and workflow state entirely in the monitor;
+  each useful post or reply becomes one independent structured report.
+- 2026-07-18: Use one generic external report ID for retry safety instead of an
+  event inbox, claim version, or site-side lifecycle.
+- 2026-07-18: Defer OpenAPI generation until multiple producers or observed
+  contract drift justify it.
+- 2026-07-19: Expose a small authenticated `v1` reference catalog so machine
+  producers can validate parsed IDs without coupling to site-internal tables or
+  vendoring canonical data. Derive aliases only from canonical localized names.
+
+## Outcomes & Retrospective
+
+The site endpoint and reference catalog are implemented. Shadow monitoring
+and cutover still require the checks in phases 2 and 3.
+
 ## Context
 
 `mrtdown-data-crawler` currently discovers Reddit submissions through an RSS
@@ -21,14 +102,14 @@ clustering, presentation, and dispatch pipeline.
 
 Related references:
 
-- `docs/plans/completed/crowdsourced-reports.md`
-- `docs/DATA_PIPELINE.md`
+- [Crowdsourced reports](../completed/crowdsourced-reports.md)
+- [Data pipeline](../../architecture/data-pipeline.md)
 - `app/routes/api.reports.tsx`
 - `app/util/crowdReports.ts`
 - `app/util/crowdReportDispatch.ts`
 - `../mrtdown-reddit-monitor/README.md`
 
-## Decision
+### Chosen approach
 
 Add a generic programmatic crowd-report endpoint to `mrtdown-site` and keep all
 Reddit-specific acquisition and interpretation in `mrtdown-reddit-monitor`.
@@ -50,41 +131,9 @@ This supersedes the earlier community-observation and community-claim designs.
 Do not add claim lifecycle, cross-source merging, Reddit conversation storage,
 or a parallel community-signal product model to the site.
 
-## Goals
+### Site Boundary
 
-- Accept structured crowd reports from a small number of registered machine
-  producers without Turnstile or public IP-based rate limiting.
-- Reuse the existing crowd-report schema and downstream behavior wherever the
-  public and programmatic paths have the same semantics.
-- Make producer retries safe with one stable external report ID.
-- Retain enough generic provenance to identify the producer and inspect the
-  upstream source when permitted.
-- Give machine producers a compact canonical line and station catalog for
-  validating parsed identifiers before submission.
-- Keep route names, validation, database fields, and downstream code independent
-  of Reddit.
-- Preserve the existing crawler until the monitor demonstrates equivalent
-  discovery coverage and successful reply monitoring.
-
-## Non-Goals
-
-- Store Reddit threads, comments, usernames, conversation trees, polling state,
-  or Reddit credentials in `mrtdown-site`.
-- Introduce community claims, claim versions, support aggregation, or a second
-  signal lifecycle.
-- Add a separate canonical `community-signal` ingest contract.
-- Reconstruct conversations or correlate Reddit authors in the site.
-- Batch reports in the first version.
-- Publish an npm package or generated OpenAPI client for this small initial
-  boundary.
-- Replace the public human-report endpoint or weaken its Turnstile, abuse, and
-  rate-limit protections.
-- Make Reddit authoritative; the monitor still decides only whether a source
-  object is useful enough to submit as a community report.
-
-## Site Boundary
-
-### Endpoint
+#### Endpoint
 
 Add:
 
@@ -126,7 +175,7 @@ bounded, and must use an allowed HTTP or HTTPS origin policy.
 The nested `report` uses the existing structured submission fields, excluding
 public-only fields such as `turnstileToken` and `clientFingerprint`.
 
-### Response and idempotency
+#### Response and idempotency
 
 Return `202` with the site report ID and moderation status when a report is
 created. Repeating the same producer and `externalReportId` must return the
@@ -149,7 +198,7 @@ silently changing a submitted report.
 A single database uniqueness constraint on `(producer, external_report_id)` is
 the idempotency boundary. A separate inbox or event table is unnecessary.
 
-### Persistence
+#### Persistence
 
 Extend `crowd_reports` with the minimum provenance required by both routes:
 
@@ -177,7 +226,7 @@ the public distinct-IP threshold; this must be explicit at the wrapper call
 site and covered by tests. Do not encode a fake producer identity in the
 `crowd_report_abuse_events` table.
 
-### Contract ownership
+#### Contract ownership
 
 The route's Zod schema in `mrtdown-site` is the runtime source of truth. Keep a
 concise request and response example in this plan and in the monitor README.
@@ -188,7 +237,7 @@ Do not add OpenAPI generation, vendoring, compatibility windows, or generated
 consumer types until the boundary has more than one real producer or manual
 contract drift becomes a demonstrated problem.
 
-### Reference catalog
+#### Reference catalog
 
 Registered producers may use the same bearer credential to call:
 
@@ -208,7 +257,7 @@ ingestion. The report endpoint continues validating submitted references at the
 report's observation date, which also protects producers using a briefly stale
 catalog.
 
-## Monitor Boundary
+### Monitor Boundary
 
 This plan does not implement the sibling Worker, but the site contract assumes
 the following simple behavior:
@@ -233,21 +282,7 @@ workflow scheduling, source-object deduplication, parsing, and delivery retry.
 The site neither knows nor cares whether a report originated from a post,
 reply, edit, or another future producer.
 
-## Measured Workload and Initial Cadence
-
-A 2026-07-17 sample found approximately 54 new posts per day across the two
-target subreddits and about 2.65 daily matches for a deliberately broad rail
-keyword query. Manual sampling suggested only roughly one to three genuinely
-live operational threads per month.
-
-Reply traffic was front-loaded in representative disruption threads: roughly
-77% to 88% of sampled replies arrived within three hours. This supports a small
-fixed workflow schedule rather than a general polling scheduler or adaptive
-watch queue. Start with four polls during the first hour, followed by polls at
-three, six, and 24 hours. Change the cadence only after observing missed useful
-updates or unnecessary request volume.
-
-## Implementation Plan
+## Plan of Work
 
 ### Phase 1: Add the programmatic endpoint (completed 2026-07-18)
 
@@ -323,26 +358,7 @@ Exit criteria:
 - Retries do not create duplicate reports or canonical dispatches.
 - Only the monitor/site path produces new Reddit-derived reports.
 
-## Decisions
-
-- 2026-07-17: Use a dedicated Worker because frequent mostly-empty Reddit
-  discovery is a better fit for Cloudflare scheduling than waking the
-  scale-to-zero site.
-- 2026-07-18: Keep Reddit discovery in the existing crawler until the new
-  monitor demonstrates equivalent coverage.
-- 2026-07-18: Supersede the community-observation and community-claim designs
-  with a programmatic crowd-report endpoint feeding the existing site pipeline.
-- 2026-07-18: Keep conversations and workflow state entirely in the monitor;
-  each useful post or reply becomes one independent structured report.
-- 2026-07-18: Use one generic external report ID for retry safety instead of an
-  event inbox, claim version, or site-side lifecycle.
-- 2026-07-18: Defer OpenAPI generation until multiple producers or observed
-  contract drift justify it.
-- 2026-07-19: Expose a small authenticated `v1` reference catalog so machine
-  producers can validate parsed IDs without coupling to site-internal tables or
-  vendoring canonical data. Derive aliases only from canonical localized names.
-
-## Validation
+## Validation and Acceptance
 
 Run `npm run verify` after implementation. The endpoint test suite should cover
 authentication, schema validation, missing station/line references,

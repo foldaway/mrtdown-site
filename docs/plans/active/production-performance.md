@@ -1,35 +1,8 @@
 # Production Performance Plan
 
-## Context
+## Purpose
 
-Production checks on 2026-05-22 showed that heavier pages were slow mainly
-because the then-current Cloudflare Worker spent several seconds preparing SSR
-HTML before it sent the first byte. Static assets were fast, so asset delivery
-was not the primary bottleneck.
-
-Since those measurements, the application runtime has moved to a containerized
-Node.js service on Fly.io. The request-path, payload-size, and hydration goals
-remain relevant, but Worker-specific cache and observability tasks are
-historical unless explicitly carried forward below.
-
-This plan follows the investigation in
-`docs/investigations/2026-05-21-site-slowness.md`.
-
-Measured from Singapore with `curl --compressed -L`:
-
-| Route | TTFB samples | Transfer size |
-| --- | ---: | ---: |
-| `/` | 2.44s, 1.08s, 0.92s | ~77 KB compressed |
-| `/statistics` | 9.73s, 7.15s, 10.99s | ~77 KB compressed |
-| `/about` | 0.06s-0.15s | ~9 KB compressed |
-
-The sampled SSR responses did not expose useful `cache-control`,
-`cf-cache-status`, or `server-timing` headers. That makes it likely that public
-HTML is being rendered dynamically for each request, and also means we cannot
-yet separate database time, CPU time, and serialization time from production
-headers alone.
-
-## Goals
+### Goals
 
 - Bring `/statistics` TTFB below 1.5s for warm production requests.
 - Bring home page TTFB below 750ms for warm production requests.
@@ -39,16 +12,179 @@ headers alone.
   database queries, in-memory computation, SSR rendering, or response payload
   size.
 
-## Non-Goals
+### Non-Goals
 
 - This plan does not redesign the visual UI.
 - This plan does not replace TanStack Start.
 - This plan does not change the canonical pull workflow unless a later phase
   chooses to persist precomputed public page data.
 
-## Root Causes
+## Progress
 
-### 1. Statistics is computed on the request path
+- [x] Add repeatable route timing probes for HTML and agent Markdown (2026-06-13).
+- [x] Record replacement of Worker HTML caching with Fly and Cloudflare
+  response caching (2026-07-12).
+- [ ] Rerun warm and cold route probes and compare TTFB, payload size, and
+  cache behavior against the current targets.
+
+### Progress notes
+
+- 2026-07-12: Reintroduced public response caching for the Fly.io topology via
+  origin-controlled browser and Cloudflare headers rather than the Worker
+  Cache API. Successful public SSR, canonical Markdown, and sitemap responses
+  now share an environment-scoped cache tag. Completed canonical pulls,
+  public-holiday changes, and crowd-report submissions purge that tag. The
+  process-local public read-model caches were removed so a post-purge MISS
+  cannot repopulate Cloudflare with stale process memory. The anonymous Sentry
+  cookie now bootstraps through a separate `no-store` endpoint so `Set-Cookie`
+  does not make cacheable documents ineligible. See the [edge caching guide](../../operations/edge-caching.md)
+  for the required Cloudflare Cache Rule and Fly secrets.
+- 2026-07-11: Removed the Worker Cache API-backed public HTML cache and its
+  shared-cache response headers ahead of the move to Fly.io. Public HTML now
+  always passes through SSR; the public-route classification still used by
+  agent Markdown negotiation lives with that feature instead of in a cache
+  utility.
+- 2026-05-25: Implemented Phase 1 Worker-side public HTML caching for
+  successful public `GET` responses on the planned cacheable route set, plus
+  origin cache headers for matching `GET`/`HEAD` responses. Cacheable pages now
+  emit `Cache-Control: public, max-age=0, s-maxage=60,
+  stale-while-revalidate=300` and `X-MRTDown-Cache: public-html`; cache hits
+  return before SSR with `X-MRTDown-Render: public-html-cache`. API/internal
+  routes, non-candidate pages, non-HTML responses, non-200 responses,
+  `Set-Cookie`, private/no-store opt-outs, and client no-cache requests are
+  excluded. Added focused route-matching and cache-key tests in
+  `app/util/publicHtmlCache.test.ts`.
+- 2026-05-27: Started Phase 2 payload reduction for `/statistics`. The
+  statistics loader now returns an explicit included-entity subset: all lines
+  needed by the line chart, the top station-chart stations, the longest
+  disruption issues, and the line/station dependencies those issue cards need.
+  It no longer serializes the full operators, towns, landmarks, or station
+  dictionaries for the statistics route. Added focused selector coverage in
+  `app/util/dbQueries/includedEntities.test.ts`.
+- 2026-05-27: Advanced Phase 2 for `/` and started Phase 3. The home loader now
+  returns an explicit included-entity subset instead of the full base included
+  graph: rendered line summaries, selected advisory/date-card issues, and the
+  line/station dependencies those issue cards need. The route now SSR-loads the
+  mobile-sized 30-day window, then fetches the existing viewport-sized 60/90-day
+  windows client-side for larger screens without navigating to a `viewport`
+  search parameter.
+- 2026-05-27: Extended Phase 2 payload reduction beyond home/statistics. Line,
+  station, operator, issue, and history loaders now use the explicit
+  included-entity selector instead of spreading the full base included graph
+  into each response. The selector can now opt into route-local operators,
+  station towns, and station landmarks for pages that actually render them.
+- 2026-05-27: Extended the Phase 3 viewport-reload cleanup to operator profile
+  pages. Operator routes now SSR-load a 30-day baseline and fetch the wider
+  60/90-day viewport windows client-side without navigating to a `viewport`
+  search parameter, matching the home page pattern.
+- 2026-05-27: Started Phase 4 precomputed statistics. Added a rebuildable
+  `statistics_snapshots` read-model table, refresh it after pull workflow
+  operational facts and manual facts rebuilds, and make the statistics route use
+  the snapshot when available. The existing request-time statistics builder
+  remains as a fallback for development and un-migrated environments.
+- 2026-05-30: Continued Phase 4 by storing the statistics route's pruned
+  included-entity payload inside new statistics snapshot rows. The request path
+  now returns precomputed snapshot data and included entities without rebuilding
+  a dataset when the v1 snapshot shape is available, while legacy
+  statistics-only snapshot rows still fall back to the previous included-entity
+  assembly path.
+- 2026-05-31: Started Phase 5 production Web Vitals telemetry. The root route
+  now captures browser FCP, LCP, CLS, and approximate INP metrics through the
+  existing PostHog provider in production, tagged with normalized route paths so
+  entity IDs do not create high-cardinality analytics dimensions.
+- 2026-06-10: Continued Phase 5 statistics hydration cleanup. The statistics
+  grid now lazy-loads chart-heavy cards behind stable skeleton placeholders and
+  an `IntersectionObserver` viewport gate, keeping Recharts and chart card code
+  out of the initial statistics route render until the cards are near view. A
+  production build emits separate client chunks for `CountTrendCards`,
+  `DurationTrendCards`, `LinesIssueCountCard`, `StationsIssueCountCard`, and
+  `DisruptionsHeatmap`.
+- 2026-06-11: Continued Phase 5 line profile hydration cleanup. The line route
+  now lazy-loads the focused system map and line chart cards behind stable
+  skeleton placeholders and an `IntersectionObserver` viewport gate. A
+  production build keeps the line route entry chunk from preloading the
+  generated `StationMap` asset and shared Recharts charting chunk up front; they
+  remain nested lazy dependencies of the line component chunk.
+- 2026-06-11: Continued Phase 5 operator profile hydration cleanup. The
+  operator route now lazy-loads the shared line chart cards behind stable
+  skeleton placeholders and an `IntersectionObserver` viewport gate. A
+  production build emits separate client chunks for `CountTrendCards`,
+  `UptimeRatioTrendCards`, and the shared Recharts charting chunk instead of
+  importing the chart implementation directly in the operator route entry.
+- 2026-06-11: Continued Phase 5 generated map bundle cleanup. `StationMap` now
+  keeps the current April 2025 snapshot in the base map chunk and lazy-loads
+  historical and future generated snapshots only when their timeline tabs are
+  opened. A production build emits separate client chunks for the inactive
+  `MapJan2012`, `MapNov2017`, `MapDec2019`, `MapNov2024`, `MapDec2027`,
+  `MapDec2029`, `MapDec2030`, and `MapDec2032` snapshots.
+- 2026-06-11: Continued Phase 5 statistics hydration cleanup by lazy-loading
+  the longest-disruptions card behind the existing statistics viewport gate and
+  skeleton. The statistics route preload set no longer includes `IssueCard`,
+  Radix Collapsible, or chevron icon chunks up front; those dependencies now
+  sit behind the separate `LongestDisruptionsCard` chunk. Tightened the
+  TanStack route-file ignore pattern so support `helpers`, `components`,
+  `hooks`, and test files are not scanned as route files during builds.
+- 2026-06-12: Continued Phase 5 hydration cleanup by extracting the repeated
+  viewport-gated `Suspense` wrapper used by statistics, line, and operator
+  routes into `DeferredViewportWidget`, and by sharing the profile chart/map
+  skeletons. A production build keeps statistics chart cards, line trend cards,
+  `LineSystemMapCard`, and generated `StationMap` assets as dynamic imports
+  rather than route preloads; route preloads now include only the small shared
+  deferred wrapper.
+- 2026-06-13: Continued Phase 5 profile route hydration cleanup by lazy-loading
+  the optional `CommunitySignalsSection` behind `DeferredViewportWidget` on
+  home, line, and station routes. A production build now emits a separate
+  `CommunitySignalsSection` client/server chunk, and the home, line, and
+  station route component entries list it only as a dynamic import instead of
+  an eager route dependency.
+- 2026-06-13: Continued Phase 5 profile route hydration cleanup by
+  lazy-loading recent-issues sections behind `DeferredViewportWidget` on line,
+  operator, and station profile routes. A production build now emits separate
+  recent-issues chunks, keeping `IssueCard` out of the initial profile route
+  render and keeping the shared line/operator recent-issues Radix Collapsible
+  dependency behind the viewport gate.
+- 2026-06-13: Continued Phase 5 route preload cleanup by removing the unused
+  runtime `ViewportSchema` from `useViewport`. The home and operator route
+  entries still use the viewport hook, but the production build no longer pulls
+  the `zod` chunk through that hook.
+- 2026-06-13: Continued Phase 5 home hydration cleanup by splitting the
+  collapsed current-advisory issue details into a lazy `Details` chunk and
+  replacing the eager Radix Collapsible dependency with local button state. A
+  production build emits separate client assets for `Details` and `IssueCard`,
+  keeping advisory detail cards out of the initial home route bundle until the
+  user opens the section.
+- 2026-06-13: Continued Phase 0 repeatable production checks by extending
+  `npm run perf:routes` beyond public HTML routes. The script now samples
+  `/llms.txt`, `/index.md`, representative line/station/operator `index.md`
+  routes, `.md` alias attempts, and a regular HTML route with
+  `Accept: text/markdown`; results include sample number, TTFB, total time,
+  response bytes, content type, Cloudflare cache status, app cache marker,
+  render source, cache-control, and server-timing headers. Use
+  `PROBES=html`, `PROBES=markdown`, or `PROBES=all` to scope a run.
+- 2026-06-13: Ran `SAMPLES=1 PROBES=markdown npm run perf:routes --`
+  against production after the script update. `/llms.txt`, `/index.md`, and
+  representative line/station/operator `index.md` routes returned 200
+  `text/markdown` responses with `X-MRTDown-Cache: public-markdown`.
+  Unsupported `.md` alias attempts and `/lines/BPLRT` with
+  `Accept: text/markdown` currently return 500 JSON responses in production,
+  so a follow-up should decide whether those should normalize to 404/406 before
+  adding alias support.
+- 2026-06-13: Normalized unsupported Markdown request surfaces before they
+  reach the TanStack router. Non-canonical `.md` alias attempts now return 404
+  plain text, while explicit `Accept: text/markdown` requests for non-Markdown
+  routes return 406 plain text. Canonical Markdown routes still pass through
+  their route handlers and keep public Markdown cache headers.
+- 2026-06-15: Clarified the Phase 5 map-bundle strategy for SEO. The public
+  `/system-map` route now passes eager generated snapshot components into
+  `StationMap` so timeline map content does not depend on React Suspense
+  fallbacks, while supporting profile widgets can continue using the default
+  deferred snapshot imports behind their viewport gate.
+
+## Surprises & Discoveries
+
+### Original root causes
+
+#### 1. Statistics is computed on the request path
 
 `getStatisticsData` loads the base dataset, scans all issues for line and station
 totals, sorts longest disruptions, checks operational fact coverage, and builds
@@ -60,7 +196,7 @@ Relevant code:
 - `app/util/statistics.functions.ts`
 - `app/util/dbQueries/statistics.ts#getStatisticsData`
 
-### 2. Route responses serialize more included data than they need
+#### 2. Route responses serialize more included data than they need
 
 `withIssues` spreads the whole base included entity set into route payloads. Even
 when a route only needs selected issues, the response still carries full line,
@@ -77,7 +213,7 @@ Relevant code:
 - `app/util/dbQueries/includedEntities.ts#selectIncludedEntities`
 - `app/contexts/IncludedEntities.ts`
 
-### 3. Home page performs viewport-dependent data loading
+#### 3. Home page performs viewport-dependent data loading
 
 The home route defaults to `viewport=xs`, then the client measures the viewport
 and navigates to a new search parameter if the real viewport differs. Desktop
@@ -90,7 +226,7 @@ Relevant code:
 - `app/hooks/useViewport.ts`
 - `app/helpers/getDateCountForViewport.ts`
 
-### 4. Public response caching depends on Cloudflare
+#### 4. Public response caching depends on Cloudflare
 
 The former five-minute process-local base and overview dataset caches were
 removed when Cloudflare became the sole public response cache. This avoids
@@ -102,13 +238,66 @@ Relevant code:
 - `app/util/dbQueries/dataset.ts#getBaseDataset`
 - `app/util/dbQueries/dataset.ts#buildDataset`
 
-### 5. Public SSR HTML is not application-cached
+#### 5. Public SSR HTML is not application-cached
 
 The former Worker Cache API implementation was removed before the Fly.io
 migration. Public HTML currently passes through SSR, so repeated requests still
 pay the application render cost unless a separate upstream cache is configured.
 
-## Plan
+### Originally open questions
+
+- Should public HTML remain uncached on Fly.io, or should a separate reverse
+  proxy/CDN cache be introduced with explicit invalidation and cache-status
+  telemetry?
+- Are statistics allowed to be stale by 1-5 minutes, or should they update
+  immediately after each successful data pull?
+- Which production telemetry target should own route timing data: Sentry,
+  PostHog, Fly logs, or structured application logs?
+- Should precomputed statistics remain in Postgres or move to a generated
+  artifact deployed with the application?
+
+## Decision Log
+
+- 2026-07-11 — Retire the Worker Cache API implementation for the move to Fly.
+- 2026-07-12 — Use origin freshness headers and Cloudflare cache tags for public
+  documents. See the [edge caching guide](../../operations/edge-caching.md).
+
+## Outcomes & Retrospective
+
+The progress notes record narrower loader payloads, deferred hydration,
+and precomputed statistics. Collect a fresh production comparison before
+closing the plan against its latency and payload targets.
+
+## Context
+
+Production checks on 2026-05-22 showed that heavier pages were slow mainly
+because the then-current Cloudflare Worker spent several seconds preparing SSR
+HTML before it sent the first byte. Static assets were fast, so asset delivery
+was not the primary bottleneck.
+
+Since those measurements, the application runtime has moved to a containerized
+Node.js service on Fly.io. The request-path, payload-size, and hydration goals
+remain relevant, but Worker-specific cache and observability tasks are
+historical unless explicitly carried forward below.
+
+This plan follows the investigation in
+[site slowness investigation](../../investigations/2026-05-21-site-slowness.md).
+
+Measured from Singapore with `curl --compressed -L`:
+
+| Route | TTFB samples | Transfer size |
+| --- | ---: | ---: |
+| `/` | 2.44s, 1.08s, 0.92s | ~77 KB compressed |
+| `/statistics` | 9.73s, 7.15s, 10.99s | ~77 KB compressed |
+| `/about` | 0.06s-0.15s | ~9 KB compressed |
+
+The sampled SSR responses did not expose useful `cache-control`,
+`cf-cache-status`, or `server-timing` headers. That makes it likely that public
+HTML is being rendered dynamically for each request, and also means we cannot
+yet separate database time, CPU time, and serialization time from production
+headers alone.
+
+## Plan of Work
 
 ### Phase 0: Instrument First
 
@@ -275,7 +464,7 @@ Exit criteria:
 - Chart-heavy statistics code is loaded only when needed.
 - Route-level Web Vitals are visible in production telemetry.
 
-## Historical Implementation Order
+### Historical Implementation Order
 
 1. Add `Server-Timing` and route timing logs.
 2. Add short public HTML edge caching.
@@ -288,160 +477,7 @@ Exit criteria:
 This was the original order. Phase 1 caching has since been retired; use the
 progress notes and current measurements before planning new work.
 
-## Progress Notes
-
-- 2026-07-12: Reintroduced public response caching for the Fly.io topology via
-  origin-controlled browser and Cloudflare headers rather than the Worker
-  Cache API. Successful public SSR, canonical Markdown, and sitemap responses
-  now share an environment-scoped cache tag. Completed canonical pulls,
-  public-holiday changes, and crowd-report submissions purge that tag. The
-  process-local public read-model caches were removed so a post-purge MISS
-  cannot repopulate Cloudflare with stale process memory. The anonymous Sentry
-  cookie now bootstraps through a separate `no-store` endpoint so `Set-Cookie`
-  does not make cacheable documents ineligible. See `docs/CACHING.md` for the
-  required Cloudflare Cache Rule and Fly secrets.
-- 2026-07-11: Removed the Worker Cache API-backed public HTML cache and its
-  shared-cache response headers ahead of the move to Fly.io. Public HTML now
-  always passes through SSR; the public-route classification still used by
-  agent Markdown negotiation lives with that feature instead of in a cache
-  utility.
-- 2026-05-25: Implemented Phase 1 Worker-side public HTML caching for
-  successful public `GET` responses on the planned cacheable route set, plus
-  origin cache headers for matching `GET`/`HEAD` responses. Cacheable pages now
-  emit `Cache-Control: public, max-age=0, s-maxage=60,
-  stale-while-revalidate=300` and `X-MRTDown-Cache: public-html`; cache hits
-  return before SSR with `X-MRTDown-Render: public-html-cache`. API/internal
-  routes, non-candidate pages, non-HTML responses, non-200 responses,
-  `Set-Cookie`, private/no-store opt-outs, and client no-cache requests are
-  excluded. Added focused route-matching and cache-key tests in
-  `app/util/publicHtmlCache.test.ts`.
-- 2026-05-27: Started Phase 2 payload reduction for `/statistics`. The
-  statistics loader now returns an explicit included-entity subset: all lines
-  needed by the line chart, the top station-chart stations, the longest
-  disruption issues, and the line/station dependencies those issue cards need.
-  It no longer serializes the full operators, towns, landmarks, or station
-  dictionaries for the statistics route. Added focused selector coverage in
-  `app/util/dbQueries/includedEntities.test.ts`.
-- 2026-05-27: Advanced Phase 2 for `/` and started Phase 3. The home loader now
-  returns an explicit included-entity subset instead of the full base included
-  graph: rendered line summaries, selected advisory/date-card issues, and the
-  line/station dependencies those issue cards need. The route now SSR-loads the
-  mobile-sized 30-day window, then fetches the existing viewport-sized 60/90-day
-  windows client-side for larger screens without navigating to a `viewport`
-  search parameter.
-- 2026-05-27: Extended Phase 2 payload reduction beyond home/statistics. Line,
-  station, operator, issue, and history loaders now use the explicit
-  included-entity selector instead of spreading the full base included graph
-  into each response. The selector can now opt into route-local operators,
-  station towns, and station landmarks for pages that actually render them.
-- 2026-05-27: Extended the Phase 3 viewport-reload cleanup to operator profile
-  pages. Operator routes now SSR-load a 30-day baseline and fetch the wider
-  60/90-day viewport windows client-side without navigating to a `viewport`
-  search parameter, matching the home page pattern.
-- 2026-05-27: Started Phase 4 precomputed statistics. Added a rebuildable
-  `statistics_snapshots` read-model table, refresh it after pull workflow
-  operational facts and manual facts rebuilds, and make the statistics route use
-  the snapshot when available. The existing request-time statistics builder
-  remains as a fallback for development and un-migrated environments.
-- 2026-05-30: Continued Phase 4 by storing the statistics route's pruned
-  included-entity payload inside new statistics snapshot rows. The request path
-  now returns precomputed snapshot data and included entities without rebuilding
-  a dataset when the v1 snapshot shape is available, while legacy
-  statistics-only snapshot rows still fall back to the previous included-entity
-  assembly path.
-- 2026-05-31: Started Phase 5 production Web Vitals telemetry. The root route
-  now captures browser FCP, LCP, CLS, and approximate INP metrics through the
-  existing PostHog provider in production, tagged with normalized route paths so
-  entity IDs do not create high-cardinality analytics dimensions.
-- 2026-06-10: Continued Phase 5 statistics hydration cleanup. The statistics
-  grid now lazy-loads chart-heavy cards behind stable skeleton placeholders and
-  an `IntersectionObserver` viewport gate, keeping Recharts and chart card code
-  out of the initial statistics route render until the cards are near view. A
-  production build emits separate client chunks for `CountTrendCards`,
-  `DurationTrendCards`, `LinesIssueCountCard`, `StationsIssueCountCard`, and
-  `DisruptionsHeatmap`.
-- 2026-06-11: Continued Phase 5 line profile hydration cleanup. The line route
-  now lazy-loads the focused system map and line chart cards behind stable
-  skeleton placeholders and an `IntersectionObserver` viewport gate. A
-  production build keeps the line route entry chunk from preloading the
-  generated `StationMap` asset and shared Recharts charting chunk up front; they
-  remain nested lazy dependencies of the line component chunk.
-- 2026-06-11: Continued Phase 5 operator profile hydration cleanup. The
-  operator route now lazy-loads the shared line chart cards behind stable
-  skeleton placeholders and an `IntersectionObserver` viewport gate. A
-  production build emits separate client chunks for `CountTrendCards`,
-  `UptimeRatioTrendCards`, and the shared Recharts charting chunk instead of
-  importing the chart implementation directly in the operator route entry.
-- 2026-06-11: Continued Phase 5 generated map bundle cleanup. `StationMap` now
-  keeps the current April 2025 snapshot in the base map chunk and lazy-loads
-  historical and future generated snapshots only when their timeline tabs are
-  opened. A production build emits separate client chunks for the inactive
-  `MapJan2012`, `MapNov2017`, `MapDec2019`, `MapNov2024`, `MapDec2027`,
-  `MapDec2029`, `MapDec2030`, and `MapDec2032` snapshots.
-- 2026-06-11: Continued Phase 5 statistics hydration cleanup by lazy-loading
-  the longest-disruptions card behind the existing statistics viewport gate and
-  skeleton. The statistics route preload set no longer includes `IssueCard`,
-  Radix Collapsible, or chevron icon chunks up front; those dependencies now
-  sit behind the separate `LongestDisruptionsCard` chunk. Tightened the
-  TanStack route-file ignore pattern so support `helpers`, `components`,
-  `hooks`, and test files are not scanned as route files during builds.
-- 2026-06-12: Continued Phase 5 hydration cleanup by extracting the repeated
-  viewport-gated `Suspense` wrapper used by statistics, line, and operator
-  routes into `DeferredViewportWidget`, and by sharing the profile chart/map
-  skeletons. A production build keeps statistics chart cards, line trend cards,
-  `LineSystemMapCard`, and generated `StationMap` assets as dynamic imports
-  rather than route preloads; route preloads now include only the small shared
-  deferred wrapper.
-- 2026-06-13: Continued Phase 5 profile route hydration cleanup by lazy-loading
-  the optional `CommunitySignalsSection` behind `DeferredViewportWidget` on
-  home, line, and station routes. A production build now emits a separate
-  `CommunitySignalsSection` client/server chunk, and the home, line, and
-  station route component entries list it only as a dynamic import instead of
-  an eager route dependency.
-- 2026-06-13: Continued Phase 5 profile route hydration cleanup by
-  lazy-loading recent-issues sections behind `DeferredViewportWidget` on line,
-  operator, and station profile routes. A production build now emits separate
-  recent-issues chunks, keeping `IssueCard` out of the initial profile route
-  render and keeping the shared line/operator recent-issues Radix Collapsible
-  dependency behind the viewport gate.
-- 2026-06-13: Continued Phase 5 route preload cleanup by removing the unused
-  runtime `ViewportSchema` from `useViewport`. The home and operator route
-  entries still use the viewport hook, but the production build no longer pulls
-  the `zod` chunk through that hook.
-- 2026-06-13: Continued Phase 5 home hydration cleanup by splitting the
-  collapsed current-advisory issue details into a lazy `Details` chunk and
-  replacing the eager Radix Collapsible dependency with local button state. A
-  production build emits separate client assets for `Details` and `IssueCard`,
-  keeping advisory detail cards out of the initial home route bundle until the
-  user opens the section.
-- 2026-06-13: Continued Phase 0 repeatable production checks by extending
-  `npm run perf:routes` beyond public HTML routes. The script now samples
-  `/llms.txt`, `/index.md`, representative line/station/operator `index.md`
-  routes, `.md` alias attempts, and a regular HTML route with
-  `Accept: text/markdown`; results include sample number, TTFB, total time,
-  response bytes, content type, Cloudflare cache status, app cache marker,
-  render source, cache-control, and server-timing headers. Use
-  `PROBES=html`, `PROBES=markdown`, or `PROBES=all` to scope a run.
-- 2026-06-13: Ran `SAMPLES=1 PROBES=markdown npm run perf:routes --`
-  against production after the script update. `/llms.txt`, `/index.md`, and
-  representative line/station/operator `index.md` routes returned 200
-  `text/markdown` responses with `X-MRTDown-Cache: public-markdown`.
-  Unsupported `.md` alias attempts and `/lines/BPLRT` with
-  `Accept: text/markdown` currently return 500 JSON responses in production,
-  so a follow-up should decide whether those should normalize to 404/406 before
-  adding alias support.
-- 2026-06-13: Normalized unsupported Markdown request surfaces before they
-  reach the TanStack router. Non-canonical `.md` alias attempts now return 404
-  plain text, while explicit `Accept: text/markdown` requests for non-Markdown
-  routes return 406 plain text. Canonical Markdown routes still pass through
-  their route handlers and keep public Markdown cache headers.
-- 2026-06-15: Clarified the Phase 5 map-bundle strategy for SEO. The public
-  `/system-map` route now passes eager generated snapshot components into
-  `StationMap` so timeline map content does not depend on React Suspense
-  fallbacks, while supporting profile widgets can continue using the default
-  deferred snapshot imports behind their viewport gate.
-
-## Validation
+## Validation and Acceptance
 
 For each phase:
 
@@ -467,15 +503,3 @@ wc -c /tmp/mrtdown-statistics.html /tmp/mrtdown-statistics.headers
 
 SAMPLES=2 PROBES=all npm run perf:routes -- https://www.mrtdown.org
 ```
-
-## Open Questions
-
-- Should public HTML remain uncached on Fly.io, or should a separate reverse
-  proxy/CDN cache be introduced with explicit invalidation and cache-status
-  telemetry?
-- Are statistics allowed to be stale by 1-5 minutes, or should they update
-  immediately after each successful data pull?
-- Which production telemetry target should own route timing data: Sentry,
-  PostHog, Fly logs, or structured application logs?
-- Should precomputed statistics remain in Postgres or move to a generated
-  artifact deployed with the application?

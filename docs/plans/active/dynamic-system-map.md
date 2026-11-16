@@ -1,24 +1,8 @@
 # Dynamic System Map Plan
 
-## Context
+## Purpose
 
-`mrtdown-site` currently renders the system map from large hard-coded TSX
-snapshots under `app/components/StationMap/components/Map*.tsx`. The snapshots
-are selected by fixed timeline values in `StationMap`, and the map interaction
-logic depends on SVG ids for line groups, station nodes, station labels, and
-line segments.
-
-The existing feasibility investigation is
-`docs/investigations/2026-05-24-system-map-generation-feasibility.md`.
-
-The preferred direction is a larger Opt 1/2 migration: keep schematic map
-generation canonical in `mrtdown-data`, then have `mrtdown-site` pull, validate,
-and render generated schematic map data. This keeps transit facts, layout rules,
-constraints, and generated schematic versions in the same canonical data
-publication pipeline while leaving site-specific rendering, status overlays,
-links, zoom, and interaction behavior inside `mrtdown-site`.
-
-## Goals
+### Goals
 
 - Move system map authoring away from hard-coded generated TSX snapshots.
 - Treat generated schematic map versions as artifacts published by `mrtdown-data`.
@@ -39,7 +23,7 @@ links, zoom, and interaction behavior inside `mrtdown-site`.
   data through reviewed `mrtdown-data` pull requests instead of making
   `mrtdown-site` a direct data authority.
 
-## Non-Goals
+### Non-Goals
 
 - This plan does not make `mrtdown-site` the canonical owner of schematic data.
 - This plan does not require automatic graph layout from transit topology alone;
@@ -55,7 +39,83 @@ links, zoom, and interaction behavior inside `mrtdown-site`.
   hard-coded coordinates when a coherent LTA-style generated layout is visually
   acceptable.
 
-## Ownership Model
+## Progress
+
+- [x] Record the feasibility investigation and the proposed repository
+  ownership (2026-05-24).
+- [ ] Confirm the current generator contract in `mrtdown-data` and compare a
+  representative generated snapshot with the existing April 2025 site map.
+
+### Progress log
+
+- 2026-05-24: Created plan after deciding that schematic map data should be
+  canonical in `mrtdown-data`, with `mrtdown-site` responsible for rendering and
+  interaction behavior.
+- 2026-05-24: Added protected map designer direction for visual authoring that
+  submits reviewed canonical changes back to `mrtdown-data`.
+
+## Surprises & Discoveries
+
+See the [feasibility investigation](../../investigations/2026-05-24-system-map-generation-feasibility.md)
+for the comparison of map generation approaches.
+
+## Decision Log
+
+- 2026-05-24: Use complete snapshot map versions as the published storage
+  contract because large schematic reflows make mandatory `extends` deltas hard
+  to review and maintain.
+- 2026-05-24: Allow raw SVG path geometry and explicit layer ordering so
+  reviewed exceptions can be preserved rather than forced through an
+  inappropriate generic auto-layout algorithm.
+- 2026-05-24: Keep rendering and interaction behavior in `mrtdown-site`; only
+  schematic data and validation belong in the canonical data source.
+- 2026-05-24: Treat any map designer as an authoring client for
+  `mrtdown-data`, similar in direction to crowdsourced report dispatch but with
+  higher-trust access and PR review before canonical publication.
+- 2026-05-25: Align with the data-side generator-first plan: the generator
+  implementation plus rule and constraint inputs are canonical, while generated
+  snapshots are reproducible artifacts.
+- 2026-05-25: Use `2025-04` as the first baseline and preserve the current SVG id
+  interaction contract during migration.
+- 2026-05-25: Visual parity means coherent LTA-style output with compatible ids,
+  visible network coverage, reasonable label placement, and no major visual
+  regression; it does not mean exact coordinate reproduction.
+- 2026-05-25: Use `lta-system-map-2011` as the first layout engine id.
+- 2026-05-25: Start constraints at station and line-segment scope; avoid
+  per-station absolute coordinates except map-frame anchors and explained
+  exceptions.
+- 2026-05-25: Parse current hard-coded maps into reference fixtures, starting
+  with `MapApr2025.tsx`.
+- 2026-05-25: Treat LTA-style rules as inferred from reference maps and observed
+  conventions because no formal spec is assumed.
+- 2026-05-25: Generated snapshots store structured map primitives for the site
+  renderer, not TSX.
+- 2026-05-25: Model interchange node composition early because overlays depend
+  on line-specific station node parts.
+
+## Outcomes & Retrospective
+
+The site renderer and visual parity checks remain open in this plan.
+
+## Context
+
+`mrtdown-site` currently renders the system map from large hard-coded TSX
+snapshots under `app/components/StationMap/components/Map*.tsx`. The snapshots
+are selected by fixed timeline values in `StationMap`, and the map interaction
+logic depends on SVG ids for line groups, station nodes, station labels, and
+line segments.
+
+The existing feasibility investigation is
+[system map feasibility investigation](../../investigations/2026-05-24-system-map-generation-feasibility.md).
+
+The preferred direction is a larger Opt 1/2 migration: keep schematic map
+generation canonical in `mrtdown-data`, then have `mrtdown-site` pull, validate,
+and render generated schematic map data. This keeps transit facts, layout rules,
+constraints, and generated schematic versions in the same canonical data
+publication pipeline while leaving site-specific rendering, status overlays,
+links, zoom, and interaction behavior inside `mrtdown-site`.
+
+### Ownership Model
 
 `mrtdown-data` should own:
 
@@ -81,7 +141,7 @@ links, zoom, and interaction behavior inside `mrtdown-site`.
   request, or equivalent reviewed ingest workflow;
 - route-level loading, caching, bundle strategy, and visual QA.
 
-## Phases
+## Plan of Work
 
 ### Phase 1: Cross-Repo Generator Data Contract
 
@@ -234,49 +294,7 @@ Exit criteria:
   replaced.
 - No runtime path depends on the old hard-coded TSX snapshots.
 
-## Progress Log
-
-- 2026-05-24: Created plan after deciding that schematic map data should be
-  canonical in `mrtdown-data`, with `mrtdown-site` responsible for rendering and
-  interaction behavior.
-- 2026-05-24: Added protected map designer direction for visual authoring that
-  submits reviewed canonical changes back to `mrtdown-data`.
-
-## Decision Log
-
-- 2026-05-24: Use complete snapshot map versions as the published storage
-  contract because large schematic reflows make mandatory `extends` deltas hard
-  to review and maintain.
-- 2026-05-24: Allow raw SVG path geometry and explicit layer ordering so
-  reviewed exceptions can be preserved rather than forced through an
-  inappropriate generic auto-layout algorithm.
-- 2026-05-24: Keep rendering and interaction behavior in `mrtdown-site`; only
-  schematic data and validation belong in the canonical data source.
-- 2026-05-24: Treat any map designer as an authoring client for
-  `mrtdown-data`, similar in direction to crowdsourced report dispatch but with
-  higher-trust access and PR review before canonical publication.
-- 2026-05-25: Align with the data-side generator-first plan: the generator
-  implementation plus rule and constraint inputs are canonical, while generated
-  snapshots are reproducible artifacts.
-- 2026-05-25: Use `2025-04` as the first baseline and preserve the current SVG id
-  interaction contract during migration.
-- 2026-05-25: Visual parity means coherent LTA-style output with compatible ids,
-  visible network coverage, reasonable label placement, and no major visual
-  regression; it does not mean exact coordinate reproduction.
-- 2026-05-25: Use `lta-system-map-2011` as the first layout engine id.
-- 2026-05-25: Start constraints at station and line-segment scope; avoid
-  per-station absolute coordinates except map-frame anchors and explained
-  exceptions.
-- 2026-05-25: Parse current hard-coded maps into reference fixtures, starting
-  with `MapApr2025.tsx`.
-- 2026-05-25: Treat LTA-style rules as inferred from reference maps and observed
-  conventions because no formal spec is assumed.
-- 2026-05-25: Generated snapshots store structured map primitives for the site
-  renderer, not TSX.
-- 2026-05-25: Model interchange node composition early because overlays depend
-  on line-specific station node parts.
-
-## Validation
+## Validation and Acceptance
 
 For site-side changes:
 

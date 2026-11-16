@@ -7,7 +7,7 @@ they can retrieve current transit status and canonical entity context without
 parsing the React UI.
 
 This plan follows the investigation in
-`docs/investigations/2026-05-29-markdown-for-agents-feasibility.md`.
+[Markdown for agents feasibility investigation](../../investigations/2026-05-29-markdown-for-agents-feasibility.md).
 
 Relevant code:
 

@@ -1,65 +1,35 @@
-# Agent Notes
+# Agent Map
 
-This repository is mid-overhaul on the stacked `codex/overhaul-*` branches.
+Start at the [documentation index](docs/README.md). Keep durable guidance in
+the relevant subject guide and use this file to point to it.
 
-## Entry Points
+## Entry points
 
-- App routes live in `app/routes`.
-- Server functions live in `app/util/*.functions.ts`.
-- Database schema and connection helpers live in `app/db`.
-- Canonical data pull workflow code lives in `app/workflows/pull`.
-- Generated files include `app/routeTree.gen.ts` and large station map snapshots under `app/components/StationMap/components/Map*.tsx`.
+- [Local setup and commands](README.md)
+- [Architecture](docs/architecture/overview.md) for routes in `app/routes`,
+  server functions in `app/util/*.functions.ts`, and the PostGIS read model
+  in `app/db` and `app/util/dbQueries`. Prefer canonical `@mrtdown/core`
+  domain types where possible.
+- [Data pipeline](docs/architecture/data-pipeline.md) for canonical archive
+  imports and timetable retention in `app/workflows/pull`.
+- [Quality checks](docs/development/quality.md) and
+  [generated files](docs/development/generated-files.md).
+- [Writing docs and proposals](docs/development/writing.md) for concise,
+  scannable changes and decision records.
+- [Execution plans](docs/plans/README.md) for choosing a checklist or a
+  versioned plan, finding existing work, and recording a handoff.
 
-## Code Organization
+## Working rules
 
-When writing code, favor focused modules: create separate files when they improve cohesion and avoid accumulating thousands of lines in a single file.
+- Keep modules focused. Declare an explicit TypeScript props type for React
+  components and use it in the function signature.
+- Regenerate generated files with their owning tools. Use `npm run db:generate`
+  for schema migrations so Drizzle maintains the SQL, snapshots, and journal.
+- Run `npm run verify` before handing back or publishing changes.
+  Report any blocked or failing check, including the command and remaining risk.
+- Use Conventional Commits for commit subjects and PR titles. Add this trailer
+  after a blank line in Codex-created commits:
 
-For React components, declare an explicit TypeScript props type (for example, `type ComponentProps = { ... }`) and use it in the function signature instead of declaring props inline in the parameter list.
-
-## Verification
-
-Run `npm run verify` before handing work back or publishing changes. The command runs typechecking, linting, formatting checks, migration drift checks, and tests.
-
-Agents must treat validation as part of the task, not as an optional follow-up. If validation cannot be run, or if any validation step fails, document the exact command, failure, and remaining risk in the final response and do not claim the work is ready.
-
-Use narrower commands while iterating:
-
-- `npm run typecheck`
-- `npm run lint`
-- `npm run format:check`
-- `npm run test:run`
-- `npm run verify:strict`
-
-## Commits and Pull Requests
-
-Commit subjects and PR titles must follow Conventional Commits, for example `chore: retire generated API client types`. Keep each subject aligned with the change scope so release tooling and changelog readers can classify the change without opening it.
-
-Commits created with an agent must include an agent co-author trailer. For Codex, add this exact trailer after a blank line at the end of the commit message:
-
-```text
-Co-authored-by: Codex <codex@openai.com>
-```
-
-## Generated Files
-
-Do not manually edit generated files unless the task is explicitly about generated output. Prefer regenerating them with the relevant script or tool, then review the generated diff.
-
-## Database Migrations
-
-Create database migrations through the Drizzle CLI (`npm run db:generate` or `drizzle-kit generate`) so `drizzle/meta/_journal.json`, snapshot files, and migration timestamps stay consistent. Do not hand-create numbered migration files or manually edit the Drizzle journal unless repairing existing migration metadata.
-
-## Overhaul Context
-
-The overhaul moves data reads from the generated MRTDown API client toward a local Postgres/PostGIS-backed read model populated from canonical mrtdown data archives. The generated API client has been retired, and the remaining extracted read-model type surface should continue shrinking toward canonical `@mrtdown/core` types. See `docs/OVERHAUL_BASELINE.md`, `docs/ARCHITECTURE.md`, `docs/DATA_PIPELINE.md`, and `docs/GENERATED_FILES.md`.
-
-## Current Plans
-
-Use checked-in plans for multi-phase work that needs durable context across agent runs. Active plans live in `docs/plans/active`, completed plans live in `docs/plans/completed`, and plan conventions live in `docs/plans/README.md`.
-
-Current active plans:
-
-- `docs/plans/active/dynamic-system-map.md`
-- `docs/plans/active/production-performance.md`
-- `docs/plans/active/production-egress-reduction.md`
-- `docs/plans/active/reddit-community-monitoring.md`
-- `docs/plans/active/seo-remediation.md`
+  ```text
+  Co-authored-by: Codex <codex@openai.com>
+  ```
