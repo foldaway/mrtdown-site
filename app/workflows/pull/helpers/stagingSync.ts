@@ -29,6 +29,7 @@ import {
 } from 'drizzle-orm';
 import { CANONICAL_TOPOLOGY_PROMOTION_KEY } from '../../../db/canonicalTopologyPromotion.js';
 import type { getDb } from '../../../db/index.js';
+import { markPageProfilesUpdating } from '../../../db/pageProfileGeneration.js';
 import {
   evidencesTable,
   impactEventBasisEvidencesTable,
@@ -542,6 +543,7 @@ export async function syncOperatorsTownsLandmarksUpserts(
   db: Db,
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    await markPageProfilesUpdating(tx);
     // A partial promotion must not serve topology or skip recovery to the previous manifest.
     await tx
       .delete(metadataTable)

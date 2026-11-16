@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyPublicDataCacheHeaders,
   getPublicDataCacheTag,
+  ISSUE_PROFILE_FRESH_UNTIL_HEADER,
   PUBLIC_BROWSER_CACHE_CONTROL,
   PUBLIC_CLOUDFLARE_CACHE_CONTROL,
   STATION_PROFILE_FRESH_UNTIL_HEADER,
@@ -172,6 +173,50 @@ describe('public response cache policy', () => {
     expect(getPublicDataCacheTag('Preview Branch')).toBe(
       'mrtdown-preview-branch-data',
     );
+  });
+});
+
+describe('completed issue edge caching', () => {
+  const now = Date.parse('2026-11-16T15:59:00Z');
+
+  beforeEach(() => vi.spyOn(Date, 'now').mockReturnValue(now));
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each([
+    ['text/html', 'public-html'],
+    ['text/markdown', 'public-markdown'],
+  ])('caps %s freshness at Singapore midnight', (contentType, marker) => {
+    const cached = applyPublicDataCacheHeaders(
+      request(),
+      response(contentType, {
+        headers: { [ISSUE_PROFILE_FRESH_UNTIL_HEADER]: String(now + 60_000) },
+      }),
+    );
+
+    expect(cached.headers.get('cloudflare-cdn-cache-control')).toBe(
+      'public, max-age=60, must-revalidate, stale-if-error=0',
+    );
+    expect(cached.headers.get('x-mrtdown-cache')).toBe(marker);
+    expect(cached.headers.has(ISSUE_PROFILE_FRESH_UNTIL_HEADER)).toBe(false);
+  });
+
+  it('strips shared caching headers if Markdown rendering crosses the deadline', () => {
+    const expired = applyPublicDataCacheHeaders(
+      request(),
+      response('text/markdown', {
+        headers: {
+          [ISSUE_PROFILE_FRESH_UNTIL_HEADER]: String(now - 1),
+          'cache-tag': 'mrtdown-test-data',
+          'cloudflare-cdn-cache-control': PUBLIC_CLOUDFLARE_CACHE_CONTROL,
+          'x-mrtdown-cache': 'public-markdown',
+        },
+      }),
+    );
+
+    expect(expired.headers.get('cache-control')).toBe('no-store');
+    expect(expired.headers.has('cloudflare-cdn-cache-control')).toBe(false);
+    expect(expired.headers.has('cache-tag')).toBe(false);
+    expect(expired.headers.has('x-mrtdown-cache')).toBe(false);
   });
 });
 

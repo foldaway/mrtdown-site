@@ -3,6 +3,7 @@ import { recordServerTiming, timeServerSpan } from '~/util/serverTiming';
 const SELECT_IN_BATCH_SIZE = 100;
 
 export type AppDb = ReturnType<typeof import('~/db').getDb>;
+export type AppDbReader = Pick<AppDb, 'select' | 'selectDistinct'>;
 
 export async function getDefaultDb() {
   const { getDb } = await import('~/db');

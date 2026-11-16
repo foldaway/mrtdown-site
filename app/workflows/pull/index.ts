@@ -9,11 +9,13 @@ import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts.js';
 import { rebuildSitemapSnapshot } from '~/util/dbQueries/sitemap.js';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics.js';
+import { isIssueProfileCacheEnabled } from '~/util/issueProfileCache.server.js';
 import {
   isNavigationCachePublicationEnabled,
   publishNavigationCache,
 } from '~/util/navigationCache.server.js';
 import { getDb } from '../../db/index.js';
+import { completePageProfileGeneration } from '../../db/pageProfileGeneration.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
 import { importScheduledTimetableArchive } from './helpers/importScheduledTimetableArchive.js';
@@ -59,6 +61,10 @@ import {
 const ISSUE_SYNC_BATCH_SIZE = 500;
 const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
 
+function isPageProfilePublicationEnabled() {
+  return isNavigationCachePublicationEnabled() || isIssueProfileCacheEnabled();
+}
+
 async function runPullStep<T>(
   context: WorkflowContext<PullParams>,
   name: string,
@@ -88,7 +94,7 @@ async function executePull(
 ) {
   if (params.seedNavigationCache) {
     await runPullStep(context, 'seed-navigation-cache', async () => {
-      if (!isNavigationCachePublicationEnabled()) {
+      if (!isPageProfilePublicationEnabled()) {
         throw new WorkflowNonRetryableError(
           'Navigation cache publication is disabled',
         );
@@ -98,6 +104,7 @@ async function executePull(
           'Navigation cache seed requires a completed canonical pull',
         );
       }
+      await completePageProfileGeneration(getDb(), context.workflowRunId);
       await publishNavigationCache(context.workflowRunId);
       return purgePublicDataCache();
     });
@@ -425,7 +432,8 @@ async function executePull(
   );
 
   await runPullStep(context, 'publish-public-data-cache', async () => {
-    if (isNavigationCachePublicationEnabled()) {
+    await completePageProfileGeneration(getDb(), context.workflowRunId);
+    if (isPageProfilePublicationEnabled()) {
       await publishNavigationCache(context.workflowRunId);
     }
     return purgePublicDataCache();
