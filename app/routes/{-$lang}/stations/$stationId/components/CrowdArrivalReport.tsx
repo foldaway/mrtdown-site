@@ -1,3 +1,4 @@
+import { ChevronRightIcon } from '@heroicons/react/16/solid';
 import { useEffect, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import {
@@ -90,8 +91,12 @@ export function CrowdArrivalReport({
   }
 
   return (
-    <details className="mt-1 text-xs">
-      <summary className="w-fit cursor-pointer rounded py-1 text-blue-700 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300">
+    <details className="group/report ms-8 mt-0.5 text-xs sm:ms-9">
+      <summary className="flex min-h-7 w-fit cursor-pointer list-none items-center gap-1 rounded text-gray-600 hover:text-blue-700 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-gray-300 dark:hover:text-blue-300 [&::-webkit-details-marker]:hidden">
+        <ChevronRightIcon
+          aria-hidden="true"
+          className="size-3.5 shrink-0 group-open/report:rotate-90"
+        />
         <FormattedMessage
           id="station.arrival_report.summary"
           defaultMessage="Report an arrival"

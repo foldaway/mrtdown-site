@@ -116,7 +116,10 @@ describe('station guide arrival sources', () => {
     const html = renderRow(scheduled);
     expect(html).toContain('2 min');
     expect(html).toMatch(/then <strong[^>]*>.*≈.*7 min<\/strong>/);
-    expect(html).toContain('Scheduled');
+    expect(html).not.toMatch(/<\/time> Scheduled/);
+    expect(html).toMatch(
+      /aria-controls="([^"]+)" aria-expanded="false".*hidden="" id="\1"/,
+    );
     expect(html).toContain('Approximate scheduled');
     expect(html).toMatch(
       />Service<\/p>.*towards <span data-station-id="[^"]+">Destination<\/span>/,
@@ -149,6 +152,16 @@ describe('station guide arrival sources', () => {
     expect(elapsed).not.toContain('0 min');
     expect(elapsed).toMatch(/then <strong[^>]*>.*5 min<\/strong>/);
     expect(elapsed.match(/<time/g)).toHaveLength(5);
+  });
+
+  it('keeps the one-hour boundary in minutes', () => {
+    const html = renderRow(
+      scheduled,
+      'ready',
+      Date.parse('2026-10-24T15:10:00Z'),
+    );
+    expect(html).toContain('60 min');
+    expect(html).not.toContain('1h 0m');
   });
 
   it('shows recent reports separately from the timetable and expires them on the client', () => {

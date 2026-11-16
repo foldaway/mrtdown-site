@@ -401,7 +401,6 @@
   "station.arrivals.refresh_failed": "无法加载时刻表",
   "station.arrivals.refreshing": "正在刷新到站时间… 显示上次获取的结果。",
   "station.arrivals.schedule_note": "计划时刻 · ≈ 估算 · 实时时间请查看车站显示屏",
-  "station.arrivals.scheduled": "计划时刻",
   "station.arrivals.scheduled_times": "计划时刻",
   "station.arrivals.stale": "刷新失败。显示上次获取的结果；时间可能已过时。",
   "station.arrivals.timetable_sources": "时刻表来源",

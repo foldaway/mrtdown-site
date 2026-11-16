@@ -401,7 +401,6 @@
   "station.arrivals.refresh_failed": "கால அட்டவணையை ஏற்ற முடியவில்லை",
   "station.arrivals.refreshing": "வருகை நேரங்கள் புதுப்பிக்கப்படுகின்றன… கடைசியாகப் பெற்ற தகவல் காட்டப்படுகிறது.",
   "station.arrivals.schedule_note": "அட்டவணை நேரங்கள் · ≈ தோராயம் · நேரலை நேரங்களுக்கு நிலையத் திரைகளைப் பார்க்கவும்",
-  "station.arrivals.scheduled": "அட்டவணை நேரம்",
   "station.arrivals.scheduled_times": "அட்டவணை நேரங்கள்",
   "station.arrivals.stale": "புதுப்பிக்க முடியவில்லை. கடைசியாகப் பெற்ற தகவல் காட்டப்படுகிறது; நேரங்கள் காலாவதியாகியிருக்கலாம்.",
   "station.arrivals.timetable_sources": "கால அட்டவணையின் தரவு மூலங்கள்",

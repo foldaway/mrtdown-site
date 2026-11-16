@@ -401,7 +401,6 @@
   "station.arrivals.refresh_failed": "Couldn’t load timetable",
   "station.arrivals.refreshing": "Refreshing arrivals… Showing the last known response.",
   "station.arrivals.schedule_note": "Scheduled times · ≈ Approximate · Check station displays for live times",
-  "station.arrivals.scheduled": "Scheduled",
   "station.arrivals.scheduled_times": "Scheduled times",
   "station.arrivals.stale": "Refresh failed. Showing the last known response; times may be out of date.",
   "station.arrivals.timetable_sources": "Timetable sources",

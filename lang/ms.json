@@ -401,7 +401,6 @@
   "station.arrivals.refresh_failed": "Jadual tidak dapat dimuatkan",
   "station.arrivals.refreshing": "Memuat semula ketibaan… Memaparkan respons terakhir.",
   "station.arrivals.schedule_note": "Waktu berjadual · ≈ Anggaran · Semak paparan stesen untuk waktu sebenar",
-  "station.arrivals.scheduled": "Berjadual",
   "station.arrivals.scheduled_times": "Waktu berjadual",
   "station.arrivals.stale": "Muat semula gagal. Memaparkan respons terakhir; waktu mungkin sudah lapuk.",
   "station.arrivals.timetable_sources": "Sumber jadual",
