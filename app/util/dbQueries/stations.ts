@@ -3,8 +3,8 @@ import {
   asc,
   desc,
   eq,
-  gt as isAfter,
   inArray,
+  gt as isAfter,
   isNull,
   or,
 } from 'drizzle-orm';
@@ -444,43 +444,60 @@ export async function getStationProfileReadModel(
       boardablePlatformLabelsByServiceId.set(serviceId, labels);
     }
   }
-  const destinationStationIds = [
+  const arrivalDirections = arrivalBranches.map((branch) => {
+    const destination = branch.entries.at(-1);
+    const isLoop =
+      destination != null && isLoopPath(branch.entries, destination.stationId);
+    const viaStationId = isLoop
+      ? branch.entries[
+          branch.entries.findIndex((entry) => entry.stationId === station.id) +
+            1
+        ]?.stationId
+      : undefined;
+    return { branch, destination, isLoop, viaStationId };
+  });
+  const arrivalStationIds = [
     ...new Set(
-      arrivalBranches
-        .map((branch) => branch.entries.at(-1)?.stationId)
-        .filter((stationId): stationId is string => stationId != null),
+      arrivalDirections.flatMap(({ destination, viaStationId }) =>
+        [destination?.stationId, viaStationId].filter(
+          (stationId): stationId is string => stationId != null,
+        ),
+      ),
     ),
   ];
-  const destinationStationRows =
-    destinationStationIds.length > 0
+  const arrivalStationRows =
+    arrivalStationIds.length > 0
       ? await timeDbQuery('station_profile_q_arrival_destinations', () =>
           db
             .select({ id: stationsTable.id, name: stationsTable.name })
             .from(stationsTable)
-            .where(inArray(stationsTable.id, destinationStationIds)),
+            .where(inArray(stationsTable.id, arrivalStationIds)),
         )
       : [];
-  const destinationNameByStationId = Object.fromEntries(
-    destinationStationRows.map((destination) => [
-      destination.id,
-      parseTranslations(destination.name),
-    ]),
+  const arrivalStationNames = new Map(
+    arrivalStationRows.map(({ id, name }) => [id, parseTranslations(name)]),
   );
-  const arrivalServices = arrivalBranches.map((branch) => {
-    const destination = branch.entries.at(-1);
-    return {
-      serviceId: branch.id,
-      lineId: branch.lineId,
-      serviceName: branch.name,
-      destinationStationId: destination?.stationId ?? null,
-      destinationCode: destination?.displayCode ?? branch.id,
-      destinationName:
-        destinationNameByStationId[destination?.stationId ?? ''] ?? null,
-      ...(destination && isLoopPath(branch.entries, destination.stationId)
-        ? { isLoop: true as const }
-        : {}),
-    };
-  });
+  const arrivalServices = arrivalDirections.map(
+    ({ branch, destination, isLoop, viaStationId }) => {
+      const viaStationName = viaStationId
+        ? arrivalStationNames.get(viaStationId)
+        : undefined;
+      return {
+        serviceId: branch.id,
+        lineId: branch.lineId,
+        serviceName: branch.name,
+        destinationStationId: destination?.stationId ?? null,
+        destinationCode: destination?.displayCode ?? branch.id,
+        destinationName: destination
+          ? (arrivalStationNames.get(destination.stationId) ?? null)
+          : null,
+        ...(isLoop ? { isLoop: true as const } : {}),
+        ...(viaStationId && viaStationName
+          ? { viaStationId, viaStationName }
+          : {}),
+      };
+    },
+  );
   const arrivalLinesById = new Map<string, StationArrivalBranch[]>();
   for (const service of arrivalServices) {
     const timings = arrivalLinesById.get(service.lineId) ?? [];

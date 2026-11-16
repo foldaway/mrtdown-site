@@ -1,11 +1,13 @@
 import { Popover } from '@base-ui/react/popover';
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FormattedMessage } from 'react-intl';
 import { BetaBadge } from '~/components/BetaBadge';
+import type { Station } from '~/types';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { ExitSign } from './StationGuideSigns';
+import { StationLineFacts } from './StationLineFacts';
 import { arrivalBranchKey } from './stationArrivalRefresh';
 import type { ArrivalLine, StationExit } from './stationGuide.types';
 import { TimetableSources } from './TimetableSources';
@@ -17,7 +19,10 @@ type StationGuideProps = {
   exits: StationExit[];
   lineColors: Record<string, string>;
   lineNames: Record<string, string>;
+  memberships: Station['memberships'];
+  referenceAt: string;
   stationId: string;
+  visibleMemberships: Station['memberships'];
 };
 
 export function StationGuide({
@@ -25,7 +30,10 @@ export function StationGuide({
   exits,
   lineColors,
   lineNames,
+  memberships,
+  referenceAt,
   stationId,
+  visibleMemberships,
 }: StationGuideProps) {
   const { states, refreshAfterReport } = useStationArrivals(
     stationId,
@@ -33,6 +41,30 @@ export function StationGuide({
   );
   const [now, setNow] = useState<number | null>(null);
   const hasArrivals = arrivalLines.length > 0;
+  const sections = useMemo(() => {
+    const arrivals = new Map(arrivalLines.map((line) => [line.lineId, line]));
+    const membershipLineIds = memberships.map(({ lineId }) => lineId);
+    const visibleKeys = new Set(
+      visibleMemberships.map(({ lineId, code }) => `${lineId}:${code}`),
+    );
+    return [...new Set([...arrivals.keys(), ...membershipLineIds])].map(
+      (lineId) => {
+        const lineMemberships = memberships.filter(
+          (membership) => membership.lineId === lineId,
+        );
+        return {
+          lineId,
+          timings: arrivals.get(lineId)?.arrivalTimings ?? [],
+          facts: lineMemberships.map((membership) => ({
+            membership,
+            showCode:
+              lineMemberships.length > 1 ||
+              !visibleKeys.has(`${lineId}:${membership.code}`),
+          })),
+        };
+      },
+    );
+  }, [arrivalLines, memberships, visibleMemberships]);
 
   useEffect(() => {
     if (!hasArrivals) return;
@@ -57,69 +89,66 @@ export function StationGuide({
             defaultMessage="Station guide"
           />
         </h2>
-        <ArrivalInfo />
+        {hasArrivals && <ArrivalInfo />}
       </div>
-      {hasArrivals && (
-        <section
-          aria-labelledby="station-arrivals-title"
-          className="border-gray-200 border-t dark:border-gray-700"
-        >
-          <h3 className="sr-only" id="station-arrivals-title">
-            <FormattedMessage
-              id="station.arrivals.title"
-              defaultMessage="Arrivals"
-            />
-          </h3>
-          {arrivalLines.map((line) => (
+      {sections.length > 0 && (
+        <div className="space-y-3 px-4 pb-3 sm:px-6">
+          {sections.map(({ lineId, timings, facts }) => (
             <section
-              aria-labelledby={`arrival-line-${line.lineId}`}
-              className="border-gray-200 border-t dark:border-gray-700"
-              key={line.lineId}
+              aria-labelledby={`station-guide-line-${lineId}`}
+              className="border-s-3 ps-2.5 sm:ps-3"
+              key={lineId}
+              style={{ borderInlineStartColor: lineColors[lineId] }}
             >
-              <h4
-                className="flex items-center gap-2 px-4 pt-2.5 font-semibold text-gray-900 text-sm sm:px-6 dark:text-gray-100"
-                id={`arrival-line-${line.lineId}`}
-              >
-                <Link
-                  className="group flex items-center gap-2"
-                  params={{ lineId: line.lineId }}
-                  to="/{-$lang}/lines/$lineId"
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 pb-2">
+                <h3
+                  className="font-semibold text-gray-900 text-sm dark:text-gray-100"
+                  id={`station-guide-line-${lineId}`}
                 >
-                  <span
-                    className="shrink-0 rounded-sm px-2 py-1 font-semibold text-white text-xs leading-none"
-                    style={{ backgroundColor: lineColors[line.lineId] }}
+                  <Link
+                    className="hover:underline"
+                    params={{ lineId }}
+                    to="/{-$lang}/lines/$lineId"
                   >
-                    {line.lineId}
-                  </span>
-                  <span className="group-hover:underline">
-                    {lineNames[line.lineId] ?? line.lineId}
-                  </span>
-                </Link>
-              </h4>
-              <ul className="mt-1 divide-y divide-gray-200 dark:divide-gray-700">
-                {line.arrivalTimings.map((arrivalTiming) => {
-                  const branchKey = arrivalBranchKey(
-                    line.lineId,
-                    arrivalTiming.serviceId,
-                    arrivalTiming.destinationStationId,
-                  );
-                  return (
-                    <ServiceArrivalSummary
-                      arrivalTiming={arrivalTiming}
-                      key={branchKey}
-                      arrivalState={states[branchKey]}
-                      lineColor={lineColors[line.lineId]}
-                      now={now}
-                      onArrivalReported={refreshAfterReport}
-                    />
-                  );
-                })}
-              </ul>
+                    {lineNames[lineId] ?? lineId}
+                  </Link>
+                </h3>
+                <StationLineFacts facts={facts} referenceAt={referenceAt} />
+              </div>
+              {timings.length > 0 && (
+                <ul className="divide-y divide-gray-200 border-gray-200 border-t dark:divide-gray-700 dark:border-gray-700">
+                  {timings.map((arrivalTiming) => {
+                    const key = arrivalBranchKey(
+                      lineId,
+                      arrivalTiming.serviceId,
+                      arrivalTiming.destinationStationId,
+                    );
+                    return (
+                      <ServiceArrivalSummary
+                        arrivalTiming={arrivalTiming}
+                        key={key}
+                        arrivalState={states[key]}
+                        lineColor={lineColors[lineId]}
+                        now={now}
+                        onArrivalReported={refreshAfterReport}
+                      />
+                    );
+                  })}
+                </ul>
+              )}
             </section>
           ))}
-          <TimetableSources states={states} />
-        </section>
+          {hasArrivals && (
+            <p className="text-gray-600 text-xs dark:text-gray-300">
+              <FormattedMessage
+                id="station.arrivals.schedule_note"
+                defaultMessage="Scheduled times · ≈ Approximate · Check station displays for live times"
+              />
+            </p>
+          )}
+        </div>
       )}
+      {hasArrivals && <TimetableSources states={states} />}
       {exits.length > 0 && (
         <div className="border-gray-200 border-t dark:border-gray-700">
           <div className="flex items-center gap-2 px-4 py-2.5 sm:px-6">
