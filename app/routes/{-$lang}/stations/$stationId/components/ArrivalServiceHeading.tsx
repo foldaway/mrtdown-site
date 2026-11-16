@@ -62,11 +62,11 @@ export function ArrivalServiceHeading({ timing }: ArrivalServiceHeadingProps) {
 
   return (
     <>
-      <p className="font-semibold text-gray-900 text-sm leading-snug dark:text-gray-100">
+      <p className="font-medium text-gray-800 text-sm leading-snug dark:text-gray-200">
         {serviceName}
       </p>
       {station && (
-        <p className="text-gray-700 text-xs leading-snug dark:text-gray-200">
+        <p className="text-gray-600 text-xs leading-snug dark:text-gray-400">
           {timing.isLoop ? (
             <FormattedMessage
               id="station.arrivals.via"

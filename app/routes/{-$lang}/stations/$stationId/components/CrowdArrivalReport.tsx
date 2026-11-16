@@ -92,7 +92,7 @@ export function CrowdArrivalReport({
 
   return (
     <details className="group/report ms-8 mt-0.5 text-xs sm:ms-9">
-      <summary className="flex min-h-7 w-fit cursor-pointer list-none items-center gap-1 rounded text-gray-600 hover:text-blue-700 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-gray-300 dark:hover:text-blue-300 [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-7 w-fit cursor-pointer list-none items-center gap-1 rounded text-gray-600 hover:text-blue-700 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-gray-400 dark:hover:text-blue-300 [&::-webkit-details-marker]:hidden">
         <ChevronRightIcon
           aria-hidden="true"
           className="size-3.5 shrink-0 group-open/report:rotate-90"

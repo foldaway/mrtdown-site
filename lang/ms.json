@@ -390,7 +390,7 @@
   "station.arrivals.attribution": "Data jadual GTFS daripada {source}, diakses pada {date}. <licence>Lesen set data</licence>",
   "station.arrivals.clockwise": "Ikut arah jam",
   "station.arrivals.eastbound": "Arah timur",
-  "station.arrivals.empty_window": "Tiada pelepasan berjadual",
+  "station.arrivals.empty_window": "Tiada pelepasan dalam tempoh ini",
   "station.arrivals.empty_window_range": "{start}–{end} (waktu Singapura)",
   "station.arrivals.explainer": "Waktu diambil daripada jadual yang diterbitkan. Waktu anggaran kurang tepat dan jadual mungkin tidak lengkap. Semak paparan stesen untuk waktu sebenar.",
   "station.arrivals.explainer_label": "Tentang waktu ketibaan",

@@ -30,20 +30,20 @@ export function ScheduledArrivalStatus({
         heading={heading}
         lineColor={lineColor}
         platformLabels={[]}
-      >
-        <div
-          aria-live="polite"
-          className="text-gray-700 text-xs dark:text-gray-200"
-        >
-          {data.coverage.complete ? (
-            <>
-              <p className="font-medium">
+        status={
+          data.coverage.complete ? (
+            <details className="group/empty">
+              <summary className="flex min-h-7 w-fit cursor-pointer list-none items-center gap-1 rounded hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:text-gray-200 [&::-webkit-details-marker]:hidden">
                 <FormattedMessage
                   id="station.arrivals.empty_window"
-                  defaultMessage="No scheduled departures"
+                  defaultMessage="No departures in this window"
                 />
-              </p>
-              <p className="mt-0.5">
+                <ChevronDownIcon
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 group-open/empty:rotate-180"
+                />
+              </summary>
+              <p className="pb-1">
                 <FormattedMessage
                   id="station.arrivals.empty_window_range"
                   defaultMessage="{start}–{end} (Singapore time)"
@@ -53,15 +53,15 @@ export function ScheduledArrivalStatus({
                   }}
                 />
               </p>
-            </>
+            </details>
           ) : (
             <FormattedMessage
               id="station.arrivals.no_timed_departures"
               defaultMessage="Incomplete timetable. No departure times."
             />
-          )}
-        </div>
-      </ArrivalServiceRow>
+          )
+        }
+      />
     );
   }
 
@@ -89,7 +89,7 @@ export function ScheduledArrivalStatus({
       {!data.coverage.complete && (
         <p
           aria-live="polite"
-          className="mt-1 text-gray-700 text-xs dark:text-gray-200"
+          className="ms-8 mt-1 text-gray-600 text-xs sm:ms-9 dark:text-gray-400"
         >
           <FormattedMessage
             id="station.arrivals.incomplete"
@@ -103,7 +103,7 @@ export function ScheduledArrivalStatus({
 
 type PlatformDeparturesProps = Omit<
   ComponentProps<typeof ArrivalServiceRow>,
-  'children'
+  'children' | 'status'
 > & {
   departures: ScheduledDeparture[];
   now: number | null;
@@ -118,7 +118,7 @@ function PlatformDepartures({
   const panelId = useId();
   const [expanded, setExpanded] = useState(false);
   const [next, following] = departures;
-  if (!next) return <ArrivalServiceRow {...row}>{null}</ArrivalServiceRow>;
+  if (!next) return <ArrivalServiceRow {...row} />;
 
   return (
     <>
@@ -214,19 +214,19 @@ function DepartureTime({ departure, following, now }: DepartureTimeProps) {
   );
 
   return following ? (
-    <span className="block text-gray-700 text-xs leading-snug dark:text-gray-200">
+    <span className="block text-gray-600 text-xs leading-snug dark:text-gray-400">
       <FormattedMessage
         id="station.arrival_timings.then"
         defaultMessage="then {time}"
         values={{
           time: (
-            <strong className="whitespace-nowrap font-semibold">{value}</strong>
+            <strong className="whitespace-nowrap font-medium">{value}</strong>
           ),
         }}
       />
     </span>
   ) : (
-    <span className="block font-semibold text-gray-900 text-lg leading-none tracking-tight sm:text-xl dark:text-gray-100">
+    <span className="block font-semibold text-gray-950 text-lg leading-none tracking-tight sm:text-xl dark:text-white">
       {value}
     </span>
   );

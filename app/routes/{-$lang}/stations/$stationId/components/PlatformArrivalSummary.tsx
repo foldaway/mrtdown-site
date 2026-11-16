@@ -50,17 +50,16 @@ export function ServiceArrivalSummary({
           heading={heading}
           lineColor={lineColor}
           platformLabels={arrivalTiming.platformLabels}
-        >
-          {(data?.source === 'unavailable' ||
-            arrivalTiming.destinationStationId == null) && (
-            <p className="text-gray-700 text-xs dark:text-gray-300">
+          status={
+            (data?.source === 'unavailable' ||
+              arrivalTiming.destinationStationId == null) && (
               <FormattedMessage
                 id="station.arrivals.timetable_unavailable"
                 defaultMessage="Timetable unavailable"
               />
-            </p>
-          )}
-        </ArrivalServiceRow>
+            )
+          }
+        />
       )}
       {arrivalTiming.destinationStationId != null && (
         <ArrivalRefreshNotice state={arrivalState} />

@@ -139,7 +139,7 @@ export function StationGuide({
             </section>
           ))}
           {hasArrivals && (
-            <p className="text-gray-600 text-xs dark:text-gray-300">
+            <p className="text-gray-600 text-xs dark:text-gray-400">
               <FormattedMessage
                 id="station.arrivals.schedule_note"
                 defaultMessage="Scheduled times · ≈ Approximate · Check station displays for live times"

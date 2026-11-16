@@ -18,14 +18,14 @@ export function StationLineFacts({
 
   const referenceDate = DateTime.fromISO(referenceAt, { zone }).toISODate();
   return (
-    <ul className="space-y-1 text-gray-600 text-xs dark:text-gray-300">
+    <ul className="space-y-1 text-gray-600 text-xs dark:text-gray-400">
       {facts.map(({ membership, showCode }) => (
         <li
           className="flex flex-wrap items-baseline gap-x-1.5"
           key={membership.code}
         >
           {showCode && <span className="font-semibold">{membership.code}</span>}
-          <span className="font-medium text-gray-800 dark:text-gray-100">
+          <span className="font-medium text-gray-700 dark:text-gray-300">
             <FormattedMessage
               {...StationStructureTypeLabels[membership.structureType]}
             />

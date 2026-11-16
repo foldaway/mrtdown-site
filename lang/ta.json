@@ -390,7 +390,7 @@
   "station.arrivals.attribution": "{source} வழங்கிய GTFS அட்டவணைத் தரவு, {date} அன்று பெறப்பட்டது. <licence>தரவுத்தொகுப்பு உரிமம்</licence>",
   "station.arrivals.clockwise": "கடிகாரத் திசை",
   "station.arrivals.eastbound": "கிழக்கு நோக்கி",
-  "station.arrivals.empty_window": "திட்டமிடப்பட்ட புறப்பாடுகள் இல்லை",
+  "station.arrivals.empty_window": "இந்த நேர இடைவெளியில் புறப்பாடுகள் இல்லை",
   "station.arrivals.empty_window_range": "{start}–{end} (சிங்கப்பூர் நேரம்)",
   "station.arrivals.explainer": "நேரங்கள் வெளியிடப்பட்ட கால அட்டவணையிலிருந்து பெறப்படுகின்றன. தோராயமான நேரங்களின் துல்லியம் குறைவு; கால அட்டவணை முழுமையாக இல்லாமல் இருக்கலாம். நேரடி நேரங்களுக்கு நிலையத் திரைகளைப் பார்க்கவும்.",
   "station.arrivals.explainer_label": "வருகை நேரங்கள் பற்றிய விளக்கம்",

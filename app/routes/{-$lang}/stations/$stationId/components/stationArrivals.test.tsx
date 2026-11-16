@@ -184,7 +184,9 @@ describe('station guide arrival sources', () => {
     }
     const empty = { ...scheduled, timings: [] };
     const html = renderRow(empty);
-    expect(html).toContain('No scheduled departures');
+    expect(html).toMatch(
+      /<details[^>]*><summary[^>]*>No departures in this window/,
+    );
     expect(html).toMatch(/12:00 am–1:00 am \(Singapore time\)/i);
     expect(html).not.toContain('Service ended');
     expect(html).not.toContain('Frequency estimate');
@@ -204,7 +206,7 @@ describe('station guide arrival sources', () => {
     };
     const onArrivalReported = async () => {};
     for (const [data, message, canReport] of [
-      [empty, 'No scheduled departures', false],
+      [empty, 'No departures in this window', false],
       [partial, 'Incomplete timetable. No departure times.', true],
       [unavailable, 'Timetable unavailable', true],
     ] as const) {

@@ -390,7 +390,7 @@
   "station.arrivals.attribution": "GTFS schedule data from {source}, accessed {date}. <licence>Dataset licence</licence>",
   "station.arrivals.clockwise": "Clockwise",
   "station.arrivals.eastbound": "Eastbound",
-  "station.arrivals.empty_window": "No scheduled departures",
+  "station.arrivals.empty_window": "No departures in this window",
   "station.arrivals.empty_window_range": "{start}–{end} (Singapore time)",
   "station.arrivals.explainer": "Times come from a published timetable. Approximate scheduled times are less precise, and timetables may be incomplete. Check station displays for live times.",
   "station.arrivals.explainer_label": "How arrivals work",
