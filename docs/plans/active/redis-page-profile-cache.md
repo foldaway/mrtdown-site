@@ -17,7 +17,9 @@ response shapes, and report behavior.
 - [x] Confirm continuous Neon activity in the production usage window
   (2026-11-15).
 - [x] Implement the opt-in Navigation reader and canonical-pull publication.
-- [ ] Publish and serve Navigation from Redis in staging.
+- [x] Seed and serve Navigation from Redis on both staging Fly Machines
+  (2026-11-15).
+- [ ] Verify an authenticated Cloudflare MISS for staging Navigation.
 - [ ] Add cache fills for completed Issue Profiles in staging and verify
   import and retry behavior.
 - [ ] Evaluate the Redis pilot in production and decide whether to expand it.
@@ -55,9 +57,27 @@ response shapes, and report behavior.
 
 ## Outcomes & Retrospective
 
-Record staging parity results here. Compare production active time, query
-counts, and latency after enabling each reader so the benefits can be
-attributed to the change.
+- 2026-11-15 — Deployed `33bf615` to Fly staging in publish-only mode with the
+  existing timetable pin. The manual build skipped Sentry source-map upload.
+  The staging success fingerprint allowed seed run
+  `wfr_PM9UlB4jmR1VUzwR9Ycet` to reuse the completed import. QStash retried a
+  Redis connection failure, then published the same workflow generation,
+  purged the edge tag, and released the lease. The 2,804-byte entry matched
+  the three ordered SQL results for 11 lines, three operators, and the
+  last-pull timestamp.
+- Enabled the reader through the staging Fly runtime setting, then purged
+  `mrtdown-staging-data`. Both Machines returned HTTP 200 with
+  `X-MRTDown-Navigation-Source: redis` on Fly origin requests, including a
+  cold start and `/ms/about`. The English header and footer matched the SQL
+  baseline. Staging had no `pg_stat_statements` view. A local production build
+  served the Redis hit without `DATABASE_URL` and returned the same rendered
+  Navigation with `no-store` for missing, invalid, and timed-out Redis data.
+- `npm run verify` passed 618 tests with local PostGIS. The Cloudflare staging
+  hostname redirected to Access login and browser access was unavailable.
+  An authenticated `CF-Cache-Status: MISS` remains to be confirmed.
+
+Compare production active time, query counts, and latency after enabling
+each reader so the benefits can be attributed to the change.
 
 ## Context
 
