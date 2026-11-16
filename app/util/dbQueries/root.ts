@@ -3,7 +3,7 @@ import { linesTable, metadataTable, operatorsTable } from '~/db/schema';
 import { timeServerSpan } from '~/util/serverTiming';
 import { getDefaultDb, timeDbQuery } from './database';
 
-const ROOT_LAST_UPDATED_METADATA_KEY = 'manifest_last_pulled_at';
+export const ROOT_LAST_UPDATED_METADATA_KEY = 'manifest_last_pulled_at';
 
 export async function getRootData() {
   return timeServerSpan('root_data', async () => {

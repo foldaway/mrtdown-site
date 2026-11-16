@@ -44,11 +44,21 @@ describe('canonical pull trigger payload', () => {
     ).toHaveBeenCalledWith(expect.objectContaining({ body: { sourceReview } }));
   });
 
+  it('forwards a standalone Navigation cache seed to the workflow', async () => {
+    expect((await post('{"seedNavigationCache":true}')).status).toBe(202);
+    expect(
+      vi.mocked(getClient).mock.results[0].value.trigger,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({ body: { seedNavigationCache: true } }),
+    );
+  });
+
   it.each([
     '{',
     'null',
     '{"importInstant":"2026-10-24T00:00:00Z"}',
     '{"sourceReview":{}}',
+    '{"seedNavigationCache":true,"rebuildScheduledTimetableProjection":true}',
   ])('rejects invalid input before enqueueing: %s', async (body) => {
     expect((await post(body)).status).toBe(400);
     expect(getClient).not.toHaveBeenCalled();

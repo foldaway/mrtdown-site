@@ -64,16 +64,20 @@ export function getCanonicalManifestFingerprint(
     .digest('hex');
 }
 
-export async function isCanonicalManifestCurrent(
-  db: AppDb,
-  fingerprint: string,
-): Promise<boolean> {
+export async function readCanonicalManifestFingerprint(db: AppDb) {
   const rows = await db
     .select({ value: metadataTable.value })
     .from(metadataTable)
     .where(eq(metadataTable.key, MANIFEST_FINGERPRINT_METADATA_KEY))
     .limit(1);
-  return rows[0]?.value === fingerprint;
+  return rows[0]?.value;
+}
+
+export async function isCanonicalManifestCurrent(
+  db: AppDb,
+  fingerprint: string,
+): Promise<boolean> {
+  return (await readCanonicalManifestFingerprint(db)) === fingerprint;
 }
 
 export async function clearCanonicalManifestFingerprint(db: AppDb) {
