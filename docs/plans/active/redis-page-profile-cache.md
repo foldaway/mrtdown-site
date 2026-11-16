@@ -22,7 +22,8 @@ response shapes, and report behavior.
 - [x] Verify an authenticated Cloudflare MISS for staging Navigation
   (2026-11-15).
 - [x] Implement generation-guarded cache fills for completed Issue Profiles.
-- [ ] Enable Issue Profiles in staging and verify import and retry behavior.
+- [x] Enable Issue Profiles in staging and verify the seed, cold and warm
+  reads, and publication retry behavior (2026-11-15).
 - [ ] Evaluate the Redis pilot in production and decide whether to expand it.
 
 ## Surprises & Discoveries
@@ -87,6 +88,17 @@ response shapes, and report behavior.
   paused promotion. A cold fill held across publication returned `no-store`
   and wrote neither generation. A following fill served the correction.
   The same probe covered Redis timeout and expiry at Singapore midnight.
+- Deployed `d437275` to Fly staging and enabled `REDIS_ISSUE_PROFILE_CACHE`
+  after seed workflow `wfr_43cV0_YJDzhjPrQlBZJDE` succeeded. The manual build
+  skipped Sentry source-map upload. Postgres and Redis agreed on the active
+  generation. The completed SKLRT profile used 36,861 bytes and expired at
+  Singapore midnight. Both Machines served it from Redis, including a new
+  process. The staging Markdown and Malay HTML matched their SQL baselines.
+  The cold fill, ongoing issue and future issue responses used `no-store`.
+  Missing issue responses remained 404. The existing report limiter blocked
+  a synthetic sixth request. The staging checks exercised the seed workflow.
+  Partial promotion and publication failure injection used isolated local
+  PostGIS, Redis and workflow fixtures.
 
 Compare production active time, query counts, and latency after enabling
 each reader so the benefits can be attributed to the change.
