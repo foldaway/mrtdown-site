@@ -118,38 +118,42 @@ function PlatformDepartures({
   return (
     <>
       <ArrivalServiceRow {...row}>
-        <button
-          aria-controls={panelId}
-          aria-expanded={expanded}
-          className="group flex min-h-11 cursor-pointer items-center justify-end gap-0.5 rounded-md px-0.5 text-end hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-blue-500 sm:gap-2 sm:px-1 dark:hover:bg-white/5"
-          onClick={() => setExpanded((open) => !open)}
-          type="button"
-        >
-          <span className="min-w-0 space-y-0.5 tabular-nums">
-            <DepartureTime departure={next} now={now} />
-            {following && (
-              <DepartureTime departure={following} following now={now} />
-            )}
-          </span>
-          <span className="sr-only">
-            <FormattedMessage
-              id="station.arrivals.scheduled_times"
-              defaultMessage="Scheduled times"
+        <div className="rounded-lg bg-gray-50 ring-1 ring-gray-200/80 ring-inset dark:bg-gray-900/45 dark:ring-white/10">
+          <button
+            aria-controls={panelId}
+            aria-expanded={expanded}
+            className="group grid min-h-11 w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-lg px-1.5 py-1.5 text-start hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-blue-500 sm:gap-2 sm:px-3 dark:hover:bg-white/5"
+            onClick={() => setExpanded((open) => !open)}
+            type="button"
+          >
+            <span className="block min-w-0 space-y-1 tabular-nums sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-2.5 sm:gap-y-1 sm:space-y-0">
+              <DepartureTime departure={next} now={now} />
+              {following && (
+                <DepartureTime departure={following} following now={now} />
+              )}
+            </span>
+            <span className="sr-only">
+              <FormattedMessage
+                id="station.arrivals.scheduled_times"
+                defaultMessage="Scheduled times"
+              />
+            </span>
+            <ChevronDownIcon
+              aria-hidden="true"
+              className="size-4.5 shrink-0 text-gray-500 group-aria-expanded:rotate-180 sm:size-5 dark:text-gray-400"
+              strokeWidth={2}
             />
-          </span>
-          <ChevronDownIcon
-            aria-hidden="true"
-            className="size-4.5 shrink-0 text-gray-500 group-aria-expanded:rotate-180 sm:size-5 dark:text-gray-400"
-            strokeWidth={2}
-          />
-        </button>
-        {reportButton && (
-          <div className="self-end pe-4.5 sm:pe-7">{reportButton}</div>
-        )}
+          </button>
+          {reportButton && (
+            <div className="mx-1.5 flex justify-start border-gray-200/75 border-t sm:mx-3 dark:border-white/10">
+              <div className="-ms-1">{reportButton}</div>
+            </div>
+          )}
+        </div>
       </ArrivalServiceRow>
       <section
         aria-labelledby={`${panelId}-title`}
-        className="mt-2 rounded-lg bg-gray-50 px-3 py-2.5 dark:bg-gray-900/50"
+        className="mt-2 rounded-lg bg-gray-50 px-3 py-2.5 ring-1 ring-gray-200/80 ring-inset dark:bg-gray-900/45 dark:ring-white/10"
         hidden={!expanded}
         id={panelId}
       >
@@ -198,7 +202,7 @@ function DepartureTime({ departure, following, now }: DepartureTimeProps) {
   const intl = useIntl();
   const minutes =
     now == null ? 0 : Math.ceil((Date.parse(departure.time) - now) / 60_000);
-  const duration = minutes > 0 ? formatWait(minutes, intl) : null;
+  const duration = minutes > 0 ? formatWait(minutes, intl, following) : null;
   const clock = (
     <time dateTime={departure.time}>
       {formatClockTime(departure.time, intl)}
@@ -213,7 +217,7 @@ function DepartureTime({ departure, following, now }: DepartureTimeProps) {
   );
 
   return following ? (
-    <span className="block text-gray-600 text-xs leading-snug dark:text-gray-400">
+    <span className="block text-[11px] text-gray-600 leading-snug sm:text-xs dark:text-gray-400">
       <FormattedMessage
         id="station.arrival_timings.then"
         defaultMessage="then {time}"
@@ -225,28 +229,35 @@ function DepartureTime({ departure, following, now }: DepartureTimeProps) {
       />
     </span>
   ) : (
-    <span className="block font-semibold text-gray-950 text-lg leading-none tracking-tight sm:text-xl dark:text-white">
+    <span className="block font-semibold text-gray-950 text-xl leading-none tracking-tight sm:text-2xl dark:text-white">
       {value}
     </span>
   );
 }
 
-function formatWait(minutes: number, intl: IntlShape) {
+function formatWait(minutes: number, intl: IntlShape, following = false) {
+  const unit = (text: ReactNode) =>
+    following ? (
+      text
+    ) : (
+      <span className="font-medium text-[0.7em] tracking-normal">{text}</span>
+    );
   if (minutes > 60) {
     return intl.formatMessage(
       {
         id: 'station.arrival_timings.hours_and_minutes',
-        defaultMessage: '{hours, number}h {minutes, number}m',
+        defaultMessage:
+          '{hours, number}<unit>h</unit> {minutes, number}<unit>m</unit>',
       },
-      { hours: Math.floor(minutes / 60), minutes: minutes % 60 },
+      { hours: Math.floor(minutes / 60), minutes: minutes % 60, unit },
     );
   }
   return intl.formatMessage(
     {
       id: 'station.arrival_timings.compact_minutes',
-      defaultMessage: '{minutes, number} min',
+      defaultMessage: '{minutes, number} <unit>min</unit>',
     },
-    { minutes },
+    { minutes, unit },
   );
 }
 

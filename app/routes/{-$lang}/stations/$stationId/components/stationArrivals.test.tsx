@@ -114,7 +114,7 @@ afterEach(() => {
 describe('station guide arrival sources', () => {
   it('highlights the next two departures per platform group and keeps later times available', () => {
     const html = renderRow(scheduled);
-    expect(html).toContain('2 min');
+    expect(html).toMatch(/>2 <span[^>]*>min<\/span>/);
     expect(html).toMatch(/then <strong[^>]*>.*≈.*7 min<\/strong>/);
     expect(html).not.toMatch(/<\/time> Scheduled/);
     expect(html).toMatch(
@@ -142,7 +142,7 @@ describe('station guide arrival sources', () => {
   it('uses clock times for stale responses and departures whose scheduled time has passed', () => {
     const stale = renderRow(scheduled, 'error');
     expect(stale).toContain('Showing the last known response');
-    expect(stale).not.toContain('2 min');
+    expect(stale).not.toMatch(/>2 <span[^>]*>min<\/span>/);
     expect(stale).not.toContain('>7 min<');
     const elapsed = renderRow(
       scheduled,
@@ -160,7 +160,7 @@ describe('station guide arrival sources', () => {
       'ready',
       Date.parse('2026-10-24T15:10:00Z'),
     );
-    expect(html).toContain('60 min');
+    expect(html).toMatch(/>60 <span[^>]*>min<\/span>/);
     expect(html).not.toContain('1h 0m');
   });
 
@@ -168,7 +168,7 @@ describe('station guide arrival sources', () => {
     const recent = { ...scheduled, recentCrowdArrival };
     const html = renderRow(recent, 'ready', undefined, async () => {});
     expect(html).toContain('Rider-reported arrival');
-    expect(html).toContain('2 min');
+    expect(html).toMatch(/>2 <span[^>]*>min<\/span>/);
     expect(html).toContain('Report an arrival');
     const expired = renderRow(
       recent,
@@ -238,7 +238,7 @@ describe('station guide arrival sources', () => {
       timings: scheduled.timings,
     });
     expect(partialWithTimes).not.toContain('Incomplete timetable');
-    expect(partialWithTimes).toContain('2 min');
+    expect(partialWithTimes).toMatch(/>2 <span[^>]*>min<\/span>/);
     expect(partialWithTimes).not.toContain('Timetable unavailable');
     expect(renderRow(empty, 'error')).toContain(
       'Showing the last known response',

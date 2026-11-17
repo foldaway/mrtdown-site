@@ -25,7 +25,7 @@ export function ArrivalServiceRow({
     <div
       className={
         children != null
-          ? 'grid grid-cols-[minmax(0,1fr)_minmax(0,43%)] items-start gap-x-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,10rem)] sm:gap-x-4'
+          ? 'grid grid-cols-[minmax(0,1fr)_minmax(0,44%)] items-start gap-x-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,12rem)] sm:gap-x-4'
           : undefined
       }
     >
