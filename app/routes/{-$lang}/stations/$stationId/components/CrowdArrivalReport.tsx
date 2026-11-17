@@ -1,4 +1,3 @@
-import { PencilSquareIcon } from '@heroicons/react/16/solid';
 import { useEffect, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import {
@@ -57,11 +56,10 @@ export function ArrivalReportButton({
         id: 'station.arrival_report.summary',
         defaultMessage: 'Report an arrival',
       })}
-      className="-ms-1 inline-flex min-h-6 cursor-pointer items-center gap-1 rounded px-1 text-gray-700 text-xs leading-snug hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-blue-500 aria-expanded:bg-gray-100 dark:text-gray-300 dark:aria-expanded:bg-white/5 dark:hover:bg-white/5"
+      className="inline-flex min-h-6 cursor-pointer items-center rounded px-1 text-gray-600 text-xs leading-snug underline decoration-gray-400 underline-offset-2 hover:text-gray-900 hover:decoration-current focus-visible:outline-2 focus-visible:outline-blue-500 aria-expanded:text-gray-900 dark:text-gray-400 dark:decoration-gray-600 dark:aria-expanded:text-gray-100 dark:hover:text-gray-100"
       onClick={onToggle}
       type="button"
     >
-      <PencilSquareIcon aria-hidden="true" className="size-3.5 shrink-0" />
       <FormattedMessage
         id="station.arrival_report.short_label"
         defaultMessage="Report"

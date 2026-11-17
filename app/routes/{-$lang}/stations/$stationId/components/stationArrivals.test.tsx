@@ -178,7 +178,7 @@ describe('station guide arrival sources', () => {
     expect(expired).not.toContain('Rider-reported arrival');
   });
 
-  it('offers one inline report action across platform groups with the report initially collapsed', () => {
+  it('offers one report action next to the timings across platform groups with the report initially collapsed', () => {
     const html = renderRow(scheduled, 'ready', undefined, async () => {});
     const triggers = [
       ...html.matchAll(
@@ -188,9 +188,9 @@ describe('station guide arrival sources', () => {
     expect(triggers).toHaveLength(1);
     expect(html).toContain('>Report</button>');
     expect(html).toContain(`hidden="" id="${triggers[0]?.[1]}"`);
-    expect(html.indexOf('aria-label="Report an arrival"')).toBeLessThan(
-      html.indexOf('<section'),
-    );
+    const report = html.indexOf('aria-label="Report an arrival"');
+    expect(report).toBeGreaterThan(html.indexOf('Scheduled times</span>'));
+    expect(report).toBeLessThan(html.indexOf('<section'));
   });
 
   it('keeps empty, partial, unavailable and stale responses distinct without SSR estimates', () => {

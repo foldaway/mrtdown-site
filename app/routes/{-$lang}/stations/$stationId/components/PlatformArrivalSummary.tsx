@@ -57,20 +57,13 @@ export function ServiceArrivalSummary({
       />
     ) : null;
   const heading = <ArrivalServiceHeading timing={arrivalTiming} />;
-  const headingWithReport = reportForm ? (
-    <ArrivalServiceHeading
-      timing={arrivalTiming}
-      reportButton={
-        <ArrivalReportButton
-          expanded={reportExpanded}
-          panelId={reportPanelId}
-          onToggle={() => setReportExpanded((open) => !open)}
-        />
-      }
+  const reportButton = reportForm ? (
+    <ArrivalReportButton
+      expanded={reportExpanded}
+      panelId={reportPanelId}
+      onToggle={() => setReportExpanded((open) => !open)}
     />
-  ) : (
-    heading
-  );
+  ) : null;
   return (
     <li className="py-2">
       {data?.source === 'scheduled' ? (
@@ -78,13 +71,14 @@ export function ServiceArrivalSummary({
           data={data}
           hasDepartures={hasDepartures}
           heading={heading}
-          firstHeading={headingWithReport}
+          reportButton={reportButton}
           lineColor={lineColor}
           now={arrivalState?.status === 'error' ? null : now}
         />
       ) : (
         <ArrivalServiceRow
-          heading={headingWithReport}
+          heading={heading}
+          reportButton={reportButton}
           lineColor={lineColor}
           platformLabels={arrivalTiming.platformLabels}
           status={

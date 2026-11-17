@@ -12,7 +12,7 @@ type ScheduledArrivalStatusProps = {
   data: ScheduledResponse;
   hasDepartures: boolean;
   heading: ReactNode;
-  firstHeading: ReactNode;
+  reportButton?: ReactNode;
   lineColor: string;
   now: number | null;
 };
@@ -21,7 +21,7 @@ export function ScheduledArrivalStatus({
   data,
   hasDepartures,
   heading,
-  firstHeading,
+  reportButton,
   lineColor,
   now,
 }: ScheduledArrivalStatusProps) {
@@ -29,7 +29,8 @@ export function ScheduledArrivalStatus({
   if (!hasDepartures) {
     return (
       <ArrivalServiceRow
-        heading={firstHeading}
+        heading={heading}
+        reportButton={reportButton}
         lineColor={lineColor}
         platformLabels={[]}
         status={
@@ -67,9 +68,12 @@ export function ScheduledArrivalStatus({
     );
   }
 
+  const firstTimedGroup = data.timings.find(
+    ({ departures }) => departures.length > 0,
+  );
   return (
     <div className="space-y-2">
-      {data.timings.map((timing, index) => (
+      {data.timings.map((timing) => (
         <div
           className="border-gray-200 dark:border-gray-700 [&+&]:border-t [&+&]:pt-2"
           key={JSON.stringify(timing.platforms.map(({ id }) => id))}
@@ -78,7 +82,8 @@ export function ScheduledArrivalStatus({
             departures={timing.departures}
             now={now}
             alternativePlatforms={timing.platforms.length > 1}
-            heading={index === 0 ? firstHeading : heading}
+            heading={heading}
+            reportButton={timing === firstTimedGroup ? reportButton : null}
             lineColor={lineColor}
             platformLabels={[
               ...new Set(timing.platforms.map(({ label }) => label)),
@@ -101,13 +106,14 @@ type PlatformDeparturesProps = Omit<
 function PlatformDepartures({
   departures,
   now,
+  reportButton,
   ...row
 }: PlatformDeparturesProps) {
   const intl = useIntl();
   const panelId = useId();
   const [expanded, setExpanded] = useState(false);
   const [next, following] = departures;
-  if (!next) return <ArrivalServiceRow {...row} />;
+  if (!next) return <ArrivalServiceRow {...row} reportButton={reportButton} />;
 
   return (
     <>
@@ -137,6 +143,9 @@ function PlatformDepartures({
             strokeWidth={2}
           />
         </button>
+        {reportButton && (
+          <div className="self-end pe-4.5 sm:pe-7">{reportButton}</div>
+        )}
       </ArrivalServiceRow>
       <section
         aria-labelledby={`${panelId}-title`}
