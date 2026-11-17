@@ -73,7 +73,7 @@ export function ArrivalServiceHeading({
         {serviceName}
       </p>
       {(station || reportButton) && (
-        <div className="flex flex-wrap items-baseline gap-x-1.5">
+        <div className="flex flex-wrap items-center gap-x-1.5">
           {station && (
             <p className="text-gray-600 text-xs leading-snug dark:text-gray-400">
               {timing.isLoop ? (

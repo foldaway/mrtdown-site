@@ -57,7 +57,7 @@ export function ArrivalReportButton({
         id: 'station.arrival_report.summary',
         defaultMessage: 'Report an arrival',
       })}
-      className="inline-flex min-h-6 cursor-pointer items-center gap-1 rounded px-1 text-gray-700 text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-blue-500 aria-expanded:bg-gray-100 dark:text-gray-300 dark:aria-expanded:bg-white/5 dark:hover:bg-white/5"
+      className="-ms-1 inline-flex min-h-6 cursor-pointer items-center gap-1 rounded px-1 text-gray-700 text-xs leading-snug hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-blue-500 aria-expanded:bg-gray-100 dark:text-gray-300 dark:aria-expanded:bg-white/5 dark:hover:bg-white/5"
       onClick={onToggle}
       type="button"
     >
