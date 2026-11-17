@@ -19,9 +19,11 @@ response shapes, and report behavior.
 - [x] Implement the opt-in Navigation reader and canonical-pull publication.
 - [x] Seed and serve Navigation from Redis on both staging Fly Machines
   (2026-11-15).
-- [ ] Verify an authenticated Cloudflare MISS for staging Navigation.
-- [ ] Add cache fills for completed Issue Profiles in staging and verify
-  import and retry behavior.
+- [x] Verify an authenticated Cloudflare MISS for staging Navigation
+  (2026-11-15).
+- [x] Implement generation-guarded cache fills for completed Issue Profiles.
+- [x] Enable Issue Profiles in staging and verify the seed, cold and warm
+  reads, and publication retry behavior (2026-11-15).
 - [ ] Evaluate the Redis pilot in production and decide whether to expand it.
 
 ## Surprises & Discoveries
@@ -54,6 +56,9 @@ response shapes, and report behavior.
   It takes the existing lease and requires the successful manifest fingerprint,
   which is cleared at the start of live promotion. The publish-only setting
   allows an operator to warm and inspect the key before enabling reads.
+- Issue Profiles use the same published generation as Navigation and a
+  separate read flag. Entries are capped at 128 KiB and expire at Singapore
+  midnight. Redis compares the generation atomically when a fill writes.
 
 ## Outcomes & Retrospective
 
@@ -72,9 +77,28 @@ response shapes, and report behavior.
   baseline. Staging had no `pg_stat_statements` view. A local production build
   served the Redis hit without `DATABASE_URL` and returned the same rendered
   Navigation with `no-store` for missing, invalid, and timed-out Redis data.
-- `npm run verify` passed 618 tests with local PostGIS. The Cloudflare staging
-  hostname redirected to Access login and browser access was unavailable.
-  An authenticated `CF-Cache-Status: MISS` remains to be confirmed.
+- `npm run verify` passed 618 tests with local PostGIS.
+- After PR #309 merged and the staging deployment completed, the user
+  confirmed `CF-Cache-Status: MISS` and
+  `X-MRTDown-Navigation-Source: redis` on the same authenticated staging
+  response. This completes Milestone 1 acceptance.
+- Milestone 2 passed 631 tests with PostGIS. The built server matched HTML
+  and Markdown against disposable PostGIS and Redis data, preserving evidence
+  order, redaction, affected entities and 404s. A warm profile survived a
+  paused promotion. A cold fill held across publication returned `no-store`
+  and wrote neither generation. A following fill served the correction.
+  The same probe covered Redis timeout and expiry at Singapore midnight.
+- Deployed `d437275` to Fly staging and enabled `REDIS_ISSUE_PROFILE_CACHE`
+  after seed workflow `wfr_43cV0_YJDzhjPrQlBZJDE` succeeded. The manual build
+  skipped Sentry source-map upload. Postgres and Redis agreed on the active
+  generation. The completed SKLRT profile used 36,861 bytes and expired at
+  Singapore midnight. Both Machines served it from Redis, including a new
+  process. The staging Markdown and Malay HTML matched their SQL baselines.
+  The cold fill, ongoing issue and future issue responses used `no-store`.
+  Missing issue responses remained 404. The existing report limiter blocked
+  a synthetic sixth request. The staging checks exercised the seed workflow.
+  Partial promotion and publication failure injection used isolated local
+  PostGIS, Redis and workflow fixtures.
 
 Compare production active time, query counts, and latency after enabling
 each reader so the benefits can be attributed to the change.
@@ -149,6 +173,7 @@ adds Redis publication after the pull rebuilds the read model.
    disabled so an in-flight fill cannot refill the edge after a purge.
    Subsequent Redis hits can populate the edge. Test that a fill crossing
    publication cannot write into the new generation.
+   [Staging enablement and rollback](../../operations/edge-caching.md#completed-issue-profiles)
 3. Enable readers in production one at a time after staging acceptance.
    Measure Redis hits, SQL fallbacks by route, origin latency, and Redis
    commands, memory, and errors. Compare Neon CU-hours and suspended time

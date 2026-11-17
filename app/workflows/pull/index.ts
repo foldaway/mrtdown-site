@@ -13,7 +13,9 @@ import {
   isNavigationCachePublicationEnabled,
   publishNavigationCache,
 } from '~/util/navigationCache.server.js';
+import { isIssueProfileCacheEnabled } from '~/util/pageProfileRedis.server.js';
 import { getDb } from '../../db/index.js';
+import { completePageProfileGeneration } from '../../db/pageProfileGeneration.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
 import { importScheduledTimetableArchive } from './helpers/importScheduledTimetableArchive.js';
@@ -59,6 +61,18 @@ import {
 const ISSUE_SYNC_BATCH_SIZE = 500;
 const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
 
+function isPageProfilePublicationEnabled() {
+  return isNavigationCachePublicationEnabled() || isIssueProfileCacheEnabled();
+}
+
+async function publishPullCaches(generation: string) {
+  await completePageProfileGeneration(getDb(), generation);
+  if (isPageProfilePublicationEnabled()) {
+    await publishNavigationCache(generation);
+  }
+  return purgePublicDataCache();
+}
+
 async function runPullStep<T>(
   context: WorkflowContext<PullParams>,
   name: string,
@@ -88,7 +102,7 @@ async function executePull(
 ) {
   if (params.seedNavigationCache) {
     await runPullStep(context, 'seed-navigation-cache', async () => {
-      if (!isNavigationCachePublicationEnabled()) {
+      if (!isPageProfilePublicationEnabled()) {
         throw new WorkflowNonRetryableError(
           'Navigation cache publication is disabled',
         );
@@ -98,8 +112,7 @@ async function executePull(
           'Navigation cache seed requires a completed canonical pull',
         );
       }
-      await publishNavigationCache(context.workflowRunId);
-      return purgePublicDataCache();
+      return publishPullCaches(context.workflowRunId);
     });
     return;
   }
@@ -424,12 +437,9 @@ async function executePull(
     `[PULL] Rebuilt sitemap snapshot ${sitemap.asOf} with ${sitemap.pathEntityCount} entity paths`,
   );
 
-  await runPullStep(context, 'publish-public-data-cache', async () => {
-    if (isNavigationCachePublicationEnabled()) {
-      await publishNavigationCache(context.workflowRunId);
-    }
-    return purgePublicDataCache();
-  });
+  await runPullStep(context, 'publish-public-data-cache', () =>
+    publishPullCaches(context.workflowRunId),
+  );
 
   await runPullStep(context, 'record-manifest-fingerprint', () =>
     recordCanonicalManifestFingerprint(getDb(), manifestFingerprint),

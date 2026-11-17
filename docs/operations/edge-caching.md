@@ -68,7 +68,8 @@ The canonical pull publishes updated data in this order:
 
 1. Promote staged canonical data.
 2. Rebuild operational facts plus the statistics and sitemap snapshots.
-3. Publish Navigation to Redis when configured.
+3. Mark the page-profile generation complete and publish Navigation to Redis
+   when either page-profile cache is configured.
 4. Purge `mrtdown-<tier>-data` through the Cloudflare API.
 5. Record the successful manifest fingerprint and release the pull lease.
 
@@ -112,6 +113,29 @@ after the new configuration is serving traffic. A staging origin fill reports
 edge hit replays the origin fill's header. To roll back, unset
 `REDIS_NAVIGATION_CACHE` and purge the tier's data tag. Seed again before
 re-enabling the reader if a pull ran while publication was disabled.
+
+## Completed Issue Profiles
+
+Enable `REDIS_ISSUE_PROFILE_CACHE=enabled` after seeding Navigation on the
+same deployed revision. The seed task also records the active generation in
+Postgres. Keep `REDIS_NAVIGATION_CACHE` on its own setting so the two
+readers can be evaluated independently. With only Issue Profile caching
+enabled, the pull still publishes the shared generation and Navigation value.
+
+An Issue Profile with ended intervals can fill Redis only when a
+repeatable-read Postgres snapshot sees the published generation marked
+complete. The pull marks it updating with the first live canonical write.
+Reads use `MGET` to fetch the active generation and profile atomically. A
+conditional Redis write prevents delayed fills from publishing after the
+generation advances. Entries are limited to 128 KiB and expire at Singapore
+midnight. Cache hits can populate Cloudflare for up to 15 minutes, capped at
+the same midnight.
+SQL responses bypass shared caching while the reader is enabled.
+
+On staging origin requests, check `X-MRTDown-Issue-Profile-Source`. A cold
+completed issue returns `sql` with `no-store`, then returns `redis` on the
+next origin request. HTML and Markdown share a Redis entry. For rollback,
+unset `REDIS_ISSUE_PROFILE_CACHE` and purge the tier's data tag.
 
 ## Verification
 

@@ -10,6 +10,7 @@ import { Route as StationMarkdownRoute } from './stations/$stationId/index[.]md'
 const mocks = vi.hoisted(() => ({
   getIssueFn: vi.fn(),
   getIssueMarkdown: vi.fn(),
+  getResponseHeaders: vi.fn(),
   getLineMarkdown: vi.fn(),
   getLineProfileFn: vi.fn(),
   getLlmsTxt: vi.fn(),
@@ -28,6 +29,10 @@ vi.mock('@tanstack/react-router', () => ({
     options,
     path,
   }),
+}));
+
+vi.mock('@tanstack/react-start/server', () => ({
+  getResponseHeaders: mocks.getResponseHeaders,
 }));
 
 vi.mock('~/util/agentMarkdownContent', () => ({
@@ -169,6 +174,7 @@ describe('agent Markdown routes', () => {
     const issuePayload = { data: { id: 'issue-1' }, included: {} };
     mocks.getIssueFn.mockResolvedValue(issuePayload);
     mocks.getIssueMarkdown.mockReturnValue('# issue');
+    mocks.getResponseHeaders.mockReturnValue(new Headers());
 
     const response = await getHandler(IssueMarkdownRoute)({
       params: { issueId: 'issue-1' },
@@ -182,6 +188,24 @@ describe('agent Markdown routes', () => {
     });
     await expect(response.text()).resolves.toBe('# issue');
     expectMarkdownResponse(response);
+  });
+
+  it('preserves the issue loader’s no-store directive in Markdown', async () => {
+    mocks.getIssueFn.mockResolvedValue({
+      data: { id: 'issue-1' },
+      included: {},
+    });
+    mocks.getIssueMarkdown.mockReturnValue('# issue');
+    mocks.getResponseHeaders.mockReturnValue(
+      new Headers({ 'Cache-Control': 'no-store' }),
+    );
+
+    const response = await getHandler(IssueMarkdownRoute)({
+      params: { issueId: 'issue-1' },
+    });
+
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.has('cloudflare-cdn-cache-control')).toBe(false);
   });
 
   it('preserves missing-entity responses from the line read model', async () => {

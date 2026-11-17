@@ -46,7 +46,12 @@ import {
   selectServiceRevisionForReferenceDate,
   serviceRevisionHasEnded,
 } from '~/util/serviceRevisions';
-import { type AppDb, getDefaultDb, timeDbQuery } from './database';
+import {
+  type AppDb,
+  type AppDbReader,
+  getDefaultDb,
+  timeDbQuery,
+} from './database';
 import { isoDate, isoDateTime, nowSg, parseDateTime } from './dateTime';
 import {
   buildIssuesByLineId,
@@ -230,7 +235,7 @@ export function parseTranslations(value: unknown): Line['name'] {
 
 export async function buildDataset(
   referenceNow = nowSg(),
-  db?: AppDb,
+  db?: AppDbReader,
   issueIds?: readonly string[],
   staticScope?: DatasetStaticScope,
 ): Promise<BaseDataset> {

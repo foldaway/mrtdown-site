@@ -17,8 +17,10 @@ import {
   vi,
 } from 'vitest';
 import { getDb } from '~/db';
+import { completePageProfileGeneration } from '~/db/pageProfileGeneration';
 import { relations } from '~/db/relations';
 import { ZipStore } from '~/helpers/ZipStore';
+import { purgePublicDataCache } from '~/util/cloudflareCache';
 import {
   COMBINED_DEPARTURE_PROJECTOR_VERSION,
   projectScheduledTimetable,
@@ -29,6 +31,7 @@ import { retainScheduledTimetable } from '~/util/dbQueries/retainScheduledTimeta
 import { retentionReview } from '~/util/dbQueries/scheduledTimetableRetention.fixture';
 import { getStationProfileReadModel } from '~/util/dbQueries/stations';
 import { withSelectedScheduledTimetable } from '~/util/dbQueries/withSelectedScheduledTimetable';
+import { publishNavigationCache } from '~/util/navigationCache.server';
 import { combinedTimetableArchiveFixture } from './helpers/combinedTimetableArchive.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
 import { fetchManifest } from './helpers/fetchManifest';
@@ -85,6 +88,10 @@ vi.mock('@mrtdown/fs', async (original) => ({
   },
 }));
 vi.mock('~/db', () => ({ getDb: vi.fn() }));
+vi.mock('~/db/pageProfileGeneration', async (original) => ({
+  ...(await original<typeof import('~/db/pageProfileGeneration')>()),
+  completePageProfileGeneration: vi.fn(async () => {}),
+}));
 vi.mock('./helpers/fetchManifest', () => ({ fetchManifest: vi.fn() }));
 vi.mock('./helpers/fetchArchive', () => ({ fetchArchive: vi.fn() }));
 vi.mock(
@@ -158,6 +165,10 @@ vi.mock('~/util/dbQueries/sitemap', () => ({
 }));
 vi.mock('~/util/cloudflareCache', () => ({
   purgePublicDataCache: vi.fn(async () => {}),
+}));
+vi.mock('~/util/navigationCache.server', async (original) => ({
+  ...(await original<typeof import('~/util/navigationCache.server')>()),
+  publishNavigationCache: vi.fn(async () => {}),
 }));
 
 const canonical = scheduledTimetableCanonicalFixture();
@@ -249,6 +260,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('MRTDOWN_DATA_URL', 'https://data.example.com');
   vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', undefined);
+  vi.stubEnv('REDIS_ISSUE_PROFILE_CACHE', undefined);
+  vi.stubEnv('REDIS_NAVIGATION_CACHE', undefined);
   state.fingerprint = undefined;
   vi.mocked(getDb).mockReturnValue({} as ReturnType<typeof getDb>);
   vi.mocked(fetchManifest).mockResolvedValue(manifest);
@@ -380,6 +393,38 @@ describe('pull timetable admission', () => {
       'Invalid canonical pull request',
     );
     expect(acquireOrRenewPullWorkflowLease).not.toHaveBeenCalled();
+  });
+
+  it('retries Redis publication and edge purge under the same generation before recording success', async () => {
+    vi.stubEnv('REDIS_ISSUE_PROFILE_CACHE', 'enabled');
+    vi.mocked(publishNavigationCache).mockRejectedValueOnce(
+      new Error('Redis timed out'),
+    );
+    vi.mocked(purgePublicDataCache).mockRejectedValueOnce(
+      new Error('Cloudflare timed out'),
+    );
+    const pull = workflow();
+
+    await expect(pull.run()).rejects.toThrow('Redis timed out');
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
+
+    await expect(pull.run()).rejects.toThrow('Cloudflare timed out');
+    expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
+
+    await pull.run();
+    expect(truncateStagingTables).toHaveBeenCalledOnce();
+    const generation = pull.context.workflowRunId;
+    expect(
+      vi.mocked(completePageProfileGeneration).mock.calls.map(([, id]) => id),
+    ).toEqual([generation, generation, generation]);
+    expect(vi.mocked(publishNavigationCache).mock.calls).toEqual([
+      [generation],
+      [generation],
+      [generation],
+    ]);
+    expect(purgePublicDataCache).toHaveBeenCalledTimes(2);
+    expect(recordCanonicalManifestFingerprint).toHaveBeenCalledOnce();
   });
 
   it('rejects an advertised incomplete bundle before staging or recording success', async () => {

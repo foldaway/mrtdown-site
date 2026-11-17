@@ -7,7 +7,7 @@ import {
   servicesTable,
   stationCodesTable,
 } from '~/db/schema';
-import { type AppDb, timeDbQuery, timeDbRowsQuery } from './database';
+import { type AppDbReader, timeDbQuery, timeDbRowsQuery } from './database';
 import type { DatasetStaticScope } from './dataset';
 
 type IssueReferenceRows = {
@@ -42,7 +42,7 @@ export function deriveIssueInitialScope(referenceRows: IssueReferenceRows) {
 
 export async function getIssueStaticScope(
   issueIds: readonly string[],
-  db: AppDb,
+  db: AppDbReader,
   queryPrefix:
     | 'issue'
     | 'line_profile'

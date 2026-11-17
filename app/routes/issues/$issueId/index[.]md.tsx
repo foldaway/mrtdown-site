@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { getResponseHeaders } from '@tanstack/react-start/server';
 import { createPublicMarkdownResponse } from '~/util/agentMarkdown';
 import { getIssueMarkdown } from '~/util/agentMarkdownContent';
 import { getIssueFn } from '~/util/issue.functions';
@@ -15,6 +16,7 @@ export const Route = createFileRoute('/issues/$issueId/index.md')({
           getIssueMarkdown(issue, {
             rootUrl: import.meta.env.VITE_ROOT_URL,
           }),
+          { headers: [...getResponseHeaders()] },
         );
       },
     },

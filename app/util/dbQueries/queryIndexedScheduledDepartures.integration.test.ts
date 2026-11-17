@@ -6,13 +6,13 @@ import { StationLayoutPlatformSchema } from '@mrtdown/core';
 import {
   hashBytes,
   queryRetainedScheduledDepartures,
+  type ScheduledTimetableRollbackOptions,
   scheduleTopologyProjection,
   selectRetainedScheduledTimetable,
-  type ScheduledTimetableRollbackOptions,
 } from '@mrtdown/fs';
-import { DateTime } from 'luxon';
 import { and, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { DateTime } from 'luxon';
 import { Pool } from 'pg';
 import {
   afterAll,
@@ -23,6 +23,10 @@ import {
   it,
   vi,
 } from 'vitest';
+import {
+  completePageProfileGeneration,
+  readCompletedPageProfileGeneration,
+} from '~/db/pageProfileGeneration';
 import { relations } from '~/db/relations';
 import {
   scheduledDepartureDaysTable as days,
@@ -31,15 +35,15 @@ import {
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
 import {
-  stationsTable,
-  servicesTable,
   lineServicesTable,
   linesNextTable,
   linesTable,
   metadataTable,
   serviceRevisionPathStationEntriesTable,
   serviceRevisionsTable,
+  servicesTable,
   stationPlatformsTable,
+  stationsTable,
 } from '~/db/schema';
 import {
   getCanonicalManifestFingerprint,
@@ -63,17 +67,17 @@ import {
 } from '~/workflows/pull/helpers/stagingSync';
 import * as database from './database';
 import { buildDataset } from './dataset';
-import { getTownProfileReadModel } from './towns';
-import { getStationProfileReadModel } from './stations';
 import { buildLineSummary, buildUptimeGraph } from './lineAnalytics';
-import { isLineOperatingNow, isLineFuture } from './serviceOperations';
 import { buildLineOperationalFactRows } from './operationalFacts';
 import { projectScheduledTimetable } from './projectScheduledTimetable';
 import { queryIndexedScheduledDepartures } from './queryIndexedScheduledDepartures';
-import { readStationArrivalSource } from './readStationArrivalSource';
 import { readLiveScheduleTopology } from './readLiveScheduleTopology';
+import { readStationArrivalSource } from './readStationArrivalSource';
 import { retainScheduledTimetable } from './retainScheduledTimetable';
 import { retentionReview } from './scheduledTimetableRetention.fixture';
+import { isLineFuture, isLineOperatingNow } from './serviceOperations';
+import { getStationProfileReadModel } from './stations';
+import { getTownProfileReadModel } from './towns';
 
 const url = process.env.TEST_TIMETABLE_DATABASE_URL;
 const schema = `gtfs_window_test_${randomUUID().replaceAll('-', '')}`;
@@ -952,6 +956,7 @@ describe.skipIf(!url)('indexed departure window', () => {
   });
 
   it('holds one read-only repeatable-read snapshot across topology promotion, history changes and rebuilt occurrence rows for every candidate date', async () => {
+    await completePageProfileGeneration(db(), 'prior-run');
     const before = await queryIndexedScheduledDepartures(db(), options());
     const result = await queryIndexedScheduledDepartures(db(), {
       ...options(),
@@ -977,10 +982,12 @@ describe.skipIf(!url)('indexed departure window', () => {
           await writer.delete(timetables);
         });
         expect(await readLiveScheduleTopology(tx)).toEqual(topology);
+        expect(await readCompletedPageProfileGeneration(tx)).toBe('prior-run');
         return topology;
       },
     });
     expect(result).toEqual(before);
+    expect(await readCompletedPageProfileGeneration(db())).toBeUndefined();
     await expect(
       queryIndexedScheduledDepartures(db(), options()),
     ).rejects.toThrow('completed promotion');

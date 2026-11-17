@@ -1,9 +1,11 @@
+const PUBLIC_EDGE_TTL_SECONDS = 900;
+
 export const PUBLIC_BROWSER_CACHE_CONTROL =
   'public, max-age=0, must-revalidate';
-export const PUBLIC_CLOUDFLARE_CACHE_CONTROL =
-  'public, max-age=900, stale-while-revalidate=300, stale-if-error=86400';
+export const PUBLIC_CLOUDFLARE_CACHE_CONTROL = `public, max-age=${PUBLIC_EDGE_TTL_SECONDS}, stale-while-revalidate=300, stale-if-error=86400`;
 export const STATION_PROFILE_FRESH_UNTIL_HEADER =
   'X-MRTDown-Station-Fresh-Until';
+export const ISSUE_PROFILE_FRESH_UNTIL_HEADER = 'X-MRTDown-Issue-Fresh-Until';
 
 export type PublicCacheKind =
   | 'html'
@@ -84,7 +86,13 @@ export function applyPublicDataCacheHeaders(
   const kind = getResponseKind(request, response);
   const pathname = new URL(request.url).pathname;
   const isStationHtml = kind === 'html' && isStationProfilePath(pathname);
-  const freshUntil = response.headers.get(STATION_PROFILE_FRESH_UNTIL_HEADER);
+  const stationFreshUntil = response.headers.get(
+    STATION_PROFILE_FRESH_UNTIL_HEADER,
+  );
+  const issueFreshUntil = response.headers.get(
+    ISSUE_PROFILE_FRESH_UNTIL_HEADER,
+  );
+  const freshUntil = issueFreshUntil ?? stationFreshUntil;
   const cacheable =
     (request.method === 'GET' || request.method === 'HEAD') &&
     response.status === 200 &&
@@ -96,13 +104,19 @@ export function applyPublicDataCacheHeaders(
 
   const headers = new Headers(response.headers);
   headers.delete(STATION_PROFILE_FRESH_UNTIL_HEADER);
+  headers.delete(ISSUE_PROFILE_FRESH_UNTIL_HEADER);
   if (
     isStationHtml ||
-    (cacheable && kind === 'server-function' && freshUntil != null)
+    issueFreshUntil != null ||
+    (cacheable && kind === 'server-function' && stationFreshUntil != null)
   ) {
     // Subtract the time spent assembling and rendering the response.
     const expiresAt = Number(freshUntil ?? Number.NaN);
-    const ttl = Math.floor((expiresAt - Date.now()) / 1000);
+    const remainingSeconds = Math.floor((expiresAt - Date.now()) / 1000);
+    const ttl =
+      issueFreshUntil == null
+        ? remainingSeconds
+        : Math.min(remainingSeconds, PUBLIC_EDGE_TTL_SECONDS);
     if (cacheable && Number.isFinite(ttl) && ttl > 0) {
       setPublicDataCacheHeaders(
         headers,
@@ -114,7 +128,11 @@ export function applyPublicDataCacheHeaders(
       headers.set('Cache-Control', 'no-store');
       headers.delete('Cloudflare-CDN-Cache-Control');
       headers.delete('Cache-Tag');
-      if (cacheable) headers.set('X-MRTDown-Cache', 'dynamic-station');
+      if (issueFreshUntil != null) {
+        headers.delete('X-MRTDown-Cache');
+      } else if (cacheable) {
+        headers.set('X-MRTDown-Cache', 'dynamic-station');
+      }
     }
   } else if (cacheable) {
     setPublicDataCacheHeaders(

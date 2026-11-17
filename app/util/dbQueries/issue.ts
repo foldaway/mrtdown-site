@@ -1,15 +1,20 @@
 import { desc, eq } from 'drizzle-orm';
 import { evidencesTable, issuesTable } from '~/db/schema';
-import { getDefaultDb, timeDbQuery } from './database';
+import { type AppDbReader, getDefaultDb, timeDbQuery } from './database';
 import { buildDataset } from './dataset';
+import { nowSg } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
-import { getIssueStaticScope } from './readModelScope';
 import { toIssueUpdate } from './issueEvidence';
+import { getIssueStaticScope } from './readModelScope';
 
 export { deriveIssueInitialScope } from './readModelScope';
 
-export async function getIssueReadModel(issueId: string) {
-  const db = await getDefaultDb();
+export async function getIssueReadModel(
+  issueId: string,
+  referenceNow = nowSg(),
+  reader?: AppDbReader,
+) {
+  const db = reader ?? (await getDefaultDb());
   const [issueRow] = await timeDbQuery('issue_q_root', () =>
     db
       .select({ id: issuesTable.id })
@@ -34,7 +39,7 @@ export async function getIssueReadModel(issueId: string) {
         .orderBy(desc(evidencesTable.ts)),
     ),
   ]);
-  const dataset = await buildDataset(undefined, db, [issueId], staticScope);
+  const dataset = await buildDataset(referenceNow, db, [issueId], staticScope);
   const issue = dataset.allIssues[issueId];
   if (issue == null) {
     throw new Error(
