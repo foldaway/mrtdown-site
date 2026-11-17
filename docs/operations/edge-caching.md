@@ -125,8 +125,8 @@ enabled, the pull still publishes the shared generation and Navigation value.
 An Issue Profile with ended intervals can fill Redis only when a
 repeatable-read Postgres snapshot sees the published generation marked
 complete. The pull marks it updating with the first live canonical write.
-An old fill cannot write after the active Redis generation changes. Redis
-entries are limited to 128 KiB and expire at Singapore midnight. Cache hits
+Redis checks the active generation atomically with each profile read or write.
+Entries are limited to 128 KiB and expire at Singapore midnight. Cache hits
 can populate Cloudflare for up to 15 minutes, capped at the same midnight.
 SQL responses bypass shared caching while the reader is enabled.
 
