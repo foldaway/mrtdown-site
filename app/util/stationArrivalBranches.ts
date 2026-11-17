@@ -10,6 +10,8 @@ export type StationArrivalBranch = {
   destinationName: Station['name'] | null;
   platformLabels: string[];
   isLoop?: true;
+  viaStationId?: string;
+  viaStationName?: Station['name'];
 };
 
 export function isLoopPath(

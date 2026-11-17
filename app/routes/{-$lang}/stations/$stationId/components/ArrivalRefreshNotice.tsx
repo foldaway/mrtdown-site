@@ -8,7 +8,7 @@ export function ArrivalRefreshNotice({ state }: ArrivalRefreshNoticeProps) {
   return (
     <p
       aria-live="polite"
-      className="mt-1 text-gray-500 text-xs empty:mt-0 dark:text-gray-400"
+      className="ms-8 mt-1 text-gray-600 text-xs empty:mt-0 sm:ms-9 dark:text-gray-400"
     >
       {state?.status === 'error' ? (
         state.data ? (

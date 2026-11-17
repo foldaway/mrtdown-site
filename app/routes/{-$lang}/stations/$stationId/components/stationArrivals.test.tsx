@@ -12,6 +12,7 @@ import {
   serializeStationArrivalsV2,
 } from '~/util/stationArrivalsV2';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
+import { StationGuide } from './StationGuide';
 import {
   type ArrivalStates,
   arrivalBranchKey,
@@ -20,9 +21,14 @@ import {
 import type { ArrivalLine } from './stationGuide.types';
 import { TimetableSources } from './TimetableSources';
 
-type MockLinkProps = { children: React.ReactNode };
+type MockLinkProps = {
+  children: React.ReactNode;
+  params?: { stationId?: string };
+};
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children }: MockLinkProps) => <span>{children}</span>,
+  Link: ({ children, params }: MockLinkProps) => (
+    <span data-station-id={params?.stationId}>{children}</span>
+  ),
 }));
 const scheduled = serializeStationArrivalsV2({
   source: 'scheduled',
@@ -106,21 +112,23 @@ afterEach(() => {
 });
 
 describe('station guide arrival sources', () => {
-  it('highlights the next two departures per platform group and keeps later times available', () => {
+  it('shows the next two departures per platform group as read-only times', () => {
     const html = renderRow(scheduled);
-    expect(html).toContain('2 min');
-    expect(html).toContain('then 7 min');
-    expect(html).toContain('Scheduled');
+    expect(html).toMatch(/>2 <span[^>]*>min<\/span>/);
+    expect(html).toMatch(
+      /class="sr-only">then<\/span>.*<svg[^>]*aria-hidden="true"[^>]*>.*<strong[^>]*>.*≈.*7 min<\/strong>/,
+    );
+    expect(html).not.toContain('aria-expanded');
+    expect(html).not.toContain('Scheduled times');
     expect(html).toContain('Approximate scheduled');
-    expect(html).toContain('Service details');
+    expect(html).toMatch(
+      />Service<\/p>.*towards <span data-station-id="[^"]+">Destination<\/span>/,
+    );
+    expect(html).not.toContain('D1');
     expect(html).toContain('Alternative platforms for the same train');
     expect(html).not.toContain('Dataset licence');
-    expect(html.match(/<ol/g)).toHaveLength(3);
-    expect(html.match(/<time/g)).toHaveLength(4);
-    expect(html).toContain('Later departures</summary>');
-    expect(html).toMatch(
-      /<time[^>]+datetime="2026-10-24T16:10:00Z"[^>]*>12:10 am<\/time>/i,
-    );
+    expect(html).not.toContain('<ol');
+    expect(html).not.toContain('<time');
     expect(html).not.toContain('Frequency estimate');
     expect(html).not.toContain('Help improve');
     expect(html).not.toContain(departure.manifestSha256);
@@ -130,23 +138,38 @@ describe('station guide arrival sources', () => {
   it('uses clock times for stale responses and departures whose scheduled time has passed', () => {
     const stale = renderRow(scheduled, 'error');
     expect(stale).toContain('Showing the last known response');
-    expect(stale).not.toContain('2 min');
-    expect(stale).not.toContain('then 7 min');
+    expect(stale).not.toMatch(/>2 <span[^>]*>min<\/span>/);
+    expect(stale).not.toContain('>7 min<');
+    expect(stale.match(/<time/g)).toHaveLength(3);
+    expect(stale).toContain('12:10 am');
+    expect(stale).not.toContain('12:20 am');
     const elapsed = renderRow(
       scheduled,
       'ready',
       Date.parse('2026-10-24T16:10:15Z'),
     );
     expect(elapsed).not.toContain('0 min');
-    expect(elapsed).toContain('then 5 min');
-    expect(elapsed.match(/<time/g)).toHaveLength(4);
+    expect(elapsed).toMatch(
+      /class="sr-only">then<\/span>.*<strong[^>]*>.*5 min<\/strong>/,
+    );
+    expect(elapsed.match(/<time/g)).toHaveLength(1);
+  });
+
+  it('keeps the one-hour boundary in minutes', () => {
+    const html = renderRow(
+      scheduled,
+      'ready',
+      Date.parse('2026-10-24T15:10:00Z'),
+    );
+    expect(html).toMatch(/>60 <span[^>]*>min<\/span>/);
+    expect(html).not.toContain('1h 0m');
   });
 
   it('shows recent reports separately from the timetable and expires them on the client', () => {
     const recent = { ...scheduled, recentCrowdArrival };
     const html = renderRow(recent, 'ready', undefined, async () => {});
     expect(html).toContain('Rider-reported arrival');
-    expect(html).toContain('2 min');
+    expect(html).toMatch(/>2 <span[^>]*>min<\/span>/);
     expect(html).toContain('Report an arrival');
     const expired = renderRow(
       recent,
@@ -156,14 +179,29 @@ describe('station guide arrival sources', () => {
     expect(expired).not.toContain('Rider-reported arrival');
   });
 
+  it('offers one report action next to the timings across platform groups with the report initially collapsed', () => {
+    const html = renderRow(scheduled, 'ready', undefined, async () => {});
+    const triggers = [
+      ...html.matchAll(
+        /aria-controls="([^"]+)" aria-expanded="false" aria-label="Report an arrival"/g,
+      ),
+    ];
+    expect(triggers).toHaveLength(1);
+    expect(html).toContain('>Report</button>');
+    expect(html).toContain(`hidden="" id="${triggers[0]?.[1]}"`);
+    const report = html.indexOf('aria-label="Report an arrival"');
+    expect(report).toBeGreaterThan(html.indexOf('class="sr-only">then</span>'));
+    expect(html).not.toContain('<section');
+  });
+
   it('keeps empty, partial, unavailable and stale responses distinct without SSR estimates', () => {
     if (scheduled.source !== 'scheduled') {
       throw new Error('fixture');
     }
     const empty = { ...scheduled, timings: [] };
     const html = renderRow(empty);
-    expect(html).toContain('No scheduled departures');
-    expect(html).toMatch(/12:00 am–1:00 am \(Singapore time\)/i);
+    expect(html).toContain('No departures in this window');
+    expect(html).not.toContain('<details');
     expect(html).not.toContain('Service ended');
     expect(html).not.toContain('Frequency estimate');
     const partial = {
@@ -182,12 +220,13 @@ describe('station guide arrival sources', () => {
     };
     const onArrivalReported = async () => {};
     for (const [data, message, canReport] of [
-      [empty, 'No scheduled departures', false],
-      [partial, 'Incomplete timetable. No departure times.', true],
+      [empty, 'No departures in this window', false],
+      [partial, 'Timetable unavailable', true],
       [unavailable, 'Timetable unavailable', true],
     ] as const) {
       const row = renderRow(data, 'ready', undefined, onArrivalReported);
       expect(row).toContain(message);
+      expect(row).toContain('>N/A</span>');
       expect(row.includes('Report an arrival')).toBe(canReport);
       const withReport = renderRow({ ...data, recentCrowdArrival });
       expect(withReport).toContain(message);
@@ -198,15 +237,59 @@ describe('station guide arrival sources', () => {
       ...partial,
       timings: scheduled.timings,
     });
-    expect(partialWithTimes).toContain('Incomplete timetable');
-    expect(partialWithTimes).toContain('2 min');
-    expect(partialWithTimes).not.toContain('No departure times');
+    expect(partialWithTimes).not.toContain('Incomplete timetable');
+    expect(partialWithTimes).toMatch(/>2 <span[^>]*>min<\/span>/);
+    expect(partialWithTimes).not.toContain('Timetable unavailable');
     expect(renderRow(empty, 'error')).toContain(
       'Showing the last known response',
     );
     const failed = renderRow(null, 'error');
     expect(failed).toContain('Couldn’t load timetable');
     expect(failed).not.toContain('Timetable unavailable');
+  });
+
+  it('combines line facts, service directions and exits without repeating a visible station code', () => {
+    const currentMembership = {
+      lineId: 'EWL',
+      code: 'EW21',
+      structureType: 'elevated' as const,
+      startedAt: '1988-03-12',
+      branchId: 'EWL_MAIN_E',
+      sequenceOrder: 1,
+    };
+    const oldMembership = {
+      ...currentMembership,
+      lineId: 'CCL',
+      code: 'CC22',
+      endedAt: '2011-10-08',
+    };
+    const html = renderToStaticMarkup(
+      <IntlProvider locale="en-SG" defaultLocale="en-SG">
+        <StationGuide
+          arrivalLines={[
+            {
+              lineId: 'EWL',
+              arrivalTimings: [
+                { ...timing, lineId: 'EWL', serviceId: 'EWL_MAIN_E' },
+              ],
+            },
+          ]}
+          exits={[{ id: 1, label: 'A' }]}
+          lineColors={{ EWL: '#006945', CCL: '#8a5000' }}
+          lineNames={{ EWL: 'East–West Line', CCL: 'Circle Line' }}
+          memberships={[currentMembership, oldMembership]}
+          referenceAt="2026-10-24T12:00:00+08:00"
+          stationId={scheduled.scope.stationId}
+          visibleMemberships={[currentMembership]}
+        />
+      </IntlProvider>,
+    );
+    expect(html).toMatch(
+      /East–West Line.*Opened.*12 Mar 1988.*Eastbound.*towards .*Destination/,
+    );
+    expect(html).toMatch(/Circle Line.*CC22.*Closed.*8 Oct 2011/);
+    expect(html).toContain('Exit A');
+    expect(html).not.toContain('EW21');
   });
 
   it('lists each distinct credit once across service rows, including stale schedules', () => {
@@ -295,16 +378,24 @@ describe('station guide refresh session', () => {
     const html = renderToStaticMarkup(
       <IntlProvider locale="en-SG" defaultLocale="en-SG">
         <ServiceArrivalSummary
-          arrivalTiming={loopTiming}
+          arrivalTiming={{
+            ...loopTiming,
+            serviceId: 'CCL_LOOP_CW',
+            viaStationId: 'via-station',
+            viaStationName: display.destinationName,
+          }}
           arrivalState={{ data: scheduled, status: 'ready' }}
           lineColor="#123456"
           now={null}
         />
       </IntlProvider>,
     );
-    expect(html).toContain('Loop Service (Clockwise)');
-    expect(html).not.toContain('Towards');
-    expect(html).toContain('Scheduled');
+    expect(html).toMatch(
+      />Clockwise<\/p>.*via <span data-station-id="via-station">Destination<\/span>/,
+    );
+    expect(html).not.toContain('towards');
+    expect(html).not.toContain('D1');
+    expect(html).toContain('12:10 am');
   });
   it('makes a fresh request after a report even when a poll was in flight', async () => {
     const pending = deferred();

@@ -1,6 +1,13 @@
+import { ArrowLongRightIcon } from '@heroicons/react/16/solid';
+import type { ReactNode } from 'react';
 import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
 import type { StationArrivalsV2 } from '~/util/stationArrivalsV2';
-import { PlatformSign } from './StationGuideSigns';
+import { ArrivalServiceRow } from './ArrivalServiceRow';
+import {
+  ArrivalTimeValue,
+  ArrivalTimingDisplay,
+  NoArrivalTimes,
+} from './ArrivalTimingDisplay';
 
 type ScheduledResponse = Extract<StationArrivalsV2, { source: 'scheduled' }>;
 type ScheduledDeparture =
@@ -9,6 +16,8 @@ type ScheduledDeparture =
 type ScheduledArrivalStatusProps = {
   data: ScheduledResponse;
   hasDepartures: boolean;
+  heading: ReactNode;
+  reportButton?: ReactNode;
   lineColor: string;
   now: number | null;
 };
@@ -16,137 +25,68 @@ type ScheduledArrivalStatusProps = {
 export function ScheduledArrivalStatus({
   data,
   hasDepartures,
+  heading,
+  reportButton,
   lineColor,
   now,
 }: ScheduledArrivalStatusProps) {
-  const intl = useIntl();
-  return (
-    <div className="min-w-0 space-y-2 text-gray-700 text-xs dark:text-gray-300">
-      {!hasDepartures ? (
-        <div aria-live="polite">
-          {data.coverage.complete ? (
-            <>
-              <p className="text-sm">
-                <FormattedMessage
-                  id="station.arrivals.empty_window"
-                  defaultMessage="No scheduled departures"
-                />
-              </p>
-              <p className="text-gray-500 dark:text-gray-400">
-                <FormattedMessage
-                  id="station.arrivals.empty_window_range"
-                  defaultMessage="{start}–{end} (Singapore time)"
-                  values={{
-                    start: formatClockTime(data.window.startInstant, intl),
-                    end: formatClockTime(data.window.endInstant, intl),
-                  }}
-                />
-              </p>
-            </>
-          ) : (
-            <p className="text-sm">
-              <FormattedMessage
-                id="station.arrivals.no_timed_departures"
-                defaultMessage="Incomplete timetable. No departure times."
-              />
-            </p>
-          )}
-        </div>
-      ) : (
-        !data.coverage.complete && (
-          <p aria-live="polite">
-            <FormattedMessage
-              id="station.arrivals.incomplete"
-              defaultMessage="Incomplete timetable"
-            />
-          </p>
-        )
-      )}
-      {data.timings.map((timing) => (
-        <div
-          className="space-y-1.5 border-gray-200 dark:border-gray-700 [&+&]:border-t [&+&]:pt-2"
-          key={JSON.stringify(timing.platforms.map(({ id }) => id))}
-        >
-          {timing.platforms.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {timing.platforms.map((platform) => (
-                <PlatformSign
-                  key={platform.id}
-                  color={lineColor}
-                  label={platform.label}
-                />
-              ))}
-              {timing.platforms.length > 1 && (
-                <span>
-                  <FormattedMessage
-                    id="station.arrivals.platform_alternatives"
-                    defaultMessage="Alternative platforms for the same train"
-                  />
-                </span>
-              )}
-            </div>
-          )}
-          <PlatformDepartures departures={timing.departures} now={now} />
-        </div>
-      ))}
-    </div>
+  if (!hasDepartures) {
+    return (
+      <ArrivalServiceRow
+        heading={heading}
+        lineColor={lineColor}
+        platformLabels={[]}
+      >
+        <ArrivalTimingDisplay reportButton={reportButton}>
+          <NoArrivalTimes emptyWindow={data.coverage.complete} />
+        </ArrivalTimingDisplay>
+      </ArrivalServiceRow>
+    );
+  }
+
+  const firstTimedGroup = data.timings.find(
+    ({ departures }) => departures.length > 0,
   );
-}
-
-type PlatformDeparturesProps = {
-  departures: ScheduledDeparture[];
-  now: number | null;
-};
-
-function PlatformDepartures({ departures, now }: PlatformDeparturesProps) {
-  const intl = useIntl();
-  const [next, following, ...later] = departures;
-  if (!next) return null;
-
   return (
-    <>
-      <ol className="grid grid-cols-2 items-baseline gap-x-3 tabular-nums">
-        <li className="min-w-0">
-          <DepartureTime departure={next} now={now} />
-        </li>
-        {following && (
-          <li className="min-w-0">
-            <DepartureTime departure={following} following now={now} />
-          </li>
-        )}
-      </ol>
-      {later.length > 0 && (
-        <details>
-          <summary className="w-fit cursor-pointer rounded py-1 text-gray-600 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-gray-300">
-            <FormattedMessage
-              id="station.arrivals.later_departures"
-              defaultMessage="Later departures"
-            />
-          </summary>
-          <ol className="mt-1 space-y-1 ps-3 tabular-nums">
-            {later.map((departure) => (
-              <li
-                className="flex flex-wrap items-baseline gap-x-2"
-                key={JSON.stringify([
-                  departure.manifestSha256,
-                  departure.snapshotSha256,
-                  departure.revisionId,
-                  departure.serviceDate,
-                  departure.providerTripId,
-                  departure.providerStopId,
-                  departure.stopSequence,
-                ])}
+    <div className="space-y-2">
+      {data.timings.map((timing) => {
+        const [next, following] = timing.departures;
+        return (
+          <div
+            className="border-gray-200 dark:border-gray-700 [&+&]:border-t [&+&]:pt-2"
+            key={JSON.stringify(timing.platforms.map(({ id }) => id))}
+          >
+            <ArrivalServiceRow
+              alternativePlatforms={timing.platforms.length > 1}
+              heading={heading}
+              lineColor={lineColor}
+              platformLabels={[
+                ...new Set(timing.platforms.map(({ label }) => label)),
+              ]}
+            >
+              <ArrivalTimingDisplay
+                reportButton={timing === firstTimedGroup ? reportButton : null}
               >
-                <time className="font-medium" dateTime={departure.time}>
-                  {formatClockTime(departure.time, intl)}
-                </time>
-                <DeparturePrecision precision={departure.precision} />
-              </li>
-            ))}
-          </ol>
-        </details>
-      )}
-    </>
+                {next ? (
+                  <>
+                    <DepartureTime departure={next} now={now} />
+                    {following && (
+                      <DepartureTime
+                        departure={following}
+                        following
+                        now={now}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <NoArrivalTimes emptyWindow={data.coverage.complete} />
+                )}
+              </ArrivalTimingDisplay>
+            </ArrivalServiceRow>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -160,56 +100,69 @@ function DepartureTime({ departure, following, now }: DepartureTimeProps) {
   const intl = useIntl();
   const minutes =
     now == null ? 0 : Math.ceil((Date.parse(departure.time) - now) / 60_000);
-  const duration = minutes > 0 ? formatWait(minutes, intl) : null;
+  const duration = minutes > 0 ? formatWait(minutes, intl, following) : null;
   const clock = (
-    <time dateTime={departure.time} className="whitespace-nowrap">
+    <time dateTime={departure.time}>
       {formatClockTime(departure.time, intl)}
     </time>
   );
 
-  return (
+  const value = (
     <>
-      <p
-        className={
-          following
-            ? 'font-medium text-gray-700 text-sm leading-tight dark:text-gray-200'
-            : 'font-bold text-gray-900 text-lg leading-none dark:text-gray-100'
-        }
-      >
-        {following ? (
-          <FormattedMessage
-            id="station.arrival_timings.then"
-            defaultMessage="then {time}"
-            values={{ time: duration ?? clock }}
-          />
-        ) : (
-          (duration ?? clock)
-        )}
-      </p>
-      <p className="mt-0.5 text-gray-500 dark:text-gray-400">
-        {duration != null && <span className="block">{clock}</span>}
-        <DeparturePrecision precision={departure.precision} />
-      </p>
+      {departure.precision !== 'exact' && <ApproximateTime />}
+      {duration ?? clock}
     </>
+  );
+
+  return following ? (
+    <span className="inline-flex items-center gap-1 text-[11px] text-gray-600 leading-snug sm:text-xs dark:text-gray-400">
+      <FormattedMessage
+        id="station.arrival_timings.then"
+        defaultMessage="<label>then</label> {time}"
+        values={{
+          label: (label) => (
+            <>
+              <span className="sr-only">{label}</span>
+              <ArrowLongRightIcon
+                aria-hidden="true"
+                className="size-3.5 shrink-0 text-gray-500 dark:text-gray-400"
+              />
+            </>
+          ),
+          time: (
+            <strong className="whitespace-nowrap font-medium">{value}</strong>
+          ),
+        }}
+      />
+    </span>
+  ) : (
+    <ArrivalTimeValue>{value}</ArrivalTimeValue>
   );
 }
 
-function formatWait(minutes: number, intl: IntlShape) {
-  if (minutes >= 60) {
+function formatWait(minutes: number, intl: IntlShape, following = false) {
+  const unit = (text: ReactNode) =>
+    following ? (
+      text
+    ) : (
+      <span className="font-medium text-[0.7em] tracking-normal">{text}</span>
+    );
+  if (minutes > 60) {
     return intl.formatMessage(
       {
         id: 'station.arrival_timings.hours_and_minutes',
-        defaultMessage: '{hours, number}h {minutes, number}m',
+        defaultMessage:
+          '{hours, number}<unit>h</unit> {minutes, number}<unit>m</unit>',
       },
-      { hours: Math.floor(minutes / 60), minutes: minutes % 60 },
+      { hours: Math.floor(minutes / 60), minutes: minutes % 60, unit },
     );
   }
   return intl.formatMessage(
     {
       id: 'station.arrival_timings.compact_minutes',
-      defaultMessage: '{minutes, number} min',
+      defaultMessage: '{minutes, number} <unit>min</unit>',
     },
-    { minutes },
+    { minutes, unit },
   );
 }
 
@@ -217,18 +170,16 @@ function formatClockTime(time: string, intl: IntlShape) {
   return intl.formatTime(time, { timeZone: 'Asia/Singapore' });
 }
 
-type DeparturePrecisionProps = { precision: ScheduledDeparture['precision'] };
-
-function DeparturePrecision({ precision }: DeparturePrecisionProps) {
-  return precision === 'exact' ? (
-    <FormattedMessage
-      id="station.arrivals.scheduled"
-      defaultMessage="Scheduled"
-    />
-  ) : (
-    <FormattedMessage
-      id="station.arrivals.approximate_scheduled"
-      defaultMessage="Approximate scheduled"
-    />
+function ApproximateTime() {
+  return (
+    <>
+      <span aria-hidden="true">≈</span>
+      <span className="sr-only">
+        <FormattedMessage
+          id="station.arrivals.approximate_scheduled"
+          defaultMessage="Approximate scheduled"
+        />{' '}
+      </span>
+    </>
   );
 }

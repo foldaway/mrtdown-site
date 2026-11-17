@@ -12,6 +12,8 @@ export function useStationArrivals(stationId: string, lines: ArrivalLine[]) {
     states: ArrivalStates;
   } | null>(null);
   useEffect(() => {
+    if (lines.length === 0) return;
+
     const current = createArrivalRefresh(stationId, lines, (states) =>
       setSnapshot({ stationId, states }),
     );

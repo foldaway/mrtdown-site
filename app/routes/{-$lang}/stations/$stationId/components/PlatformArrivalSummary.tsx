@@ -1,11 +1,14 @@
-import { Link } from '@tanstack/react-router';
-import { FormattedMessage, useIntl } from 'react-intl';
-import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
+import { useId, useState } from 'react';
 import { ArrivalRefreshNotice } from './ArrivalRefreshNotice';
-import { CrowdArrivalReport, RecentCrowdArrival } from './CrowdArrivalReport';
+import { ArrivalServiceHeading } from './ArrivalServiceHeading';
+import { ArrivalServiceRow } from './ArrivalServiceRow';
+import { ArrivalTimingDisplay, NoArrivalTimes } from './ArrivalTimingDisplay';
+import {
+  ArrivalReportButton,
+  CrowdArrivalReport,
+  RecentCrowdArrival,
+} from './CrowdArrivalReport';
 import { ScheduledArrivalStatus } from './ScheduledArrivalStatus';
-import { ServiceDetailsPopover } from './ServiceDetailsPopover';
-import { PlatformSign } from './StationGuideSigns';
 import type { BranchArrivalState } from './stationArrivalRefresh';
 import type { ArrivalTiming } from './stationGuide.types';
 
@@ -24,7 +27,8 @@ export function ServiceArrivalSummary({
   now,
   onArrivalReported,
 }: ServiceArrivalSummaryProps) {
-  const intl = useIntl();
+  const reportPanelId = useId();
+  const [reportExpanded, setReportExpanded] = useState(false);
   const data = arrivalState?.data;
   const report = data?.recentCrowdArrival;
   const recentReport =
@@ -37,106 +41,59 @@ export function ServiceArrivalSummary({
     (hasDepartures ||
       (data.scope.stationId !== data.scope.destinationStationId &&
         (data.source === 'unavailable' || !data.coverage.complete)));
-  const destinationName =
-    arrivalTiming.destinationName == null
-      ? null
-      : getLocalizedTranslation(arrivalTiming.destinationName, intl.locale);
-  const identity = (
-    <>
-      <span
-        className="shrink-0 rounded-md px-1.5 py-0.5 font-bold text-[11px] text-white leading-none shadow-sm"
-        style={{ backgroundColor: lineColor }}
-      >
-        {arrivalTiming.destinationCode}
-      </span>
-      {destinationName != null && (
-        <span className="truncate font-medium text-gray-800 text-sm group-hover:underline dark:text-gray-200">
-          {destinationName}
-        </span>
-      )}
-    </>
-  );
+  const reportForm =
+    reportable && onArrivalReported ? (
+      <CrowdArrivalReport
+        key={JSON.stringify(data.scope)}
+        expanded={reportExpanded}
+        panelId={reportPanelId}
+        scope={{
+          stationId: data.scope.stationId,
+          lineId: data.scope.lineId,
+          serviceId: data.scope.serviceId,
+          destinationStationId: data.scope.destinationStationId,
+        }}
+        onSubmitted={onArrivalReported}
+      />
+    ) : null;
+  const heading = <ArrivalServiceHeading timing={arrivalTiming} />;
+  const reportButton = reportForm ? (
+    <ArrivalReportButton
+      expanded={reportExpanded}
+      panelId={reportPanelId}
+      onToggle={() => setReportExpanded((open) => !open)}
+    />
+  ) : null;
   return (
-    <li className="px-4 py-2.5 sm:px-6">
-      <div className="grid items-start gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] sm:gap-4">
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-1.5">
-            {arrivalTiming.isLoop ? (
-              <span className="font-medium text-gray-800 text-sm dark:text-gray-200">
-                {getLocalizedTranslation(
-                  arrivalTiming.serviceName,
-                  intl.locale,
-                )}
-              </span>
-            ) : (
-              <>
-                <span className="shrink-0 text-gray-500 text-sm dark:text-gray-400">
-                  <FormattedMessage
-                    id="station.arrival_timings.towards_label"
-                    defaultMessage="Towards"
-                  />
-                </span>
-                {arrivalTiming.destinationStationId == null ? (
-                  identity
-                ) : (
-                  <Link
-                    className="group flex min-w-0 items-center gap-1.5"
-                    params={{ stationId: arrivalTiming.destinationStationId }}
-                    to="/{-$lang}/stations/$stationId"
-                  >
-                    {identity}
-                  </Link>
-                )}
-                <ServiceDetailsPopover
-                  serviceName={arrivalTiming.serviceName}
-                />
-              </>
-            )}
-          </div>
-          {data?.source !== 'scheduled' &&
-            arrivalTiming.platformLabels.length > 0 && (
-              <ul className="mt-1.5 flex flex-wrap gap-1">
-                {arrivalTiming.platformLabels.map((label) => (
-                  <li key={label}>
-                    <PlatformSign color={lineColor} label={label} />
-                  </li>
-                ))}
-              </ul>
-            )}
-        </div>
-        {data?.source === 'scheduled' ? (
-          <ScheduledArrivalStatus
-            data={data}
-            hasDepartures={hasDepartures}
-            lineColor={lineColor}
-            now={arrivalState?.status === 'error' ? null : now}
-          />
-        ) : data?.source === 'unavailable' ||
+    <li className="py-2">
+      {data?.source === 'scheduled' ? (
+        <ScheduledArrivalStatus
+          data={data}
+          hasDepartures={hasDepartures}
+          heading={heading}
+          reportButton={reportButton}
+          lineColor={lineColor}
+          now={arrivalState?.status === 'error' ? null : now}
+        />
+      ) : (
+        <ArrivalServiceRow
+          heading={heading}
+          lineColor={lineColor}
+          platformLabels={arrivalTiming.platformLabels}
+        >
+          {data?.source === 'unavailable' ||
           arrivalTiming.destinationStationId == null ? (
-          <p className="text-gray-700 text-sm dark:text-gray-300">
-            <FormattedMessage
-              id="station.arrivals.timetable_unavailable"
-              defaultMessage="Timetable unavailable"
-            />
-          </p>
-        ) : null}
-      </div>
+            <ArrivalTimingDisplay reportButton={reportButton}>
+              <NoArrivalTimes />
+            </ArrivalTimingDisplay>
+          ) : null}
+        </ArrivalServiceRow>
+      )}
       {arrivalTiming.destinationStationId != null && (
         <ArrivalRefreshNotice state={arrivalState} />
       )}
       {recentReport && <RecentCrowdArrival report={recentReport} />}
-      {reportable && onArrivalReported && (
-        <CrowdArrivalReport
-          key={JSON.stringify(data.scope)}
-          scope={{
-            stationId: data.scope.stationId,
-            lineId: data.scope.lineId,
-            serviceId: data.scope.serviceId,
-            destinationStationId: data.scope.destinationStationId,
-          }}
-          onSubmitted={onArrivalReported}
-        />
-      )}
+      {reportForm}
     </li>
   );
 }

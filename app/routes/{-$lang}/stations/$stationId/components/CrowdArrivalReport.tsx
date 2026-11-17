@@ -36,12 +36,48 @@ export function RecentCrowdArrival({ report }: RecentCrowdArrivalProps) {
   );
 }
 
+type ArrivalReportButtonProps = {
+  expanded: boolean;
+  panelId: string;
+  onToggle: () => void;
+};
+
+export function ArrivalReportButton({
+  expanded,
+  panelId,
+  onToggle,
+}: ArrivalReportButtonProps) {
+  const intl = useIntl();
+  return (
+    <button
+      aria-controls={panelId}
+      aria-expanded={expanded}
+      aria-label={intl.formatMessage({
+        id: 'station.arrival_report.summary',
+        defaultMessage: 'Report an arrival',
+      })}
+      className="inline-flex min-h-6 cursor-pointer items-center rounded px-1 text-gray-600 text-xs leading-snug underline decoration-gray-400 underline-offset-2 hover:text-gray-900 hover:decoration-current focus-visible:outline-2 focus-visible:outline-blue-500 aria-expanded:text-gray-900 dark:text-gray-400 dark:decoration-gray-600 dark:aria-expanded:text-gray-100 dark:hover:text-gray-100"
+      onClick={onToggle}
+      type="button"
+    >
+      <FormattedMessage
+        id="station.arrival_report.short_label"
+        defaultMessage="Report"
+      />
+    </button>
+  );
+}
+
 type CrowdArrivalReportProps = {
+  expanded: boolean;
+  panelId: string;
   scope: ArrivalBranchScope;
   onSubmitted: () => Promise<void>;
 };
 
 export function CrowdArrivalReport({
+  expanded,
+  panelId,
   scope,
   onSubmitted,
 }: CrowdArrivalReportProps) {
@@ -90,79 +126,75 @@ export function CrowdArrivalReport({
   }
 
   return (
-    <details className="mt-1 text-xs">
-      <summary className="w-fit cursor-pointer rounded py-1 text-blue-700 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300">
-        <FormattedMessage
-          id="station.arrival_report.summary"
-          defaultMessage="Report an arrival"
-        />
-      </summary>
-      <div className="mt-1 rounded-lg bg-blue-50 px-3 py-2 text-gray-700 dark:bg-blue-950/30 dark:text-gray-200">
-        {status !== 'sent' && (
-          <>
-            <p>
-              <FormattedMessage
-                id="station.arrival_report.explainer"
-                defaultMessage="At this station? Share the arrival time shown on the station display for this service."
-              />
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {[0, 1, 3, 5].map((minutes) => (
-                <button
-                  className="min-h-8 rounded-md border border-blue-300 bg-white px-2 py-1 font-medium text-blue-800 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-50 dark:border-blue-700 dark:bg-gray-900 dark:text-blue-200 dark:hover:bg-blue-900"
-                  disabled={status === 'sending' || coolingDown}
-                  key={minutes}
-                  onClick={() => void submit(minutes)}
-                  type="button"
-                >
-                  {minutes === 0 ? (
-                    <FormattedMessage
-                      id="station.arrival_report.arriving_now"
-                      defaultMessage="Arriving now"
-                    />
-                  ) : (
-                    <FormattedMessage
-                      id="station.arrival_report.minutes"
-                      defaultMessage="{minutes} min away"
-                      values={{ minutes }}
-                    />
-                  )}
-                </button>
-              ))}
-            </div>
-          </>
+    <div
+      className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-gray-700 text-xs dark:bg-blue-950/30 dark:text-gray-200"
+      hidden={!expanded}
+      id={panelId}
+    >
+      {status !== 'sent' && (
+        <>
+          <p>
+            <FormattedMessage
+              id="station.arrival_report.explainer"
+              defaultMessage="At this station? Share the arrival time shown on the station display for this service."
+            />
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {[0, 1, 3, 5].map((minutes) => (
+              <button
+                className="min-h-8 rounded-md border border-blue-300 bg-white px-2 py-1 font-medium text-blue-800 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-50 dark:border-blue-700 dark:bg-gray-900 dark:text-blue-200 dark:hover:bg-blue-900"
+                disabled={status === 'sending' || coolingDown}
+                key={minutes}
+                onClick={() => void submit(minutes)}
+                type="button"
+              >
+                {minutes === 0 ? (
+                  <FormattedMessage
+                    id="station.arrival_report.arriving_now"
+                    defaultMessage="Arriving now"
+                  />
+                ) : (
+                  <FormattedMessage
+                    id="station.arrival_report.minutes"
+                    defaultMessage="{minutes} min away"
+                    values={{ minutes }}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <div aria-live="polite">
+        {status === 'sending' && (
+          <FormattedMessage
+            id="report.submitting"
+            defaultMessage="Submitting"
+          />
         )}
-        <div aria-live="polite">
-          {status === 'sending' && (
+        {status === 'sent' && (
+          <FormattedMessage
+            id="station.arrival_report.thanks"
+            defaultMessage="Thanks. Your arrival report was shared."
+          />
+        )}
+        {status === 'error' && (
+          <p className="mt-2 text-red-700 dark:text-red-300">
             <FormattedMessage
-              id="report.submitting"
-              defaultMessage="Submitting"
+              id="station.arrival_report.error"
+              defaultMessage="Couldn’t send your report. Please try again."
             />
-          )}
-          {status === 'sent' && (
+          </p>
+        )}
+        {status === 'rate-limited' && (
+          <p className="mt-2 text-red-700 dark:text-red-300">
             <FormattedMessage
-              id="station.arrival_report.thanks"
-              defaultMessage="Thanks. Your arrival report was shared."
+              id="station.arrival_report.rate_limited"
+              defaultMessage="Please wait before reporting another arrival."
             />
-          )}
-          {status === 'error' && (
-            <p className="mt-2 text-red-700 dark:text-red-300">
-              <FormattedMessage
-                id="station.arrival_report.error"
-                defaultMessage="Couldn’t send your report. Please try again."
-              />
-            </p>
-          )}
-          {status === 'rate-limited' && (
-            <p className="mt-2 text-red-700 dark:text-red-300">
-              <FormattedMessage
-                id="station.arrival_report.rate_limited"
-                defaultMessage="Please wait before reporting another arrival."
-              />
-            </p>
-          )}
-        </div>
+          </p>
+        )}
       </div>
-    </details>
+    </div>
   );
 }
