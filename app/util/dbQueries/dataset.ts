@@ -46,7 +46,12 @@ import {
   selectServiceRevisionForReferenceDate,
   serviceRevisionHasEnded,
 } from '~/util/serviceRevisions';
-import { type AppDbReader, getDefaultDb, timeDbQuery } from './database';
+import {
+  type AppDb,
+  type AppDbReader,
+  getDefaultDb,
+  timeDbQuery,
+} from './database';
 import { isoDate, isoDateTime, nowSg, parseDateTime } from './dateTime';
 import {
   buildIssuesByLineId,
@@ -1432,7 +1437,7 @@ export async function buildDataset(
 export async function buildCompleteDataset(
   caller: CompleteDatasetCaller,
   referenceNow = nowSg(),
-  db?: AppDbReader,
+  db?: AppDb,
 ): Promise<BaseDataset> {
   console.info(
     JSON.stringify({

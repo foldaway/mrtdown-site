@@ -269,6 +269,7 @@ describe('station profile edge caching', () => {
     expect(expired.headers.get('cache-control')).toBe('no-store');
     expect(expired.headers.has('cloudflare-cdn-cache-control')).toBe(false);
     expect(expired.headers.has(STATION_PROFILE_FRESH_UNTIL_HEADER)).toBe(false);
+    expect(expired.headers.get('x-mrtdown-cache')).toBe('dynamic-station');
   });
 });
 

@@ -3,10 +3,8 @@ import { setResponseHeader } from '@tanstack/react-start/server';
 import { z } from 'zod';
 import { nowSg } from './dbQueries/dateTime';
 import { getIssueReadModel } from './dbQueries/issue';
-import {
-  getCachedIssueProfile,
-  isIssueProfileCacheEnabled,
-} from './issueProfileCache.server';
+import { getCachedIssueProfile } from './issueProfileCache.server';
+import { isIssueProfileCacheEnabled } from './pageProfileRedis.server';
 import { ISSUE_PROFILE_FRESH_UNTIL_HEADER } from './publicResponseCache';
 import { recordServerTiming } from './serverTiming';
 

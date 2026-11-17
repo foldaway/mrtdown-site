@@ -9,11 +9,11 @@ import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts.js';
 import { rebuildSitemapSnapshot } from '~/util/dbQueries/sitemap.js';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics.js';
-import { isIssueProfileCacheEnabled } from '~/util/issueProfileCache.server.js';
 import {
   isNavigationCachePublicationEnabled,
   publishNavigationCache,
 } from '~/util/navigationCache.server.js';
+import { isIssueProfileCacheEnabled } from '~/util/pageProfileRedis.server.js';
 import { getDb } from '../../db/index.js';
 import { completePageProfileGeneration } from '../../db/pageProfileGeneration.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
@@ -65,6 +65,14 @@ function isPageProfilePublicationEnabled() {
   return isNavigationCachePublicationEnabled() || isIssueProfileCacheEnabled();
 }
 
+async function publishPullCaches(generation: string) {
+  await completePageProfileGeneration(getDb(), generation);
+  if (isPageProfilePublicationEnabled()) {
+    await publishNavigationCache(generation);
+  }
+  return purgePublicDataCache();
+}
+
 async function runPullStep<T>(
   context: WorkflowContext<PullParams>,
   name: string,
@@ -104,9 +112,7 @@ async function executePull(
           'Navigation cache seed requires a completed canonical pull',
         );
       }
-      await completePageProfileGeneration(getDb(), context.workflowRunId);
-      await publishNavigationCache(context.workflowRunId);
-      return purgePublicDataCache();
+      return publishPullCaches(context.workflowRunId);
     });
     return;
   }
@@ -431,13 +437,9 @@ async function executePull(
     `[PULL] Rebuilt sitemap snapshot ${sitemap.asOf} with ${sitemap.pathEntityCount} entity paths`,
   );
 
-  await runPullStep(context, 'publish-public-data-cache', async () => {
-    await completePageProfileGeneration(getDb(), context.workflowRunId);
-    if (isPageProfilePublicationEnabled()) {
-      await publishNavigationCache(context.workflowRunId);
-    }
-    return purgePublicDataCache();
-  });
+  await runPullStep(context, 'publish-public-data-cache', () =>
+    publishPullCaches(context.workflowRunId),
+  );
 
   await runPullStep(context, 'record-manifest-fingerprint', () =>
     recordCanonicalManifestFingerprint(getDb(), manifestFingerprint),

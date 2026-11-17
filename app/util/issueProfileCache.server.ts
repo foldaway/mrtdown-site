@@ -113,14 +113,9 @@ redis.call('SET', KEYS[2], ARGV[2], 'PXAT', ARGV[3])
 return 1
 `;
 
-type IssueCacheLookup = Awaited<ReturnType<typeof lookupProfile>>;
-type IssueCacheMiss = NonNullable<IssueCacheLookup>;
+type IssueCacheLookup = NonNullable<Awaited<ReturnType<typeof lookupProfile>>>;
 
 const inFlightFills = new Map<string, Promise<IssueProfile>>();
-
-export function isIssueProfileCacheEnabled() {
-  return process.env.REDIS_ISSUE_PROFILE_CACHE === 'enabled';
-}
 
 function decodeProfile(raw: string | null, issueId: string) {
   if (raw == null || Buffer.byteLength(raw) > MAX_PROFILE_BYTES) return null;
@@ -163,47 +158,52 @@ async function lookupProfile(issueId: string, referenceNow: DateTime) {
   };
 }
 
-async function readIssueSnapshot(
+async function loadIssueProfile(
   issueId: string,
   referenceNow: DateTime,
-  miss: IssueCacheMiss | null,
+  lookup: IssueCacheLookup | null,
 ) {
   const db = await getDefaultDb();
-  const result = await db.transaction(
+  const { generation, profile } = await db.transaction(
     async (tx) => {
-      const generation = miss && (await readCompletedPageProfileGeneration(tx));
+      const generation =
+        lookup && (await readCompletedPageProfileGeneration(tx));
       const profile = await getIssueReadModel(issueId, referenceNow, tx);
       return { generation, profile };
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
   );
   if (
-    miss &&
-    result.generation === miss.generation &&
-    Date.now() < miss.expiresAt
+    lookup == null ||
+    generation !== lookup.generation ||
+    Date.now() >= lookup.expiresAt
   ) {
-    const completed = CompletedProfileSchema.safeParse(result.profile);
-    if (
-      completed.success &&
-      Object.hasOwn(completed.data.included.issues, issueId)
-    ) {
-      const raw = JSON.stringify(completed.data);
-      if (Buffer.byteLength(raw) <= MAX_PROFILE_BYTES) {
-        await miss.redis
-          .eval(
-            WRITE_CURRENT_GENERATION,
-            2,
-            miss.navigationKey,
-            miss.cacheKey,
-            miss.generation,
-            raw,
-            miss.expiresAt,
-          )
-          .catch(() => undefined);
-      }
-    }
+    return profile;
   }
-  return result.profile;
+
+  const completed = CompletedProfileSchema.safeParse(profile);
+  if (
+    !completed.success ||
+    !Object.hasOwn(completed.data.included.issues, issueId)
+  ) {
+    return profile;
+  }
+
+  const raw = JSON.stringify(completed.data);
+  if (Buffer.byteLength(raw) > MAX_PROFILE_BYTES) return profile;
+
+  await lookup.redis
+    .eval(
+      WRITE_CURRENT_GENERATION,
+      2,
+      lookup.navigationKey,
+      lookup.cacheKey,
+      lookup.generation,
+      raw,
+      lookup.expiresAt,
+    )
+    .catch(() => undefined);
+  return profile;
 }
 
 export async function getCachedIssueProfile(
@@ -215,12 +215,12 @@ export async function getCachedIssueProfile(
     return { profile: lookup.profile, expiresAt: lookup.expiresAt };
   }
   if (lookup == null) {
-    return { profile: await readIssueSnapshot(issueId, referenceNow, null) };
+    return { profile: await loadIssueProfile(issueId, referenceNow, null) };
   }
 
   let fill = inFlightFills.get(lookup.cacheKey);
   if (fill == null) {
-    fill = readIssueSnapshot(issueId, referenceNow, lookup).finally(() => {
+    fill = loadIssueProfile(issueId, referenceNow, lookup).finally(() => {
       inFlightFills.delete(lookup.cacheKey);
     });
     inFlightFills.set(lookup.cacheKey, fill);
