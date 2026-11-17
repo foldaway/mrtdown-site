@@ -385,7 +385,7 @@
   "station.arrival_timings.hours_and_minutes": "{hours, number}<unit>h</unit> {minutes, number}<unit>m</unit>",
   "station.arrival_timings.info_label": "About arrivals",
   "station.arrival_timings.platform": "Platform {label}",
-  "station.arrival_timings.then": "then {time}",
+  "station.arrival_timings.then": "<label>then</label> {time}",
   "station.arrivals.anticlockwise": "Anticlockwise",
   "station.arrivals.approximate_scheduled": "Approximate scheduled",
   "station.arrivals.attribution": "GTFS schedule data from {source}, accessed {date}. <licence>Dataset licence</licence>",

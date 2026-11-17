@@ -115,7 +115,9 @@ describe('station guide arrival sources', () => {
   it('shows the next two departures per platform group as read-only times', () => {
     const html = renderRow(scheduled);
     expect(html).toMatch(/>2 <span[^>]*>min<\/span>/);
-    expect(html).toMatch(/then <strong[^>]*>.*≈.*7 min<\/strong>/);
+    expect(html).toMatch(
+      /class="sr-only">then<\/span>.*<svg[^>]*aria-hidden="true"[^>]*>.*<strong[^>]*>.*≈.*7 min<\/strong>/,
+    );
     expect(html).not.toContain('aria-expanded');
     expect(html).not.toContain('Scheduled times');
     expect(html).toContain('Approximate scheduled');
@@ -147,7 +149,9 @@ describe('station guide arrival sources', () => {
       Date.parse('2026-10-24T16:10:15Z'),
     );
     expect(elapsed).not.toContain('0 min');
-    expect(elapsed).toMatch(/then <strong[^>]*>.*5 min<\/strong>/);
+    expect(elapsed).toMatch(
+      /class="sr-only">then<\/span>.*<strong[^>]*>.*5 min<\/strong>/,
+    );
     expect(elapsed.match(/<time/g)).toHaveLength(1);
   });
 
@@ -186,7 +190,7 @@ describe('station guide arrival sources', () => {
     expect(html).toContain('>Report</button>');
     expect(html).toContain(`hidden="" id="${triggers[0]?.[1]}"`);
     const report = html.indexOf('aria-label="Report an arrival"');
-    expect(report).toBeGreaterThan(html.indexOf('then <strong'));
+    expect(report).toBeGreaterThan(html.indexOf('class="sr-only">then</span>'));
     expect(html).not.toContain('<section');
   });
 
@@ -222,7 +226,7 @@ describe('station guide arrival sources', () => {
     ] as const) {
       const row = renderRow(data, 'ready', undefined, onArrivalReported);
       expect(row).toContain(message);
-      expect(row).toContain('>N/A</p>');
+      expect(row).toContain('>N/A</span>');
       expect(row.includes('Report an arrival')).toBe(canReport);
       const withReport = renderRow({ ...data, recentCrowdArrival });
       expect(withReport).toContain(message);

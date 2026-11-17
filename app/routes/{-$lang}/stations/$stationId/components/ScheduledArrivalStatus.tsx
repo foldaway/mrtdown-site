@@ -1,8 +1,13 @@
+import { ArrowLongRightIcon } from '@heroicons/react/16/solid';
 import type { ReactNode } from 'react';
 import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
 import type { StationArrivalsV2 } from '~/util/stationArrivalsV2';
 import { ArrivalServiceRow } from './ArrivalServiceRow';
-import { ArrivalTimingDisplay, NoArrivalTimes } from './ArrivalTimingDisplay';
+import {
+  ArrivalTimeValue,
+  ArrivalTimingDisplay,
+  NoArrivalTimes,
+} from './ArrivalTimingDisplay';
 
 type ScheduledResponse = Extract<StationArrivalsV2, { source: 'scheduled' }>;
 type ScheduledDeparture =
@@ -110,11 +115,20 @@ function DepartureTime({ departure, following, now }: DepartureTimeProps) {
   );
 
   return following ? (
-    <span className="block text-[11px] text-gray-600 leading-snug sm:text-xs dark:text-gray-400">
+    <span className="inline-flex items-center gap-1 text-[11px] text-gray-600 leading-snug sm:text-xs dark:text-gray-400">
       <FormattedMessage
         id="station.arrival_timings.then"
-        defaultMessage="then {time}"
+        defaultMessage="<label>then</label> {time}"
         values={{
+          label: (label) => (
+            <>
+              <span className="sr-only">{label}</span>
+              <ArrowLongRightIcon
+                aria-hidden="true"
+                className="size-3.5 shrink-0 text-gray-500 dark:text-gray-400"
+              />
+            </>
+          ),
           time: (
             <strong className="whitespace-nowrap font-medium">{value}</strong>
           ),
@@ -122,9 +136,7 @@ function DepartureTime({ departure, following, now }: DepartureTimeProps) {
       />
     </span>
   ) : (
-    <span className="block font-semibold text-gray-950 text-xl leading-none tracking-tight sm:text-2xl dark:text-white">
-      {value}
-    </span>
+    <ArrivalTimeValue>{value}</ArrivalTimeValue>
   );
 }
 

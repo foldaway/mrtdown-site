@@ -385,7 +385,7 @@
   "station.arrival_timings.hours_and_minutes": "{hours, number} <unit>மணி</unit> {minutes, number} <unit>நிமி</unit>",
   "station.arrival_timings.info_label": "வருகைகள் பற்றி",
   "station.arrival_timings.platform": "நடைமேடை {label}",
-  "station.arrival_timings.then": "பிறகு {time}",
+  "station.arrival_timings.then": "<label>பிறகு</label> {time}",
   "station.arrivals.anticlockwise": "எதிர்கடிகாரத் திசை",
   "station.arrivals.approximate_scheduled": "தோராயமான அட்டவணை நேரம்",
   "station.arrivals.attribution": "{source} வழங்கிய GTFS அட்டவணைத் தரவு, {date} அன்று பெறப்பட்டது. <licence>தரவுத்தொகுப்பு உரிமம்</licence>",

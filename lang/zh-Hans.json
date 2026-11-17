@@ -385,7 +385,7 @@
   "station.arrival_timings.hours_and_minutes": "{hours, number}<unit>小时</unit>{minutes, number}<unit>分</unit>",
   "station.arrival_timings.info_label": "关于到站时间",
   "station.arrival_timings.platform": "{label}号站台",
-  "station.arrival_timings.then": "随后 {time}",
+  "station.arrival_timings.then": "<label>随后</label> {time}",
   "station.arrivals.anticlockwise": "逆时针方向",
   "station.arrivals.approximate_scheduled": "计划时刻（约）",
   "station.arrivals.attribution": "GTFS 时刻表数据来自 {source}，获取日期为 {date}。<licence>数据集许可证</licence>",

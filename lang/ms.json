@@ -385,7 +385,7 @@
   "station.arrival_timings.hours_and_minutes": "{hours, number}<unit>j</unit> {minutes, number}<unit>m</unit>",
   "station.arrival_timings.info_label": "Tentang ketibaan",
   "station.arrival_timings.platform": "Platform {label}",
-  "station.arrival_timings.then": "kemudian {time}",
+  "station.arrival_timings.then": "<label>kemudian</label> {time}",
   "station.arrivals.anticlockwise": "Lawan arah jam",
   "station.arrivals.approximate_scheduled": "Jadual anggaran",
   "station.arrivals.attribution": "Data jadual GTFS daripada {source}, diakses pada {date}. <licence>Lesen set data</licence>",

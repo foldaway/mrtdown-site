@@ -24,20 +24,36 @@ export function ArrivalTimingDisplay({
   );
 }
 
+type ArrivalTimeValueProps = {
+  children: ReactNode;
+  unavailable?: boolean;
+};
+
+export function ArrivalTimeValue({
+  children,
+  unavailable,
+}: ArrivalTimeValueProps) {
+  return (
+    <span
+      aria-hidden={unavailable || undefined}
+      className={`block font-semibold text-xl leading-none tracking-tight sm:text-2xl ${unavailable ? 'text-gray-600 dark:text-gray-400' : 'text-gray-950 dark:text-white'}`}
+    >
+      {children}
+    </span>
+  );
+}
+
 type NoArrivalTimesProps = { emptyWindow?: boolean };
 
 export function NoArrivalTimes({ emptyWindow }: NoArrivalTimesProps) {
   return (
     <div aria-live="polite">
-      <p
-        aria-hidden="true"
-        className="font-medium text-gray-600 text-lg leading-none dark:text-gray-400"
-      >
+      <ArrivalTimeValue unavailable>
         <FormattedMessage
           id="station.arrivals.not_available"
           defaultMessage="N/A"
         />
-      </p>
+      </ArrivalTimeValue>
       <p className="mt-1 text-gray-600 text-xs leading-snug dark:text-gray-400">
         {emptyWindow ? (
           <FormattedMessage
