@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import type { ReactNode } from 'react';
 import {
   defineMessages,
   FormattedMessage,
@@ -28,9 +29,15 @@ const shortServiceNames: Partial<Record<string, MessageDescriptor>> =
     },
   });
 
-type ArrivalServiceHeadingProps = { timing: ArrivalTiming };
+type ArrivalServiceHeadingProps = {
+  timing: ArrivalTiming;
+  reportButton?: ReactNode;
+};
 
-export function ArrivalServiceHeading({ timing }: ArrivalServiceHeadingProps) {
+export function ArrivalServiceHeading({
+  timing,
+  reportButton,
+}: ArrivalServiceHeadingProps) {
   const intl = useIntl();
   const shortName = Object.hasOwn(shortServiceNames, timing.serviceId)
     ? shortServiceNames[timing.serviceId]
@@ -65,22 +72,27 @@ export function ArrivalServiceHeading({ timing }: ArrivalServiceHeadingProps) {
       <p className="font-medium text-gray-800 text-sm leading-snug dark:text-gray-200">
         {serviceName}
       </p>
-      {station && (
-        <p className="text-gray-600 text-xs leading-snug dark:text-gray-400">
-          {timing.isLoop ? (
-            <FormattedMessage
-              id="station.arrivals.via"
-              defaultMessage="via {station}"
-              values={{ station }}
-            />
-          ) : (
-            <FormattedMessage
-              id="station.arrivals.towards"
-              defaultMessage="towards {station}"
-              values={{ station }}
-            />
+      {(station || reportButton) && (
+        <div className="flex flex-wrap items-baseline gap-x-1.5">
+          {station && (
+            <p className="text-gray-600 text-xs leading-snug dark:text-gray-400">
+              {timing.isLoop ? (
+                <FormattedMessage
+                  id="station.arrivals.via"
+                  defaultMessage="via {station}"
+                  values={{ station }}
+                />
+              ) : (
+                <FormattedMessage
+                  id="station.arrivals.towards"
+                  defaultMessage="towards {station}"
+                  values={{ station }}
+                />
+              )}
+            </p>
           )}
-        </p>
+          {reportButton}
+        </div>
       )}
     </>
   );

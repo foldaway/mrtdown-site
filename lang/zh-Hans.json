@@ -378,6 +378,7 @@
   "station.arrival_report.minutes": "{minutes} 分钟后到站",
   "station.arrival_report.rate_limited": "请稍候再报告另一趟列车。",
   "station.arrival_report.recent": "乘客报告的到站时间：<clock>{time}</clock>",
+  "station.arrival_report.short_label": "报告",
   "station.arrival_report.summary": "报告到站时间",
   "station.arrival_report.thanks": "谢谢，你报告的到站时间已分享。",
   "station.arrival_timings.compact_minutes": "{minutes, number}分",

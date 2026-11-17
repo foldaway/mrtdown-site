@@ -378,6 +378,7 @@
   "station.arrival_report.minutes": "{minutes} minit lagi",
   "station.arrival_report.rate_limited": "Sila tunggu sebelum melaporkan ketibaan lain.",
   "station.arrival_report.recent": "Ketibaan yang dilaporkan penumpang: <clock>{time}</clock>",
+  "station.arrival_report.short_label": "Lapor",
   "station.arrival_report.summary": "Laporkan ketibaan",
   "station.arrival_report.thanks": "Terima kasih. Laporan ketibaan anda telah dikongsi.",
   "station.arrival_timings.compact_minutes": "{minutes, number}m",

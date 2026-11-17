@@ -178,18 +178,19 @@ describe('station guide arrival sources', () => {
     expect(expired).not.toContain('Rider-reported arrival');
   });
 
-  it('keeps one report action visible when a service timetable is collapsed', () => {
-    if (scheduled.source !== 'scheduled') {
-      throw new Error('fixture');
-    }
-    const html = renderRow(
-      { ...scheduled, timings: scheduled.timings.slice(0, 1) },
-      'ready',
-      undefined,
-      async () => {},
+  it('offers one inline report action across platform groups with the report initially collapsed', () => {
+    const html = renderRow(scheduled, 'ready', undefined, async () => {});
+    const triggers = [
+      ...html.matchAll(
+        /aria-controls="([^"]+)" aria-expanded="false" aria-label="Report an arrival"/g,
+      ),
+    ];
+    expect(triggers).toHaveLength(1);
+    expect(html).toContain('>Report</button>');
+    expect(html).toContain(`hidden="" id="${triggers[0]?.[1]}"`);
+    expect(html.indexOf('aria-label="Report an arrival"')).toBeLessThan(
+      html.indexOf('<section'),
     );
-    expect(html.match(/Report an arrival/g)).toHaveLength(1);
-    expect(html).toMatch(/<\/section>.*<summary[^>]*>.*Report an arrival/);
   });
 
   it('keeps empty, partial, unavailable and stale responses distinct without SSR estimates', () => {

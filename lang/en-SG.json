@@ -378,6 +378,7 @@
   "station.arrival_report.minutes": "{minutes} min away",
   "station.arrival_report.rate_limited": "Please wait before reporting another arrival.",
   "station.arrival_report.recent": "Rider-reported arrival: <clock>{time}</clock>",
+  "station.arrival_report.short_label": "Report",
   "station.arrival_report.summary": "Report an arrival",
   "station.arrival_report.thanks": "Thanks. Your arrival report was shared.",
   "station.arrival_timings.compact_minutes": "{minutes, number} min",

@@ -12,6 +12,7 @@ type ScheduledArrivalStatusProps = {
   data: ScheduledResponse;
   hasDepartures: boolean;
   heading: ReactNode;
+  firstHeading: ReactNode;
   lineColor: string;
   now: number | null;
 };
@@ -20,6 +21,7 @@ export function ScheduledArrivalStatus({
   data,
   hasDepartures,
   heading,
+  firstHeading,
   lineColor,
   now,
 }: ScheduledArrivalStatusProps) {
@@ -27,7 +29,7 @@ export function ScheduledArrivalStatus({
   if (!hasDepartures) {
     return (
       <ArrivalServiceRow
-        heading={heading}
+        heading={firstHeading}
         lineColor={lineColor}
         platformLabels={[]}
         status={
@@ -67,7 +69,7 @@ export function ScheduledArrivalStatus({
 
   return (
     <div className="space-y-2">
-      {data.timings.map((timing) => (
+      {data.timings.map((timing, index) => (
         <div
           className="border-gray-200 dark:border-gray-700 [&+&]:border-t [&+&]:pt-2"
           key={JSON.stringify(timing.platforms.map(({ id }) => id))}
@@ -76,7 +78,7 @@ export function ScheduledArrivalStatus({
             departures={timing.departures}
             now={now}
             alternativePlatforms={timing.platforms.length > 1}
-            heading={heading}
+            heading={index === 0 ? firstHeading : heading}
             lineColor={lineColor}
             platformLabels={[
               ...new Set(timing.platforms.map(({ label }) => label)),

@@ -378,6 +378,7 @@
   "station.arrival_report.minutes": "இன்னும் {minutes} நிமிடம்",
   "station.arrival_report.rate_limited": "மற்றொரு வருகையைப் புகாரளிப்பதற்கு முன் காத்திருக்கவும்.",
   "station.arrival_report.recent": "பயணி தெரிவித்த வருகை நேரம்: <clock>{time}</clock>",
+  "station.arrival_report.short_label": "புகாரளி",
   "station.arrival_report.summary": "வருகையைப் புகாரளிக்கவும்",
   "station.arrival_report.thanks": "நன்றி. உங்கள் வருகைத் தகவல் பகிரப்பட்டது.",
   "station.arrival_timings.compact_minutes": "{minutes, number} நிமி",
