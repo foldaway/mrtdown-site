@@ -7,8 +7,6 @@ type ArrivalServiceRowProps = {
   heading: ReactNode;
   lineColor: string;
   platformLabels: string[];
-  status?: ReactNode;
-  reportButton?: ReactNode;
   alternativePlatforms?: boolean;
 };
 
@@ -17,8 +15,6 @@ export function ArrivalServiceRow({
   heading,
   lineColor,
   platformLabels,
-  status,
-  reportButton,
   alternativePlatforms,
 }: ArrivalServiceRowProps) {
   return (
@@ -43,15 +39,6 @@ export function ArrivalServiceRow({
         )}
         <div className="wrap-break-word min-w-0">
           {heading}
-          {status && (
-            <div
-              aria-live="polite"
-              className="mt-1 text-gray-600 text-xs dark:text-gray-400"
-            >
-              {status}
-            </div>
-          )}
-          {reportButton && <div className="-ms-1">{reportButton}</div>}
           {alternativePlatforms && (
             <p className="text-gray-600 text-xs dark:text-gray-400">
               <FormattedMessage

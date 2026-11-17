@@ -112,14 +112,12 @@ afterEach(() => {
 });
 
 describe('station guide arrival sources', () => {
-  it('highlights the next two departures per platform group and keeps later times available', () => {
+  it('shows the next two departures per platform group as read-only times', () => {
     const html = renderRow(scheduled);
     expect(html).toMatch(/>2 <span[^>]*>min<\/span>/);
     expect(html).toMatch(/then <strong[^>]*>.*≈.*7 min<\/strong>/);
-    expect(html).not.toMatch(/<\/time> Scheduled/);
-    expect(html).toMatch(
-      /aria-controls="([^"]+)" aria-expanded="false".*hidden="" id="\1"/,
-    );
+    expect(html).not.toContain('aria-expanded');
+    expect(html).not.toContain('Scheduled times');
     expect(html).toContain('Approximate scheduled');
     expect(html).toMatch(
       />Service<\/p>.*towards <span data-station-id="[^"]+">Destination<\/span>/,
@@ -127,12 +125,8 @@ describe('station guide arrival sources', () => {
     expect(html).not.toContain('D1');
     expect(html).toContain('Alternative platforms for the same train');
     expect(html).not.toContain('Dataset licence');
-    expect(html.match(/<ol/g)).toHaveLength(2);
-    expect(html.match(/<time/g)).toHaveLength(4);
-    expect(html.match(/Scheduled times<\/span>/g)).toHaveLength(2);
-    expect(html).toMatch(
-      /<time[^>]+datetime="2026-10-24T16:10:00Z"[^>]*>12:10 am<\/time>/i,
-    );
+    expect(html).not.toContain('<ol');
+    expect(html).not.toContain('<time');
     expect(html).not.toContain('Frequency estimate');
     expect(html).not.toContain('Help improve');
     expect(html).not.toContain(departure.manifestSha256);
@@ -144,6 +138,9 @@ describe('station guide arrival sources', () => {
     expect(stale).toContain('Showing the last known response');
     expect(stale).not.toMatch(/>2 <span[^>]*>min<\/span>/);
     expect(stale).not.toContain('>7 min<');
+    expect(stale.match(/<time/g)).toHaveLength(3);
+    expect(stale).toContain('12:10 am');
+    expect(stale).not.toContain('12:20 am');
     const elapsed = renderRow(
       scheduled,
       'ready',
@@ -151,7 +148,7 @@ describe('station guide arrival sources', () => {
     );
     expect(elapsed).not.toContain('0 min');
     expect(elapsed).toMatch(/then <strong[^>]*>.*5 min<\/strong>/);
-    expect(elapsed.match(/<time/g)).toHaveLength(5);
+    expect(elapsed.match(/<time/g)).toHaveLength(1);
   });
 
   it('keeps the one-hour boundary in minutes', () => {
@@ -189,8 +186,8 @@ describe('station guide arrival sources', () => {
     expect(html).toContain('>Report</button>');
     expect(html).toContain(`hidden="" id="${triggers[0]?.[1]}"`);
     const report = html.indexOf('aria-label="Report an arrival"');
-    expect(report).toBeGreaterThan(html.indexOf('Scheduled times</span>'));
-    expect(report).toBeLessThan(html.indexOf('<section'));
+    expect(report).toBeGreaterThan(html.indexOf('then <strong'));
+    expect(html).not.toContain('<section');
   });
 
   it('keeps empty, partial, unavailable and stale responses distinct without SSR estimates', () => {
@@ -199,10 +196,8 @@ describe('station guide arrival sources', () => {
     }
     const empty = { ...scheduled, timings: [] };
     const html = renderRow(empty);
-    expect(html).toMatch(
-      /<details[^>]*><summary[^>]*>No departures in this window/,
-    );
-    expect(html).toMatch(/12:00 am–1:00 am \(Singapore time\)/i);
+    expect(html).toContain('No departures in this window');
+    expect(html).not.toContain('<details');
     expect(html).not.toContain('Service ended');
     expect(html).not.toContain('Frequency estimate');
     const partial = {
@@ -227,6 +222,7 @@ describe('station guide arrival sources', () => {
     ] as const) {
       const row = renderRow(data, 'ready', undefined, onArrivalReported);
       expect(row).toContain(message);
+      expect(row).toContain('>N/A</p>');
       expect(row.includes('Report an arrival')).toBe(canReport);
       const withReport = renderRow({ ...data, recentCrowdArrival });
       expect(withReport).toContain(message);
@@ -395,7 +391,7 @@ describe('station guide refresh session', () => {
     );
     expect(html).not.toContain('towards');
     expect(html).not.toContain('D1');
-    expect(html).toContain('Scheduled');
+    expect(html).toContain('12:10 am');
   });
   it('makes a fresh request after a report even when a poll was in flight', async () => {
     const pending = deferred();

@@ -1,8 +1,8 @@
 import { useId, useState } from 'react';
-import { FormattedMessage } from 'react-intl';
 import { ArrivalRefreshNotice } from './ArrivalRefreshNotice';
 import { ArrivalServiceHeading } from './ArrivalServiceHeading';
 import { ArrivalServiceRow } from './ArrivalServiceRow';
+import { ArrivalTimingDisplay, NoArrivalTimes } from './ArrivalTimingDisplay';
 import {
   ArrivalReportButton,
   CrowdArrivalReport,
@@ -78,19 +78,16 @@ export function ServiceArrivalSummary({
       ) : (
         <ArrivalServiceRow
           heading={heading}
-          reportButton={reportButton}
           lineColor={lineColor}
           platformLabels={arrivalTiming.platformLabels}
-          status={
-            (data?.source === 'unavailable' ||
-              arrivalTiming.destinationStationId == null) && (
-              <FormattedMessage
-                id="station.arrivals.timetable_unavailable"
-                defaultMessage="Timetable unavailable"
-              />
-            )
-          }
-        />
+        >
+          {data?.source === 'unavailable' ||
+          arrivalTiming.destinationStationId == null ? (
+            <ArrivalTimingDisplay reportButton={reportButton}>
+              <NoArrivalTimes />
+            </ArrivalTimingDisplay>
+          ) : null}
+        </ArrivalServiceRow>
       )}
       {arrivalTiming.destinationStationId != null && (
         <ArrivalRefreshNotice state={arrivalState} />
