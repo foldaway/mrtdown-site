@@ -15,7 +15,7 @@ import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import { getDefaultDb } from './dbQueries/database';
 import { isoDate } from './dbQueries/dateTime';
 import { getIssueReadModel } from './dbQueries/issue';
-import { readNavigationCacheEntry } from './navigationCache.server';
+import { parseNavigationCacheEntry } from './navigationCache.server';
 import {
   getNavigationCacheKey,
   getPageProfileRedis,
@@ -102,21 +102,13 @@ const CompletedProfileSchema = z.object({
   }),
 }) satisfies z.ZodType<IssueProfile>;
 
-// Read or write the profile atomically with the generation check. Both keys
-// use the Navigation key's slot.
-const REQUIRE_CURRENT_GENERATION = `
+// Compare and set together so a delayed fill cannot publish after its
+// generation stops being active.
+const WRITE_CURRENT_GENERATION = `
 local raw = redis.call('GET', KEYS[1])
 if not raw then return false end
 local ok, entry = pcall(cjson.decode, raw)
 if not ok or type(entry) ~= 'table' or entry.generation ~= ARGV[1] then return false end
-`;
-
-// An array with a null value is a miss in the current generation.
-const READ_CURRENT_GENERATION = `${REQUIRE_CURRENT_GENERATION}
-return {redis.call('GET', KEYS[2])}
-`;
-
-const WRITE_CURRENT_GENERATION = `${REQUIRE_CURRENT_GENERATION}
 redis.call('SET', KEYS[2], ARGV[2], 'PXAT', ARGV[3])
 return 1
 `;
@@ -149,23 +141,17 @@ function decodeProfile(raw: string | null, issueId: string) {
 
 async function lookupProfile(issueId: string, referenceNow: DateTime) {
   if (issueId.length > MAX_CACHEABLE_ID_LENGTH) return null;
-  const active = await readNavigationCacheEntry();
+  const navigationKey = getNavigationCacheKey();
+  const redis = await getPageProfileRedis();
+  const observedNavigation = await redis.get(navigationKey);
+  const active = parseNavigationCacheEntry(observedNavigation);
   if (active == null) return null;
 
-  const navigationKey = getNavigationCacheKey();
+  // Keep both keys in the same slot so MGET observes them atomically.
   const cacheKey = `{${navigationKey}}:issue:${encodeURIComponent(active.generation)}:${isoDate(referenceNow)}:${encodeURIComponent(issueId)}`;
   const expiresAt = referenceNow.plus({ days: 1 }).startOf('day').toMillis();
-  const redis = await getPageProfileRedis();
-  const result: unknown = await redis.eval(
-    READ_CURRENT_GENERATION,
-    2,
-    navigationKey,
-    cacheKey,
-    active.generation,
-  );
-  if (!Array.isArray(result)) return null;
-  const raw: unknown = result[0];
-  if (raw !== null && typeof raw !== 'string') return null;
+  const [currentNavigation, raw] = await redis.mget(navigationKey, cacheKey);
+  if (currentNavigation !== observedNavigation) return null;
   const profile = decodeProfile(raw, issueId);
   return {
     navigationKey,

@@ -37,15 +37,15 @@ export function isNavigationCachePublicationEnabled() {
   );
 }
 
-export async function readNavigationCacheEntry() {
-  const key = getNavigationCacheKey();
-  const value = await (await getPageProfileRedis()).get(key);
+export function parseNavigationCacheEntry(value: string | null) {
   if (value == null) return null;
   return NavigationEntrySchema.parse(JSON.parse(value));
 }
 
 export async function readCachedNavigation() {
-  return (await readNavigationCacheEntry())?.navigation ?? null;
+  const key = getNavigationCacheKey();
+  const value = await (await getPageProfileRedis()).get(key);
+  return parseNavigationCacheEntry(value)?.navigation ?? null;
 }
 
 export async function publishNavigationCache(generation: string) {

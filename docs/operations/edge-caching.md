@@ -125,9 +125,11 @@ enabled, the pull still publishes the shared generation and Navigation value.
 An Issue Profile with ended intervals can fill Redis only when a
 repeatable-read Postgres snapshot sees the published generation marked
 complete. The pull marks it updating with the first live canonical write.
-Redis checks the active generation atomically with each profile read or write.
-Entries are limited to 128 KiB and expire at Singapore midnight. Cache hits
-can populate Cloudflare for up to 15 minutes, capped at the same midnight.
+Reads use `MGET` to fetch the active generation and profile atomically. A
+conditional Redis write prevents delayed fills from publishing after the
+generation advances. Entries are limited to 128 KiB and expire at Singapore
+midnight. Cache hits can populate Cloudflare for up to 15 minutes, capped at
+the same midnight.
 SQL responses bypass shared caching while the reader is enabled.
 
 On staging origin requests, check `X-MRTDown-Issue-Profile-Source`. A cold

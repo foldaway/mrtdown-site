@@ -7,8 +7,8 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
   marker: vi.fn(),
   issue: vi.fn(),
-  navigation: vi.fn(),
-  read: vi.fn(),
+  get: vi.fn(),
+  mget: vi.fn(),
   write: vi.fn(),
 }));
 
@@ -22,15 +22,12 @@ vi.mock('./dbQueries/database', () => ({
 
 vi.mock('./dbQueries/issue', () => ({ getIssueReadModel: mocks.issue }));
 
-vi.mock('./navigationCache.server', () => ({
-  readNavigationCacheEntry: mocks.navigation,
-}));
-
 vi.mock('./pageProfileRedis.server', () => ({
   getNavigationCacheKey: () => 'navigation',
   getPageProfileRedis: async () => ({
-    eval: (...args: unknown[]) =>
-      (args.length === 5 ? mocks.read : mocks.write)(...args),
+    get: mocks.get,
+    mget: mocks.mget,
+    eval: mocks.write,
   }),
 }));
 
@@ -38,6 +35,17 @@ const now = DateTime.fromISO('2026-11-16T23:50:00', { zone: SG_TIMEZONE });
 const midnight = now.plus({ days: 1 }).startOf('day');
 const key = '{navigation}:issue:pull-1:2026-11-16:2026-11-16-incident';
 const tx = {};
+const navigationEntry = {
+  generation: 'pull-1',
+  navigation: {
+    lineNavItems: [],
+    operatorNavItems: [],
+    metadata: [
+      { key: 'manifest_last_pulled_at', value: '2026-11-16T00:00:00.000Z' },
+    ],
+  },
+};
+const navigationValue = JSON.stringify(navigationEntry);
 const profile = {
   data: {
     id: '2026-11-16-incident',
@@ -85,8 +93,8 @@ beforeEach(() => {
   mocks.transaction.mockImplementation((callback) => callback(tx));
   mocks.marker.mockResolvedValue('pull-1');
   mocks.issue.mockResolvedValue(profile);
-  mocks.navigation.mockResolvedValue({ generation: 'pull-1' });
-  mocks.read.mockResolvedValue([null]);
+  mocks.get.mockResolvedValue(navigationValue);
+  mocks.mget.mockResolvedValue([navigationValue, null]);
   mocks.write.mockResolvedValue(1);
 });
 
@@ -94,20 +102,18 @@ afterEach(() => vi.useRealTimers());
 
 describe('Issue Profile cache', () => {
   it('uses Redis alone on a hit and switches keys at Singapore midnight', async () => {
-    mocks.read.mockResolvedValueOnce([JSON.stringify(profile)]);
+    mocks.mget.mockResolvedValueOnce([
+      navigationValue,
+      JSON.stringify(profile),
+    ]);
 
     expect(await getCachedIssueProfile('2026-11-16-incident', now)).toEqual({
       profile,
       expiresAt: midnight.toMillis(),
     });
-    expect(mocks.read).toHaveBeenCalledWith(
-      expect.any(String),
-      2,
-      'navigation',
-      key,
-      'pull-1',
-    );
+    expect(mocks.mget).toHaveBeenCalledWith('navigation', key);
     expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.write).not.toHaveBeenCalled();
 
     vi.setSystemTime(midnight.toJSDate());
     expect(
@@ -115,19 +121,19 @@ describe('Issue Profile cache', () => {
     ).toEqual({
       profile,
     });
-    expect(mocks.read).toHaveBeenLastCalledWith(
-      expect.any(String),
-      2,
+    expect(mocks.mget).toHaveBeenLastCalledWith(
       'navigation',
       '{navigation}:issue:pull-1:2026-11-17:2026-11-16-incident',
-      'pull-1',
     );
   });
 
   it('uses uncached SQL when publication advances before the profile read', async () => {
     const corrected = structuredClone(profile);
     corrected.included.issues['2026-11-16-incident'].durationSeconds = 1500;
-    mocks.read.mockResolvedValue(null);
+    mocks.mget.mockResolvedValue([
+      JSON.stringify({ ...navigationEntry, generation: 'pull-2' }),
+      JSON.stringify(profile),
+    ]);
     mocks.issue.mockResolvedValue(corrected);
 
     expect(await getCachedIssueProfile('2026-11-16-incident', now)).toEqual({
@@ -196,7 +202,7 @@ describe('Issue Profile cache', () => {
   );
 
   it('rejects oversized profiles and rewrites invalid entries from SQL', async () => {
-    mocks.read.mockResolvedValue(['invalid JSON']);
+    mocks.mget.mockResolvedValue([navigationValue, 'invalid JSON']);
     expect(await getCachedIssueProfile('2026-11-16-incident', now)).toEqual({
       profile,
     });
@@ -212,7 +218,7 @@ describe('Issue Profile cache', () => {
   });
 
   it('preserves SQL 404s and skips writes when Redis times out', async () => {
-    mocks.read.mockRejectedValue(new Error('Command timed out'));
+    mocks.mget.mockRejectedValue(new Error('Command timed out'));
     expect(await getCachedIssueProfile('2026-11-16-incident', now)).toEqual({
       profile,
     });
