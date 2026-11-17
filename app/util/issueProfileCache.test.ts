@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SG_TIMEZONE } from './dbQueries/dateTime';
+import { TEST_LINE } from './dbQueries/testFixtures';
 import { getCachedIssueProfile } from './issueProfileCache.server';
 
 const mocks = vi.hoisted(() => ({
@@ -101,6 +102,33 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('Issue Profile cache', () => {
+  it('caches lines with no known train car counts in the SQL read model', async () => {
+    const profileWithLine = {
+      ...profile,
+      included: {
+        ...profile.included,
+        lines: { [TEST_LINE.id]: { ...TEST_LINE, trainCarCounts: [] } },
+      },
+    };
+    mocks.issue.mockResolvedValue(profileWithLine);
+
+    await expect(
+      getCachedIssueProfile('2026-11-16-incident', now),
+    ).resolves.toEqual({ profile: profileWithLine });
+    expect(mocks.write).toHaveBeenCalledOnce();
+    const cachedValue = mocks.write.mock.calls[0][5];
+    expect(JSON.parse(cachedValue)).toEqual(profileWithLine);
+
+    mocks.mget.mockResolvedValue([navigationValue, cachedValue]);
+    await expect(
+      getCachedIssueProfile('2026-11-16-incident', now),
+    ).resolves.toEqual({
+      profile: profileWithLine,
+      expiresAt: midnight.toMillis(),
+    });
+    expect(mocks.transaction).toHaveBeenCalledOnce();
+  });
+
   it('uses Redis alone on a hit and switches keys at Singapore midnight', async () => {
     mocks.mget.mockResolvedValueOnce([
       navigationValue,

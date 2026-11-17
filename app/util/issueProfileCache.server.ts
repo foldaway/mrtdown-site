@@ -79,7 +79,13 @@ const CompletedProfileSchema = z.object({
     issues: z.record(z.string(), CompletedIssueSchema),
     lines: z.record(
       z.string(),
-      z.object(LineSchema.shape).omit({ serviceIds: true }),
+      z
+        .object(LineSchema.shape)
+        .omit({ serviceIds: true })
+        .extend({
+          // The Postgres read model uses an empty array for unknown counts.
+          trainCarCounts: LineSchema.shape.trainCarCounts.or(z.tuple([])),
+        }),
     ),
     stations: z.record(
       z.string(),
