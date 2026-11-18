@@ -38,6 +38,14 @@
 - [ ] Collect matching transfer and Cloudflare route/cache-status samples
   before deciding whether to implement topology reuse.
 
+The November Redis [follow-up attribution](redis-page-profile-cache.md#follow-up-attribution-november-17-pt)
+confirms repeated service-path reads across range routes and a separate
+schedule-topology workload in arrivals. The next bounded prototype and its
+consistency/measurement gates are maintained in that plan's
+[Milestone 3](redis-page-profile-cache.md#milestone-3--reuse-service-path-inputs-for-date-range-readers).
+Cloudflare route/cache-status analytics and aggregate Redis billing remain
+unavailable; do not treat the July sample as the current workload.
+
 ### Progress log
 
 - 2026-07-21: Drafted the follow-up plan from the measured approximately 78%

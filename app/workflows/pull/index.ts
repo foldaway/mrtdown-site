@@ -14,6 +14,10 @@ import {
   publishNavigationCache,
 } from '~/util/navigationCache.server.js';
 import { isIssueProfileCacheEnabled } from '~/util/pageProfileRedis.server.js';
+import {
+  isServicePathCachePublicationEnabled,
+  publishServicePathCache,
+} from '~/util/servicePathCache.server.js';
 import { getDb } from '../../db/index.js';
 import { completePageProfileGeneration } from '../../db/pageProfileGeneration.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
@@ -67,6 +71,9 @@ function isPageProfilePublicationEnabled() {
 
 async function publishPullCaches(generation: string) {
   await completePageProfileGeneration(getDb(), generation);
+  if (isServicePathCachePublicationEnabled()) {
+    await publishServicePathCache(generation);
+  }
   if (isPageProfilePublicationEnabled()) {
     await publishNavigationCache(generation);
   }
@@ -100,6 +107,22 @@ async function executePull(
   context: WorkflowContext<PullParams>,
   params: PullParams,
 ) {
+  if (params.seedServicePathCache) {
+    await runPullStep(context, 'seed-service-path-cache', async () => {
+      if (!isServicePathCachePublicationEnabled()) {
+        throw new WorkflowNonRetryableError(
+          'Service-path publication is disabled',
+        );
+      }
+      if (!(await readCanonicalManifestFingerprint(getDb()))) {
+        throw new WorkflowNonRetryableError(
+          'Service-path seed requires a completed pull',
+        );
+      }
+      return publishServicePathCache();
+    });
+    return;
+  }
   if (params.seedNavigationCache) {
     await runPullStep(context, 'seed-navigation-cache', async () => {
       if (!isPageProfilePublicationEnabled()) {
@@ -167,6 +190,11 @@ async function executePull(
     async () => isCanonicalManifestCurrent(getDb(), manifestFingerprint),
   );
   if (manifestIsCurrent && !rebuildScheduledTimetableProjection) {
+    if (isServicePathCachePublicationEnabled()) {
+      await runPullStep(context, 'renew-service-path-cache', () =>
+        publishServicePathCache(),
+      );
+    }
     console.log('[PULL] Canonical manifest unchanged; skipping pull');
     return;
   }

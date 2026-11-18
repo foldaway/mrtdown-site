@@ -9,15 +9,19 @@ export const PullParamsSchema = z
     combinedReleaseIndex: CombinedTimetableReleaseIndexSchema.optional(),
     rebuildScheduledTimetableProjection: z.boolean().optional(),
     seedNavigationCache: z.literal(true).optional(),
+    seedServicePathCache: z.literal(true).optional(),
   })
   .strict()
   .refine(
     (params) =>
-      !params.seedNavigationCache ||
+      (!params.seedNavigationCache && !params.seedServicePathCache) ||
       (!params.sourceReview &&
         !params.combinedReleaseIndex &&
-        !params.rebuildScheduledTimetableProjection),
-    { message: 'Navigation cache seed must run separately from an import' },
+        !params.rebuildScheduledTimetableProjection &&
+        !(params.seedNavigationCache && params.seedServicePathCache)),
+    {
+      message: 'Cache seeds must run separately from an import and each other',
+    },
   );
 
 export type PullParams = z.infer<typeof PullParamsSchema>;

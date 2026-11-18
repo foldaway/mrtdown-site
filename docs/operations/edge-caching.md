@@ -118,9 +118,9 @@ re-enabling the reader if a pull ran while publication was disabled.
 
 Enable `REDIS_ISSUE_PROFILE_CACHE=enabled` after seeding Navigation on the
 same deployed revision. The seed task also records the active generation in
-Postgres. Keep `REDIS_NAVIGATION_CACHE` on its own setting so the two
-readers can be evaluated independently. With only Issue Profile caching
-enabled, the pull still publishes the shared generation and Navigation value.
+Postgres. Keep `REDIS_NAVIGATION_CACHE` on its own setting for targeted
+rollback. With Issue Profile caching enabled, the pull publishes the shared
+generation and Navigation value.
 
 An Issue Profile with ended intervals can fill Redis only when a
 repeatable-read Postgres snapshot sees the published generation marked
@@ -136,6 +136,66 @@ On staging origin requests, check `X-MRTDown-Issue-Profile-Source`. A cold
 completed issue returns `sql` with `no-store`, then returns `redis` on the
 next origin request. HTML and Markdown share a Redis entry. For rollback,
 unset `REDIS_ISSUE_PROFILE_CACHE` and purge the tier's data tag.
+
+## Service-path inputs
+
+`REDIS_SERVICE_PATH_CACHE` controls path reuse for overview/system map,
+history/day, and weekly-report range readers. The default is direct SQL.
+`publish` enables pull publication only; `enabled` also enables reads. This
+setting is independent of Navigation and completed Issue Profiles.
+
+Deploy in `publish` mode with the existing timetable pin. After confirming a
+successful canonical fingerprint, trigger the authenticated pull task with
+`{"seedServicePathCache":true}`. The task takes the pull lease and publishes
+paths for the current completed SQL generation. It does not import data,
+advance the generation, or republish other caches. Do not combine a seed with
+other seed or timetable inputs. Confirm the workflow releases its lease.
+
+Entries use `mrtdown:<tier>:service-paths:v1:<generation>` and contain only
+path columns, with a 512 KiB JSON ceiling and 24-hour Redis retention. Successful
+pulls publish before the edge purge and fingerprint completion. An unchanged
+manifest renews identical path data's retention without advancing the generation
+or purging. Different contents under the same generation fail publication.
+Oversize data remains on SQL; Redis publication failures retry the workflow.
+
+Each enabled range read uses one read-only repeatable-read SQL snapshot for
+generation, issue discovery, revisions, and assembly. Only matching completed
+generations can reuse paths. Missing, invalid, oversized, or unavailable entries,
+and incomplete promotion, fall back through that snapshot with `no-store`.
+The process retains at most one decoded entry for five minutes and shares one
+in-flight load. Returned rows are copied so assembly cannot mutate the memo.
+SQL generation validation still runs on every request. Live intervals, holidays,
+metadata, and rider reports stay on their existing paths.
+
+Enable the reader after seed/parity checks and purge the tier's data tag.
+Staging responses expose `X-MRTDown-Service-Paths-Source` as `redis`, `memory`,
+or `sql`. Structured `service_path_cache_read` logs record source, range, and
+attributed Redis payload bytes; a shared load attributes bytes to its initiating
+request. `service_path_cache_transfer` logs record actual received payload bytes,
+including rejected values. A bounded `GETRANGE` caps each read at the size
+ceiling plus one byte. Failed commands have no measured response-byte total.
+
+Verify the four route families against SQL, an empty range, a correction,
+publication crossing a read, and a cold process. Warm hits must execute zero
+dataset path queries. Station profiles and arrivals retain their current SQL
+readers. To roll back, unset only `REDIS_SERVICE_PATH_CACHE` and purge the data
+tag. Production enablement still requires the aggregate usage evidence below.
+
+## Redis usage evidence
+
+Use the configured database's Upstash Usage and billing views, or the
+[management stats API](https://upstash.com/docs/devops/developer-api/redis/get_database_stats),
+for aggregate commands, billing, throughput, connections, and hit/miss series.
+Record the database identity, plan, limits, time zone, and sampling boundaries.
+Include the crowd-report limiter when assessing shared capacity. Database REST
+or Redis connection credentials do not establish management API access.
+
+Treat Redis INFO as diagnostic point evidence unless server identity and
+counter continuity are established. A missing run identifier, decreasing
+counter, or inconsistent fields prevents a trustworthy window delta. Memory
+alone cannot establish command headroom, cost, or a reader's hit rate. See the
+[production cache plan](../plans/active/redis-page-profile-cache.md#redis-aggregate-evidence-still-needed)
+for the latest evidence and missing account-level measurements.
 
 ## Verification
 
