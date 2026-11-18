@@ -32,6 +32,7 @@ import { retentionReview } from '~/util/dbQueries/scheduledTimetableRetention.fi
 import { getStationProfileReadModel } from '~/util/dbQueries/stations';
 import { withSelectedScheduledTimetable } from '~/util/dbQueries/withSelectedScheduledTimetable';
 import { publishNavigationCache } from '~/util/navigationCache.server';
+import { publishServicePathCache } from '~/util/servicePathCache.server';
 import { combinedTimetableArchiveFixture } from './helpers/combinedTimetableArchive.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
 import { fetchManifest } from './helpers/fetchManifest';
@@ -92,6 +93,10 @@ vi.mock('~/db/pageProfileGeneration', async (original) => ({
   ...(await original<typeof import('~/db/pageProfileGeneration')>()),
   completePageProfileGeneration: vi.fn(async () => {}),
 }));
+vi.mock('~/util/servicePathCache.server', async (original) => ({
+  ...(await original<typeof import('~/util/servicePathCache.server')>()),
+  publishServicePathCache: vi.fn(async () => ({ published: true, bytes: 100 })),
+}));
 vi.mock('./helpers/fetchManifest', () => ({ fetchManifest: vi.fn() }));
 vi.mock('./helpers/fetchArchive', () => ({ fetchArchive: vi.fn() }));
 vi.mock(
@@ -117,6 +122,7 @@ vi.mock('./helpers/manifestFingerprint', async (original) => ({
   isCanonicalManifestCurrent: vi.fn(
     async (_db, hash) => state.fingerprint === hash,
   ),
+  readCanonicalManifestFingerprint: vi.fn(async () => state.fingerprint),
   recordCanonicalManifestFingerprint: vi.fn(async (_db, hash) => {
     state.fingerprint = hash;
   }),
@@ -262,6 +268,7 @@ beforeEach(() => {
   vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', undefined);
   vi.stubEnv('REDIS_ISSUE_PROFILE_CACHE', undefined);
   vi.stubEnv('REDIS_NAVIGATION_CACHE', undefined);
+  vi.stubEnv('REDIS_SERVICE_PATH_CACHE', undefined);
   state.fingerprint = undefined;
   vi.mocked(getDb).mockReturnValue({} as ReturnType<typeof getDb>);
   vi.mocked(fetchManifest).mockResolvedValue(manifest);
@@ -274,6 +281,52 @@ afterEach(async () => {
       code: 'ENOENT',
     });
   }
+});
+
+describe('service-path publication workflow', () => {
+  it('publishes independently of the profile readers and retries before purge and fingerprint completion', async () => {
+    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'publish');
+    vi.mocked(publishServicePathCache).mockRejectedValueOnce(
+      Error('Redis unavailable'),
+    );
+    const run = workflow();
+    await expect(run.run()).rejects.toThrow('Redis unavailable');
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
+    await run.run();
+    expect(publishServicePathCache).toHaveBeenCalledTimes(2);
+    expect(publishServicePathCache).toHaveBeenLastCalledWith(
+      run.context.workflowRunId,
+    );
+    expect(completePageProfileGeneration).toHaveBeenCalledWith(
+      expect.anything(),
+      run.context.workflowRunId,
+    );
+    expect(publishNavigationCache).not.toHaveBeenCalled();
+    expect(purgePublicDataCache).toHaveBeenCalledOnce();
+    expect(recordCanonicalManifestFingerprint).toHaveBeenCalledOnce();
+  });
+
+  it('renews retention on an unchanged manifest without advancing the generation or purging', async () => {
+    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
+    state.fingerprint = getCanonicalManifestFingerprint(manifest);
+    await workflow().run();
+    expect(publishServicePathCache).toHaveBeenCalledExactlyOnceWith();
+    expect(completePageProfileGeneration).not.toHaveBeenCalled();
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(fetchArchive).not.toHaveBeenCalled();
+  });
+
+  it('seeds an existing completed generation without touching timetable selection or other caches', async () => {
+    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'publish');
+    state.fingerprint = 'completed';
+    await workflow({ seedServicePathCache: true }).run();
+    expect(publishServicePathCache).toHaveBeenCalledExactlyOnceWith();
+    expect(completePageProfileGeneration).not.toHaveBeenCalled();
+    expect(fetchManifest).not.toHaveBeenCalled();
+    expect(fetchArchive).not.toHaveBeenCalled();
+    expect(publishNavigationCache).not.toHaveBeenCalled();
+  });
 });
 
 describe('pull timetable admission', () => {

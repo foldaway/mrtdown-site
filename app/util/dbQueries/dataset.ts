@@ -18,7 +18,6 @@ import {
   metadataTable,
   operatorsTable,
   publicHolidaysTable,
-  serviceRevisionPathStationEntriesTable,
   serviceRevisionsTable,
   servicesTable,
   stationCodesTable,
@@ -65,6 +64,7 @@ import {
   selectServiceBranchSourceEvents,
 } from './issueState';
 import { resolveStationMembershipEndedAt } from './serviceOperations';
+import { readServicePathRows, type ServicePathRow } from './servicePaths';
 
 export type BaseIncludedEntities = Omit<IncludedEntities, 'issues'>;
 
@@ -238,6 +238,8 @@ export async function buildDataset(
   db?: AppDbReader,
   issueIds?: readonly string[],
   staticScope?: DatasetStaticScope,
+  // Only supply rows validated against the generation in this same SQL snapshot.
+  cachedServicePaths?: readonly ServicePathRow[],
 ): Promise<BaseDataset> {
   const database =
     db ?? (await timeServerSpan('db_connect', () => getDefaultDb()));
@@ -750,28 +752,14 @@ export async function buildDataset(
   const allRevisionIds = [
     ...new Set(serviceRevisionRows.map((revision) => revision.id)),
   ];
-  const servicePathRows = await timeServerSpan(
-    'dataset_service_path_query',
-    () =>
-      allRevisionIds.length > 0
-        ? database
-            .select({
-              service_revision_id:
-                serviceRevisionPathStationEntriesTable.service_revision_id,
-              service_id: serviceRevisionPathStationEntriesTable.service_id,
-              station_id: serviceRevisionPathStationEntriesTable.station_id,
-              display_code: serviceRevisionPathStationEntriesTable.display_code,
-              path_index: serviceRevisionPathStationEntriesTable.path_index,
-            })
-            .from(serviceRevisionPathStationEntriesTable)
-            .where(
-              inArray(
-                serviceRevisionPathStationEntriesTable.service_revision_id,
-                allRevisionIds,
-              ),
-            )
-        : Promise.resolve([]),
-  );
+  const revisionIds = new Set(allRevisionIds);
+  const servicePathRows = cachedServicePaths
+    ? cachedServicePaths.filter((row) =>
+        revisionIds.has(row.service_revision_id),
+      )
+    : await timeServerSpan('dataset_service_path_query', () =>
+        readServicePathRows(database, allRevisionIds),
+      );
   const assemblyStartedAt = performance.now();
 
   const pathEntriesByRevisionKey = servicePathRows.reduce<

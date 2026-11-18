@@ -53,12 +53,23 @@ describe('canonical pull trigger payload', () => {
     );
   });
 
+  it('forwards a standalone service-path seed without timetable inputs', async () => {
+    expect((await post('{"seedServicePathCache":true}')).status).toBe(202);
+    expect(
+      vi.mocked(getClient).mock.results[0].value.trigger,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({ body: { seedServicePathCache: true } }),
+    );
+  });
+
   it.each([
     '{',
     'null',
     '{"importInstant":"2026-10-24T00:00:00Z"}',
     '{"sourceReview":{}}',
     '{"seedNavigationCache":true,"rebuildScheduledTimetableProjection":true}',
+    '{"seedServicePathCache":true,"rebuildScheduledTimetableProjection":true}',
+    '{"seedServicePathCache":true,"seedNavigationCache":true}',
   ])('rejects invalid input before enqueueing: %s', async (body) => {
     expect((await post(body)).status).toBe(400);
     expect(getClient).not.toHaveBeenCalled();
