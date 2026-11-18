@@ -144,8 +144,10 @@ history/day, and weekly-report range readers. The default is direct SQL.
 `publish` enables pull publication only; `enabled` also enables reads. This
 setting is independent of Navigation and completed Issue Profiles.
 
-Deploy in `publish` mode with the existing timetable pin. After confirming a
-successful canonical fingerprint, trigger the authenticated pull task with
+Deploy with the existing timetable pin. Reads may be `enabled` immediately:
+cache misses use Postgres while the seed runs. `publish` mode is also available
+when inspecting an entry before enabling reads. After confirming a successful
+canonical fingerprint, trigger the authenticated pull task with
 `{"seedServicePathCache":true}`. The task takes the pull lease and publishes
 paths for the current completed SQL generation. It does not import data,
 advance the generation, or republish other caches. Do not combine a seed with
@@ -167,7 +169,7 @@ in-flight load. Returned rows are copied so assembly cannot mutate the memo.
 SQL generation validation still runs on every request. Live intervals, holidays,
 metadata, and rider reports stay on their existing paths.
 
-Enable the reader after seed/parity checks and purge the tier's data tag.
+Purge the tier's data tag after the enabled setting is serving traffic.
 Staging responses expose `X-MRTDown-Service-Paths-Source` as `redis`, `memory`,
 or `sql`. Structured `service_path_cache_read` logs record source, range, and
 attributed Redis payload bytes; a shared load attributes bytes to its initiating

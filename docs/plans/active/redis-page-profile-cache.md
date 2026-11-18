@@ -8,8 +8,8 @@ reduce query work and give Neon longer idle periods. Postgres remains the
 relational read model and handles cache misses. Preserve existing URLs,
 response shapes, and report behavior.
 
-Next: validate the opt-in service-path reader in staging. The implementation
-reuses generation-scoped path inputs for date-range readers. Aggregate Redis
+Next: review the staging-validated service-path change in
+[PR #312](https://github.com/foldaway/mrtdown-site/pull/312). Aggregate Redis
 billing and limit evidence is still needed before production enablement.
 
 ## Progress
@@ -42,7 +42,8 @@ billing and limit evidence is still needed before production enablement.
   still missing (2026-11-17 PT).
 - [x] Implement opt-in service-path reuse for date-range readers and validate
   SQL snapshot parity locally (2026-11-17 PT).
-- [ ] Seed and validate the service-path reader in staging.
+- [x] Seed and validate the service-path reader on both staging Machines
+  (2026-11-17 PT).
 - [ ] Capture aggregate Redis usage, billing, and limits before enabling the
   next reader in production.
 
@@ -93,6 +94,9 @@ billing and limit evidence is still needed before production enablement.
   candidate. Start with date-range readers, retain current-time issue assembly,
   and treat the change as an egress reduction. Arrival and other live SQL reads
   remain a separate obstacle to suspension.
+- 2026-11-17, implementation — The user confirmed that enabled readers may
+  use Postgres while the seed generates. Staging enabled reads before seeding;
+  publish-only mode is optional, not a rollout prerequisite.
 
 ## Outcomes & Retrospective
 
@@ -363,6 +367,26 @@ tests cover malformed/oversize data, timeouts, concurrent generations, bounded
 memoization, mutation isolation, retry, and immutable retention renewal. The
 staging build passed without Sentry source-map upload.
 
+The built app also passed real-Redis checks for byte-identical HTML on all
+four route families under a fixed clock, zero path SQL on hits, and `no-store`
+SQL fallback for partial promotion, missing/malformed/oversize data, and Redis
+unavailability.
+
+Deployed `c8aa3fc` manually to staging, preserving the exact timetable pin and
+existing schedules. Reads were enabled before seed publication; the first
+origin overview returned HTTP 200 from SQL with `no-store`. Seed workflow
+`wfr_RJsSbodav-Bu-BEJ0LYuH` completed successfully and released its lease without
+advancing generation `wfr_43cV0_YJDzhjPrQlBZJDE`. The entry contains 2,088 rows
+in 263,955 bytes with 24-hour retention. SQL and Navigation retained the same
+generation and the canonical fingerprint remained present.
+
+The deployed range reader matched direct SQL for overview, history, weekly,
+and empty ranges with zero path SQL on hits; subsequent reads used the local
+memo. One origin history request on each staging Machine returned HTTP 200
+with both Navigation and service paths from Redis and normal public cache
+headers. This change was deployed only to staging; production enablement
+remains pending.
+
 ### Redis aggregate evidence still needed
 
 The fresh INFO snapshots again lacked a run identifier. At 10:04 p.m. PT one
@@ -510,7 +534,8 @@ adds Redis publication after the pull rebuilds the read model.
    malformed/oversize Redis values, restart, timeout, and publication races.
    A warm route must execute zero dataset path SQL while retaining its other
    reads. Add source/fallback and transferred-byte diagnostics for this reader.
-6. Collect actual aggregate Redis usage, cost and limits before enablement.
+6. Collect actual aggregate Redis usage, cost and limits before production
+   enablement.
    Validate in staging, then compare matched production windows with route
    counts and Neon egress. Keep the timetable pin and QStash schedules. Disable
    only the new reader and purge the data tag to roll back. Evaluate station
