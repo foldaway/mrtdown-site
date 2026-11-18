@@ -51,7 +51,7 @@ and [execution plan guide](https://developers.openai.com/cookbook/articles/codex
   remaining database transfer from scoped issue, date-range, and static
   topology reads.
 - [Cache public page profiles in Redis](active/redis-page-profile-cache.md)
-  reduces repeated Postgres reads and measures how often Neon suspends.
+  records the production rollout and pending service-path egress comparison.
 - [Reddit community monitoring](active/reddit-community-monitoring.md):
   stateful Reddit thread and reply monitoring through authenticated
   programmatic crowd reports and canonical reference validation.

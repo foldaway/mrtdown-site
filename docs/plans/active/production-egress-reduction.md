@@ -2,6 +2,13 @@
 
 ## Purpose
 
+Reduce avoidable database transfer while preserving public responses and
+canonical data semantics. As of November 18, service-path reuse for date-range
+pages is deployed in production. Its next step is the matched post-cutover
+comparison in the [Redis plan](redis-page-profile-cache.md#measurement-handoff).
+Use that result before selecting further topology work; the July measurements
+below are historical baselines.
+
 ### Goals
 
 - Reduce avoidable Neon public network transfer without changing public route
@@ -35,16 +42,16 @@
 - [x] Deploy the date-range issue query and confirm the old ID-chunk fan-out
   is absent (2026-07-22).
 - [x] Collect a 48-hour Neon transfer sample (2026-07-29).
-- [ ] Collect matching transfer and Cloudflare route/cache-status samples
-  before deciding whether to implement topology reuse.
+- [x] Attribute November range reads and deploy service-path reuse through
+  PR #312 (2026-11-17–18 PT).
+- [ ] Evaluate its matched post-cutover transfer and provider usage before
+  selecting further topology work.
 
-The November Redis [follow-up attribution](redis-page-profile-cache.md#follow-up-attribution-november-17-pt)
-confirms repeated service-path reads across range routes and a separate
-schedule-topology workload in arrivals. The next bounded prototype and its
-consistency/measurement gates are maintained in that plan's
-[Milestone 3](redis-page-profile-cache.md#milestone-3--reuse-service-path-inputs-for-date-range-readers).
-Cloudflare route/cache-status analytics and aggregate Redis billing remain
-unavailable; do not treat the July sample as the current workload.
+The [Redis plan](redis-page-profile-cache.md#milestone-3--reuse-service-path-inputs-for-date-range-readers)
+owns this rollout and its measurement. November [attribution](redis-page-profile-cache.md#follow-up-attribution-november-17-pt)
+also identified a separate arrival-topology workload. Aggregate Redis usage
+and billing were inspected before rollout; Cloudflare route/cache-status
+analytics remain unavailable. Do not treat SQL call counts as HTTP traffic.
 
 ### Progress log
 
