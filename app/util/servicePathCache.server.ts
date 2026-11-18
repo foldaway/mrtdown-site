@@ -1,8 +1,13 @@
+import { setResponseHeader } from '@tanstack/react-start/server';
 import { z } from 'zod';
 import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
-import { getDefaultDb } from './dbQueries/database';
-import { readServicePathRows } from './dbQueries/servicePaths';
+import { type AppDbReader, getDefaultDb } from './dbQueries/database';
+import {
+  readServicePathRows,
+  type ServicePathRow,
+} from './dbQueries/servicePaths';
 import { getPageProfileRedis } from './pageProfileRedis.server';
+import { recordServerTiming } from './serverTiming';
 
 export const MAX_SERVICE_PATH_CACHE_BYTES = 512 * 1024;
 const RETENTION_SECONDS = 24 * 60 * 60;
@@ -20,10 +25,11 @@ const EntrySchema = z.object({
     }),
   ),
 });
-type Entry = z.infer<typeof EntrySchema>;
-type Hit = { entry: Entry; source: 'redis' | 'memory'; redisBytes: number };
-let memo: { key: string; entry: Entry; expiresAt: number } | undefined;
-let loading: { key: string; promise: Promise<Hit | null> } | undefined;
+type CachedPaths = { rows: ServicePathRow[]; redisBytes: number };
+let memo:
+  | { key: string; rows: ServicePathRow[]; expiresAt: number }
+  | undefined;
+let loading: { key: string; promise: Promise<CachedPaths | null> } | undefined;
 
 export function isServicePathCacheEnabled() {
   return process.env.REDIS_SERVICE_PATH_CACHE === 'enabled';
@@ -51,6 +57,21 @@ function parseEntry(raw: string, generation: string) {
     : null;
 }
 
+async function loadCachedPaths(key: string, generation: string) {
+  const redis = await getPageProfileRedis();
+  // Read at most the ceiling plus one byte, including for malformed keys.
+  const raw = await redis.getrange(key, 0, MAX_SERVICE_PATH_CACHE_BYTES);
+  const redisBytes = Buffer.byteLength(raw);
+  console.info(
+    JSON.stringify({ event: 'service_path_cache_transfer', bytes: redisBytes }),
+  );
+  const entry = raw && parseEntry(raw, generation);
+  if (!entry) return null;
+
+  memo = { key, rows: entry.rows, expiresAt: Date.now() + MEMO_MS };
+  return { rows: entry.rows, redisBytes };
+}
+
 /** The caller must obtain generation from its owning SQL snapshot. No fills on reads. */
 export async function readCachedServicePaths(generation: string) {
   let key: string;
@@ -61,7 +82,7 @@ export async function readCachedServicePaths(generation: string) {
   }
   if (memo?.key === key && memo.expiresAt > Date.now()) {
     return {
-      rows: structuredClone(memo.entry.rows),
+      rows: structuredClone(memo.rows),
       source: 'memory' as const,
       redisBytes: 0,
     };
@@ -69,21 +90,7 @@ export async function readCachedServicePaths(generation: string) {
   if (loading && loading.key !== key) return null;
   const ownsLoad = !loading;
   if (!loading) {
-    const promise = (async (): Promise<Hit | null> => {
-      const redis = await getPageProfileRedis();
-      // Read at most the ceiling plus one byte, including for malformed keys.
-      const raw = await redis.getrange(key, 0, MAX_SERVICE_PATH_CACHE_BYTES);
-      console.info(
-        JSON.stringify({
-          event: 'service_path_cache_transfer',
-          bytes: Buffer.byteLength(raw),
-        }),
-      );
-      const entry = raw && parseEntry(raw, generation);
-      if (!entry) return null;
-      memo = { key, entry, expiresAt: Date.now() + MEMO_MS };
-      return { entry, source: 'redis', redisBytes: Buffer.byteLength(raw) };
-    })()
+    const promise = loadCachedPaths(key, generation)
       .catch(() => null)
       .finally(() => {
         loading = undefined;
@@ -91,13 +98,48 @@ export async function readCachedServicePaths(generation: string) {
     loading = { key, promise };
   }
   const hit = await loading.promise;
-  return hit
-    ? {
-        source: hit.source,
-        redisBytes: ownsLoad ? hit.redisBytes : 0,
-        rows: structuredClone(hit.entry.rows),
-      }
-    : null;
+  if (!hit) return null;
+  return {
+    source: 'redis' as const,
+    redisBytes: ownsLoad ? hit.redisBytes : 0,
+    rows: structuredClone(hit.rows),
+  };
+}
+
+/** Read through the transaction that owns issue discovery and dataset assembly. */
+export async function readServicePathsForSnapshot(
+  db: AppDbReader,
+  range: { start: string; end: string },
+) {
+  const startedAt = performance.now();
+  const generation = await readCompletedPageProfileGeneration(db);
+  const paths = generation ? await readCachedServicePaths(generation) : null;
+  const source = paths?.source ?? 'sql';
+  const redisBytes = paths?.redisBytes ?? 0;
+  recordServerTiming(
+    'service_paths_load',
+    performance.now() - startedAt,
+    source,
+  );
+  recordServerTiming('service_paths_redis_bytes', 0, String(redisBytes));
+  try {
+    if (process.env.TIER === 'staging') {
+      setResponseHeader('X-MRTDown-Service-Paths-Source', source);
+    }
+    if (!paths) setResponseHeader('Cache-Control', 'no-store');
+  } catch {
+    // Scripts and maintenance probes have no request context.
+  }
+  console.info(
+    JSON.stringify({
+      event: 'service_path_cache_read',
+      source,
+      redisBytes,
+      rangeStart: range.start,
+      rangeEnd: range.end,
+    }),
+  );
+  return paths?.rows;
 }
 
 /** Called under the pull lease, after promotion and before purge/fingerprint completion. */

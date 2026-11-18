@@ -1,12 +1,9 @@
-import { setResponseHeader } from '@tanstack/react-start/server';
 import { asc, desc, eq, sql } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
-import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import { impactEventPeriodsTable, impactEventsTable } from '~/db/schema';
-import { recordServerTiming } from '~/util/serverTiming';
 import {
   isServicePathCacheEnabled,
-  readCachedServicePaths,
+  readServicePathsForSnapshot,
 } from '~/util/servicePathCache.server';
 import {
   type AppDb,
@@ -17,6 +14,7 @@ import {
 import { buildDataset } from './dataset';
 import { isoDateTime, nowSg, parseDateTime } from './dateTime';
 import { issueOverlapsRange } from './issueIntervals';
+import type { ServicePathRow } from './servicePaths';
 
 async function getIssueIdsOverlappingRange(
   rangeStart: DateTime,
@@ -102,7 +100,7 @@ export async function getIssuesOverlappingRange(
   const database = db ?? (await getDefaultDb());
   const read = async (
     reader: AppDbReader & Pick<AppDb, '$with' | 'selectDistinctOn' | 'with'>,
-    paths?: Awaited<ReturnType<typeof readCachedServicePaths>>,
+    paths?: readonly ServicePathRow[],
   ) => {
     const issueIds = await getIssueIdsOverlappingRange(
       rangeStart,
@@ -114,7 +112,7 @@ export async function getIssuesOverlappingRange(
       reader,
       issueIds,
       undefined,
-      paths?.rows,
+      paths,
     );
     const issues = Object.values(dataset.allIssues).filter((issue) =>
       issueOverlapsRange(issue, rangeStart, rangeEnd, referenceNow),
@@ -125,39 +123,10 @@ export async function getIssuesOverlappingRange(
 
   return database.transaction(
     async (tx) => {
-      const startedAt = performance.now();
-      const generation = await readCompletedPageProfileGeneration(tx);
-      const paths = generation
-        ? await readCachedServicePaths(generation)
-        : null;
-      const source = paths?.source ?? 'sql';
-      recordServerTiming(
-        'service_paths_load',
-        performance.now() - startedAt,
-        source,
-      );
-      recordServerTiming(
-        'service_paths_redis_bytes',
-        0,
-        String(paths?.redisBytes ?? 0),
-      );
-      try {
-        if (process.env.TIER === 'staging') {
-          setResponseHeader('X-MRTDown-Service-Paths-Source', source);
-        }
-        if (!paths) setResponseHeader('Cache-Control', 'no-store');
-      } catch {
-        // Scripts and maintenance probes have no request context.
-      }
-      console.info(
-        JSON.stringify({
-          event: 'service_path_cache_read',
-          source,
-          redisBytes: paths?.redisBytes ?? 0,
-          rangeStart: isoDateTime(rangeStart),
-          rangeEnd: isoDateTime(rangeEnd),
-        }),
-      );
+      const paths = await readServicePathsForSnapshot(tx, {
+        start: isoDateTime(rangeStart),
+        end: isoDateTime(rangeEnd),
+      });
       return read(tx, paths);
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
