@@ -16,6 +16,7 @@ import { DateTime } from 'luxon';
 import { Pool } from 'pg';
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -23,6 +24,12 @@ import {
   it,
   vi,
 } from 'vitest';
+import {
+  CANONICAL_TOPOLOGY_ATTESTATION_KEY,
+  CANONICAL_TOPOLOGY_LAST_PULL_KEY,
+  CANONICAL_TOPOLOGY_PROMOTION_KEY,
+  readCanonicalTopologyAttestation,
+} from '~/db/canonicalTopologyPromotion';
 import {
   completePageProfileGeneration,
   readCompletedPageProfileGeneration,
@@ -71,10 +78,15 @@ import { buildLineSummary, buildUptimeGraph } from './lineAnalytics';
 import { buildLineOperationalFactRows } from './operationalFacts';
 import { projectScheduledTimetable } from './projectScheduledTimetable';
 import { queryIndexedScheduledDepartures } from './queryIndexedScheduledDepartures';
+import * as liveTopology from './readLiveScheduleTopology';
 import { readLiveScheduleTopology } from './readLiveScheduleTopology';
 import { readStationArrivalSource } from './readStationArrivalSource';
 import { retainScheduledTimetable } from './retainScheduledTimetable';
 import { retentionReview } from './scheduledTimetableRetention.fixture';
+import {
+  MAX_SCHEDULE_TOPOLOGY_MEMO_BYTES,
+  readScheduleTopologyForSnapshot,
+} from './scheduleTopologyCache';
 import { isLineFuture, isLineOperatingNow } from './serviceOperations';
 import { getStationProfileReadModel } from './stations';
 import { getTownProfileReadModel } from './towns';
@@ -250,7 +262,22 @@ describe.skipIf(!url)('indexed departure window', () => {
   let pool: Pool;
   let directory: string;
   let canonicalTopologyComplete = false;
-  const db = () => drizzle({ client: pool, relations });
+  const queries: string[] = [];
+  const db = () =>
+    drizzle({
+      client: pool,
+      relations,
+      logger: { logQuery: (query) => queries.push(query) },
+    });
+  const bulkTopologyQueries = () =>
+    queries.filter(
+      (query) =>
+        query.startsWith('select ') &&
+        !query.includes(' where ') &&
+        /from "(?:operators|lines|line_operators|line_services|stations|station_codes|station_platforms|station_platform_services|services|service_revisions|service_revision_path_station_entries)"/.test(
+          query,
+        ),
+    );
   const finalize = () => finalizePull(db(), { canonicalTopologyComplete });
   const options = () => ({
     ...window,
@@ -306,6 +333,7 @@ describe.skipIf(!url)('indexed departure window', () => {
     }
   });
   beforeEach(async () => {
+    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'enabled');
     await pool.query('TRUNCATE scheduled_timetables, public_holidays CASCADE');
     await pool.query(
       'TRUNCATE operators, towns, lines, stations, services, metadata CASCADE',
@@ -354,6 +382,10 @@ describe.skipIf(!url)('indexed departure window', () => {
         JSON.stringify(retained.record),
       );
     }
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
   afterAll(async () => {
     await pool?.end();
@@ -953,6 +985,288 @@ describe.skipIf(!url)('indexed departure window', () => {
         expect.objectContaining({ reason: 'projection-incomplete' }),
       ],
     });
+  });
+
+  it('attests producer-equivalent live topology and removes all bulk topology SQL on warm arrival reads', async () => {
+    const reader = db();
+    const request = {
+      scope,
+      referenceInstant: window.startInstant,
+      endInstant: window.endInstant,
+    };
+    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'disabled');
+    const expected = await readStationArrivalSource(reader, request);
+    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'enabled');
+    queries.length = 0;
+    expect(await readStationArrivalSource(reader, request)).toEqual(expected);
+    expect(bulkTopologyQueries()).toHaveLength(11);
+    await completePageProfileGeneration(reader, 'navigation-only-seed');
+    queries.length = 0;
+    expect(await readStationArrivalSource(reader, request)).toEqual(expected);
+    expect(bulkTopologyQueries()).toEqual([]);
+    for (const table of [
+      'metadata',
+      'scheduled_timetables',
+      'scheduled_departure_projections',
+      'scheduled_departure_days',
+      'scheduled_departure_occurrences',
+    ]) {
+      expect(queries.some((q) => q.includes(`from "${table}"`))).toBe(true);
+    }
+    await reader.transaction(
+      async (tx) => {
+        const identity = await readCanonicalTopologyAttestation(tx);
+        const topology = await readScheduleTopologyForSnapshot(reader, tx);
+        expect(JSON.stringify(topology)).toBe(
+          JSON.stringify(canonical.topology()),
+        );
+        expect(identity.attestation?.sha256).toBe(
+          hashBytes(Buffer.from(JSON.stringify(canonical.topology()))),
+        );
+        topology.stations[0].platforms.length = 0;
+        expect(await readScheduleTopologyForSnapshot(reader, tx)).toEqual(
+          canonical.topology(),
+        );
+      },
+      { isolationLevel: 'repeatable read', accessMode: 'read only' },
+    );
+    // A different database handle is cold even when topology digests agree.
+    queries.length = 0;
+    await queryIndexedScheduledDepartures(db(), options());
+    expect(bulkTopologyQueries()).toHaveLength(11);
+    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'disabled');
+    queries.length = 0;
+    expect(await readStationArrivalSource(reader, request)).toEqual(expected);
+    expect(bulkTopologyQueries()).toHaveLength(11);
+  });
+
+  it.each(['empty', 'untimed', 'rollback', 'platform'] as const)(
+    'preserves %s selection and coverage on warm topology hits',
+    async (kind) => {
+      const reader = db();
+      const request = {
+        ...options(),
+        ...(kind === 'empty' && {
+          startInstant: '2026-10-26T12:00:00+08:00',
+          endInstant: '2026-10-26T13:00:00+08:00',
+        }),
+        ...(kind === 'untimed' && {
+          scope: { ...scope, stationId: 'station-2' },
+        }),
+        ...(kind === 'rollback' && { rollback }),
+        ...(kind === 'platform' && {
+          scope: { ...scope, platformId: 'platform-1' },
+        }),
+      };
+      vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'disabled');
+      const expected = await queryIndexedScheduledDepartures(reader, request);
+      vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'enabled');
+      await queryIndexedScheduledDepartures(reader, request);
+      queries.length = 0;
+      expect(await queryIndexedScheduledDepartures(reader, request)).toEqual(
+        expected,
+      );
+      expect(bulkTopologyQueries()).toEqual([]);
+    },
+  );
+
+  it.each(['missing', 'malformed', 'version', 'stale', 'digest'] as const)(
+    'uses current SQL with a %s attestation, including when memory was warm',
+    async (kind) => {
+      const reader = db();
+      const expected = await queryIndexedScheduledDepartures(reader, options());
+      const [row] = await reader
+        .select()
+        .from(metadataTable)
+        .where(eq(metadataTable.key, CANONICAL_TOPOLOGY_ATTESTATION_KEY));
+      const attestation = JSON.parse(row.value);
+      if (kind === 'missing') {
+        await reader
+          .delete(metadataTable)
+          .where(eq(metadataTable.key, row.key));
+      } else {
+        const value =
+          kind === 'malformed'
+            ? '{'
+            : JSON.stringify({
+                ...attestation,
+                ...(kind === 'version' && { encodingVersion: 2 }),
+                ...(kind === 'stale' && {
+                  lastPulledAt: '1990-01-01T00:00:00Z',
+                }),
+                ...(kind === 'digest' && { sha256: 'e'.repeat(64) }),
+              });
+        await reader
+          .update(metadataTable)
+          .set({ value })
+          .where(eq(metadataTable.key, row.key));
+      }
+      for (let repeat = 0; repeat < 2; repeat++) {
+        queries.length = 0;
+        expect(
+          await queryIndexedScheduledDepartures(reader, options()),
+        ).toEqual(expected);
+        expect(bulkTopologyQueries()).toHaveLength(11);
+      }
+    },
+  );
+
+  it('keeps selection fresh under unchanged cached topology and rejects a damaged admission chain', async () => {
+    const reader = db();
+    const before = await queryIndexedScheduledDepartures(reader, options());
+    await reader
+      .update(projections)
+      .set({ completed_at: null })
+      .where(eq(projections.manifest_sha256, newer.entry.manifestSha256));
+    queries.length = 0;
+    const repaired = await queryIndexedScheduledDepartures(reader, options());
+    expect(repaired).not.toEqual(before);
+    expect(repaired.serviceDays.at(-1)?.attempts[0].reason).toBe(
+      'projection-incomplete',
+    );
+    expect(bulkTopologyQueries()).toEqual([]);
+    await reader.update(timetables).set({ manifest_bytes: Buffer.from('{}') });
+    await expect(
+      queryIndexedScheduledDepartures(reader, options()),
+    ).rejects.toThrow('Retained timetable manifest does not match');
+  });
+
+  it('warms topology before a compatible overlapping cold load finishes', async () => {
+    const reader = db();
+    const expected = await queryIndexedScheduledDepartures(db(), options());
+    const firstLoaded = Promise.withResolvers<void>();
+    const secondLoaded = Promise.withResolvers<void>();
+    const releaseFirst = Promise.withResolvers<void>();
+    const releaseSecond = Promise.withResolvers<void>();
+    const original = liveTopology.readLiveScheduleTopology;
+    vi.spyOn(liveTopology, 'readLiveScheduleTopology')
+      .mockImplementationOnce(async (tx) => {
+        const topology = await original(tx);
+        firstLoaded.resolve();
+        await releaseFirst.promise;
+        return topology;
+      })
+      .mockImplementationOnce(async (tx) => {
+        const topology = await original(tx);
+        secondLoaded.resolve();
+        await releaseSecond.promise;
+        return topology;
+      });
+    const firstRequest = queryIndexedScheduledDepartures(reader, options());
+    await firstLoaded.promise;
+    const secondRequest = queryIndexedScheduledDepartures(reader, options());
+    await secondLoaded.promise;
+    try {
+      releaseFirst.resolve();
+      expect(await firstRequest).toEqual(expected);
+      queries.length = 0;
+      expect(await queryIndexedScheduledDepartures(reader, options())).toEqual(
+        expected,
+      );
+      expect(bulkTopologyQueries()).toEqual([]);
+      releaseSecond.resolve();
+      expect(await secondRequest).toEqual(expected);
+      queries.length = 0;
+      await queryIndexedScheduledDepartures(reader, options());
+      expect(bulkTopologyQueries()).toEqual([]);
+    } finally {
+      releaseFirst.resolve();
+      releaseSecond.resolve();
+      await Promise.all([firstRequest, secondRequest]);
+    }
+  });
+
+  it('preserves an old snapshot without allowing its delayed fill to replace newly finalized topology', async () => {
+    const reader = db();
+    const before = await queryIndexedScheduledDepartures(db(), options());
+    const loaded = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const original = liveTopology.readLiveScheduleTopology;
+    vi.spyOn(liveTopology, 'readLiveScheduleTopology').mockImplementationOnce(
+      async (tx) => {
+        const topology = await original(tx);
+        loaded.resolve();
+        await release.promise;
+        return topology;
+      },
+    );
+    const oldRequest = queryIndexedScheduledDepartures(reader, options());
+    await loaded.promise;
+    try {
+      await syncOperatorsTownsLandmarksUpserts(db());
+      await expect(
+        queryIndexedScheduledDepartures(reader, options()),
+      ).rejects.toThrow('completed promotion');
+      await reader.update(stationPlatformsTable).set({ label: 'New topology' });
+      await finalize();
+      // Finalization precedes page-profile completion and Redis publication.
+      expect(await readCompletedPageProfileGeneration(reader)).toBeUndefined();
+      const current = await queryIndexedScheduledDepartures(reader, options());
+      expect(current.complete).toBe(false);
+      expect(current.serviceDays[0].attempts[0].reason).toBe(
+        'topology-mismatch',
+      );
+      release.resolve();
+      expect(await oldRequest).toEqual(before);
+      queries.length = 0;
+      expect(await queryIndexedScheduledDepartures(reader, options())).toEqual(
+        current,
+      );
+      expect(bulkTopologyQueries()).toEqual([]);
+      await syncOperatorsTownsLandmarksUpserts(reader);
+      await finalizePull(reader, { canonicalTopologyComplete: false });
+      await expect(
+        queryIndexedScheduledDepartures(reader, options()),
+      ).rejects.toThrow('completed promotion');
+    } finally {
+      release.resolve();
+      await oldRequest;
+    }
+  });
+
+  it('does not memoize oversized topology or complete a promotion with invalid live paths', async () => {
+    const reader = db();
+    await syncOperatorsTownsLandmarksUpserts(reader);
+    await reader
+      .update(stationPlatformsTable)
+      .set({ label: 'x'.repeat(MAX_SCHEDULE_TOPOLOGY_MEMO_BYTES) });
+    await finalize();
+    for (let repeat = 0; repeat < 2; repeat++) {
+      queries.length = 0;
+      await queryIndexedScheduledDepartures(reader, options());
+      expect(bulkTopologyQueries()).toHaveLength(11);
+    }
+    await syncOperatorsTownsLandmarksUpserts(reader);
+    await reader
+      .update(serviceRevisionPathStationEntriesTable)
+      .set({ path_index: 9 })
+      .where(
+        and(
+          eq(
+            serviceRevisionPathStationEntriesTable.service_revision_id,
+            'revision',
+          ),
+          eq(serviceRevisionPathStationEntriesTable.path_index, 0),
+        ),
+      );
+    await expect(finalize()).rejects.toThrow(
+      'incomplete or ambiguous path order',
+    );
+    const metadata = await reader.select().from(metadataTable);
+    expect(
+      metadata.some(
+        ({ key }) =>
+          key === CANONICAL_TOPOLOGY_PROMOTION_KEY ||
+          key === CANONICAL_TOPOLOGY_ATTESTATION_KEY,
+      ),
+    ).toBe(false);
+    // The timestamp write in the failed finalization rolls back too.
+    expect(
+      metadata.some(({ key }) => key === CANONICAL_TOPOLOGY_LAST_PULL_KEY),
+    ).toBe(true);
+    await expect(
+      queryIndexedScheduledDepartures(reader, options()),
+    ).rejects.toThrow('completed promotion');
   });
 
   it('holds one read-only repeatable-read snapshot across topology promotion, history changes and rebuilt occurrence rows for every candidate date', async () => {

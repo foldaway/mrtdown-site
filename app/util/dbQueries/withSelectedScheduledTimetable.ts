@@ -18,20 +18,19 @@ import {
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
 import { isLoopPath } from '~/util/stationArrivalBranches';
 import { assessIndexedTimetableRollback } from './assessIndexedTimetableRollback';
+import type { AppDbTransaction } from './database';
 import {
   COMBINED_DEPARTURE_PROJECTOR_VERSION,
   SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
 } from './projectScheduledTimetable';
-import { readLiveScheduleTopology } from './readLiveScheduleTopology';
 import {
   scheduledTimetableHistoryColumns,
   validateScheduledTimetableHistory,
 } from './scheduledTimetableHistory';
+import { readScheduleTopologyForSnapshot } from './scheduleTopologyCache';
 
 type Database = ReturnType<typeof getDb>;
-export type ReadTransaction = Parameters<
-  Parameters<Database['transaction']>[0]
->[0];
+export type ReadTransaction = AppDbTransaction;
 export type Topology = Awaited<ReturnType<typeof readScheduleTopology>>;
 type Version = ReturnType<typeof validateScheduledTimetableHistory>[number];
 export type IndexedTimetableScope = z.infer<
@@ -180,9 +179,9 @@ export async function withScheduledTimetableSnapshot<
   );
   return db.transaction(
     async (tx) => {
-      const topology = structuredClone(
-        await (options.readCanonicalTopology ?? readLiveScheduleTopology)(tx),
-      );
+      const topology = options.readCanonicalTopology
+        ? structuredClone(await options.readCanonicalTopology(tx))
+        : await readScheduleTopologyForSnapshot(db, tx);
       z.number().int().positive().parse(topology.projectionVersion);
       const matchesPlatformDefaults = validateScope(scope, topology);
       const loopRevisions = options.loop

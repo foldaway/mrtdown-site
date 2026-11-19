@@ -800,6 +800,7 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     await staging.finalizePull(database, {
       canonicalTopologyComplete: stagedLines === lines.length,
     });
+    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'enabled');
 
     const scope = {
       stationId: 'station-1',
@@ -929,6 +930,15 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       scope: loopScope,
       loop: true,
     });
+    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'disabled');
+    expect(
+      await queryIndexedScheduledDepartures(database, {
+        ...window,
+        scope: loopScope,
+        loop: true,
+      }),
+    ).toEqual(loop);
+    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'enabled');
     expect(loop.departures).toMatchObject([
       {
         serviceId: 'service-shared',
@@ -1046,15 +1056,19 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     expect((await selectDate('2026-11-30')).selected?.projectionId).toBe(
       projection.id,
     );
+    await staging.syncOperatorsTownsLandmarksUpserts(database);
     await pool.query(
       "UPDATE station_platforms SET label = 'Different canonical label' WHERE platform_id = 'platform-1'",
     );
+    await staging.finalizePull(database, { canonicalTopologyComplete: true });
     expect((await selectDate('2026-11-30')).attempts[0].reason).toBe(
       'topology-mismatch',
     );
+    await staging.syncOperatorsTownsLandmarksUpserts(database);
     await pool.query(
       "UPDATE station_platforms SET label = 'A' WHERE platform_id = 'platform-1'",
     );
+    await staging.finalizePull(database, { canonicalTopologyComplete: true });
 
     const snapshot = await createValidatedScheduledTimetableCanonicalSnapshot(
       combined.snapshot.manifest,
