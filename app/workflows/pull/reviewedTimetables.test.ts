@@ -32,6 +32,7 @@ import { retentionReview } from '~/util/dbQueries/scheduledTimetableRetention.fi
 import { getStationProfileReadModel } from '~/util/dbQueries/stations';
 import { withSelectedScheduledTimetable } from '~/util/dbQueries/withSelectedScheduledTimetable';
 import { publishNavigationCache } from '~/util/navigationCache.server';
+import { publishRangeReferenceCache } from '~/util/rangeReferenceCache.server';
 import { publishServicePathCache } from '~/util/servicePathCache.server';
 import { combinedTimetableArchiveFixture } from './helpers/combinedTimetableArchive.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
@@ -98,6 +99,13 @@ vi.mock('~/util/servicePathCache.server', async (original) => ({
   publishServicePathCache: vi.fn(async () => ({ published: true, bytes: 100 })),
 }));
 vi.mock('./helpers/fetchManifest', () => ({ fetchManifest: vi.fn() }));
+vi.mock('~/util/rangeReferenceCache.server', async (original) => ({
+  ...(await original<typeof import('~/util/rangeReferenceCache.server')>()),
+  publishRangeReferenceCache: vi.fn(async () => ({
+    published: true,
+    bytes: 100,
+  })),
+}));
 vi.mock('./helpers/fetchArchive', () => ({ fetchArchive: vi.fn() }));
 vi.mock(
   './helpers/validateScheduledTimetableCanonicalArchive',
@@ -269,6 +277,7 @@ beforeEach(() => {
   vi.stubEnv('REDIS_ISSUE_PROFILE_CACHE', undefined);
   vi.stubEnv('REDIS_NAVIGATION_CACHE', undefined);
   vi.stubEnv('REDIS_SERVICE_PATH_CACHE', undefined);
+  vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', undefined);
   state.fingerprint = undefined;
   vi.mocked(getDb).mockReturnValue({} as ReturnType<typeof getDb>);
   vi.mocked(fetchManifest).mockResolvedValue(manifest);
@@ -326,6 +335,88 @@ describe('service-path publication workflow', () => {
     expect(fetchManifest).not.toHaveBeenCalled();
     expect(fetchArchive).not.toHaveBeenCalled();
     expect(publishNavigationCache).not.toHaveBeenCalled();
+  });
+});
+
+describe('range-reference publication workflow', () => {
+  it('publishes independently and retries before purge/fingerprint completion', async () => {
+    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'enabled');
+    vi.mocked(publishRangeReferenceCache).mockRejectedValueOnce(
+      Error('Redis unavailable'),
+    );
+    const run = workflow();
+    await expect(run.run()).rejects.toThrow('Redis unavailable');
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
+    await run.run();
+    expect(publishRangeReferenceCache).toHaveBeenCalledTimes(2);
+    expect(publishRangeReferenceCache).toHaveBeenLastCalledWith(
+      run.context.workflowRunId,
+    );
+    expect(publishServicePathCache).not.toHaveBeenCalled();
+    expect(publishNavigationCache).not.toHaveBeenCalled();
+    expect(purgePublicDataCache).toHaveBeenCalledOnce();
+    expect(recordCanonicalManifestFingerprint).toHaveBeenCalledOnce();
+  });
+
+  it('renews unchanged manifests without a generation advance or edge purge', async () => {
+    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'publish');
+    state.fingerprint = getCanonicalManifestFingerprint(manifest);
+    await workflow().run();
+    expect(publishRangeReferenceCache).toHaveBeenCalledExactlyOnceWith();
+    expect(completePageProfileGeneration).not.toHaveBeenCalled();
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(fetchArchive).not.toHaveBeenCalled();
+  });
+
+  it('seeds the completed generation without importing or republishing other caches', async () => {
+    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'publish');
+    state.fingerprint = 'complete';
+    await workflow({ seedRangeReferenceCache: true }).run();
+    expect(publishRangeReferenceCache).toHaveBeenCalledExactlyOnceWith();
+    expect(completePageProfileGeneration).not.toHaveBeenCalled();
+    expect(fetchManifest).not.toHaveBeenCalled();
+    expect(publishServicePathCache).not.toHaveBeenCalled();
+    expect(publishNavigationCache).not.toHaveBeenCalled();
+  });
+
+  it.each(['disabled', 'incomplete'] as const)(
+    'refuses a %s seed',
+    async (stateName) => {
+      vi.stubEnv(
+        'REDIS_RANGE_REFERENCE_CACHE',
+        stateName === 'disabled' ? '' : 'publish',
+      );
+      state.fingerprint = stateName === 'incomplete' ? undefined : 'complete';
+      await expect(
+        workflow({ seedRangeReferenceCache: true }).run(),
+      ).rejects.toThrow(
+        stateName === 'disabled' ? 'disabled' : 'completed pull',
+      );
+      expect(publishRangeReferenceCache).not.toHaveBeenCalled();
+    },
+  );
+
+  it('publishes references when Navigation seeding advances the shared generation', async () => {
+    vi.stubEnv('REDIS_NAVIGATION_CACHE', 'enabled');
+    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
+    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'enabled');
+    state.fingerprint = 'complete';
+    const run = workflow({ seedNavigationCache: true });
+    await run.run();
+    expect(completePageProfileGeneration).toHaveBeenCalledWith(
+      expect.anything(),
+      run.context.workflowRunId,
+    );
+    expect(publishRangeReferenceCache).toHaveBeenCalledExactlyOnceWith(
+      run.context.workflowRunId,
+    );
+    expect(publishServicePathCache).toHaveBeenCalledExactlyOnceWith(
+      run.context.workflowRunId,
+    );
+    expect(publishNavigationCache).toHaveBeenCalledExactlyOnceWith(
+      run.context.workflowRunId,
+    );
   });
 });
 

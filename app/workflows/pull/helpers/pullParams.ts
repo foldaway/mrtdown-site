@@ -10,15 +10,24 @@ export const PullParamsSchema = z
     rebuildScheduledTimetableProjection: z.boolean().optional(),
     seedNavigationCache: z.literal(true).optional(),
     seedServicePathCache: z.literal(true).optional(),
+    seedRangeReferenceCache: z.literal(true).optional(),
   })
   .strict()
   .refine(
-    (params) =>
-      (!params.seedNavigationCache && !params.seedServicePathCache) ||
-      (!params.sourceReview &&
+    (params) => {
+      const seedCount = [
+        params.seedNavigationCache,
+        params.seedServicePathCache,
+        params.seedRangeReferenceCache,
+      ].filter(Boolean).length;
+      if (seedCount === 0) return true;
+      return (
+        seedCount === 1 &&
+        !params.sourceReview &&
         !params.combinedReleaseIndex &&
-        !params.rebuildScheduledTimetableProjection &&
-        !(params.seedNavigationCache && params.seedServicePathCache)),
+        !params.rebuildScheduledTimetableProjection
+      );
+    },
     {
       message: 'Cache seeds must run separately from an import and each other',
     },

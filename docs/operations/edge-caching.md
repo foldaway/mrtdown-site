@@ -137,6 +137,56 @@ completed issue returns `sql` with `no-store`, then returns `redis` on the
 next origin request. HTML and Markdown share a Redis entry. For rollback,
 unset `REDIS_ISSUE_PROFILE_CACHE` and purge the tier's data tag.
 
+## Range-reference inputs
+
+`REDIS_RANGE_REFERENCE_CACHE` enables reference reuse for overview/system map,
+history/day, issues-day, and weekly-report range readers. The default is SQL;
+`publish` enables publication only, and `enabled` adds reads. It operates
+independently of the service-path and page-profile flags.
+
+After deploying with the existing timetable pin, use the authenticated pull
+task with `{"seedRangeReferenceCache":true}` to publish the current completed
+generation. This seed requires a completed canonical fingerprint, takes the
+pull lease, and neither imports data nor advances generation. Keep seeds
+separate from other seed/import options. Reads may be enabled while seeding;
+misses use SQL with `no-store`. Purge the tier's data tag after enabling reads.
+
+The versioned key is
+`mrtdown:<tier>:range-references:v1:<generation>`. Its seven projected row sets
+are lines, line operators, services, revisions, stations, station codes, and
+station-landmark relationships. Unused lookup dictionaries and metadata are
+omitted from range assembly. Holidays remain a date-only SQL read; issues,
+events, evidence, and rider reports remain live. Paths reuse their existing
+separate entry. Arrival and entity-profile readers are unchanged.
+
+Each enabled range read obtains the SQL generation once in a read-only
+repeatable-read transaction shared by both cache readers and all range SQL.
+Each entry must match that completed generation. Missing, incomplete, invalid,
+oversized, or unavailable entries use SQL in the same snapshot with `no-store`.
+The reference entry has a 512 KiB JSON ceiling, bounded `GETRANGE`, 24-hour
+retention, one five-minute decoded process memo, and one shared in-flight load.
+Rows are copied for each request; branch/revision selection stays request-time.
+
+Pulls publish after generation completion and before edge purge/fingerprint
+completion, including Navigation seeds that advance generation. Unchanged
+manifests renew identical reference contents. Same-generation retries compare
+row sets, preserving the first publication's table-row order; different data
+fails publication. Redis failures retry the workflow. Oversize entries stay on
+SQL. Holiday sync/manual refresh needs no reference invalidation because dates
+stay in SQL. Facts/statistics/sitemap rebuilds do not change this generation.
+Canonical reference repairs must mark updating before writes, complete a new
+generation, republish, and purge; a seed cannot replace changed contents under
+an existing generation.
+
+Staging exposes `X-MRTDown-Range-References-Source` (`redis`, `memory`, `sql`).
+`range_reference_cache_read` logs source, range, and attributed payload bytes;
+`range_reference_cache_transfer` records bytes received, including rejected
+entries. A shared read attributes payload bytes once. Verify response parity,
+zero seven-table reference SQL on hits, SQL holiday/live-issue reads, both flag
+combinations, and coherent fallback. Disable only `REDIS_RANGE_REFERENCE_CACHE`
+and purge the data tag to roll back. Measure provider egress/latency and Redis
+usage over matched windows after a separately authorized production enablement.
+
 ## Service-path inputs
 
 `REDIS_SERVICE_PATH_CACHE` controls path reuse for overview/system map,
@@ -166,8 +216,9 @@ generations can reuse paths. Missing, invalid, oversized, or unavailable entries
 and incomplete promotion, fall back through that snapshot with `no-store`.
 The process retains at most one decoded entry for five minutes and shares one
 in-flight load. Returned rows are copied so assembly cannot mutate the memo.
-SQL generation validation still runs on every request. Live intervals, holidays,
-metadata, and rider reports stay on their existing paths.
+SQL generation validation still runs on every request. Other range references
+can use the independent [reference reader](#range-reference-inputs); live
+intervals, holidays, and rider reports stay on their existing paths.
 
 Purge the tier's data tag after the enabled setting is serving traffic.
 Staging responses expose `X-MRTDown-Service-Paths-Source` as `redis`, `memory`,

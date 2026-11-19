@@ -15,6 +15,10 @@ import {
 } from '~/util/navigationCache.server.js';
 import { isIssueProfileCacheEnabled } from '~/util/pageProfileRedis.server.js';
 import {
+  isRangeReferenceCachePublicationEnabled,
+  publishRangeReferenceCache,
+} from '~/util/rangeReferenceCache.server.js';
+import {
   isServicePathCachePublicationEnabled,
   publishServicePathCache,
 } from '~/util/servicePathCache.server.js';
@@ -74,6 +78,9 @@ async function publishPullCaches(generation: string) {
   if (isServicePathCachePublicationEnabled()) {
     await publishServicePathCache(generation);
   }
+  if (isRangeReferenceCachePublicationEnabled()) {
+    await publishRangeReferenceCache(generation);
+  }
   if (isPageProfilePublicationEnabled()) {
     await publishNavigationCache(generation);
   }
@@ -107,6 +114,22 @@ async function executePull(
   context: WorkflowContext<PullParams>,
   params: PullParams,
 ) {
+  if (params.seedRangeReferenceCache) {
+    await runPullStep(context, 'seed-range-reference-cache', async () => {
+      if (!isRangeReferenceCachePublicationEnabled()) {
+        throw new WorkflowNonRetryableError(
+          'Range-reference publication is disabled',
+        );
+      }
+      if (!(await readCanonicalManifestFingerprint(getDb()))) {
+        throw new WorkflowNonRetryableError(
+          'Range-reference seed requires a completed pull',
+        );
+      }
+      return publishRangeReferenceCache();
+    });
+    return;
+  }
   if (params.seedServicePathCache) {
     await runPullStep(context, 'seed-service-path-cache', async () => {
       if (!isServicePathCachePublicationEnabled()) {
@@ -193,6 +216,11 @@ async function executePull(
     if (isServicePathCachePublicationEnabled()) {
       await runPullStep(context, 'renew-service-path-cache', () =>
         publishServicePathCache(),
+      );
+    }
+    if (isRangeReferenceCachePublicationEnabled()) {
+      await runPullStep(context, 'renew-range-reference-cache', () =>
+        publishRangeReferenceCache(),
       );
     }
     console.log('[PULL] Canonical manifest unchanged; skipping pull');
