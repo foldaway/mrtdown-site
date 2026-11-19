@@ -5,10 +5,7 @@ import type { AppDb, AppDbTransaction } from './database';
 import { readLiveScheduleTopology } from './readLiveScheduleTopology';
 
 type Topology = Awaited<ReturnType<typeof readLiveScheduleTopology>>;
-type Memo = {
-  latestRead: symbol;
-  entry?: { key: string; topology: Topology };
-};
+type Memo = { key: string; topology: Topology };
 const memos = new WeakMap<AppDb, Memo>();
 export const MAX_SCHEDULE_TOPOLOGY_MEMO_BYTES = 1024 * 1024;
 
@@ -42,15 +39,7 @@ export async function readScheduleTopologyForSnapshot(
   tx: AppDbTransaction,
 ): Promise<Topology> {
   const startedAt = performance.now();
-  const ticket = Symbol();
-  let memo = memos.get(db);
-  if (!memo) {
-    memo = { latestRead: ticket };
-    memos.set(db, memo);
-  }
-  // Every reader reserves its place before the first snapshot-establishing query.
-  // A delayed old load cannot overwrite a later reader's entry.
-  memo.latestRead = ticket;
+  const memo = memos.get(db);
   const enabled = process.env.SCHEDULE_TOPOLOGY_MEMO === 'enabled';
   const identity = enabled ? await readCanonicalTopologyAttestation(tx) : null;
   const attestation = identity?.attestation;
@@ -78,8 +67,8 @@ export async function readScheduleTopologyForSnapshot(
       }),
     );
   };
-  if (key && memo.entry?.key === key) {
-    const topology = structuredClone(memo.entry.topology);
+  if (key && memo?.key === key) {
+    const topology = structuredClone(memo.topology);
     report('memory', 'hit', 0, 0);
     return topology;
   }
@@ -96,8 +85,10 @@ export async function readScheduleTopologyForSnapshot(
       reason = 'digest-mismatch';
     } else if (bytes > MAX_SCHEDULE_TOPOLOGY_MEMO_BYTES) {
       reason = 'oversized';
-    } else if (memo.latestRead === ticket) {
-      memo.entry = { key, topology: structuredClone(topology) };
+    } else if (memos.get(db) === memo) {
+      // Another pending read does not block warming. A completed fill changes
+      // the slot, so an old snapshot cannot replace newly cached topology.
+      memos.set(db, { key, topology: structuredClone(topology) });
     }
   }
   report('sql', reason, topologyRows(topology), bytes);

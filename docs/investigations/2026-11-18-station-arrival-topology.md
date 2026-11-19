@@ -155,6 +155,7 @@ and [combined pull tests](../../app/workflows/pull/reviewedTimetables.test.ts) c
   topology; a projection change remains visible with topology warm.
 - Old-snapshot coherence across promotion, partial/failed promotion rejection,
   newly finalized topology before page-cache publication, and delayed fill ordering.
+  Overlapping cold reads warm the memo before every pending load finishes.
   Changing a platform label rejects old timetable hashes even with unchanged paths.
 - Cold handles, disabled reads, caller mutation, absent/malformed/unsupported/stale
   attestations, digest mismatch, size ceiling, invalid path ordering and damaged
@@ -193,9 +194,9 @@ The next step is staging acceptance using the owning guide, followed by matched
 production measurement if rollout is authorized.
 
 `TZ=UTC npm run verify -- -- --maxWorkers=2` passed with
-`TEST_TIMETABLE_DATABASE_URL` set to local PostGIS: all 98 files and 670 tests
+`TEST_TIMETABLE_DATABASE_URL` set to local PostGIS: all 98 files and 671 tests
 passed, including integration tests in isolated schemas. Docs, types, lint,
 formatting and migration drift passed. The default parallel run hit two local
 database test/hook timeouts; reducing concurrency passed without changing test
-timeouts or production code. Focused arrival, range-cache and pull checks also
-passed independently (60 tests before the final combined warm-parity additions).
+timeouts or production code. The overlapping-load regression failed before the
+memo-fill correction and passed afterward, along with the existing promotion race.

@@ -1131,6 +1131,51 @@ describe.skipIf(!url)('indexed departure window', () => {
     ).rejects.toThrow('Retained timetable manifest does not match');
   });
 
+  it('warms topology before a compatible overlapping cold load finishes', async () => {
+    const reader = db();
+    const expected = await queryIndexedScheduledDepartures(db(), options());
+    const firstLoaded = Promise.withResolvers<void>();
+    const secondLoaded = Promise.withResolvers<void>();
+    const releaseFirst = Promise.withResolvers<void>();
+    const releaseSecond = Promise.withResolvers<void>();
+    const original = liveTopology.readLiveScheduleTopology;
+    vi.spyOn(liveTopology, 'readLiveScheduleTopology')
+      .mockImplementationOnce(async (tx) => {
+        const topology = await original(tx);
+        firstLoaded.resolve();
+        await releaseFirst.promise;
+        return topology;
+      })
+      .mockImplementationOnce(async (tx) => {
+        const topology = await original(tx);
+        secondLoaded.resolve();
+        await releaseSecond.promise;
+        return topology;
+      });
+    const firstRequest = queryIndexedScheduledDepartures(reader, options());
+    await firstLoaded.promise;
+    const secondRequest = queryIndexedScheduledDepartures(reader, options());
+    await secondLoaded.promise;
+    try {
+      releaseFirst.resolve();
+      expect(await firstRequest).toEqual(expected);
+      queries.length = 0;
+      expect(await queryIndexedScheduledDepartures(reader, options())).toEqual(
+        expected,
+      );
+      expect(bulkTopologyQueries()).toEqual([]);
+      releaseSecond.resolve();
+      expect(await secondRequest).toEqual(expected);
+      queries.length = 0;
+      await queryIndexedScheduledDepartures(reader, options());
+      expect(bulkTopologyQueries()).toEqual([]);
+    } finally {
+      releaseFirst.resolve();
+      releaseSecond.resolve();
+      await Promise.all([firstRequest, secondRequest]);
+    }
+  });
+
   it('preserves an old snapshot without allowing its delayed fill to replace newly finalized topology', async () => {
     const reader = db();
     const before = await queryIndexedScheduledDepartures(db(), options());
