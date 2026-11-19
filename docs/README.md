@@ -37,5 +37,7 @@ See the [project README](../README.md) for setup and the
   compares schematic map generation approaches.
 - [Markdown for agents feasibility](investigations/2026-05-29-markdown-for-agents-feasibility.md)
   records the evaluation of Markdown delivery options.
+- [Range reference egress](investigations/2026-11-18-range-reference-egress.md)
+  records range-reference narrowing, generation-based caching, and validation.
 - [Overhaul baseline](history/overhaul-baseline.md) records the original
   migration from API-client reads to the local read model.

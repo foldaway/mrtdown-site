@@ -62,6 +62,15 @@ describe('canonical pull trigger payload', () => {
     );
   });
 
+  it('forwards a standalone reference seed', async () => {
+    expect((await post('{"seedRangeReferenceCache":true}')).status).toBe(202);
+    expect(
+      vi.mocked(getClient).mock.results[0].value.trigger,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({ body: { seedRangeReferenceCache: true } }),
+    );
+  });
+
   it.each([
     '{',
     'null',
@@ -70,6 +79,10 @@ describe('canonical pull trigger payload', () => {
     '{"seedNavigationCache":true,"rebuildScheduledTimetableProjection":true}',
     '{"seedServicePathCache":true,"rebuildScheduledTimetableProjection":true}',
     '{"seedServicePathCache":true,"seedNavigationCache":true}',
+    '{"seedRangeReferenceCache":true,"seedServicePathCache":true}',
+    '{"seedRangeReferenceCache":true,"seedNavigationCache":true}',
+    '{"seedRangeReferenceCache":true,"rebuildScheduledTimetableProjection":true}',
+    '{"seedRangeReferenceCache":true,"sourceReview":{}}',
   ])('rejects invalid input before enqueueing: %s', async (body) => {
     expect((await post(body)).status).toBe(400);
     expect(getClient).not.toHaveBeenCalled();

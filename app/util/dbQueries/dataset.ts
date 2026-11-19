@@ -63,6 +63,7 @@ import {
   selectLatestServiceEvents,
   selectServiceBranchSourceEvents,
 } from './issueState';
+import type { RangeReferenceRows } from './rangeReferences';
 import { resolveStationMembershipEndedAt } from './serviceOperations';
 import { readServicePathRows, type ServicePathRow } from './servicePaths';
 
@@ -114,6 +115,12 @@ export type DatasetStaticScope = {
   issueTransitionHorizon?: DateTime;
 };
 
+type DatasetReferenceInputs = {
+  // Supplied rows must belong to the caller's SQL snapshot or its completed generation.
+  servicePaths?: readonly ServicePathRow[];
+  references?: RangeReferenceRows;
+};
+
 function omitAuditTimestamps<TColumns extends Record<string, unknown>>(
   columns: TColumns,
 ) {
@@ -140,9 +147,7 @@ const stationLandmarksReadColumns = omitAuditTimestamps(
   getTableColumns(stationLandmarksTable),
 );
 const servicesReadColumns = omitAuditTimestamps(getTableColumns(servicesTable));
-const publicHolidaysReadColumns = omitAuditTimestamps(
-  getTableColumns(publicHolidaysTable),
-);
+const publicHolidaysReadColumns = { date: publicHolidaysTable.date };
 const issuesReadColumns = omitAuditTimestamps(getTableColumns(issuesTable));
 const impactEventsReadColumns = omitAuditTimestamps(
   getTableColumns(impactEventsTable),
@@ -175,8 +180,8 @@ const {
 
 type DatasetServiceRevision = Omit<
   typeof serviceRevisionsTable.$inferSelect,
-  'created_at'
->;
+  'created_at' | 'operating_hours' | 'updated_at'
+> & { updated_at: Date | string };
 type DatasetImpactEvent = Omit<
   typeof impactEventsTable.$inferSelect,
   'created_at' | 'updated_at'
@@ -238,9 +243,10 @@ export async function buildDataset(
   db?: AppDbReader,
   issueIds?: readonly string[],
   staticScope?: DatasetStaticScope,
-  // Only supply rows validated against the generation in this same SQL snapshot.
-  cachedServicePaths?: readonly ServicePathRow[],
+  inputs: DatasetReferenceInputs = {},
 ): Promise<BaseDataset> {
+  const { servicePaths: cachedServicePaths, references: rangeReferences } =
+    inputs;
   const database =
     db ?? (await timeServerSpan('db_connect', () => getDefaultDb()));
   const selectedIssueIds =
@@ -252,15 +258,17 @@ export async function buildDataset(
   const selectedStationIds =
     staticScope == null ? undefined : [...new Set(staticScope.stationIds)];
   const selectedOperatorIds =
-    staticScope == null
+    staticScope == null && !rangeReferences
       ? undefined
-      : [...new Set(staticScope.operatorIds ?? [])];
+      : [...new Set(staticScope?.operatorIds ?? [])];
   const selectedTownIds =
-    staticScope == null ? undefined : [...new Set(staticScope.townIds ?? [])];
-  const selectedLandmarkIds =
-    staticScope == null
+    staticScope == null && !rangeReferences
       ? undefined
-      : [...new Set(staticScope.landmarkIds ?? [])];
+      : [...new Set(staticScope?.townIds ?? [])];
+  const selectedLandmarkIds =
+    staticScope == null && !rangeReferences
+      ? undefined
+      : [...new Set(staticScope?.landmarkIds ?? [])];
 
   const [
     metadataRows,
@@ -280,35 +288,37 @@ export async function buildDataset(
     impactEventRows,
   ] = await timeServerSpan('dataset_base_queries', () =>
     Promise.all([
-      staticScope == null
+      staticScope == null && !rangeReferences
         ? timeDbQuery('dataset_q_metadata', () =>
             database.select().from(metadataTable),
           )
         : [],
-      selectedLineIds == null
-        ? timeDbQuery('dataset_q_lines', () =>
-            database.select(linesReadColumns).from(linesTable),
-          )
-        : selectedLineIds.length > 0
+      rangeReferences?.lines ??
+        (selectedLineIds == null
           ? timeDbQuery('dataset_q_lines', () =>
-              database
-                .select(linesReadColumns)
-                .from(linesTable)
-                .where(inArray(linesTable.id, selectedLineIds)),
+              database.select(linesReadColumns).from(linesTable),
             )
-          : [],
-      selectedLineIds == null
-        ? timeDbQuery('dataset_q_line_operators', () =>
-            database.select().from(lineOperatorsTable),
-          )
-        : selectedLineIds.length > 0
+          : selectedLineIds.length > 0
+            ? timeDbQuery('dataset_q_lines', () =>
+                database
+                  .select(linesReadColumns)
+                  .from(linesTable)
+                  .where(inArray(linesTable.id, selectedLineIds)),
+              )
+            : []),
+      rangeReferences?.lineOperators ??
+        (selectedLineIds == null
           ? timeDbQuery('dataset_q_line_operators', () =>
-              database
-                .select()
-                .from(lineOperatorsTable)
-                .where(inArray(lineOperatorsTable.line_id, selectedLineIds)),
+              database.select().from(lineOperatorsTable),
             )
-          : [],
+          : selectedLineIds.length > 0
+            ? timeDbQuery('dataset_q_line_operators', () =>
+                database
+                  .select()
+                  .from(lineOperatorsTable)
+                  .where(inArray(lineOperatorsTable.line_id, selectedLineIds)),
+              )
+            : []),
       selectedOperatorIds == null
         ? timeDbQuery('dataset_q_operators', () =>
             database.select(operatorsReadColumns).from(operatorsTable),
@@ -345,20 +355,8 @@ export async function buildDataset(
                 .where(inArray(landmarksTable.id, selectedLandmarkIds)),
             )
           : [],
-      selectedStationIds == null
-        ? timeDbQuery('dataset_q_stations', () =>
-            database
-              .select({
-                id: stationsTable.id,
-                name: stationsTable.name,
-                townId: stationsTable.townId,
-                firstLastTrain: stationsTable.first_last_train,
-                latitude: sql<number>`ST_Y(${stationsTable.geo})`,
-                longitude: sql<number>`ST_X(${stationsTable.geo})`,
-              })
-              .from(stationsTable),
-          )
-        : selectedStationIds.length > 0
+      rangeReferences?.stations ??
+        (selectedStationIds == null
           ? timeDbQuery('dataset_q_stations', () =>
               database
                 .select({
@@ -369,68 +367,91 @@ export async function buildDataset(
                   latitude: sql<number>`ST_Y(${stationsTable.geo})`,
                   longitude: sql<number>`ST_X(${stationsTable.geo})`,
                 })
-                .from(stationsTable)
-                .where(inArray(stationsTable.id, selectedStationIds)),
+                .from(stationsTable),
             )
-          : [],
-      selectedStationIds == null
-        ? timeDbQuery('dataset_q_station_codes', () =>
-            database.select(stationCodesReadColumns).from(stationCodesTable),
-          )
-        : selectedStationIds.length > 0
+          : selectedStationIds.length > 0
+            ? timeDbQuery('dataset_q_stations', () =>
+                database
+                  .select({
+                    id: stationsTable.id,
+                    name: stationsTable.name,
+                    townId: stationsTable.townId,
+                    firstLastTrain: stationsTable.first_last_train,
+                    latitude: sql<number>`ST_Y(${stationsTable.geo})`,
+                    longitude: sql<number>`ST_X(${stationsTable.geo})`,
+                  })
+                  .from(stationsTable)
+                  .where(inArray(stationsTable.id, selectedStationIds)),
+              )
+            : []),
+      rangeReferences?.stationCodes ??
+        (selectedStationIds == null
           ? timeDbQuery('dataset_q_station_codes', () =>
-              database
-                .select(stationCodesReadColumns)
-                .from(stationCodesTable)
-                .where(
-                  inArray(stationCodesTable.station_id, selectedStationIds),
-                ),
+              database.select(stationCodesReadColumns).from(stationCodesTable),
             )
-          : [],
-      selectedStationIds == null
-        ? timeDbQuery('dataset_q_station_landmarks', () =>
-            database
-              .select(stationLandmarksReadColumns)
-              .from(stationLandmarksTable),
-          )
-        : selectedStationIds.length > 0
+          : selectedStationIds.length > 0
+            ? timeDbQuery('dataset_q_station_codes', () =>
+                database
+                  .select(stationCodesReadColumns)
+                  .from(stationCodesTable)
+                  .where(
+                    inArray(stationCodesTable.station_id, selectedStationIds),
+                  ),
+              )
+            : []),
+      rangeReferences?.stationLandmarks ??
+        (selectedStationIds == null
           ? timeDbQuery('dataset_q_station_landmarks', () =>
               database
                 .select(stationLandmarksReadColumns)
-                .from(stationLandmarksTable)
-                .where(
-                  inArray(stationLandmarksTable.station_id, selectedStationIds),
-                ),
+                .from(stationLandmarksTable),
             )
-          : [],
-      selectedServiceIds == null
-        ? timeDbQuery('dataset_q_services', () =>
-            database.select(servicesReadColumns).from(servicesTable),
-          )
-        : selectedServiceIds.length > 0
+          : selectedStationIds.length > 0
+            ? timeDbQuery('dataset_q_station_landmarks', () =>
+                database
+                  .select(stationLandmarksReadColumns)
+                  .from(stationLandmarksTable)
+                  .where(
+                    inArray(
+                      stationLandmarksTable.station_id,
+                      selectedStationIds,
+                    ),
+                  ),
+              )
+            : []),
+      rangeReferences?.services ??
+        (selectedServiceIds == null
           ? timeDbQuery('dataset_q_services', () =>
-              database
-                .select(servicesReadColumns)
-                .from(servicesTable)
-                .where(inArray(servicesTable.id, selectedServiceIds)),
+              database.select(servicesReadColumns).from(servicesTable),
             )
-          : [],
-      selectedServiceIds == null
-        ? timeDbQuery('dataset_q_service_revisions', () =>
-            database
-              .select(serviceRevisionsReadColumns)
-              .from(serviceRevisionsTable),
-          )
-        : selectedServiceIds.length > 0
+          : selectedServiceIds.length > 0
+            ? timeDbQuery('dataset_q_services', () =>
+                database
+                  .select(servicesReadColumns)
+                  .from(servicesTable)
+                  .where(inArray(servicesTable.id, selectedServiceIds)),
+              )
+            : []),
+      rangeReferences?.revisions ??
+        (selectedServiceIds == null
           ? timeDbQuery('dataset_q_service_revisions', () =>
               database
                 .select(serviceRevisionsReadColumns)
-                .from(serviceRevisionsTable)
-                .where(
-                  inArray(serviceRevisionsTable.service_id, selectedServiceIds),
-                ),
+                .from(serviceRevisionsTable),
             )
-          : [],
+          : selectedServiceIds.length > 0
+            ? timeDbQuery('dataset_q_service_revisions', () =>
+                database
+                  .select(serviceRevisionsReadColumns)
+                  .from(serviceRevisionsTable)
+                  .where(
+                    inArray(
+                      serviceRevisionsTable.service_id,
+                      selectedServiceIds,
+                    ),
+                  ),
+              )
+            : []),
       staticScope == null || staticScope.includePublicHolidays === true
         ? timeDbQuery('dataset_q_public_holidays', () =>
             database

@@ -1,6 +1,11 @@
 import { asc, desc, eq, sql } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
+import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import { impactEventPeriodsTable, impactEventsTable } from '~/db/schema';
+import {
+  isRangeReferenceCacheEnabled,
+  readRangeReferencesForSnapshot,
+} from '~/util/rangeReferenceCache.server';
 import {
   isServicePathCacheEnabled,
   readServicePathsForSnapshot,
@@ -14,6 +19,10 @@ import {
 import { buildDataset } from './dataset';
 import { isoDateTime, nowSg, parseDateTime } from './dateTime';
 import { issueOverlapsRange } from './issueIntervals';
+import {
+  type RangeReferenceRows,
+  readRangeReferenceRows,
+} from './rangeReferences';
 import type { ServicePathRow } from './servicePaths';
 
 async function getIssueIdsOverlappingRange(
@@ -101,6 +110,7 @@ export async function getIssuesOverlappingRange(
   const read = async (
     reader: AppDbReader & Pick<AppDb, '$with' | 'selectDistinctOn' | 'with'>,
     paths?: readonly ServicePathRow[],
+    references?: RangeReferenceRows,
   ) => {
     const issueIds = await getIssueIdsOverlappingRange(
       rangeStart,
@@ -112,22 +122,34 @@ export async function getIssuesOverlappingRange(
       reader,
       issueIds,
       undefined,
-      paths,
+      {
+        servicePaths: paths,
+        references: references ?? (await readRangeReferenceRows(reader)),
+      },
     );
     const issues = Object.values(dataset.allIssues).filter((issue) =>
       issueOverlapsRange(issue, rangeStart, rangeEnd, referenceNow),
     );
     return { dataset, issues };
   };
-  if (!isServicePathCacheEnabled()) return read(database);
+  const usePaths = isServicePathCacheEnabled();
+  const useReferences = isRangeReferenceCacheEnabled();
+  if (!usePaths && !useReferences) return read(database);
 
   return database.transaction(
     async (tx) => {
-      const paths = await readServicePathsForSnapshot(tx, {
+      const generation = await readCompletedPageProfileGeneration(tx);
+      const range = {
         start: isoDateTime(rangeStart),
         end: isoDateTime(rangeEnd),
-      });
-      return read(tx, paths);
+      };
+      const [paths, references] = await Promise.all([
+        usePaths ? readServicePathsForSnapshot(generation, range) : undefined,
+        useReferences
+          ? readRangeReferencesForSnapshot(generation, range)
+          : undefined,
+      ]);
+      return read(tx, paths, references);
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
   );
