@@ -16,7 +16,7 @@ type AppDb = ReturnType<typeof getDb>;
  * Bump this when a pull-pipeline or derived-data change needs one full pull
  * even if the upstream manifest is unchanged.
  */
-const PULL_PIPELINE_VERSION = 6;
+const PULL_PIPELINE_VERSION = 7;
 
 export const MANIFEST_FINGERPRINT_METADATA_KEY = `canonical_manifest_fingerprint_v${PULL_PIPELINE_VERSION}`;
 

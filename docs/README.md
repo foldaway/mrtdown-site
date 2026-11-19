@@ -31,6 +31,8 @@ See the [project README](../README.md) for setup and the
   active work and completed plans.
 - [Site slowness investigation](investigations/2026-05-21-site-slowness.md)
   records the initial route performance and payload findings.
+- [Station-arrival topology reuse](investigations/2026-11-18-station-arrival-topology.md)
+  recommends snapshot-safe reuse and focused implementation/measurement checks.
 - [System map feasibility](investigations/2026-05-24-system-map-generation-feasibility.md)
   compares schematic map generation approaches.
 - [Markdown for agents feasibility](investigations/2026-05-29-markdown-for-agents-feasibility.md)

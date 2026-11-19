@@ -24,6 +24,43 @@ A failed promotion keeps the marker and successful fingerprint cleared so a
 retry can repair the state. See the
 [live topology loader](../../app/util/dbQueries/readLiveScheduleTopology.ts).
 
+### Arrival topology reuse
+
+Finalization also validates and hashes the actual live schedule topology, then
+atomically records `canonical_topology_attestation_v1` with the promotion marker
+and last-pull timestamp. The first live promotion write clears the attestation.
+This runs independently of cache flags. Pipeline version 7 forces one full pull
+for unchanged upstream inputs; timetable pins, admission and projection reuse
+retain their existing rules.
+
+Set `SCHEDULE_TOPOLOGY_MEMO=enabled` to reuse this topology inside each Node
+process. It defaults to disabled. The [reader](../../app/util/dbQueries/scheduleTopologyCache.ts)
+checks promotion and attestation through the arrival request's read-only
+repeatable-read transaction. A warm hit skips all 11 topology-table reads;
+history, eligibility, coverage, departures and display names still use SQL.
+Arrival responses remain `no-store`, and rider reports remain fresh.
+
+The memo holds one object of at most 1 MiB per database handle, cloned for each
+caller. Cold processes, invalid/missing attestation, digest disagreement or
+oversized topology use the original SQL loader. Missing promotion completion
+still fails closed. Page-profile generation and Redis publication do not select
+or validate arrival topology. Facts and holiday rebuilds do not invalidate it.
+
+Before enabling in an environment, drain older pull executions and let a full
+pull establish the attestation. No seed or timetable artifact cache is needed.
+Topology repairs must use the promotion protocol; direct table edits must first
+clear the promotion marker and attestation. An older finalizer's last-pull
+timestamp mismatch forces SQL fallback. Validation now happens at finalization,
+so malformed topology prevents that promotion from completing.
+
+`schedule_topology_read` logs source, bypass reason, duration, selected-row count,
+encoded JSON bytes on SQL loads, and promotion token. Counts and bytes are
+diagnostic proxies, not billed network transfer. `schedule_topology_load` and
+`schedule_topology_rows` also appear in Server-Timing. To roll back, unset only
+`SCHEDULE_TOPOLOGY_MEMO`; reads immediately use SQL without an edge purge. Keep
+attestation maintenance enabled. See the [investigation](../investigations/2026-11-18-station-arrival-topology.md)
+for evidence, parity checks and the pending production measurement.
+
 ## Timetable admission
 
 Three checks apply to each new release:

@@ -1,7 +1,6 @@
 import { ServiceRevisionSchema } from '@mrtdown/core';
 import type { readScheduleTopology } from '@mrtdown/fs';
 import { eq } from 'drizzle-orm';
-import type { getDb } from '~/db';
 import { CANONICAL_TOPOLOGY_PROMOTION_KEY } from '~/db/canonicalTopologyPromotion';
 import {
   stationCodesTable as codes,
@@ -17,9 +16,8 @@ import {
   servicesTable as services,
   stationsTable as stations,
 } from '~/db/schema';
+import type { AppDbTransaction } from './database';
 
-type Database = ReturnType<typeof getDb>;
-type ReadTransaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 type Topology = Awaited<ReturnType<typeof readScheduleTopology>>;
 
 function sorted<T>(values: T[]): T[] {
@@ -46,7 +44,7 @@ const key = (...ids: string[]) => JSON.stringify(ids);
 
 /** Read only through the owning repeatable-read transaction, never a candidate's topology. */
 export async function readLiveScheduleTopology(
-  tx: ReadTransaction,
+  tx: AppDbTransaction,
 ): Promise<Topology> {
   const [promotion] = await tx
     .select({ value: metadataTable.value })

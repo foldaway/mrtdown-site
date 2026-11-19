@@ -4,6 +4,7 @@
  * manifest hashes to skip unchanged rows; orphan deletes use `NOT EXISTS` anti-joins
  * against `*_next` so we avoid huge `IN (...)` parameter lists.
  */
+import { randomUUID } from 'node:crypto';
 import {
   type Evidence,
   type ImpactEvent,
@@ -16,6 +17,7 @@ import {
   type Station,
   type Town,
 } from '@mrtdown/core';
+import { hashBytes } from '@mrtdown/fs';
 import {
   asc,
   eq,
@@ -27,7 +29,12 @@ import {
   or,
   sql,
 } from 'drizzle-orm';
-import { CANONICAL_TOPOLOGY_PROMOTION_KEY } from '../../../db/canonicalTopologyPromotion.js';
+import {
+  CANONICAL_TOPOLOGY_ATTESTATION_KEY,
+  CANONICAL_TOPOLOGY_LAST_PULL_KEY,
+  CANONICAL_TOPOLOGY_PROMOTION_KEY,
+  CanonicalTopologyAttestationSchema,
+} from '../../../db/canonicalTopologyPromotion.js';
 import type { getDb } from '../../../db/index.js';
 import { markPageProfilesUpdating } from '../../../db/pageProfileGeneration.js';
 import {
@@ -72,6 +79,7 @@ import {
   type DbDiagnosticContext,
   withDbDiagnostics as withSharedDbDiagnostics,
 } from '../../../util/dbDiagnostics.js';
+import { readLiveScheduleTopology } from '../../../util/dbQueries/readLiveScheduleTopology.js';
 import { MANIFEST_FINGERPRINT_METADATA_KEY } from './manifestFingerprint.js';
 
 /** Max rows per `insert().values()` batch to stay within driver/param limits. */
@@ -550,6 +558,7 @@ export async function syncOperatorsTownsLandmarksUpserts(
       .where(
         inArray(metadataTable.key, [
           CANONICAL_TOPOLOGY_PROMOTION_KEY,
+          CANONICAL_TOPOLOGY_ATTESTATION_KEY,
           MANIFEST_FINGERPRINT_METADATA_KEY,
         ]),
       );
@@ -1831,27 +1840,47 @@ export async function finalizePull(
   db: Db,
   options: { canonicalTopologyComplete?: boolean } = {},
 ): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx.execute(
-      sql`TRUNCATE ${operatorsNextTable}, ${townsNextTable}, ${landmarksNextTable}, ${linesNextTable}, ${stationsNextTable}, ${servicesNextTable}, ${issuesNextTable} RESTART IDENTITY`,
-    );
-    await tx
-      .insert(metadataTable)
-      .values({
-        key: 'manifest_last_pulled_at',
-        value: new Date().toISOString(),
-      })
-      .onConflictDoUpdate({
-        target: [metadataTable.key],
-        set: { value: new Date().toISOString() },
-      });
-    await tx
-      .delete(metadataTable)
-      .where(eq(metadataTable.key, CANONICAL_TOPOLOGY_PROMOTION_KEY));
-    if (options.canonicalTopologyComplete === true) {
+  await db.transaction(
+    async (tx) => {
+      await tx.execute(
+        sql`TRUNCATE ${operatorsNextTable}, ${townsNextTable}, ${landmarksNextTable}, ${linesNextTable}, ${stationsNextTable}, ${servicesNextTable}, ${issuesNextTable} RESTART IDENTITY`,
+      );
+      const lastPulledAt = new Date().toISOString();
       await tx
         .insert(metadataTable)
-        .values({ key: CANONICAL_TOPOLOGY_PROMOTION_KEY, value: '1' });
-    }
-  });
+        .values({ key: CANONICAL_TOPOLOGY_LAST_PULL_KEY, value: lastPulledAt })
+        .onConflictDoUpdate({
+          target: [metadataTable.key],
+          set: { value: lastPulledAt },
+        });
+      await tx
+        .delete(metadataTable)
+        .where(
+          inArray(metadataTable.key, [
+            CANONICAL_TOPOLOGY_PROMOTION_KEY,
+            CANONICAL_TOPOLOGY_ATTESTATION_KEY,
+          ]),
+        );
+      if (options.canonicalTopologyComplete === true) {
+        await tx
+          .insert(metadataTable)
+          .values({ key: CANONICAL_TOPOLOGY_PROMOTION_KEY, value: '1' });
+        // The marker is visible only inside this transaction until live SQL
+        // topology has passed validation. Never attest a candidate's digest.
+        const topology = await readLiveScheduleTopology(tx);
+        const attestation = CanonicalTopologyAttestationSchema.parse({
+          encodingVersion: 1,
+          projectionVersion: topology.projectionVersion,
+          sha256: hashBytes(Buffer.from(JSON.stringify(topology))),
+          promotionToken: randomUUID(),
+          lastPulledAt,
+        });
+        await tx.insert(metadataTable).values({
+          key: CANONICAL_TOPOLOGY_ATTESTATION_KEY,
+          value: JSON.stringify(attestation),
+        });
+      }
+    },
+    { isolationLevel: 'repeatable read' },
+  );
 }
