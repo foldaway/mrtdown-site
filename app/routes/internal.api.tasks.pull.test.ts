@@ -2,17 +2,116 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { retentionReview } from '~/util/dbQueries/scheduledTimetableRetention.fixture';
 import { getClient } from '~/workflows/client';
 import { scheduledTimetableArchiveFixture } from '~/workflows/pull/helpers/scheduledTimetableArchive.fixture';
-import { handlePullPost } from './internal.api.tasks.pull';
+import { handlePullGet, handlePullPost } from './internal.api.tasks.pull';
+
+const { logs } = vi.hoisted(() => ({ logs: vi.fn() }));
 
 vi.mock('~/workflows/client', () => ({
   getClient: vi.fn(() => ({
     trigger: vi.fn().mockResolvedValue({ workflowRunId: 'pull-test' }),
+    logs,
   })),
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('VITE_ROOT_URL', 'https://www.mrtdown.org');
+});
+
+describe('canonical pull completion receipt', () => {
+  const workflowUrl = 'https://www.mrtdown.org/internal/api/workflows/pull';
+  const combinedReleaseIndex = {
+    manifestSha256: 'a'.repeat(64),
+    releaseSha256: 'b'.repeat(64),
+  };
+  const get = (id = 'wfr_test') =>
+    handlePullGet(
+      new Request(
+        `https://www.mrtdown.org/internal/api/tasks/pull?workflowRunId=${encodeURIComponent(id)}`,
+      ),
+    );
+
+  it('rejects missing or invalid run identifiers before fetching logs', async () => {
+    expect((await get('')).status).toBe(400);
+    expect((await get('../other')).status).toBe(400);
+    expect(logs).not.toHaveBeenCalled();
+  });
+
+  it('waits for new runs and filters the exact canonical pull URL', async () => {
+    logs.mockResolvedValue({ runs: [] });
+    const response = await get();
+    expect(await response.json()).toEqual({
+      workflowRunId: 'wfr_test',
+      state: 'PENDING',
+    });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(logs).toHaveBeenCalledWith({
+      filter: { workflowRunId: 'wfr_test', workflowUrl },
+      count: 1,
+    });
+  });
+
+  it('returns the completed release identity without exposing workflow logs', async () => {
+    logs.mockResolvedValue({
+      runs: [
+        {
+          workflowRunId: 'wfr_test',
+          workflowUrl,
+          workflowState: 'RUN_SUCCESS',
+          workflowRunResponse: JSON.stringify({ combinedReleaseIndex }),
+          steps: [{ secret: 'hidden' }],
+        },
+      ],
+    });
+    expect(await (await get()).json()).toEqual({
+      workflowRunId: 'wfr_test',
+      state: 'RUN_SUCCESS',
+      combinedReleaseIndex,
+    });
+  });
+
+  it.each(['RUN_STARTED', 'RUN_FAILED', 'RUN_CANCELED'])(
+    'reports %s without claiming completion',
+    async (state) => {
+      logs.mockResolvedValue({
+        runs: [
+          { workflowRunId: 'wfr_test', workflowUrl, workflowState: state },
+        ],
+      });
+      expect(await (await get()).json()).toEqual({
+        workflowRunId: 'wfr_test',
+        state,
+        combinedReleaseIndex: null,
+      });
+    },
+  );
+
+  it('does not mistake another workflow for the requested pull', async () => {
+    logs.mockResolvedValue({
+      runs: [
+        {
+          workflowRunId: 'wfr_test',
+          workflowUrl: 'https://www.mrtdown.org/other',
+          workflowState: 'RUN_SUCCESS',
+        },
+      ],
+    });
+    expect((await (await get()).json()).state).toBe('PENDING');
+  });
+
+  it('fails closed for a malformed completed receipt', async () => {
+    logs.mockResolvedValue({
+      runs: [
+        {
+          workflowRunId: 'wfr_test',
+          workflowUrl,
+          workflowState: 'RUN_SUCCESS',
+          workflowRunResponse: '{',
+        },
+      ],
+    });
+    expect((await get()).status).toBe(502);
+  });
 });
 afterEach(() => vi.unstubAllEnvs());
 
