@@ -30,6 +30,13 @@ export function ScheduledArrivalStatus({
   lineColor,
   now,
 }: ScheduledArrivalStatusProps) {
+  // A fresh response can be newer than the last sampled client clock.
+  const emptyWindow =
+    data.coverage.complete &&
+    now != null &&
+    Math.max(now, Date.parse(data.window.startInstant)) <
+      Date.parse(data.window.endInstant);
+
   if (!hasDepartures) {
     return (
       <ArrivalServiceRow
@@ -38,7 +45,7 @@ export function ScheduledArrivalStatus({
         platformLabels={[]}
       >
         <ArrivalTimingDisplay reportButton={reportButton}>
-          <NoArrivalTimes emptyWindow={data.coverage.complete} />
+          <NoArrivalTimes emptyWindow={emptyWindow} />
         </ArrivalTimingDisplay>
       </ArrivalServiceRow>
     );
@@ -79,7 +86,7 @@ export function ScheduledArrivalStatus({
                     )}
                   </>
                 ) : (
-                  <NoArrivalTimes emptyWindow={data.coverage.complete} />
+                  <NoArrivalTimes emptyWindow={emptyWindow} />
                 )}
               </ArrivalTimingDisplay>
             </ArrivalServiceRow>

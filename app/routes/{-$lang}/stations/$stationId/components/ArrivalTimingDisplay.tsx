@@ -47,18 +47,16 @@ type NoArrivalTimesProps = { emptyWindow?: boolean };
 
 export function NoArrivalTimes({ emptyWindow }: NoArrivalTimesProps) {
   return (
-    <div aria-live="polite">
-      <ArrivalTimeValue unavailable>
-        <FormattedMessage
-          id="station.arrivals.not_available"
-          defaultMessage="N/A"
-        />
-      </ArrivalTimeValue>
+    <div
+      aria-live="polite"
+      className="min-w-0 max-w-full [overflow-wrap:anywhere]"
+    >
+      <ArrivalTimeValue unavailable>—</ArrivalTimeValue>
       <p className="mt-1 text-gray-600 text-xs leading-snug dark:text-gray-400">
         {emptyWindow ? (
           <FormattedMessage
             id="station.arrivals.empty_window"
-            defaultMessage="No departures in this window"
+            defaultMessage="None in the next hour"
           />
         ) : (
           <FormattedMessage

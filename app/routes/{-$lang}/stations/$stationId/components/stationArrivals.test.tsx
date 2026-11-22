@@ -81,7 +81,7 @@ const key = arrivalBranchKey(
 function renderRow(
   data: StationArrivalsV2 | null,
   status: 'ready' | 'error' | 'loading' = 'ready',
-  now = Date.parse('2026-10-24T16:08:30Z'),
+  now: number | null = Date.parse('2026-10-24T16:08:30Z'),
   onArrivalReported?: () => Promise<void>,
 ) {
   return renderToStaticMarkup(
@@ -200,7 +200,7 @@ describe('station guide arrival sources', () => {
     }
     const empty = { ...scheduled, timings: [] };
     const html = renderRow(empty);
-    expect(html).toContain('No departures in this window');
+    expect(html).toContain('None in the next hour');
     expect(html).not.toContain('<details');
     expect(html).not.toContain('Service ended');
     expect(html).not.toContain('Frequency estimate');
@@ -220,13 +220,13 @@ describe('station guide arrival sources', () => {
     };
     const onArrivalReported = async () => {};
     for (const [data, message, canReport] of [
-      [empty, 'No departures in this window', false],
+      [empty, 'None in the next hour', false],
       [partial, 'Timetable unavailable', true],
       [unavailable, 'Timetable unavailable', true],
     ] as const) {
       const row = renderRow(data, 'ready', undefined, onArrivalReported);
       expect(row).toContain(message);
-      expect(row).toContain('>N/A</span>');
+      expect(row).toContain('>—</span>');
       expect(row.includes('Report an arrival')).toBe(canReport);
       const withReport = renderRow({ ...data, recentCrowdArrival });
       expect(withReport).toContain(message);
@@ -246,6 +246,46 @@ describe('station guide arrival sources', () => {
     const failed = renderRow(null, 'error');
     expect(failed).toContain('Couldn’t load timetable');
     expect(failed).not.toContain('Timetable unavailable');
+  });
+
+  it.each(['ready', 'loading', 'error'] as const)(
+    'does not describe expired empty results as the next hour while %s',
+    (status) => {
+      if (scheduled.source !== 'scheduled') throw new Error('fixture');
+      const emptyGroup = {
+        ...scheduled.timings[0],
+        platforms: [{ id: 'empty', label: 'D' }],
+        departures: [],
+      };
+      for (const timings of [[], [...scheduled.timings, emptyGroup]]) {
+        const html = renderRow(
+          { ...scheduled, timings },
+          status,
+          Date.parse(scheduled.window.endInstant),
+        );
+        expect(html).not.toContain('None in the next hour');
+        expect(html).toContain('Timetable unavailable');
+      }
+    },
+  );
+
+  it('accepts fresh empty responses ahead of the sampled clock while rejecting expired or stale results', () => {
+    if (scheduled.source !== 'scheduled') throw new Error('fixture');
+    const empty = { ...scheduled, timings: [] };
+    const start = Date.parse(empty.window.startInstant);
+    const end = Date.parse(empty.window.endInstant);
+    for (const now of [start - 15_000, start - 1, start, end - 1]) {
+      expect(renderRow(empty, 'ready', now)).toContain('None in the next hour');
+    }
+    for (const now of [null, end, end + 60_000]) {
+      const html = renderRow(empty, 'ready', now);
+      expect(html).not.toContain('None in the next hour');
+      expect(html).toContain('Timetable unavailable');
+    }
+    const stale = renderRow(empty, 'error', start);
+    expect(stale).not.toContain('None in the next hour');
+    expect(stale).toContain('Timetable unavailable');
+    expect(stale).toContain('Showing the last known response');
   });
 
   it('combines line facts, service directions and exits without repeating a visible station code', () => {
