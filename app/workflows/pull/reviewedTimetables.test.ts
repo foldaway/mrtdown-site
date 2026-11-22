@@ -25,12 +25,16 @@ import { completePageProfileGeneration } from '~/db/pageProfileGeneration';
 import { relations } from '~/db/relations';
 import { ZipStore } from '~/helpers/ZipStore';
 import { purgePublicDataCache } from '~/util/cloudflareCache';
+import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
 import { publishArrivalInputSnapshot } from '~/util/arrivalInputSnapshot.server';
 import {
   parseArrivalInputs,
   readArrivalInputHistory,
   selectArrivalInputCoverage,
 } from '~/util/dbQueries/arrivalInputs';
+import { readDeparturePartition } from '~/util/dbQueries/readDeparturePartition';
+import { readPartitionDepartureRows } from '~/util/dbQueries/departurePartition';
+import { readCombinedDepartureRows } from '~/util/dbQueries/readCombinedDepartureRows';
 import { readArrivalInputs } from '~/util/dbQueries/readArrivalInputs';
 import { createTimetableSelectionPolicy } from '~/util/dbQueries/scheduledTimetableSelection';
 import {
@@ -43,6 +47,7 @@ import { retainScheduledTimetable } from '~/util/dbQueries/retainScheduledTimeta
 import { retentionReview } from '~/util/dbQueries/scheduledTimetableRetention.fixture';
 import { getStationProfileReadModel } from '~/util/dbQueries/stations';
 import { withSelectedScheduledTimetable } from '~/util/dbQueries/withSelectedScheduledTimetable';
+import { publishArrivalDepartures } from './helpers/publishArrivalDepartures';
 import { publishNavigationCache } from '~/util/navigationCache.server';
 import { publishRangeReferenceCache } from '~/util/rangeReferenceCache.server';
 import { publishRangeSnapshot } from '~/util/rangeSnapshot.server';
@@ -77,8 +82,18 @@ const state = vi.hoisted(() => ({
     | ((args: { context: WorkflowContext<PullParams> }) => Promise<void>),
   fingerprint: undefined as string | undefined,
   arrivalHead: undefined as
-    | { fingerprint: string; generation: string }
+    | { fingerprint: string; generation: string; sha256?: string }
     | undefined,
+}));
+vi.mock('~/util/arrivalDepartureStore.server', async (original) => ({
+  ...(await original<typeof import('~/util/arrivalDepartureStore.server')>()),
+  arrivalDepartureStore: {
+    manifest: { read: vi.fn(async () => null) },
+    ready: vi.fn(async () => false),
+  },
+}));
+vi.mock('./helpers/publishArrivalDepartures', () => ({
+  publishArrivalDepartures: vi.fn(async () => {}),
 }));
 vi.mock('~/util/rangeSnapshot.server', () => ({
   publishRangeSnapshot: vi.fn(async () => {}),
@@ -321,10 +336,13 @@ beforeEach(() => {
   vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', undefined);
   vi.stubEnv('REDIS_RANGE_SNAPSHOT', undefined);
   vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', undefined);
+  vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', undefined);
   vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(false);
   vi.mocked(rangeSnapshotStore.hasWriter).mockResolvedValue(false);
   state.fingerprint = undefined;
   state.arrivalHead = undefined;
+  vi.mocked(arrivalDepartureStore.manifest.read).mockResolvedValue(null);
+  vi.mocked(arrivalDepartureStore.ready).mockResolvedValue(false);
   vi.mocked(getDb).mockReturnValue({} as ReturnType<typeof getDb>);
   vi.mocked(fetchManifest).mockResolvedValue(manifest);
   vi.mocked(fetchArchive).mockResolvedValue(Buffer.from(zipSync({})));
@@ -339,6 +357,30 @@ afterEach(async () => {
 });
 
 describe('published zero-SQL range inputs', () => {
+  it('holds purge and checkpoint completion until departure publication succeeds', async () => {
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+    vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', 'publish');
+    state.fingerprint = getCanonicalManifestFingerprint(manifest);
+    vi.mocked(publishArrivalDepartures).mockRejectedValueOnce(
+      Error('partition publication failed'),
+    );
+    const run = workflow();
+    await expect(run.run()).rejects.toThrow('partition publication failed');
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(rangeSnapshotStore.complete).not.toHaveBeenCalled();
+    await run.run();
+    expect(publishArrivalDepartures).toHaveBeenCalledTimes(2);
+    expect(
+      vi.mocked(publishArrivalDepartures).mock.invocationCallOrder[1],
+    ).toBeLessThan(vi.mocked(purgePublicDataCache).mock.invocationCallOrder[0]);
+    expect(
+      vi.mocked(purgePublicDataCache).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vi.mocked(rangeSnapshotStore.complete).mock.invocationCallOrder[0],
+    );
+  });
+
   it('repairs missing arrival metadata before restoring the range checkpoint', async () => {
     vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
     vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
@@ -381,6 +423,36 @@ describe('published zero-SQL range inputs', () => {
     expect(getDb).not.toHaveBeenCalled();
     expect(publishArrivalInputSnapshot).not.toHaveBeenCalled();
   });
+  it('keeps matching departures SQL-free and repairs absent parts before checkpoint completion', async () => {
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+    vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', 'publish');
+    vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    const fingerprint = getCanonicalManifestFingerprint(manifest);
+    state.arrivalHead = {
+      fingerprint,
+      generation: 'complete',
+      sha256: 'a'.repeat(64),
+    };
+    vi.mocked(arrivalDepartureStore.manifest.read).mockResolvedValue({
+      value: { fingerprint, generation: 'complete' },
+      inputs: { arrivalInputsSha256: 'a'.repeat(64), partitions: [] },
+    } as unknown as NonNullable<
+      Awaited<ReturnType<typeof arrivalDepartureStore.manifest.read>>
+    >);
+    vi.mocked(arrivalDepartureStore.ready).mockResolvedValue(true);
+    const healthy = workflow();
+    await healthy.run();
+    expect(getDb).not.toHaveBeenCalled();
+    expect(acquireOrRenewPullWorkflowLease).not.toHaveBeenCalled();
+    vi.mocked(arrivalDepartureStore.ready).mockResolvedValue(false);
+    state.fingerprint = fingerprint;
+    await workflow().run();
+    expect(acquireOrRenewPullWorkflowLease).toHaveBeenCalled();
+    expect(publishArrivalDepartures).toHaveBeenCalledOnce();
+    expect(rangeSnapshotStore.complete).toHaveBeenCalledWith(fingerprint);
+  });
+
   it('finishes an unchanged scheduled poll before getDb or lease acquisition', async () => {
     vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
     vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
@@ -1078,6 +1150,59 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
         ),
       ),
     );
+    await database.transaction(async (tx) => {
+      for (const projection of metadata.projections) {
+        const partition = await readDeparturePartition(
+          tx,
+          { projectionId: projection.id, stationId: scope.stationId },
+          projection.projectorVersion,
+        );
+        for (const selected of [
+          multi,
+          exact,
+          { ...multi, platformId: 'platform-common' },
+          { ...multi, platformId: 'platform-1' },
+          { ...multi, platformId: 'closed' },
+        ]) {
+          for (const date of ['2026-11-29', '2026-11-30', '2026-12-01']) {
+            const lower = window.startInstant;
+            const upper = window.endInstant;
+            const cached = readPartitionDepartureRows(
+              partition,
+              selected,
+              ['station-2'],
+              date,
+              lower,
+              upper,
+            );
+            const original = await readCombinedDepartureRows(
+              tx,
+              selected,
+              ['station-2'],
+              projection.id,
+              date,
+              lower,
+              upper,
+            );
+            const normalize = (rows: Record<string, unknown>[]) =>
+              rows
+                .map((row) => ({
+                  ...row,
+                  stop_sequence: String(row.stop_sequence),
+                  arrival_instant: row.arrival_instant
+                    ? new Date(String(row.arrival_instant)).toISOString()
+                    : null,
+                  departure_instant: row.departure_instant
+                    ? new Date(String(row.departure_instant)).toISOString()
+                    : null,
+                }))
+                .sort((a, b) => a.stop_sequence.localeCompare(b.stop_sequence));
+            expect(cached.untimed).toEqual(original.untimed);
+            expect(normalize(cached.rows)).toEqual(normalize(original.rows));
+          }
+        }
+      }
+    });
     const validatedScope = ScheduledTimetableRequestScopeSchema.parse(multi);
     const metadataPolicy = createTimetableSelectionPolicy({
       scope: validatedScope,

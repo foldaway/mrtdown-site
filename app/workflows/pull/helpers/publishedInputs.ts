@@ -1,5 +1,9 @@
 import { WorkflowNonRetryableError } from '@upstash/workflow';
 import {
+  arrivalDepartureStore,
+  isArrivalDeparturePublicationEnabled,
+} from '~/util/arrivalDepartureStore.server';
+import {
   arrivalInputSnapshotStore,
   isArrivalInputPublicationEnabled,
 } from '~/util/arrivalInputSnapshot.server';
@@ -36,13 +40,25 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
     );
   const fingerprint = getCanonicalManifestFingerprint(manifest, pinned);
   if (!(await rangeSnapshotStore.isCurrent(fingerprint))) return false;
-  if (!isArrivalInputPublicationEnabled()) return true;
+  if (!isArrivalInputPublicationEnabled())
+    return !isArrivalDeparturePublicationEnabled();
   const [range, arrivals] = await Promise.all([
     rangeSnapshotStore.head(),
     arrivalInputSnapshotStore.read({ verifyPayload: true }),
   ]);
-  return (
+  const metadataMatches =
     arrivals?.value.fingerprint === fingerprint &&
-    arrivals.value.generation === range.value?.generation
+    arrivals.value.generation === range.value?.generation;
+  if (!metadataMatches || !arrivals) return false;
+  if (!isArrivalDeparturePublicationEnabled()) return true;
+  const departures = await arrivalDepartureStore.manifest.read({
+    verifyPayload: true,
+  });
+  return Boolean(
+    departures &&
+      departures.value.fingerprint === fingerprint &&
+      departures.value.generation === arrivals.value.generation &&
+      departures.inputs.arrivalInputsSha256 === arrivals.value.sha256 &&
+      (await arrivalDepartureStore.ready(departures)),
   );
 }

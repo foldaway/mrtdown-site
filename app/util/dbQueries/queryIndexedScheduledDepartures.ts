@@ -337,7 +337,7 @@ async function readIndexedScheduledDepartures<
   });
 }
 
-async function readLegacyDepartureRows(
+export async function readLegacyDepartureRows(
   tx: ReadTransaction,
   scope: IndexedTimetableScope,
   destinationIds: string[],

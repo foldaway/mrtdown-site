@@ -84,6 +84,9 @@ import {
 } from '~/workflows/pull/helpers/stagingSync';
 import * as database from './database';
 import { buildDataset } from './dataset';
+import { publishArrivalDepartures } from '~/workflows/pull/helpers/publishArrivalDepartures';
+import { acquireOrRenewPullWorkflowLease } from '~/workflows/pull/helpers/workflowLease';
+import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
 import { withSelectedScheduledTimetable } from './withSelectedScheduledTimetable';
 import {
   parseArrivalInputs,
@@ -94,6 +97,9 @@ import { createTimetableSelectionPolicy } from './scheduledTimetableSelection';
 import { buildLineSummary, buildUptimeGraph } from './lineAnalytics';
 import { buildLineOperationalFactRows } from './operationalFacts';
 import { projectScheduledTimetable } from './projectScheduledTimetable';
+import { readDeparturePartition } from './readDeparturePartition';
+import { readPartitionDepartureRows } from './departurePartition';
+import { readLegacyDepartureRows } from './queryIndexedScheduledDepartures';
 import { queryIndexedScheduledDepartures } from './queryIndexedScheduledDepartures';
 import * as liveTopology from './readLiveScheduleTopology';
 import { readLiveScheduleTopology } from './readLiveScheduleTopology';
@@ -319,6 +325,7 @@ describe.skipIf(!url)('indexed departure window', () => {
       '20260518155031_curious_vision',
       '20260521104213_busy_midnight',
       '20260529122429_spicy_zombie',
+      '20260711165111_freezing_fallen_one',
       '20260721025518_milky_absorbing_man',
       '20260721032337_soft_crystal',
       '20260721035821_sloppy_lady_deathstrike',
@@ -414,6 +421,194 @@ describe.skipIf(!url)('indexed departure window', () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it('compacts dated legacy calls without changing windows, platforms or untimed counts', async () => {
+    const indexed = await db().select().from(projections);
+    for (const projection of indexed) {
+      await db().transaction(async (tx) => {
+        const partition = await readDeparturePartition(
+          tx,
+          {
+            projectionId: projection.id,
+            stationId: scope.stationId,
+          },
+          projection.projector_version,
+        );
+        const normalize = (rows: Record<string, unknown>[]) =>
+          rows
+            .map((row) => {
+              const {
+                service_id: _service,
+                revision_id: _revision,
+                platform_ids: _platforms,
+                platform_semantics: _semantics,
+                ...rest
+              } = row;
+              return {
+                ...rest,
+                arrival_instant: rest.arrival_instant
+                  ? new Date(String(rest.arrival_instant)).toISOString()
+                  : null,
+                departure_instant: rest.departure_instant
+                  ? new Date(String(rest.departure_instant)).toISOString()
+                  : null,
+              };
+            })
+            .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+        for (const date of [
+          '2026-10-24',
+          '2026-10-25',
+          '2026-10-26',
+          '2026-10-27',
+        ]) {
+          const lower = `${date}T00:00:00+08:00`;
+          const upper = new Date(
+            Date.parse(lower) + 48 * 3600_000,
+          ).toISOString();
+          for (const selected of [
+            scope,
+            { ...scope, platformId: 'not-a-platform' },
+          ]) {
+            const cached = readPartitionDepartureRows(
+              partition,
+              selected,
+              [scope.destinationStationId],
+              date,
+              lower,
+              upper,
+            );
+            const original = await readLegacyDepartureRows(
+              tx,
+              selected,
+              [scope.destinationStationId],
+              projection.id,
+              date,
+              lower,
+              upper,
+            );
+            expect(cached.untimed).toEqual(original.untimed);
+            expect(normalize(cached.rows)).toEqual(normalize(original.rows));
+          }
+        }
+      });
+    }
+    const [call] = await db().select().from(occurrences).limit(1);
+    if (!call) throw Error('Missing legacy departure fixture');
+    await db()
+      .update(occurrences)
+      .set({
+        departure_instant: sql`${occurrences.departure_instant} + interval '1 second'`,
+      })
+      .where(
+        and(
+          eq(occurrences.projection_id, call.projection_id),
+          eq(occurrences.service_date, call.service_date),
+          eq(occurrences.provider_trip_id, call.provider_trip_id),
+          eq(occurrences.stop_sequence, call.stop_sequence),
+        ),
+      );
+    await expect(
+      db().transaction((tx) =>
+        readDeparturePartition(
+          tx,
+          {
+            projectionId: call.projection_id,
+            stationId: call.station_id,
+          },
+          1,
+        ),
+      ),
+    ).rejects.toThrow('instants do not match source offsets');
+  });
+
+  it.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
+    'resumes departure publication and rejects a changed source frontier',
+    async () => {
+      vi.stubEnv('TIER', schema);
+      vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
+      vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+      vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', 'publish');
+      vi.spyOn(database, 'getDefaultDb').mockResolvedValue(db());
+      const redis = await getPageProfileRedis();
+      const prefixes = [
+        getSnapshotKeyPrefix('arrival-inputs'),
+        getSnapshotKeyPrefix('arrival-departures'),
+      ];
+      const owner = randomUUID();
+      const fingerprint = 'a'.repeat(64);
+      try {
+        await completePageProfileGeneration(db(), 'departures-fixture');
+        await recordCanonicalManifestFingerprint(db(), fingerprint);
+        await publishArrivalInputSnapshot();
+        await acquireOrRenewPullWorkflowLease(db(), owner);
+        const prepare = arrivalDepartureStore.prepare;
+        const spy = vi.spyOn(arrivalDepartureStore, 'prepare');
+        spy
+          .mockImplementationOnce(prepare)
+          .mockRejectedValueOnce(Error('interrupted write'));
+        const outputs = new Map<string, unknown>();
+        const run = async <T>(
+          name: string,
+          callback: () => Promise<T>,
+        ): Promise<T> => {
+          if (!outputs.has(name))
+            outputs.set(name, JSON.parse(JSON.stringify(await callback())));
+          return outputs.get(name) as T;
+        };
+        await expect(
+          publishArrivalDepartures(run, owner, fingerprint),
+        ).rejects.toThrow('interrupted write');
+        expect(
+          (await arrivalDepartureStore.manifest.head()).value,
+        ).toBeUndefined();
+        const prepared = spy.mock.calls[0][0];
+        spy.mockImplementation(prepare);
+        await publishArrivalDepartures(run, owner, fingerprint);
+        expect(
+          spy.mock.calls.filter(
+            ([part]) =>
+              part.projectionId === prepared.projectionId &&
+              part.stationId === prepared.stationId,
+          ),
+        ).toHaveLength(1);
+        const published = await arrivalDepartureStore.manifest.read();
+        if (!published) throw Error('Missing departure manifest');
+        expect(await arrivalDepartureStore.ready(published)).toBe(true);
+        for (const ref of published.inputs.partitions)
+          expect(
+            await arrivalDepartureStore.readPartition(published, ref),
+          ).not.toBeNull();
+
+        outputs.clear();
+        spy.mockImplementationOnce(async (partition, remaining) => {
+          const result = await prepare(partition, remaining);
+          await db()
+            .update(projections)
+            .set({ completed_at: '2026-10-28T00:00:00Z' })
+            .where(eq(projections.id, partition.projectionId));
+          return result;
+        });
+        await expect(
+          publishArrivalDepartures(run, owner, fingerprint),
+        ).rejects.toThrow('projection changed');
+        expect((await arrivalDepartureStore.manifest.head()).raw).toEqual(
+          published.raw,
+        );
+        await expect(
+          publishArrivalDepartures(
+            async (_name, callback) => callback(),
+            'wrong-owner',
+            fingerprint,
+          ),
+        ).rejects.toThrow('lease lost');
+      } finally {
+        for (const prefix of prefixes) {
+          const keys = await redis.keys(`${prefix}:*`);
+          if (keys.length) await redis.del(...keys);
+        }
+      }
+    },
+  );
 
   it.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
     'publishes reusable arrival metadata and retains the head across interrupted rebuilds',

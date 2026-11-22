@@ -300,7 +300,7 @@ for remaining wake-ups and eventual provider-level acceptance.
 `REDIS_ARRIVAL_SNAPSHOT=publish` publishes admission history, attested canonical
 topology, projection headers, coverage days/scopes and display names during a
 completed pull. Unset disables it. This tranche has no public reader and does
-not cache departures or recent rider reports; arrivals still use SQL.
+not serve departures or recent rider reports; arrivals still use SQL.
 
 The publisher captures these inputs together in a read-only repeatable-read
 transaction. It verifies the topology attestation and retained admission chain,
@@ -323,6 +323,48 @@ snapshot with the same generation and fingerprint preserves the SQL-free
 unchanged-pull path. Check `arrival_inputs_published`, payload size and a cold
 validated read before considering a future serving flag. Unset this flag to
 stop publication; no public arrival behavior changes in this tranche.
+
+## Published departure partitions
+
+`REDIS_ARRIVAL_DEPARTURES=publish` adds the departure producer and requires
+`REDIS_ARRIVAL_SNAPSHOT=publish`. Both flags default off. Public arrivals still
+use SQL; serving cached departures and caching recent rider reports are separate
+steps in the [Neon sleep plan](../plans/active/neon-sleep.md#arrivals-follow-up).
+
+Each station/projection partition groups identical calls across their explicit
+service dates. It retains source offsets, opaque stop sequences, shared service
+memberships, platform alternatives and untimed calls. Instants are reconstructed
+with the canonical Singapore service-day helper; publication rejects SQL rows
+that do not match that time base. Coverage and reviewed rollback remain the
+arrival metadata policy's responsibility, including zero-active dates.
+
+The pull publishes one station per durable step under its renewed SQL lease.
+Each read checks the completed generation, topology attestation and projection
+header in a read-only repeatable-read transaction with a 15-second statement
+timeout. Activation rechecks the source frontier and atomically persists every
+partition with its manifest, bound to the metadata payload hash. Purge and the
+external completion checkpoint follow activation. A healthy unchanged preflight
+checks matching identities, partition existence and the repair marker without
+SQL. A future partition reader can mark detected corruption for repair.
+
+Limits are 1,000 partitions, 20,000 unique calls per partition, 8 MiB expanded
+JSON and 2 MiB encoded per partition, and 64 MiB total active encoded partitions.
+A violation preserves the previous manifest. Active parts have no TTL; pending
+parts and superseded parts expire after 24 hours. A run interrupted beyond that
+retention period must restart with a new pull if activation finds an expired
+part. Lost/corrupt manifests can leave unreferenced persistent parts; investigate
+those explicitly rather than deleting keys still used by a current manifest.
+
+For publish-only staging validation, deploy with both flags unset, enable the
+two producers, then trigger an authenticated empty pull. Check
+`arrival_departures_published`, total encoded bytes, cold partition reads and
+SQL parity for active/empty dates, shared/platform calls and overnight tails.
+Repeat the unchanged pull and verify external preflight finishes before SQL
+lease acquisition. November 22 production table sizing found about 5.3 million
+occurrences and 5.4 million memberships occupying 1.7 GB including indexes; it
+does not establish the compressed partition size or staging query latency.
+Measure both before production publication. Unset the departure flag to stop
+its producer independently; it does not change public arrival responses.
 
 ## Redis usage evidence
 
