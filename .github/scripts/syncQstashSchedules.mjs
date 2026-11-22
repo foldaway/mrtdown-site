@@ -35,14 +35,21 @@ function normalizeRootUrl(value) {
   return url.origin;
 }
 
-export function buildManagedSchedules({ internalApiToken, rootUrl, tier }) {
+export function buildManagedSchedules({
+  internalApiToken,
+  rootUrl,
+  tier,
+  pullWorkflowUrl,
+}) {
   const prefix = `mrtdown-${tier}`;
   const origin = normalizeRootUrl(rootUrl);
 
   return [
     {
       scheduleId: `${prefix}-pull`,
-      destination: new URL('/internal/api/workflows/pull', origin).toString(),
+      destination:
+        pullWorkflowUrl ||
+        new URL('/internal/api/workflows/pull', origin).toString(),
       cron: PULL_CRON,
       retries: 3,
       label: `${prefix}-pull`,
@@ -158,6 +165,7 @@ async function main() {
   const dryRun = process.argv.includes('--dry-run');
   const schedules = buildManagedSchedules({
     tier: parseDeploymentTier(process.env.TIER),
+    pullWorkflowUrl: process.env.PULL_WORKFLOW_URL,
     rootUrl: assertNonEmpty(process.env.VITE_ROOT_URL, 'VITE_ROOT_URL'),
     internalApiToken: assertNonEmpty(
       process.env.INTERNAL_API_TOKEN,

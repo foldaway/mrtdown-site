@@ -16,6 +16,7 @@ vi.mock('~/workflows/client', () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('VITE_ROOT_URL', 'https://www.mrtdown.org');
+  vi.stubEnv('PULL_WORKFLOW_URL', '');
 });
 
 describe('canonical pull completion receipt', () => {
@@ -112,6 +113,39 @@ describe('canonical pull completion receipt', () => {
     });
     expect((await get()).status).toBe(502);
   });
+
+  it('recognizes runs at the direct origin and preserves old public receipts', async () => {
+    const directUrl =
+      'https://mrtdown-site.fly.dev/internal/api/workflows/pull';
+    vi.stubEnv('PULL_WORKFLOW_URL', directUrl);
+    logs.mockResolvedValueOnce({ runs: [] }).mockResolvedValueOnce({
+      runs: [
+        {
+          workflowRunId: 'wfr_test',
+          workflowUrl,
+          workflowState: 'RUN_SUCCESS',
+          workflowRunResponse: JSON.stringify({ combinedReleaseIndex }),
+        },
+      ],
+    });
+    expect((await (await get()).json()).combinedReleaseIndex).toEqual(
+      combinedReleaseIndex,
+    );
+    expect(logs.mock.calls.map(([value]) => value.filter.workflowUrl)).toEqual([
+      directUrl,
+      workflowUrl,
+    ]);
+    logs.mockResolvedValueOnce({
+      runs: [
+        {
+          workflowRunId: 'wfr_test',
+          workflowUrl: directUrl,
+          workflowState: 'RUN_STARTED',
+        },
+      ],
+    });
+    expect((await (await get()).json()).state).toBe('RUN_STARTED');
+  });
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -125,6 +159,15 @@ function post(body?: string) {
 }
 
 describe('canonical pull trigger payload', () => {
+  it('uses the configured direct origin for signed pull callbacks', async () => {
+    const url = 'https://mrtdown-site.fly.dev/internal/api/workflows/pull';
+    vi.stubEnv('PULL_WORKFLOW_URL', url);
+    expect((await post('{}')).status).toBe(202);
+    expect(
+      vi.mocked(getClient).mock.results[0].value.trigger,
+    ).toHaveBeenCalledWith(expect.objectContaining({ url }));
+  });
+
   it.each([undefined, '{}'])(
     'accepts an empty pull request: %s',
     async (body) => {
