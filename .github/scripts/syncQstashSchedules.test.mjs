@@ -7,6 +7,17 @@ import {
 } from './syncQstashSchedules.mjs';
 
 describe('QStash schedule synchronization', () => {
+  it('treats an empty optional pull URL as unset', () => {
+    const schedules = buildManagedSchedules({
+      tier: 'production',
+      rootUrl: 'https://www.mrtdown.org',
+      internalApiToken: 'schedule-secret',
+      pullWorkflowUrl: '',
+    });
+    expect(schedules[0].destination).toBe(
+      'https://www.mrtdown.org/internal/api/workflows/pull',
+    );
+  });
   it('uses the direct workflow origin only for timetable pulls', () => {
     const schedules = buildManagedSchedules({
       tier: 'production',

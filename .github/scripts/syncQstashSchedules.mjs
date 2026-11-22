@@ -48,7 +48,7 @@ export function buildManagedSchedules({
     {
       scheduleId: `${prefix}-pull`,
       destination:
-        pullWorkflowUrl ??
+        pullWorkflowUrl ||
         new URL('/internal/api/workflows/pull', origin).toString(),
       cron: PULL_CRON,
       retries: 3,
