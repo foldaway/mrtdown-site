@@ -300,7 +300,7 @@ for remaining wake-ups and eventual provider-level acceptance.
 `REDIS_ARRIVAL_SNAPSHOT=publish` publishes admission history, attested canonical
 topology, projection headers, coverage days/scopes and display names during a
 completed pull. Unset disables it. This tranche has no public reader and does
-not cache departures or recent rider reports; arrivals still use SQL.
+not serve departures or recent rider reports; arrivals still use SQL.
 
 The publisher captures these inputs together in a read-only repeatable-read
 transaction. It verifies the topology attestation and retained admission chain,
@@ -323,6 +323,29 @@ snapshot with the same generation and fingerprint preserves the SQL-free
 unchanged-pull path. Check `arrival_inputs_published`, payload size and a cold
 validated read before considering a future serving flag. Unset this flag to
 stop publication; no public arrival behavior changes in this tranche.
+
+## Published departure partitions
+
+`REDIS_ARRIVAL_DEPARTURES=publish` requires `REDIS_ARRIVAL_SNAPSHOT=publish`.
+Both default off. This publishes compact station/projection partitions; public
+arrivals still use SQL. Explicit source dates, shared memberships, platforms,
+unknown timing and overnight offsets are retained.
+
+The pull publishes one station per durable step, then atomically activates a
+manifest tied to the arrival metadata. Purge and checkpoint completion follow.
+Limits are 1,000 partitions, 20,000 distinct calls per partition, 8 MiB expanded
+and 2 MiB encoded per partition, and 64 MiB total encoded partitions. Failures
+preserve the previous manifest. Active parts persist; pending and retired parts
+expire after 24 hours. Restart the pull if pending parts expire before activation.
+
+For staging validation, deploy with flags unset, enable both producers and
+trigger an authenticated empty pull. Check `arrival_departures_published`, total
+bytes and publication latency; repeat the unchanged pull and confirm it finishes
+before SQL lease acquisition. Production table/index sizing was about 1.7 GB;
+compressed payload size and staging latency remain unmeasured. Validate both
+before production publication. Unset the departure flag to stop its producer.
+The [Neon sleep plan](../plans/active/neon-sleep.md#arrivals-follow-up) tracks
+rider-report caching and public serving separately.
 
 ## Redis usage evidence
 

@@ -52,3 +52,20 @@ export async function releasePullWorkflowLease(db: AppDb, owner: string) {
       ),
     );
 }
+
+export async function assertPullWorkflowLease(
+  db: Pick<AppDb, 'select'>,
+  owner: string,
+) {
+  const leases = await db
+    .select({ owner: workflowLeasesTable.owner })
+    .from(workflowLeasesTable)
+    .where(
+      and(
+        eq(workflowLeasesTable.key, PULL_WORKFLOW_LEASE_KEY),
+        eq(workflowLeasesTable.owner, owner),
+        sql`${workflowLeasesTable.expires_at} > now()`,
+      ),
+    );
+  if (!leases.length) throw new Error('Canonical pull workflow lease lost');
+}

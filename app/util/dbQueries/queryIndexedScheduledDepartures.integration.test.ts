@@ -84,6 +84,9 @@ import {
 } from '~/workflows/pull/helpers/stagingSync';
 import * as database from './database';
 import { buildDataset } from './dataset';
+import { publishArrivalDepartures } from '~/workflows/pull/helpers/publishArrivalDepartures';
+import { acquireOrRenewPullWorkflowLease } from '~/workflows/pull/helpers/workflowLease';
+import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
 import { withSelectedScheduledTimetable } from './withSelectedScheduledTimetable';
 import {
   parseArrivalInputs,
@@ -94,6 +97,13 @@ import { createTimetableSelectionPolicy } from './scheduledTimetableSelection';
 import { buildLineSummary, buildUptimeGraph } from './lineAnalytics';
 import { buildLineOperationalFactRows } from './operationalFacts';
 import { projectScheduledTimetable } from './projectScheduledTimetable';
+import { readDeparturePartition } from './readDeparturePartition';
+import {
+  expandDeparturePartition,
+  parseDeparturePartition,
+  DEPARTURE_PARTITION_LIMITS,
+} from './departurePartition';
+import { decodeSnapshotPayload } from '~/util/snapshotPayload.server';
 import { queryIndexedScheduledDepartures } from './queryIndexedScheduledDepartures';
 import * as liveTopology from './readLiveScheduleTopology';
 import { readLiveScheduleTopology } from './readLiveScheduleTopology';
@@ -319,6 +329,7 @@ describe.skipIf(!url)('indexed departure window', () => {
       '20260518155031_curious_vision',
       '20260521104213_busy_midnight',
       '20260529122429_spicy_zombie',
+      '20260711165111_freezing_fallen_one',
       '20260721025518_milky_absorbing_man',
       '20260721032337_soft_crystal',
       '20260721035821_sloppy_lady_deathstrike',
@@ -414,6 +425,140 @@ describe.skipIf(!url)('indexed departure window', () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
+    'resumes departure publication and rejects a changed source frontier',
+    async () => {
+      vi.stubEnv('TIER', schema);
+      vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
+      vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+      vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', 'publish');
+      vi.spyOn(database, 'getDefaultDb').mockResolvedValue(db());
+      const redis = await getPageProfileRedis();
+      const prefixes = [
+        getSnapshotKeyPrefix('arrival-inputs'),
+        getSnapshotKeyPrefix('arrival-departures'),
+      ];
+      const owner = randomUUID();
+      const fingerprint = 'a'.repeat(64);
+      try {
+        await completePageProfileGeneration(db(), 'departures-fixture');
+        await recordCanonicalManifestFingerprint(db(), fingerprint);
+        await publishArrivalInputSnapshot();
+        await acquireOrRenewPullWorkflowLease(db(), owner);
+        const prepare = arrivalDepartureStore.prepare;
+        const spy = vi.spyOn(arrivalDepartureStore, 'prepare');
+        spy
+          .mockImplementationOnce(prepare)
+          .mockRejectedValueOnce(Error('interrupted write'));
+        const outputs = new Map<string, unknown>();
+        const run = async <T>(
+          name: string,
+          callback: () => Promise<T>,
+        ): Promise<T> => {
+          if (!outputs.has(name))
+            outputs.set(name, JSON.parse(JSON.stringify(await callback())));
+          return outputs.get(name) as T;
+        };
+        await expect(
+          publishArrivalDepartures(run, owner, fingerprint),
+        ).rejects.toThrow('interrupted write');
+        expect(
+          (await arrivalDepartureStore.manifest.head()).value,
+        ).toBeUndefined();
+        const prepared = spy.mock.calls[0][0];
+        spy.mockImplementation(prepare);
+        await publishArrivalDepartures(run, owner, fingerprint);
+        expect(
+          spy.mock.calls.filter(
+            ([part]) =>
+              part.projectionId === prepared.projectionId &&
+              part.stationId === prepared.stationId,
+          ),
+        ).toHaveLength(1);
+        const published = await arrivalDepartureStore.manifest.read();
+        if (!published) throw Error('Missing departure manifest');
+        expect(await arrivalDepartureStore.ready(published)).toBe(true);
+        for (const ref of published.inputs.partitions) {
+          const encoded = await redis.getrange(
+            `${prefixes[1]}:partition:${ref.sha256}`,
+            0,
+            DEPARTURE_PARTITION_LIMITS.encodedBytes,
+          );
+          const partition = decodeSnapshotPayload(
+            encoded,
+            ref.sha256,
+            parseDeparturePartition,
+            DEPARTURE_PARTITION_LIMITS,
+          );
+          expect(partition).toMatchObject({
+            projectionId: ref.projectionId,
+            stationId: ref.stationId,
+          });
+          const [source] = await db()
+            .select()
+            .from(occurrences)
+            .where(
+              and(
+                eq(occurrences.projection_id, ref.projectionId),
+                eq(occurrences.station_id, ref.stationId),
+              ),
+            )
+            .limit(1);
+          if (source) {
+            const {
+              service_id,
+              revision_id,
+              platform_ids,
+              arrival_instant: _arrival,
+              departure_instant: _departure,
+              ...call
+            } = source;
+            expect([...expandDeparturePartition(partition)]).toContainEqual(
+              expect.objectContaining({
+                ...call,
+                boardingByService: [
+                  {
+                    serviceId: service_id,
+                    revisionId: revision_id,
+                    platformIds: platform_ids,
+                  },
+                ],
+              }),
+            );
+          }
+        }
+
+        outputs.clear();
+        spy.mockImplementationOnce(async (partition, remaining) => {
+          const result = await prepare(partition, remaining);
+          await db()
+            .update(projections)
+            .set({ completed_at: '2026-10-28T00:00:00Z' })
+            .where(eq(projections.id, partition.projectionId));
+          return result;
+        });
+        await expect(
+          publishArrivalDepartures(run, owner, fingerprint),
+        ).rejects.toThrow('projection changed');
+        expect((await arrivalDepartureStore.manifest.head()).raw).toEqual(
+          published.raw,
+        );
+        await expect(
+          publishArrivalDepartures(
+            async (_name, callback) => callback(),
+            'wrong-owner',
+            fingerprint,
+          ),
+        ).rejects.toThrow('lease lost');
+      } finally {
+        for (const prefix of prefixes) {
+          const keys = await redis.keys(`${prefix}:*`);
+          if (keys.length) await redis.del(...keys);
+        }
+      }
+    },
+  );
 
   it.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
     'publishes reusable arrival metadata and retains the head across interrupted rebuilds',

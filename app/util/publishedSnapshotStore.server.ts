@@ -1,14 +1,18 @@
 import { isUtf8 } from 'node:buffer';
-import { createHash, randomUUID } from 'node:crypto';
-import { gunzipSync, gzipSync } from 'node:zlib';
+import { randomUUID } from 'node:crypto';
 import type Redis from 'ioredis';
 import { z } from 'zod';
 
-const MAX_ENCODED_BYTES = 4 * 1024 * 1024;
-const MAX_JSON_BYTES = 24 * 1024 * 1024;
+import {
+  DEFAULT_SNAPSHOT_LIMITS,
+  decodeSnapshotPayload,
+  encodeSnapshotPayload,
+  snapshotDigest,
+} from './snapshotPayload.server';
+
+const MAX_ENCODED_BYTES = DEFAULT_SNAPSHOT_LIMITS.encodedBytes;
 const PREVIOUS_RETENTION_SECONDS = 24 * 60 * 60;
 const MAX_HEAD_BYTES = 2048;
-const digest = (raw: string) => createHash('sha256').update(raw).digest('hex');
 const HeadSchema = z.object({
   version: z.literal(1),
   publicationId: z.uuid(),
@@ -22,7 +26,10 @@ export type SnapshotRedis = Pick<
   Redis,
   'getrange' | 'getrangeBuffer' | 'set' | 'eval' | 'del'
 >;
-export type SnapshotNamespace = 'range-snapshot' | 'arrival-inputs';
+export type SnapshotNamespace =
+  | 'range-snapshot'
+  | 'arrival-inputs'
+  | 'arrival-departures';
 
 export function getSnapshotKeyPrefix(namespace: SnapshotNamespace) {
   const tier = process.env.TIER ?? 'development';
@@ -48,9 +55,22 @@ const PUBLISH = `
 local current = redis.call('GET', KEYS[1]) or ''
 if string.len(current) > ${MAX_HEAD_BYTES} then current = string.sub(current, 1, ${MAX_HEAD_BYTES + 1}) end
 if current ~= ARGV[1] then return 0 end
+local activeCount = tonumber(ARGV[5]) or 0
+for i = 4, 3 + activeCount do
+  if redis.call('EXISTS', KEYS[i]) == 0 then return -1 end
+end
 redis.call('SET', KEYS[2], ARGV[4])
 redis.call('SET', KEYS[1], ARGV[2])
 if KEYS[3] ~= KEYS[2] then redis.call('EXPIRE', KEYS[3], ARGV[3]) end
+local active = {}
+for i = 4, 3 + activeCount do
+  active[KEYS[i]] = true
+  redis.call('PERSIST', KEYS[i])
+end
+local previousCount = tonumber(ARGV[6]) or 0
+for i = 4 + activeCount, 3 + activeCount + previousCount do
+  if not active[KEYS[i]] then redis.call('EXPIRE', KEYS[i], ARGV[3]) end
+end
 return 1`;
 
 export function createPublishedSnapshotStore<T>(
@@ -91,13 +111,12 @@ export function createPublishedSnapshotStore<T>(
       );
       if (!encoded || Buffer.byteLength(encoded) > MAX_ENCODED_BYTES)
         return null;
-      if (digest(encoded) !== hash) return null;
+      if (snapshotDigest(encoded) !== hash) return null;
       if (memo?.hash !== hash) {
-        if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) return null;
-        const json = gunzipSync(Buffer.from(encoded, 'base64'), {
-          maxOutputLength: MAX_JSON_BYTES,
-        }).toString('utf8');
-        memo = { hash, inputs: parseInputs(JSON.parse(json)) };
+        memo = {
+          hash,
+          inputs: decodeSnapshotPayload(encoded, hash, parseInputs),
+        };
       }
       return {
         ...current,
@@ -116,40 +135,51 @@ export function createPublishedSnapshotStore<T>(
     inputs: T,
     generation: string,
     fingerprint: string,
+    dependencies?: { active: string[]; previous: string[] },
   ) {
-    const normalized = parseInputs(inputs);
-    const json = JSON.stringify(normalized);
-    if (Buffer.byteLength(json) > MAX_JSON_BYTES)
-      throw new Error('Snapshot exceeds JSON limit');
-    const encoded = gzipSync(json).toString('base64');
-    if (Buffer.byteLength(encoded) > MAX_ENCODED_BYTES)
-      throw new Error('Snapshot exceeds Redis limit');
+    const { encoded, sha256, bytes } = encodeSnapshotPayload(
+      inputs,
+      parseInputs,
+    );
     const next = HeadSchema.parse({
       version: 1,
       publicationId: randomUUID(),
-      sha256: digest(encoded),
+      sha256,
       generation,
       fingerprint,
     });
     const redis = await connect();
     const key = payloadKey(next.sha256);
     const previous = parseHead(expectedRawHead);
+    const dependencyKeys = dependencies
+      ? [...dependencies.active, ...dependencies.previous].map((hash) => {
+          if (!/^[a-f0-9]{64}$/.test(hash))
+            throw new Error('Invalid partition hash');
+          return `${prefix()}:partition:${hash}`;
+        })
+      : [];
     const result = await redis.eval(
       PUBLISH,
-      3,
+      3 + dependencyKeys.length,
       headKey(),
       key,
       previous ? payloadKey(previous.sha256) : key,
+      ...dependencyKeys,
       expectedRawHead,
       JSON.stringify(next),
       PREVIOUS_RETENTION_SECONDS,
       encoded,
+      ...(dependencies
+        ? [dependencies.active.length, dependencies.previous.length]
+        : []),
     );
+    if (result === -1)
+      throw new Error('Snapshot partition missing before activation');
     if (result !== 1)
       throw new Error(
         'Snapshot publication superseded; retry from current SQL state',
       );
-    return { ...next, bytes: Buffer.byteLength(encoded) };
+    return { ...next, bytes };
   }
 
   return { read, head, publish };

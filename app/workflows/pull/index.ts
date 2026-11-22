@@ -5,6 +5,7 @@ import {
 } from '@upstash/workflow';
 import { createWorkflow } from '@upstash/workflow/tanstack';
 import { ZipStore } from '~/helpers/ZipStore.js';
+import { isArrivalDeparturePublicationEnabled } from '~/util/arrivalDepartureStore.server.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import {
   isArrivalInputPublicationEnabled,
@@ -43,6 +44,7 @@ import {
   readCanonicalManifestFingerprint,
   recordCanonicalManifestFingerprint,
 } from './helpers/manifestFingerprint.js';
+import { publishArrivalDepartures } from './helpers/publishArrivalDepartures.js';
 import { canSkipPublishedCanonicalPull } from './helpers/publishedInputs.js';
 import {
   type PullParams,
@@ -100,7 +102,7 @@ async function publishPullCaches(generation: string, fingerprint?: string) {
   if (isArrivalInputPublicationEnabled()) {
     await publishArrivalInputSnapshot(fingerprint);
   }
-  return purgePublicDataCache();
+  if (!isArrivalDeparturePublicationEnabled()) return purgePublicDataCache();
 }
 
 async function runPullStep<T>(
@@ -120,6 +122,21 @@ async function runPullStep<T>(
     }
     return callback();
   });
+}
+
+async function publishDepartureCaches(
+  context: WorkflowContext<PullParams>,
+  fingerprint: string,
+) {
+  if (!isArrivalDeparturePublicationEnabled()) return;
+  await publishArrivalDepartures(
+    (name, callback) => runPullStep(context, name, callback),
+    context.workflowRunId,
+    fingerprint,
+  );
+  await runPullStep(context, 'purge-departure-publication', () =>
+    purgePublicDataCache(),
+  );
 }
 
 /**
@@ -163,19 +180,26 @@ async function executePull(
     return;
   }
   if (params.seedNavigationCache) {
-    await runPullStep(context, 'seed-navigation-cache', async () => {
-      if (!isPageProfilePublicationEnabled()) {
-        throw new WorkflowNonRetryableError(
-          'Navigation cache publication is disabled',
-        );
-      }
-      if (!(await readCanonicalManifestFingerprint(getDb()))) {
-        throw new WorkflowNonRetryableError(
-          'Navigation cache seed requires a completed canonical pull',
-        );
-      }
-      return publishPullCaches(context.workflowRunId);
-    });
+    const fingerprint = await runPullStep(
+      context,
+      'seed-navigation-cache',
+      async () => {
+        if (!isPageProfilePublicationEnabled()) {
+          throw new WorkflowNonRetryableError(
+            'Navigation cache publication is disabled',
+          );
+        }
+        const fingerprint = await readCanonicalManifestFingerprint(getDb());
+        if (!fingerprint) {
+          throw new WorkflowNonRetryableError(
+            'Navigation cache seed requires a completed canonical pull',
+          );
+        }
+        await publishPullCaches(context.workflowRunId, fingerprint);
+        return fingerprint;
+      },
+    );
+    await publishDepartureCaches(context, fingerprint);
     return;
   }
 
@@ -238,10 +262,20 @@ async function executePull(
           await publishRangeSnapshot(manifestFingerprint);
         if (isArrivalInputPublicationEnabled())
           await publishArrivalInputSnapshot(manifestFingerprint);
-        await purgePublicDataCache();
-        if (isRangeSnapshotPublicationEnabled())
-          await rangeSnapshotStore.complete(manifestFingerprint);
+        if (!isArrivalDeparturePublicationEnabled()) {
+          await purgePublicDataCache();
+          if (isRangeSnapshotPublicationEnabled())
+            await rangeSnapshotStore.complete(manifestFingerprint);
+        }
       });
+      await publishDepartureCaches(context, manifestFingerprint);
+      if (
+        isArrivalDeparturePublicationEnabled() &&
+        isRangeSnapshotPublicationEnabled()
+      )
+        await runPullStep(context, 'complete-departure-repair', () =>
+          rangeSnapshotStore.complete(manifestFingerprint),
+        );
     }
     if (isServicePathCachePublicationEnabled()) {
       await runPullStep(context, 'renew-service-path-cache', () =>
@@ -533,6 +567,8 @@ async function executePull(
     publishPullCaches(context.workflowRunId, manifestFingerprint),
   );
 
+  await publishDepartureCaches(context, manifestFingerprint);
+
   await runPullStep(context, 'record-manifest-fingerprint', async () => {
     await recordCanonicalManifestFingerprint(getDb(), manifestFingerprint);
     if (isRangeSnapshotPublicationEnabled()) {
@@ -558,6 +594,13 @@ export const pullWorkflow = createWorkflow<
       throw new WorkflowNonRetryableError('Invalid canonical pull request');
     }
     const params = parsed.data;
+    if (
+      isArrivalDeparturePublicationEnabled() &&
+      !isArrivalInputPublicationEnabled()
+    )
+      throw new WorkflowNonRetryableError(
+        'Departure publication requires arrival metadata publication',
+      );
     if (isRangeSnapshotPublicationEnabled()) {
       const unchanged = await context.run('check-published-range-inputs', () =>
         canSkipPublishedCanonicalPull(params),
