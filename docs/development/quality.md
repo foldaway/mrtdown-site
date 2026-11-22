@@ -15,7 +15,9 @@ Run `npm run verify` before handing off or publishing a change. CI runs the
   The tests create and drop their own schemas. A connection URL with an
   `options` parameter can override their schema selection. Local runs without
   the variable skip these tests.
-- **Published range snapshots.** Set `TEST_SNAPSHOT_REDIS_URL` to a disposable
+- **Published snapshots.** Set `TEST_SNAPSHOT_REDIS_URL` to a disposable
   local Redis/Valkey instance. Tests use an isolated key prefix and remove only
   their own keys. CI supplies both Redis and PostGIS; the range parity tests
-  verify that snapshot hits succeed with SQL access disabled.
+  verify that snapshot hits succeed with SQL access disabled. Arrival metadata
+  checks combine the same Redis service with an isolated PostGIS schema and
+  compare cached selection decisions with the existing SQL reader.

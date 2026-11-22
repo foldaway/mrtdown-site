@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { access, mkdtemp, readdir, readFile } from 'node:fs/promises';
 import type { Manifest, ScheduledTimetableSourceReview } from '@mrtdown/core';
-import { hashBytes, type ScheduledTimetableRollbackOptions } from '@mrtdown/fs';
+import {
+  hashBytes,
+  type ScheduledTimetableRollbackOptions,
+  ScheduledTimetableRequestScopeSchema,
+} from '@mrtdown/fs';
 import type { WorkflowContext } from '@upstash/workflow';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { zipSync } from 'fflate';
@@ -21,6 +25,14 @@ import { completePageProfileGeneration } from '~/db/pageProfileGeneration';
 import { relations } from '~/db/relations';
 import { ZipStore } from '~/helpers/ZipStore';
 import { purgePublicDataCache } from '~/util/cloudflareCache';
+import { publishArrivalInputSnapshot } from '~/util/arrivalInputSnapshot.server';
+import {
+  parseArrivalInputs,
+  readArrivalInputHistory,
+  selectArrivalInputCoverage,
+} from '~/util/dbQueries/arrivalInputs';
+import { readArrivalInputs } from '~/util/dbQueries/readArrivalInputs';
+import { createTimetableSelectionPolicy } from '~/util/dbQueries/scheduledTimetableSelection';
 import {
   COMBINED_DEPARTURE_PROJECTOR_VERSION,
   projectScheduledTimetable,
@@ -64,13 +76,26 @@ const state = vi.hoisted(() => ({
     | undefined
     | ((args: { context: WorkflowContext<PullParams> }) => Promise<void>),
   fingerprint: undefined as string | undefined,
+  arrivalHead: undefined as
+    | { fingerprint: string; generation: string }
+    | undefined,
 }));
 vi.mock('~/util/rangeSnapshot.server', () => ({
   publishRangeSnapshot: vi.fn(async () => {}),
 }));
+vi.mock('~/util/arrivalInputSnapshot.server', async (original) => ({
+  ...(await original<typeof import('~/util/arrivalInputSnapshot.server')>()),
+  publishArrivalInputSnapshot: vi.fn(async () => {}),
+  arrivalInputSnapshotStore: {
+    read: vi.fn(async () =>
+      state.arrivalHead ? { value: state.arrivalHead } : null,
+    ),
+  },
+}));
 vi.mock('~/util/rangeSnapshotStore.server', async (original) => ({
   ...(await original<typeof import('~/util/rangeSnapshotStore.server')>()),
   rangeSnapshotStore: {
+    head: vi.fn(async () => ({ raw: '', value: { generation: 'complete' } })),
     isCurrent: vi.fn(async () => false),
     complete: vi.fn(async () => {}),
     invalidateCompletion: vi.fn(async () => {}),
@@ -295,9 +320,11 @@ beforeEach(() => {
   vi.stubEnv('REDIS_SERVICE_PATH_CACHE', undefined);
   vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', undefined);
   vi.stubEnv('REDIS_RANGE_SNAPSHOT', undefined);
+  vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', undefined);
   vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(false);
   vi.mocked(rangeSnapshotStore.hasWriter).mockResolvedValue(false);
   state.fingerprint = undefined;
+  state.arrivalHead = undefined;
   vi.mocked(getDb).mockReturnValue({} as ReturnType<typeof getDb>);
   vi.mocked(fetchManifest).mockResolvedValue(manifest);
   vi.mocked(fetchArchive).mockResolvedValue(Buffer.from(zipSync({})));
@@ -312,6 +339,48 @@ afterEach(async () => {
 });
 
 describe('published zero-SQL range inputs', () => {
+  it('repairs missing arrival metadata before restoring the range checkpoint', async () => {
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+    vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    state.fingerprint = getCanonicalManifestFingerprint(manifest);
+    vi.mocked(publishArrivalInputSnapshot).mockRejectedValueOnce(
+      Error('arrival publication unavailable'),
+    );
+    const run = workflow();
+    await expect(run.run()).rejects.toThrow('arrival publication unavailable');
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(rangeSnapshotStore.complete).not.toHaveBeenCalled();
+    await run.run();
+    expect(publishArrivalInputSnapshot).toHaveBeenCalledTimes(2);
+    expect(publishArrivalInputSnapshot).toHaveBeenNthCalledWith(
+      2,
+      state.fingerprint,
+    );
+    expect(rangeSnapshotStore.complete).toHaveBeenCalledWith(state.fingerprint);
+    expect(
+      vi.mocked(publishArrivalInputSnapshot).mock.invocationCallOrder[1],
+    ).toBeLessThan(
+      vi.mocked(rangeSnapshotStore.complete).mock.invocationCallOrder[0],
+    );
+    expect(fetchArchive).not.toHaveBeenCalled();
+  });
+
+  it('keeps a completed arrival metadata publication on the SQL-free unchanged path', async () => {
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+    vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    state.arrivalHead = {
+      fingerprint: getCanonicalManifestFingerprint(manifest),
+      generation: 'complete',
+    };
+    vi.mocked(getDb).mockImplementation(() => {
+      throw Error('SQL must stay asleep');
+    });
+    await workflow().run();
+    expect(getDb).not.toHaveBeenCalled();
+    expect(publishArrivalInputSnapshot).not.toHaveBeenCalled();
+  });
   it('finishes an unchanged scheduled poll before getDb or lease acquisition', async () => {
     vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
     vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
@@ -355,11 +424,18 @@ describe('published zero-SQL range inputs', () => {
 
   it('publishes changed inputs before purge and checkpoints after the SQL fingerprint', async () => {
     vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
     const run = workflow();
     await run.run();
     expect(publishRangeSnapshot).toHaveBeenCalledWith(
       getCanonicalManifestFingerprint(manifest),
     );
+    expect(publishArrivalInputSnapshot).toHaveBeenCalledWith(
+      getCanonicalManifestFingerprint(manifest),
+    );
+    expect(
+      vi.mocked(publishArrivalInputSnapshot).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(purgePublicDataCache).mock.invocationCallOrder[0]);
     expect(
       vi.mocked(publishRangeSnapshot).mock.invocationCallOrder[0],
     ).toBeLessThan(vi.mocked(purgePublicDataCache).mock.invocationCallOrder[0]);
@@ -992,6 +1068,37 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
         { scope: multi, serviceDate },
         async (_tx, selection) => selection,
       );
+    const metadata = parseArrivalInputs(
+      JSON.parse(
+        JSON.stringify(
+          await database.transaction(readArrivalInputs, {
+            isolationLevel: 'repeatable read',
+            accessMode: 'read only',
+          }),
+        ),
+      ),
+    );
+    const validatedScope = ScheduledTimetableRequestScopeSchema.parse(multi);
+    const metadataPolicy = createTimetableSelectionPolicy({
+      scope: validatedScope,
+      topology: metadata.topology,
+      history: readArrivalInputHistory(metadata),
+      indexed: metadata.projections,
+      loopRevisions: [],
+    });
+    for (const date of [
+      '2026-11-28',
+      '2026-11-29',
+      '2026-11-30',
+      '2026-12-01',
+    ]) {
+      expect(
+        metadataPolicy.select(
+          date,
+          selectArrivalInputCoverage(metadata, validatedScope, date),
+        ),
+      ).toEqual(await selectDate(date));
+    }
     const empty = await selectDate('2026-11-29');
     expect(empty.selected?.coverage).toMatchObject({ activeTripCount: 0 });
     expect((await selectDate('2026-11-28')).attempts[0].reason).toBe(
@@ -1183,6 +1290,20 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       selected: { version: { format: 'legacy' } },
       rollback: { status: 'applied' },
     });
+    const rollbackPolicy = createTimetableSelectionPolicy({
+      scope: exact,
+      topology: metadata.topology,
+      history: readArrivalInputHistory(metadata),
+      indexed: metadata.projections,
+      loopRevisions: [],
+      rollback,
+    });
+    expect(
+      rollbackPolicy.select(
+        '2026-11-30',
+        selectArrivalInputCoverage(metadata, exact, '2026-11-30'),
+      ),
+    ).toEqual(await exactSelection(rollback));
 
     const multiRollback = await withSelectedScheduledTimetable(
       database,

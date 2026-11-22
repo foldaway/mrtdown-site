@@ -160,11 +160,27 @@ describe.skipIf(!url)('immutable range snapshots with Redis', () => {
     );
   });
 
-  it('repairs malformed heads through the same compare-and-swap protocol', async () => {
-    await redis.set(`${prefix}:active`, '{}');
-    const store = createRangeSnapshotStore(connect);
-    const expected = await store.head();
-    await store.publish(expected.raw, inputs, 'repaired', fingerprint);
-    expect((await store.read())?.value.generation).toBe('repaired');
-  });
+  it.each(['json', 'utf8', 'oversized'] as const)(
+    'repairs %s heads without weakening compare-and-swap',
+    async (failure) => {
+      const store = createRangeSnapshotStore(connect);
+      await store.publish('', inputs, 'initial', fingerprint);
+      const valid = (await store.head()).raw.toString();
+      const corrupt =
+        failure === 'utf8'
+          ? Buffer.from([0xc3, 0x28])
+          : failure === 'oversized'
+            ? valid.padEnd(2049, ' ') + 'invalid tail'
+            : '{}';
+      await redis.set(`${prefix}:active`, corrupt);
+      const expected = await store.head();
+      expect(expected.value).toBeUndefined();
+      expect(await createRangeSnapshotStore(connect).read()).toBeNull();
+      await store.publish(expected.raw, inputs, 'repaired', fingerprint);
+      expect((await store.read())?.value.generation).toBe('repaired');
+      await expect(
+        store.publish(expected.raw, inputs, 'stale', fingerprint),
+      ).rejects.toThrow('superseded');
+    },
+  );
 });

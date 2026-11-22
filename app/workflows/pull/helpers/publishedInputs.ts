@@ -1,5 +1,9 @@
 import { WorkflowNonRetryableError } from '@upstash/workflow';
 import {
+  arrivalInputSnapshotStore,
+  isArrivalInputPublicationEnabled,
+} from '~/util/arrivalInputSnapshot.server';
+import {
   isRangeSnapshotEnabled,
   rangeSnapshotStore,
 } from '~/util/rangeSnapshotStore.server';
@@ -30,7 +34,15 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
     throw new WorkflowNonRetryableError(
       'Pull must specify only one scheduled timetable format',
     );
-  return rangeSnapshotStore.isCurrent(
-    getCanonicalManifestFingerprint(manifest, pinned),
+  const fingerprint = getCanonicalManifestFingerprint(manifest, pinned);
+  if (!(await rangeSnapshotStore.isCurrent(fingerprint))) return false;
+  if (!isArrivalInputPublicationEnabled()) return true;
+  const [range, arrivals] = await Promise.all([
+    rangeSnapshotStore.head(),
+    arrivalInputSnapshotStore.read({ verifyPayload: true }),
+  ]);
+  return (
+    arrivals?.value.fingerprint === fingerprint &&
+    arrivals.value.generation === range.value?.generation
   );
 }

@@ -24,7 +24,7 @@ alone cannot establish production-wide sleep.
 
 - [x] Separate timetable eligibility, coverage and reviewed rollback decisions
   from SQL reads so published inputs can reuse the same policy.
-- [ ] Publish coherent admission history, topology, projection/coverage metadata
+- [x] Publish coherent admission history, topology, projection/coverage metadata
   and display labels; reject partial promotions and failed projections.
 - [ ] Publish bounded departure partitions for all retained covered dates,
   preserving untimed counts, shared memberships, platforms and 24+ hour tails.
@@ -105,6 +105,23 @@ across 101 files with PostGIS and Redis, none skipped. Existing integration
 scenarios cover shared memberships, loops, empty coverage, source correction,
 topology mismatch, partial projections and reviewed rollback; no new tests were
 added for the extraction.
+
+### Arrival metadata producer
+
+The next tranche publishes attested topology, hash-verified admission history,
+projection coverage and display labels behind `REDIS_ARRIVAL_SNAPSHOT=publish`.
+It shares the bounded atomic snapshot store with range inputs. The existing
+selection policy produces the same decisions from a cold Redis snapshot as
+from SQL, including zero-active dates and uncovered dates. Failed rebuilds or
+partial promotion cannot replace the completed head.
+
+Missing arrival metadata prevents the enabled range preflight from skipping
+its repair. Successful metadata publication precedes purge and external
+checkpoint completion; a healthy matching generation/fingerprint keeps the
+unchanged path SQL-free. Departure partitions, recent rider reports and the
+public reader remain unimplemented. No arrival publication flag was set in
+staging or production for this tranche. The [runbook](../../operations/edge-caching.md#published-arrival-metadata)
+owns limits and the separate publish-only staging procedure.
 
 ## Context
 

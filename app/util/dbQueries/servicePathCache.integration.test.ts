@@ -55,6 +55,7 @@ import { rebuildStatisticsSnapshot } from './statistics';
 const store = vi.hoisted(() => new Map<string, string>());
 const redis = vi.hoisted(() => ({
   getrange: vi.fn(),
+  getrangeBuffer: vi.fn(),
   set: vi.fn(),
   expire: vi.fn(),
   eval: vi.fn(),
@@ -137,6 +138,9 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     redis.getrange.mockImplementation(
       async (key: string) => store.get(key) ?? '',
     );
+    redis.getrangeBuffer.mockImplementation(async (key: string) =>
+      Buffer.from(store.get(key) ?? ''),
+    );
     redis.set.mockImplementation(
       async (key: string, raw: string, ...args: unknown[]) => {
         if (args.includes('NX') && store.has(key)) return null;
@@ -160,7 +164,8 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         _retention,
         encoded,
       ) => {
-        if ((store.get(active) ?? '') !== expected) return 0;
+        if (!Buffer.from(store.get(active) ?? '').equals(Buffer.from(expected)))
+          return 0;
         store.set(key, encoded);
         store.set(active, next);
         return 1;
@@ -390,7 +395,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
       if (failure === 'invalid')
         store.set('mrtdown:{staging:range-snapshot:v1}:active', '{}');
       if (failure === 'unavailable')
-        redis.getrange.mockRejectedValueOnce(Error('unavailable'));
+        redis.getrangeBuffer.mockRejectedValueOnce(Error('unavailable'));
       queries.length = 0;
       expect(await range()).toEqual(baseline);
       expect(queries.length).toBeGreaterThan(0);

@@ -6,6 +6,10 @@ import {
 import { createWorkflow } from '@upstash/workflow/tanstack';
 import { ZipStore } from '~/helpers/ZipStore.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
+import {
+  isArrivalInputPublicationEnabled,
+  publishArrivalInputSnapshot,
+} from '~/util/arrivalInputSnapshot.server.js';
 import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts.js';
 import { rebuildSitemapSnapshot } from '~/util/dbQueries/sitemap.js';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics.js';
@@ -92,6 +96,9 @@ async function publishPullCaches(generation: string, fingerprint?: string) {
   }
   if (isRangeSnapshotPublicationEnabled()) {
     await publishRangeSnapshot(fingerprint);
+  }
+  if (isArrivalInputPublicationEnabled()) {
+    await publishArrivalInputSnapshot(fingerprint);
   }
   return purgePublicDataCache();
 }
@@ -222,11 +229,18 @@ async function executePull(
     async () => isCanonicalManifestCurrent(getDb(), manifestFingerprint),
   );
   if (manifestIsCurrent && !rebuildScheduledTimetableProjection) {
-    if (isRangeSnapshotPublicationEnabled()) {
+    if (
+      isRangeSnapshotPublicationEnabled() ||
+      isArrivalInputPublicationEnabled()
+    ) {
       await runPullStep(context, 'repair-range-snapshot', async () => {
-        await publishRangeSnapshot(manifestFingerprint);
+        if (isRangeSnapshotPublicationEnabled())
+          await publishRangeSnapshot(manifestFingerprint);
+        if (isArrivalInputPublicationEnabled())
+          await publishArrivalInputSnapshot(manifestFingerprint);
         await purgePublicDataCache();
-        await rangeSnapshotStore.complete(manifestFingerprint);
+        if (isRangeSnapshotPublicationEnabled())
+          await rangeSnapshotStore.complete(manifestFingerprint);
       });
     }
     if (isServicePathCachePublicationEnabled()) {
