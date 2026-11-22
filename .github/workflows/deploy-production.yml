@@ -1,0 +1,23 @@
+name: Deploy production
+
+on:
+  push:
+    branches:
+      - production
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize the whole release with the manual rebase-and-deploy workflow.
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/production'
+    uses: ./.github/workflows/production-deployment.yml
+    with:
+      sha: ${{ github.sha }}
+    secrets: inherit

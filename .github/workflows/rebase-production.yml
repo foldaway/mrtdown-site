@@ -1,0 +1,54 @@
+name: Rebase and deploy production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    if: github.ref == 'refs/heads/main'
+    name: Rebase production onto main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.rebase.outputs.sha }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Rebase and push production
+        id: rebase
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin \
+            +refs/heads/main:refs/remotes/origin/main \
+            +refs/heads/production:refs/remotes/origin/production
+          previous_sha="$(git rev-parse refs/remotes/origin/production)"
+          git switch -C production refs/remotes/origin/production
+          git rebase refs/remotes/origin/main
+
+          # Refuse to overwrite an update made since the fetch, including a force push.
+          git push --force-with-lease="refs/heads/production:$previous_sha" \
+            origin HEAD:refs/heads/production
+          printf 'sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: rebase
+    uses: ./.github/workflows/production-deployment.yml
+    with:
+      sha: ${{ needs.rebase.outputs.sha }}
+    secrets: inherit
