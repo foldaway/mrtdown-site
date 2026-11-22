@@ -35,6 +35,16 @@ import {
   readCompletedPageProfileGeneration,
 } from '~/db/pageProfileGeneration';
 import { relations } from '~/db/relations';
+import { markPageProfilesUpdating } from '~/db/pageProfileGeneration';
+import {
+  arrivalInputSnapshotStore,
+  publishArrivalInputSnapshot,
+} from '~/util/arrivalInputSnapshot.server';
+import { getPageProfileRedis } from '~/util/pageProfileRedis.server';
+import {
+  createPublishedSnapshotStore,
+  getSnapshotKeyPrefix,
+} from '~/util/publishedSnapshotStore.server';
 import {
   scheduledDepartureDaysTable as days,
   scheduledDepartureOccurrencesTable as occurrences,
@@ -74,6 +84,13 @@ import {
 } from '~/workflows/pull/helpers/stagingSync';
 import * as database from './database';
 import { buildDataset } from './dataset';
+import { withSelectedScheduledTimetable } from './withSelectedScheduledTimetable';
+import {
+  parseArrivalInputs,
+  readArrivalInputHistory,
+  selectArrivalInputCoverage,
+} from './arrivalInputs';
+import { createTimetableSelectionPolicy } from './scheduledTimetableSelection';
 import { buildLineSummary, buildUptimeGraph } from './lineAnalytics';
 import { buildLineOperationalFactRows } from './operationalFacts';
 import { projectScheduledTimetable } from './projectScheduledTimetable';
@@ -397,6 +414,91 @@ describe.skipIf(!url)('indexed departure window', () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
+    'publishes reusable arrival metadata and retains the head across interrupted rebuilds',
+    async () => {
+      vi.stubEnv('TIER', schema);
+      vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
+      vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+      vi.spyOn(database, 'getDefaultDb').mockResolvedValue(db());
+      const redis = await getPageProfileRedis();
+      const prefix = getSnapshotKeyPrefix('arrival-inputs');
+      try {
+        await completePageProfileGeneration(db(), 'arrival-fixture');
+        await recordCanonicalManifestFingerprint(db(), 'a'.repeat(64));
+        const dates = ['2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27'];
+        const expected = [];
+        for (const serviceDate of dates) {
+          expected.push(
+            await withSelectedScheduledTimetable(
+              db(),
+              { scope, serviceDate },
+              async (_tx, selection) => selection,
+            ),
+          );
+        }
+        await publishArrivalInputSnapshot();
+        const before = (await arrivalInputSnapshotStore.head()).raw;
+        queries.length = 0;
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('Snapshot reuse must not open SQL'),
+        );
+        const cold = createPublishedSnapshotStore(
+          getPageProfileRedis,
+          'arrival-inputs',
+          parseArrivalInputs,
+        );
+        const snapshot = await cold.read();
+        if (!snapshot) throw Error('Arrival snapshot missing');
+        const policy = createTimetableSelectionPolicy({
+          scope,
+          topology: snapshot.inputs.topology,
+          history: readArrivalInputHistory(snapshot.inputs),
+          indexed: snapshot.inputs.projections,
+          loopRevisions: [],
+        });
+        for (const [index, date] of dates.entries()) {
+          expect(
+            policy.select(
+              date,
+              selectArrivalInputCoverage(snapshot.inputs, scope, date),
+            ),
+          ).toEqual(expected[index]);
+        }
+        expect(queries).toEqual([]);
+        expect(
+          snapshot.inputs.stationNames.find((row) => row.id === scope.stationId)
+            ?.name,
+        ).toEqual(canonical.canonical.stations[0].name);
+        const corrupt = structuredClone(snapshot.inputs);
+        corrupt.history[0].manifestBase64 =
+          Buffer.from('{}').toString('base64');
+        expect(() => parseArrivalInputs(corrupt)).toThrow(
+          'manifest does not match',
+        );
+
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db());
+        await db()
+          .update(projections)
+          .set({ completed_at: null })
+          .where(eq(projections.manifest_sha256, newer.entry.manifestSha256));
+        await expect(publishArrivalInputSnapshot()).rejects.toThrow(
+          'completed timetable projections',
+        );
+        expect((await arrivalInputSnapshotStore.head()).raw).toBe(before);
+        await markPageProfilesUpdating(db());
+        await expect(publishArrivalInputSnapshot()).rejects.toThrow(
+          'completed canonical inputs',
+        );
+        expect((await arrivalInputSnapshotStore.head()).raw).toBe(before);
+      } finally {
+        const keys = await redis.keys(`${prefix}:*`);
+        if (keys.length) await redis.del(...keys);
+        await redis.quit();
+      }
+    },
+  );
 
   it('reads real scheduled arrivals and display metadata in the same snapshot, including complete empty coverage', async () => {
     const request = {

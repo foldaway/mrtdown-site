@@ -295,6 +295,35 @@ reference/path readers remain available. A successful local check does not
 establish production sleep; use the [sleep plan](../plans/active/neon-sleep.md)
 for remaining wake-ups and eventual provider-level acceptance.
 
+## Published arrival metadata
+
+`REDIS_ARRIVAL_SNAPSHOT=publish` publishes admission history, attested canonical
+topology, projection headers, coverage days/scopes and display names during a
+completed pull. Unset disables it. This tranche has no public reader and does
+not cache departures or recent rider reports; arrivals still use SQL.
+
+The publisher captures these inputs together in a read-only repeatable-read
+transaction. It verifies the topology attestation and retained admission chain,
+and rejects an incomplete projection for the current topology. Publication uses
+the same bounded gzip/base64, unique publication ID and atomic head swap as the
+range snapshot, under `mrtdown:{<tier>:arrival-inputs:v1}`. Active data has no
+TTL. The separate namespace leaves range-reader rollback independent.
+
+Bounds are 100 retained versions/projection headers, 10,000 day rows, 100,000
+scope rows, 4 MiB encoded and 24 MiB expanded JSON. A bound violation fails
+publication and preserves the preceding head; rows are never truncated into a
+valid snapshot. November 22 production sizing found 53,680 scopes and 44 days
+across two projections. This is sizing evidence, not a production publication.
+
+For a separate staging rollout, deploy with the flag unset, then configure
+`publish` and send an authenticated empty pull. Even when the range checkpoint
+is current, missing/invalid arrival metadata forces the normal SQL repair path.
+Both snapshots must publish before purge and checkpoint completion. A healthy
+snapshot with the same generation and fingerprint preserves the SQL-free
+unchanged-pull path. Check `arrival_inputs_published`, payload size and a cold
+validated read before considering a future serving flag. Unset this flag to
+stop publication; no public arrival behavior changes in this tranche.
+
 ## Redis usage evidence
 
 Use the configured database's Upstash Usage and billing views, or the
