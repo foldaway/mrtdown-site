@@ -253,8 +253,9 @@ Redis keys use `mrtdown:{<tier>:range-snapshot:v1}` (one cluster hash slot):
 `active` names an immutable
 `payload:<sha256>` containing gzip/base64 canonical input rows. Limits are
 4 MiB encoded and 24 MiB expanded JSON. The payload and pointer commit in one
-atomic compare-and-swap operation; a delayed producer must retry from
-current SQL state. Readers keep using the last completed snapshot throughout
+atomic compare-and-swap operation. Each head has a unique publication ID, so
+a delayed producer must retry even if the inputs changed and then changed back.
+Readers keep using the last completed snapshot throughout
 an import. The active pointer and payload have no TTL; superseded
 payloads expire after 24 hours. Each process memoizes one decoded payload but
 checks the active pointer in Redis on every read. Cold processes use Redis,
@@ -267,10 +268,17 @@ fetch upstream metadata and validate this external checkpoint and payload
 before acquiring a SQL lease. Missing payloads/checkpoints or changed inputs
 take the normal writer/recovery path. Reviews, rebuilds and explicit seeds
 always retain that path. Publish-only mode retains existing renewal behavior.
+Writers clear the checkpoint before import or projection work can mutate SQL,
+while retaining the serving snapshot. A failed rebuild therefore cannot stop
+the next ordinary poll from reaching SQL recovery.
 Failure cleanup uses a short-lived external writer marker to avoid opening SQL
 when an upstream-only preflight failed before lease acquisition.
 
-Holiday changes republish the snapshot before the holiday workflow's purge.
+When publication is enabled, every holiday workflow run republishes before
+purging, even if the holiday rows are unchanged. This retries publication or
+purge failures after an earlier sync committed, without a separate dirty marker.
+The publisher reads both completion metadata and source rows in the same
+repeatable-read transaction; an updating canonical generation is rejected.
 Manual facts rebuilds do not change its canonical source inputs. Canonical SQL
 repairs must complete promotion and republish before considering the change
 public; direct unsupported writes are not made fresh by a reader TTL.

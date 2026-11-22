@@ -73,6 +73,7 @@ vi.mock('~/util/rangeSnapshotStore.server', async (original) => ({
   rangeSnapshotStore: {
     isCurrent: vi.fn(async () => false),
     complete: vi.fn(async () => {}),
+    invalidateCompletion: vi.fn(async () => {}),
     markWriter: vi.fn(async () => {}),
     hasWriter: vi.fn(async () => false),
     finishWriter: vi.fn(async () => {}),
@@ -1371,6 +1372,21 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
   });
 
   it('lets an ordinary pull repair a failed explicit rebuild of a current manifest', async () => {
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    let completedFingerprint: string | undefined;
+    vi.mocked(rangeSnapshotStore.isCurrent).mockImplementation(
+      async (fingerprint) => completedFingerprint === fingerprint,
+    );
+    vi.mocked(rangeSnapshotStore.complete).mockImplementation(
+      async (fingerprint) => {
+        completedFingerprint = fingerprint;
+      },
+    );
+    vi.mocked(rangeSnapshotStore.invalidateCompletion).mockImplementation(
+      async () => {
+        completedFingerprint = undefined;
+      },
+    );
     const actual = await vi.importActual<
       typeof import('./helpers/manifestFingerprint')
     >('./helpers/manifestFingerprint');
@@ -1385,6 +1401,7 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     expect(await actual.isCanonicalManifestCurrent(getDb(), fingerprint)).toBe(
       true,
     );
+    expect(completedFingerprint).toBe(fingerprint);
     const [projection] = await projections();
 
     await pool.query(`ALTER TABLE scheduled_departure_days
@@ -1407,6 +1424,7 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       false,
     );
     expect(recordCanonicalManifestFingerprint).toHaveBeenCalledOnce();
+    expect(completedFingerprint).toBeUndefined();
 
     vi.mocked(isCanonicalManifestCurrent).mockImplementationOnce(
       actual.isCanonicalManifestCurrent,

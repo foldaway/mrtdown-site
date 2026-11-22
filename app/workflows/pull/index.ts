@@ -243,6 +243,12 @@ async function executePull(
     return;
   }
 
+  if (isRangeSnapshotPublicationEnabled()) {
+    await runPullStep(context, 'invalidate-range-snapshot-checkpoint', () =>
+      rangeSnapshotStore.invalidateCompletion(),
+    );
+  }
+
   const counts = await runPullStep(context, 'parse', async () => {
     const archiveBuffer = await fetchArchive(dataUrl);
     console.log('[PULL] Fetched archive', archiveBuffer.length);

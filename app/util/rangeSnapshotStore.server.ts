@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import type Redis from 'ioredis';
 import { z } from 'zod';
@@ -13,6 +13,7 @@ const MAX_HEAD_BYTES = 2048;
 const digest = (raw: string) => createHash('sha256').update(raw).digest('hex');
 const HeadSchema = z.object({
   version: z.literal(1),
+  publicationId: z.uuid(),
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   generation: z.string().min(1).max(200),
   fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
@@ -118,6 +119,7 @@ export function createRangeSnapshotStore(connect: () => Promise<Store>) {
       throw new Error('Range snapshot exceeds Redis limit');
     const next = HeadSchema.parse({
       version: 1,
+      publicationId: randomUUID(),
       sha256: digest(encoded),
       generation,
       fingerprint,
@@ -156,6 +158,10 @@ export function createRangeSnapshotStore(connect: () => Promise<Store>) {
     head,
     publish,
     isCurrent,
+    invalidateCompletion: async () => {
+      const redis = await connect();
+      await redis.del(checkpointKey());
+    },
     markWriter: async (owner: string) => {
       const redis = await connect();
       await redis.set(writerKey(owner), '1', 'EX', 86400);

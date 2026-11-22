@@ -33,20 +33,31 @@ vi.mock('~/util/rangeSnapshot.server.js', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv('REDIS_RANGE_SNAPSHOT', undefined);
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 const run = () => state.execute?.({ run: async (_name, fn) => fn() });
 
-it('republishes changed holidays before purging and blocks purge when publication fails', async () => {
-  vi.mocked(syncPublicHolidaysFromDataGov).mockResolvedValue({
-    fetched: 1,
-    upserted: 1,
-    deleted: 0,
-    changedDates: ['2026-12-25'],
-    range: { start: '2026-12-25', end: '2026-12-25' },
-  });
+it('retries a failed publication on a later run even when the holiday rows are now unchanged', async () => {
+  vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+  vi.mocked(syncPublicHolidaysFromDataGov)
+    .mockResolvedValueOnce({
+      fetched: 1,
+      upserted: 1,
+      deleted: 0,
+      changedDates: ['2026-12-25'],
+      range: { start: '2026-12-25', end: '2026-12-25' },
+    })
+    .mockResolvedValue({
+      fetched: 1,
+      upserted: 0,
+      deleted: 0,
+      changedDates: [],
+      range: null,
+    });
   vi.mocked(publishRangeSnapshot).mockRejectedValueOnce(
     Error('publication unavailable'),
   );

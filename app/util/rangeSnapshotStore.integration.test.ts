@@ -88,20 +88,25 @@ describe.skipIf(!url)('immutable range snapshots with Redis', () => {
     expect((await first.read())?.inputs.publicHolidayRows).toHaveLength(1);
   });
 
-  it('rejects delayed publication and never moves the pointer to an obsolete SQL snapshot', async () => {
+  it('rejects delayed publication even when inputs change and then return to their original value', async () => {
     const store = createRangeSnapshotStore(connect);
-    await store.publish('', inputs, 'old', fingerprint);
+    await store.publish('', inputs, 'complete', fingerprint);
     const original = (await store.head()).raw;
+    const changedInputs = {
+      ...inputs,
+      publicHolidayRows: [{ date: '2026-12-25' }],
+    };
+    await store.publish(original, changedInputs, 'complete', fingerprint);
     await store.publish(
-      original,
-      { ...inputs, publicHolidayRows: [{ date: '2026-12-25' }] },
-      'new',
+      (await store.head()).raw,
+      inputs,
+      'complete',
       fingerprint,
     );
     await expect(
-      store.publish(original, inputs, 'stale', fingerprint),
+      store.publish(original, changedInputs, 'complete', fingerprint),
     ).rejects.toThrow('superseded');
-    expect((await store.read())?.value.generation).toBe('new');
+    expect((await store.read())?.inputs).toEqual(inputs);
   });
 
   it('requires a completed checkpoint and a recoverable payload before skipping an unchanged poll', async () => {
@@ -110,6 +115,10 @@ describe.skipIf(!url)('immutable range snapshots with Redis', () => {
     expect(await store.isCurrent(fingerprint)).toBe(false);
     await store.complete(fingerprint);
     expect(await store.isCurrent(fingerprint)).toBe(true);
+    await store.invalidateCompletion();
+    expect(await store.isCurrent(fingerprint)).toBe(false);
+    expect((await store.read())?.inputs).toEqual(inputs);
+    await store.complete(fingerprint);
     await redis.del(`${prefix}:payload:${value.sha256}`);
     expect(await store.isCurrent(fingerprint)).toBe(false);
   });

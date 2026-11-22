@@ -3,6 +3,7 @@ import { getDb } from '~/db/index.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import { rebuildOperationalFactsForDates } from '~/util/dbQueries/operationalFacts.js';
 import { publishRangeSnapshot } from '~/util/rangeSnapshot.server.js';
+import { isRangeSnapshotPublicationEnabled } from '~/util/rangeSnapshotStore.server.js';
 import { syncPublicHolidaysFromDataGov } from './helpers/syncPublicHolidays.js';
 
 type Params = Record<string, never>;
@@ -24,7 +25,11 @@ export const publicHolidaysWorkflow = createWorkflow<Params, void>(
       },
     );
 
-    if (syncResult.changedDates.length > 0) {
+    // Sync may have committed on a previous run whose publication or purge failed.
+    if (
+      syncResult.changedDates.length > 0 ||
+      isRangeSnapshotPublicationEnabled()
+    ) {
       await context.run('publish-public-holiday-cache', async () => {
         await publishRangeSnapshot();
         return purgePublicDataCache();

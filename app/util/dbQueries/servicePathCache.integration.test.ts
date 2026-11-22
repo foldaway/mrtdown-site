@@ -36,6 +36,7 @@ import {
 } from '~/util/servicePathCache.server';
 import { buildWeeklySummary } from '~/util/weeklyReport';
 import { syncPublicHolidays } from '~/workflows/publicHolidays/helpers/syncPublicHolidays';
+import { recordCanonicalManifestFingerprint } from '~/workflows/pull/helpers/manifestFingerprint';
 import { scheduledTimetableCanonicalFixture } from '~/workflows/pull/helpers/scheduledTimetableCanonical.fixture';
 import * as sync from '~/workflows/pull/helpers/stagingSync';
 import * as database from './database';
@@ -332,7 +333,8 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
   it('keeps the complete published source during promotion and switches issue/path corrections together', async () => {
     const baseline = await range();
     vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'publish');
-    await publishRangeSnapshot('a'.repeat(64));
+    await recordCanonicalManifestFingerprint(db, 'a'.repeat(64));
+    await publishRangeSnapshot();
     vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
     await markPageProfilesUpdating(db);
     await db
@@ -345,11 +347,10 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     queries.length = 0;
     expect(await range()).toEqual(baseline);
     expect(queries).toEqual([]);
-    await expect(publishRangeSnapshot('b'.repeat(64))).rejects.toThrow(
-      'completed canonical',
-    );
+    await expect(publishRangeSnapshot()).rejects.toThrow('completed canonical');
     await completePageProfileGeneration(db, randomUUID());
-    await publishRangeSnapshot('b'.repeat(64));
+    await recordCanonicalManifestFingerprint(db, 'b'.repeat(64));
+    await publishRangeSnapshot();
     queries.length = 0;
     const corrected = await range();
     expect(corrected.issues[0].title['en-SG']).toBe('Corrected issue');
