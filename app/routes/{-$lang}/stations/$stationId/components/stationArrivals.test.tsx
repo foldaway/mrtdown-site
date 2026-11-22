@@ -200,7 +200,7 @@ describe('station guide arrival sources', () => {
     }
     const empty = { ...scheduled, timings: [] };
     const html = renderRow(empty);
-    expect(html).toContain('No departures in this window');
+    expect(html).toContain('None in the next hour');
     expect(html).not.toContain('<details');
     expect(html).not.toContain('Service ended');
     expect(html).not.toContain('Frequency estimate');
@@ -220,13 +220,13 @@ describe('station guide arrival sources', () => {
     };
     const onArrivalReported = async () => {};
     for (const [data, message, canReport] of [
-      [empty, 'No departures in this window', false],
+      [empty, 'None in the next hour', false],
       [partial, 'Timetable unavailable', true],
       [unavailable, 'Timetable unavailable', true],
     ] as const) {
       const row = renderRow(data, 'ready', undefined, onArrivalReported);
       expect(row).toContain(message);
-      expect(row).toContain('>N/A</span>');
+      expect(row).toContain('>—</span>');
       expect(row.includes('Report an arrival')).toBe(canReport);
       const withReport = renderRow({ ...data, recentCrowdArrival });
       expect(withReport).toContain(message);
