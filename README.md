@@ -8,6 +8,8 @@ populated from data archives by durable Upstash Workflows.
 
 ## Local Development
 
+Use Node.js 26 (`nvm use` reads the version from `.nvmrc`).
+
 1. Install dependencies:
 
    ```sh
