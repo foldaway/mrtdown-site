@@ -81,7 +81,7 @@ const key = arrivalBranchKey(
 function renderRow(
   data: StationArrivalsV2 | null,
   status: 'ready' | 'error' | 'loading' = 'ready',
-  now = Date.parse('2026-10-24T16:08:30Z'),
+  now: number | null = Date.parse('2026-10-24T16:08:30Z'),
   onArrivalReported?: () => Promise<void>,
 ) {
   return renderToStaticMarkup(
@@ -246,6 +246,46 @@ describe('station guide arrival sources', () => {
     const failed = renderRow(null, 'error');
     expect(failed).toContain('Couldn’t load timetable');
     expect(failed).not.toContain('Timetable unavailable');
+  });
+
+  it.each(['ready', 'loading', 'error'] as const)(
+    'does not describe expired empty results as the next hour while %s',
+    (status) => {
+      if (scheduled.source !== 'scheduled') throw new Error('fixture');
+      const emptyGroup = {
+        ...scheduled.timings[0],
+        platforms: [{ id: 'empty', label: 'D' }],
+        departures: [],
+      };
+      for (const timings of [[], [...scheduled.timings, emptyGroup]]) {
+        const html = renderRow(
+          { ...scheduled, timings },
+          status,
+          Date.parse(scheduled.window.endInstant),
+        );
+        expect(html).not.toContain('None in the next hour');
+        expect(html).toContain('Timetable unavailable');
+      }
+    },
+  );
+
+  it('only describes an empty next hour with a known time inside the response window', () => {
+    if (scheduled.source !== 'scheduled') throw new Error('fixture');
+    const empty = { ...scheduled, timings: [] };
+    const start = Date.parse(empty.window.startInstant);
+    const end = Date.parse(empty.window.endInstant);
+    for (const now of [start, end - 1]) {
+      expect(renderRow(empty, 'ready', now)).toContain('None in the next hour');
+    }
+    for (const now of [null, start - 1, end + 60_000]) {
+      const html = renderRow(empty, 'ready', now);
+      expect(html).not.toContain('None in the next hour');
+      expect(html).toContain('Timetable unavailable');
+    }
+    const stale = renderRow(empty, 'error', start);
+    expect(stale).not.toContain('None in the next hour');
+    expect(stale).toContain('Timetable unavailable');
+    expect(stale).toContain('Showing the last known response');
   });
 
   it('combines line facts, service directions and exits without repeating a visible station code', () => {

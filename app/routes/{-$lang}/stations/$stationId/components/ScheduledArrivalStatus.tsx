@@ -30,6 +30,12 @@ export function ScheduledArrivalStatus({
   lineColor,
   now,
 }: ScheduledArrivalStatusProps) {
+  const emptyWindow =
+    data.coverage.complete &&
+    now != null &&
+    Date.parse(data.window.startInstant) <= now &&
+    now < Date.parse(data.window.endInstant);
+
   if (!hasDepartures) {
     return (
       <ArrivalServiceRow
@@ -38,7 +44,7 @@ export function ScheduledArrivalStatus({
         platformLabels={[]}
       >
         <ArrivalTimingDisplay reportButton={reportButton}>
-          <NoArrivalTimes emptyWindow={data.coverage.complete} />
+          <NoArrivalTimes emptyWindow={emptyWindow} />
         </ArrivalTimingDisplay>
       </ArrivalServiceRow>
     );
@@ -79,7 +85,7 @@ export function ScheduledArrivalStatus({
                     )}
                   </>
                 ) : (
-                  <NoArrivalTimes emptyWindow={data.coverage.complete} />
+                  <NoArrivalTimes emptyWindow={emptyWindow} />
                 )}
               </ArrivalTimingDisplay>
             </ArrivalServiceRow>
