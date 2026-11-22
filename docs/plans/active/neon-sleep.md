@@ -17,8 +17,21 @@ alone cannot establish production-wide sleep.
 - [x] Skip unchanged pulls before acquiring a SQL lease; repair absent snapshots.
 - [x] Cover holiday publication, corruption/fallback, publication races and
   SQL parity across date boundaries; run repository verification.
-- [ ] Separately validate staging and an explicitly authorized production cutover.
+- [x] Separately validate staging and the user-authorized production cutover.
 - [ ] Remove remaining public/background wake-ups and verify sustained sleep.
+
+### Arrivals follow-up
+
+- [x] Separate timetable eligibility, coverage and reviewed rollback decisions
+  from SQL reads so published inputs can reuse the same policy.
+- [ ] Publish coherent admission history, topology, projection/coverage metadata
+  and display labels; reject partial promotions and failed projections.
+- [ ] Publish bounded departure partitions for all retained covered dates,
+  preserving untimed counts, shared memberships, platforms and 24+ hour tails.
+- [ ] Serve recent rider reports, including empty results and expiry, without
+  polling Postgres. Refresh them from their write paths.
+- [ ] Prove the complete arrivals endpoint works with SQL disabled across clock,
+  correction, coverage and report changes before a separate activation.
 
 ## Surprises & Discoveries
 
@@ -51,8 +64,47 @@ lint, formatting and migration drift passed. The production build passed.
 A built-server fixture
 served cold/warm issues-day and history requests with DATABASE_URL unset. The
 fixture proves transport and lack of SQL dependency; local PostGIS parity tests
-cover nonempty canonical data. Production has not been deployed or changed for
-this tranche, and production-wide sleep remains unverified and incomplete.
+cover nonempty canonical data. Production-wide sleep remains unverified and
+incomplete; the range rollout receipt below does not cover other SQL readers.
+
+### Range rollout, November 22 PT
+
+The [staging deployment](https://github.com/foldaway/mrtdown-site/actions/runs/45049953123)
+and [production deployment](https://github.com/foldaway/mrtdown-site/actions/runs/45051886340)
+installed merge `4604950`. Both environments published the existing completed
+generation before enabling reads. Staging origin checks on both Machines
+returned 200; the issues-day JSON was byte-identical to SQL, with a cold Redis
+read followed by a memory hit. The unchanged staging pull completed with only
+initialization and `check-published-range-inputs` steps.
+
+Production's first pull failed closed because its live combined-release pin
+was empty. The retained November 22 admission and completed projection already
+identified manifest `8aece457` and release `c5e00a0b`. That exact index reproduced
+the existing canonical fingerprint against current upstream inputs. Restoring
+it in the production GitHub deployment environment and redeploying the same
+image restored the deploy-managed setting. The retry repaired the range
+snapshot without importing or rebuilding a projection; its generation stayed
+`wfr_YYvm_nOVZ6nCepuq9XfqH`.
+
+Production is now `enabled`. The 770,364-byte payload has no expiry, and its
+completed checkpoint matches SQL. Both Machines returned 200 for history and
+issues-day; the API JSON matched its SQL baseline byte for byte. Reader logs
+showed cold Redis reads and warm memory hits on both Machines, and Cloudflare
+accepted the data-tag purge. Unchanged pull `wfr_0GIebAtCs_uNsrYLSXQeU` completed
+with only initialization and external preflight steps. The final check found
+the same publication identity and canonical generation, with no active lease.
+Both Fly health checks passed. These are origin checks, not evidence of public
+Cloudflare cache hits or sustained Neon suspension.
+
+A standalone deep-object diagnostic stalled one staging Machine. It was
+restarted before activation, and normal origin-route comparisons replaced that
+probe. Both staging health checks passed afterward.
+
+The arrivals selection-policy extraction passed Node 24 verification: 742 tests
+across 101 files with PostGIS and Redis, none skipped. Existing integration
+scenarios cover shared memberships, loops, empty coverage, source correction,
+topology mismatch, partial projections and reviewed rollback; no new tests were
+added for the extraction.
 
 ## Context
 
@@ -88,6 +140,15 @@ validation, optional reports, sitemap/statistics and background workflows.
 Publish their required serving inputs on writes. Keep reports/admin/recovery
 wake-ups explicit. Accept production-wide sleep only with provider state and
 compute-time evidence under ordinary traffic, without SQL monitoring waking it.
+
+Start with the arrivals polling path: station pages refresh it every 30 seconds.
+The first follow-up extracts the existing selection policy; the SQL adapter
+still owns one repeatable-read transaction and canonical scope validation.
+Publishers and future snapshot readers must reuse that policy rather than
+relaxing admission or duplicating eligibility rules. Cache source inputs, not
+clock-frozen arrival responses. Midnight alone must not require a SQL refill.
+The remaining producer and reader work above is required before claiming
+zero-SQL arrivals; this extraction alone does not change the sleep boundary.
 
 ## Validation and Acceptance
 
