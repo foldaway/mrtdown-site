@@ -10,23 +10,30 @@ import {
   it,
   vi,
 } from 'vitest';
-import { createArrivalDepartureStore } from './arrivalDepartureStore.server';
-import type { DeparturePartition } from './dbQueries/departurePartition';
+import { z } from 'zod';
+import { createPartitionedSnapshotStore } from './partitionedSnapshotStore.server';
 
 const url = process.env.TEST_SNAPSHOT_REDIS_URL;
 const tier = `departure_test_${randomUUID().replaceAll('-', '')}`;
 const prefix = `mrtdown:{${tier}:arrival-departures:v1}`;
 const fingerprint = 'a'.repeat(64);
 const inputsHash = 'b'.repeat(64);
-const partition: DeparturePartition = {
-  projectionId: 1,
-  stationId: 'station',
-  calls: [],
-};
+const partitionSchema = z.object({ id: z.string(), rows: z.array(z.number()) });
+const manifestSchema = z.object({
+  sourceSha256: z.string(),
+  partitions: z.array(z.object({ sha256: z.string(), bytes: z.number() })),
+});
+const partition = { id: 'first', rows: [] };
 
-describe.skipIf(!url)('departure publication with Redis', () => {
+describe.skipIf(!url)('partitioned snapshots with Redis', () => {
   let redis: Redis;
-  const store = () => createArrivalDepartureStore(async () => redis);
+  const store = () =>
+    createPartitionedSnapshotStore(async () => redis, 'arrival-departures', {
+      parseManifest: (value) => manifestSchema.parse(value),
+      parsePartition: (value) => partitionSchema.parse(value),
+      partitions: (manifest) => manifest.partitions,
+      partitionLimits: { encodedBytes: 1024, jsonBytes: 4096 },
+    });
   beforeAll(() => {
     if (!url) throw new Error('TEST_SNAPSHOT_REDIS_URL missing');
     redis = new Redis(url);
@@ -44,13 +51,13 @@ describe.skipIf(!url)('departure publication with Redis', () => {
   it('activates all parts together, preserves shared active parts and retires old data', async () => {
     const writer = store();
     const first = await writer.prepare(partition);
-    const old = await writer.prepare({ ...partition, stationId: 'old' });
+    const old = await writer.prepare({ ...partition, id: 'old' });
     expect(
       await redis.ttl(`${prefix}:partition:${first.sha256}`),
     ).toBeGreaterThan(0);
     const head = await writer.manifest.head();
     const inputs = {
-      arrivalInputsSha256: inputsHash,
+      sourceSha256: inputsHash,
       partitions: [first, old],
     };
     await writer.publish(head.raw, inputs, 'generation', fingerprint, []);
@@ -67,13 +74,13 @@ describe.skipIf(!url)('departure publication with Redis', () => {
       'total Redis limit',
     );
 
-    const next = await writer.prepare({ ...partition, stationId: 'next' });
+    const next = await writer.prepare({ ...partition, id: 'next' });
     const expected = (await writer.manifest.head()).raw;
     await redis.del(`${prefix}:partition:${next.sha256}`);
     await expect(
       writer.publish(
         expected,
-        { arrivalInputsSha256: inputsHash, partitions: [first, next] },
+        { sourceSha256: inputsHash, partitions: [first, next] },
         'generation',
         fingerprint,
         [first, old],
@@ -81,10 +88,10 @@ describe.skipIf(!url)('departure publication with Redis', () => {
     ).rejects.toThrow('partition missing');
     expect((await writer.manifest.head()).raw).toEqual(expected);
     expect(await redis.ttl(`${prefix}:partition:${old.sha256}`)).toBe(-1);
-    await writer.prepare({ ...partition, stationId: 'next' });
+    await writer.prepare({ ...partition, id: 'next' });
     await writer.publish(
       expected,
-      { arrivalInputsSha256: inputsHash, partitions: [first, next] },
+      { sourceSha256: inputsHash, partitions: [first, next] },
       'generation',
       fingerprint,
       [first, old],
@@ -101,7 +108,7 @@ describe.skipIf(!url)('departure publication with Redis', () => {
   it('detects eviction/corruption, repairs it and ignores repair signals from old readers', async () => {
     const writer = store();
     const ref = await writer.prepare(partition);
-    const inputs = { arrivalInputsSha256: inputsHash, partitions: [ref] };
+    const inputs = { sourceSha256: inputsHash, partitions: [ref] };
     await writer.publish(
       (await writer.manifest.head()).raw,
       inputs,
@@ -120,7 +127,7 @@ describe.skipIf(!url)('departure publication with Redis', () => {
     if (!repaired) throw Error('Missing repaired manifest');
     await redis.set(`${prefix}:partition:${ref.sha256}`, 'corrupt');
     expect(await store().readPartition(repaired, ref)).toBeNull();
-    expect(await writer.ready(old)).toBe(false);
+    expect(await writer.ready(repaired)).toBe(false);
     await writer.prepare(partition);
     await writer.publish(repaired.raw, inputs, 'two', fingerprint, [ref]);
     const fresh = await store().manifest.read();

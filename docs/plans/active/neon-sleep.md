@@ -141,6 +141,14 @@ publication size. No departure producer was deployed or enabled for this slice;
 real staging payload size and query latency remain the next rollout gate.
 Public arrivals continue using SQL.
 
+Redis preparation, retention, readiness and repair live in the reusable
+[partitioned snapshot store](../../../app/util/partitionedSnapshotStore.server.ts),
+which uses the same payload encoding and atomic head publication as range and
+arrival metadata snapshots. The departure adapter owns timetable identity and
+bounds. Existing generation caches keep their SQL-generation/expiry contract.
+The existing Redis lifecycle scenarios exercise the shared store directly;
+SQL parity and workflow checks remain at their feature boundaries.
+
 Node 26.3.1 verification passed all 757 tests across 102 files with PostGIS and
 Redis; none skipped. Checks cover SQL parity, lossless offset reconstruction,
 interrupted publication, source-frontier changes, atomic part retention/repair

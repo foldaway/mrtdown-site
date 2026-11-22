@@ -14,12 +14,16 @@ import {
   isArrivalInputPublicationEnabled,
 } from '~/util/arrivalInputSnapshot.server';
 import type { ArrivalInputs } from '~/util/dbQueries/arrivalInputs';
-import { getDefaultDb } from '~/util/dbQueries/database';
-import { readDeparturePartition } from '~/util/dbQueries/readDeparturePartition';
+import { getDefaultDb, type AppDbTransaction } from '~/util/dbQueries/database';
+import {
+  readDeparturePartition,
+  type DeparturePartitionIdentity,
+} from '~/util/dbQueries/readDeparturePartition';
 import { assertPullWorkflowLease } from './workflowLease';
 
 type RunStep = <T>(name: string, callback: () => Promise<T>) => Promise<T>;
 type Projection = ArrivalInputs['projections'][number];
+const MAX_PUBLICATION_PLAN_BYTES = 256 * 1024;
 
 /** Step results contain only identities and hashes, never departure payloads. */
 export async function publishArrivalDepartures(
@@ -48,12 +52,10 @@ export async function publishArrivalDepartures(
     const indexed = arrivals.inputs.projections.filter(
       (row) => row.completedAt !== null,
     );
-    const parts = new Map<
-      string,
-      { projectionId: number; stationId: string }
-    >();
+    const projectionIds = new Set(indexed.map((row) => row.id));
+    const parts = new Map<string, DeparturePartitionIdentity>();
     for (const scope of arrivals.inputs.scopes) {
-      if (indexed.some((row) => row.id === scope.projection_id)) {
+      if (projectionIds.has(scope.projection_id)) {
         const part = {
           projectionId: scope.projection_id,
           stationId: scope.station_id,
@@ -76,17 +78,15 @@ export async function publishArrivalDepartures(
     };
     if (
       parts.size > MAX_DEPARTURE_PARTITIONS ||
-      Buffer.byteLength(JSON.stringify(plan)) > 256 * 1024
+      Buffer.byteLength(JSON.stringify(plan)) > MAX_PUBLICATION_PLAN_BYTES
     )
       throw new Error('Departure publication plan exceeds bounds');
     return plan;
   });
   const db = await getDefaultDb();
-  async function capture<T>(
+  async function withPublicationSnapshot<T>(
     indexed: Projection[],
-    callback: (
-      tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
-    ) => Promise<T>,
+    callback: (tx: AppDbTransaction) => Promise<T>,
   ) {
     const arrivals = await arrivalInputSnapshotStore.head();
     if (
@@ -142,32 +142,29 @@ export async function publishArrivalDepartures(
     );
   }
   const refs: DeparturePartitionRef[] = [];
+  const projectionsById = new Map(plan.projections.map((row) => [row.id, row]));
+  let partitionBytes = 0;
   for (let i = 0; i < plan.partitions.length; i++) {
     const identity = plan.partitions[i];
     const ref = await run(`publish-arrival-departure-${i}`, async () => {
-      const projection = plan.projections.find(
-        (row) => row.id === identity.projectionId,
-      );
+      const projection = projectionsById.get(identity.projectionId);
       if (!projection)
         throw new Error('Departure projection missing from plan');
-      const partition = await capture([projection], (tx) =>
+      const partition = await withPublicationSnapshot([projection], (tx) =>
         readDeparturePartition(tx, identity, projection.projectorVersion),
       );
       return arrivalDepartureStore.prepare(
         partition,
-        MAX_DEPARTURE_TOTAL_BYTES -
-          refs.reduce((sum, part) => sum + part.bytes, 0),
+        MAX_DEPARTURE_TOTAL_BYTES - partitionBytes,
       );
     });
     refs.push(ref);
-    if (
-      refs.reduce((sum, part) => sum + part.bytes, 0) >
-      MAX_DEPARTURE_TOTAL_BYTES
-    )
+    partitionBytes += ref.bytes;
+    if (partitionBytes > MAX_DEPARTURE_TOTAL_BYTES)
       throw new Error('Departure publication exceeds total Redis limit');
   }
   return run('activate-arrival-departures', async () => {
-    await capture(plan.projections, async () => {});
+    await withPublicationSnapshot(plan.projections, async () => {});
     const result = await arrivalDepartureStore.publish(
       Buffer.from(plan.expectedHeadBase64, 'base64'),
       { arrivalInputsSha256: plan.arrivalInputsSha256, partitions: refs },
@@ -180,7 +177,7 @@ export async function publishArrivalDepartures(
         event: 'arrival_departures_published',
         ...result,
         partitions: refs.length,
-        partitionBytes: refs.reduce((sum, ref) => sum + ref.bytes, 0),
+        partitionBytes,
       }),
     );
     return result;

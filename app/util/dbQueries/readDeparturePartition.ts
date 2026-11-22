@@ -85,7 +85,7 @@ export async function readDeparturePartition(
     .orderBy(sql`${source.template}::text COLLATE "C"`)
     .limit(MAX_DEPARTURE_TEMPLATES + 1)
     .as('groups');
-  // Check the aggregate byte budget in SQL before transferring templates/dates.
+  // Keep oversized SQL aggregates out of the Node process.
   const withinBudget = sql`sum(octet_length(${groups.template}::text) +
     octet_length(array_to_json(${groups.dates})::text) + 64) OVER ()
     <= ${DEPARTURE_PARTITION_LIMITS.jsonBytes}`;
@@ -107,7 +107,7 @@ export async function readDeparturePartition(
   return parseDeparturePartition({
     ...identity,
     calls: grouped.map((row) => ({
-      ...(row.template as Record<string, unknown>),
+      ...row.template,
       serviceDates: row.dates,
     })),
   });
