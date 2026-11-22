@@ -5,8 +5,14 @@ import {
   type DeparturePartition,
 } from './dbQueries/departurePartition';
 import { getPageProfileRedis } from './pageProfileRedis.server';
-import { createPartitionedSnapshotStore } from './partitionedSnapshotStore.server';
-import type { SnapshotRedis } from './publishedSnapshotStore.server';
+import {
+  createPublishedSnapshotStore,
+  type SnapshotRedis,
+} from './publishedSnapshotStore.server';
+import {
+  createSnapshotPartitions,
+  type PartitionRedis,
+} from './snapshotPartitions.server';
 
 export const MAX_DEPARTURE_PARTITIONS = 1_000;
 export const MAX_DEPARTURE_TOTAL_BYTES = 64 * 1024 * 1024;
@@ -43,21 +49,26 @@ function parseManifest(value: unknown): DepartureManifest {
   return manifest;
 }
 export function createArrivalDepartureStore(
-  connect: () => Promise<SnapshotRedis>,
+  connect: () => Promise<SnapshotRedis & PartitionRedis>,
 ) {
-  const store = createPartitionedSnapshotStore(connect, 'arrival-departures', {
+  const manifest = createPublishedSnapshotStore(
+    connect,
+    'arrival-departures',
     parseManifest,
-    parsePartition: parseDeparturePartition,
-    partitions: (manifest) => manifest.partitions,
-    partitionLimits: DEPARTURE_PARTITION_LIMITS,
-  });
-  type Snapshot = NonNullable<Awaited<ReturnType<typeof store.manifest.read>>>;
+  );
+  const parts = createSnapshotPartitions(
+    connect,
+    'arrival-departures',
+    parseDeparturePartition,
+    DEPARTURE_PARTITION_LIMITS,
+  );
+  type Snapshot = NonNullable<Awaited<ReturnType<typeof manifest.read>>>;
 
   async function prepare(
     partition: DeparturePartition,
     remainingBytes = MAX_DEPARTURE_TOTAL_BYTES,
   ) {
-    const ref = await store.prepare(partition, remainingBytes);
+    const ref = await parts.prepare(partition, remainingBytes);
     return {
       projectionId: partition.projectionId,
       stationId: partition.stationId,
@@ -65,26 +76,39 @@ export function createArrivalDepartureStore(
     };
   }
 
-  async function readPartition(snapshot: Snapshot, ref: DeparturePartitionRef) {
-    const member = snapshot.inputs.partitions.find(
-      (part) =>
-        part.projectionId === ref.projectionId &&
-        part.stationId === ref.stationId &&
-        part.sha256 === ref.sha256,
+  async function publish(
+    expectedRawHead: Buffer,
+    inputs: DepartureManifest,
+    generation: string,
+    fingerprint: string,
+    previous: DeparturePartitionRef[],
+  ) {
+    const current = await manifest.read({ verifyPayload: true });
+    // The durable activation step can retry after losing its success response.
+    const replay =
+      current &&
+      current.value.generation === generation &&
+      current.value.fingerprint === fingerprint &&
+      JSON.stringify(current.inputs) === JSON.stringify(inputs);
+    return manifest.publish(
+      replay ? current.raw : expectedRawHead,
+      inputs,
+      generation,
+      fingerprint,
+      {
+        active: inputs.partitions.map((ref) => ref.sha256),
+        previous: previous.map((ref) => ref.sha256),
+      },
     );
-    if (!member) return null;
-    const partition = await store.readPartition(snapshot, member);
-    if (!partition) return null;
-    if (
-      partition.projectionId !== ref.projectionId ||
-      partition.stationId !== ref.stationId
-    ) {
-      await store.markForRepair(snapshot);
-      return null;
-    }
-    return partition;
   }
-  return { ...store, prepare, readPartition };
+
+  function ready(snapshot: Snapshot) {
+    return parts.ready(
+      snapshot.raw,
+      snapshot.inputs.partitions.map((ref) => ref.sha256),
+    );
+  }
+  return { manifest, prepare, publish, ready };
 }
 export const arrivalDepartureStore =
   createArrivalDepartureStore(getPageProfileRedis);

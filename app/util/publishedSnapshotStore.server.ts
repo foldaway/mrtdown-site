@@ -71,7 +71,6 @@ local previousCount = tonumber(ARGV[6]) or 0
 for i = 4 + activeCount, 3 + activeCount + previousCount do
   if not active[KEYS[i]] then redis.call('EXPIRE', KEYS[i], ARGV[3]) end
 end
-if ARGV[7] == 'multipart' then redis.call('DEL', KEYS[#KEYS]) end
 return 1`;
 
 export function createPublishedSnapshotStore<T>(
@@ -159,7 +158,6 @@ export function createPublishedSnapshotStore<T>(
           return `${prefix()}:partition:${hash}`;
         })
       : [];
-    if (dependencies) dependencyKeys.push(`${prefix()}:repair`);
     const result = await redis.eval(
       PUBLISH,
       3 + dependencyKeys.length,
@@ -172,11 +170,7 @@ export function createPublishedSnapshotStore<T>(
       PREVIOUS_RETENTION_SECONDS,
       encoded,
       ...(dependencies
-        ? [
-            dependencies.active.length,
-            dependencies.previous.length,
-            'multipart',
-          ]
+        ? [dependencies.active.length, dependencies.previous.length]
         : []),
     );
     if (result === -1)

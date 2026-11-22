@@ -326,45 +326,26 @@ stop publication; no public arrival behavior changes in this tranche.
 
 ## Published departure partitions
 
-`REDIS_ARRIVAL_DEPARTURES=publish` adds the departure producer and requires
-`REDIS_ARRIVAL_SNAPSHOT=publish`. Both flags default off. Public arrivals still
-use SQL; serving cached departures and caching recent rider reports are separate
-steps in the [Neon sleep plan](../plans/active/neon-sleep.md#arrivals-follow-up).
+`REDIS_ARRIVAL_DEPARTURES=publish` requires `REDIS_ARRIVAL_SNAPSHOT=publish`.
+Both default off. This publishes compact station/projection partitions; public
+arrivals still use SQL. Explicit source dates, shared memberships, platforms,
+unknown timing and overnight offsets are retained.
 
-Each station/projection partition groups identical calls across their explicit
-service dates. It retains source offsets, opaque stop sequences, shared service
-memberships, platform alternatives and untimed calls. Instants are reconstructed
-with the canonical Singapore service-day helper; publication rejects SQL rows
-that do not match that time base. Coverage and reviewed rollback remain the
-arrival metadata policy's responsibility, including zero-active dates.
+The pull publishes one station per durable step, then atomically activates a
+manifest tied to the arrival metadata. Purge and checkpoint completion follow.
+Limits are 1,000 partitions, 20,000 distinct calls per partition, 8 MiB expanded
+and 2 MiB encoded per partition, and 64 MiB total encoded partitions. Failures
+preserve the previous manifest. Active parts persist; pending and retired parts
+expire after 24 hours. Restart the pull if pending parts expire before activation.
 
-The pull publishes one station per durable step under its renewed SQL lease.
-Each read checks the completed generation, topology attestation and projection
-header in a read-only repeatable-read transaction with a 15-second statement
-timeout. Activation rechecks the source frontier and atomically persists every
-partition with its manifest, bound to the metadata payload hash. Purge and the
-external completion checkpoint follow activation. A healthy unchanged preflight
-checks matching identities, partition existence and the repair marker without
-SQL. A future partition reader can mark detected corruption for repair.
-
-Limits are 1,000 partitions, 20,000 unique calls per partition, 8 MiB expanded
-JSON and 2 MiB encoded per partition, and 64 MiB total active encoded partitions.
-A violation preserves the previous manifest. Active parts have no TTL; pending
-parts and superseded parts expire after 24 hours. A run interrupted beyond that
-retention period must restart with a new pull if activation finds an expired
-part. Lost/corrupt manifests can leave unreferenced persistent parts; investigate
-those explicitly rather than deleting keys still used by a current manifest.
-
-For publish-only staging validation, deploy with both flags unset, enable the
-two producers, then trigger an authenticated empty pull. Check
-`arrival_departures_published`, total encoded bytes, cold partition reads and
-SQL parity for active/empty dates, shared/platform calls and overnight tails.
-Repeat the unchanged pull and verify external preflight finishes before SQL
-lease acquisition. November 22 production table sizing found about 5.3 million
-occurrences and 5.4 million memberships occupying 1.7 GB including indexes; it
-does not establish the compressed partition size or staging query latency.
-Measure both before production publication. Unset the departure flag to stop
-its producer independently; it does not change public arrival responses.
+For staging validation, deploy with flags unset, enable both producers and
+trigger an authenticated empty pull. Check `arrival_departures_published`, total
+bytes and publication latency; repeat the unchanged pull and confirm it finishes
+before SQL lease acquisition. Production table/index sizing was about 1.7 GB;
+compressed payload size and staging latency remain unmeasured. Validate both
+before production publication. Unset the departure flag to stop its producer.
+The [Neon sleep plan](../plans/active/neon-sleep.md#arrivals-follow-up) tracks
+rider-report caching and public serving separately.
 
 ## Redis usage evidence
 

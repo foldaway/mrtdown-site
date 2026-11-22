@@ -98,8 +98,12 @@ import { buildLineSummary, buildUptimeGraph } from './lineAnalytics';
 import { buildLineOperationalFactRows } from './operationalFacts';
 import { projectScheduledTimetable } from './projectScheduledTimetable';
 import { readDeparturePartition } from './readDeparturePartition';
-import { readPartitionDepartureRows } from './departurePartition';
-import { readLegacyDepartureRows } from './queryIndexedScheduledDepartures';
+import {
+  expandDeparturePartition,
+  parseDeparturePartition,
+  DEPARTURE_PARTITION_LIMITS,
+} from './departurePartition';
+import { decodeSnapshotPayload } from '~/util/snapshotPayload.server';
 import { queryIndexedScheduledDepartures } from './queryIndexedScheduledDepartures';
 import * as liveTopology from './readLiveScheduleTopology';
 import { readLiveScheduleTopology } from './readLiveScheduleTopology';
@@ -422,105 +426,6 @@ describe.skipIf(!url)('indexed departure window', () => {
     }
   });
 
-  it('compacts dated legacy calls without changing windows, platforms or untimed counts', async () => {
-    const indexed = await db().select().from(projections);
-    for (const projection of indexed) {
-      await db().transaction(async (tx) => {
-        const partition = await readDeparturePartition(
-          tx,
-          {
-            projectionId: projection.id,
-            stationId: scope.stationId,
-          },
-          projection.projector_version,
-        );
-        const normalize = (rows: Record<string, unknown>[]) =>
-          rows
-            .map((row) => {
-              const {
-                service_id: _service,
-                revision_id: _revision,
-                platform_ids: _platforms,
-                platform_semantics: _semantics,
-                ...rest
-              } = row;
-              return {
-                ...rest,
-                arrival_instant: rest.arrival_instant
-                  ? new Date(String(rest.arrival_instant)).toISOString()
-                  : null,
-                departure_instant: rest.departure_instant
-                  ? new Date(String(rest.departure_instant)).toISOString()
-                  : null,
-              };
-            })
-            .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-        for (const date of [
-          '2026-10-24',
-          '2026-10-25',
-          '2026-10-26',
-          '2026-10-27',
-        ]) {
-          const lower = `${date}T00:00:00+08:00`;
-          const upper = new Date(
-            Date.parse(lower) + 48 * 3600_000,
-          ).toISOString();
-          for (const selected of [
-            scope,
-            { ...scope, platformId: 'not-a-platform' },
-          ]) {
-            const cached = readPartitionDepartureRows(
-              partition,
-              selected,
-              [scope.destinationStationId],
-              date,
-              lower,
-              upper,
-            );
-            const original = await readLegacyDepartureRows(
-              tx,
-              selected,
-              [scope.destinationStationId],
-              projection.id,
-              date,
-              lower,
-              upper,
-            );
-            expect(cached.untimed).toEqual(original.untimed);
-            expect(normalize(cached.rows)).toEqual(normalize(original.rows));
-          }
-        }
-      });
-    }
-    const [call] = await db().select().from(occurrences).limit(1);
-    if (!call) throw Error('Missing legacy departure fixture');
-    await db()
-      .update(occurrences)
-      .set({
-        departure_instant: sql`${occurrences.departure_instant} + interval '1 second'`,
-      })
-      .where(
-        and(
-          eq(occurrences.projection_id, call.projection_id),
-          eq(occurrences.service_date, call.service_date),
-          eq(occurrences.provider_trip_id, call.provider_trip_id),
-          eq(occurrences.stop_sequence, call.stop_sequence),
-        ),
-      );
-    await expect(
-      db().transaction((tx) =>
-        readDeparturePartition(
-          tx,
-          {
-            projectionId: call.projection_id,
-            stationId: call.station_id,
-          },
-          1,
-        ),
-      ),
-    ).rejects.toThrow('instants do not match source offsets');
-  });
-
   it.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
     'resumes departure publication and rejects a changed source frontier',
     async () => {
@@ -574,10 +479,55 @@ describe.skipIf(!url)('indexed departure window', () => {
         const published = await arrivalDepartureStore.manifest.read();
         if (!published) throw Error('Missing departure manifest');
         expect(await arrivalDepartureStore.ready(published)).toBe(true);
-        for (const ref of published.inputs.partitions)
-          expect(
-            await arrivalDepartureStore.readPartition(published, ref),
-          ).not.toBeNull();
+        for (const ref of published.inputs.partitions) {
+          const encoded = await redis.getrange(
+            `${prefixes[1]}:partition:${ref.sha256}`,
+            0,
+            DEPARTURE_PARTITION_LIMITS.encodedBytes,
+          );
+          const partition = decodeSnapshotPayload(
+            encoded,
+            ref.sha256,
+            parseDeparturePartition,
+            DEPARTURE_PARTITION_LIMITS,
+          );
+          expect(partition).toMatchObject({
+            projectionId: ref.projectionId,
+            stationId: ref.stationId,
+          });
+          const [source] = await db()
+            .select()
+            .from(occurrences)
+            .where(
+              and(
+                eq(occurrences.projection_id, ref.projectionId),
+                eq(occurrences.station_id, ref.stationId),
+              ),
+            )
+            .limit(1);
+          if (source) {
+            const {
+              service_id,
+              revision_id,
+              platform_ids,
+              arrival_instant: _arrival,
+              departure_instant: _departure,
+              ...call
+            } = source;
+            expect([...expandDeparturePartition(partition)]).toContainEqual(
+              expect.objectContaining({
+                ...call,
+                boardingByService: [
+                  {
+                    serviceId: service_id,
+                    revisionId: revision_id,
+                    platformIds: platform_ids,
+                  },
+                ],
+              }),
+            );
+          }
+        }
 
         outputs.clear();
         spy.mockImplementationOnce(async (partition, remaining) => {

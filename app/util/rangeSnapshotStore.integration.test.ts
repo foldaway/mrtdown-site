@@ -12,6 +12,9 @@ import {
   vi,
 } from 'vitest';
 import type { DatasetInputs } from './dbQueries/dataset';
+import { z } from 'zod';
+import { createSnapshotPartitions } from './snapshotPartitions.server';
+import { createPublishedSnapshotStore } from './publishedSnapshotStore.server';
 import { createRangeSnapshotStore } from './rangeSnapshotStore.server';
 
 const url = process.env.TEST_SNAPSHOT_REDIS_URL;
@@ -61,6 +64,74 @@ describe.skipIf(!url)('immutable range snapshots with Redis', () => {
   });
   afterAll(async () => {
     await redis?.quit();
+  });
+
+  it('activates complete partitions and preserves retention across retries and eviction', async () => {
+    const parts = createSnapshotPartitions(
+      connect,
+      'range-snapshot',
+      z.string().parse,
+      { encodedBytes: 1024, jsonBytes: 4096 },
+    );
+    const manifest = createPublishedSnapshotStore(
+      connect,
+      'range-snapshot',
+      z.array(z.object({ sha256: z.string(), bytes: z.number() })).parse,
+    );
+    const first = await parts.prepare('first', 1024);
+    const old = await parts.prepare('old', 1024);
+    expect(
+      await redis.ttl(`${prefix}:partition:${first.sha256}`),
+    ).toBeGreaterThan(0);
+    await manifest.publish('', [first, old], 'complete', fingerprint, {
+      active: [first.sha256, old.sha256],
+      previous: [],
+    });
+    await parts.prepare('first', 1024);
+    expect(await redis.ttl(`${prefix}:partition:${first.sha256}`)).toBe(-1);
+    const head = (await manifest.head()).raw;
+    expect(await parts.ready(head, [first.sha256, old.sha256])).toBe(true);
+    const next = await parts.prepare('next', 1024);
+    await redis.del(`${prefix}:partition:${next.sha256}`);
+    const dependencies = {
+      active: [first.sha256, next.sha256],
+      previous: [first.sha256, old.sha256],
+    };
+    await expect(
+      manifest.publish(
+        head,
+        [first, next],
+        'complete',
+        fingerprint,
+        dependencies,
+      ),
+    ).rejects.toThrow('partition missing');
+    expect((await manifest.head()).raw).toEqual(head);
+    await parts.prepare('next', 1024);
+    await manifest.publish(
+      head,
+      [first, next],
+      'complete',
+      fingerprint,
+      dependencies,
+    );
+    expect(
+      await redis.ttl(`${prefix}:partition:${old.sha256}`),
+    ).toBeGreaterThan(0);
+    expect(await redis.ttl(`${prefix}:partition:${first.sha256}`)).toBe(-1);
+    await redis.del(`${prefix}:partition:${first.sha256}`);
+    const active = (await manifest.head()).raw;
+    expect(await parts.ready(active, dependencies.active)).toBe(false);
+    await parts.prepare('first', 1024);
+    await manifest.publish(
+      active,
+      [first, next],
+      'complete',
+      fingerprint,
+      dependencies,
+    );
+    expect(await redis.ttl(`${prefix}:partition:${first.sha256}`)).toBe(-1);
+    expect(await parts.ready(head, dependencies.active)).toBe(false);
   });
 
   it('retains the active payload/head without a TTL, survives a cold process and retires only superseded data', async () => {

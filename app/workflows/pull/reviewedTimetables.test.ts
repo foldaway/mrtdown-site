@@ -8,6 +8,7 @@ import {
 } from '@mrtdown/fs';
 import type { WorkflowContext } from '@upstash/workflow';
 import { drizzle } from 'drizzle-orm/node-postgres';
+
 import { zipSync } from 'fflate';
 import { Pool } from 'pg';
 import {
@@ -33,8 +34,7 @@ import {
   selectArrivalInputCoverage,
 } from '~/util/dbQueries/arrivalInputs';
 import { readDeparturePartition } from '~/util/dbQueries/readDeparturePartition';
-import { readPartitionDepartureRows } from '~/util/dbQueries/departurePartition';
-import { readCombinedDepartureRows } from '~/util/dbQueries/readCombinedDepartureRows';
+import { expandDeparturePartition } from '~/util/dbQueries/departurePartition';
 import { readArrivalInputs } from '~/util/dbQueries/readArrivalInputs';
 import { createTimetableSelectionPolicy } from '~/util/dbQueries/scheduledTimetableSelection';
 import {
@@ -1150,59 +1150,6 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
         ),
       ),
     );
-    await database.transaction(async (tx) => {
-      for (const projection of metadata.projections) {
-        const partition = await readDeparturePartition(
-          tx,
-          { projectionId: projection.id, stationId: scope.stationId },
-          projection.projectorVersion,
-        );
-        for (const selected of [
-          multi,
-          exact,
-          { ...multi, platformId: 'platform-common' },
-          { ...multi, platformId: 'platform-1' },
-          { ...multi, platformId: 'closed' },
-        ]) {
-          for (const date of ['2026-11-29', '2026-11-30', '2026-12-01']) {
-            const lower = window.startInstant;
-            const upper = window.endInstant;
-            const cached = readPartitionDepartureRows(
-              partition,
-              selected,
-              ['station-2'],
-              date,
-              lower,
-              upper,
-            );
-            const original = await readCombinedDepartureRows(
-              tx,
-              selected,
-              ['station-2'],
-              projection.id,
-              date,
-              lower,
-              upper,
-            );
-            const normalize = (rows: Record<string, unknown>[]) =>
-              rows
-                .map((row) => ({
-                  ...row,
-                  stop_sequence: String(row.stop_sequence),
-                  arrival_instant: row.arrival_instant
-                    ? new Date(String(row.arrival_instant)).toISOString()
-                    : null,
-                  departure_instant: row.departure_instant
-                    ? new Date(String(row.departure_instant)).toISOString()
-                    : null,
-                }))
-                .sort((a, b) => a.stop_sequence.localeCompare(b.stop_sequence));
-            expect(cached.untimed).toEqual(original.untimed);
-            expect(normalize(cached.rows)).toEqual(normalize(original.rows));
-          }
-        }
-      }
-    });
     const validatedScope = ScheduledTimetableRequestScopeSchema.parse(multi);
     const metadataPolicy = createTimetableSelectionPolicy({
       scope: validatedScope,
@@ -1281,6 +1228,30 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
         platformIds: ['platform-common'],
       },
     ]);
+    const partition = await database.transaction((tx) =>
+      readDeparturePartition(
+        tx,
+        { projectionId: projection.id, stationId: scope.stationId },
+        projection.projector_version,
+      ),
+    );
+    const expanded = [...expandDeparturePartition(partition)];
+    const timed = expanded.filter((row) => row.departure_seconds !== null);
+    expect(timed).toHaveLength(overnight.departures.length);
+    expect(
+      expanded.filter((row) => row.departure_seconds === null),
+    ).toHaveLength(overnight.untimedDepartureCount);
+    for (const departure of overnight.departures) {
+      expect(timed).toContainEqual(
+        expect.objectContaining({
+          service_date: departure.serviceDate,
+          stop_sequence: departure.stopSequence,
+          departure_seconds: departure.departureSeconds,
+          platform_semantics: departure.platformSemantics,
+          boardingByService: departure.boardingByService,
+        }),
+      );
+    }
     const common = await queryIndexedScheduledDepartures(database, {
       ...window,
       scope: { ...multi, platformId: 'platform-common' },

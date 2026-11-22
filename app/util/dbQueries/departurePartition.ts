@@ -5,8 +5,6 @@ import {
 import { createSelectSchema } from 'drizzle-orm/zod';
 import { z } from 'zod';
 import { combinedDepartureOccurrencesTable } from '~/db/scheduledDepartures.schema';
-import { indexedServiceIds } from './scheduledTimetableSelection';
-import type { IndexedTimetableScope } from './withSelectedScheduledTimetable';
 
 export const MAX_DEPARTURE_TEMPLATES = 20_000;
 export const DEPARTURE_PARTITION_LIMITS = {
@@ -56,60 +54,23 @@ export function parseDeparturePartition(value: unknown): DeparturePartition {
   return partition;
 }
 
-/** Coverage and source selection remain the shared metadata policy's responsibility. */
-export function readPartitionDepartureRows(
-  partition: DeparturePartition,
-  scope: IndexedTimetableScope,
-  destinationIds: string[],
-  serviceDate: string,
-  lowerBound: string,
-  upperBound: string,
-) {
-  if (partition.stationId !== scope.stationId)
-    throw new Error('Departure partition station mismatch');
-  const services = new Set(indexedServiceIds(scope));
-  const lower = Date.parse(lowerBound);
-  const upper = Date.parse(upperBound);
-  if (!Number.isFinite(lower) || !Number.isFinite(upper) || lower >= upper)
-    throw new Error('Invalid departure window');
-  let untimed = 0;
-  const rows = [];
-  for (const { serviceDates, boardingByService, ...call } of partition.calls) {
-    if (
-      call.line_id !== scope.lineId ||
-      !destinationIds.includes(call.destination_station_id) ||
-      !serviceDates.includes(serviceDate)
-    )
-      continue;
-    const memberships = boardingByService.filter(
-      (membership) =>
-        services.has(membership.serviceId) &&
-        (scope.platformId === undefined ||
-          membership.platformIds.includes(scope.platformId)),
-    );
-    if (!memberships.length) continue;
-    if (call.departure_seconds === null) {
-      untimed++;
-      continue;
+export function* expandDeparturePartition(partition: DeparturePartition) {
+  for (const { serviceDates, ...call } of partition.calls) {
+    for (const serviceDate of serviceDates) {
+      yield {
+        ...call,
+        projection_id: partition.projectionId,
+        station_id: partition.stationId,
+        service_date: serviceDate,
+        arrival_instant:
+          call.arrival_seconds === null
+            ? null
+            : scheduledServiceDayInstant(serviceDate, call.arrival_seconds),
+        departure_instant:
+          call.departure_seconds === null
+            ? null
+            : scheduledServiceDayInstant(serviceDate, call.departure_seconds),
+      };
     }
-    const departure = scheduledServiceDayInstant(
-      serviceDate,
-      call.departure_seconds,
-    );
-    if (Date.parse(departure) < lower || Date.parse(departure) >= upper)
-      continue;
-    rows.push({
-      ...call,
-      projection_id: partition.projectionId,
-      station_id: partition.stationId,
-      service_date: serviceDate,
-      arrival_instant:
-        call.arrival_seconds === null
-          ? null
-          : scheduledServiceDayInstant(serviceDate, call.arrival_seconds),
-      departure_instant: departure,
-      boardingByService: memberships,
-    });
   }
-  return { untimed: { count: untimed }, rows };
 }
