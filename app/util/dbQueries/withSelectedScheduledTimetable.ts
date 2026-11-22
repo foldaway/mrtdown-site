@@ -1,5 +1,4 @@
 import {
-  hashBytes,
   type readScheduleTopology,
   ScheduledTimetableRequestScopeSchema,
   type ScheduledTimetableRollbackAssessment,
@@ -17,7 +16,6 @@ import {
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
 import { isLoopPath } from '~/util/stationArrivalBranches';
-import { assessIndexedTimetableRollback } from './assessIndexedTimetableRollback';
 import type { AppDbTransaction } from './database';
 import {
   COMBINED_DEPARTURE_PROJECTOR_VERSION,
@@ -28,6 +26,10 @@ import {
   validateScheduledTimetableHistory,
 } from './scheduledTimetableHistory';
 import { readScheduleTopologyForSnapshot } from './scheduleTopologyCache';
+import {
+  createTimetableSelectionPolicy,
+  indexedServiceIds,
+} from './scheduledTimetableSelection';
 
 type Database = ReturnType<typeof getDb>;
 export type ReadTransaction = AppDbTransaction;
@@ -83,9 +85,7 @@ export type ScheduledTimetableSnapshotOptions<
 
 export class InvalidStationArrivalScopeError extends Error {}
 
-export function indexedServiceIds(scope: IndexedTimetableScope) {
-  return scope.serviceId === undefined ? scope.serviceIds : [scope.serviceId];
-}
+export { indexedServiceIds } from './scheduledTimetableSelection';
 
 // The shared selector does not export its canonical request validation.
 function validateScope(scope: IndexedTimetableScope, topology: Topology) {
@@ -205,7 +205,6 @@ export async function withScheduledTimetableSnapshot<
       const destinationFilter = options.loop
         ? undefined
         : eq(scopes.destination_station_id, scope.destinationStationId);
-      const fingerprint = hashBytes(Buffer.from(JSON.stringify(topology)));
       // Check the full source chain before considering derived projections.
       const history = validateScheduledTimetableHistory(
         await tx.select(scheduledTimetableHistoryColumns).from(timetables),
@@ -229,51 +228,21 @@ export async function withScheduledTimetableSnapshot<
             COMBINED_DEPARTURE_PROJECTOR_VERSION,
           ]),
         );
-      const byIdentity = new Map(
-        indexed.map((row) => [
-          `${row.manifestSha256}:${row.projectorVersion}`,
-          row,
-        ]),
-      );
-      const projectionFor = (version: Version) =>
-        byIdentity.get(
-          `${version.manifestSha256}:${
-            version.format === 'combined'
-              ? COMBINED_DEPARTURE_PROJECTOR_VERSION
-              : SCHEDULED_DEPARTURE_PROJECTOR_VERSION
-          }`,
-        );
-      const projectionReason = (
-        version: Version,
-      ): Attempt['reason'] | undefined => {
-        const { manifest, serviceDateRange } = version;
-        const projection = projectionFor(version);
-        if (
-          manifest.identity.topology.sha256 !== fingerprint ||
-          manifest.identity.topology.projectionVersion !==
-            topology.projectionVersion
-        ) {
-          return 'topology-mismatch';
-        }
-        if (!projection) {
-          return 'projection-unavailable';
-        }
-        if (projection.completedAt === null) {
-          return 'projection-incomplete';
-        }
-        if (
-          projection.topologySha256 !== fingerprint ||
-          projection.topologyProjectionVersion !== topology.projectionVersion
-        ) {
-          return 'topology-mismatch';
-        }
-        if (
-          projection.startDate !== serviceDateRange.startDate ||
-          projection.endDate !== serviceDateRange.endDate
-        ) {
-          return 'projection-metadata-mismatch';
-        }
-      };
+      const policy = createTimetableSelectionPolicy({
+        scope,
+        topology,
+        history,
+        indexed,
+        loop: options.loop,
+        loopRevisions,
+        rollback,
+      });
+      const {
+        projectionFor,
+        projectionReason,
+        maximumDepartureSeconds,
+        unavailableProjections,
+      } = policy;
       // A combined projection can establish an explicitly reviewed service/platform scope.
       if (!matchesPlatformDefaults && scope.platformId !== undefined) {
         const combinedProjectionIds = history.flatMap((version) => {
@@ -308,36 +277,8 @@ export async function withScheduledTimetableSnapshot<
           );
         }
       }
-      let maximumDepartureSeconds = 0;
-      const unavailableProjections: {
-        manifestSha256: string;
-        reason: Attempt['reason'];
-      }[] = [];
-      for (const version of history) {
-        const { manifest, manifestSha256 } = version;
-        if (
-          manifest.identity.topology.sha256 !== fingerprint ||
-          manifest.identity.topology.projectionVersion !==
-            topology.projectionVersion
-        ) {
-          continue;
-        }
-        const reason = projectionReason(version);
-        if (reason) {
-          // Unknown source offsets can hide older service dates, even if a fallback is selected.
-          unavailableProjections.push({ manifestSha256, reason });
-        } else {
-          maximumDepartureSeconds = Math.max(
-            maximumDepartureSeconds,
-            projectionFor(version)?.maximumDepartureSeconds ?? 0,
-          );
-        }
-      }
-      const selectEligible = async (
-        input: string,
-        versions: readonly Version[],
-      ): Promise<ScheduledTimetableSelection<Scope>> => {
-        const serviceDate = z.iso.date().parse(input);
+      const select = async (serviceDate: string) => {
+        const validatedDate = z.iso.date().parse(serviceDate);
         const coverageRows = await tx
           .select({
             projectionId: days.projection_id,
@@ -360,143 +301,8 @@ export async function withScheduledTimetableSnapshot<
               destinationFilter,
             ),
           )
-          .where(eq(days.service_date, serviceDate));
-        const byProjection = new Map<number, (typeof coverageRows)[number][]>();
-        for (const row of coverageRows) {
-          const group = byProjection.get(row.projectionId);
-          if (group) group.push(row);
-          else byProjection.set(row.projectionId, [row]);
-        }
-        const selection: ScheduledTimetableSelection<Scope> = {
-          serviceDate,
-          scope,
-          selected: null,
-          attempts: [],
-          rollback: null,
-        };
-        const loopActive = loopRevisions.every((revisions) =>
-          revisions?.some(
-            ({ startAt, endAt }) =>
-              startAt <= serviceDate && (endAt == null || serviceDate < endAt),
-          ),
-        );
-        // Only the validated receipt chain establishes newest-to-oldest order.
-        for (const version of [...versions].reverse()) {
-          const { serviceDateRange, manifestSha256 } = version;
-          const projection = projectionFor(version);
-          const rows = projection && byProjection.get(projection.id);
-          const coveredScopes = rows?.filter(
-            (row) =>
-              row.platformIds !== null &&
-              (scope.platformId === undefined ||
-                row.platformIds.includes(scope.platformId)),
-          );
-          const unavailable = projectionReason(version);
-          let reason: Attempt['reason'];
-          let coverage: Coverage | undefined;
-          if (
-            serviceDate < serviceDateRange.startDate ||
-            serviceDate > serviceDateRange.endDate
-          ) {
-            reason = 'outside-feed-range';
-          } else if (unavailable) {
-            reason = unavailable;
-          } else if (!projection || projection.completedAt === null) {
-            throw new Error('Eligible projection metadata is missing');
-          } else if (!rows?.length) {
-            reason = 'day-not-indexed';
-          } else if (
-            !loopActive ||
-            !coveredScopes ||
-            new Set(coveredScopes.map(({ serviceId }) => serviceId)).size !==
-              serviceIds.length
-          ) {
-            reason = 'scope-not-covered';
-          } else {
-            coverage = {
-              activeTripCount: rows[0].activeTripCount,
-              unassignedActiveTripCount: rows[0].unassignedActiveTripCount,
-            };
-            reason =
-              coverage.unassignedActiveTripCount > 0
-                ? 'mapping-coverage-gap'
-                : 'eligible';
-            if (reason === 'eligible') {
-              selection.selected = {
-                projectionId: projection.id,
-                projectorVersion: projection.projectorVersion,
-                topology: {
-                  sha256: fingerprint,
-                  projectionVersion: topology.projectionVersion,
-                },
-                maximumDepartureSeconds: projection.maximumDepartureSeconds,
-                completedAt: projection.completedAt,
-                version,
-                ...(options.loop && {
-                  loopDestinationIds: [
-                    ...new Set(
-                      coveredScopes.flatMap(({ destinationId }) =>
-                        destinationId === null ? [] : [destinationId],
-                      ),
-                    ),
-                  ],
-                }),
-                coverage: {
-                  ...coverage,
-                  platformIds: [
-                    ...new Set(
-                      coveredScopes.flatMap((row) => row.platformIds ?? []),
-                    ),
-                  ].sort(),
-                },
-              };
-            }
-          }
-          selection.attempts.push({ manifestSha256, reason, ...coverage });
-          if (selection.selected) {
-            break;
-          }
-        }
-        return selection;
-      };
-      const select = async (
-        serviceDate: string,
-      ): Promise<ScheduledTimetableSelection<Scope>> => {
-        const normal = await selectEligible(serviceDate, history);
-        // Exact-destination rollback reviews do not apply to loop-wide reads.
-        if (!rollback || options.loop) {
-          return normal;
-        }
-        const assessment = assessIndexedTimetableRollback(
-          rollback,
-          normal,
-          history,
-        );
-        if (assessment.status === 'not-applicable') {
-          return { ...normal, rollback: assessment };
-        }
-        if (assessment.status === 'rejected') {
-          return { ...normal, selected: null, rollback: assessment };
-        }
-        // Reuse every normal eligibility check, restricted to the exact reviewed target.
-        const overridden = await selectEligible(
-          serviceDate,
-          history.filter(
-            (version) =>
-              version.manifestSha256 === rollback.review.to.manifestSha256,
-          ),
-        );
-        return {
-          ...overridden,
-          attempts: [...normal.attempts, ...overridden.attempts],
-          rollback: overridden.selected
-            ? assessment
-            : {
-                ...assessment,
-                status: 'rejected',
-                blockers: ['rollback-target-is-not-eligible'],
-              },
-        };
+          .where(eq(days.service_date, validatedDate));
+        return policy.select(validatedDate, coverageRows);
       };
       return use(tx, {
         scope,
