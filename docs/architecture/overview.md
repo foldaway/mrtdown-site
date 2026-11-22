@@ -49,12 +49,32 @@ The end state is to remove the legacy extracted type surface entirely.
 
 Deploy workflows are branch-driven and map branches to environments as follows:
 
-- `production` branch -> `production` environment (`.github/workflows/deploy.yml`)
+- `production` branch -> `production` environment ([deploy-production.yml](../../.github/workflows/deploy-production.yml))
 - `main` branch -> `staging` environment (`.github/workflows/deploy.yml`)
 - `preview` branch -> `preview` environment (`.github/workflows/deploy-preview.yml`)
 
 This mapping is intentional so environment state is tied to a single long-lived
 branch rather than per-PR preview deploys.
+
+Production callers share the reusable
+[production deployment](../../.github/workflows/production-deployment.yml),
+which migrates the database, deploys the supplied commit SHA, and syncs QStash
+schedules. Pushes to `production` deploy the pushed SHA. To promote `main`, run
+[Rebase and deploy production](../../.github/workflows/rebase-production.yml)
+manually with `main` selected. It fetches the latest branches, rebases
+`production` onto `main`, and pushes with an explicit force-with-lease before
+calling the same deployment workflow. Rebase conflicts or concurrent branch
+updates fail the run before deployment; resolve the branch state and retry.
+
+Both callers serialize the entire production release without cancelling a run
+in progress. Each migration and deployment checks that its SHA is still the
+production branch tip, so a queued stale release fails before that operation.
+The rebase uses `GITHUB_TOKEN`, so its push does not start a second
+push-triggered deployment. The manual caller deploys the resulting SHA directly,
+including when the rebase leaves `production` unchanged. GitHub branch rules
+must allow the workflow token to update (and, for divergent history, force-push)
+`production`. The production environment must allow deployments from `main` for
+the manual caller, as well as from `production` for the push caller.
 
 Each environment uses its own `fly.<environment>.toml`. GitHub deployment
 environments provide the Fly deployment token, migration database URL, Sentry
