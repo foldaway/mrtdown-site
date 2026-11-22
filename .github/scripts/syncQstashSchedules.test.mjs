@@ -7,6 +7,21 @@ import {
 } from './syncQstashSchedules.mjs';
 
 describe('QStash schedule synchronization', () => {
+  it('uses the direct workflow origin only for timetable pulls', () => {
+    const schedules = buildManagedSchedules({
+      tier: 'production',
+      rootUrl: 'https://www.mrtdown.org',
+      internalApiToken: 'schedule-secret',
+      pullWorkflowUrl:
+        'https://mrtdown-site.fly.dev/internal/api/workflows/pull',
+    });
+    expect(schedules[0].destination).toBe(
+      'https://mrtdown-site.fly.dev/internal/api/workflows/pull',
+    );
+    expect(schedules[1].destination).toBe(
+      'https://www.mrtdown.org/internal/api/workflows/publicHolidays',
+    );
+  });
   it('builds deterministic production schedules for all recurring jobs', () => {
     const schedules = buildManagedSchedules({
       tier: 'production',

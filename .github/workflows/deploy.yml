@@ -89,6 +89,7 @@ jobs:
           QSTASH_URL: ${{ secrets.QSTASH_URL }}
           TIER: staging
           VITE_ROOT_URL: https://staging.mrtdown.org
+          PULL_WORKFLOW_URL: https://mrtdown-site-staging.fly.dev/internal/api/workflows/pull
 
   migrate-production:
     if: github.ref == 'refs/heads/production'
@@ -168,3 +169,4 @@ jobs:
           QSTASH_URL: ${{ secrets.QSTASH_URL }}
           TIER: production
           VITE_ROOT_URL: https://www.mrtdown.org
+          PULL_WORKFLOW_URL: https://mrtdown-site.fly.dev/internal/api/workflows/pull

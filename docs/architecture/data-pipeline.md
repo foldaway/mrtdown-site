@@ -70,6 +70,14 @@ diagnostic proxies, not billed network transfer. `schedule_topology_load` and
 attestation maintenance enabled. See the [investigation](../investigations/2026-11-18-station-arrival-topology.md)
 for evidence, parity checks and the pending production measurement.
 
+Long timetable imports use `PULL_WORKFLOW_URL` for the signed QStash pull
+endpoint. Production and staging target their direct Fly HTTPS origins so
+Cloudflare response limits do not interrupt projection builds. Public links
+continue to use `VITE_ROOT_URL`. The authenticated completion endpoint accepts
+receipts from both the configured workflow URL and the previous public URL.
+Fly permits up to fifteen minutes of idle response time for these requests;
+producer polling still requires an exact successful release receipt.
+
 ## Timetable admission
 
 Three checks apply to each new release:

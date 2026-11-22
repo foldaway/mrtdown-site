@@ -4,6 +4,26 @@ import { internalMiddleware } from '~/util/internal.middleware';
 import { getClient } from '~/workflows/client';
 import { PullParamsSchema } from '~/workflows/pull/helpers/pullParams';
 
+function pullWorkflowUrls() {
+  const legacy = new URL(
+    '/internal/api/workflows/pull',
+    process.env.VITE_ROOT_URL,
+  ).toString();
+  const configured = process.env.PULL_WORKFLOW_URL;
+  if (!configured) return [legacy];
+  const url = new URL(configured);
+  if (
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    url.pathname !== '/internal/api/workflows/pull'
+  )
+    throw new Error('PULL_WORKFLOW_URL must be an HTTPS pull workflow URL');
+  return [...new Set([url.toString(), legacy])];
+}
+
 export async function handlePullPost(request: Request) {
   let json: unknown;
   try {
@@ -23,10 +43,7 @@ export async function handlePullPost(request: Request) {
     );
   }
   const { workflowRunId } = await getClient().trigger({
-    url: new URL(
-      '/internal/api/workflows/pull',
-      process.env.VITE_ROOT_URL,
-    ).toString(),
+    url: pullWorkflowUrls()[0],
     body: parsed.data,
     headers: {
       'Content-Type': 'application/json',
@@ -47,19 +64,20 @@ export async function handlePullGet(request: Request) {
       { status: 400 },
     );
   }
-  const workflowUrl = new URL(
-    '/internal/api/workflows/pull',
-    process.env.VITE_ROOT_URL,
-  ).toString();
-  const { runs } = await getClient().logs({
-    filter: { workflowRunId, workflowUrl },
-    count: 1,
-  });
-  const run = runs.find(
-    (value) =>
-      value.workflowRunId === workflowRunId &&
-      value.workflowUrl === workflowUrl,
-  );
+  const client = getClient();
+  let run: Awaited<ReturnType<typeof client.logs>>['runs'][number] | undefined;
+  for (const workflowUrl of pullWorkflowUrls()) {
+    const { runs } = await client.logs({
+      filter: { workflowRunId, workflowUrl },
+      count: 1,
+    });
+    run = runs.find(
+      (value) =>
+        value.workflowRunId === workflowRunId &&
+        value.workflowUrl === workflowUrl,
+    );
+    if (run) break;
+  }
   if (!run)
     return Response.json(
       { workflowRunId, state: 'PENDING' },
