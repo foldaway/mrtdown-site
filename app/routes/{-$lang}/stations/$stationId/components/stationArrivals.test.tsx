@@ -269,15 +269,15 @@ describe('station guide arrival sources', () => {
     },
   );
 
-  it('only describes an empty next hour with a known time inside the response window', () => {
+  it('accepts fresh empty responses ahead of the sampled clock while rejecting expired or stale results', () => {
     if (scheduled.source !== 'scheduled') throw new Error('fixture');
     const empty = { ...scheduled, timings: [] };
     const start = Date.parse(empty.window.startInstant);
     const end = Date.parse(empty.window.endInstant);
-    for (const now of [start, end - 1]) {
+    for (const now of [start - 15_000, start - 1, start, end - 1]) {
       expect(renderRow(empty, 'ready', now)).toContain('None in the next hour');
     }
-    for (const now of [null, start - 1, end + 60_000]) {
+    for (const now of [null, end, end + 60_000]) {
       const html = renderRow(empty, 'ready', now);
       expect(html).not.toContain('None in the next hour');
       expect(html).toContain('Timetable unavailable');
