@@ -238,13 +238,35 @@ export function parseTranslations(value: unknown): Line['name'] {
   };
 }
 
-export async function buildDataset(
-  referenceNow = nowSg(),
+type LatestEventsByIssueId = Record<
+  string,
+  Partial<Record<DatasetImpactEvent['type'], DatasetImpactEvent>>
+>;
+
+function indexLatestEvents(impactEventRows: DatasetImpactEvent[]) {
+  return impactEventRows.reduce<LatestEventsByIssueId>((acc, event) => {
+    acc[event.issue_id] ??= {};
+    const current = acc[event.issue_id][event.type];
+    if (current == null) {
+      acc[event.issue_id][event.type] = event;
+      return acc;
+    }
+
+    const tsDiff =
+      parseDateTime(event.ts).toMillis() - parseDateTime(current.ts).toMillis();
+    if (tsDiff > 0 || (tsDiff === 0 && event.id > current.id)) {
+      acc[event.issue_id][event.type] = event;
+    }
+    return acc;
+  }, {});
+}
+
+export async function readDatasetInputs(
   db?: AppDbReader,
   issueIds?: readonly string[],
   staticScope?: DatasetStaticScope,
   inputs: DatasetReferenceInputs = {},
-): Promise<BaseDataset> {
+) {
   const { servicePaths: cachedServicePaths, references: rangeReferences } =
     inputs;
   const database =
@@ -508,31 +530,7 @@ export async function buildDataset(
     ]),
   );
 
-  const latestEventByTypeByIssueId = impactEventRows.reduce<
-    Record<
-      string,
-      Partial<
-        Record<
-          (typeof impactEventRows)[number]['type'],
-          (typeof impactEventRows)[number]
-        >
-      >
-    >
-  >((acc, event) => {
-    acc[event.issue_id] ??= {};
-    const current = acc[event.issue_id][event.type];
-    if (current == null) {
-      acc[event.issue_id][event.type] = event;
-      return acc;
-    }
-
-    const tsDiff =
-      parseDateTime(event.ts).toMillis() - parseDateTime(current.ts).toMillis();
-    if (tsDiff > 0 || (tsDiff === 0 && event.id > current.id)) {
-      acc[event.issue_id][event.type] = event;
-    }
-    return acc;
-  }, {});
+  const latestEventByTypeByIssueId = indexLatestEvents(impactEventRows);
 
   const selectedStateEventIds = [
     ...new Set(
@@ -668,6 +666,78 @@ export async function buildDataset(
     ]),
   );
 
+  const allRevisionIds = [
+    ...new Set(serviceRevisionRows.map((revision) => revision.id)),
+  ];
+  const revisionIds = new Set(allRevisionIds);
+  const servicePathRows = cachedServicePaths
+    ? cachedServicePaths.filter((row) =>
+        revisionIds.has(row.service_revision_id),
+      )
+    : await timeServerSpan('dataset_service_path_query', () =>
+        readServicePathRows(database, allRevisionIds),
+      );
+  return {
+    metadataRows,
+    linesRows,
+    lineOperatorsRows,
+    operatorsRows,
+    townsRows,
+    landmarksRows,
+    stationRows,
+    stationCodesRows,
+    stationLandmarksRows,
+    serviceRows,
+    serviceRevisionRows,
+    publicHolidayRows,
+    issueRows,
+    latestEvidenceRows,
+    impactEventRows,
+    impactEventPeriodRows,
+    impactEventServiceRows,
+    impactEventFacilityRows,
+    impactEventCauseRows,
+    impactEventServiceScopeRows,
+    impactEventServiceEffectRows,
+    impactEventFacilityEffectRows,
+    servicePathRows,
+  };
+}
+
+export type DatasetInputs = Awaited<ReturnType<typeof readDatasetInputs>>;
+
+/** Pure request-clock assembly; published inputs never freeze current state. */
+export function assembleDataset(
+  referenceNow: DateTime,
+  rows: DatasetInputs,
+  staticScope?: DatasetStaticScope,
+): BaseDataset {
+  const {
+    metadataRows,
+    linesRows,
+    lineOperatorsRows,
+    operatorsRows,
+    townsRows,
+    landmarksRows,
+    stationRows,
+    stationCodesRows,
+    stationLandmarksRows,
+    serviceRows,
+    serviceRevisionRows,
+    publicHolidayRows,
+    issueRows,
+    latestEvidenceRows,
+    impactEventRows,
+    impactEventPeriodRows,
+    impactEventServiceRows,
+    impactEventFacilityRows,
+    impactEventCauseRows,
+    impactEventServiceScopeRows,
+    impactEventServiceEffectRows,
+    impactEventFacilityEffectRows,
+    servicePathRows,
+  } = rows;
+  const latestEventByTypeByIssueId = indexLatestEvents(impactEventRows);
   const metadata = Object.fromEntries(
     metadataRows.map((row) => [row.key, row.value]),
   );
@@ -770,17 +840,6 @@ export async function buildDataset(
       ),
   );
 
-  const allRevisionIds = [
-    ...new Set(serviceRevisionRows.map((revision) => revision.id)),
-  ];
-  const revisionIds = new Set(allRevisionIds);
-  const servicePathRows = cachedServicePaths
-    ? cachedServicePaths.filter((row) =>
-        revisionIds.has(row.service_revision_id),
-      )
-    : await timeServerSpan('dataset_service_path_query', () =>
-        readServicePathRows(database, allRevisionIds),
-      );
   const assemblyStartedAt = performance.now();
 
   const pathEntriesByRevisionKey = servicePathRows.reduce<
@@ -1436,6 +1495,20 @@ export async function buildDataset(
     issuesByLineId,
     issueFreshUntil,
   };
+}
+
+export async function buildDataset(
+  referenceNow = nowSg(),
+  db?: AppDbReader,
+  issueIds?: readonly string[],
+  staticScope?: DatasetStaticScope,
+  inputs: DatasetReferenceInputs = {},
+): Promise<BaseDataset> {
+  return assembleDataset(
+    referenceNow,
+    await readDatasetInputs(db, issueIds, staticScope, inputs),
+    staticScope,
+  );
 }
 
 /**

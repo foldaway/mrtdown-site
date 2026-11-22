@@ -28,12 +28,15 @@ import {
   getRangeReferenceCacheKey,
   publishRangeReferenceCache,
 } from '~/util/rangeReferenceCache.server';
+import { publishRangeSnapshot } from '~/util/rangeSnapshot.server';
+import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
 import {
   getServicePathCacheKey,
   publishServicePathCache,
 } from '~/util/servicePathCache.server';
 import { buildWeeklySummary } from '~/util/weeklyReport';
 import { syncPublicHolidays } from '~/workflows/publicHolidays/helpers/syncPublicHolidays';
+import { recordCanonicalManifestFingerprint } from '~/workflows/pull/helpers/manifestFingerprint';
 import { scheduledTimetableCanonicalFixture } from '~/workflows/pull/helpers/scheduledTimetableCanonical.fixture';
 import * as sync from '~/workflows/pull/helpers/stagingSync';
 import * as database from './database';
@@ -54,6 +57,8 @@ const redis = vi.hoisted(() => ({
   getrange: vi.fn(),
   set: vi.fn(),
   expire: vi.fn(),
+  eval: vi.fn(),
+  del: vi.fn(),
 }));
 vi.mock('~/util/pageProfileRedis.server', () => ({
   getPageProfileRedis: async () => redis,
@@ -122,6 +127,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
   });
   beforeEach(async () => {
     vi.stubEnv('TIER', 'staging');
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', undefined);
     vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'publish');
     vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'publish');
     vi.setSystemTime(now.toJSDate());
@@ -131,12 +137,35 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     redis.getrange.mockImplementation(
       async (key: string) => store.get(key) ?? '',
     );
-    redis.set.mockImplementation(async (key: string, raw: string) => {
-      if (store.has(key)) return null;
-      store.set(key, raw);
-      return 'OK';
-    });
+    redis.set.mockImplementation(
+      async (key: string, raw: string, ...args: unknown[]) => {
+        if (args.includes('NX') && store.has(key)) return null;
+        store.set(key, raw);
+        return 'OK';
+      },
+    );
     redis.expire.mockResolvedValue(1);
+    redis.del.mockImplementation(async (key: string) =>
+      Number(store.delete(key)),
+    );
+    redis.eval.mockImplementation(
+      async (
+        _script,
+        _count,
+        active,
+        key,
+        _previous,
+        expected,
+        next,
+        _retention,
+        encoded,
+      ) => {
+        if ((store.get(active) ?? '') !== expected) return 0;
+        store.set(key, encoded);
+        store.set(active, next);
+        return 1;
+      },
+    );
     await pool.query(
       'TRUNCATE operators, towns, landmarks, lines, stations, services, issues, metadata, public_holidays CASCADE',
     );
@@ -218,6 +247,156 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
       await admin.end();
     }
   });
+
+  it('serves a published range at different request clocks with no database accessor', async () => {
+    const clocks = [now.minus({ hours: 2 }), now, now.plus({ days: 1 })];
+    const expected = [];
+    for (const clock of clocks)
+      expected.push(
+        await getIssuesOverlappingRange(
+          clock.startOf('day'),
+          clock.plus({ days: 1 }).startOf('day'),
+          clock,
+          db,
+        ),
+      );
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'publish');
+    await publishRangeSnapshot('a'.repeat(64));
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.spyOn(database, 'getDefaultDb').mockRejectedValue(
+      Error('SQL must stay asleep'),
+    );
+    queries.length = 0;
+    for (const [index, clock] of clocks.entries()) {
+      expect(
+        await getIssuesOverlappingRange(
+          clock.startOf('day'),
+          clock.plus({ days: 1 }).startOf('day'),
+          clock,
+        ),
+      ).toEqual(expected[index]);
+    }
+    expect(queries).toEqual([]);
+    expect(headers).not.toHaveBeenCalledWith('Cache-Control', 'no-store');
+  });
+
+  it('recomputes open intervals and service revisions across midnight without republishing', async () => {
+    await pool.query(
+      "update service_revisions set end_at='2026-11-19' where id='revision'",
+    );
+    await pool.query(
+      "insert into service_revisions (id,service_id,start_at,end_at,operating_hours) select 'next',service_id,'2026-11-19',null,operating_hours from service_revisions where id='revision'",
+    );
+    await pool.query(
+      "insert into service_revision_path_station_entries (service_revision_id,service_id,station_id,display_code,path_index) select 'next',service_id,station_id,display_code || 'N',path_index from service_revision_path_station_entries where service_revision_id='revision'",
+    );
+    await pool.query('update impact_event_periods set end_ts=null');
+    const at = (clock: DateTime) =>
+      getIssuesOverlappingRange(
+        clock.startOf('day'),
+        clock.plus({ days: 1 }).startOf('day'),
+        clock,
+        db,
+      );
+    const expected = [await at(now), await at(now.plus({ days: 1 }))];
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'publish');
+    await publishRangeSnapshot('a'.repeat(64));
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    queries.length = 0;
+    expect(await at(now)).toEqual(expected[0]);
+    const tomorrow = await at(now.plus({ days: 1 }));
+    expect(tomorrow).toEqual(expected[1]);
+    expect(
+      tomorrow.dataset.branchByServiceId.service.entries[0].displayCode,
+    ).toBe('T1N');
+    expect(tomorrow.issues).toHaveLength(1);
+    expect(queries).toEqual([]);
+  });
+
+  it('uses only the latest corrected periods, including timestamp ties, for published range selection', async () => {
+    await pool.query(
+      "insert into impact_events (id,ts,issue_id,type) values ('period-z','2026-11-18T10:00:00+08:00','issue','periods.set')",
+    );
+    await pool.query(
+      "insert into impact_event_periods (impact_event_id,index,start_ts,end_ts) values ('period-z',0,'2026-12-01T10:00:00+08:00','2026-12-01T11:00:00+08:00')",
+    );
+    const baseline = await range();
+    expect(baseline.issues).toEqual([]);
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'publish');
+    await publishRangeSnapshot('a'.repeat(64));
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    queries.length = 0;
+    expect(await range()).toEqual(baseline);
+    expect(queries).toEqual([]);
+  });
+
+  it('keeps the complete published source during promotion and switches issue/path corrections together', async () => {
+    const baseline = await range();
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'publish');
+    await recordCanonicalManifestFingerprint(db, 'a'.repeat(64));
+    await publishRangeSnapshot();
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    await markPageProfilesUpdating(db);
+    await db
+      .update(paths)
+      .set({ display_code: 'CORRECTED' })
+      .where(eq(paths.path_index, 0));
+    await db.update(issuesTable).set({
+      title: { ...baseline.issues[0].title, 'en-SG': 'Corrected issue' },
+    });
+    queries.length = 0;
+    expect(await range()).toEqual(baseline);
+    expect(queries).toEqual([]);
+    await expect(publishRangeSnapshot()).rejects.toThrow('completed canonical');
+    await completePageProfileGeneration(db, randomUUID());
+    await recordCanonicalManifestFingerprint(db, 'b'.repeat(64));
+    await publishRangeSnapshot();
+    queries.length = 0;
+    const corrected = await range();
+    expect(corrected.issues[0].title['en-SG']).toBe('Corrected issue');
+    expect(
+      corrected.dataset.branchByServiceId.service.entries[0].displayCode,
+    ).toBe('CORRECTED');
+    expect(queries).toEqual([]);
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', '');
+    expect(await range()).toEqual(corrected);
+  });
+
+  it('republishes independent holiday changes and preserves zero-SQL overview/history output', async () => {
+    const outputs = async () => ({
+      overview: await getOverviewData(30),
+      month: await getHistoryYearMonthData(2026, 11),
+    });
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'publish');
+    const before = await outputs();
+    await publishRangeSnapshot('a'.repeat(64));
+    const original = (await rangeSnapshotStore.head()).value?.sha256;
+    await pool.query('delete from public_holidays');
+    const expected = await outputs();
+    expect(expected.overview).not.toEqual(before.overview);
+    await publishRangeSnapshot('a'.repeat(64));
+    expect((await rangeSnapshotStore.head()).value?.sha256).not.toBe(original);
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    queries.length = 0;
+    expect(await outputs()).toEqual(expected);
+    expect(queries).toEqual([]);
+  });
+
+  it.each(['missing', 'invalid', 'unavailable'] as const)(
+    'recovers through SQL with no-store for %s published head',
+    async (failure) => {
+      const baseline = await range();
+      vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+      if (failure === 'invalid')
+        store.set('mrtdown:{staging:range-snapshot:v1}:active', '{}');
+      if (failure === 'unavailable')
+        redis.getrange.mockRejectedValueOnce(Error('unavailable'));
+      queries.length = 0;
+      expect(await range()).toEqual(baseline);
+      expect(queries.length).toBeGreaterThan(0);
+      expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+    },
+  );
 
   it('preserves SQL output while eliminating path queries', async () => {
     const baseline = await range();

@@ -18,6 +18,11 @@ import {
   isRangeReferenceCachePublicationEnabled,
   publishRangeReferenceCache,
 } from '~/util/rangeReferenceCache.server.js';
+import { publishRangeSnapshot } from '~/util/rangeSnapshot.server.js';
+import {
+  isRangeSnapshotPublicationEnabled,
+  rangeSnapshotStore,
+} from '~/util/rangeSnapshotStore.server.js';
 import {
   isServicePathCachePublicationEnabled,
   publishServicePathCache,
@@ -34,6 +39,7 @@ import {
   readCanonicalManifestFingerprint,
   recordCanonicalManifestFingerprint,
 } from './helpers/manifestFingerprint.js';
+import { canSkipPublishedCanonicalPull } from './helpers/publishedInputs.js';
 import {
   type PullParams,
   PullParamsSchema,
@@ -73,7 +79,7 @@ function isPageProfilePublicationEnabled() {
   return isNavigationCachePublicationEnabled() || isIssueProfileCacheEnabled();
 }
 
-async function publishPullCaches(generation: string) {
+async function publishPullCaches(generation: string, fingerprint?: string) {
   await completePageProfileGeneration(getDb(), generation);
   if (isServicePathCachePublicationEnabled()) {
     await publishServicePathCache(generation);
@@ -83,6 +89,9 @@ async function publishPullCaches(generation: string) {
   }
   if (isPageProfilePublicationEnabled()) {
     await publishNavigationCache(generation);
+  }
+  if (isRangeSnapshotPublicationEnabled()) {
+    await publishRangeSnapshot(fingerprint);
   }
   return purgePublicDataCache();
 }
@@ -213,6 +222,13 @@ async function executePull(
     async () => isCanonicalManifestCurrent(getDb(), manifestFingerprint),
   );
   if (manifestIsCurrent && !rebuildScheduledTimetableProjection) {
+    if (isRangeSnapshotPublicationEnabled()) {
+      await runPullStep(context, 'repair-range-snapshot', async () => {
+        await publishRangeSnapshot(manifestFingerprint);
+        await purgePublicDataCache();
+        await rangeSnapshotStore.complete(manifestFingerprint);
+      });
+    }
     if (isServicePathCachePublicationEnabled()) {
       await runPullStep(context, 'renew-service-path-cache', () =>
         publishServicePathCache(),
@@ -225,6 +241,12 @@ async function executePull(
     }
     console.log('[PULL] Canonical manifest unchanged; skipping pull');
     return;
+  }
+
+  if (isRangeSnapshotPublicationEnabled()) {
+    await runPullStep(context, 'invalidate-range-snapshot-checkpoint', () =>
+      rangeSnapshotStore.invalidateCompletion(),
+    );
   }
 
   const counts = await runPullStep(context, 'parse', async () => {
@@ -494,12 +516,15 @@ async function executePull(
   );
 
   await runPullStep(context, 'publish-public-data-cache', () =>
-    publishPullCaches(context.workflowRunId),
+    publishPullCaches(context.workflowRunId, manifestFingerprint),
   );
 
-  await runPullStep(context, 'record-manifest-fingerprint', () =>
-    recordCanonicalManifestFingerprint(getDb(), manifestFingerprint),
-  );
+  await runPullStep(context, 'record-manifest-fingerprint', async () => {
+    await recordCanonicalManifestFingerprint(getDb(), manifestFingerprint);
+    if (isRangeSnapshotPublicationEnabled()) {
+      await rangeSnapshotStore.complete(manifestFingerprint);
+    }
+  });
 
   console.log('[PULL] Pull complete', counts);
 }
@@ -518,6 +543,20 @@ export const pullWorkflow = createWorkflow<
     if (!parsed.success) {
       throw new WorkflowNonRetryableError('Invalid canonical pull request');
     }
+    const params = parsed.data;
+    if (isRangeSnapshotPublicationEnabled()) {
+      const unchanged = await context.run('check-published-range-inputs', () =>
+        canSkipPublishedCanonicalPull(params),
+      );
+      if (unchanged) {
+        return { combinedReleaseIndex: params.combinedReleaseIndex ?? null };
+      }
+      // Persist whether SQL lease acquisition can have occurred. Failure
+      // cleanup must not wake SQL after a failed external-only preflight.
+      await context.run('mark-range-snapshot-writer', () =>
+        rangeSnapshotStore.markWriter(context.workflowRunId),
+      );
+    }
     const acquired = await context.run('acquire-pull-lease', async () =>
       acquireOrRenewPullWorkflowLease(getDb(), context.workflowRunId),
     );
@@ -531,11 +570,23 @@ export const pullWorkflow = createWorkflow<
     await context.run('release-pull-lease', async () =>
       releasePullWorkflowLease(getDb(), context.workflowRunId),
     );
+    if (isRangeSnapshotPublicationEnabled()) {
+      await context.run('finish-range-snapshot-writer', () =>
+        rangeSnapshotStore.finishWriter(context.workflowRunId),
+      );
+    }
     return { combinedReleaseIndex: parsed.data.combinedReleaseIndex ?? null };
   },
   {
     failureFunction: async ({ context }) => {
+      if (
+        isRangeSnapshotPublicationEnabled() &&
+        !(await rangeSnapshotStore.hasWriter(context.workflowRunId))
+      )
+        return;
       await releasePullWorkflowLease(getDb(), context.workflowRunId);
+      if (isRangeSnapshotPublicationEnabled())
+        await rangeSnapshotStore.finishWriter(context.workflowRunId);
     },
   },
 );

@@ -13,6 +13,15 @@ jobs:
     name: Verify
     runs-on: ubuntu-latest
     services:
+      redis:
+        image: valkey/valkey:9-alpine
+        ports:
+          - 6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
       postgres:
         image: ghcr.io/baosystems/postgis:17
         env:
@@ -44,4 +53,5 @@ jobs:
       - name: Verify
         env:
           TEST_TIMETABLE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports[5432] }}/mrtdown_test
+          TEST_SNAPSHOT_REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports[6379] }}
         run: npm run verify

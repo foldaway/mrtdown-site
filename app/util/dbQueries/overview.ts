@@ -4,7 +4,7 @@ import {
   type CommunitySignalOptions,
   getPageCommunitySignals,
 } from './communitySignals';
-import { type AppDb, getDefaultDb } from './database';
+import type { AppDb } from './database';
 import type { BaseDataset } from './dataset';
 import { nowSg, SG_TIMEZONE } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
@@ -27,7 +27,6 @@ async function buildOverviewDataset(
   db?: AppDb,
 ): Promise<OverviewDataset> {
   return timeServerSpan('build_overview_dataset', async () => {
-    const database = db ?? (await getDefaultDb());
     const referenceDateTime = referenceNow.setZone(SG_TIMEZONE);
     const rangeStart = referenceDateTime
       .startOf('day')
@@ -35,8 +34,7 @@ async function buildOverviewDataset(
     const rangeEnd = referenceDateTime.startOf('day').plus({ days: 1 });
     const { dataset } = await timeServerSpan(
       'overview_issue_range_dataset',
-      () =>
-        getIssuesOverlappingRange(rangeStart, rangeEnd, referenceNow, database),
+      () => getIssuesOverlappingRange(rangeStart, rangeEnd, referenceNow, db),
     );
     return {
       included: dataset.included,

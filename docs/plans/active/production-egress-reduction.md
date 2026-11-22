@@ -2,6 +2,11 @@
 
 ## Purpose
 
+For new work, the [Neon sleep plan](neon-sleep.md) owns the primary outcome:
+ordinary public reads and unchanged-input polls should execute zero SQL so
+Neon can remain suspended between changes. Transfer reductions below describe
+earlier tranches and are not sufficient acceptance for that goal.
+
 Reduce avoidable database transfer while preserving public responses and
 canonical data semantics. As of November 18, service-path reuse for date-range
 pages is deployed in production. Its next step is the matched post-cutover

@@ -234,6 +234,67 @@ dataset path queries. Station profiles and arrivals retain their current SQL
 readers. To roll back, unset only `REDIS_SERVICE_PATH_CACHE` and purge the data
 tag. Production enablement still requires the aggregate usage evidence below.
 
+## Published zero-SQL range inputs
+
+`REDIS_RANGE_SNAPSHOT` accepts `publish` (writer only), `enabled` (writer and
+reader), or unset (disabled). This is a separate opt-in path from the reference
+and service-path caches. It serves canonical range assembly for history,
+issues-day, overview/map and report range inputs. Optional community signals,
+weekly archive/sitemap reads, entity profiles and arrivals still have their
+existing SQL dependencies; this flag alone cannot make the entire site sleep.
+
+The producer loads canonical source rows from one read-only repeatable-read
+snapshot after page-profile completion. It excludes evidence bodies and rider
+reports. The consumer validates the encoding, digest and row schemas, selects
+latest-period candidates and assembles using the request's clock. Time passing,
+including midnight or an issue ending, does not need SQL or republication.
+
+Redis keys use `mrtdown:{<tier>:range-snapshot:v1}` (one cluster hash slot):
+`active` names an immutable
+`payload:<sha256>` containing gzip/base64 canonical input rows. Limits are
+4 MiB encoded and 24 MiB expanded JSON. The payload and pointer commit in one
+atomic compare-and-swap operation. Each head has a unique publication ID, so
+a delayed producer must retry even if the inputs changed and then changed back.
+Readers keep using the last completed snapshot throughout
+an import. The active pointer and payload have no TTL; superseded
+payloads expire after 24 hours. Each process memoizes one decoded payload but
+checks the active pointer in Redis on every read. Cold processes use Redis,
+not a SQL generation check. A missing/invalid/unavailable snapshot uses SQL
+with `no-store`; requests never publish replacements.
+
+A `completed` fingerprint is recorded only after canonical publication, purge
+and the SQL fingerprint succeed. With reads enabled, unchanged scheduled pulls
+fetch upstream metadata and validate this external checkpoint and payload
+before acquiring a SQL lease. Missing payloads/checkpoints or changed inputs
+take the normal writer/recovery path. Reviews, rebuilds and explicit seeds
+always retain that path. Publish-only mode retains existing renewal behavior.
+Writers clear the checkpoint before import or projection work can mutate SQL,
+while retaining the serving snapshot. A failed rebuild therefore cannot stop
+the next ordinary poll from reaching SQL recovery.
+Failure cleanup uses a short-lived external writer marker to avoid opening SQL
+when an upstream-only preflight failed before lease acquisition.
+
+When publication is enabled, every holiday workflow run republishes before
+purging, even if the holiday rows are unchanged. This retries publication or
+purge failures after an earlier sync committed, without a separate dirty marker.
+The publisher reads both completion metadata and source rows in the same
+repeatable-read transaction; an updating canonical generation is rejected.
+Manual facts rebuilds do not change its canonical source inputs. Canonical SQL
+repairs must complete promotion and republish before considering the change
+public; direct unsupported writes are not made fresh by a reader TTL.
+
+For rollout, deploy with the flag unset, then set `publish` and run the normal
+authenticated pull. Unchanged inputs repair the snapshot without importing or
+advancing generation. Validate payload size and cold/warm SQL parity in staging,
+then enable reads and purge the public data tag. Staging exposes
+`X-MRTDown-Range-Snapshot-Source`; structured `range_snapshot_read` events report
+`redis`, `memory` or `sql` and payload bytes. Verify zero SQL for canonical
+range hits and for unchanged scheduled pulls, including failure cleanup.
+Rollback by unsetting only this flag and purging the data tag; existing SQL and
+reference/path readers remain available. A successful local check does not
+establish production sleep; use the [sleep plan](../plans/active/neon-sleep.md)
+for remaining wake-ups and eventual provider-level acceptance.
+
 ## Redis usage evidence
 
 Use the configured database's Upstash Usage and billing views, or the
