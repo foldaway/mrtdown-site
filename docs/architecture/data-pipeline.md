@@ -5,6 +5,15 @@ read the normalized tables through [feature queries](../../app/util/dbQueries).
 
 ## Canonical pull
 
+The authenticated `POST /internal/api/tasks/pull` queues an import and returns
+its workflow run ID. `GET` on the same route with `workflowRunId` reports that
+exact canonical pull's state. A successful new pull also returns its requested
+`combinedReleaseIndex` after the import, cache publication and lease release
+finish. Publishers must match both the run and release identity before advancing
+their baseline; HTTP 202 alone only means queued. Responses are uncached and omit
+workflow steps, payloads and headers. Pre-existing runs without the new receipt
+cannot confirm an exact release to an automated publisher.
+
 The [pull workflow](../../app/workflows/pull/index.ts) snapshots the source
 manifest, verifies any advertised timetable, stages canonical entities in
 `*_next` tables, and promotes them before refreshing derived data. Staging

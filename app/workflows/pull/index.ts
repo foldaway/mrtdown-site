@@ -504,7 +504,10 @@ async function executePull(
   console.log('[PULL] Pull complete', counts);
 }
 
-export const pullWorkflow = createWorkflow<PullParams, void>(
+export const pullWorkflow = createWorkflow<
+  PullParams,
+  { combinedReleaseIndex: PullParams['combinedReleaseIndex'] | null }
+>(
   async (context) => {
     // Scheduled invocations have an empty body; direct signed workflow calls
     // must validate the same review contract as the authenticated task trigger.
@@ -528,6 +531,7 @@ export const pullWorkflow = createWorkflow<PullParams, void>(
     await context.run('release-pull-lease', async () =>
       releasePullWorkflowLease(getDb(), context.workflowRunId),
     );
+    return { combinedReleaseIndex: parsed.data.combinedReleaseIndex ?? null };
   },
   {
     failureFunction: async ({ context }) => {
