@@ -1,3 +1,4 @@
+import { isUtf8 } from 'node:buffer';
 import { createHash, randomUUID } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import type Redis from 'ioredis';
@@ -17,7 +18,10 @@ const HeadSchema = z.object({
 });
 export type PublishedSnapshotHead = z.infer<typeof HeadSchema>;
 
-export type SnapshotRedis = Pick<Redis, 'getrange' | 'set' | 'eval' | 'del'>;
+export type SnapshotRedis = Pick<
+  Redis,
+  'getrange' | 'getrangeBuffer' | 'set' | 'eval' | 'del'
+>;
 export type SnapshotNamespace = 'range-snapshot' | 'arrival-inputs';
 
 export function getSnapshotKeyPrefix(namespace: SnapshotNamespace) {
@@ -27,9 +31,11 @@ export function getSnapshotKeyPrefix(namespace: SnapshotNamespace) {
   return `mrtdown:{${tier}:${namespace}:v1}`;
 }
 
-function parseHead(raw: string): PublishedSnapshotHead | undefined {
+function parseHead(raw: string | Buffer): PublishedSnapshotHead | undefined {
+  const bytes = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+  if (bytes.length > MAX_HEAD_BYTES || !isUtf8(bytes)) return undefined;
   try {
-    return HeadSchema.parse(JSON.parse(raw));
+    return HeadSchema.parse(JSON.parse(bytes.toString('utf8')));
   } catch {
     // Keep the raw value so a publisher can replace a malformed head via CAS.
     return undefined;
@@ -59,7 +65,7 @@ export function createPublishedSnapshotStore<T>(
 
   async function head() {
     const redis = await connect();
-    const raw = await redis.getrange(headKey(), 0, MAX_HEAD_BYTES);
+    const raw = await redis.getrangeBuffer(headKey(), 0, MAX_HEAD_BYTES);
     return { raw, value: parseHead(raw) };
   }
 
@@ -106,7 +112,7 @@ export function createPublishedSnapshotStore<T>(
   }
 
   async function publish(
-    expectedRawHead: string,
+    expectedRawHead: string | Buffer,
     inputs: T,
     generation: string,
     fingerprint: string,

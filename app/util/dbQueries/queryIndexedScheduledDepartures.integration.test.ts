@@ -486,12 +486,12 @@ describe.skipIf(!url)('indexed departure window', () => {
         await expect(publishArrivalInputSnapshot()).rejects.toThrow(
           'completed timetable projections',
         );
-        expect((await arrivalInputSnapshotStore.head()).raw).toBe(before);
+        expect((await arrivalInputSnapshotStore.head()).raw).toEqual(before);
         await markPageProfilesUpdating(db());
         await expect(publishArrivalInputSnapshot()).rejects.toThrow(
           'completed canonical inputs',
         );
-        expect((await arrivalInputSnapshotStore.head()).raw).toBe(before);
+        expect((await arrivalInputSnapshotStore.head()).raw).toEqual(before);
       } finally {
         const keys = await redis.keys(`${prefix}:*`);
         if (keys.length) await redis.del(...keys);

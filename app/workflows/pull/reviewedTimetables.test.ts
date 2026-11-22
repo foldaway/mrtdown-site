@@ -352,8 +352,17 @@ describe('published zero-SQL range inputs', () => {
     expect(purgePublicDataCache).not.toHaveBeenCalled();
     expect(rangeSnapshotStore.complete).not.toHaveBeenCalled();
     await run.run();
-    expect(publishArrivalInputSnapshot).toHaveBeenCalledWith(state.fingerprint);
+    expect(publishArrivalInputSnapshot).toHaveBeenCalledTimes(2);
+    expect(publishArrivalInputSnapshot).toHaveBeenNthCalledWith(
+      2,
+      state.fingerprint,
+    );
     expect(rangeSnapshotStore.complete).toHaveBeenCalledWith(state.fingerprint);
+    expect(
+      vi.mocked(publishArrivalInputSnapshot).mock.invocationCallOrder[1],
+    ).toBeLessThan(
+      vi.mocked(rangeSnapshotStore.complete).mock.invocationCallOrder[0],
+    );
     expect(fetchArchive).not.toHaveBeenCalled();
   });
 
