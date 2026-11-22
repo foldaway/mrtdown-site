@@ -41,6 +41,8 @@ and [execution plan guide](https://developers.openai.com/cookbook/articles/codex
 
 ## Active
 
+- [Let Neon sleep between canonical changes](active/neon-sleep.md): zero-SQL
+  public serving and unchanged-input checks outside Postgres.
 - [Combined timetable pull rollout](active/combined-timetable-pull-rollout.md):
   records the November cutover and tracks safe successor projection builds.
 - [Dynamic system map](active/dynamic-system-map.md): canonical schematic map

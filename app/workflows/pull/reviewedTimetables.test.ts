@@ -33,6 +33,8 @@ import { getStationProfileReadModel } from '~/util/dbQueries/stations';
 import { withSelectedScheduledTimetable } from '~/util/dbQueries/withSelectedScheduledTimetable';
 import { publishNavigationCache } from '~/util/navigationCache.server';
 import { publishRangeReferenceCache } from '~/util/rangeReferenceCache.server';
+import { publishRangeSnapshot } from '~/util/rangeSnapshot.server';
+import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
 import { publishServicePathCache } from '~/util/servicePathCache.server';
 import { combinedTimetableArchiveFixture } from './helpers/combinedTimetableArchive.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
@@ -62,6 +64,19 @@ const state = vi.hoisted(() => ({
     | undefined
     | ((args: { context: WorkflowContext<PullParams> }) => Promise<void>),
   fingerprint: undefined as string | undefined,
+}));
+vi.mock('~/util/rangeSnapshot.server', () => ({
+  publishRangeSnapshot: vi.fn(async () => {}),
+}));
+vi.mock('~/util/rangeSnapshotStore.server', async (original) => ({
+  ...(await original<typeof import('~/util/rangeSnapshotStore.server')>()),
+  rangeSnapshotStore: {
+    isCurrent: vi.fn(async () => false),
+    complete: vi.fn(async () => {}),
+    markWriter: vi.fn(async () => {}),
+    hasWriter: vi.fn(async () => false),
+    finishWriter: vi.fn(async () => {}),
+  },
 }));
 vi.mock('node:fs/promises', async (original) => {
   const actual = await original<typeof import('node:fs/promises')>();
@@ -278,6 +293,9 @@ beforeEach(() => {
   vi.stubEnv('REDIS_NAVIGATION_CACHE', undefined);
   vi.stubEnv('REDIS_SERVICE_PATH_CACHE', undefined);
   vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', undefined);
+  vi.stubEnv('REDIS_RANGE_SNAPSHOT', undefined);
+  vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(false);
+  vi.mocked(rangeSnapshotStore.hasWriter).mockResolvedValue(false);
   state.fingerprint = undefined;
   vi.mocked(getDb).mockReturnValue({} as ReturnType<typeof getDb>);
   vi.mocked(fetchManifest).mockResolvedValue(manifest);
@@ -290,6 +308,70 @@ afterEach(async () => {
       code: 'ENOENT',
     });
   }
+});
+
+describe('published zero-SQL range inputs', () => {
+  it('finishes an unchanged scheduled poll before getDb or lease acquisition', async () => {
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    vi.mocked(getDb).mockImplementation(() => {
+      throw Error('SQL must stay asleep');
+    });
+    await workflow().run();
+    expect(fetchManifest).toHaveBeenCalledOnce();
+    expect(getDb).not.toHaveBeenCalled();
+    expect(acquireOrRenewPullWorkflowLease).not.toHaveBeenCalled();
+    expect(releasePullWorkflowLease).not.toHaveBeenCalled();
+    expect(fetchArchive).not.toHaveBeenCalled();
+  });
+
+  it('does not wake SQL during failure cleanup if preflight never acquired a writer marker', async () => {
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.mocked(fetchManifest).mockRejectedValueOnce(
+      Error('upstream unavailable'),
+    );
+    const run = workflow();
+    await expect(run.run()).rejects.toThrow('upstream unavailable');
+    await state.failure?.({ context: run.context });
+    expect(getDb).not.toHaveBeenCalled();
+    expect(releasePullWorkflowLease).not.toHaveBeenCalled();
+  });
+
+  it('repairs a missing snapshot on unchanged SQL inputs, then checkpoints only after publication/purge', async () => {
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    state.fingerprint = getCanonicalManifestFingerprint(manifest);
+    vi.mocked(publishRangeSnapshot).mockRejectedValueOnce(
+      Error('publication unavailable'),
+    );
+    const run = workflow();
+    await expect(run.run()).rejects.toThrow('publication unavailable');
+    expect(rangeSnapshotStore.complete).not.toHaveBeenCalled();
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    await run.run();
+    expect(rangeSnapshotStore.complete).toHaveBeenCalledWith(state.fingerprint);
+    expect(purgePublicDataCache).toHaveBeenCalled();
+    expect(fetchArchive).not.toHaveBeenCalled();
+  });
+
+  it('publishes changed inputs before purge and checkpoints after the SQL fingerprint', async () => {
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    const run = workflow();
+    await run.run();
+    expect(publishRangeSnapshot).toHaveBeenCalledWith(
+      getCanonicalManifestFingerprint(manifest),
+    );
+    expect(
+      vi.mocked(publishRangeSnapshot).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(purgePublicDataCache).mock.invocationCallOrder[0]);
+    expect(
+      vi.mocked(recordCanonicalManifestFingerprint).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vi.mocked(rangeSnapshotStore.complete).mock.invocationCallOrder[0],
+    );
+    expect(rangeSnapshotStore.finishWriter).toHaveBeenCalledWith(
+      run.context.workflowRunId,
+    );
+  });
 });
 
 describe('service-path publication workflow', () => {

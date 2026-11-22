@@ -1,7 +1,8 @@
 # Data Pipeline
 
 The site imports canonical mrtdown archives into Postgres. Server functions
-read the normalized tables through [feature queries](../../app/util/dbQueries).
+use [feature queries](../../app/util/dbQueries) backed by normalized SQL tables
+or completed published serving inputs, as described below.
 
 ## Canonical pull
 
@@ -32,6 +33,25 @@ reader can otherwise see a stable snapshot of a partially promoted network.
 A failed promotion keeps the marker and successful fingerprint cleared so a
 retry can repair the state. See the
 [live topology loader](../../app/util/dbQueries/readLiveScheduleTopology.ts).
+
+### Published range serving inputs
+
+`REDIS_RANGE_SNAPSHOT=enabled` selects a completed Redis snapshot before any
+range SQL connection or generation read. The snapshot contains canonical source
+rows; dataset assembly still uses the request clock. Canonical publication
+loads one repeatable-read snapshot after generation completion, then atomically
+commits its content-addressed payload and active pointer. The previous completed
+snapshot remains readable during promotion. Independent holiday changes also
+republish before their purge; manual facts rebuilds do not change range inputs.
+
+The external completed-fingerprint checkpoint is written after publication,
+purge and the successful SQL fingerprint. Enabled unchanged polls validate
+upstream inputs and the recoverable Redis snapshot before acquiring a SQL
+lease. Changed/explicit inputs and missing snapshots keep the normal writer
+path. This does not remove SQL from arrivals, entity profiles or community
+signals. The [snapshot runbook](../operations/edge-caching.md#published-zero-sql-range-inputs)
+owns limits, recovery and rollout; the [sleep plan](../plans/active/neon-sleep.md)
+tracks the remaining wake-ups.
 
 ### Arrival topology reuse
 

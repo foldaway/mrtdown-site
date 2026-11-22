@@ -2,6 +2,11 @@
 
 ## Purpose
 
+The [Neon sleep plan](neon-sleep.md) owns the next serving-architecture tranche.
+Its goal is zero-SQL public reads and unchanged-input checks, superseding transfer
+reduction as the primary outcome for new work. The rollout history below retains
+the original tranches' acceptance criteria.
+
 Reduce repeated Postgres reads at the origin with Redis-backed Navigation,
 completed Issue Profiles, and service-path inputs for date-range pages.
 Postgres remains the relational read model and serves cache misses. Public

@@ -1,3 +1,4 @@
+import { setResponseHeader } from '@tanstack/react-start/server';
 import { asc, desc, eq, sql } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
 import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
@@ -6,6 +7,11 @@ import {
   isRangeReferenceCacheEnabled,
   readRangeReferencesForSnapshot,
 } from '~/util/rangeReferenceCache.server';
+import {
+  isRangeSnapshotEnabled,
+  rangeSnapshotStore,
+} from '~/util/rangeSnapshotStore.server';
+import { recordServerTiming } from '~/util/serverTiming';
 import {
   isServicePathCacheEnabled,
   readServicePathsForSnapshot,
@@ -16,13 +22,14 @@ import {
   getDefaultDb,
   timeDbRowsQuery,
 } from './database';
-import { buildDataset } from './dataset';
+import { assembleDataset, buildDataset } from './dataset';
 import { isoDateTime, nowSg, parseDateTime } from './dateTime';
 import { issueOverlapsRange } from './issueIntervals';
 import {
   type RangeReferenceRows,
   readRangeReferenceRows,
 } from './rangeReferences';
+import { selectRangeSnapshotInputs } from './rangeSnapshotInputs';
 import type { ServicePathRow } from './servicePaths';
 
 async function getIssueIdsOverlappingRange(
@@ -106,6 +113,50 @@ export async function getIssuesOverlappingRange(
   referenceNow = nowSg(),
   db?: AppDb,
 ) {
+  if (isRangeSnapshotEnabled()) {
+    const startedAt = performance.now();
+    const snapshot = await rangeSnapshotStore.read();
+    const source = snapshot?.source ?? 'sql';
+    recordServerTiming(
+      'range_snapshot_load',
+      performance.now() - startedAt,
+      source,
+    );
+    console.info(
+      JSON.stringify({
+        event: 'range_snapshot_read',
+        source,
+        redisBytes: snapshot?.redisBytes ?? 0,
+      }),
+    );
+    try {
+      if (process.env.TIER === 'staging')
+        setResponseHeader('X-MRTDown-Range-Snapshot-Source', source);
+    } catch {
+      /* no request context */
+    }
+    if (snapshot) {
+      const dataset = assembleDataset(
+        referenceNow,
+        selectRangeSnapshotInputs(
+          snapshot.inputs,
+          rangeStart.toMillis(),
+          rangeEnd.toMillis(),
+        ),
+      );
+      const issues = Object.values(dataset.allIssues).filter((issue) =>
+        issueOverlapsRange(issue, rangeStart, rangeEnd, referenceNow),
+      );
+      return { dataset, issues };
+    }
+    // Missing or invalid snapshots use the existing coherent SQL recovery path.
+    // A failed snapshot must never create a publicly reusable mixed response.
+    try {
+      setResponseHeader('Cache-Control', 'no-store');
+    } catch {
+      /* no request context */
+    }
+  }
   const database = db ?? (await getDefaultDb());
   const read = async (
     reader: AppDbReader & Pick<AppDb, '$with' | 'selectDistinctOn' | 'with'>,
