@@ -9,6 +9,7 @@ import { getPageProfileRedis } from './pageProfileRedis.server';
 const MAX_ENCODED_BYTES = 4 * 1024 * 1024;
 const MAX_JSON_BYTES = 24 * 1024 * 1024;
 const PREVIOUS_RETENTION_SECONDS = 24 * 60 * 60;
+const MAX_HEAD_BYTES = 2048;
 const digest = (raw: string) => createHash('sha256').update(raw).digest('hex');
 const HeadSchema = z.object({
   version: z.literal(1),
@@ -27,11 +28,20 @@ function prefix() {
 
 type Store = Pick<Redis, 'getrange' | 'set' | 'eval' | 'del'>;
 
+function parseHead(raw: string): RangeSnapshotHead | undefined {
+  try {
+    return HeadSchema.parse(JSON.parse(raw));
+  } catch {
+    // Keep the raw value so a publisher can replace a malformed head via CAS.
+    return undefined;
+  }
+}
+
 // The immutable payload and head become visible together. CAS rejects delayed
 // producers, and rewriting the content-addressed value repairs corruption.
 const PUBLISH = `
 local current = redis.call('GET', KEYS[1]) or ''
-if string.len(current) > 2048 then current = string.sub(current, 1, 2049) end
+if string.len(current) > ${MAX_HEAD_BYTES} then current = string.sub(current, 1, ${MAX_HEAD_BYTES + 1}) end
 if current ~= ARGV[1] then return 0 end
 redis.call('SET', KEYS[2], ARGV[4])
 redis.call('SET', KEYS[1], ARGV[2])
@@ -42,19 +52,16 @@ export function createRangeSnapshotStore(connect: () => Promise<Store>) {
   let memo: { hash: string; inputs: DatasetInputs } | undefined;
   const headKey = () => `${prefix()}:active`;
   const payloadKey = (hash: string) => `${prefix()}:payload:${hash}`;
+  const checkpointKey = () => `${prefix()}:completed`;
+  const writerKey = (owner: string) => `${prefix()}:writer:${owner}`;
 
   async function head() {
-    const raw = await (await connect()).getrange(headKey(), 0, 2048);
-    let value: RangeSnapshotHead | undefined;
-    try {
-      value = HeadSchema.parse(JSON.parse(raw));
-    } catch {
-      /* repairable head */
-    }
-    return { raw, value };
+    const redis = await connect();
+    const raw = await redis.getrange(headKey(), 0, MAX_HEAD_BYTES);
+    return { raw, value: parseHead(raw) };
   }
 
-  async function read(verifyPayload = false) {
+  async function read({ verifyPayload = false } = {}) {
     try {
       const current = await head();
       if (!current.value) return null;
@@ -68,7 +75,8 @@ export function createRangeSnapshotStore(connect: () => Promise<Store>) {
           redisBytes: 0,
         };
       }
-      const encoded = await (await connect()).getrange(
+      const redis = await connect();
+      const encoded = await redis.getrange(
         payloadKey(hash),
         0,
         MAX_ENCODED_BYTES,
@@ -116,12 +124,7 @@ export function createRangeSnapshotStore(connect: () => Promise<Store>) {
     });
     const redis = await connect();
     const key = payloadKey(next.sha256);
-    let previous: RangeSnapshotHead | undefined;
-    try {
-      previous = HeadSchema.parse(JSON.parse(expectedRawHead));
-    } catch {
-      /* repairable head */
-    }
+    const previous = parseHead(expectedRawHead);
     const result = await redis.eval(
       PUBLISH,
       3,
@@ -141,13 +144,10 @@ export function createRangeSnapshotStore(connect: () => Promise<Store>) {
   }
 
   async function isCurrent(fingerprint: string) {
-    const current = await read(true);
+    const current = await read({ verifyPayload: true });
     if (!current || current.value.fingerprint !== fingerprint) return false;
-    const checkpoint = await (await connect()).getrange(
-      `${prefix()}:completed`,
-      0,
-      128,
-    );
+    const redis = await connect();
+    const checkpoint = await redis.getrange(checkpointKey(), 0, 128);
     return checkpoint === fingerprint;
   }
 
@@ -157,19 +157,16 @@ export function createRangeSnapshotStore(connect: () => Promise<Store>) {
     publish,
     isCurrent,
     markWriter: async (owner: string) => {
-      await (await connect()).set(
-        `${prefix()}:writer:${owner}`,
-        '1',
-        'EX',
-        86400,
-      );
+      const redis = await connect();
+      await redis.set(writerKey(owner), '1', 'EX', 86400);
     },
-    hasWriter: async (owner: string) =>
-      (await (
-        await connect()
-      ).getrange(`${prefix()}:writer:${owner}`, 0, 1)) === '1',
+    hasWriter: async (owner: string) => {
+      const redis = await connect();
+      return (await redis.getrange(writerKey(owner), 0, 1)) === '1';
+    },
     finishWriter: async (owner: string) => {
-      await (await connect()).del(`${prefix()}:writer:${owner}`);
+      const redis = await connect();
+      await redis.del(writerKey(owner));
     },
     complete: async (fingerprint: string) => {
       if (!/^[a-f0-9]{64}$/.test(fingerprint))
@@ -177,12 +174,13 @@ export function createRangeSnapshotStore(connect: () => Promise<Store>) {
       const current = await head();
       if (current.value?.fingerprint !== fingerprint)
         throw new Error('Cannot checkpoint superseded range inputs');
-      const result = await (await connect()).eval(
+      const redis = await connect();
+      const result = await redis.eval(
         `if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
 redis.call('SET', KEYS[2], ARGV[2]); return 1`,
         2,
         headKey(),
-        `${prefix()}:completed`,
+        checkpointKey(),
         current.raw,
         fingerprint,
       );

@@ -1,3 +1,4 @@
+import { ImpactEventSchema } from '@mrtdown/core';
 import { createSelectSchema } from 'drizzle-orm/zod';
 import { z } from 'zod';
 import {
@@ -19,7 +20,6 @@ import { RangeReferenceRowsSchema } from './rangeReferences';
 const audit = { created_at: true, updated_at: true } as const;
 const refs = RangeReferenceRowsSchema.shape;
 
-/** Only canonical inputs used by range assembly; no evidence bodies or reports. */
 export const RangeSnapshotInputsSchema = z.object({
   metadataRows: z.array(z.never()),
   operatorsRows: z.array(z.never()),
@@ -39,13 +39,7 @@ export const RangeSnapshotInputsSchema = z.object({
   ),
   impactEventRows: z.array(
     createSelectSchema(impactEventsTable, {
-      type: z.enum([
-        'periods.set',
-        'causes.set',
-        'service_scopes.set',
-        'service_effects.set',
-        'facility_effects.set',
-      ]),
+      type: z.union(ImpactEventSchema.options.map((event) => event.shape.type)),
     }).omit(audit),
   ),
   impactEventPeriodRows: z.array(
@@ -75,8 +69,7 @@ export const RangeSnapshotInputsSchema = z.object({
 });
 
 export function parseRangeSnapshotInputs(value: unknown): DatasetInputs {
-  // Drizzle's JSONB schema validates JSON values; domain assembly retains its
-  // existing translations/operating-hours validation and canonical semantics.
+  // Drizzle's JSONB schema cannot infer the domain types used by assembly.
   return RangeSnapshotInputsSchema.parse(value) as DatasetInputs;
 }
 
@@ -86,19 +79,28 @@ export function selectRangeSnapshotInputs(
   startMillis: number,
   endMillis: number,
 ): DatasetInputs {
-  const latest = new Map<string, DatasetInputs['impactEventRows'][number]>();
+  const latestPeriodEventByIssueId = new Map<
+    string,
+    DatasetInputs['impactEventRows'][number]
+  >();
   for (const event of inputs.impactEventRows) {
     if (event.type !== 'periods.set') continue;
-    const previous = latest.get(event.issue_id);
-    const delta = previous
-      ? parseDateTime(event.ts).toMillis() -
-        parseDateTime(previous.ts).toMillis()
-      : 1;
-    if (!previous || delta > 0 || (delta === 0 && event.id > previous.id)) {
-      latest.set(event.issue_id, event);
+    const previous = latestPeriodEventByIssueId.get(event.issue_id);
+    if (!previous) {
+      latestPeriodEventByIssueId.set(event.issue_id, event);
+      continue;
+    }
+    const timestampDifference =
+      parseDateTime(event.ts).toMillis() -
+      parseDateTime(previous.ts).toMillis();
+    if (
+      timestampDifference > 0 ||
+      (timestampDifference === 0 && event.id > previous.id)
+    ) {
+      latestPeriodEventByIssueId.set(event.issue_id, event);
     }
   }
-  const overlaps = new Set(
+  const overlappingPeriodEventIds = new Set(
     inputs.impactEventPeriodRows
       .filter(
         (row) =>
@@ -108,15 +110,15 @@ export function selectRangeSnapshotInputs(
       )
       .map((row) => row.impact_event_id),
   );
-  const ids = new Set(
-    [...latest.values()]
-      .filter((event) => overlaps.has(event.id))
+  const selectedIssueIds = new Set(
+    [...latestPeriodEventByIssueId.values()]
+      .filter((event) => overlappingPeriodEventIds.has(event.id))
       .map((event) => event.issue_id),
   );
-  // Detail rows are immutable and selected events are assembled only for these
-  // issues. Preserve their published order, including membership ordering.
   return {
     ...inputs,
-    issueRows: inputs.issueRows.filter((issue) => ids.has(issue.id)),
+    issueRows: inputs.issueRows.filter((issue) =>
+      selectedIssueIds.has(issue.id),
+    ),
   };
 }

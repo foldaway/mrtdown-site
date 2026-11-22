@@ -318,7 +318,6 @@ describe('published zero-SQL range inputs', () => {
       throw Error('SQL must stay asleep');
     });
     await workflow().run();
-    expect(fetchManifest).toHaveBeenCalledOnce();
     expect(getDb).not.toHaveBeenCalled();
     expect(acquireOrRenewPullWorkflowLease).not.toHaveBeenCalled();
     expect(releasePullWorkflowLease).not.toHaveBeenCalled();

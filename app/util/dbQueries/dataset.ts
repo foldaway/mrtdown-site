@@ -238,18 +238,13 @@ export function parseTranslations(value: unknown): Line['name'] {
   };
 }
 
+type LatestEventsByIssueId = Record<
+  string,
+  Partial<Record<DatasetImpactEvent['type'], DatasetImpactEvent>>
+>;
+
 function indexLatestEvents(impactEventRows: DatasetImpactEvent[]) {
-  return impactEventRows.reduce<
-    Record<
-      string,
-      Partial<
-        Record<
-          (typeof impactEventRows)[number]['type'],
-          (typeof impactEventRows)[number]
-        >
-      >
-    >
-  >((acc, event) => {
+  return impactEventRows.reduce<LatestEventsByIssueId>((acc, event) => {
     acc[event.issue_id] ??= {};
     const current = acc[event.issue_id][event.type];
     if (current == null) {

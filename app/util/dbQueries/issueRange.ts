@@ -149,8 +149,7 @@ export async function getIssuesOverlappingRange(
       );
       return { dataset, issues };
     }
-    // Missing or invalid snapshots use the existing coherent SQL recovery path.
-    // A failed snapshot must never create a publicly reusable mixed response.
+    // Keep recovery responses out of shared caches until publication is repaired.
     try {
       setResponseHeader('Cache-Control', 'no-store');
     } catch {
