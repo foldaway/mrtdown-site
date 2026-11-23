@@ -21,6 +21,7 @@ import {
   MAX_REPORT_AGE_MS,
   recentCrowdArrivalFromReport,
 } from './crowdArrivalReportContract';
+import type { ArrivalInputs } from './dbQueries/arrivalInputs';
 import { isoDate, parseDateTimeUncached } from './dbQueries/dateTime';
 import {
   selectServiceRevisionForReferenceDate,
@@ -73,12 +74,20 @@ export async function getRecentCrowdArrival(
   database: Db | (() => Db),
   scope: ArrivalBranchScope,
   referenceInstant: string,
+  options?: { sqlFallback: false; arrivalInputs: ArrivalInputs },
 ): Promise<RecentCrowdArrival | undefined> {
   const cached =
     process.env.REDIS_ARRIVAL_REPORTS === 'enabled'
-      ? await readCachedCrowdArrival(scope, referenceInstant)
+      ? await readCachedCrowdArrival(
+          scope,
+          referenceInstant,
+          options?.arrivalInputs,
+        )
       : undefined;
   if (cached?.status === 'ready') return cached.value;
+  // Reports are optional. A healthy published schedule must not wake SQL to
+  // repair an unavailable signal; writers or an explicit seed restore it.
+  if (options?.sqlFallback === false) return undefined;
 
   const db = typeof database === 'function' ? database() : database;
   if (cached?.status === 'missing') {
@@ -90,6 +99,7 @@ export async function getRecentCrowdArrival(
   const [report] = await db
     .select({
       reportedAt: reports.reported_at,
+      destinationStationId: reports.destination_station_id,
       minutes: reports.minutes_to_arrival,
     })
     .from(reports)
@@ -112,6 +122,8 @@ export async function getRecentCrowdArrival(
   const value = recentCrowdArrivalFromReport(report, referenceInstant);
   if (
     !value ||
+    (report.destinationStationId !== null &&
+      report.destinationStationId !== scope.destinationStationId) ||
     !(await isReportableArrivalScope(db, scope, report.reportedAt))
   ) {
     return undefined;
@@ -165,6 +177,7 @@ export async function submitCrowdArrival(
       id: crypto.randomUUID(),
       station_id: submission.stationId,
       service_id: submission.serviceId,
+      destination_station_id: submission.destinationStationId,
       minutes_to_arrival: submission.minutesToArrival,
       reported_at: reportedAt,
       created_at: receivedAt,

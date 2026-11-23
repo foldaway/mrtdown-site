@@ -299,8 +299,8 @@ for remaining wake-ups and eventual provider-level acceptance.
 
 `REDIS_ARRIVAL_SNAPSHOT=publish` publishes admission history, attested canonical
 topology, projection headers, coverage days/scopes and display names during a
-completed pull. Unset disables it. This tranche has no public reader and does
-not serve departures or recent rider reports; arrivals still use SQL.
+completed pull. Unset disables it. Public serving is controlled separately by
+`REDIS_ARRIVAL_READS`; publishing alone leaves arrivals on SQL.
 
 The publisher captures these inputs together in a read-only repeatable-read
 transaction. It verifies the topology attestation and retained admission chain,
@@ -321,14 +321,14 @@ is current, missing/invalid arrival metadata forces the normal SQL repair path.
 Both snapshots must publish before purge and checkpoint completion. A healthy
 snapshot with the same generation and fingerprint preserves the SQL-free
 unchanged-pull path. Check `arrival_inputs_published`, payload size and a cold
-validated read before considering a future serving flag. Unset this flag to
-stop publication; no public arrival behavior changes in this tranche.
+validated read before considering the separate serving flag below. Unset this
+flag to stop publication; reader activation remains independent.
 
 ## Published departure partitions
 
 `REDIS_ARRIVAL_DEPARTURES=publish` requires `REDIS_ARRIVAL_SNAPSHOT=publish`.
-Both default off. This publishes compact station/projection partitions; public
-arrivals still use SQL. Explicit source dates, shared memberships, platforms,
+Both default off. This publishes compact station/projection partitions.
+Explicit source dates, shared memberships, platforms,
 unknown timing and overnight offsets are retained.
 
 The pull publishes one station per durable step, then atomically activates a
@@ -350,10 +350,9 @@ rider-report caching and public serving separately.
 ## Recent arrival reports
 
 `REDIS_ARRIVAL_REPORTS` defaults off. `publish` refreshes Redis after accepted
-SQL submissions; `enabled` also lets report reads use it. This does not remove
-the public v2 route's schedule SQL dependency. Non-platform report hits, empty
-results and clock expiry use no SQL; missing/unavailable inputs retain SQL
-fallback. A missing or dirty report input gets one bounded repair attempt on
+SQL submissions; `enabled` also lets report reads use it. Non-platform report hits, empty
+results and clock expiry use no SQL. SQL-backed schedule requests retain report
+SQL fallback; published schedule requests omit missing/unavailable reports. A missing or dirty report input gets one bounded repair attempt on
 that request. Missing topology falls back without repairing reports.
 
 Before enabling reads, run `publish` on **every report writer**, drain old
@@ -362,7 +361,12 @@ instances, and republish arrival metadata with revision recency. Seed with
 [`crowdArrivalReportCache.server.ts`](../../app/util/crowdArrivalReportCache.server.ts),
 or let the first enabled read initialize it. Repair loads at most 10,000 recent
 accepted rows; exceeding the bound keeps SQL fallback. There is no timer or
-expiry refill. The cache contains no reporter identities.
+expiry refill. The cache contains no reporter identities. Apply the generated
+nullable `destination_station_id` migration before deploying the updated report
+writer.
+Each new report preserves its validated destination through SQL and Redis;
+mismatched or legacy rows without that identity are omitted from cached reads.
+No destination is backfilled from potentially changed topology.
 
 Redis invalidation failure rejects a submission before insertion. Publication
 failure after commit preserves the accepted report and leaves the cache unknown
@@ -374,6 +378,37 @@ readers have drained. Reseed before re-enabling after any writer ran without
 publication, direct SQL report edits, or a Redis restore. No flags were enabled
 as part of this implementation; staging measurement and full public serving
 remain separate gates.
+
+## Published arrivals reader
+
+`REDIS_ARRIVAL_READS=enabled` opts the public v2 endpoint into published inputs.
+It defaults off and does not enable either producer. The reader requires metadata
+and a departure manifest with matching generation, fingerprint and metadata
+payload digest. It reads only the selected station/projection partitions, with
+bounded decoding and digest/identity checks. Selection, Singapore service dates
+(including 24+ hour tails), display labels and limits use the SQL path's shared
+policy and assembly code at the request clock. Empty or incomplete coverage is a
+normal response, distinct from an unavailable required snapshot.
+
+Missing, mismatched or corrupt required inputs select SQL recovery lazily. A
+cached scope rejection checks SQL's completed generation: a changed or updating
+generation selects SQL validation, covering newly promoted platforms before
+snapshot publication. A matching generation retains the cached 400. Valid scopes
+never perform this generation check. No request-side departure publication or
+repair is attempted. With a healthy publication, neither a cold process nor
+midnight needs SQL. Branch-level reports
+use `REDIS_ARRIVAL_REPORTS=enabled` and the same metadata snapshot; expiry and
+initialized-empty reports remain SQL-free. Disabled, dirty or unavailable optional
+reports are omitted on this path, leaving the timetable usable. Writers or an
+explicit report seed restore missing signals. Platform queries omit reports.
+
+Keep public reads off until the publish-only staging payload-size and latency
+gates above pass. Then compare cold/warm v2 responses against SQL, including
+empty coverage, midnight and report expiry, before a separate activation decision.
+Rollback by unsetting `REDIS_ARRIVAL_READS`; producers can remain in `publish`.
+No deployment or flags were changed by the reader implementation. Other public
+profiles, sitemap/statistics and background readers still independently wake SQL;
+this endpoint alone does not establish production-wide Neon sleep.
 
 ## Redis usage evidence
 

@@ -8,6 +8,7 @@ import {
   type RecentCrowdArrival,
   recentCrowdArrivalFromReport,
 } from './crowdArrivalReportContract';
+import type { ArrivalInputs } from './dbQueries/arrivalInputs';
 import { isoDate, parseDateTimeUncached } from './dbQueries/dateTime';
 import type { AppDb, AppDbTransaction } from './dbQueries/database';
 import { getPageProfileRedis } from './pageProfileRedis.server';
@@ -21,6 +22,7 @@ const MAX_SCOPE_BYTES = 2 * 1024 * 1024;
 const reportSchema = z.object({
   reportedAt: z.iso.datetime({ offset: true }),
   minutes: z.number().int().min(0).max(30),
+  destinationStationId: z.string().min(1).nullish(),
 });
 const rowsSchema = z.array(reportSchema).max(MAX_REPORTS);
 const readySchema = z.object({ initializedAt: z.number().finite() });
@@ -76,6 +78,7 @@ export async function repairArrivalReportCache(db: AppDb) {
         .select({
           stationId: reports.station_id,
           serviceId: reports.service_id,
+          destinationStationId: reports.destination_station_id,
           reportedAt: reports.reported_at,
           minutes: reports.minutes_to_arrival,
         })
@@ -100,6 +103,7 @@ export async function repairArrivalReportCache(db: AppDb) {
         group.push({
           reportedAt: new Date(row.reportedAt).toISOString(),
           minutes: row.minutes,
+          destinationStationId: row.destinationStationId,
         });
         grouped.set(field, group);
       }
@@ -130,6 +134,7 @@ export async function repairArrivalReportCache(db: AppDb) {
 export async function readCachedCrowdArrival(
   scope: ArrivalBranchScope,
   referenceInstant: string,
+  arrivalInputs?: ArrivalInputs,
 ): Promise<CachedCrowdArrival> {
   try {
     const redis = await getPageProfileRedis();
@@ -154,16 +159,20 @@ export async function readCachedCrowdArrival(
     });
     const value =
       report && recentCrowdArrivalFromReport(report, referenceInstant);
-    if (!value) return { status: 'ready', value: undefined };
-    const snapshot = await arrivalInputSnapshotStore.read();
-    if (!snapshot) return { status: 'unavailable' };
-    const service = snapshot.inputs.topology.services.find(
+    // Check after selecting the latest row: mismatched/legacy rows suppress
+    // older signals and must never be relabelled using newer timetable data.
+    if (!value || report?.destinationStationId !== scope.destinationStationId)
+      return { status: 'ready', value: undefined };
+    const inputs =
+      arrivalInputs ?? (await arrivalInputSnapshotStore.read())?.inputs;
+    if (!inputs) return { status: 'unavailable' };
+    const service = inputs.topology.services.find(
       (row) => row.id === scope.serviceId && row.lineId === scope.lineId,
     );
     if (!service) return { status: 'ready', value: undefined };
     const revisions = [];
     for (const revision of service.revisions) {
-      const recency = snapshot.inputs.serviceRevisionRecency.find(
+      const recency = inputs.serviceRevisionRecency.find(
         (row) => row.serviceId === scope.serviceId && row.id === revision.id,
       );
       if (!recency) return { status: 'unavailable' };

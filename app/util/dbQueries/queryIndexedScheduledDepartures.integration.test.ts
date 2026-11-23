@@ -1,3 +1,9 @@
+import { Temporal } from '@js-temporal/polyfill';
+import * as appDatabase from '~/db';
+import { Route as arrivalRoute } from '~/routes/api.stations.$stationId.arrivals.v2';
+import { readPublishedStationArrivals } from '~/util/publishedStationArrivals.server';
+import { serializeStationArrivalsV2 } from '~/util/stationArrivalsV2';
+import { createArrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
 import { randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -103,7 +109,6 @@ import { createTimetableSelectionPolicy } from './scheduledTimetableSelection';
 import { buildLineSummary, buildUptimeGraph } from './lineAnalytics';
 import { buildLineOperationalFactRows } from './operationalFacts';
 import { projectScheduledTimetable } from './projectScheduledTimetable';
-import { readDeparturePartition } from './readDeparturePartition';
 import {
   expandDeparturePartition,
   parseDeparturePartition,
@@ -346,6 +351,7 @@ describe.skipIf(!url)('indexed departure window', () => {
       '20261027152337_early_lilith',
       '20261108020149_combined_timetable_retention',
       '20261108050132_combined_departure_index',
+      '20261123005213_arrival_report_destination',
     ]) {
       await pool.query(
         (
@@ -617,6 +623,17 @@ describe.skipIf(!url)('indexed departure window', () => {
             ),
           ).toEqual(expected[index]);
         }
+        // A day count without a matching scope is uncovered, not an absent day.
+        const uncovered = policy.select(
+          '2026-10-25',
+          selectArrivalInputCoverage(
+            { ...snapshot.inputs, scopes: [] },
+            scope,
+            '2026-10-25',
+          ),
+        );
+        expect(uncovered.selected).toBeNull();
+        expect(uncovered.attempts[0].reason).toBe('scope-not-covered');
         expect(queries).toEqual([]);
         expect(
           snapshot.inputs.stationNames.find((row) => row.id === scope.stationId)
@@ -648,6 +665,285 @@ describe.skipIf(!url)('indexed departure window', () => {
         if (keys.length) await redis.del(...keys);
         await redis.quit();
       }
+    },
+  );
+
+  describe.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
+    'published public arrivals',
+    () => {
+      let redis: Awaited<ReturnType<typeof getPageProfileRedis>>;
+      const fingerprint = 'a'.repeat(64);
+      const owner = randomUUID();
+      const prefixes = () => [
+        getSnapshotKeyPrefix('arrival-inputs'),
+        getSnapshotKeyPrefix('arrival-departures'),
+      ];
+      const handler = (
+        arrivalRoute as unknown as {
+          options: {
+            server: {
+              handlers: {
+                GET: (args: {
+                  params: { stationId: string };
+                  request: Request;
+                }) => Promise<Response>;
+              };
+            };
+          };
+        }
+      ).options.server.handlers.GET;
+      const request = async (instant: string, platformId?: string) => {
+        vi.spyOn(Temporal.Now, 'instant').mockReturnValue(
+          Temporal.Instant.from(instant),
+        );
+        const search = new URLSearchParams({
+          lineId: scope.lineId,
+          serviceId: scope.serviceId,
+          destinationStationId: scope.destinationStationId,
+          ...(platformId && { platformId }),
+        });
+        return handler({
+          params: { stationId: scope.stationId },
+          request: new Request(
+            `http://localhost/api/stations/${scope.stationId}/arrivals/v2?${search}`,
+          ),
+        });
+      };
+      beforeEach(async () => {
+        vi.stubEnv('TIER', schema);
+        vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
+        vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+        vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', 'publish');
+        vi.stubEnv('REDIS_ARRIVAL_READS', 'enabled');
+        vi.stubEnv('REDIS_ARRIVAL_REPORTS', 'enabled');
+        vi.spyOn(database, 'getDefaultDb').mockResolvedValue(db());
+        redis = await getPageProfileRedis();
+        await completePageProfileGeneration(db(), 'public-arrivals-fixture');
+        await recordCanonicalManifestFingerprint(db(), fingerprint);
+        await publishArrivalInputSnapshot();
+        await pool.query('TRUNCATE workflow_leases');
+        expect(await acquireOrRenewPullWorkflowLease(db(), owner)).toBe(true);
+        await publishArrivalDepartures(
+          async (_name, callback) => callback(),
+          owner,
+          fingerprint,
+        );
+        // Seed at the fixture clock so the initialized-empty result is authoritative.
+        vi.spyOn(Date, 'now').mockReturnValue(Date.parse(window.startInstant));
+        await reportCache.repairArrivalReportCache(db());
+        vi.spyOn(appDatabase, 'getDb').mockImplementation(() => {
+          throw Error('Public cache hit must not open SQL');
+        });
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('Cache hit must not open default SQL'),
+        );
+        // Fresh stores exercise cold decoding, then their ordinary memory path.
+        vi.spyOn(arrivalInputSnapshotStore, 'read').mockImplementation(
+          createPublishedSnapshotStore(
+            getPageProfileRedis,
+            'arrival-inputs',
+            parseArrivalInputs,
+          ).read,
+        );
+        vi.spyOn(arrivalDepartureStore.manifest, 'read').mockImplementation(
+          createArrivalDepartureStore(getPageProfileRedis).manifest.read,
+        );
+      });
+      afterEach(async () => {
+        for (const prefix of prefixes()) {
+          const keys = await redis.keys(`${prefix}:*`);
+          if (keys.length) await redis.del(...keys);
+        }
+        await redis.del(`mrtdown:${schema}:arrival-reports:v1`);
+        await redis.quit();
+      });
+
+      it('serves complete cold/warm responses through midnight, 24+ tails, empty coverage and report expiry without SQL', async () => {
+        for (const instant of [
+          '2026-10-24T15:59:59.500Z',
+          window.startInstant,
+          '2026-10-24T16:15:00.000000001Z',
+          '2026-10-26T04:00:00Z',
+        ]) {
+          const reference = Temporal.Instant.from(instant);
+          const expected = serializeStationArrivalsV2(
+            await readStationArrivalSource(db(), {
+              scope,
+              referenceInstant: reference.toString(),
+              endInstant: reference.add({ minutes: 60 }).toString(),
+              limit: 20,
+            }),
+          );
+          queries.length = 0;
+          for (let repeat = 0; repeat < 2; repeat++) {
+            const response = await request(instant);
+            expect(response.status).toBe(200);
+            expect(response.headers.get('cache-control')).toBe('no-store');
+            expect(await response.json()).toEqual({
+              success: true,
+              data: expected,
+            });
+          }
+          expect(queries).toEqual([]);
+        }
+        const reportKey = `mrtdown:${schema}:arrival-reports:v1`;
+        await redis.hset(
+          reportKey,
+          JSON.stringify([scope.stationId, scope.serviceId]),
+          JSON.stringify([
+            {
+              reportedAt: '2026-10-24T16:00:00Z',
+              minutes: 0,
+              destinationStationId: scope.destinationStationId,
+            },
+          ]),
+        );
+        queries.length = 0;
+        expect(
+          (await (await request(window.startInstant)).json()).data
+            .recentCrowdArrival,
+        ).toBeDefined();
+        expect(
+          (await (await request('2026-10-24T16:01:00Z')).json()).data
+            .recentCrowdArrival,
+        ).toBeUndefined();
+        await redis.del(reportKey);
+        expect((await request(window.startInstant)).status).toBe(200);
+        expect((await request(window.startInstant, 'platform-1')).status).toBe(
+          200,
+        );
+        expect(appDatabase.getDb).not.toHaveBeenCalled();
+        expect(queries).toEqual([]);
+
+        // Republish a coverage change; clock-based assembly must follow the new
+        // coherent metadata/manifest pair rather than retaining a response memo.
+        await db()
+          .update(days)
+          .set({ unassigned_active_trip_count: 1 })
+          .where(sql`${days.active_trip_count} > 0`);
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db());
+        await publishArrivalInputSnapshot();
+        await publishArrivalDepartures(
+          async (_name, callback) => callback(),
+          owner,
+          fingerprint,
+        );
+        const expected = serializeStationArrivalsV2(
+          await readStationArrivalSource(db(), {
+            scope,
+            referenceInstant: Temporal.Instant.from(
+              window.startInstant,
+            ).toString(),
+            endInstant: Temporal.Instant.from(window.endInstant).toString(),
+            limit: 20,
+          }),
+        );
+        queries.length = 0;
+        expect(await (await request(window.startInstant)).json()).toEqual({
+          success: true,
+          data: expected,
+        });
+        expect(appDatabase.getDb).not.toHaveBeenCalled();
+        expect(queries).toEqual([]);
+      });
+
+      it('checks generation only after scope rejection and recovers a newly promoted platform before publication', async () => {
+        vi.mocked(appDatabase.getDb).mockReturnValue(db());
+        queries.length = 0;
+        expect(
+          (await request(window.startInstant, 'new-platform')).status,
+        ).toBe(400);
+        expect(queries).toHaveLength(1); // Current generation confirms the cached rejection.
+        await db().insert(stationPlatformsTable).values({
+          station_id: scope.stationId,
+          platform_id: 'new-platform',
+          label: 'New',
+          line_id: scope.lineId,
+          last_updated: '2026-10-25',
+        });
+        await markPageProfilesUpdating(db());
+        await finalize();
+        expect(
+          (await request(window.startInstant, 'new-platform')).status,
+        ).toBe(200);
+        await completePageProfileGeneration(db(), 'new-unpublished-generation');
+        expect(
+          (await request(window.startInstant, 'new-platform')).status,
+        ).toBe(200);
+        expect(
+          (await request(window.startInstant, 'still-unknown')).status,
+        ).toBe(400);
+        // Valid scopes continue using the preceding coherent publication, even
+        // while the SQL generation has advanced and publication is still pending.
+        vi.mocked(appDatabase.getDb)
+          .mockClear()
+          .mockImplementation(() => {
+            throw Error('SQL disabled');
+          });
+        queries.length = 0;
+        expect((await request(window.startInstant)).status).toBe(200);
+        expect(appDatabase.getDb).not.toHaveBeenCalled();
+        expect(queries).toEqual([]);
+      });
+
+      it('selects SQL recovery for incoherent, missing or corrupt required inputs and retains canonical validation', async () => {
+        const options = {
+          scope,
+          referenceInstant: window.startInstant,
+          endInstant: window.endInstant,
+        };
+        vi.mocked(appDatabase.getDb).mockReturnValue(db());
+        await expect(
+          readPublishedStationArrivals({
+            ...options,
+            scope: { ...scope, platformId: 'unknown' },
+          }),
+        ).rejects.toThrow('platform');
+        await expect(
+          readPublishedStationArrivals({ ...options, loop: true }),
+        ).rejects.toThrow('Loop');
+        vi.mocked(appDatabase.getDb)
+          .mockClear()
+          .mockImplementation(() => {
+            throw Error('SQL disabled');
+          });
+        const metadata = await arrivalInputSnapshotStore.read();
+        const published = await arrivalDepartureStore.manifest.read();
+        if (!metadata || !published) throw Error('Missing published fixture');
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        for (const value of [
+          { ...published.value, generation: 'other' },
+          { ...published.value, fingerprint: 'b'.repeat(64) },
+        ]) {
+          await redis.set(`${prefixes()[1]}:active`, JSON.stringify(value));
+          expect((await request(window.startInstant)).status).toBe(500);
+        }
+        await redis.set(`${prefixes()[1]}:active`, published.raw);
+        const ref = published.inputs.partitions.find(
+          (ref) => ref.stationId === scope.stationId,
+        );
+        if (!ref) throw Error('Missing partition');
+        const key = `${prefixes()[1]}:partition:${ref.sha256}`;
+        const part = await redis.get(key);
+        await redis.del(key);
+        expect((await request(window.startInstant)).status).toBe(500);
+        await redis.set(key, 'corrupt');
+        expect((await request(window.startInstant)).status).toBe(500);
+        if (!part) throw Error('Missing partition bytes');
+        await redis.set(key, part);
+        await arrivalDepartureStore.manifest.publish(
+          published.raw,
+          { ...published.inputs, arrivalInputsSha256: 'f'.repeat(64) },
+          published.value.generation,
+          fingerprint,
+        );
+        expect((await request(window.startInstant)).status).toBe(500);
+        await redis.del(`${prefixes()[0]}:active`);
+        expect((await request(window.startInstant)).status).toBe(500);
+        expect(appDatabase.getDb).toHaveBeenCalledTimes(6);
+        vi.mocked(appDatabase.getDb).mockReturnValue(db());
+        expect((await request(window.startInstant)).status).toBe(200);
+      });
     },
   );
 
@@ -773,6 +1069,69 @@ describe.skipIf(!url)('indexed departure window', () => {
         );
       });
 
+      it('keeps the submitted destination through cache publication while timetable metadata lags', async () => {
+        await submitCrowdArrival(
+          db(),
+          { ...scope, minutesToArrival: 4 },
+          'old-branch',
+        );
+        const old = await arrivalInputSnapshotStore.read();
+        if (!old) throw Error('Missing metadata fixture');
+        const other = { ...scope, destinationStationId: 'station-2' };
+        await db()
+          .update(serviceRevisionPathStationEntriesTable)
+          .set({ station_id: other.destinationStationId })
+          .where(
+            eq(
+              serviceRevisionPathStationEntriesTable.station_id,
+              scope.destinationStationId,
+            ),
+          );
+        vi.setSystemTime(later(1));
+        await submitCrowdArrival(
+          db(),
+          { ...other, minutesToArrival: 3 },
+          'new-branch',
+        );
+        const [row] = await db()
+          .select()
+          .from(crowdArrivalReportsTable)
+          .where(eq(crowdArrivalReportsTable.reporter_hash, 'new-branch'));
+        expect(row.destination_station_id).toBe(other.destinationStationId);
+        queries.length = 0;
+        const options = {
+          sqlFallback: false as const,
+          arrivalInputs: old.inputs,
+        };
+        expect(
+          await getRecentCrowdArrival(noSql, scope, later(1), options),
+        ).toBeUndefined();
+        expect(
+          await getRecentCrowdArrival(noSql, other, later(1), options),
+        ).toBeUndefined();
+        expect(queries).toEqual([]);
+        expect(await sqlRead(later(1))).toBeUndefined();
+        // Legacy cached rows have no proven branch identity. They suppress older
+        // rows without asking SQL to reconstruct a potentially changed branch.
+        await redis.hset(
+          reportKey,
+          JSON.stringify([scope.stationId, scope.serviceId]),
+          JSON.stringify([
+            { reportedAt: later(1), minutes: 3 },
+            {
+              reportedAt: at,
+              minutes: 4,
+              destinationStationId: scope.destinationStationId,
+            },
+          ]),
+        );
+        queries.length = 0;
+        expect(
+          await getRecentCrowdArrival(noSql, scope, later(1), options),
+        ).toBeUndefined();
+        expect(queries).toEqual([]);
+      });
+
       it('selects the latest timestamp/id before expiry, never resurrects an older signal and stays empty as the clock advances', async () => {
         await db()
           .insert(crowdArrivalReportsTable)
@@ -786,6 +1145,7 @@ describe.skipIf(!url)('indexed departure window', () => {
               ...row,
               station_id: scope.stationId,
               service_id: scope.serviceId,
+              destination_station_id: scope.destinationStationId,
               reporter_hash: row.id,
             })),
           );

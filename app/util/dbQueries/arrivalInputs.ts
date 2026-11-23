@@ -146,18 +146,24 @@ export function selectArrivalInputCoverage(
   loop = false,
 ): TimetableCoverageRow[] {
   const services = new Set(indexedServiceIds(scope));
+  const byProjection = new Map<number, ArrivalInputs['scopes']>();
+  for (const row of inputs.scopes) {
+    if (
+      row.service_date !== serviceDate ||
+      row.station_id !== scope.stationId ||
+      row.line_id !== scope.lineId ||
+      !services.has(row.service_id) ||
+      (!loop && row.destination_station_id !== scope.destinationStationId)
+    )
+      continue;
+    const matched = byProjection.get(row.projection_id) ?? [];
+    matched.push(row);
+    byProjection.set(row.projection_id, matched);
+  }
   return inputs.days
     .filter((day) => day.service_date === serviceDate)
     .flatMap((day) => {
-      const matched = inputs.scopes.filter(
-        (row) =>
-          row.projection_id === day.projection_id &&
-          row.service_date === serviceDate &&
-          row.station_id === scope.stationId &&
-          row.line_id === scope.lineId &&
-          services.has(row.service_id) &&
-          (loop || row.destination_station_id === scope.destinationStationId),
-      );
+      const matched = byProjection.get(day.projection_id) ?? [];
       return (matched.length ? matched : [null]).map((row) => ({
         projectionId: day.projection_id,
         serviceDate,

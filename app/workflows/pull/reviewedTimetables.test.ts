@@ -34,6 +34,8 @@ import {
   selectArrivalInputCoverage,
 } from '~/util/dbQueries/arrivalInputs';
 import { readDeparturePartition } from '~/util/dbQueries/readDeparturePartition';
+import { readStationArrivalSource } from '~/util/dbQueries/readStationArrivalSource';
+import { assemblePublishedStationArrivals } from '~/util/publishedStationArrivals.server';
 import { expandDeparturePartition } from '~/util/dbQueries/departurePartition';
 import { readArrivalInputs } from '~/util/dbQueries/readArrivalInputs';
 import { createTimetableSelectionPolicy } from '~/util/dbQueries/scheduledTimetableSelection';
@@ -90,6 +92,7 @@ vi.mock('~/util/arrivalDepartureStore.server', async (original) => ({
   arrivalDepartureStore: {
     manifest: { read: vi.fn(async () => null) },
     ready: vi.fn(async () => false),
+    read: vi.fn(),
   },
 }));
 vi.mock('./helpers/publishArrivalDepartures', () => ({
@@ -1324,6 +1327,39 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       { stopSequence: combined.sequences[1] },
     ]);
     expect(loop.untimedDepartureCount).toBe(1);
+    // Reuse the combined fixture's shared boarding, reviewed nondefault platform,
+    // loop termini and 25h tail to compare the published assembler with SQL.
+    vi.mocked(arrivalDepartureStore.read).mockResolvedValue(partition);
+    const refs = [
+      {
+        projectionId: partition.projectionId,
+        stationId: partition.stationId,
+        sha256: 'a'.repeat(64),
+        bytes: 1,
+      },
+    ];
+    for (const request of [
+      { scope: { ...exact, platformId: 'platform-common' } },
+      {
+        scope: {
+          ...scope,
+          serviceId: 'service-shared',
+          platformId: 'platform-1',
+        },
+      },
+      { scope: loopScope, loop: true as const },
+    ]) {
+      const options = {
+        ...request,
+        referenceInstant: window.startInstant,
+        endInstant: window.endInstant,
+        limit: 20,
+      };
+      expect(
+        (await assemblePublishedStationArrivals(options, metadata, refs))
+          .decision,
+      ).toEqual(await readStationArrivalSource(database, options));
+    }
     const emptyLoop = await queryIndexedScheduledDepartures(database, {
       startInstant: '2026-11-29T12:00:00+08:00',
       endInstant: '2026-11-29T13:00:00+08:00',

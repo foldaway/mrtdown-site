@@ -30,7 +30,7 @@ alone cannot establish production-wide sleep.
   preserving untimed counts, shared memberships, platforms and 24+ hour tails.
 - [x] Serve recent rider reports, including empty results and expiry, without
   polling Postgres. Refresh them from their write paths.
-- [ ] Prove the complete arrivals endpoint works with SQL disabled across clock,
+- [x] Prove the complete arrivals endpoint works with SQL disabled across clock,
   correction, coverage and report changes before a separate activation.
 
 ## Surprises & Discoveries
@@ -118,8 +118,7 @@ partial promotion cannot replace the completed head.
 Missing arrival metadata prevents the enabled range preflight from skipping
 its repair. Successful metadata publication precedes purge and external
 checkpoint completion; a healthy matching generation/fingerprint keeps the
-unchanged path SQL-free. The departure producer follows below; the public reader
-remains unimplemented. No arrival publication flag was set in staging or
+unchanged path SQL-free. The departure producer and separately gated public reader follow below. No arrival publication flag was set in staging or
 production for this tranche. The [runbook](../../operations/edge-caching.md#published-arrival-metadata)
 owns limits and the separate publish-only staging procedure.
 
@@ -128,21 +127,50 @@ owns limits and the separate publish-only staging procedure.
 Bounded station/projection partitions publish in resumable pull steps and
 activate together through the existing snapshot publisher. Round-trip checks
 cover both timetable formats; publication checks cover interruption, source
-changes and checkpoint ordering. Public arrivals remain SQL-backed. No producer
-flags were enabled. Next: measure staging payload size and publication latency
+changes and checkpoint ordering. Public serving remains off by default. No
+producer flags were enabled. Next: measure staging payload size and publication latency
 using the [runbook](../../operations/edge-caching.md#published-departure-partitions).
 
 ### Recent arrival reports
 
 Recent reports now publish from committed writes behind the off-by-default
 `REDIS_ARRIVAL_REPORTS` gate. Healthy reads—including empty results, expiry and
-midnight/topology revalidation—use no SQL. Public v2 schedules still use SQL;
-no flags were activated. The [runbook](../../operations/edge-caching.md#recent-arrival-reports)
+midnight/topology revalidation—use no SQL. Schedule serving has a separate gate
+below; no flags were activated. The [runbook](../../operations/edge-caching.md#recent-arrival-reports)
 owns initialization, failure handling and rollback.
 
 Node 26 `npm run verify -- -- --maxWorkers=2` passed all 758 tests with local
 PostGIS and Redis, none skipped. The three added integration scenarios cover
 writes/failure, latest-first expiry and scope changes, with SQL disabled on hits.
+
+### Public arrivals reader
+
+The v2 handler can now use coherent published metadata and bounded departure
+partitions behind off-by-default `REDIS_ARRIVAL_READS=enabled`. Database access
+is lazy and reserved for unavailable required inputs or a cached scope rejection.
+Only rejected scopes check SQL generation, so a promotion can recover new scopes
+before publication while matching-generation rejections still return 400. It reuses canonical scope
+validation, timetable selection, date-tail selection and response assembly from
+the SQL reader. Optional report failure/absence is omitted on a published hit;
+SQL-backed requests retain the existing report recovery behavior.
+
+Node 26 `npm run verify -- -- --maxWorkers=2` passed 761 tests across 101 files
+with disposable local PostGIS/Redis and none skipped. Three added scenarios
+exercise the full handler with database access throwing on cold/warm hits,
+midnight/24+ tails, empty/expired reports, coverage republication and required
+input failure/recovery. The existing combined fixture also compares shared
+boarding, nondefault platforms and loop termini with SQL.
+
+Review follow-up adds a nullable report-destination migration and preserves the
+validated branch through publication. Cached legacy/mismatched reports are
+omitted. Coverage rows are grouped once per date before projection selection.
+Node 26 verification passed 763 tests across 101 files, none skipped; added
+regressions cover destination changes and generation-aware scope recovery.
+
+No deployment or activation occurred. Publish-only staging payload size and
+publication latency remain rollout gates in the
+[runbook](../../operations/edge-caching.md#published-arrivals-reader). Entity
+profiles, sitemap/statistics and background readers remain independent wake-ups.
 
 ## Context
 
