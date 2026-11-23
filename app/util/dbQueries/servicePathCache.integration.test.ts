@@ -49,7 +49,13 @@ import {
 import { getIssuesOverlappingRange } from './issueRange';
 import { rebuildOperationalFactsRange } from './operationalFacts';
 import { getOverviewData, getSystemMapData } from './overview';
-import { rebuildSitemapSnapshot } from './sitemap';
+import {
+  getSitemapData,
+  publishSitemapSnapshot,
+  rebuildSitemapSnapshot,
+} from './sitemap';
+import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
+import { buildSitemapPaths } from '~/util/sitemap.functions';
 import { rebuildStatisticsSnapshot } from './statistics';
 
 const store = vi.hoisted(() => new Map<string, string>());
@@ -129,6 +135,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
   beforeEach(async () => {
     vi.stubEnv('TIER', 'staging');
     vi.stubEnv('REDIS_RANGE_SNAPSHOT', undefined);
+    vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', undefined);
     vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'publish');
     vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'publish');
     vi.setSystemTime(now.toJSDate());
@@ -586,6 +593,98 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     expect(await range()).toEqual(changed);
     expect(referenceSql()).toHaveLength(0);
     expect(redis.set).toHaveBeenCalledTimes(2);
+  });
+
+  it('serves sitemap paths from cold/warm published inputs across Singapore midnight without SQL', async () => {
+    const fingerprint = 'a'.repeat(64);
+    await pool.query(
+      "update service_revisions set end_at='2026-11-19' where id='revision'",
+    );
+    await pool.query(
+      "update impact_event_periods set end_ts='2026-11-19T00:00:00+08:00' where impact_event_id='period'",
+    );
+    await rebuildSitemapSnapshot();
+    const baseline = await getSitemapData();
+    expect(baseline).toMatchObject({
+      issueIds: ['issue'],
+      townIds: ['town'],
+      operatorIds: ['operator'],
+      stationIds: ['station-1', 'station-2', 'station-3'],
+      reportEarliestDate: '2026-11-18',
+    });
+    vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'publish');
+    await publishSitemapSnapshot(fingerprint);
+    // A revision change and an ended issue do not remove their canonical URLs.
+    for (const clock of [
+      now,
+      now.plus({ days: 1 }),
+      DateTime.fromISO('2027-01-04T00:01:00+08:00'),
+    ]) {
+      vi.setSystemTime(clock.toJSDate());
+      vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'publish');
+      const sql = await getSitemapData();
+      vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'enabled');
+      vi.mocked(database.getDefaultDb).mockRejectedValue(
+        Error('SQL must stay asleep'),
+      );
+      queries.length = 0;
+      expect(await getSitemapData()).toEqual(sql);
+      expect(buildSitemapPaths(await getSitemapData())).toEqual(
+        buildSitemapPaths(sql),
+      );
+      expect(queries).toEqual([]);
+      vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+    }
+  });
+
+  it('retains the completed sitemap through partial promotion, then publishes corrections and authoritative emptiness', async () => {
+    vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'enabled');
+    await recordCanonicalManifestFingerprint(db, 'b'.repeat(64));
+    await publishSitemapSnapshot();
+    const baseline = await getSitemapData();
+    const head = (await sitemapSnapshotStore.head()).raw;
+    await markPageProfilesUpdating(db);
+    await pool.query("delete from issues where id='issue'");
+    await expect(publishSitemapSnapshot()).rejects.toThrow(
+      'completed canonical inputs',
+    );
+    expect((await sitemapSnapshotStore.head()).raw).toEqual(head);
+    expect(await getSitemapData()).toEqual(baseline);
+    await completePageProfileGeneration(db, 'corrected');
+    await rebuildSitemapSnapshot();
+    // The facts rebuild's publication can update the head without a new pull.
+    await publishSitemapSnapshot();
+    vi.setSystemTime(DateTime.fromISO('2027-01-01T00:01:00+08:00').toJSDate());
+    vi.mocked(database.getDefaultDb).mockRejectedValue(
+      Error('SQL must stay asleep'),
+    );
+    for (let read = 0; read < 2; read++) {
+      expect(await getSitemapData()).toMatchObject({
+        issueIds: [],
+        reportEarliestDate: null,
+        monthEarliest: '2027-01-01',
+        monthLatest: '2027-01-01',
+        currentDate: '2027-01-01',
+      });
+    }
+  });
+
+  it('lazily recovers missing, corrupt or unavailable sitemap inputs through the SQL snapshot', async () => {
+    await rebuildSitemapSnapshot();
+    const baseline = await getSitemapData();
+    vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'enabled');
+    for (const failure of ['missing', 'corrupt', 'unavailable']) {
+      store.clear();
+      if (failure === 'corrupt')
+        store.set('mrtdown:{staging:sitemap:v1}:active', '{}');
+      if (failure === 'unavailable')
+        redis.getrangeBuffer.mockRejectedValueOnce(Error('Redis unavailable'));
+      queries.length = 0;
+      expect(await getSitemapData()).toEqual(baseline);
+      expect(
+        queries.filter((q) => q.includes('from "sitemap_snapshots"')),
+      ).toHaveLength(1);
+    }
   });
 
   it('assembles revision boundaries at request time and preserves empty ranges', async () => {

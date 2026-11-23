@@ -172,6 +172,25 @@ publication latency remain rollout gates in the
 [runbook](../../operations/edge-caching.md#published-arrivals-reader). Entity
 profiles, sitemap/statistics and background readers remain independent wake-ups.
 
+### Sitemap follow-up
+
+The next bounded item-3 slice publishes sitemap inputs behind off-by-default
+`REDIS_SITEMAP_SNAPSHOT`. Healthy reads avoid both the Postgres sitemap snapshot
+query and the legacy earliest-issue-date query. Canonical completion and facts
+rebuilds publish from a completed SQL snapshot; unchanged pulls verify/repair
+the publication. Request dates and archive paths remain clock-dependent.
+The [runbook](../../operations/edge-caching.md#published-sitemap-inputs) owns
+seeding, activation and rollback. No deployment or activation occurred.
+Entity profiles/directories, SQL-backed statistics, Issue Profile misses and
+other background readers remain item-3 work; this slice cannot establish
+production-wide sleep.
+
+Node 26 `npm run verify -- -- --maxWorkers=2` passed 767 tests across 101 files
+with local PostGIS/Redis, none skipped. Four scenarios in existing suites cover
+SQL-disabled cold/warm reads, clock/empty paths, partial promotion and
+write-driven repair/fallback. The existing Redis suite covers the shared
+store's persistence, validation and delayed-publisher protection.
+
 ## Context
 
 [Range reads](../../../app/util/dbQueries/issueRange.ts) own history, overview,

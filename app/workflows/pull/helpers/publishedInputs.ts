@@ -1,5 +1,9 @@
 import { WorkflowNonRetryableError } from '@upstash/workflow';
 import {
+  isSitemapSnapshotPublicationEnabled,
+  sitemapSnapshotStore,
+} from '~/util/sitemapSnapshot.server';
+import {
   arrivalDepartureStore,
   isArrivalDeparturePublicationEnabled,
 } from '~/util/arrivalDepartureStore.server';
@@ -40,6 +44,18 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
     );
   const fingerprint = getCanonicalManifestFingerprint(manifest, pinned);
   if (!(await rangeSnapshotStore.isCurrent(fingerprint))) return false;
+  if (isSitemapSnapshotPublicationEnabled()) {
+    const [range, sitemap] = await Promise.all([
+      rangeSnapshotStore.head(),
+      sitemapSnapshotStore.read({ verifyPayload: true }),
+    ]);
+    if (
+      !sitemap ||
+      sitemap.value.fingerprint !== fingerprint ||
+      sitemap.value.generation !== range.value?.generation
+    )
+      return false;
+  }
   if (!isArrivalInputPublicationEnabled())
     return !isArrivalDeparturePublicationEnabled();
   const [range, arrivals] = await Promise.all([

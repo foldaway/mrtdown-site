@@ -12,13 +12,17 @@ import {
   publishArrivalInputSnapshot,
 } from '~/util/arrivalInputSnapshot.server.js';
 import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts.js';
-import { rebuildSitemapSnapshot } from '~/util/dbQueries/sitemap.js';
+import {
+  publishSitemapSnapshot,
+  rebuildSitemapSnapshot,
+} from '~/util/dbQueries/sitemap.js';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics.js';
 import {
   isNavigationCachePublicationEnabled,
   publishNavigationCache,
 } from '~/util/navigationCache.server.js';
 import { isIssueProfileCacheEnabled } from '~/util/pageProfileRedis.server.js';
+import { isSitemapSnapshotPublicationEnabled } from '~/util/sitemapSnapshot.server.js';
 import {
   isRangeReferenceCachePublicationEnabled,
   publishRangeReferenceCache,
@@ -87,6 +91,7 @@ function isPageProfilePublicationEnabled() {
 
 async function publishPullCaches(generation: string, fingerprint?: string) {
   await completePageProfileGeneration(getDb(), generation);
+  await publishSitemapSnapshot(fingerprint);
   if (isServicePathCachePublicationEnabled()) {
     await publishServicePathCache(generation);
   }
@@ -255,13 +260,15 @@ async function executePull(
   if (manifestIsCurrent && !rebuildScheduledTimetableProjection) {
     if (
       isRangeSnapshotPublicationEnabled() ||
-      isArrivalInputPublicationEnabled()
+      isArrivalInputPublicationEnabled() ||
+      isSitemapSnapshotPublicationEnabled()
     ) {
       await runPullStep(context, 'repair-range-snapshot', async () => {
         if (isRangeSnapshotPublicationEnabled())
           await publishRangeSnapshot(manifestFingerprint);
         if (isArrivalInputPublicationEnabled())
           await publishArrivalInputSnapshot(manifestFingerprint);
+        await publishSitemapSnapshot(manifestFingerprint);
         if (!isArrivalDeparturePublicationEnabled()) {
           await purgePublicDataCache();
           if (isRangeSnapshotPublicationEnabled())

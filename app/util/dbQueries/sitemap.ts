@@ -1,6 +1,13 @@
 import { eq, sql } from 'drizzle-orm';
 import { sitemapSnapshotsTable } from '~/db/schema';
-import { timeServerSpan } from '~/util/serverTiming';
+import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
+import { readCanonicalManifestFingerprint } from '~/workflows/pull/helpers/manifestFingerprint';
+import {
+  isSitemapSnapshotEnabled,
+  isSitemapSnapshotPublicationEnabled,
+  sitemapSnapshotStore,
+} from '~/util/sitemapSnapshot.server';
+import { recordServerTiming, timeServerSpan } from '~/util/serverTiming';
 import { type AppDb, getDefaultDb, isUndefinedTableError } from './database';
 import { type BaseDataset, buildCompleteDataset } from './dataset';
 import { isoDate, isoDateTime, nowSg, parseDateTime } from './dateTime';
@@ -197,14 +204,69 @@ export async function rebuildSitemapSnapshot(db?: AppDb) {
 
 export async function getSitemapData() {
   return timeServerSpan('sitemap_data', async () => {
-    const snapshot = requireSitemapSnapshot(await getLatestSitemapSnapshot());
+    const published = isSitemapSnapshotEnabled()
+      ? await sitemapSnapshotStore.read()
+      : null;
+    const snapshot =
+      published?.inputs ??
+      requireSitemapSnapshot(await getLatestSitemapSnapshot());
+    recordServerTiming(
+      'sitemap_source',
+      0,
+      `source=${published?.source ?? 'sql'}`,
+    );
+    const currentDate = isoDate(nowSg());
     return {
       ...snapshot,
+      // Empty archives use the request month, including after a quiet midnight.
+      ...(snapshot.issueIds.length === 0
+        ? { monthEarliest: currentDate, monthLatest: currentDate }
+        : {}),
       reportEarliestDate:
         snapshot.reportEarliestDate !== undefined
           ? snapshot.reportEarliestDate
           : await getEarliestRecordedIssueDate(),
-      currentDate: isoDate(nowSg()),
+      currentDate,
     };
   });
+}
+
+export async function publishSitemapSnapshot(fingerprint?: string) {
+  if (!isSitemapSnapshotPublicationEnabled()) return;
+  const expected = await sitemapSnapshotStore.head();
+  const db = await getDefaultDb();
+  const snapshot = await db.transaction(
+    async (tx) => {
+      const generation = await readCompletedPageProfileGeneration(tx);
+      const identity =
+        fingerprint ?? (await readCanonicalManifestFingerprint(tx));
+      if (!generation || !identity)
+        throw new Error(
+          'Sitemap publication requires completed canonical inputs',
+        );
+      // Rebuild in this completed SQL snapshot: the mutable SQL projection may
+      // have been rebuilt by a concurrent facts task during canonical promotion.
+      const dataset = await buildCompleteDataset(
+        'workflow:sitemap-snapshot',
+        nowSg(),
+        tx,
+      );
+      const data = buildSitemapDataFromDataset(dataset);
+      return { generation, fingerprint: identity, data };
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' },
+  );
+  const result = await sitemapSnapshotStore.publish(
+    expected.raw,
+    {
+      ...snapshot.data,
+      reportEarliestDate: snapshot.data.reportEarliestDate ?? null,
+    },
+    snapshot.generation,
+    snapshot.fingerprint,
+  );
+  console.info(
+    JSON.stringify({ event: 'sitemap_snapshot_published', ...result }),
+  );
+  return result;
 }

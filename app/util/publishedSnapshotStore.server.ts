@@ -28,6 +28,7 @@ export type SnapshotRedis = Pick<
 >;
 export type SnapshotNamespace =
   | 'range-snapshot'
+  | 'sitemap'
   | 'arrival-inputs'
   | 'arrival-departures';
 
