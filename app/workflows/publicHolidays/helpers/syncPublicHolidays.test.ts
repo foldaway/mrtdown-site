@@ -78,4 +78,16 @@ describe('fetchDataGovPublicHolidays', () => {
     expect(new URL(fetches[1]).searchParams.get('offset')).toBe('1');
     expect(rows.map((row) => row.date)).toEqual(['2026-01-01', '2026-05-01']);
   });
+  it('rejects empty and truncated sources instead of certifying them unchanged', async () => {
+    for (const total of [0, 2]) {
+      await expect(
+        fetchDataGovPublicHolidays(async () =>
+          Response.json({
+            success: true,
+            result: { total, records: [] },
+          }),
+        ),
+      ).rejects.toThrow(/Empty|Incomplete/);
+    }
+  });
 });

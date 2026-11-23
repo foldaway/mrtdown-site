@@ -35,7 +35,18 @@ import {
   publishServicePathCache,
 } from '~/util/servicePathCache.server';
 import { buildWeeklySummary } from '~/util/weeklyReport';
-import { syncPublicHolidays } from '~/workflows/publicHolidays/helpers/syncPublicHolidays';
+import {
+  acquireOrRenewPullWorkflowLease,
+  releasePullWorkflowLease,
+} from '~/workflows/pull/helpers/workflowLease';
+import {
+  canSkipPublicHolidaySync,
+  completePublicHolidaySync,
+} from '~/workflows/publicHolidays/helpers/syncCheckpoint';
+import {
+  normalizeDataGovPublicHolidayRecord,
+  syncPublicHolidays,
+} from '~/workflows/publicHolidays/helpers/syncPublicHolidays';
 import { recordCanonicalManifestFingerprint } from '~/workflows/pull/helpers/manifestFingerprint';
 import { scheduledTimetableCanonicalFixture } from '~/workflows/pull/helpers/scheduledTimetableCanonical.fixture';
 import * as sync from '~/workflows/pull/helpers/stagingSync';
@@ -545,6 +556,54 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     expect(pathsSql()).toHaveLength(1);
     expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
     expect(redis.getrange).not.toHaveBeenCalled();
+  });
+
+  it('retains holiday fact repairs across committed retries and serializes every holiday writer', async () => {
+    vi.useRealTimers(); // SQL lease expiry compares against the database clock.
+    vi.stubEnv('REDIS_PUBLIC_HOLIDAY_PREFLIGHT', 'enabled');
+    const rows = [
+      normalizeDataGovPublicHolidayRecord({
+        date: '2026-11-17',
+        holiday: 'First',
+      }),
+      normalizeDataGovPublicHolidayRecord({
+        date: '2026-11-19',
+        holiday: 'Last',
+      }),
+    ];
+    expect(await acquireOrRenewPullWorkflowLease(db, 'other-writer')).toBe(
+      true,
+    );
+    await expect(syncPublicHolidays(db, rows)).rejects.toThrow(
+      'workflow lease',
+    );
+    expect(redis.set).not.toHaveBeenCalled();
+    await releasePullWorkflowLease(db, 'other-writer');
+
+    const first = await syncPublicHolidays(db, rows);
+    expect(first.changedDates).toEqual([
+      '2026-11-17',
+      '2026-11-18',
+      '2026-11-19',
+    ]);
+    // Simulate a crash after commit, before the facts step. A new, narrower
+    // source must still recover the deletion and dates from the earlier source.
+    const retry = await syncPublicHolidays(db, [rows[1]]);
+    expect(retry.changedDates).toEqual(first.changedDates);
+    expect(retry.deleted).toBe(0);
+    await expect(
+      completePublicHolidaySync(first.checkpointToken, rows),
+    ).rejects.toThrow('superseded');
+    expect(await canSkipPublicHolidaySync([rows[1]])).toBe(false);
+
+    // Even with skip reads disabled, direct/seed writes invalidate old receipts.
+    await completePublicHolidaySync(retry.checkpointToken, [rows[1]]);
+    expect(await canSkipPublicHolidaySync([rows[1]])).toBe(true);
+    vi.stubEnv('REDIS_PUBLIC_HOLIDAY_PREFLIGHT', undefined);
+    vi.stubEnv('REDIS_URL', 'redis://unused');
+    await syncPublicHolidays(db, [rows[1]]);
+    vi.stubEnv('REDIS_PUBLIC_HOLIDAY_PREFLIGHT', 'enabled');
+    expect(await canSkipPublicHolidaySync([rows[1]])).toBe(false);
   });
 
   it('keeps holidays and live issue corrections current without invalidating references, including manual facts rebuilds', async () => {
