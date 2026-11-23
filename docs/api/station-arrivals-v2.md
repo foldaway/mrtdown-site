@@ -28,7 +28,9 @@ response fields.
 Alternative platforms describe one departure. An approximate time is still
 scheduled. A recent rider report is a separate branch-level observation and
 never changes scheduled times. Platform-specific reads omit the rider report.
-A failed report lookup leaves the timetable result usable.
+A failed report lookup leaves the timetable result usable. Published schedule
+reads also omit an uninitialized or unavailable report cache; see the
+[published reader runbook](../operations/edge-caching.md#published-arrivals-reader).
 
 Invalid syntax or canonical scope returns HTTP 400. Unexpected failures return
 HTTP 500. The legacy frequency endpoint at

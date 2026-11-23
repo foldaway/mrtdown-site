@@ -108,7 +108,16 @@ export function createArrivalDepartureStore(
       snapshot.inputs.partitions.map((ref) => ref.sha256),
     );
   }
-  return { manifest, prepare, publish, ready };
+  async function read(ref: DeparturePartitionRef) {
+    const partition = await parts.read(ref);
+    if (
+      partition.projectionId !== ref.projectionId ||
+      partition.stationId !== ref.stationId
+    )
+      throw new Error('Departure partition identity mismatch');
+    return partition;
+  }
+  return { manifest, prepare, publish, ready, read };
 }
 export const arrivalDepartureStore =
   createArrivalDepartureStore(getPageProfileRedis);

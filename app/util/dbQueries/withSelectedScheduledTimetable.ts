@@ -141,6 +141,46 @@ function validateScope(scope: IndexedTimetableScope, topology: Topology) {
   );
 }
 
+/** Canonical scope checks are identical for SQL and published inputs. */
+export function validateTimetableScope(
+  scope: IndexedTimetableScope,
+  topology: Topology,
+  loop?: true,
+) {
+  const serviceIds = indexedServiceIds(scope);
+  const matchesPlatformDefaults = validateScope(scope, topology);
+  const loopRevisions = loop
+    ? serviceIds.map((serviceId) =>
+        topology.services
+          .find(({ id }) => id === serviceId)
+          ?.revisions.filter(
+            ({ stations }) =>
+              isLoopPath(stations, scope.destinationStationId) &&
+              stations
+                .slice(0, -1)
+                .some(({ stationId }) => stationId === scope.stationId),
+          ),
+      )
+    : [];
+  if (loopRevisions.some((revisions) => !revisions?.length)) {
+    throw new InvalidStationArrivalScopeError(
+      'Loop timetable requests require a canonical loop and its anchor',
+    );
+  }
+  return { matchesPlatformDefaults, loopRevisions };
+}
+
+export type TimetableSnapshot<Scope extends IndexedTimetableScope> = {
+  scope: Scope;
+  topology: Topology;
+  maximumDepartureSeconds: number;
+  unavailableProjections: {
+    manifestSha256: string;
+    reason: Attempt['reason'];
+  }[];
+  select: (serviceDate: string) => Promise<ScheduledTimetableSelection<Scope>>;
+};
+
 /**
  * One read-only snapshot for selection and all consumer reads. The trusted
  * default loader reconstructs live topology through tx after completed promotion.
@@ -153,21 +193,7 @@ export async function withScheduledTimetableSnapshot<
 >(
   db: Database,
   options: ScheduledTimetableSnapshotOptions<Scope>,
-  use: (
-    tx: ReadTransaction,
-    snapshot: {
-      scope: Scope;
-      topology: Topology;
-      maximumDepartureSeconds: number;
-      unavailableProjections: {
-        manifestSha256: string;
-        reason: Attempt['reason'];
-      }[];
-      select: (
-        serviceDate: string,
-      ) => Promise<ScheduledTimetableSelection<Scope>>;
-    },
-  ) => Promise<T>,
+  use: (tx: ReadTransaction, snapshot: TimetableSnapshot<Scope>) => Promise<T>,
 ): Promise<T> {
   // Parsing preserves the exact-service or service-set variant.
   const scope = ScheduledTimetableRequestScopeSchema.parse(
@@ -183,25 +209,11 @@ export async function withScheduledTimetableSnapshot<
         ? structuredClone(await options.readCanonicalTopology(tx))
         : await readScheduleTopologyForSnapshot(db, tx);
       z.number().int().positive().parse(topology.projectionVersion);
-      const matchesPlatformDefaults = validateScope(scope, topology);
-      const loopRevisions = options.loop
-        ? serviceIds.map((serviceId) =>
-            topology.services
-              .find(({ id }) => id === serviceId)
-              ?.revisions.filter(
-                ({ stations }) =>
-                  isLoopPath(stations, scope.destinationStationId) &&
-                  stations
-                    .slice(0, -1)
-                    .some(({ stationId }) => stationId === scope.stationId),
-              ),
-          )
-        : [];
-      if (loopRevisions.some((revisions) => !revisions?.length)) {
-        throw new InvalidStationArrivalScopeError(
-          'Loop timetable requests require a canonical loop and its anchor',
-        );
-      }
+      const { matchesPlatformDefaults, loopRevisions } = validateTimetableScope(
+        scope,
+        topology,
+        options.loop,
+      );
       const destinationFilter = options.loop
         ? undefined
         : eq(scopes.destination_station_id, scope.destinationStationId);

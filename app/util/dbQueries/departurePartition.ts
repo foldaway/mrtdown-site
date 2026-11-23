@@ -54,9 +54,18 @@ export function parseDeparturePartition(value: unknown): DeparturePartition {
   return partition;
 }
 
-export function* expandDeparturePartition(partition: DeparturePartition) {
+export function* expandDeparturePartition(
+  partition: DeparturePartition,
+  selectedDate?: string,
+) {
   for (const { serviceDates, ...call } of partition.calls) {
-    for (const serviceDate of serviceDates) {
+    const dates =
+      selectedDate === undefined
+        ? serviceDates
+        : serviceDates.includes(selectedDate)
+          ? [selectedDate]
+          : [];
+    for (const serviceDate of dates) {
       yield {
         ...call,
         projection_id: partition.projectionId,

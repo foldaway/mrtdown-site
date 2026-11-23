@@ -8,6 +8,7 @@ import {
   type RecentCrowdArrival,
   recentCrowdArrivalFromReport,
 } from './crowdArrivalReportContract';
+import type { ArrivalInputs } from './dbQueries/arrivalInputs';
 import { isoDate, parseDateTimeUncached } from './dbQueries/dateTime';
 import type { AppDb, AppDbTransaction } from './dbQueries/database';
 import { getPageProfileRedis } from './pageProfileRedis.server';
@@ -130,6 +131,7 @@ export async function repairArrivalReportCache(db: AppDb) {
 export async function readCachedCrowdArrival(
   scope: ArrivalBranchScope,
   referenceInstant: string,
+  arrivalInputs?: ArrivalInputs,
 ): Promise<CachedCrowdArrival> {
   try {
     const redis = await getPageProfileRedis();
@@ -155,15 +157,16 @@ export async function readCachedCrowdArrival(
     const value =
       report && recentCrowdArrivalFromReport(report, referenceInstant);
     if (!value) return { status: 'ready', value: undefined };
-    const snapshot = await arrivalInputSnapshotStore.read();
-    if (!snapshot) return { status: 'unavailable' };
-    const service = snapshot.inputs.topology.services.find(
+    const inputs =
+      arrivalInputs ?? (await arrivalInputSnapshotStore.read())?.inputs;
+    if (!inputs) return { status: 'unavailable' };
+    const service = inputs.topology.services.find(
       (row) => row.id === scope.serviceId && row.lineId === scope.lineId,
     );
     if (!service) return { status: 'ready', value: undefined };
     const revisions = [];
     for (const revision of service.revisions) {
-      const recency = snapshot.inputs.serviceRevisionRecency.find(
+      const recency = inputs.serviceRevisionRecency.find(
         (row) => row.serviceId === scope.serviceId && row.id === revision.id,
       );
       if (!recency) return { status: 'unavailable' };

@@ -4,6 +4,7 @@ import {
   type SnapshotNamespace,
 } from './publishedSnapshotStore.server';
 import {
+  decodeSnapshotPayload,
   encodeSnapshotPayload,
   type SnapshotLimits,
 } from './snapshotPayload.server';
@@ -54,5 +55,21 @@ export function createSnapshotPartitions<T>(
     const head = await redis.getrangeBuffer(`${prefix()}:active`, 0, 2048);
     return head.equals(expectedHead);
   }
-  return { prepare, ready };
+  async function read(ref: { sha256: string; bytes: number }) {
+    const redis = await connect();
+    const raw = await redis.getrangeBuffer(
+      key(ref.sha256),
+      0,
+      limits.encodedBytes,
+    );
+    if (raw.length !== ref.bytes)
+      throw new Error('Missing or oversized snapshot partition');
+    return decodeSnapshotPayload(
+      raw.toString('utf8'),
+      ref.sha256,
+      parse,
+      limits,
+    );
+  }
+  return { prepare, ready, read };
 }

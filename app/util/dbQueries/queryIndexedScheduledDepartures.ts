@@ -33,6 +33,7 @@ import {
   type ScheduledTimetableSelection,
   type ScheduledTimetableSnapshotOptions,
   type Topology,
+  type TimetableSnapshot,
   withScheduledTimetableSnapshot,
 } from './withSelectedScheduledTimetable';
 
@@ -64,7 +65,7 @@ function compareText(left: string, right: string) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-type IndexedDepartureOptions<
+export type IndexedDepartureOptions<
   Scope extends IndexedTimetableScope = ExactTimetableScope,
 > = ScheduledTimetableSnapshotOptions<Scope> & {
   startInstant: string;
@@ -89,7 +90,7 @@ type IndexedServiceSetDeparture = RetainedScheduledDeparture & {
 
 type ServiceSetScope = Extract<IndexedTimetableScope, { serviceIds: string[] }>;
 
-type IndexedDepartures<
+export type IndexedDepartures<
   Scope extends IndexedTimetableScope = ExactTimetableScope,
   Departure = IndexedScheduledDeparture,
 > = {
@@ -105,7 +106,7 @@ type IndexedDepartures<
   departures: Departure[];
 };
 
-function exactServiceDeparture(
+export function exactServiceDeparture(
   departure: IndexedServiceSetDeparture,
 ): IndexedScheduledDeparture {
   const { boardingByService, platformSemantics, ...timing } = departure;
@@ -183,6 +184,44 @@ async function readIndexedScheduledDepartures<
     topology: Topology,
   ) => Promise<T>,
 ): Promise<T> {
+  // Reject invalid windows before opening a SQL snapshot.
+  departureWindow(options);
+  return withScheduledTimetableSnapshot(db, options, async (tx, snapshot) => {
+    const result = await assembleIndexedScheduledDepartures(
+      options,
+      snapshot,
+      (scope, destinations, selected, date, lower, upper) =>
+        selected.version.format === 'combined'
+          ? readCombinedDepartureRows(
+              tx,
+              scope,
+              destinations,
+              selected.projectionId,
+              date,
+              lower,
+              upper,
+            )
+          : readLegacyDepartureRows(
+              tx,
+              scope,
+              destinations,
+              selected.projectionId,
+              date,
+              lower,
+              upper,
+            ),
+      mapDeparture,
+    );
+    return use(tx, result, snapshot.topology);
+  });
+}
+
+function departureWindow(
+  options: Pick<
+    IndexedDepartureOptions,
+    'startInstant' | 'endInstant' | 'limit'
+  >,
+) {
   const { startInstant, endInstant } = options;
   const limit = z.number().int().positive().optional().parse(options.limit);
   const window = { startInstant, endInstant };
@@ -201,140 +240,154 @@ async function readIndexedScheduledDepartures<
   const upperBound = end
     .round({ smallestUnit: 'second', roundingMode: 'ceil' })
     .toString();
-  return withScheduledTimetableSnapshot(db, options, async (tx, snapshot) => {
-    const { scope } = snapshot;
-    // The helper owns Singapore service-day arithmetic, including 24+ offsets.
-    // Current civil dates also need selection when all known times are missing.
-    const serviceDates = [
-      ...new Set([
-        ...scheduledServiceDatesForWindow(
-          dailyCalendar('0001-01-01'),
-          window,
-          snapshot.maximumDepartureSeconds,
+  return { window, start, end, lowerBound, upperBound, limit };
+}
+
+type DepartureRows = {
+  untimed: { count: number };
+  rows: (Omit<
+    Awaited<ReturnType<typeof readCombinedDepartureRows>>['rows'][number],
+    'platform_semantics'
+  > & { platform_semantics?: PlatformSemantics })[];
+};
+
+/** Shared date-tail selection, half-open filtering, provenance, ordering and limits. */
+export async function assembleIndexedScheduledDepartures<
+  Scope extends IndexedTimetableScope,
+  Departure extends RetainedScheduledDeparture,
+>(
+  options: IndexedDepartureOptions<Scope>,
+  snapshot: TimetableSnapshot<Scope>,
+  readRows: (
+    scope: Scope,
+    destinationIds: string[],
+    selected: NonNullable<ScheduledTimetableSelection<Scope>['selected']>,
+    serviceDate: string,
+    lowerBound: string,
+    upperBound: string,
+  ) => Promise<DepartureRows>,
+  mapDeparture: (departure: IndexedServiceSetDeparture) => Departure,
+): Promise<IndexedDepartures<Scope, Departure>> {
+  const { window, start, lowerBound, upperBound, limit } =
+    departureWindow(options);
+  const { scope } = snapshot;
+  // The helper owns Singapore service-day arithmetic, including 24+ offsets.
+  // Current civil dates also need selection when all known times are missing.
+  const serviceDates = [
+    ...new Set([
+      ...scheduledServiceDatesForWindow(
+        dailyCalendar('0001-01-01'),
+        window,
+        snapshot.maximumDepartureSeconds,
+      ),
+      ...scheduledServiceDatesForWindow(
+        dailyCalendar(
+          start.toZonedDateTimeISO('Asia/Singapore').toPlainDate().toString(),
         ),
-        ...scheduledServiceDatesForWindow(
-          dailyCalendar(
-            start.toZonedDateTimeISO('Asia/Singapore').toPlainDate().toString(),
-          ),
-          window,
-          86_400,
-        ),
-      ]),
-    ].sort();
-    const serviceDays: ScheduledTimetableSelection<Scope>[] = [];
-    const departures: {
-      departure: Departure;
-      occurrenceIndex: number;
-    }[] = [];
-    let untimedDepartureCount = 0;
-    for (const serviceDate of serviceDates) {
-      const selection = await snapshot.select(serviceDate);
-      serviceDays.push(selection);
-      const selected = selection.selected;
-      if (!selected) {
-        continue;
-      }
-      const destinationIds = selected.loopDestinationIds ?? [
-        scope.destinationStationId,
-      ];
-      const { rows, untimed } =
-        selected.version.format === 'combined'
-          ? await readCombinedDepartureRows(
-              tx,
-              scope,
-              destinationIds,
-              selected.projectionId,
-              serviceDate,
-              lowerBound,
-              upperBound,
-            )
-          : await readLegacyDepartureRows(
-              tx,
-              scope,
-              destinationIds,
-              selected.projectionId,
-              serviceDate,
-              lowerBound,
-              upperBound,
-            );
-      untimedDepartureCount += untimed.count;
-      const { manifest, manifestSha256 } = selected.version;
-      for (const row of rows) {
-        if (row.departure_instant === null) {
-          throw new Error('Timed departure query returned an untimed row');
-        }
-        const boardingByService = row.boardingByService;
-        const platformSemantics =
-          'platform_semantics' in row ? row.platform_semantics : undefined;
-        departures.push({
-          occurrenceIndex: row.occurrence_index,
-          departure: mapDeparture({
-            providerTripId: row.provider_trip_id,
-            providerRouteId: row.provider_route_id,
-            providerCalendarId: row.provider_calendar_id,
-            providerStopId: row.provider_stop_id,
-            stopSequence: row.stop_sequence,
-            serviceDate: row.service_date,
-            stationId: row.station_id,
-            lineId: row.line_id,
-            destinationStationId: row.destination_station_id,
-            platformIds: [
-              ...new Set(
-                boardingByService.flatMap((member) => member.platformIds),
-              ),
-            ],
-            boardingByService,
-            ...(platformSemantics === undefined ? {} : { platformSemantics }),
-            arrivalSeconds: row.arrival_seconds,
-            departureSeconds: row.departure_seconds,
-            arrivalInstant:
-              row.arrival_instant === null
-                ? null
-                : instant(row.arrival_instant),
-            departureInstant: instant(row.departure_instant),
-            pickupType: row.pickup_type,
-            dropOffType: row.drop_off_type,
-            timepoint: row.timepoint,
-            basis: 'scheduled',
-            precision: row.timepoint === 0 ? 'approximate' : 'exact',
-            manifestSha256,
-            snapshotSha256: manifest.capture.sha256,
-            retrievedAt: manifest.capture.retrieved_at,
-            correctionRevision: manifest.correctionRevision,
-          }),
-        });
-      }
+        window,
+        86_400,
+      ),
+    ]),
+  ].sort();
+  const serviceDays: ScheduledTimetableSelection<Scope>[] = [];
+  const departures: {
+    departure: Departure;
+    occurrenceIndex: number;
+  }[] = [];
+  let untimedDepartureCount = 0;
+  for (const serviceDate of serviceDates) {
+    const selection = await snapshot.select(serviceDate);
+    serviceDays.push(selection);
+    const selected = selection.selected;
+    if (!selected) {
+      continue;
     }
-    // SQL bounds reads by date/scope/window. Merge every date before limiting;
-    // source occurrence order breaks ties without interpreting opaque sequences.
-    departures.sort(
-      (left, right) =>
-        Date.parse(left.departure.departureInstant) -
-          Date.parse(right.departure.departureInstant) ||
-        compareText(left.departure.serviceDate, right.departure.serviceDate) ||
-        compareText(
-          left.departure.providerTripId,
-          right.departure.providerTripId,
-        ) ||
-        left.occurrenceIndex - right.occurrenceIndex,
-    );
-    const result: IndexedDepartures<Scope, Departure> = {
+    const destinationIds = selected.loopDestinationIds ?? [
+      scope.destinationStationId,
+    ];
+    const { rows, untimed } = await readRows(
       scope,
-      window,
-      serviceDays,
-      unavailableProjections: snapshot.unavailableProjections,
-      untimedDepartureCount,
-      complete:
-        untimedDepartureCount === 0 &&
-        snapshot.unavailableProjections.length === 0 &&
-        serviceDays.every(({ selected }) => selected !== null),
-      departures: (limit === undefined
-        ? departures
-        : departures.slice(0, limit)
-      ).map(({ departure }) => departure),
-    };
-    return use(tx, result, snapshot.topology);
-  });
+      destinationIds,
+      selected,
+      serviceDate,
+      lowerBound,
+      upperBound,
+    );
+    untimedDepartureCount += untimed.count;
+    const { manifest, manifestSha256 } = selected.version;
+    for (const row of rows) {
+      if (row.departure_instant === null) {
+        throw new Error('Timed departure query returned an untimed row');
+      }
+      const boardingByService = row.boardingByService;
+      const platformSemantics =
+        'platform_semantics' in row ? row.platform_semantics : undefined;
+      departures.push({
+        occurrenceIndex: row.occurrence_index,
+        departure: mapDeparture({
+          providerTripId: row.provider_trip_id,
+          providerRouteId: row.provider_route_id,
+          providerCalendarId: row.provider_calendar_id,
+          providerStopId: row.provider_stop_id,
+          stopSequence: row.stop_sequence,
+          serviceDate: row.service_date,
+          stationId: row.station_id,
+          lineId: row.line_id,
+          destinationStationId: row.destination_station_id,
+          platformIds: [
+            ...new Set(
+              boardingByService.flatMap((member) => member.platformIds),
+            ),
+          ],
+          boardingByService,
+          ...(platformSemantics === undefined ? {} : { platformSemantics }),
+          arrivalSeconds: row.arrival_seconds,
+          departureSeconds: row.departure_seconds,
+          arrivalInstant:
+            row.arrival_instant === null ? null : instant(row.arrival_instant),
+          departureInstant: instant(row.departure_instant),
+          pickupType: row.pickup_type,
+          dropOffType: row.drop_off_type,
+          timepoint: row.timepoint,
+          basis: 'scheduled',
+          precision: row.timepoint === 0 ? 'approximate' : 'exact',
+          manifestSha256,
+          snapshotSha256: manifest.capture.sha256,
+          retrievedAt: manifest.capture.retrieved_at,
+          correctionRevision: manifest.correctionRevision,
+        }),
+      });
+    }
+  }
+  // SQL bounds reads by date/scope/window. Merge every date before limiting;
+  // source occurrence order breaks ties without interpreting opaque sequences.
+  departures.sort(
+    (left, right) =>
+      Date.parse(left.departure.departureInstant) -
+        Date.parse(right.departure.departureInstant) ||
+      compareText(left.departure.serviceDate, right.departure.serviceDate) ||
+      compareText(
+        left.departure.providerTripId,
+        right.departure.providerTripId,
+      ) ||
+      left.occurrenceIndex - right.occurrenceIndex,
+  );
+  const result: IndexedDepartures<Scope, Departure> = {
+    scope,
+    window,
+    serviceDays,
+    unavailableProjections: snapshot.unavailableProjections,
+    untimedDepartureCount,
+    complete:
+      untimedDepartureCount === 0 &&
+      snapshot.unavailableProjections.length === 0 &&
+      serviceDays.every(({ selected }) => selected !== null),
+    departures: (limit === undefined
+      ? departures
+      : departures.slice(0, limit)
+    ).map(({ departure }) => departure),
+  };
+  return result;
 }
 
 async function readLegacyDepartureRows(

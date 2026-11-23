@@ -14,9 +14,13 @@ const mocks = vi.hoisted(() => ({
   getDb: vi.fn(),
   read: vi.fn(),
   readCrowdArrival: vi.fn(),
+  readPublished: vi.fn(),
 }));
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: () => (options: unknown) => ({ options }),
+}));
+vi.mock('~/util/publishedStationArrivals.server', () => ({
+  readPublishedStationArrivals: mocks.readPublished,
 }));
 vi.mock('~/db', () => ({ getDb: mocks.getDb }));
 vi.mock('~/util/crowdArrivalReports', () => ({
@@ -56,6 +60,7 @@ describe('station arrivals v2 contract', () => {
       Temporal.Instant.from(result.window.startInstant),
     );
     mocks.getDb.mockReturnValue('database');
+    mocks.readPublished.mockReset().mockResolvedValue(null);
     mocks.readCrowdArrival.mockReset().mockResolvedValue(undefined);
   });
 
@@ -168,9 +173,10 @@ describe('station arrivals v2 contract', () => {
     mocks.readCrowdArrival.mockResolvedValueOnce(report);
     const { data } = await (await request()).json();
     expect(mocks.readCrowdArrival).toHaveBeenCalledWith(
-      'database',
+      mocks.getDb,
       scope,
       result.window.startInstant,
+      undefined,
     );
     expect(data.recentCrowdArrival).toEqual(report);
     expect(data.timings[0].departures[0].time).toBe(departure.departureInstant);
@@ -184,6 +190,26 @@ describe('station arrivals v2 contract', () => {
     const fallback = await response.json();
     expect(fallback.data.recentCrowdArrival).toBeUndefined();
     expect(fallback.data.timings).toEqual(data.timings);
+  });
+
+  it('uses published schedules before SQL and omits an unavailable optional signal', async () => {
+    const decision = selectStationArrivalSource(
+      buildScheduledStationArrivalLines(result, display),
+    );
+    const inputs = { publication: 'coherent fixture' };
+    mocks.readPublished.mockResolvedValue({ decision, inputs });
+    mocks.getDb.mockImplementation(() => {
+      throw Error('SQL disabled');
+    });
+    expect((await request()).status).toBe(200);
+    expect(mocks.readCrowdArrival).toHaveBeenCalledWith(
+      mocks.getDb,
+      scope,
+      result.window.startInstant,
+      { sqlFallback: false, arrivalInputs: inputs },
+    );
+    expect(mocks.getDb).not.toHaveBeenCalled();
+    expect(mocks.read).not.toHaveBeenCalled();
   });
 
   it('passes loop requests to the reader with the canonical anchor in scope', async () => {
