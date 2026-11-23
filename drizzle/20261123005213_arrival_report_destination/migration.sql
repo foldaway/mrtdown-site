@@ -1,0 +1,1 @@
+ALTER TABLE "crowd_arrival_reports" ADD COLUMN "destination_station_id" text;

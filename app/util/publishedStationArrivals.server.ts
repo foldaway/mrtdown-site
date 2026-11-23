@@ -1,4 +1,6 @@
 import { ScheduledTimetableRequestScopeSchema } from '@mrtdown/fs';
+import { getDb } from '~/db';
+import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import {
   type DeparturePartitionRef,
   arrivalDepartureStore,
@@ -32,6 +34,7 @@ export async function readPublishedStationArrivals(
   options: StationArrivalRequest,
 ) {
   if (process.env.REDIS_ARRIVAL_READS !== 'enabled') return null;
+  let generation: string | undefined;
   try {
     const [metadata, departures] = await Promise.all([
       arrivalInputSnapshotStore.read(),
@@ -47,13 +50,20 @@ export async function readPublishedStationArrivals(
       metadata.value.sha256 !== departures.inputs.arrivalInputsSha256
     )
       return null;
+    generation = metadata.value.generation;
     return await assemblePublishedStationArrivals(
       options,
       metadata.inputs,
       departures.inputs.partitions,
     );
   } catch (error) {
-    if (error instanceof InvalidStationArrivalScopeError) throw error;
+    if (error instanceof InvalidStationArrivalScopeError) {
+      // A promotion can add scopes before its snapshots publish. Only rejected
+      // scopes consult SQL generation; healthy published reads never open SQL.
+      const current = await readCompletedPageProfileGeneration(getDb());
+      if (current === generation) throw error;
+      return null;
+    }
     console.error('Published station arrivals unavailable; using SQL', {
       error,
     });

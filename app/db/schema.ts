@@ -213,6 +213,8 @@ export const crowdArrivalReportsTable = pgTable(
     service_id: text('service_id')
       .references(() => servicesTable.id)
       .notNull(),
+    // Preserve the branch accepted at submission; older rows stay unknown.
+    destination_station_id: text('destination_station_id'),
     reported_at: timestamp('reported_at', {
       withTimezone: true,
       mode: 'string',

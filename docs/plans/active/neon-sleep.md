@@ -147,7 +147,9 @@ writes/failure, latest-first expiry and scope changes, with SQL disabled on hits
 
 The v2 handler can now use coherent published metadata and bounded departure
 partitions behind off-by-default `REDIS_ARRIVAL_READS=enabled`. Database access
-is lazy and reserved for unavailable required inputs. It reuses canonical scope
+is lazy and reserved for unavailable required inputs or a cached scope rejection.
+Only rejected scopes check SQL generation, so a promotion can recover new scopes
+before publication while matching-generation rejections still return 400. It reuses canonical scope
 validation, timetable selection, date-tail selection and response assembly from
 the SQL reader. Optional report failure/absence is omitted on a published hit;
 SQL-backed requests retain the existing report recovery behavior.
@@ -158,6 +160,12 @@ exercise the full handler with database access throwing on cold/warm hits,
 midnight/24+ tails, empty/expired reports, coverage republication and required
 input failure/recovery. The existing combined fixture also compares shared
 boarding, nondefault platforms and loop termini with SQL.
+
+Review follow-up adds a nullable report-destination migration and preserves the
+validated branch through publication. Cached legacy/mismatched reports are
+omitted. Coverage rows are grouped once per date before projection selection.
+Node 26 verification passed 763 tests across 101 files, none skipped; added
+regressions cover destination changes and generation-aware scope recovery.
 
 No deployment or activation occurred. Publish-only staging payload size and
 publication latency remain rollout gates in the

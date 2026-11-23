@@ -99,6 +99,7 @@ export async function getRecentCrowdArrival(
   const [report] = await db
     .select({
       reportedAt: reports.reported_at,
+      destinationStationId: reports.destination_station_id,
       minutes: reports.minutes_to_arrival,
     })
     .from(reports)
@@ -121,6 +122,8 @@ export async function getRecentCrowdArrival(
   const value = recentCrowdArrivalFromReport(report, referenceInstant);
   if (
     !value ||
+    (report.destinationStationId !== null &&
+      report.destinationStationId !== scope.destinationStationId) ||
     !(await isReportableArrivalScope(db, scope, report.reportedAt))
   ) {
     return undefined;
@@ -174,6 +177,7 @@ export async function submitCrowdArrival(
       id: crypto.randomUUID(),
       station_id: submission.stationId,
       service_id: submission.serviceId,
+      destination_station_id: submission.destinationStationId,
       minutes_to_arrival: submission.minutesToArrival,
       reported_at: reportedAt,
       created_at: receivedAt,

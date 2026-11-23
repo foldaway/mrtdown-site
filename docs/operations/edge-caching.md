@@ -361,7 +361,12 @@ instances, and republish arrival metadata with revision recency. Seed with
 [`crowdArrivalReportCache.server.ts`](../../app/util/crowdArrivalReportCache.server.ts),
 or let the first enabled read initialize it. Repair loads at most 10,000 recent
 accepted rows; exceeding the bound keeps SQL fallback. There is no timer or
-expiry refill. The cache contains no reporter identities.
+expiry refill. The cache contains no reporter identities. Apply the generated
+nullable `destination_station_id` migration before deploying the updated report
+writer.
+Each new report preserves its validated destination through SQL and Redis;
+mismatched or legacy rows without that identity are omitted from cached reads.
+No destination is backfilled from potentially changed topology.
 
 Redis invalidation failure rejects a submission before insertion. Publication
 failure after commit preserves the accepted report and leaves the cache unknown
@@ -385,9 +390,13 @@ bounded decoding and digest/identity checks. Selection, Singapore service dates
 policy and assembly code at the request clock. Empty or incomplete coverage is a
 normal response, distinct from an unavailable required snapshot.
 
-Missing, mismatched or corrupt required inputs select SQL recovery lazily. No
-request-side departure publication or repair is attempted. With a healthy
-publication, neither a cold process nor midnight needs SQL. Branch-level reports
+Missing, mismatched or corrupt required inputs select SQL recovery lazily. A
+cached scope rejection checks SQL's completed generation: a changed or updating
+generation selects SQL validation, covering newly promoted platforms before
+snapshot publication. A matching generation retains the cached 400. Valid scopes
+never perform this generation check. No request-side departure publication or
+repair is attempted. With a healthy publication, neither a cold process nor
+midnight needs SQL. Branch-level reports
 use `REDIS_ARRIVAL_REPORTS=enabled` and the same metadata snapshot; expiry and
 initialized-empty reports remain SQL-free. Disabled, dirty or unavailable optional
 reports are omitted on this path, leaving the timetable usable. Writers or an

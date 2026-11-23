@@ -351,6 +351,7 @@ describe.skipIf(!url)('indexed departure window', () => {
       '20261027152337_early_lilith',
       '20261108020149_combined_timetable_retention',
       '20261108050132_combined_departure_index',
+      '20261123005213_arrival_report_destination',
     ]) {
       await pool.query(
         (
@@ -622,6 +623,17 @@ describe.skipIf(!url)('indexed departure window', () => {
             ),
           ).toEqual(expected[index]);
         }
+        // A day count without a matching scope is uncovered, not an absent day.
+        const uncovered = policy.select(
+          '2026-10-25',
+          selectArrivalInputCoverage(
+            { ...snapshot.inputs, scopes: [] },
+            scope,
+            '2026-10-25',
+          ),
+        );
+        expect(uncovered.selected).toBeNull();
+        expect(uncovered.attempts[0].reason).toBe('scope-not-covered');
         expect(queries).toEqual([]);
         expect(
           snapshot.inputs.stationNames.find((row) => row.id === scope.stationId)
@@ -778,7 +790,13 @@ describe.skipIf(!url)('indexed departure window', () => {
         await redis.hset(
           reportKey,
           JSON.stringify([scope.stationId, scope.serviceId]),
-          JSON.stringify([{ reportedAt: '2026-10-24T16:00:00Z', minutes: 0 }]),
+          JSON.stringify([
+            {
+              reportedAt: '2026-10-24T16:00:00Z',
+              minutes: 0,
+              destinationStationId: scope.destinationStationId,
+            },
+          ]),
         );
         queries.length = 0;
         expect(
@@ -829,12 +847,52 @@ describe.skipIf(!url)('indexed departure window', () => {
         expect(queries).toEqual([]);
       });
 
+      it('checks generation only after scope rejection and recovers a newly promoted platform before publication', async () => {
+        vi.mocked(appDatabase.getDb).mockReturnValue(db());
+        queries.length = 0;
+        expect(
+          (await request(window.startInstant, 'new-platform')).status,
+        ).toBe(400);
+        expect(queries).toHaveLength(1); // Current generation confirms the cached rejection.
+        await db().insert(stationPlatformsTable).values({
+          station_id: scope.stationId,
+          platform_id: 'new-platform',
+          label: 'New',
+          line_id: scope.lineId,
+          last_updated: '2026-10-25',
+        });
+        await markPageProfilesUpdating(db());
+        await finalize();
+        expect(
+          (await request(window.startInstant, 'new-platform')).status,
+        ).toBe(200);
+        await completePageProfileGeneration(db(), 'new-unpublished-generation');
+        expect(
+          (await request(window.startInstant, 'new-platform')).status,
+        ).toBe(200);
+        expect(
+          (await request(window.startInstant, 'still-unknown')).status,
+        ).toBe(400);
+        // Valid scopes continue using the preceding coherent publication, even
+        // while the SQL generation has advanced and publication is still pending.
+        vi.mocked(appDatabase.getDb)
+          .mockClear()
+          .mockImplementation(() => {
+            throw Error('SQL disabled');
+          });
+        queries.length = 0;
+        expect((await request(window.startInstant)).status).toBe(200);
+        expect(appDatabase.getDb).not.toHaveBeenCalled();
+        expect(queries).toEqual([]);
+      });
+
       it('selects SQL recovery for incoherent, missing or corrupt required inputs and retains canonical validation', async () => {
         const options = {
           scope,
           referenceInstant: window.startInstant,
           endInstant: window.endInstant,
         };
+        vi.mocked(appDatabase.getDb).mockReturnValue(db());
         await expect(
           readPublishedStationArrivals({
             ...options,
@@ -844,6 +902,11 @@ describe.skipIf(!url)('indexed departure window', () => {
         await expect(
           readPublishedStationArrivals({ ...options, loop: true }),
         ).rejects.toThrow('Loop');
+        vi.mocked(appDatabase.getDb)
+          .mockClear()
+          .mockImplementation(() => {
+            throw Error('SQL disabled');
+          });
         const metadata = await arrivalInputSnapshotStore.read();
         const published = await arrivalDepartureStore.manifest.read();
         if (!metadata || !published) throw Error('Missing published fixture');
@@ -1006,6 +1069,69 @@ describe.skipIf(!url)('indexed departure window', () => {
         );
       });
 
+      it('keeps the submitted destination through cache publication while timetable metadata lags', async () => {
+        await submitCrowdArrival(
+          db(),
+          { ...scope, minutesToArrival: 4 },
+          'old-branch',
+        );
+        const old = await arrivalInputSnapshotStore.read();
+        if (!old) throw Error('Missing metadata fixture');
+        const other = { ...scope, destinationStationId: 'station-2' };
+        await db()
+          .update(serviceRevisionPathStationEntriesTable)
+          .set({ station_id: other.destinationStationId })
+          .where(
+            eq(
+              serviceRevisionPathStationEntriesTable.station_id,
+              scope.destinationStationId,
+            ),
+          );
+        vi.setSystemTime(later(1));
+        await submitCrowdArrival(
+          db(),
+          { ...other, minutesToArrival: 3 },
+          'new-branch',
+        );
+        const [row] = await db()
+          .select()
+          .from(crowdArrivalReportsTable)
+          .where(eq(crowdArrivalReportsTable.reporter_hash, 'new-branch'));
+        expect(row.destination_station_id).toBe(other.destinationStationId);
+        queries.length = 0;
+        const options = {
+          sqlFallback: false as const,
+          arrivalInputs: old.inputs,
+        };
+        expect(
+          await getRecentCrowdArrival(noSql, scope, later(1), options),
+        ).toBeUndefined();
+        expect(
+          await getRecentCrowdArrival(noSql, other, later(1), options),
+        ).toBeUndefined();
+        expect(queries).toEqual([]);
+        expect(await sqlRead(later(1))).toBeUndefined();
+        // Legacy cached rows have no proven branch identity. They suppress older
+        // rows without asking SQL to reconstruct a potentially changed branch.
+        await redis.hset(
+          reportKey,
+          JSON.stringify([scope.stationId, scope.serviceId]),
+          JSON.stringify([
+            { reportedAt: later(1), minutes: 3 },
+            {
+              reportedAt: at,
+              minutes: 4,
+              destinationStationId: scope.destinationStationId,
+            },
+          ]),
+        );
+        queries.length = 0;
+        expect(
+          await getRecentCrowdArrival(noSql, scope, later(1), options),
+        ).toBeUndefined();
+        expect(queries).toEqual([]);
+      });
+
       it('selects the latest timestamp/id before expiry, never resurrects an older signal and stays empty as the clock advances', async () => {
         await db()
           .insert(crowdArrivalReportsTable)
@@ -1019,6 +1145,7 @@ describe.skipIf(!url)('indexed departure window', () => {
               ...row,
               station_id: scope.stationId,
               service_id: scope.serviceId,
+              destination_station_id: scope.destinationStationId,
               reporter_hash: row.id,
             })),
           );
