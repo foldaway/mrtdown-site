@@ -274,9 +274,10 @@ the next ordinary poll from reaching SQL recovery.
 Failure cleanup uses a short-lived external writer marker to avoid opening SQL
 when an upstream-only preflight failed before lease acquisition.
 
-When publication is enabled, every holiday workflow run republishes before
-purging, even if the holiday rows are unchanged. This retries publication or
-purge failures after an earlier sync committed, without a separate dirty marker.
+Unless the holiday preflight below proves a completed unchanged source, every
+holiday workflow run with publication enabled republishes before purging, even
+if the holiday rows are unchanged. This retries publication or
+purge failures after an earlier sync committed.
 The publisher reads both completion metadata and source rows in the same
 repeatable-read transaction; an updating canonical generation is rejected.
 Manual facts rebuilds do not change its canonical source inputs. Canonical SQL
@@ -317,6 +318,43 @@ Requests recompute the Singapore date, weekly/year archive paths and empty
 archive month bounds. Holiday and community-report changes do not affect these
 IDs/bounds. Missing, invalid or unavailable Redis inputs fall back lazily to the
 SQL sitemap snapshot, including the legacy earliest-date lookup when needed.
+
+## Unchanged holiday checks
+
+`REDIS_PUBLIC_HOLIDAY_PREFLIGHT=enabled` is off by default. After one complete
+holiday workflow, a matching normalized, nonempty data.gov.sg source skips SQL
+and the writer lease. The source includes names and hashes, not just dates.
+Range publication mode is part of the identity; enabled range publication also
+requires a valid payload. Empty, truncated or unavailable upstream responses
+fail before database access. Missing/corrupt Redis state cannot authorize a skip.
+
+Holiday writers share the canonical pull lease. Pending fact dates are stored
+transactionally with holiday changes in SQL and retained until rebuild,
+publication and purge succeed. The Redis receipt is written last. A superseded
+workflow cannot certify a newer writer; start a new workflow if it reports
+`Holiday sync superseded`. Failed attempts release their lease; a process crash
+relies on the existing lease expiry. No schedule frequency changes are needed.
+
+Writers invalidate the receipt even with skip reads disabled when `REDIS_URL`
+is configured. Redis failure then stops the write before mutation, for retry.
+The two persistent keys are under
+`mrtdown:{<tier>:range-snapshot:v1}:public-holidays:{writer,completed}`; they do
+not expire or cause periodic SQL refills.
+
+For activation, first deploy this code to **all** holiday writers and let any
+old holiday workflows finish. Delete only the tier's `public-holidays:completed`
+key, configure Redis consistently, enable the flag, then run the authenticated
+holiday task once to seed a receipt. A second unchanged run should contain only
+`check-published-public-holidays`; observe workflow steps without querying SQL.
+Validate this separately in staging before production activation. Roll back by
+disabling the flag; keep Redis configured for writer invalidation. Clear and
+reseed the receipt after any out-of-band holiday SQL edit, older-code writer,
+or writes made without Redis configured.
+
+This removes the healthy monthly holiday wake-up only. Weekly disruption-report
+dispatch retains SQL as its durable recovery queue, including moderation and
+failed delivery. Arrival reports use a separate cache. Entity/profile readers,
+statistics, genuine writes and repairs remain independent wake-ups.
 
 ## Published arrival metadata
 

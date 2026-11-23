@@ -191,6 +191,23 @@ SQL-disabled cold/warm reads, clock/empty paths, partial promotion and
 write-driven repair/fallback. The existing Redis suite covers the shared
 store's persistence, validation and delayed-publisher protection.
 
+### Background holiday follow-up
+
+The bounded item-4 slice adds an off-by-default holiday source preflight. A
+completed unchanged source skips database access and SQL lease helpers. Pending
+fact dates survive committed writes; the existing writer lease and a persistent
+Redis writer token prevent overlapping/replayed workflows from certifying stale
+work. The receipt follows facts, publication and purge. See the
+[runbook](../../operations/edge-caching.md#unchanged-holiday-checks) for seeding,
+rollback and intentional remaining wake-ups. No deployment, schedule change or
+activation occurred. Disruption dispatch still uses its authoritative SQL queue;
+entity profiles and statistics remain outside this slice.
+
+Node 26 `npm run verify -- -- --maxWorkers=2` passed all 773 tests across
+101 files with local PostGIS/Redis and none skipped. Existing suites cover
+SQL-disabled unchanged checks, unknown inputs, repair after committed writes,
+writer contention, superseded receipts and facts/publication/purge retries.
+
 ## Context
 
 [Range reads](../../../app/util/dbQueries/issueRange.ts) own history, overview,
