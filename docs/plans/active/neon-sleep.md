@@ -134,17 +134,15 @@ using the [runbook](../../operations/edge-caching.md#published-departure-partiti
 
 ### Recent arrival reports
 
-`REDIS_ARRIVAL_REPORTS` defaults off. Committed submissions refresh a bounded
-five-minute Redis input; initialized empty and clock expiry require no SQL.
-Unknown state falls back to SQL and can repair the input. Scope validation uses
-published arrival topology and revision recency at both Singapore dates.
-Three integration scenarios cover writes/failure, latest-first expiry and
-midnight/topology changes with a throwing SQL accessor on cache hits.
+Recent reports now publish from committed writes behind the off-by-default
+`REDIS_ARRIVAL_REPORTS` gate. Healthy reads—including empty results, expiry and
+midnight/topology revalidation—use no SQL. Public v2 schedules still use SQL;
+no flags were activated. The [runbook](../../operations/edge-caching.md#recent-arrival-reports)
+owns initialization, failure handling and rollback.
+
 Node 26 `npm run verify -- -- --maxWorkers=2` passed all 758 tests with local
-PostGIS and Redis, none skipped.
-The [runbook](../../operations/edge-caching.md#recent-arrival-reports) owns
-initialization and rollback. The public v2 schedule reader still uses SQL;
-no report or arrival producer flags were activated for this implementation.
+PostGIS and Redis, none skipped. The three added integration scenarios cover
+writes/failure, latest-first expiry and scope changes, with SQL disabled on hits.
 
 ## Context
 

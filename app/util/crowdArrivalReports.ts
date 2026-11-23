@@ -1,11 +1,4 @@
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
-import {
-  invalidateArrivalReportCache,
-  isArrivalReportPublicationEnabled,
-  lockArrivalReportPublication,
-  readCachedCrowdArrival,
-  repairArrivalReportCache,
-} from './crowdArrivalReportCache.server';
 import type { getDb } from '~/db';
 import {
   serviceRevisionPathStationEntriesTable as entries,
@@ -13,6 +6,13 @@ import {
   serviceRevisionsTable as revisions,
   servicesTable as services,
 } from '~/db/schema';
+import {
+  invalidateArrivalReportCache,
+  isArrivalReportPublicationEnabled,
+  lockArrivalReportPublication,
+  readCachedCrowdArrival,
+  repairArrivalReportCache,
+} from './crowdArrivalReportCache.server';
 import {
   type ArrivalBranchScope,
   CROWD_ARRIVAL_COOLDOWN_SECONDS,
@@ -74,18 +74,18 @@ export async function getRecentCrowdArrival(
   scope: ArrivalBranchScope,
   referenceInstant: string,
 ): Promise<RecentCrowdArrival | undefined> {
-  if (process.env.REDIS_ARRIVAL_REPORTS === 'enabled') {
-    const cached = await readCachedCrowdArrival(scope, referenceInstant);
-    if (cached.status === 'ready') return cached.value;
-    if (cached.status === 'missing') {
-      await repairArrivalReportCache(
-        typeof database === 'function' ? database() : database,
-      ).catch((error) => {
-        console.error('Arrival report cache repair failed', { error });
-      });
-    }
-  }
+  const cached =
+    process.env.REDIS_ARRIVAL_REPORTS === 'enabled'
+      ? await readCachedCrowdArrival(scope, referenceInstant)
+      : undefined;
+  if (cached?.status === 'ready') return cached.value;
+
   const db = typeof database === 'function' ? database() : database;
+  if (cached?.status === 'missing') {
+    await repairArrivalReportCache(db).catch((error) => {
+      console.error('Arrival report cache repair failed', { error });
+    });
+  }
   const now = Date.parse(referenceInstant);
   const [report] = await db
     .select({

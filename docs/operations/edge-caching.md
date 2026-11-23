@@ -364,13 +364,10 @@ or let the first enabled read initialize it. Repair loads at most 10,000 recent
 accepted rows; exceeding the bound keeps SQL fallback. There is no timer or
 expiry refill. The cache contains no reporter identities.
 
-Writers invalidate readiness before committing under a shared SQL advisory
-lock. Redis invalidation failure rejects that submission before insertion;
-post-commit publication failure keeps the accepted report and leaves the cache
-unknown until repair. Repairs use the same lock and Redis WATCH/MULTI to fence
-delayed publishers. All scopes and readiness share one Redis hash so eviction
-cannot masquerade as an empty scope. Latest-first selection checks expiry
-before scope eligibility; an expired latest report suppresses older reports.
+Redis invalidation failure rejects a submission before insertion. Publication
+failure after commit preserves the accepted report and leaves the cache unknown
+until repair. Writers and repairs share a SQL lock; Redis WATCH/MULTI rejects
+delayed publishers. Readiness and scopes share one hash so eviction stays unknown.
 
 Rollback reads to `publish` first. Turn publication off only after all enabled
 readers have drained. Reseed before re-enabling after any writer ran without

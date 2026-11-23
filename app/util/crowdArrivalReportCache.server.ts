@@ -5,6 +5,7 @@ import { arrivalInputSnapshotStore } from './arrivalInputSnapshot.server';
 import {
   type ArrivalBranchScope,
   MAX_REPORT_AGE_MS,
+  type RecentCrowdArrival,
   recentCrowdArrivalFromReport,
 } from './crowdArrivalReportContract';
 import { isoDate, parseDateTimeUncached } from './dbQueries/dateTime';
@@ -22,7 +23,11 @@ const reportSchema = z.object({
   minutes: z.number().int().min(0).max(30),
 });
 const rowsSchema = z.array(reportSchema).max(MAX_REPORTS);
-const readySchema = z.object({ since: z.number().finite() });
+const readySchema = z.object({ initializedAt: z.number().finite() });
+
+type CachedCrowdArrival =
+  | { status: 'ready'; value: RecentCrowdArrival | undefined }
+  | { status: 'missing' | 'unavailable' };
 const scopeKey = (scope: Pick<ArrivalBranchScope, 'stationId' | 'serviceId'>) =>
   JSON.stringify([scope.stationId, scope.serviceId]);
 
@@ -48,6 +53,7 @@ export async function lockArrivalReportPublication(tx: AppDbTransaction) {
 // opt-in writer fails before inserting; it cannot silently leave a cached empty.
 export async function invalidateArrivalReportCache() {
   const redis = await getPageProfileRedis();
+  // A fresh token also invalidates WATCH when the cache was already dirty.
   await redis.hset(
     cacheKey(),
     'ready',
@@ -65,7 +71,7 @@ export async function repairArrivalReportCache(db: AppDb) {
       // The SQL lock excludes uncommitted writers. WATCH also fences a Redis
       // command delayed past a timeout and past this transaction's lock release.
       await redis.watch(cacheKey());
-      const since = Date.now();
+      const initializedAt = Date.now();
       const rows = await tx
         .select({
           stationId: reports.station_id,
@@ -79,7 +85,7 @@ export async function repairArrivalReportCache(db: AppDb) {
             eq(reports.status, 'accepted'),
             gte(
               reports.reported_at,
-              new Date(since - MAX_REPORT_AGE_MS).toISOString(),
+              new Date(initializedAt - MAX_REPORT_AGE_MS).toISOString(),
             ),
           ),
         )
@@ -98,7 +104,7 @@ export async function repairArrivalReportCache(db: AppDb) {
         grouped.set(field, group);
       }
       const fields: Record<string, string> = {
-        ready: JSON.stringify({ since }),
+        ready: JSON.stringify({ initializedAt }),
       };
       for (const [field, group] of grouped) {
         fields[field] = JSON.stringify(rowsSchema.parse(group));
@@ -124,7 +130,7 @@ export async function repairArrivalReportCache(db: AppDb) {
 export async function readCachedCrowdArrival(
   scope: ArrivalBranchScope,
   referenceInstant: string,
-) {
+): Promise<CachedCrowdArrival> {
   try {
     const redis = await getPageProfileRedis();
     const [readyRaw, rowsRaw] = await redis.hmget(
@@ -134,10 +140,11 @@ export async function readCachedCrowdArrival(
     );
     const ready = readySchema.safeParse(readyRaw ? JSON.parse(readyRaw) : null);
     const now = Date.parse(referenceInstant);
-    if (!ready.success || now < ready.data.since)
-      return { status: 'missing' } as const;
+    // Earlier request clocks may need rows outside the seeded five-minute window.
+    if (!ready.success || now < ready.data.initializedAt)
+      return { status: 'missing' };
     if (rowsRaw && Buffer.byteLength(rowsRaw) > MAX_SCOPE_BYTES)
-      return { status: 'missing' } as const;
+      return { status: 'missing' };
     const rows = rowsSchema.parse(rowsRaw ? JSON.parse(rowsRaw) : []);
     // Select before checking expiry or scope. An expired/ineligible latest row
     // must suppress older rows, exactly as the SQL LIMIT 1 reader does.
@@ -147,46 +154,48 @@ export async function readCachedCrowdArrival(
     });
     const value =
       report && recentCrowdArrivalFromReport(report, referenceInstant);
-    if (!value) return { status: 'ready', value: undefined } as const;
+    if (!value) return { status: 'ready', value: undefined };
     const snapshot = await arrivalInputSnapshotStore.read();
-    if (!snapshot) return { status: 'unavailable' } as const;
+    if (!snapshot) return { status: 'unavailable' };
     const service = snapshot.inputs.topology.services.find(
       (row) => row.id === scope.serviceId && row.lineId === scope.lineId,
     );
+    if (!service) return { status: 'ready', value: undefined };
     const revisions = [];
-    for (const revision of service?.revisions ?? []) {
+    for (const revision of service.revisions) {
       const recency = snapshot.inputs.serviceRevisionRecency.find(
-        (row) => row.serviceId === service?.id && row.id === revision.id,
+        (row) => row.serviceId === scope.serviceId && row.id === revision.id,
       );
-      if (!recency) return { status: 'unavailable' } as const;
+      if (!recency) return { status: 'unavailable' };
       revisions.push({
-        ...revision,
+        id: revision.id,
+        stations: revision.stations,
         start_at: revision.startAt,
         end_at: revision.endAt,
         updated_at: recency.updatedAt,
       });
     }
-    for (const instant of new Set([
+    for (const referenceDate of new Set([
       isoDate(parseDateTimeUncached(report.reportedAt)),
       isoDate(parseDateTimeUncached(referenceInstant)),
     ])) {
       const revision = selectServiceRevisionForReferenceDate(
         revisions,
-        instant,
+        referenceDate,
       );
       if (
         !revision ||
-        !serviceRevisionIsActiveOn(revision, instant) ||
+        !serviceRevisionIsActiveOn(revision, referenceDate) ||
         revision.stations.at(-1)?.stationId !== scope.destinationStationId ||
         !revision.stations
           .slice(0, -1)
           .some((row) => row.stationId === scope.stationId)
       ) {
-        return { status: 'ready', value: undefined } as const;
+        return { status: 'ready', value: undefined };
       }
     }
-    return { status: 'ready', value } as const;
+    return { status: 'ready', value };
   } catch {
-    return { status: 'unavailable' } as const;
+    return { status: 'unavailable' };
   }
 }
