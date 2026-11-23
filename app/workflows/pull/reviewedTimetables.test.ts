@@ -54,6 +54,8 @@ import { publishNavigationCache } from '~/util/navigationCache.server';
 import { publishRangeReferenceCache } from '~/util/rangeReferenceCache.server';
 import { publishRangeSnapshot } from '~/util/rangeSnapshot.server';
 import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
+import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
+import { publishSitemapSnapshot } from '~/util/dbQueries/sitemap';
 import { publishServicePathCache } from '~/util/servicePathCache.server';
 import { combinedTimetableArchiveFixture } from './helpers/combinedTimetableArchive.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
@@ -100,6 +102,10 @@ vi.mock('./helpers/publishArrivalDepartures', () => ({
 }));
 vi.mock('~/util/rangeSnapshot.server', () => ({
   publishRangeSnapshot: vi.fn(async () => {}),
+}));
+vi.mock('~/util/sitemapSnapshot.server', async (original) => ({
+  ...(await original<typeof import('~/util/sitemapSnapshot.server')>()),
+  sitemapSnapshotStore: { read: vi.fn(async () => null) },
 }));
 vi.mock('~/util/arrivalInputSnapshot.server', async (original) => ({
   ...(await original<typeof import('~/util/arrivalInputSnapshot.server')>()),
@@ -231,6 +237,7 @@ vi.mock('~/util/dbQueries/statistics', () => ({
   })),
 }));
 vi.mock('~/util/dbQueries/sitemap', () => ({
+  publishSitemapSnapshot: vi.fn(async () => {}),
   rebuildSitemapSnapshot: vi.fn(async () => ({
     asOf: 'test',
     pathEntityCount: 0,
@@ -338,6 +345,8 @@ beforeEach(() => {
   vi.stubEnv('REDIS_SERVICE_PATH_CACHE', undefined);
   vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', undefined);
   vi.stubEnv('REDIS_RANGE_SNAPSHOT', undefined);
+  vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', undefined);
+  vi.mocked(sitemapSnapshotStore.read).mockResolvedValue(null);
   vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', undefined);
   vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', undefined);
   vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(false);
@@ -360,6 +369,35 @@ afterEach(async () => {
 });
 
 describe('published zero-SQL range inputs', () => {
+  it('repairs sitemap inputs before completion and keeps healthy unchanged polls SQL-free', async () => {
+    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'publish');
+    vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    state.fingerprint = getCanonicalManifestFingerprint(manifest);
+    vi.mocked(publishSitemapSnapshot).mockRejectedValueOnce(
+      Error('sitemap publication failed'),
+    );
+    const repair = workflow();
+    await expect(repair.run()).rejects.toThrow('sitemap publication failed');
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(rangeSnapshotStore.complete).not.toHaveBeenCalled();
+    await repair.run();
+    expect(publishSitemapSnapshot).toHaveBeenLastCalledWith(state.fingerprint);
+    expect(rangeSnapshotStore.complete).toHaveBeenCalledWith(state.fingerprint);
+    expect(fetchArchive).not.toHaveBeenCalled();
+    vi.mocked(sitemapSnapshotStore.read).mockResolvedValue({
+      value: { fingerprint: state.fingerprint, generation: 'complete' },
+    } as unknown as NonNullable<
+      Awaited<ReturnType<typeof sitemapSnapshotStore.read>>
+    >);
+    vi.mocked(getDb).mockImplementation(() => {
+      throw Error('SQL must stay asleep');
+    });
+    vi.clearAllMocks();
+    await workflow().run();
+    expect(getDb).not.toHaveBeenCalled();
+    expect(publishSitemapSnapshot).not.toHaveBeenCalled();
+  });
   it('holds purge and checkpoint completion until departure publication succeeds', async () => {
     vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
     vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');

@@ -1,9 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
+import { purgePublicDataCache } from '~/util/cloudflareCache';
 import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts';
-import { rebuildSitemapSnapshot } from '~/util/dbQueries/sitemap';
+import {
+  publishSitemapSnapshot,
+  rebuildSitemapSnapshot,
+} from '~/util/dbQueries/sitemap';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics';
 import { internalMiddleware } from '~/util/internal.middleware';
+import { isSitemapSnapshotPublicationEnabled } from '~/util/sitemapSnapshot.server';
 
 const RequestSchema = z.object({
   days: z.number().int().min(1).max(366).default(30),
@@ -40,6 +45,10 @@ export const Route = createFileRoute('/internal/api/tasks/facts')({
         const rows = await rebuildOperationalFactsRange(days);
         const statistics = await rebuildStatisticsSnapshot();
         const sitemap = await rebuildSitemapSnapshot();
+        if (isSitemapSnapshotPublicationEnabled()) {
+          await publishSitemapSnapshot();
+          await purgePublicDataCache();
+        }
         return Response.json(
           {
             success: true,

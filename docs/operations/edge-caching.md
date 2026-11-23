@@ -295,6 +295,29 @@ reference/path readers remain available. A successful local check does not
 establish production sleep; use the [sleep plan](../plans/active/neon-sleep.md)
 for remaining wake-ups and eventual provider-level acceptance.
 
+## Published sitemap inputs
+
+`REDIS_SITEMAP_SNAPSHOT` defaults off. Use `publish` to seed from an
+authenticated canonical pull or `POST /internal/api/tasks/facts`; then use
+`enabled` to serve `/sitemap.xml` without SQL on healthy cold/warm hits.
+Validate identical sitemap paths against SQL and check `sitemap_source` in
+Server-Timing (`redis`, `memory` or `sql`) before activation. Purge the tier's
+data tag when changing reader settings. Unset the flag to roll back.
+
+Publication rebuilds IDs and issue date bounds in a completed repeatable-read
+SQL snapshot, rather than trusting a projection that a concurrent facts task
+could have rebuilt during promotion. It uses the existing bounded atomic store
+under `mrtdown:{<tier>:sitemap:v1}`; active data persists until superseded.
+Failed/partial promotion preserves the previous head. Unchanged pulls verify
+the payload, fingerprint and generation before skipping SQL; absent or corrupt
+inputs enter the existing pull repair path. Without the range snapshot gate,
+pulls retain their existing SQL preflight behavior.
+
+Requests recompute the Singapore date, weekly/year archive paths and empty
+archive month bounds. Holiday and community-report changes do not affect these
+IDs/bounds. Missing, invalid or unavailable Redis inputs fall back lazily to the
+SQL sitemap snapshot, including the legacy earliest-date lookup when needed.
+
 ## Published arrival metadata
 
 `REDIS_ARRIVAL_SNAPSHOT=publish` publishes admission history, attested canonical
