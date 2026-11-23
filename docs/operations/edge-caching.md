@@ -347,6 +347,37 @@ before production publication. Unset the departure flag to stop its producer.
 The [Neon sleep plan](../plans/active/neon-sleep.md#arrivals-follow-up) tracks
 rider-report caching and public serving separately.
 
+## Recent arrival reports
+
+`REDIS_ARRIVAL_REPORTS` defaults off. `publish` refreshes Redis after accepted
+SQL submissions; `enabled` also lets report reads use it. This does not remove
+the public v2 route's schedule SQL dependency. Non-platform report hits, empty
+results and clock expiry use no SQL; missing/unavailable inputs retain SQL
+fallback. A missing or dirty report input gets one bounded repair attempt on
+that request. Missing topology falls back without repairing reports.
+
+Before enabling reads, run `publish` on **every report writer**, drain old
+instances, and republish arrival metadata with revision recency. Seed with
+`repairArrivalReportCache(db)` from
+[`crowdArrivalReportCache.server.ts`](../../app/util/crowdArrivalReportCache.server.ts),
+or let the first enabled read initialize it. Repair loads at most 10,000 recent
+accepted rows; exceeding the bound keeps SQL fallback. There is no timer or
+expiry refill. The cache contains no reporter identities.
+
+Writers invalidate readiness before committing under a shared SQL advisory
+lock. Redis invalidation failure rejects that submission before insertion;
+post-commit publication failure keeps the accepted report and leaves the cache
+unknown until repair. Repairs use the same lock and Redis WATCH/MULTI to fence
+delayed publishers. All scopes and readiness share one Redis hash so eviction
+cannot masquerade as an empty scope. Latest-first selection checks expiry
+before scope eligibility; an expired latest report suppresses older reports.
+
+Rollback reads to `publish` first. Turn publication off only after all enabled
+readers have drained. Reseed before re-enabling after any writer ran without
+publication, direct SQL report edits, or a Redis restore. No flags were enabled
+as part of this implementation; staging measurement and full public serving
+remain separate gates.
+
 ## Redis usage evidence
 
 Use the configured database's Upstash Usage and billing views, or the

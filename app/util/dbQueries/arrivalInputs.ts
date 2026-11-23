@@ -124,6 +124,15 @@ const inputsSchema = z.object({
   scopes: z
     .array(createSelectSchema(scheduledDepartureScopesTable))
     .max(MAX_ARRIVAL_SCOPE_ROWS),
+  serviceRevisionRecency: z
+    .array(
+      z.object({
+        serviceId: id,
+        id,
+        updatedAt: z.iso.datetime({ offset: true }),
+      }),
+    )
+    .max(MAX_ARRIVAL_SCOPE_ROWS),
   stationNames: z.array(z.object({ id, name: TranslationsSchema })),
   serviceNames: z.array(z.object({ id, name: TranslationsSchema })),
 });

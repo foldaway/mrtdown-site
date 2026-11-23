@@ -1,4 +1,11 @@
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import {
+  invalidateArrivalReportCache,
+  isArrivalReportPublicationEnabled,
+  lockArrivalReportPublication,
+  readCachedCrowdArrival,
+  repairArrivalReportCache,
+} from './crowdArrivalReportCache.server';
 import type { getDb } from '~/db';
 import {
   serviceRevisionPathStationEntriesTable as entries,
@@ -11,15 +18,14 @@ import {
   CROWD_ARRIVAL_COOLDOWN_SECONDS,
   type CrowdArrivalSubmission,
   type RecentCrowdArrival,
+  MAX_REPORT_AGE_MS,
+  recentCrowdArrivalFromReport,
 } from './crowdArrivalReportContract';
 import { isoDate, parseDateTimeUncached } from './dbQueries/dateTime';
 import {
   selectServiceRevisionForReferenceDate,
   serviceRevisionIsActiveOn,
 } from './serviceRevisions';
-
-const MAX_REPORT_AGE_MS = 5 * 60_000;
-const POST_ARRIVAL_GRACE_MS = 60_000;
 
 type Db = ReturnType<typeof getDb>;
 
@@ -64,10 +70,22 @@ async function isReportableArrivalScope(
 }
 
 export async function getRecentCrowdArrival(
-  db: Db,
+  database: Db | (() => Db),
   scope: ArrivalBranchScope,
   referenceInstant: string,
 ): Promise<RecentCrowdArrival | undefined> {
+  if (process.env.REDIS_ARRIVAL_REPORTS === 'enabled') {
+    const cached = await readCachedCrowdArrival(scope, referenceInstant);
+    if (cached.status === 'ready') return cached.value;
+    if (cached.status === 'missing') {
+      await repairArrivalReportCache(
+        typeof database === 'function' ? database() : database,
+      ).catch((error) => {
+        console.error('Arrival report cache repair failed', { error });
+      });
+    }
+  }
+  const db = typeof database === 'function' ? database() : database;
   const now = Date.parse(referenceInstant);
   const [report] = await db
     .select({
@@ -91,14 +109,9 @@ export async function getRecentCrowdArrival(
     .limit(1);
   if (!report) return undefined;
 
-  const reportedAt = Date.parse(report.reportedAt);
-  const expectedAt = reportedAt + report.minutes * 60_000;
-  const expiresAt = Math.min(
-    reportedAt + MAX_REPORT_AGE_MS,
-    expectedAt + POST_ARRIVAL_GRACE_MS,
-  );
+  const value = recentCrowdArrivalFromReport(report, referenceInstant);
   if (
-    expiresAt <= now ||
+    !value ||
     !(await isReportableArrivalScope(db, scope, report.reportedAt))
   ) {
     return undefined;
@@ -111,11 +124,7 @@ export async function getRecentCrowdArrival(
   ) {
     return undefined;
   }
-  return {
-    reportedAt: new Date(reportedAt).toISOString(),
-    expectedAt: new Date(expectedAt).toISOString(),
-    expiresAt: new Date(expiresAt).toISOString(),
-  };
+  return value;
 }
 
 export class CrowdArrivalRateLimitError extends Error {}
@@ -126,7 +135,9 @@ export async function submitCrowdArrival(
   submission: CrowdArrivalSubmission,
   reporterHash: string,
 ) {
+  const publish = isArrivalReportPublicationEnabled();
   await db.transaction(async (tx) => {
+    if (publish) await lockArrivalReportPublication(tx);
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`crowd-arrival:${reporterHash}`}, 0::bigint))`,
     );
@@ -149,6 +160,7 @@ export async function submitCrowdArrival(
     if (!(await isReportableArrivalScope(tx, submission, reportedAt))) {
       throw new InvalidCrowdArrivalScopeError();
     }
+    if (publish) await invalidateArrivalReportCache();
     await tx.insert(reports).values({
       id: crypto.randomUUID(),
       station_id: submission.stationId,
@@ -160,4 +172,13 @@ export async function submitCrowdArrival(
       status: 'accepted',
     });
   });
+  if (publish) {
+    // The report is committed. Failed publication leaves the cache unknown;
+    // do not ask the rider to resubmit an already accepted report.
+    await repairArrivalReportCache(db).catch((error) => {
+      console.error('Committed arrival report cache publication failed', {
+        error,
+      });
+    });
+  }
 }

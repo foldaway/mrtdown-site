@@ -28,7 +28,7 @@ alone cannot establish production-wide sleep.
   and display labels; reject partial promotions and failed projections.
 - [x] Publish bounded departure partitions for all retained covered dates,
   preserving untimed counts, shared memberships, platforms and 24+ hour tails.
-- [ ] Serve recent rider reports, including empty results and expiry, without
+- [x] Serve recent rider reports, including empty results and expiry, without
   polling Postgres. Refresh them from their write paths.
 - [ ] Prove the complete arrivals endpoint works with SQL disabled across clock,
   correction, coverage and report changes before a separate activation.
@@ -118,9 +118,9 @@ partial promotion cannot replace the completed head.
 Missing arrival metadata prevents the enabled range preflight from skipping
 its repair. Successful metadata publication precedes purge and external
 checkpoint completion; a healthy matching generation/fingerprint keeps the
-unchanged path SQL-free. The departure producer follows below. Recent rider reports and the public
-reader remain unimplemented. No arrival publication flag was set in
-staging or production for this tranche. The [runbook](../../operations/edge-caching.md#published-arrival-metadata)
+unchanged path SQL-free. The departure producer follows below; the public reader
+remains unimplemented. No arrival publication flag was set in staging or
+production for this tranche. The [runbook](../../operations/edge-caching.md#published-arrival-metadata)
 owns limits and the separate publish-only staging procedure.
 
 ### Departure producer
@@ -131,6 +131,20 @@ cover both timetable formats; publication checks cover interruption, source
 changes and checkpoint ordering. Public arrivals remain SQL-backed. No producer
 flags were enabled. Next: measure staging payload size and publication latency
 using the [runbook](../../operations/edge-caching.md#published-departure-partitions).
+
+### Recent arrival reports
+
+`REDIS_ARRIVAL_REPORTS` defaults off. Committed submissions refresh a bounded
+five-minute Redis input; initialized empty and clock expiry require no SQL.
+Unknown state falls back to SQL and can repair the input. Scope validation uses
+published arrival topology and revision recency at both Singapore dates.
+Three integration scenarios cover writes/failure, latest-first expiry and
+midnight/topology changes with a throwing SQL accessor on cache hits.
+Node 26 `npm run verify -- -- --maxWorkers=2` passed all 758 tests with local
+PostGIS and Redis, none skipped.
+The [runbook](../../operations/edge-caching.md#recent-arrival-reports) owns
+initialization and rollback. The public v2 schedule reader still uses SQL;
+no report or arrival producer flags were activated for this implementation.
 
 ## Context
 

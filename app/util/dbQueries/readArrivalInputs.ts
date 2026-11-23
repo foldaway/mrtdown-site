@@ -6,7 +6,11 @@ import {
   scheduledDepartureScopesTable as scopes,
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
-import { servicesTable, stationsTable } from '~/db/schema';
+import {
+  serviceRevisionsTable,
+  servicesTable,
+  stationsTable,
+} from '~/db/schema';
 import {
   MAX_ARRIVAL_DAY_ROWS,
   MAX_ARRIVAL_SCOPE_ROWS,
@@ -86,7 +90,25 @@ export async function readArrivalInputs(tx: AppDbTransaction) {
     .select({ id: servicesTable.id, name: servicesTable.name })
     .from(servicesTable)
     .orderBy(asc(servicesTable.id));
+  // The attested schedule topology omits updated_at. Report scope selection
+  // needs it to preserve the SQL reader's tie-break for overlapping revisions.
+  const serviceRevisionRecency = await tx
+    .select({
+      serviceId: serviceRevisionsTable.service_id,
+      id: serviceRevisionsTable.id,
+      updatedAt: serviceRevisionsTable.updated_at,
+    })
+    .from(serviceRevisionsTable)
+    .orderBy(
+      asc(serviceRevisionsTable.service_id),
+      asc(serviceRevisionsTable.id),
+    )
+    .limit(MAX_ARRIVAL_SCOPE_ROWS + 1);
   return parseArrivalInputs({
+    serviceRevisionRecency: serviceRevisionRecency.map((row) => ({
+      ...row,
+      updatedAt: row.updatedAt.toISOString(),
+    })),
     attestation,
     topology,
     history: history.map(({ manifestBytes, ...row }) => ({

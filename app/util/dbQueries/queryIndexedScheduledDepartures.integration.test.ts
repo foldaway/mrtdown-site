@@ -52,6 +52,7 @@ import {
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
 import {
+  crowdArrivalReportsTable,
   lineServicesTable,
   linesNextTable,
   linesTable,
@@ -82,6 +83,11 @@ import {
   syncStationPlatformServices,
   syncStations,
 } from '~/workflows/pull/helpers/stagingSync';
+import * as reportCache from '~/util/crowdArrivalReportCache.server';
+import {
+  getRecentCrowdArrival,
+  submitCrowdArrival,
+} from '~/util/crowdArrivalReports';
 import * as database from './database';
 import { buildDataset } from './dataset';
 import { publishArrivalDepartures } from '~/workflows/pull/helpers/publishArrivalDepartures';
@@ -642,6 +648,222 @@ describe.skipIf(!url)('indexed departure window', () => {
         if (keys.length) await redis.del(...keys);
         await redis.quit();
       }
+    },
+  );
+
+  describe.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
+    'recent arrival report inputs',
+    () => {
+      const noSql = () => {
+        throw Error('Report hit must not open SQL');
+      };
+      const at = '2026-11-22T15:59:00.000Z';
+      const later = (seconds = 0) =>
+        new Date(Date.parse(at) + seconds * 1000).toISOString();
+      let redis: Awaited<ReturnType<typeof getPageProfileRedis>>;
+      const reportKey = `mrtdown:${schema}:arrival-reports:v1`;
+      const sqlRead = async (instant: string) => {
+        vi.stubEnv('REDIS_ARRIVAL_REPORTS', 'publish');
+        try {
+          return await getRecentCrowdArrival(db(), scope, instant);
+        } finally {
+          vi.stubEnv('REDIS_ARRIVAL_REPORTS', 'enabled');
+        }
+      };
+      beforeEach(async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(at);
+        vi.stubEnv('TIER', schema);
+        vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
+        vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+        vi.stubEnv('REDIS_ARRIVAL_REPORTS', 'enabled');
+        vi.spyOn(database, 'getDefaultDb').mockResolvedValue(db());
+        redis = await getPageProfileRedis();
+        await completePageProfileGeneration(db(), 'reports-fixture');
+        await recordCanonicalManifestFingerprint(db(), 'a'.repeat(64));
+        await publishArrivalInputSnapshot();
+        await reportCache.repairArrivalReportCache(db());
+      });
+      afterEach(async () => {
+        vi.useRealTimers();
+        const keys = await redis.keys(
+          `${getSnapshotKeyPrefix('arrival-inputs')}:*`,
+        );
+        await redis.del(reportKey, ...keys);
+        await redis.quit();
+      });
+
+      it('replaces authoritative empty after commits, fences delayed publication and repairs a failed publication', async () => {
+        expect(await getRecentCrowdArrival(noSql, scope, at)).toBeUndefined();
+        const actualRepair = reportCache.repairArrivalReportCache;
+        const started = Promise.withResolvers<void>();
+        const resume = Promise.withResolvers<void>();
+        vi.spyOn(
+          reportCache,
+          'repairArrivalReportCache',
+        ).mockImplementationOnce(async (database) => {
+          started.resolve();
+          await resume.promise;
+          return actualRepair(database);
+        });
+        const first = submitCrowdArrival(
+          db(),
+          { ...scope, minutesToArrival: 3 },
+          'first',
+        );
+        await started.promise;
+        vi.setSystemTime(later(1));
+        await submitCrowdArrival(
+          db(),
+          { ...scope, minutesToArrival: 1 },
+          'second',
+        );
+        resume.resolve();
+        await first;
+        const expected = await sqlRead(later(1));
+        expect(expected?.expectedAt).toBe(later(61));
+        queries.length = 0;
+        expect(await getRecentCrowdArrival(noSql, scope, later(1))).toEqual(
+          expected,
+        );
+        expect(queries).toEqual([]);
+
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const publisher = redis.duplicate();
+        vi.spyOn(redis, 'duplicate').mockReturnValueOnce(publisher);
+        const watch = publisher.watch.bind(publisher);
+        vi.spyOn(publisher, 'watch').mockImplementationOnce(async (key) => {
+          const result = await watch(key);
+          await reportCache.invalidateArrivalReportCache();
+          return result;
+        });
+        vi.setSystemTime(later(2));
+        await submitCrowdArrival(
+          db(),
+          { ...scope, minutesToArrival: 2 },
+          'third',
+        );
+        expect(
+          await reportCache.readCachedCrowdArrival(scope, later(2)),
+        ).toEqual({ status: 'missing' });
+        // A normal SQL fallback repairs the dirty cache; a later hit needs no DB.
+        expect(
+          (await getRecentCrowdArrival(db(), scope, later(2)))?.expectedAt,
+        ).toBe(later(122));
+        expect(
+          (await getRecentCrowdArrival(noSql, scope, later(2)))?.expectedAt,
+        ).toBe(later(122));
+        vi.spyOn(
+          reportCache,
+          'invalidateArrivalReportCache',
+        ).mockRejectedValueOnce(Error('Redis unavailable'));
+        await expect(
+          submitCrowdArrival(db(), { ...scope, minutesToArrival: 9 }, 'failed'),
+        ).rejects.toThrow('Redis unavailable');
+        expect(await db().select().from(crowdArrivalReportsTable)).toHaveLength(
+          3,
+        );
+        await redis.del(reportKey);
+        expect(
+          await reportCache.readCachedCrowdArrival(scope, later(2)),
+        ).toEqual({ status: 'missing' });
+        await reportCache.repairArrivalReportCache(db());
+        expect(await getRecentCrowdArrival(noSql, scope, later(2))).toEqual(
+          await sqlRead(later(2)),
+        );
+      });
+
+      it('selects the latest timestamp/id before expiry, never resurrects an older signal and stays empty as the clock advances', async () => {
+        await db()
+          .insert(crowdArrivalReportsTable)
+          .values(
+            [
+              { id: 'older', reported_at: later(-30), minutes_to_arrival: 5 },
+              { id: 'a', reported_at: at, minutes_to_arrival: 4 },
+              { id: 'z', reported_at: at, minutes_to_arrival: 0 },
+              { id: 'future', reported_at: later(240), minutes_to_arrival: 0 },
+            ].map((row) => ({
+              ...row,
+              station_id: scope.stationId,
+              service_id: scope.serviceId,
+              reporter_hash: row.id,
+            })),
+          );
+        await reportCache.repairArrivalReportCache(db());
+        expect(
+          (await getRecentCrowdArrival(noSql, scope, at))?.expectedAt,
+        ).toBe(at);
+        for (const seconds of [60, 61, 240, 300, 600]) {
+          const expected = await sqlRead(later(seconds));
+          queries.length = 0;
+          expect(
+            await getRecentCrowdArrival(noSql, scope, later(seconds)),
+          ).toEqual(expected);
+          expect(queries).toEqual([]);
+        }
+        expect(
+          await getRecentCrowdArrival(noSql, scope, later(61)),
+        ).toBeUndefined();
+      });
+
+      it('rechecks both Singapore dates and newly published revision recency/topology without a report write', async () => {
+        await submitCrowdArrival(
+          db(),
+          { ...scope, minutesToArrival: 4 },
+          'midnight',
+        );
+        expect(await getRecentCrowdArrival(noSql, scope, at)).toBeDefined();
+        const current = canonical.canonical.services[0].revisions[0];
+        const publishChangedTopology = async () => {
+          await finalize();
+          await completePageProfileGeneration(db(), randomUUID());
+          await publishArrivalInputSnapshot();
+        };
+        // Two active revisions share a start date: updated_at wins ahead of id.
+        await db()
+          .insert(serviceRevisionsTable)
+          .values({
+            service_id: scope.serviceId,
+            id: 'aaa-newer',
+            operating_hours: current.operatingHours,
+            start_at: current.startAt,
+            end_at: null,
+            updated_at: new Date('2027-01-01'),
+          });
+        await db().insert(serviceRevisionPathStationEntriesTable).values({
+          service_id: scope.serviceId,
+          service_revision_id: 'aaa-newer',
+          path_index: 0,
+          station_id: scope.destinationStationId,
+          display_code: 'terminal',
+        });
+        await publishChangedTopology();
+        expect(await getRecentCrowdArrival(noSql, scope, at)).toEqual(
+          await sqlRead(at),
+        );
+        expect(await getRecentCrowdArrival(noSql, scope, at)).toBeUndefined();
+        await db()
+          .update(serviceRevisionsTable)
+          .set({ start_at: '2026-11-23' })
+          .where(eq(serviceRevisionsTable.id, 'aaa-newer'));
+        await publishChangedTopology();
+        expect(await getRecentCrowdArrival(noSql, scope, at)).toBeDefined();
+        expect(await getRecentCrowdArrival(noSql, scope, later(61))).toEqual(
+          await sqlRead(later(61)),
+        );
+        expect(
+          await getRecentCrowdArrival(noSql, scope, later(61)),
+        ).toBeUndefined();
+        // The report-date scope must also remain valid if a new topology corrects it.
+        await db()
+          .update(serviceRevisionsTable)
+          .set({ start_at: '2026-11-22', end_at: '2026-11-23' })
+          .where(eq(serviceRevisionsTable.id, 'aaa-newer'));
+        await publishChangedTopology();
+        expect(
+          await getRecentCrowdArrival(noSql, scope, later(61)),
+        ).toBeUndefined();
+      });
     },
   );
 
