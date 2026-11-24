@@ -130,17 +130,8 @@ cover both timetable formats; publication checks cover interruption, source
 changes and checkpoint ordering. Public serving remains off by default. No
 producer flags were enabled. Next: measure staging payload size and publication latency
 using the [runbook](../../operations/edge-caching.md#published-departure-partitions).
-
-### Departure publication reuse
-
-Production publication exposed repeated 15-second query timeouts on 0.25 CU.
-Issue-only pulls also rebuilt every retained departure partition. Publication
-now reuses verified bytes by projection identity and completion, while missing
-bytes or rebuilt projections regenerate. Compaction groups native columns before
-JSON encoding and disables JIT only for publication transactions. Local checks
-retain legacy/combined parity and cover reuse, corrupt-part repair and rebuild
-invalidation in the existing integration scenario. Compute sizing is unchanged;
-production activation remains gated on a completed, validated publication.
+Later pulls now reuse verified completed projections across unrelated canonical
+changes; the runbook owns repair and rollout behavior.
 
 ### Recent arrival reports
 

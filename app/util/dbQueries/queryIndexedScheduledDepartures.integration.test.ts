@@ -98,7 +98,10 @@ import * as database from './database';
 import { buildDataset } from './dataset';
 import { publishArrivalDepartures } from '~/workflows/pull/helpers/publishArrivalDepartures';
 import { acquireOrRenewPullWorkflowLease } from '~/workflows/pull/helpers/workflowLease';
-import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
+import {
+  arrivalDepartureStore,
+  MAX_DEPARTURE_PARTITIONS,
+} from '~/util/arrivalDepartureStore.server';
 import { withSelectedScheduledTimetable } from './withSelectedScheduledTimetable';
 import {
   parseArrivalInputs,
@@ -573,6 +576,51 @@ describe.skipIf(!url)('indexed departure window', () => {
         });
         published = await arrivalDepartureStore.manifest.read();
         if (!published) throw Error('Missing repaired departure manifest');
+
+        // Reusing the maximum supported partition count must fit the same plan budget.
+        const metadata = await arrivalInputSnapshotStore.read();
+        if (!metadata) throw Error('Missing arrival metadata');
+        const previousParts = published.inputs.partitions;
+        const largeParts = Array.from(
+          { length: MAX_DEPARTURE_PARTITIONS },
+          (_, index) => ({
+            ...previousParts[index % previousParts.length],
+            stationId: `station-${index}`,
+          }),
+        );
+        vi.spyOn(arrivalInputSnapshotStore, 'read').mockResolvedValueOnce({
+          ...metadata,
+          inputs: {
+            ...metadata.inputs,
+            scopes: largeParts.map((ref) => ({
+              ...metadata.inputs.scopes[0],
+              projection_id: ref.projectionId,
+              station_id: ref.stationId,
+            })),
+          },
+        });
+        vi.spyOn(arrivalDepartureStore.manifest, 'read').mockResolvedValueOnce({
+          ...published,
+          inputs: { ...published.inputs, partitions: largeParts },
+        });
+        const readPart = vi
+          .spyOn(arrivalDepartureStore, 'read')
+          .mockImplementation(async (ref) => ({ ...ref, calls: [] }));
+        let planBytes = 0;
+        await expect(
+          publishArrivalDepartures(
+            async (_name, callback) => {
+              const plan = await callback();
+              planBytes = Buffer.byteLength(JSON.stringify(plan));
+              throw Error('plan inspected');
+            },
+            owner,
+            nextFingerprint,
+          ),
+        ).rejects.toThrow('plan inspected');
+        expect(readPart).toHaveBeenCalledTimes(MAX_DEPARTURE_PARTITIONS);
+        expect(planBytes).toBeLessThanOrEqual(256 * 1024);
+        readPart.mockRestore();
 
         // A same-ID rebuild changes completion and must not reuse its old bytes.
         await db()

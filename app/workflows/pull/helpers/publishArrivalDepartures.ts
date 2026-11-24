@@ -53,10 +53,15 @@ export async function publishArrivalDepartures(
     const indexed = arrivals.inputs.projections.filter(
       (row) => row.completedAt !== null,
     );
-    const projectionIds = new Set(indexed.map((row) => row.id));
+    const projectionDigests = Object.fromEntries(
+      indexed.map((projection) => [
+        projection.id,
+        snapshotDigest(JSON.stringify({ version: 1, projection })),
+      ]),
+    );
     const parts = new Map<string, DeparturePartitionIdentity>();
     for (const scope of arrivals.inputs.scopes) {
-      if (projectionIds.has(scope.projection_id)) {
+      if (projectionDigests[scope.projection_id]) {
         const part = {
           projectionId: scope.projection_id,
           stationId: scope.station_id,
@@ -66,52 +71,51 @@ export async function publishArrivalDepartures(
     }
     if (parts.size > MAX_DEPARTURE_PARTITIONS)
       throw new Error('Departure publication plan exceeds bounds');
-    const projectionHashes = new Map(
-      indexed.map((projection) => [
-        projection.id,
-        snapshotDigest(JSON.stringify({ version: 1, projection })),
-      ]),
-    );
-    const previousParts = new Map(
-      (previous?.inputs.partitions ?? []).map((ref) => [
+    const previousParts = previous?.inputs.partitions ?? [];
+    // Store references once; reuse indices keep the durable plan within its limit.
+    const previousIndices = new Map(
+      previousParts.map((ref, index) => [
         JSON.stringify([ref.projectionId, ref.stationId]),
-        ref,
+        index,
       ]),
     );
     const partitions: (DeparturePartitionIdentity & {
-      projectionSha256: string;
-      reused?: DeparturePartitionRef;
+      reuseIndex?: number;
     })[] = [];
     for (const [key, identity] of parts) {
-      const projectionSha256 = projectionHashes.get(identity.projectionId);
-      if (!projectionSha256) throw new Error('Missing departure projection');
-      const part = { ...identity, projectionSha256 };
-      const prior = previousParts.get(key);
+      const reuseIndex = previousIndices.get(key);
+      const prior =
+        reuseIndex === undefined ? undefined : previousParts[reuseIndex];
       // Completion changes on a rebuild, even when its projection ID survives.
       // Issue/label changes can retain the same verified departure bytes.
-      if (prior?.projectionSha256 === projectionSha256) {
+      if (
+        prior &&
+        previous?.inputs.projectionDigests?.[identity.projectionId] ===
+          projectionDigests[identity.projectionId]
+      ) {
         try {
           await arrivalDepartureStore.read(prior);
-          partitions.push({ ...part, reused: prior });
+          partitions.push({ ...identity, reuseIndex });
           continue;
         } catch {
           // Missing or corrupt bytes must be rebuilt, never certified as ready.
         }
       }
-      partitions.push(part);
+      partitions.push(identity);
     }
     const plan = {
       arrivalInputsSha256: arrivals.value.sha256,
       generation: arrivals.value.generation,
       attestation: arrivals.inputs.attestation,
       projections: indexed,
+      projectionDigests,
       partitions: partitions.sort(
         (a, b) =>
           a.projectionId - b.projectionId ||
           (a.stationId < b.stationId ? -1 : a.stationId > b.stationId ? 1 : 0),
       ),
       expectedHeadBase64: head.raw.toString('base64'),
-      previous: previous?.inputs.partitions ?? [],
+      previous: previousParts,
     };
     if (Buffer.byteLength(JSON.stringify(plan)) > MAX_PUBLICATION_PLAN_BYTES)
       throw new Error('Departure publication plan exceeds bounds');
@@ -182,21 +186,24 @@ export async function publishArrivalDepartures(
   let partitionBytes = 0;
   for (let i = 0; i < plan.partitions.length; i++) {
     const identity = plan.partitions[i];
-    const ref =
-      identity.reused ??
-      (await run(`publish-arrival-departure-${i}`, async () => {
+    let ref =
+      identity.reuseIndex === undefined
+        ? undefined
+        : plan.previous[identity.reuseIndex];
+    if (!ref) {
+      ref = await run(`publish-arrival-departure-${i}`, async () => {
         const projection = projectionsById.get(identity.projectionId);
         if (!projection)
           throw new Error('Departure projection missing from plan');
         const partition = await withPublicationSnapshot([projection], (tx) =>
           readDeparturePartition(tx, identity, projection.projectorVersion),
         );
-        const prepared = await arrivalDepartureStore.prepare(
+        return arrivalDepartureStore.prepare(
           partition,
           MAX_DEPARTURE_TOTAL_BYTES - partitionBytes,
         );
-        return { ...prepared, projectionSha256: identity.projectionSha256 };
-      }));
+      });
+    }
     refs.push(ref);
     partitionBytes += ref.bytes;
     if (partitionBytes > MAX_DEPARTURE_TOTAL_BYTES)
@@ -206,7 +213,11 @@ export async function publishArrivalDepartures(
     await withPublicationSnapshot(plan.projections, async () => {});
     const result = await arrivalDepartureStore.publish(
       Buffer.from(plan.expectedHeadBase64, 'base64'),
-      { arrivalInputsSha256: plan.arrivalInputsSha256, partitions: refs },
+      {
+        arrivalInputsSha256: plan.arrivalInputsSha256,
+        projectionDigests: plan.projectionDigests,
+        partitions: refs,
+      },
       plan.generation,
       fingerprint,
       plan.previous,
