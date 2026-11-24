@@ -394,6 +394,11 @@ unknown timing and overnight offsets are retained.
 
 The pull publishes one station per durable step, then atomically activates a
 manifest tied to the arrival metadata. Purge and checkpoint completion follow.
+Verified partitions are reused when the projection identity and completion stamp
+match, so issue-only pulls do not reread departure rows. Missing/corrupt bytes,
+rebuilt projections and older manifests without projection digests require
+regeneration. Compaction groups native columns before encoding JSON and disables
+JIT only within publication transactions; the 15-second SQL guard remains.
 Limits are 1,000 partitions, 20,000 distinct calls per partition, 8 MiB expanded
 and 2 MiB encoded per partition, and 64 MiB total encoded partitions. Failures
 preserve the previous manifest. Active parts persist; pending and retired parts

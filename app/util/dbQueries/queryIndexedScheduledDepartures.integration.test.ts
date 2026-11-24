@@ -439,7 +439,7 @@ describe.skipIf(!url)('indexed departure window', () => {
   });
 
   it.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
-    'resumes departure publication and rejects a changed source frontier',
+    'resumes departure publication, reuses completed projections and rejects a changed source frontier',
     async () => {
       vi.stubEnv('TIER', schema);
       vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
@@ -488,7 +488,7 @@ describe.skipIf(!url)('indexed departure window', () => {
               part.stationId === prepared.stationId,
           ),
         ).toHaveLength(1);
-        const published = await arrivalDepartureStore.manifest.read();
+        let published = await arrivalDepartureStore.manifest.read();
         if (!published) throw Error('Missing departure manifest');
         expect(await arrivalDepartureStore.ready(published)).toBe(true);
         for (const ref of published.inputs.partitions) {
@@ -541,6 +541,45 @@ describe.skipIf(!url)('indexed departure window', () => {
           }
         }
 
+        // A new canonical generation can change issues without changing a timetable.
+        const nextFingerprint = 'b'.repeat(64);
+        await completePageProfileGeneration(db(), 'issues-update');
+        await publishArrivalInputSnapshot(nextFingerprint);
+        outputs.clear();
+        queries.length = 0;
+        spy.mockClear();
+        await publishArrivalDepartures(run, owner, nextFingerprint);
+        expect(spy).not.toHaveBeenCalled();
+        expect(
+          queries.some((query) => query.includes('departure_occurrences')),
+        ).toBe(false);
+        published = await arrivalDepartureStore.manifest.read();
+        if (!published) throw Error('Missing reused departure manifest');
+        expect(published.value.generation).toBe('issues-update');
+        expect(published.value.fingerprint).toBe(nextFingerprint);
+
+        // Verify bytes before reusing them; repair only the damaged partition.
+        const damaged = published.inputs.partitions[0];
+        await redis.set(
+          `${prefixes[1]}:partition:${damaged.sha256}`,
+          'corrupt',
+        );
+        outputs.clear();
+        await publishArrivalDepartures(run, owner, nextFingerprint);
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0][0]).toMatchObject({
+          projectionId: damaged.projectionId,
+          stationId: damaged.stationId,
+        });
+        published = await arrivalDepartureStore.manifest.read();
+        if (!published) throw Error('Missing repaired departure manifest');
+
+        // A same-ID rebuild changes completion and must not reuse its old bytes.
+        await db()
+          .update(projections)
+          .set({ completed_at: '2026-10-27T00:00:00Z' })
+          .where(eq(projections.id, damaged.projectionId));
+        await publishArrivalInputSnapshot(nextFingerprint);
         outputs.clear();
         spy.mockImplementationOnce(async (partition, remaining) => {
           const result = await prepare(partition, remaining);
@@ -551,7 +590,7 @@ describe.skipIf(!url)('indexed departure window', () => {
           return result;
         });
         await expect(
-          publishArrivalDepartures(run, owner, fingerprint),
+          publishArrivalDepartures(run, owner, nextFingerprint),
         ).rejects.toThrow('projection changed');
         expect((await arrivalDepartureStore.manifest.head()).raw).toEqual(
           published.raw,
@@ -560,7 +599,7 @@ describe.skipIf(!url)('indexed departure window', () => {
           publishArrivalDepartures(
             async (_name, callback) => callback(),
             'wrong-owner',
-            fingerprint,
+            nextFingerprint,
           ),
         ).rejects.toThrow('lease lost');
       } finally {

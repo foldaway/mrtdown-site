@@ -20,6 +20,7 @@ const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const refSchema = z.object({
   projectionId: z.number().int().positive(),
   stationId: z.string().min(1),
+  projectionSha256: hash.optional(),
   sha256: hash,
   bytes: z
     .number()

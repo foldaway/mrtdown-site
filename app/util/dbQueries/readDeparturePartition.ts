@@ -45,22 +45,44 @@ export async function readDeparturePartition(
       AND ${memberships.stop_sequence} = ${occurrences.stop_sequence})`
     : sql`jsonb_build_array(jsonb_build_object('serviceId', ${legacy.service_id},
       'revisionId', ${legacy.revision_id}, 'platformIds', ${legacy.platform_ids}))`;
-  const template = sql`(to_jsonb(${occurrences}) - ARRAY[
-    'projection_id', 'station_id', 'service_date', 'arrival_instant', 'departure_instant',
-    'service_id', 'revision_id', 'platform_ids']::text[])
-    || jsonb_build_object('boardingByService', ${boarding})
-    ${isCombined ? sql`` : sql`|| jsonb_build_object('platform_semantics', 'distinct-platform-associations')`}`;
+  const columns = {
+    provider_trip_id: occurrences.provider_trip_id,
+    provider_route_id: occurrences.provider_route_id,
+    provider_calendar_id: occurrences.provider_calendar_id,
+    provider_stop_id: occurrences.provider_stop_id,
+    stop_sequence: occurrences.stop_sequence,
+    occurrence_index: occurrences.occurrence_index,
+    line_id: occurrences.line_id,
+    destination_station_id: occurrences.destination_station_id,
+    arrival_seconds: occurrences.arrival_seconds,
+    departure_seconds: occurrences.departure_seconds,
+    pickup_type: occurrences.pickup_type,
+    drop_off_type: occurrences.drop_off_type,
+    timepoint: occurrences.timepoint,
+  };
+  const platformSemantics = isCombined
+    ? sql`${combined.platform_semantics}`
+    : sql`'distinct-platform-associations'`;
   // SQL validates the same noon-minus-12h GTFS time base used by @mrtdown/core;
   // compaction may remove dates/instants only when reconstruction is lossless.
   const start = sql`((${occurrences.service_date} + time '12:00') AT TIME ZONE 'Asia/Singapore') - interval '12 hours'`;
   const consistent = sql<boolean>`
     (${occurrences.arrival_instant} IS NOT DISTINCT FROM (${start}) + ${occurrences.arrival_seconds} * interval '1 second')
     AND (${occurrences.departure_instant} IS NOT DISTINCT FROM (${start}) + ${occurrences.departure_seconds} * interval '1 second')`;
-  const source = tx
+  // Group native columns first. Encoding and sorting the entire call as JSON
+  // for every service date is costly even when most dates share that call.
+  const groups = tx
     .select({
-      template: template.as('template'),
-      serviceDate: occurrences.service_date,
-      consistent: consistent.as('consistent'),
+      ...columns,
+      platform_semantics: platformSemantics.as('platform_semantics'),
+      // Nest this SQL so Drizzle preserves its correlated table qualifiers.
+      boardingByService: sql`${boarding}`.as('boardingByService'),
+      dates: sql<
+        string[]
+      >`array_agg(${occurrences.service_date}::text ORDER BY ${occurrences.service_date})`.as(
+        'dates',
+      ),
+      consistent: sql<boolean>`bool_and(${consistent})`.as('consistent'),
     })
     .from(occurrences)
     .where(
@@ -69,37 +91,29 @@ export async function readDeparturePartition(
         eq(occurrences.station_id, identity.stationId),
       ),
     )
-    .as('source');
-  const groups = tx
-    .select({
-      template: source.template,
-      dates: sql<
-        string[]
-      >`array_agg(${source.serviceDate}::text ORDER BY ${source.serviceDate})`.as(
-        'dates',
-      ),
-      consistent: sql<boolean>`bool_and(${source.consistent})`.as('consistent'),
-    })
-    .from(source)
-    .groupBy(source.template)
-    .orderBy(sql`${source.template}::text COLLATE "C"`)
+    .groupBy(
+      ...Object.values(columns),
+      ...(isCombined ? [combined.platform_semantics] : []),
+      boarding,
+    )
     .limit(MAX_DEPARTURE_TEMPLATES + 1)
     .as('groups');
+  const template = sql`(to_jsonb(${sql.identifier('groups')}) - ARRAY['dates', 'consistent']::text[])`;
   // Keep oversized SQL aggregates out of the Node process.
-  const withinBudget = sql`sum(octet_length(${groups.template}::text) +
+  const withinBudget = sql`sum(octet_length(${template}::text) +
     octet_length(array_to_json(${groups.dates})::text) + 64) OVER ()
     <= ${DEPARTURE_PARTITION_LIMITS.jsonBytes}`;
   const grouped = await tx
     .select({
       template: sql<
         Record<string, unknown>
-      >`CASE WHEN ${withinBudget} THEN ${groups.template} END`,
+      >`CASE WHEN ${withinBudget} THEN ${template} END`,
       dates: sql<string[]>`CASE WHEN ${withinBudget} THEN ${groups.dates} END`,
       consistent: groups.consistent,
       withinBudget: sql<boolean>`${withinBudget}`,
     })
     .from(groups)
-    .orderBy(sql`${groups.template}::text COLLATE "C"`);
+    .orderBy(sql`${template}::text COLLATE "C"`);
   if (grouped.some((row) => !row.withinBudget))
     throw new Error('Snapshot exceeds JSON limit');
   if (grouped.some((row) => !row.consistent))
