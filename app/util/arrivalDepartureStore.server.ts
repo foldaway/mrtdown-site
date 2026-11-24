@@ -29,6 +29,7 @@ const refSchema = z.object({
 });
 const manifestSchema = z.object({
   arrivalInputsSha256: hash,
+  projectionDigests: z.record(z.string(), hash).optional(),
   partitions: z.array(refSchema).max(MAX_DEPARTURE_PARTITIONS),
 });
 export type DeparturePartitionRef = z.infer<typeof refSchema>;

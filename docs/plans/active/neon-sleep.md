@@ -130,6 +130,8 @@ cover both timetable formats; publication checks cover interruption, source
 changes and checkpoint ordering. Public serving remains off by default. No
 producer flags were enabled. Next: measure staging payload size and publication latency
 using the [runbook](../../operations/edge-caching.md#published-departure-partitions).
+Later pulls now reuse verified completed projections across unrelated canonical
+changes; the runbook owns repair and rollout behavior.
 
 ### Recent arrival reports
 

@@ -98,7 +98,10 @@ import * as database from './database';
 import { buildDataset } from './dataset';
 import { publishArrivalDepartures } from '~/workflows/pull/helpers/publishArrivalDepartures';
 import { acquireOrRenewPullWorkflowLease } from '~/workflows/pull/helpers/workflowLease';
-import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
+import {
+  arrivalDepartureStore,
+  MAX_DEPARTURE_PARTITIONS,
+} from '~/util/arrivalDepartureStore.server';
 import { withSelectedScheduledTimetable } from './withSelectedScheduledTimetable';
 import {
   parseArrivalInputs,
@@ -439,7 +442,7 @@ describe.skipIf(!url)('indexed departure window', () => {
   });
 
   it.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
-    'resumes departure publication and rejects a changed source frontier',
+    'resumes departure publication, reuses completed projections and rejects a changed source frontier',
     async () => {
       vi.stubEnv('TIER', schema);
       vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
@@ -488,7 +491,7 @@ describe.skipIf(!url)('indexed departure window', () => {
               part.stationId === prepared.stationId,
           ),
         ).toHaveLength(1);
-        const published = await arrivalDepartureStore.manifest.read();
+        let published = await arrivalDepartureStore.manifest.read();
         if (!published) throw Error('Missing departure manifest');
         expect(await arrivalDepartureStore.ready(published)).toBe(true);
         for (const ref of published.inputs.partitions) {
@@ -541,6 +544,90 @@ describe.skipIf(!url)('indexed departure window', () => {
           }
         }
 
+        // A new canonical generation can change issues without changing a timetable.
+        const nextFingerprint = 'b'.repeat(64);
+        await completePageProfileGeneration(db(), 'issues-update');
+        await publishArrivalInputSnapshot(nextFingerprint);
+        outputs.clear();
+        queries.length = 0;
+        spy.mockClear();
+        await publishArrivalDepartures(run, owner, nextFingerprint);
+        expect(spy).not.toHaveBeenCalled();
+        expect(
+          queries.some((query) => query.includes('departure_occurrences')),
+        ).toBe(false);
+        published = await arrivalDepartureStore.manifest.read();
+        if (!published) throw Error('Missing reused departure manifest');
+        expect(published.value.generation).toBe('issues-update');
+        expect(published.value.fingerprint).toBe(nextFingerprint);
+
+        // Verify bytes before reusing them; repair only the damaged partition.
+        const damaged = published.inputs.partitions[0];
+        await redis.set(
+          `${prefixes[1]}:partition:${damaged.sha256}`,
+          'corrupt',
+        );
+        outputs.clear();
+        await publishArrivalDepartures(run, owner, nextFingerprint);
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0][0]).toMatchObject({
+          projectionId: damaged.projectionId,
+          stationId: damaged.stationId,
+        });
+        published = await arrivalDepartureStore.manifest.read();
+        if (!published) throw Error('Missing repaired departure manifest');
+
+        // Reusing the maximum supported partition count must fit the same plan budget.
+        const metadata = await arrivalInputSnapshotStore.read();
+        if (!metadata) throw Error('Missing arrival metadata');
+        const previousParts = published.inputs.partitions;
+        const largeParts = Array.from(
+          { length: MAX_DEPARTURE_PARTITIONS },
+          (_, index) => ({
+            ...previousParts[index % previousParts.length],
+            stationId: `station-${index}`,
+          }),
+        );
+        vi.spyOn(arrivalInputSnapshotStore, 'read').mockResolvedValueOnce({
+          ...metadata,
+          inputs: {
+            ...metadata.inputs,
+            scopes: largeParts.map((ref) => ({
+              ...metadata.inputs.scopes[0],
+              projection_id: ref.projectionId,
+              station_id: ref.stationId,
+            })),
+          },
+        });
+        vi.spyOn(arrivalDepartureStore.manifest, 'read').mockResolvedValueOnce({
+          ...published,
+          inputs: { ...published.inputs, partitions: largeParts },
+        });
+        const readPart = vi
+          .spyOn(arrivalDepartureStore, 'read')
+          .mockImplementation(async (ref) => ({ ...ref, calls: [] }));
+        let planBytes = 0;
+        await expect(
+          publishArrivalDepartures(
+            async (_name, callback) => {
+              const plan = await callback();
+              planBytes = Buffer.byteLength(JSON.stringify(plan));
+              throw Error('plan inspected');
+            },
+            owner,
+            nextFingerprint,
+          ),
+        ).rejects.toThrow('plan inspected');
+        expect(readPart).toHaveBeenCalledTimes(MAX_DEPARTURE_PARTITIONS);
+        expect(planBytes).toBeLessThanOrEqual(256 * 1024);
+        readPart.mockRestore();
+
+        // A same-ID rebuild changes completion and must not reuse its old bytes.
+        await db()
+          .update(projections)
+          .set({ completed_at: '2026-10-27T00:00:00Z' })
+          .where(eq(projections.id, damaged.projectionId));
+        await publishArrivalInputSnapshot(nextFingerprint);
         outputs.clear();
         spy.mockImplementationOnce(async (partition, remaining) => {
           const result = await prepare(partition, remaining);
@@ -551,7 +638,7 @@ describe.skipIf(!url)('indexed departure window', () => {
           return result;
         });
         await expect(
-          publishArrivalDepartures(run, owner, fingerprint),
+          publishArrivalDepartures(run, owner, nextFingerprint),
         ).rejects.toThrow('projection changed');
         expect((await arrivalDepartureStore.manifest.head()).raw).toEqual(
           published.raw,
@@ -560,7 +647,7 @@ describe.skipIf(!url)('indexed departure window', () => {
           publishArrivalDepartures(
             async (_name, callback) => callback(),
             'wrong-owner',
-            fingerprint,
+            nextFingerprint,
           ),
         ).rejects.toThrow('lease lost');
       } finally {
