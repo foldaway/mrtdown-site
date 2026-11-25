@@ -84,7 +84,7 @@ export async function getRecentCrowdArrival(
     : undefined;
   if (cached?.status === 'ready') return cached.value;
   // Reports are optional. A healthy published schedule must not wake SQL to
-  // repair an unavailable signal; writers or an explicit seed restore it.
+  // repair an unavailable signal; accepted writes or SQL-backed reads restore it.
   if (options?.sqlFallback === false) return undefined;
 
   const db = typeof database === 'function' ? database() : database;

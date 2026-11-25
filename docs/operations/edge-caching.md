@@ -292,8 +292,11 @@ initialized-empty results and clock expiry need no SQL. SQL-backed schedules
 retain report fallback and a bounded missing/dirty-cache repair attempt;
 published schedules omit unavailable optional reports. Platform queries omit them.
 
-Seed or repair with `repairArrivalReportCache(db)` from
-[`crowdArrivalReportCache.server.ts`](../../app/util/crowdArrivalReportCache.server.ts).
+Repair runs after an accepted report or when a SQL-backed read finds missing or
+dirty cache state. There is no operator seed task, and published schedule reads
+do not repair reports. After Redis restore or eviction, reports may stay omitted
+until one of those repair paths runs.
+
 Repair loads at most 10,000 recent accepted rows; exceeding the bound keeps SQL
 fallback. There is no timer or expiry refill. The cache contains no reporter
 identities. Reports preserve the validated destination; mismatched/legacy rows
@@ -303,7 +306,7 @@ Invalidation failure rejects submission before insertion. Publication failure
 after commit preserves the accepted report and leaves the cache unknown until
 repair. Writers/repairs share a SQL lock; Redis WATCH/MULTI fences delayed
 publishers. Readiness and scopes share one hash so eviction remains unknown.
-Reseed after direct SQL report edits, Redis restore or writers without Redis.
+Direct SQL edits and writers without Redis do not refresh the report cache.
 
 ## Published arrivals reader
 
@@ -318,8 +321,8 @@ scope rejections check SQL's completed generation: changed/updating generations
 select SQL validation for newly promoted scopes; matching generations retain 400.
 Valid published scopes never make this check. Requests do not publish or repair
 departures. Healthy cold/warm reads, midnight and report expiry need no SQL.
-Dirty/unavailable optional reports are omitted until a writer or explicit seed
-restores them. Arrivals responses remain `no-store`.
+Dirty/unavailable optional reports are omitted until an accepted report or a
+SQL-backed repair restores them. Arrivals responses remain `no-store`.
 
 ## Redis usage evidence
 
