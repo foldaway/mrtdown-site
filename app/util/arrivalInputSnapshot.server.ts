@@ -12,12 +12,8 @@ export const arrivalInputSnapshotStore = createPublishedSnapshotStore(
   parseArrivalInputs,
 );
 
-export function isArrivalInputPublicationEnabled() {
-  return process.env.REDIS_ARRIVAL_SNAPSHOT === 'publish';
-}
-
 export async function publishArrivalInputSnapshot(fingerprint?: string) {
-  if (!isArrivalInputPublicationEnabled()) return;
+  if (!process.env.REDIS_URL) return;
   const expected = await arrivalInputSnapshotStore.head();
   const db = await getDefaultDb();
   const snapshot = await db.transaction(

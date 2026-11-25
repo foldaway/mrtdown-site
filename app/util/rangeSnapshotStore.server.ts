@@ -1,3 +1,4 @@
+import { parseRangeSnapshotInputs } from './dbQueries/rangeSnapshotInputs';
 import { getPageProfileRedis } from './pageProfileRedis.server';
 import {
   createPublishedSnapshotStore,
@@ -5,7 +6,6 @@ import {
   type PublishedSnapshotHead,
   type SnapshotRedis,
 } from './publishedSnapshotStore.server';
-import { parseRangeSnapshotInputs } from './dbQueries/rangeSnapshotInputs';
 
 export type RangeSnapshotHead = PublishedSnapshotHead;
 
@@ -72,13 +72,3 @@ redis.call('SET', KEYS[2], ARGV[2]); return 1`,
 }
 
 export const rangeSnapshotStore = createRangeSnapshotStore(getPageProfileRedis);
-
-export function isRangeSnapshotPublicationEnabled() {
-  return ['enabled', 'publish'].includes(
-    process.env.REDIS_RANGE_SNAPSHOT ?? '',
-  );
-}
-
-export function isRangeSnapshotEnabled() {
-  return process.env.REDIS_RANGE_SNAPSHOT === 'enabled';
-}

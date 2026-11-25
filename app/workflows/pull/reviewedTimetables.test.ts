@@ -340,15 +340,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('MRTDOWN_DATA_URL', 'https://data.example.com');
   vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', undefined);
-  vi.stubEnv('REDIS_ISSUE_PROFILE_CACHE', undefined);
-  vi.stubEnv('REDIS_NAVIGATION_CACHE', undefined);
-  vi.stubEnv('REDIS_SERVICE_PATH_CACHE', undefined);
-  vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', undefined);
-  vi.stubEnv('REDIS_RANGE_SNAPSHOT', undefined);
-  vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', undefined);
+  vi.stubEnv('REDIS_URL', undefined);
   vi.mocked(sitemapSnapshotStore.read).mockResolvedValue(null);
-  vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', undefined);
-  vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', undefined);
   vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(false);
   vi.mocked(rangeSnapshotStore.hasWriter).mockResolvedValue(false);
   state.fingerprint = undefined;
@@ -369,9 +362,24 @@ afterEach(async () => {
 });
 
 describe('published zero-SQL range inputs', () => {
+  function healthyArrivalHeads() {
+    const fingerprint = getCanonicalManifestFingerprint(manifest);
+    state.arrivalHead = {
+      fingerprint,
+      generation: 'complete',
+      sha256: 'a'.repeat(64),
+    };
+    vi.mocked(sitemapSnapshotStore.read).mockResolvedValue({
+      value: { fingerprint, generation: 'complete' },
+    } as never);
+    vi.mocked(arrivalDepartureStore.manifest.read).mockResolvedValue({
+      value: { fingerprint, generation: 'complete' },
+      inputs: { arrivalInputsSha256: 'a'.repeat(64), partitions: [] },
+    } as never);
+    vi.mocked(arrivalDepartureStore.ready).mockResolvedValue(true);
+  }
   it('repairs sitemap inputs before completion and keeps healthy unchanged polls SQL-free', async () => {
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
-    vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'publish');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
     state.fingerprint = getCanonicalManifestFingerprint(manifest);
     vi.mocked(publishSitemapSnapshot).mockRejectedValueOnce(
@@ -385,11 +393,7 @@ describe('published zero-SQL range inputs', () => {
     expect(publishSitemapSnapshot).toHaveBeenLastCalledWith(state.fingerprint);
     expect(rangeSnapshotStore.complete).toHaveBeenCalledWith(state.fingerprint);
     expect(fetchArchive).not.toHaveBeenCalled();
-    vi.mocked(sitemapSnapshotStore.read).mockResolvedValue({
-      value: { fingerprint: state.fingerprint, generation: 'complete' },
-    } as unknown as NonNullable<
-      Awaited<ReturnType<typeof sitemapSnapshotStore.read>>
-    >);
+    healthyArrivalHeads();
     vi.mocked(getDb).mockImplementation(() => {
       throw Error('SQL must stay asleep');
     });
@@ -399,9 +403,7 @@ describe('published zero-SQL range inputs', () => {
     expect(publishSitemapSnapshot).not.toHaveBeenCalled();
   });
   it('holds purge and checkpoint completion until departure publication succeeds', async () => {
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
-    vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
-    vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', 'publish');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     state.fingerprint = getCanonicalManifestFingerprint(manifest);
     vi.mocked(publishArrivalDepartures).mockRejectedValueOnce(
       Error('partition publication failed'),
@@ -423,9 +425,10 @@ describe('published zero-SQL range inputs', () => {
   });
 
   it('repairs missing arrival metadata before restoring the range checkpoint', async () => {
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
-    vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    healthyArrivalHeads();
+    state.arrivalHead = undefined;
     state.fingerprint = getCanonicalManifestFingerprint(manifest);
     vi.mocked(publishArrivalInputSnapshot).mockRejectedValueOnce(
       Error('arrival publication unavailable'),
@@ -450,13 +453,9 @@ describe('published zero-SQL range inputs', () => {
   });
 
   it('keeps a completed arrival metadata publication on the SQL-free unchanged path', async () => {
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
-    vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
-    state.arrivalHead = {
-      fingerprint: getCanonicalManifestFingerprint(manifest),
-      generation: 'complete',
-    };
+    healthyArrivalHeads();
     vi.mocked(getDb).mockImplementation(() => {
       throw Error('SQL must stay asleep');
     });
@@ -465,23 +464,10 @@ describe('published zero-SQL range inputs', () => {
     expect(publishArrivalInputSnapshot).not.toHaveBeenCalled();
   });
   it('keeps matching departures SQL-free and repairs absent parts before checkpoint completion', async () => {
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
-    vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
-    vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', 'publish');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
     const fingerprint = getCanonicalManifestFingerprint(manifest);
-    state.arrivalHead = {
-      fingerprint,
-      generation: 'complete',
-      sha256: 'a'.repeat(64),
-    };
-    vi.mocked(arrivalDepartureStore.manifest.read).mockResolvedValue({
-      value: { fingerprint, generation: 'complete' },
-      inputs: { arrivalInputsSha256: 'a'.repeat(64), partitions: [] },
-    } as unknown as NonNullable<
-      Awaited<ReturnType<typeof arrivalDepartureStore.manifest.read>>
-    >);
-    vi.mocked(arrivalDepartureStore.ready).mockResolvedValue(true);
+    healthyArrivalHeads();
     const healthy = workflow();
     await healthy.run();
     expect(getDb).not.toHaveBeenCalled();
@@ -495,8 +481,9 @@ describe('published zero-SQL range inputs', () => {
   });
 
   it('finishes an unchanged scheduled poll before getDb or lease acquisition', async () => {
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    healthyArrivalHeads();
     vi.mocked(getDb).mockImplementation(() => {
       throw Error('SQL must stay asleep');
     });
@@ -508,7 +495,7 @@ describe('published zero-SQL range inputs', () => {
   });
 
   it('does not wake SQL during failure cleanup if preflight never acquired a writer marker', async () => {
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(fetchManifest).mockRejectedValueOnce(
       Error('upstream unavailable'),
     );
@@ -520,7 +507,7 @@ describe('published zero-SQL range inputs', () => {
   });
 
   it('repairs a missing snapshot on unchanged SQL inputs, then checkpoints only after publication/purge', async () => {
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     state.fingerprint = getCanonicalManifestFingerprint(manifest);
     vi.mocked(publishRangeSnapshot).mockRejectedValueOnce(
       Error('publication unavailable'),
@@ -536,8 +523,7 @@ describe('published zero-SQL range inputs', () => {
   });
 
   it('publishes changed inputs before purge and checkpoints after the SQL fingerprint', async () => {
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
-    vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     const run = workflow();
     await run.run();
     expect(publishRangeSnapshot).toHaveBeenCalledWith(
@@ -564,8 +550,8 @@ describe('published zero-SQL range inputs', () => {
 });
 
 describe('service-path publication workflow', () => {
-  it('publishes independently of the profile readers and retries before purge and fingerprint completion', async () => {
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'publish');
+  it('publishes all cache families and retries before purge and fingerprint completion', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(publishServicePathCache).mockRejectedValueOnce(
       Error('Redis unavailable'),
     );
@@ -582,23 +568,23 @@ describe('service-path publication workflow', () => {
       expect.anything(),
       run.context.workflowRunId,
     );
-    expect(publishNavigationCache).not.toHaveBeenCalled();
+    expect(publishNavigationCache).toHaveBeenCalledOnce();
     expect(purgePublicDataCache).toHaveBeenCalledOnce();
     expect(recordCanonicalManifestFingerprint).toHaveBeenCalledOnce();
   });
 
-  it('renews retention on an unchanged manifest without advancing the generation or purging', async () => {
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
+  it('renews retention on an unchanged manifest without advancing the generation', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     state.fingerprint = getCanonicalManifestFingerprint(manifest);
     await workflow().run();
     expect(publishServicePathCache).toHaveBeenCalledExactlyOnceWith();
     expect(completePageProfileGeneration).not.toHaveBeenCalled();
-    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(purgePublicDataCache).toHaveBeenCalledOnce();
     expect(fetchArchive).not.toHaveBeenCalled();
   });
 
   it('seeds an existing completed generation without touching timetable selection or other caches', async () => {
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'publish');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     state.fingerprint = 'completed';
     await workflow({ seedServicePathCache: true }).run();
     expect(publishServicePathCache).toHaveBeenCalledExactlyOnceWith();
@@ -610,8 +596,8 @@ describe('service-path publication workflow', () => {
 });
 
 describe('range-reference publication workflow', () => {
-  it('publishes independently and retries before purge/fingerprint completion', async () => {
-    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'enabled');
+  it('publishes references and retries before purge/fingerprint completion', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(publishRangeReferenceCache).mockRejectedValueOnce(
       Error('Redis unavailable'),
     );
@@ -624,24 +610,24 @@ describe('range-reference publication workflow', () => {
     expect(publishRangeReferenceCache).toHaveBeenLastCalledWith(
       run.context.workflowRunId,
     );
-    expect(publishServicePathCache).not.toHaveBeenCalled();
-    expect(publishNavigationCache).not.toHaveBeenCalled();
+    expect(publishServicePathCache).toHaveBeenCalledTimes(2);
+    expect(publishNavigationCache).toHaveBeenCalledOnce();
     expect(purgePublicDataCache).toHaveBeenCalledOnce();
     expect(recordCanonicalManifestFingerprint).toHaveBeenCalledOnce();
   });
 
-  it('renews unchanged manifests without a generation advance or edge purge', async () => {
-    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'publish');
+  it('renews unchanged manifests without a generation advance', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     state.fingerprint = getCanonicalManifestFingerprint(manifest);
     await workflow().run();
     expect(publishRangeReferenceCache).toHaveBeenCalledExactlyOnceWith();
     expect(completePageProfileGeneration).not.toHaveBeenCalled();
-    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(purgePublicDataCache).toHaveBeenCalledOnce();
     expect(fetchArchive).not.toHaveBeenCalled();
   });
 
   it('seeds the completed generation without importing or republishing other caches', async () => {
-    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'publish');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     state.fingerprint = 'complete';
     await workflow({ seedRangeReferenceCache: true }).run();
     expect(publishRangeReferenceCache).toHaveBeenCalledExactlyOnceWith();
@@ -651,27 +637,25 @@ describe('range-reference publication workflow', () => {
     expect(publishNavigationCache).not.toHaveBeenCalled();
   });
 
-  it.each(['disabled', 'incomplete'] as const)(
+  it.each(['unconfigured', 'incomplete'] as const)(
     'refuses a %s seed',
     async (stateName) => {
       vi.stubEnv(
-        'REDIS_RANGE_REFERENCE_CACHE',
-        stateName === 'disabled' ? '' : 'publish',
+        'REDIS_URL',
+        stateName === 'unconfigured' ? undefined : 'redis://unused',
       );
       state.fingerprint = stateName === 'incomplete' ? undefined : 'complete';
       await expect(
         workflow({ seedRangeReferenceCache: true }).run(),
       ).rejects.toThrow(
-        stateName === 'disabled' ? 'disabled' : 'completed pull',
+        stateName === 'unconfigured' ? 'REDIS_URL' : 'completed pull',
       );
       expect(publishRangeReferenceCache).not.toHaveBeenCalled();
     },
   );
 
   it('publishes references when Navigation seeding advances the shared generation', async () => {
-    vi.stubEnv('REDIS_NAVIGATION_CACHE', 'enabled');
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
-    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'enabled');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     state.fingerprint = 'complete';
     const run = workflow({ seedNavigationCache: true });
     await run.run();
@@ -793,6 +777,11 @@ describe('pull timetable admission', () => {
         createValidatedScheduledTimetableCanonicalSnapshot,
       ).not.toHaveBeenCalled();
       expect(mkdtemp).not.toHaveBeenCalled();
+      expect(publishNavigationCache).not.toHaveBeenCalled();
+      expect(publishRangeSnapshot).not.toHaveBeenCalled();
+      expect(publishArrivalDepartures).not.toHaveBeenCalled();
+      expect(rangeSnapshotStore.markWriter).not.toHaveBeenCalled();
+      expect(purgePublicDataCache).toHaveBeenCalledOnce();
       expect(recordCanonicalManifestFingerprint).toHaveBeenCalledOnce();
       expect(releasePullWorkflowLease).toHaveBeenCalledWith(
         expect.anything(),
@@ -811,7 +800,7 @@ describe('pull timetable admission', () => {
   });
 
   it('retries Redis publication and edge purge under the same generation before recording success', async () => {
-    vi.stubEnv('REDIS_ISSUE_PROFILE_CACHE', 'enabled');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(publishNavigationCache).mockRejectedValueOnce(
       new Error('Redis timed out'),
     );
@@ -832,9 +821,8 @@ describe('pull timetable admission', () => {
     const generation = pull.context.workflowRunId;
     expect(
       vi.mocked(completePageProfileGeneration).mock.calls.map(([, id]) => id),
-    ).toEqual([generation, generation, generation]);
+    ).toEqual([generation, generation]);
     expect(vi.mocked(publishNavigationCache).mock.calls).toEqual([
-      [generation],
       [generation],
       [generation],
     ]);
@@ -1162,7 +1150,6 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     await staging.finalizePull(database, {
       canonicalTopologyComplete: stagedLines === lines.length,
     });
-    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'enabled');
 
     const scope = {
       stationId: 'station-1',
@@ -1347,7 +1334,6 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       scope: loopScope,
       loop: true,
     });
-    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'disabled');
     expect(
       await queryIndexedScheduledDepartures(database, {
         ...window,
@@ -1355,7 +1341,6 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
         loop: true,
       }),
     ).toEqual(loop);
-    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'enabled');
     expect(loop.departures).toMatchObject([
       {
         serviceId: 'service-shared',
@@ -1663,7 +1648,7 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
   });
 
   it('lets an ordinary pull repair a failed explicit rebuild of a current manifest', async () => {
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     let completedFingerprint: string | undefined;
     vi.mocked(rangeSnapshotStore.isCurrent).mockImplementation(
       async (fingerprint) => completedFingerprint === fingerprint,

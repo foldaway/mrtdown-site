@@ -3,19 +3,10 @@ import { asc, desc, eq, sql } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
 import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import { impactEventPeriodsTable, impactEventsTable } from '~/db/schema';
-import {
-  isRangeReferenceCacheEnabled,
-  readRangeReferencesForSnapshot,
-} from '~/util/rangeReferenceCache.server';
-import {
-  isRangeSnapshotEnabled,
-  rangeSnapshotStore,
-} from '~/util/rangeSnapshotStore.server';
+import { readRangeReferencesForSnapshot } from '~/util/rangeReferenceCache.server';
+import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
 import { recordServerTiming } from '~/util/serverTiming';
-import {
-  isServicePathCacheEnabled,
-  readServicePathsForSnapshot,
-} from '~/util/servicePathCache.server';
+import { readServicePathsForSnapshot } from '~/util/servicePathCache.server';
 import {
   type AppDb,
   type AppDbReader,
@@ -113,7 +104,7 @@ export async function getIssuesOverlappingRange(
   referenceNow = nowSg(),
   db?: AppDb,
 ) {
-  if (isRangeSnapshotEnabled()) {
+  if (process.env.REDIS_URL) {
     const startedAt = performance.now();
     const snapshot = await rangeSnapshotStore.read();
     const source = snapshot?.source ?? 'sql';
@@ -182,9 +173,7 @@ export async function getIssuesOverlappingRange(
     );
     return { dataset, issues };
   };
-  const usePaths = isServicePathCacheEnabled();
-  const useReferences = isRangeReferenceCacheEnabled();
-  if (!usePaths && !useReferences) return read(database);
+  if (!process.env.REDIS_URL) return read(database);
 
   return database.transaction(
     async (tx) => {
@@ -194,10 +183,8 @@ export async function getIssuesOverlappingRange(
         end: isoDateTime(rangeEnd),
       };
       const [paths, references] = await Promise.all([
-        usePaths ? readServicePathsForSnapshot(generation, range) : undefined,
-        useReferences
-          ? readRangeReferencesForSnapshot(generation, range)
-          : undefined,
+        readServicePathsForSnapshot(generation, range),
+        readRangeReferencesForSnapshot(generation, range),
       ]);
       return read(tx, paths, references);
     },

@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { nowSg } from './dbQueries/dateTime';
 import { getIssueReadModel } from './dbQueries/issue';
 import { getCachedIssueProfile } from './issueProfileCache.server';
-import { isIssueProfileCacheEnabled } from './pageProfileRedis.server';
 import { ISSUE_PROFILE_FRESH_UNTIL_HEADER } from './publicResponseCache';
 import { recordServerTiming } from './serverTiming';
 
@@ -16,7 +15,7 @@ export const getIssueFn = createServerFn({ method: 'GET' })
   .inputValidator((val) => InputSchema.parse(val))
   .handler(async (val) => {
     const { issueId } = val.data;
-    if (!isIssueProfileCacheEnabled()) return getIssueReadModel(issueId);
+    if (!process.env.REDIS_URL) return getIssueReadModel(issueId);
 
     const startedAt = performance.now();
     const { profile, expiresAt } = await getCachedIssueProfile(

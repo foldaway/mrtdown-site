@@ -145,10 +145,8 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
   });
   beforeEach(async () => {
     vi.stubEnv('TIER', 'staging');
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', undefined);
-    vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', undefined);
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'publish');
-    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'publish');
+    vi.stubEnv('REDIS_URL', 'redis://unused');
+
     vi.setSystemTime(now.toJSDate());
     vi.spyOn(database, 'getDefaultDb').mockResolvedValue(db);
     store.clear();
@@ -283,13 +281,12 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           db,
         ),
       );
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'publish');
     await publishRangeSnapshot('a'.repeat(64));
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
     vi.spyOn(database, 'getDefaultDb').mockRejectedValue(
       Error('SQL must stay asleep'),
     );
     queries.length = 0;
+    headers.mockClear();
     for (const [index, clock] of clocks.entries()) {
       expect(
         await getIssuesOverlappingRange(
@@ -322,9 +319,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         db,
       );
     const expected = [await at(now), await at(now.plus({ days: 1 }))];
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'publish');
     await publishRangeSnapshot('a'.repeat(64));
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
     queries.length = 0;
     expect(await at(now)).toEqual(expected[0]);
     const tomorrow = await at(now.plus({ days: 1 }));
@@ -345,9 +340,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     );
     const baseline = await range();
     expect(baseline.issues).toEqual([]);
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'publish');
     await publishRangeSnapshot('a'.repeat(64));
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
     queries.length = 0;
     expect(await range()).toEqual(baseline);
     expect(queries).toEqual([]);
@@ -355,10 +348,8 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
 
   it('keeps the complete published source during promotion and switches issue/path corrections together', async () => {
     const baseline = await range();
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'publish');
     await recordCanonicalManifestFingerprint(db, 'a'.repeat(64));
     await publishRangeSnapshot();
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
     await markPageProfilesUpdating(db);
     await db
       .update(paths)
@@ -381,7 +372,8 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
       corrected.dataset.branchByServiceId.service.entries[0].displayCode,
     ).toBe('CORRECTED');
     expect(queries).toEqual([]);
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', '');
+
+    vi.stubEnv('REDIS_URL', undefined);
     expect(await range()).toEqual(corrected);
   });
 
@@ -390,16 +382,16 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
       overview: await getOverviewData(30),
       month: await getHistoryYearMonthData(2026, 11),
     });
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'publish');
     const before = await outputs();
     await publishRangeSnapshot('a'.repeat(64));
     const original = (await rangeSnapshotStore.head()).value?.sha256;
     await pool.query('delete from public_holidays');
+    vi.stubEnv('REDIS_URL', undefined);
     const expected = await outputs();
+    vi.stubEnv('REDIS_URL', 'redis://unused');
     expect(expected.overview).not.toEqual(before.overview);
     await publishRangeSnapshot('a'.repeat(64));
     expect((await rangeSnapshotStore.head()).value?.sha256).not.toBe(original);
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
     queries.length = 0;
     expect(await outputs()).toEqual(expected);
     expect(queries).toEqual([]);
@@ -409,7 +401,6 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     'recovers through SQL with no-store for %s published head',
     async (failure) => {
       const baseline = await range();
-      vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
       if (failure === 'invalid')
         store.set('mrtdown:{staging:range-snapshot:v1}:active', '{}');
       if (failure === 'unavailable')
@@ -426,56 +417,45 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     expect(baseline.issues).toHaveLength(1);
     expect(pathsSql()).toHaveLength(1);
     await publishServicePathCache(generation);
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
     queries.length = 0;
 
     expect(await range()).toEqual(baseline);
     expect(pathsSql()).toHaveLength(0);
-    expect(headers).not.toHaveBeenCalledWith('Cache-Control', 'no-store');
+    expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
   });
 
-  it.each([
-    ['enabled', 'enabled', 0, 0],
-    ['enabled', '', 0, 7],
-    ['', 'enabled', 1, 0],
-    ['', '', 1, 7],
-  ] as const)(
-    'preserves range output with path=%s and references=%s',
-    async (pathFlag, referenceFlag, pathQueries, referenceQueries) => {
-      const baseline = await range();
-      const complete = await buildDataset(now, db, ['issue']);
-      expect(baseline.dataset).toEqual({
-        ...complete,
-        metadata: {},
-        included: {
-          ...complete.included,
-          operators: {},
-          towns: {},
-          landmarks: {},
-        },
-      });
-      expect(
-        baseline.dataset.included.stations['station-1'].landmarkIds,
-      ).toEqual(['z', 'a']);
-      await publishServicePathCache(generation);
-      await publishRangeReferenceCache(generation);
-      vi.stubEnv('REDIS_SERVICE_PATH_CACHE', pathFlag);
-      vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', referenceFlag);
-      queries.length = 0;
-      expect(await range()).toEqual(baseline);
-      expect(pathsSql()).toHaveLength(pathQueries);
-      expect(referenceSql()).toHaveLength(referenceQueries);
-      expect(queries.filter((q) => q.includes('from "metadata"'))).toHaveLength(
-        pathFlag || referenceFlag ? 1 : 0,
-      );
-      expect(
-        queries.filter((q) => q.includes('from "public_holidays"')),
-      ).toHaveLength(1);
-      expect(
-        queries.some((q) => /from "(?:operators|towns|landmarks)"/.test(q)),
-      ).toBe(false);
-    },
-  );
+  it('preserves range output with both path and reference inputs cached', async () => {
+    const baseline = await range();
+    const complete = await buildDataset(now, db, ['issue']);
+    expect(baseline.dataset).toEqual({
+      ...complete,
+      metadata: {},
+      included: {
+        ...complete.included,
+        operators: {},
+        towns: {},
+        landmarks: {},
+      },
+    });
+    expect(baseline.dataset.included.stations['station-1'].landmarkIds).toEqual(
+      ['z', 'a'],
+    );
+    await publishServicePathCache(generation);
+    await publishRangeReferenceCache(generation);
+    queries.length = 0;
+    expect(await range()).toEqual(baseline);
+    expect(pathsSql()).toHaveLength(0);
+    expect(referenceSql()).toHaveLength(0);
+    expect(queries.filter((q) => q.includes('from "metadata"'))).toHaveLength(
+      1,
+    );
+    expect(
+      queries.filter((q) => q.includes('from "public_holidays"')),
+    ).toHaveLength(1);
+    expect(
+      queries.some((q) => /from "(?:operators|towns|landmarks)"/.test(q)),
+    ).toBe(false);
+  });
 
   it('preserves overview/map, history/API and weekly summary output across SQL, cold and warm cache reads', async () => {
     const outputs = async () => {
@@ -499,8 +479,6 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     const baseline = await outputs();
     await publishServicePathCache(generation);
     await publishRangeReferenceCache(generation);
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
-    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'enabled');
     expect(await outputs()).toEqual(baseline);
     queries.length = 0;
     expect(await outputs()).toEqual(baseline);
@@ -534,8 +512,6 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           if (requested === key) throw Error('Redis timeout');
           return store.get(requested) ?? '';
         });
-      vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
-      vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'enabled');
       queries.length = 0;
       headers.mockClear();
       expect(await range()).toEqual(baseline);
@@ -549,7 +525,6 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     await publishServicePathCache(generation);
     await markPageProfilesUpdating(db);
     const baseline = await range();
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
     queries.length = 0;
 
     expect(await range()).toEqual(baseline);
@@ -560,7 +535,6 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
 
   it('retains holiday fact repairs across committed retries and serializes every holiday writer', async () => {
     vi.useRealTimers(); // SQL lease expiry compares against the database clock.
-    vi.stubEnv('REDIS_PUBLIC_HOLIDAY_PREFLIGHT', 'enabled');
     const rows = [
       normalizeDataGovPublicHolidayRecord({
         date: '2026-11-17',
@@ -596,21 +570,19 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     ).rejects.toThrow('superseded');
     expect(await canSkipPublicHolidaySync([rows[1]])).toBe(false);
 
-    // Even with skip reads disabled, direct/seed writes invalidate old receipts.
+    // Direct/seed writes invalidate old receipts before changing SQL.
+    await publishRangeSnapshot('a'.repeat(64));
     await completePublicHolidaySync(retry.checkpointToken, [rows[1]]);
     expect(await canSkipPublicHolidaySync([rows[1]])).toBe(true);
-    vi.stubEnv('REDIS_PUBLIC_HOLIDAY_PREFLIGHT', undefined);
+
     vi.stubEnv('REDIS_URL', 'redis://unused');
     await syncPublicHolidays(db, [rows[1]]);
-    vi.stubEnv('REDIS_PUBLIC_HOLIDAY_PREFLIGHT', 'enabled');
     expect(await canSkipPublicHolidaySync([rows[1]])).toBe(false);
   });
 
   it('keeps holidays and live issue corrections current without invalidating references, including manual facts rebuilds', async () => {
     await publishServicePathCache(generation);
     await publishRangeReferenceCache(generation);
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
-    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'enabled');
     await range();
     expect(
       (await getOverviewData(30)).data.lineSummaries[0].breakdownByDates[
@@ -651,7 +623,13 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     queries.length = 0;
     expect(await range()).toEqual(changed);
     expect(referenceSql()).toHaveLength(0);
-    expect(redis.set).toHaveBeenCalledTimes(2);
+    expect(
+      redis.set.mock.calls.filter(
+        ([key]) =>
+          key === getServicePathCacheKey(generation) ||
+          key === getRangeReferenceCacheKey(generation),
+      ),
+    ).toHaveLength(2);
   });
 
   it('serves sitemap paths from cold/warm published inputs across Singapore midnight without SQL', async () => {
@@ -671,7 +649,6 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
       stationIds: ['station-1', 'station-2', 'station-3'],
       reportEarliestDate: '2026-11-18',
     });
-    vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'publish');
     await publishSitemapSnapshot(fingerprint);
     // A revision change and an ended issue do not remove their canonical URLs.
     for (const clock of [
@@ -680,9 +657,9 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
       DateTime.fromISO('2027-01-04T00:01:00+08:00'),
     ]) {
       vi.setSystemTime(clock.toJSDate());
-      vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'publish');
+      vi.stubEnv('REDIS_URL', undefined);
       const sql = await getSitemapData();
-      vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'enabled');
+      vi.stubEnv('REDIS_URL', 'redis://unused');
       vi.mocked(database.getDefaultDb).mockRejectedValue(
         Error('SQL must stay asleep'),
       );
@@ -697,7 +674,6 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
   });
 
   it('retains the completed sitemap through partial promotion, then publishes corrections and authoritative emptiness', async () => {
-    vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'enabled');
     await recordCanonicalManifestFingerprint(db, 'b'.repeat(64));
     await publishSitemapSnapshot();
     const baseline = await getSitemapData();
@@ -731,7 +707,6 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
   it('lazily recovers missing, corrupt or unavailable sitemap inputs through the SQL snapshot', async () => {
     await rebuildSitemapSnapshot();
     const baseline = await getSitemapData();
-    vi.stubEnv('REDIS_SITEMAP_SNAPSHOT', 'enabled');
     for (const failure of ['missing', 'corrupt', 'unavailable']) {
       store.clear();
       if (failure === 'corrupt')
@@ -766,17 +741,15 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           reference,
           db,
         );
+      vi.stubEnv('REDIS_URL', undefined);
       const baseline = await readAt();
-      vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
-      vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'enabled');
+      vi.stubEnv('REDIS_URL', 'redis://unused');
       const cached = await readAt();
       expect(cached).toEqual(baseline);
       expect(
         cached.dataset.branchByServiceId.service.entries[0].displayCode,
       ).toBe(reference.day === now.day ? 'T1' : 'T1N');
       if (reference.day !== now.day) expect(cached.issues).toEqual([]);
-      vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'publish');
-      vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'publish');
     }
   });
 
@@ -818,8 +791,6 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     ).toEqual(['station-1']);
     await publishServicePathCache(generation);
     await publishRangeReferenceCache(generation);
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
-    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'enabled');
     expect(await range()).toEqual(baseline);
   });
 
@@ -830,8 +801,6 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     const original = store.get(getServicePathCacheKey(generation)) ?? '';
     const paused = Promise.withResolvers<string>();
     redis.getrange.mockReturnValueOnce(paused.promise);
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'enabled');
-    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'enabled');
     const inFlight = range();
     try {
       await vi.waitFor(() => expect(redis.getrange).toHaveBeenCalledTimes(2));
@@ -874,8 +843,8 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     expect(
       corrected.dataset.branchByServiceId.service.entries[0].displayCode,
     ).toBe('CORRECTED');
-    vi.stubEnv('REDIS_SERVICE_PATH_CACHE', 'publish');
-    vi.stubEnv('REDIS_RANGE_REFERENCE_CACHE', 'publish');
+
+    vi.stubEnv('REDIS_URL', undefined);
     expect(await range()).toEqual(corrected);
   });
 });

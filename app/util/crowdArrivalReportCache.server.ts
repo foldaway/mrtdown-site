@@ -9,8 +9,8 @@ import {
   recentCrowdArrivalFromReport,
 } from './crowdArrivalReportContract';
 import type { ArrivalInputs } from './dbQueries/arrivalInputs';
-import { isoDate, parseDateTimeUncached } from './dbQueries/dateTime';
 import type { AppDb, AppDbTransaction } from './dbQueries/database';
+import { isoDate, parseDateTimeUncached } from './dbQueries/dateTime';
 import { getPageProfileRedis } from './pageProfileRedis.server';
 import {
   selectServiceRevisionForReferenceDate,
@@ -39,12 +39,6 @@ function cacheKey() {
   return `mrtdown:${tier}:arrival-reports:v1`;
 }
 
-export function isArrivalReportPublicationEnabled() {
-  return ['publish', 'enabled'].includes(
-    process.env.REDIS_ARRIVAL_REPORTS ?? '',
-  );
-}
-
 export async function lockArrivalReportPublication(tx: AppDbTransaction) {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended('crowd-arrival-publication', 0::bigint))`,
@@ -52,7 +46,7 @@ export async function lockArrivalReportPublication(tx: AppDbTransaction) {
 }
 
 // Acknowledged invalidation precedes SQL commit. If Redis is unavailable, the
-// opt-in writer fails before inserting; it cannot silently leave a cached empty.
+// writer fails before inserting; it cannot silently leave a cached empty.
 export async function invalidateArrivalReportCache() {
   const redis = await getPageProfileRedis();
   // A fresh token also invalidates WATCH when the cache was already dirty.

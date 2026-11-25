@@ -5,37 +5,19 @@ import {
 } from '@upstash/workflow';
 import { createWorkflow } from '@upstash/workflow/tanstack';
 import { ZipStore } from '~/helpers/ZipStore.js';
-import { isArrivalDeparturePublicationEnabled } from '~/util/arrivalDepartureStore.server.js';
+import { publishArrivalInputSnapshot } from '~/util/arrivalInputSnapshot.server.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
-import {
-  isArrivalInputPublicationEnabled,
-  publishArrivalInputSnapshot,
-} from '~/util/arrivalInputSnapshot.server.js';
 import { rebuildOperationalFactsRange } from '~/util/dbQueries/operationalFacts.js';
 import {
   publishSitemapSnapshot,
   rebuildSitemapSnapshot,
 } from '~/util/dbQueries/sitemap.js';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics.js';
-import {
-  isNavigationCachePublicationEnabled,
-  publishNavigationCache,
-} from '~/util/navigationCache.server.js';
-import { isIssueProfileCacheEnabled } from '~/util/pageProfileRedis.server.js';
-import { isSitemapSnapshotPublicationEnabled } from '~/util/sitemapSnapshot.server.js';
-import {
-  isRangeReferenceCachePublicationEnabled,
-  publishRangeReferenceCache,
-} from '~/util/rangeReferenceCache.server.js';
+import { publishNavigationCache } from '~/util/navigationCache.server.js';
+import { publishRangeReferenceCache } from '~/util/rangeReferenceCache.server.js';
 import { publishRangeSnapshot } from '~/util/rangeSnapshot.server.js';
-import {
-  isRangeSnapshotPublicationEnabled,
-  rangeSnapshotStore,
-} from '~/util/rangeSnapshotStore.server.js';
-import {
-  isServicePathCachePublicationEnabled,
-  publishServicePathCache,
-} from '~/util/servicePathCache.server.js';
+import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server.js';
+import { publishServicePathCache } from '~/util/servicePathCache.server.js';
 import { getDb } from '../../db/index.js';
 import { completePageProfileGeneration } from '../../db/pageProfileGeneration.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
@@ -85,29 +67,17 @@ import {
 const ISSUE_SYNC_BATCH_SIZE = 500;
 const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
 
-function isPageProfilePublicationEnabled() {
-  return isNavigationCachePublicationEnabled() || isIssueProfileCacheEnabled();
-}
-
 async function publishPullCaches(generation: string, fingerprint?: string) {
   await completePageProfileGeneration(getDb(), generation);
+  // Local pulls still promote SQL without Redis infrastructure.
+  if (!process.env.REDIS_URL) return purgePublicDataCache();
   await publishSitemapSnapshot(fingerprint);
-  if (isServicePathCachePublicationEnabled()) {
-    await publishServicePathCache(generation);
-  }
-  if (isRangeReferenceCachePublicationEnabled()) {
-    await publishRangeReferenceCache(generation);
-  }
-  if (isPageProfilePublicationEnabled()) {
-    await publishNavigationCache(generation);
-  }
-  if (isRangeSnapshotPublicationEnabled()) {
-    await publishRangeSnapshot(fingerprint);
-  }
-  if (isArrivalInputPublicationEnabled()) {
-    await publishArrivalInputSnapshot(fingerprint);
-  }
-  if (!isArrivalDeparturePublicationEnabled()) return purgePublicDataCache();
+  await publishServicePathCache(generation);
+  await publishRangeReferenceCache(generation);
+  await publishNavigationCache(generation);
+  await publishRangeSnapshot(fingerprint);
+  await publishArrivalInputSnapshot(fingerprint);
+  // Purge only after the matching departure manifest has activated.
 }
 
 async function runPullStep<T>(
@@ -133,7 +103,7 @@ async function publishDepartureCaches(
   context: WorkflowContext<PullParams>,
   fingerprint: string,
 ) {
-  if (!isArrivalDeparturePublicationEnabled()) return;
+  if (!process.env.REDIS_URL) return;
   await publishArrivalDepartures(
     (name, callback) => runPullStep(context, name, callback),
     context.workflowRunId,
@@ -154,9 +124,9 @@ async function executePull(
 ) {
   if (params.seedRangeReferenceCache) {
     await runPullStep(context, 'seed-range-reference-cache', async () => {
-      if (!isRangeReferenceCachePublicationEnabled()) {
+      if (!process.env.REDIS_URL) {
         throw new WorkflowNonRetryableError(
-          'Range-reference publication is disabled',
+          'Range-reference seed requires REDIS_URL',
         );
       }
       if (!(await readCanonicalManifestFingerprint(getDb()))) {
@@ -170,9 +140,9 @@ async function executePull(
   }
   if (params.seedServicePathCache) {
     await runPullStep(context, 'seed-service-path-cache', async () => {
-      if (!isServicePathCachePublicationEnabled()) {
+      if (!process.env.REDIS_URL) {
         throw new WorkflowNonRetryableError(
-          'Service-path publication is disabled',
+          'Service-path seed requires REDIS_URL',
         );
       }
       if (!(await readCanonicalManifestFingerprint(getDb()))) {
@@ -189,9 +159,9 @@ async function executePull(
       context,
       'seed-navigation-cache',
       async () => {
-        if (!isPageProfilePublicationEnabled()) {
+        if (!process.env.REDIS_URL) {
           throw new WorkflowNonRetryableError(
-            'Navigation cache publication is disabled',
+            'Navigation cache seed requires REDIS_URL',
           );
         }
         const fingerprint = await readCanonicalManifestFingerprint(getDb());
@@ -258,38 +228,19 @@ async function executePull(
     async () => isCanonicalManifestCurrent(getDb(), manifestFingerprint),
   );
   if (manifestIsCurrent && !rebuildScheduledTimetableProjection) {
-    if (
-      isRangeSnapshotPublicationEnabled() ||
-      isArrivalInputPublicationEnabled() ||
-      isSitemapSnapshotPublicationEnabled()
-    ) {
+    if (process.env.REDIS_URL) {
       await runPullStep(context, 'repair-range-snapshot', async () => {
-        if (isRangeSnapshotPublicationEnabled())
-          await publishRangeSnapshot(manifestFingerprint);
-        if (isArrivalInputPublicationEnabled())
-          await publishArrivalInputSnapshot(manifestFingerprint);
+        await publishRangeSnapshot(manifestFingerprint);
+        await publishArrivalInputSnapshot(manifestFingerprint);
         await publishSitemapSnapshot(manifestFingerprint);
-        if (!isArrivalDeparturePublicationEnabled()) {
-          await purgePublicDataCache();
-          if (isRangeSnapshotPublicationEnabled())
-            await rangeSnapshotStore.complete(manifestFingerprint);
-        }
       });
       await publishDepartureCaches(context, manifestFingerprint);
-      if (
-        isArrivalDeparturePublicationEnabled() &&
-        isRangeSnapshotPublicationEnabled()
-      )
-        await runPullStep(context, 'complete-departure-repair', () =>
-          rangeSnapshotStore.complete(manifestFingerprint),
-        );
-    }
-    if (isServicePathCachePublicationEnabled()) {
+      await runPullStep(context, 'complete-departure-repair', () =>
+        rangeSnapshotStore.complete(manifestFingerprint),
+      );
       await runPullStep(context, 'renew-service-path-cache', () =>
         publishServicePathCache(),
       );
-    }
-    if (isRangeReferenceCachePublicationEnabled()) {
       await runPullStep(context, 'renew-range-reference-cache', () =>
         publishRangeReferenceCache(),
       );
@@ -298,7 +249,7 @@ async function executePull(
     return;
   }
 
-  if (isRangeSnapshotPublicationEnabled()) {
+  if (process.env.REDIS_URL) {
     await runPullStep(context, 'invalidate-range-snapshot-checkpoint', () =>
       rangeSnapshotStore.invalidateCompletion(),
     );
@@ -578,7 +529,7 @@ async function executePull(
 
   await runPullStep(context, 'record-manifest-fingerprint', async () => {
     await recordCanonicalManifestFingerprint(getDb(), manifestFingerprint);
-    if (isRangeSnapshotPublicationEnabled()) {
+    if (process.env.REDIS_URL) {
       await rangeSnapshotStore.complete(manifestFingerprint);
     }
   });
@@ -601,14 +552,7 @@ export const pullWorkflow = createWorkflow<
       throw new WorkflowNonRetryableError('Invalid canonical pull request');
     }
     const params = parsed.data;
-    if (
-      isArrivalDeparturePublicationEnabled() &&
-      !isArrivalInputPublicationEnabled()
-    )
-      throw new WorkflowNonRetryableError(
-        'Departure publication requires arrival metadata publication',
-      );
-    if (isRangeSnapshotPublicationEnabled()) {
+    if (process.env.REDIS_URL) {
       const unchanged = await context.run('check-published-range-inputs', () =>
         canSkipPublishedCanonicalPull(params),
       );
@@ -634,7 +578,7 @@ export const pullWorkflow = createWorkflow<
     await context.run('release-pull-lease', async () =>
       releasePullWorkflowLease(getDb(), context.workflowRunId),
     );
-    if (isRangeSnapshotPublicationEnabled()) {
+    if (process.env.REDIS_URL) {
       await context.run('finish-range-snapshot-writer', () =>
         rangeSnapshotStore.finishWriter(context.workflowRunId),
       );
@@ -644,12 +588,12 @@ export const pullWorkflow = createWorkflow<
   {
     failureFunction: async ({ context }) => {
       if (
-        isRangeSnapshotPublicationEnabled() &&
+        process.env.REDIS_URL &&
         !(await rangeSnapshotStore.hasWriter(context.workflowRunId))
       )
         return;
       await releasePullWorkflowLease(getDb(), context.workflowRunId);
-      if (isRangeSnapshotPublicationEnabled())
+      if (process.env.REDIS_URL)
         await rangeSnapshotStore.finishWriter(context.workflowRunId);
     },
   },
