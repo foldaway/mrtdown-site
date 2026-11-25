@@ -36,7 +36,7 @@ retry can repair the state. See the
 
 ### Published range serving inputs
 
-`REDIS_RANGE_SNAPSHOT=enabled` selects a completed Redis snapshot before any
+With `REDIS_URL` configured, range reads select a completed Redis snapshot before any
 range SQL connection or generation read. The snapshot contains canonical source
 rows; dataset assembly still uses the request clock. Canonical publication
 loads one repeatable-read snapshot after generation completion, then atomically
@@ -45,12 +45,12 @@ snapshot remains readable during promotion. Independent holiday changes also
 republish before their purge; manual facts rebuilds do not change range inputs.
 
 The external completed-fingerprint checkpoint is written after publication,
-purge and the successful SQL fingerprint. Enabled unchanged polls validate
+purge and the successful SQL fingerprint. Unchanged polls validate
 upstream inputs and the recoverable Redis snapshot before acquiring a SQL
 lease. Changed/explicit inputs and missing snapshots keep the normal writer
 path. This does not remove SQL from arrivals, entity profiles or community
 signals. The [snapshot runbook](../operations/edge-caching.md#published-zero-sql-range-inputs)
-owns limits, recovery and rollout; the [sleep plan](../plans/active/neon-sleep.md)
+owns limits and recovery; the [sleep plan](../plans/active/neon-sleep.md)
 tracks the remaining wake-ups.
 
 ### Arrival topology reuse
@@ -58,12 +58,11 @@ tracks the remaining wake-ups.
 Finalization also validates and hashes the actual live schedule topology, then
 atomically records `canonical_topology_attestation_v1` with the promotion marker
 and last-pull timestamp. The first live promotion write clears the attestation.
-This runs independently of cache flags. Pipeline version 7 forces one full pull
+This also runs without Redis. Pipeline version 7 forces one full pull
 for unchanged upstream inputs; timetable pins, admission and projection reuse
 retain their existing rules.
 
-Set `SCHEDULE_TOPOLOGY_MEMO=enabled` to reuse this topology inside each Node
-process. It defaults to disabled. The [reader](../../app/util/dbQueries/scheduleTopologyCache.ts)
+The topology memo reuses this topology inside each Node process. The [reader](../../app/util/dbQueries/scheduleTopologyCache.ts)
 checks promotion and attestation through the arrival request's read-only
 repeatable-read transaction. A warm hit skips all 11 topology-table reads;
 history, eligibility, coverage, departures and display names still use SQL.
@@ -75,8 +74,7 @@ oversized topology use the original SQL loader. Missing promotion completion
 still fails closed. Page-profile generation and Redis publication do not select
 or validate arrival topology. Facts and holiday rebuilds do not invalidate it.
 
-Before enabling in an environment, drain older pull executions and let a full
-pull establish the attestation. No seed or timetable artifact cache is needed.
+A completed full pull establishes the attestation; no separate seed is needed.
 Topology repairs must use the promotion protocol; direct table edits must first
 clear the promotion marker and attestation. An older finalizer's last-pull
 timestamp mismatch forces SQL fallback. Validation now happens at finalization,
@@ -85,9 +83,7 @@ so malformed topology prevents that promotion from completing.
 `schedule_topology_read` logs source, bypass reason, duration, selected-row count,
 encoded JSON bytes on SQL loads, and promotion token. Counts and bytes are
 diagnostic proxies, not billed network transfer. `schedule_topology_load` and
-`schedule_topology_rows` also appear in Server-Timing. To roll back, unset only
-`SCHEDULE_TOPOLOGY_MEMO`; reads immediately use SQL without an edge purge. Keep
-attestation maintenance enabled. See the [investigation](../investigations/2026-11-18-station-arrival-topology.md)
+`schedule_topology_rows` also appear in Server-Timing. See the [investigation](../investigations/2026-11-18-station-arrival-topology.md)
 for evidence, parity checks and the pending production measurement.
 
 Long timetable imports use `PULL_WORKFLOW_URL` for the signed QStash pull
