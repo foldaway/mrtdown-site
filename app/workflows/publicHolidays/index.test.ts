@@ -90,9 +90,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.store.clear();
   state.redisAvailable = true;
+  vi.stubEnv('REDIS_URL', 'redis://unused');
+  vi.spyOn(rangeSnapshotStore, 'read').mockResolvedValue({
+    inputs: {},
+  } as never);
   state.sqlDisabled = false;
-  vi.stubEnv('REDIS_RANGE_SNAPSHOT', undefined);
-  vi.stubEnv('REDIS_PUBLIC_HOLIDAY_PREFLIGHT', 'enabled');
   vi.mocked(fetchDataGovPublicHolidays).mockResolvedValue(rows);
   vi.mocked(syncPublicHolidays).mockImplementation(async () => ({
     checkpointToken: await beginPublicHolidaySync(),
@@ -134,7 +136,6 @@ it('skips a completed unchanged source without database access or SQL lease call
 it.each(['facts', 'publication', 'purge'] as const)(
   'keeps %s failure retryable and checkpoints only after recovery and pending-date cleanup',
   async (failure) => {
-    vi.stubEnv('REDIS_RANGE_SNAPSHOT', 'enabled');
     vi.spyOn(rangeSnapshotStore, 'read').mockResolvedValue({
       inputs: {},
     } as never);
@@ -185,7 +186,7 @@ it('rejects a superseded workflow before it clears pending work or certifies ano
   expect(await canSkipPublicHolidaySync(rows)).toBe(false);
 });
 
-it('does not touch SQL after a source failure and keeps the preflight off by default', async () => {
+it('does not touch SQL after a source failure and retains SQL operation without Redis', async () => {
   vi.mocked(fetchDataGovPublicHolidays).mockRejectedValueOnce(
     Error('source unavailable'),
   );
@@ -193,6 +194,8 @@ it('does not touch SQL after a source failure and keeps the preflight off by def
   expect(getDb).not.toHaveBeenCalled();
   expect(acquireOrRenewPullWorkflowLease).not.toHaveBeenCalled();
   await run();
-  vi.stubEnv('REDIS_PUBLIC_HOLIDAY_PREFLIGHT', undefined);
+  vi.stubEnv('REDIS_URL', undefined);
   expect(await canSkipPublicHolidaySync(rows)).toBe(false);
+  await run();
+  expect(syncPublicHolidays).toHaveBeenCalledTimes(2);
 });

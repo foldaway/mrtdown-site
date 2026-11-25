@@ -376,7 +376,6 @@ describe.skipIf(!url)('indexed departure window', () => {
     }
   });
   beforeEach(async () => {
-    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'enabled');
     await pool.query('TRUNCATE scheduled_timetables, public_holidays CASCADE');
     await pool.query(
       'TRUNCATE operators, towns, lines, stations, services, metadata CASCADE',
@@ -446,8 +445,6 @@ describe.skipIf(!url)('indexed departure window', () => {
     async () => {
       vi.stubEnv('TIER', schema);
       vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
-      vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
-      vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', 'publish');
       vi.spyOn(database, 'getDefaultDb').mockResolvedValue(db());
       const redis = await getPageProfileRedis();
       const prefixes = [
@@ -664,7 +661,6 @@ describe.skipIf(!url)('indexed departure window', () => {
     async () => {
       vi.stubEnv('TIER', schema);
       vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
-      vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
       vi.spyOn(database, 'getDefaultDb').mockResolvedValue(db());
       const redis = await getPageProfileRedis();
       const prefix = getSnapshotKeyPrefix('arrival-inputs');
@@ -799,10 +795,6 @@ describe.skipIf(!url)('indexed departure window', () => {
       beforeEach(async () => {
         vi.stubEnv('TIER', schema);
         vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
-        vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
-        vi.stubEnv('REDIS_ARRIVAL_DEPARTURES', 'publish');
-        vi.stubEnv('REDIS_ARRIVAL_READS', 'enabled');
-        vi.stubEnv('REDIS_ARRIVAL_REPORTS', 'enabled');
         vi.spyOn(database, 'getDefaultDb').mockResolvedValue(db());
         redis = await getPageProfileRedis();
         await completePageProfileGeneration(db(), 'public-arrivals-fixture');
@@ -1046,11 +1038,12 @@ describe.skipIf(!url)('indexed departure window', () => {
       let redis: Awaited<ReturnType<typeof getPageProfileRedis>>;
       const reportKey = `mrtdown:${schema}:arrival-reports:v1`;
       const sqlRead = async (instant: string) => {
-        vi.stubEnv('REDIS_ARRIVAL_REPORTS', 'publish');
+        const configured = process.env.REDIS_URL;
+        vi.stubEnv('REDIS_URL', undefined);
         try {
           return await getRecentCrowdArrival(db(), scope, instant);
         } finally {
-          vi.stubEnv('REDIS_ARRIVAL_REPORTS', 'enabled');
+          vi.stubEnv('REDIS_URL', configured);
         }
       };
       beforeEach(async () => {
@@ -1058,8 +1051,6 @@ describe.skipIf(!url)('indexed departure window', () => {
         vi.setSystemTime(at);
         vi.stubEnv('TIER', schema);
         vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
-        vi.stubEnv('REDIS_ARRIVAL_SNAPSHOT', 'publish');
-        vi.stubEnv('REDIS_ARRIVAL_REPORTS', 'enabled');
         vi.spyOn(database, 'getDefaultDb').mockResolvedValue(db());
         redis = await getPageProfileRedis();
         await completePageProfileGeneration(db(), 'reports-fixture');
@@ -1910,9 +1901,9 @@ describe.skipIf(!url)('indexed departure window', () => {
       referenceInstant: window.startInstant,
       endInstant: window.endInstant,
     };
-    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'disabled');
-    const expected = await readStationArrivalSource(reader, request);
-    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'enabled');
+
+    const expected = await readStationArrivalSource(db(), request);
+
     queries.length = 0;
     expect(await readStationArrivalSource(reader, request)).toEqual(expected);
     expect(bulkTopologyQueries()).toHaveLength(11);
@@ -1950,9 +1941,8 @@ describe.skipIf(!url)('indexed departure window', () => {
     queries.length = 0;
     await queryIndexedScheduledDepartures(db(), options());
     expect(bulkTopologyQueries()).toHaveLength(11);
-    vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'disabled');
     queries.length = 0;
-    expect(await readStationArrivalSource(reader, request)).toEqual(expected);
+    expect(await readStationArrivalSource(db(), request)).toEqual(expected);
     expect(bulkTopologyQueries()).toHaveLength(11);
   });
 
@@ -1974,9 +1964,7 @@ describe.skipIf(!url)('indexed departure window', () => {
           scope: { ...scope, platformId: 'platform-1' },
         }),
       };
-      vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'disabled');
       const expected = await queryIndexedScheduledDepartures(reader, request);
-      vi.stubEnv('SCHEDULE_TOPOLOGY_MEMO', 'enabled');
       await queryIndexedScheduledDepartures(reader, request);
       queries.length = 0;
       expect(await queryIndexedScheduledDepartures(reader, request)).toEqual(

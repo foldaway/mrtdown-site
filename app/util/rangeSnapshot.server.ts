@@ -3,14 +3,11 @@ import { readCanonicalManifestFingerprint } from '~/workflows/pull/helpers/manif
 import { getDefaultDb } from './dbQueries/database';
 import { readDatasetInputs } from './dbQueries/dataset';
 import { readRangeReferenceRows } from './dbQueries/rangeReferences';
-import {
-  isRangeSnapshotPublicationEnabled,
-  rangeSnapshotStore,
-} from './rangeSnapshotStore.server';
+import { rangeSnapshotStore } from './rangeSnapshotStore.server';
 
 /** Publish completed canonical inputs; CAS also orders independent holiday writers. */
 export async function publishRangeSnapshot(fingerprint?: string) {
-  if (!isRangeSnapshotPublicationEnabled()) return;
+  if (!process.env.REDIS_URL) return;
   const expected = await rangeSnapshotStore.head();
   const db = await getDefaultDb();
   const snapshot = await db.transaction(

@@ -246,9 +246,9 @@ model and before edge purge/fingerprint completion. Generation checks prevent
 partial imports or concurrent publication from creating reusable mixed data.
 
 The [edge-caching guide](../../operations/edge-caching.md) owns cache contracts,
-flags, seeding, and rollback. The [data-pipeline guide](../../architecture/data-pipeline.md)
+seeding and recovery. The [data-pipeline guide](../../architecture/data-pipeline.md)
 owns import ordering. The [egress plan](production-egress-reduction.md) tracks
-remaining topology and query opportunities. Recheck live flags, generation,
+remaining topology and query opportunities. Recheck live generation,
 and provider settings before any later cutover; the records above are dated
 observations.
 
@@ -274,10 +274,9 @@ Implementation and production rollout are complete; measurement remains.
    above. Record the exact boundaries and traffic or deployment changes.
 2. Compare normalized Neon transfer, Fly p95, source/fallback logs, and aggregate
    Redis usage. Keep provider accounting windows distinct from app metric windows.
-3. Record whether to retain the reader. If it causes unacceptable failures,
-   latency, or provider usage, disable only `REDIS_SERVICE_PATH_CACHE` and purge
-   `mrtdown-production-data` using the runbook. Enabling reads again is safe
-   while seeding because misses fall back to SQL.
+3. Record the measured result and any follow-up. The rollout switches have
+   been retired; use the runbook to repair inputs or revert the application
+   revision if necessary. Missing entries retain SQL recovery.
 4. After acceptance, move this plan to `completed/` and update inbound links.
    Keep station-profile and arrival-topology work in the egress plan, with their
    own snapshot/parity assessment before implementation.

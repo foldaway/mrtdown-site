@@ -1,13 +1,9 @@
 import { eq, sql } from 'drizzle-orm';
-import { sitemapSnapshotsTable } from '~/db/schema';
 import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
-import { readCanonicalManifestFingerprint } from '~/workflows/pull/helpers/manifestFingerprint';
-import {
-  isSitemapSnapshotEnabled,
-  isSitemapSnapshotPublicationEnabled,
-  sitemapSnapshotStore,
-} from '~/util/sitemapSnapshot.server';
+import { sitemapSnapshotsTable } from '~/db/schema';
 import { recordServerTiming, timeServerSpan } from '~/util/serverTiming';
+import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
+import { readCanonicalManifestFingerprint } from '~/workflows/pull/helpers/manifestFingerprint';
 import { type AppDb, getDefaultDb, isUndefinedTableError } from './database';
 import { type BaseDataset, buildCompleteDataset } from './dataset';
 import { isoDate, isoDateTime, nowSg, parseDateTime } from './dateTime';
@@ -204,7 +200,7 @@ export async function rebuildSitemapSnapshot(db?: AppDb) {
 
 export async function getSitemapData() {
   return timeServerSpan('sitemap_data', async () => {
-    const published = isSitemapSnapshotEnabled()
+    const published = process.env.REDIS_URL
       ? await sitemapSnapshotStore.read()
       : null;
     const snapshot =
@@ -232,7 +228,7 @@ export async function getSitemapData() {
 }
 
 export async function publishSitemapSnapshot(fingerprint?: string) {
-  if (!isSitemapSnapshotPublicationEnabled()) return;
+  if (!process.env.REDIS_URL) return;
   const expected = await sitemapSnapshotStore.head();
   const db = await getDefaultDb();
   const snapshot = await db.transaction(

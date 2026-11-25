@@ -4,22 +4,18 @@ import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import { scheduledDepartureProjectionsTable as projections } from '~/db/scheduledDepartures.schema';
 import {
   arrivalDepartureStore,
-  isArrivalDeparturePublicationEnabled,
+  type DeparturePartitionRef,
   MAX_DEPARTURE_PARTITIONS,
   MAX_DEPARTURE_TOTAL_BYTES,
-  type DeparturePartitionRef,
 } from '~/util/arrivalDepartureStore.server';
-import {
-  arrivalInputSnapshotStore,
-  isArrivalInputPublicationEnabled,
-} from '~/util/arrivalInputSnapshot.server';
+import { arrivalInputSnapshotStore } from '~/util/arrivalInputSnapshot.server';
 import type { ArrivalInputs } from '~/util/dbQueries/arrivalInputs';
-import { snapshotDigest } from '~/util/snapshotPayload.server';
-import { getDefaultDb, type AppDbTransaction } from '~/util/dbQueries/database';
+import { type AppDbTransaction, getDefaultDb } from '~/util/dbQueries/database';
 import {
-  readDeparturePartition,
   type DeparturePartitionIdentity,
+  readDeparturePartition,
 } from '~/util/dbQueries/readDeparturePartition';
+import { snapshotDigest } from '~/util/snapshotPayload.server';
 import { assertPullWorkflowLease } from './workflowLease';
 
 type RunStep = <T>(name: string, callback: () => Promise<T>) => Promise<T>;
@@ -32,11 +28,7 @@ export async function publishArrivalDepartures(
   owner: string,
   fingerprint: string,
 ) {
-  if (!isArrivalDeparturePublicationEnabled()) return;
-  if (!isArrivalInputPublicationEnabled())
-    throw new Error(
-      'Departure publication requires arrival metadata publication',
-    );
+  if (!process.env.REDIS_URL) return;
   const plan = await run('plan-arrival-departures', async () => {
     const [arrivals, previous, head] = await Promise.all([
       arrivalInputSnapshotStore.read({ verifyPayload: true }),

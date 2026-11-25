@@ -8,7 +8,6 @@ import {
 } from '~/util/dbQueries/sitemap';
 import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics';
 import { internalMiddleware } from '~/util/internal.middleware';
-import { isSitemapSnapshotPublicationEnabled } from '~/util/sitemapSnapshot.server';
 
 const RequestSchema = z.object({
   days: z.number().int().min(1).max(366).default(30),
@@ -45,7 +44,7 @@ export const Route = createFileRoute('/internal/api/tasks/facts')({
         const rows = await rebuildOperationalFactsRange(days);
         const statistics = await rebuildStatisticsSnapshot();
         const sitemap = await rebuildSitemapSnapshot();
-        if (isSitemapSnapshotPublicationEnabled()) {
+        if (process.env.REDIS_URL) {
           await publishSitemapSnapshot();
           await purgePublicDataCache();
         }

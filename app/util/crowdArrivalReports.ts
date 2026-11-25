@@ -8,7 +8,6 @@ import {
 } from '~/db/schema';
 import {
   invalidateArrivalReportCache,
-  isArrivalReportPublicationEnabled,
   lockArrivalReportPublication,
   readCachedCrowdArrival,
   repairArrivalReportCache,
@@ -17,8 +16,8 @@ import {
   type ArrivalBranchScope,
   CROWD_ARRIVAL_COOLDOWN_SECONDS,
   type CrowdArrivalSubmission,
-  type RecentCrowdArrival,
   MAX_REPORT_AGE_MS,
+  type RecentCrowdArrival,
   recentCrowdArrivalFromReport,
 } from './crowdArrivalReportContract';
 import type { ArrivalInputs } from './dbQueries/arrivalInputs';
@@ -76,17 +75,16 @@ export async function getRecentCrowdArrival(
   referenceInstant: string,
   options?: { sqlFallback: false; arrivalInputs: ArrivalInputs },
 ): Promise<RecentCrowdArrival | undefined> {
-  const cached =
-    process.env.REDIS_ARRIVAL_REPORTS === 'enabled'
-      ? await readCachedCrowdArrival(
-          scope,
-          referenceInstant,
-          options?.arrivalInputs,
-        )
-      : undefined;
+  const cached = process.env.REDIS_URL
+    ? await readCachedCrowdArrival(
+        scope,
+        referenceInstant,
+        options?.arrivalInputs,
+      )
+    : undefined;
   if (cached?.status === 'ready') return cached.value;
   // Reports are optional. A healthy published schedule must not wake SQL to
-  // repair an unavailable signal; writers or an explicit seed restore it.
+  // repair an unavailable signal; accepted writes or SQL-backed reads restore it.
   if (options?.sqlFallback === false) return undefined;
 
   const db = typeof database === 'function' ? database() : database;
@@ -147,7 +145,7 @@ export async function submitCrowdArrival(
   submission: CrowdArrivalSubmission,
   reporterHash: string,
 ) {
-  const publish = isArrivalReportPublicationEnabled();
+  const publish = Boolean(process.env.REDIS_URL);
   await db.transaction(async (tx) => {
     if (publish) await lockArrivalReportPublication(tx);
     await tx.execute(

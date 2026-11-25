@@ -26,17 +26,6 @@ const NavigationEntrySchema = z.object({
   }),
 });
 
-export function isNavigationCacheReadEnabled() {
-  return process.env.REDIS_NAVIGATION_CACHE === 'enabled';
-}
-
-export function isNavigationCachePublicationEnabled() {
-  return (
-    process.env.REDIS_NAVIGATION_CACHE === 'publish' ||
-    isNavigationCacheReadEnabled()
-  );
-}
-
 export function parseNavigationCacheEntry(value: string | null) {
   if (value == null) return null;
   return NavigationEntrySchema.parse(JSON.parse(value));

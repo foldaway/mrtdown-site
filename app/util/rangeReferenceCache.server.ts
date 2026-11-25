@@ -36,17 +36,6 @@ const cache = createGenerationCache({
 export const getRangeReferenceCacheKey = cache.getKey;
 export const readCachedRangeReferences = cache.read;
 
-export function isRangeReferenceCacheEnabled() {
-  return process.env.REDIS_RANGE_REFERENCE_CACHE === 'enabled';
-}
-
-export function isRangeReferenceCachePublicationEnabled() {
-  return (
-    isRangeReferenceCacheEnabled() ||
-    process.env.REDIS_RANGE_REFERENCE_CACHE === 'publish'
-  );
-}
-
 export async function readRangeReferencesForSnapshot(
   generation: string | undefined,
   range: { start: string; end: string },

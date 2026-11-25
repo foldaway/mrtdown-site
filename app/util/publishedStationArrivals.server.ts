@@ -2,8 +2,8 @@ import { ScheduledTimetableRequestScopeSchema } from '@mrtdown/fs';
 import { getDb } from '~/db';
 import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import {
-  type DeparturePartitionRef,
   arrivalDepartureStore,
+  type DeparturePartitionRef,
 } from './arrivalDepartureStore.server';
 import { arrivalInputSnapshotStore } from './arrivalInputSnapshot.server';
 import {
@@ -12,8 +12,8 @@ import {
   selectArrivalInputCoverage,
 } from './dbQueries/arrivalInputs';
 import {
-  expandDeparturePartition,
   type DeparturePartition,
+  expandDeparturePartition,
 } from './dbQueries/departurePartition';
 import {
   assembleIndexedScheduledDepartures,
@@ -33,7 +33,7 @@ import {
 export async function readPublishedStationArrivals(
   options: StationArrivalRequest,
 ) {
-  if (process.env.REDIS_ARRIVAL_READS !== 'enabled') return null;
+  if (!process.env.REDIS_URL) return null;
   let generation: string | undefined;
   try {
     const [metadata, departures] = await Promise.all([

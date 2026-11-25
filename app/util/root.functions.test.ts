@@ -45,7 +45,7 @@ const navigation = {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv('TIER', 'staging');
-  vi.stubEnv('REDIS_NAVIGATION_CACHE', 'enabled');
+  vi.stubEnv('REDIS_URL', 'redis://unused');
   vi.mocked(getRootData).mockResolvedValue(navigation);
   vi.mocked(getLocaleMessages).mockResolvedValue({ test: 'Mesej' });
 });
@@ -90,8 +90,8 @@ describe('Navigation loader', () => {
     },
   );
 
-  it('uses SQL directly when staging is only publishing the cache', async () => {
-    vi.stubEnv('REDIS_NAVIGATION_CACHE', 'publish');
+  it('uses SQL directly when Redis is absent', async () => {
+    vi.stubEnv('REDIS_URL', undefined);
     await getRootFn({ data: {} });
     expect(readCachedNavigation).not.toHaveBeenCalled();
     expect(getRootData).toHaveBeenCalledOnce();

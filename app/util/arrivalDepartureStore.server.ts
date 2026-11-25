@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import {
   DEPARTURE_PARTITION_LIMITS,
-  parseDeparturePartition,
   type DeparturePartition,
+  parseDeparturePartition,
 } from './dbQueries/departurePartition';
 import { getPageProfileRedis } from './pageProfileRedis.server';
 import {
@@ -122,6 +122,3 @@ export function createArrivalDepartureStore(
 }
 export const arrivalDepartureStore =
   createArrivalDepartureStore(getPageProfileRedis);
-export function isArrivalDeparturePublicationEnabled() {
-  return process.env.REDIS_ARRIVAL_DEPARTURES === 'publish';
-}

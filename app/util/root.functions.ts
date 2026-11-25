@@ -3,10 +3,7 @@ import { setResponseHeader } from '@tanstack/react-start/server';
 import z from 'zod';
 import { getRootData } from './dbQueries/root';
 import { getLocaleMessages } from './localeMessages';
-import {
-  isNavigationCacheReadEnabled,
-  readCachedNavigation,
-} from './navigationCache.server';
+import { readCachedNavigation } from './navigationCache.server';
 import { timeServerSpan } from './serverTiming';
 
 const InputSchema = z.object({
@@ -14,7 +11,7 @@ const InputSchema = z.object({
 });
 
 async function getNavigation() {
-  if (!isNavigationCacheReadEnabled()) return getRootData();
+  if (!process.env.REDIS_URL) return getRootData();
 
   const cached = await timeServerSpan('navigation_redis', () =>
     readCachedNavigation().catch(() => null),

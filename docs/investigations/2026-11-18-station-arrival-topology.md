@@ -132,7 +132,7 @@ topology fingerprint or select a timetable. Keep its current range readers intac
 - [x] Pipeline version 7 forces one full pull for unchanged inputs. Timetable pins,
   reviews, projection reuse, page-profile publication and holiday/facts behavior
   retain their existing rules.
-- [x] `SCHEDULE_TOPOLOGY_MEMO` independently controls reads; attestation maintenance
+- [x] The topology memo is always used when attested; attestation maintenance
   is unconditional. Source/bypass and sizing diagnostics support later measurement.
 - [ ] Validate in staging, then measure a separately authorized production rollout.
 

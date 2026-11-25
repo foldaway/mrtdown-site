@@ -19,14 +19,3 @@ export const sitemapSnapshotStore = createPublishedSnapshotStore(
   'sitemap',
   (value) => SitemapInputsSchema.parse(value),
 );
-
-export function isSitemapSnapshotEnabled() {
-  return process.env.REDIS_SITEMAP_SNAPSHOT === 'enabled';
-}
-
-export function isSitemapSnapshotPublicationEnabled() {
-  return (
-    isSitemapSnapshotEnabled() ||
-    process.env.REDIS_SITEMAP_SNAPSHOT === 'publish'
-  );
-}

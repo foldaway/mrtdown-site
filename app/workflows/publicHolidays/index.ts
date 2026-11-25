@@ -5,7 +5,6 @@ import { metadataTable } from '~/db/schema.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import { rebuildOperationalFactsForDates } from '~/util/dbQueries/operationalFacts.js';
 import { publishRangeSnapshot } from '~/util/rangeSnapshot.server.js';
-import { isRangeSnapshotPublicationEnabled } from '~/util/rangeSnapshotStore.server.js';
 import {
   assertPullWorkflowLease,
   releasePullWorkflowLease,
@@ -57,7 +56,7 @@ export const publicHolidaysWorkflow = createWorkflow<Params, void>(
         // effects succeed, so a new run repairs even now-unchanged SQL rows.
         if (
           syncResult.changedDates.length > 0 ||
-          isRangeSnapshotPublicationEnabled()
+          Boolean(process.env.REDIS_URL)
         ) {
           await publishRangeSnapshot();
           await purgePublicDataCache();

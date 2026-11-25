@@ -68,17 +68,18 @@ The canonical pull publishes updated data in this order:
 
 1. Promote staged canonical data.
 2. Rebuild operational facts plus the statistics and sitemap snapshots.
-3. Mark the page-profile generation complete and publish Navigation to Redis
-   when either page-profile cache is configured.
+3. Mark the page-profile generation complete and publish Navigation, range,
+   sitemap and arrival inputs when Redis is configured. Activate the matching
+   departure manifest before purging.
 4. Purge `mrtdown-<tier>-data` through the Cloudflare API.
 5. Record the successful manifest fingerprint and release the pull lease.
 
 Each Fly process reads the same Redis Navigation entry. A miss or a Redis
-failure falls back to Postgres and marks the response `no-store` when the
-reader is enabled. The last completed generation stays available while the
+failure falls back to Postgres and marks the response `no-store` when Redis
+is configured. The last completed generation stays available while the
 next canonical pull runs.
 
-Public-holiday changes use the same publication sequence. Successful crowd
+Public-holiday changes republish range inputs before purging. Successful crowd
 report submissions and successful cluster dispatches also purge the tag because
 public signals appear on cached home, line, and station pages. A crowd-report
 purge failure is logged after commit. The edge TTL bounds how long those cached
@@ -98,381 +99,230 @@ published fresh cached data. Local development logs and skips invalidation.
 
 ## Redis Navigation Bootstrap
 
-Set `REDIS_NAVIGATION_CACHE=publish` on the target Fly app and use the
-existing `REDIS_URL`. Send an authenticated `POST /internal/api/tasks/pull`
-with `{"seedNavigationCache":true}`. The workflow takes the canonical pull
-lease and requires the successful manifest fingerprint before it builds
-Navigation from Postgres. It can seed the key even if a scheduled pull
-would skip an unchanged manifest. Wait for the workflow to complete and
-confirm it published `mrtdown:<tier>:page-profiles:v1:navigation`.
+With `REDIS_URL` configured, cache reads and publication run automatically.
+Local development without Redis uses SQL. Rollout mode flags are no longer
+supported; repair missing inputs or revert the application revision when needed.
+Keep Redis configured consistently across writers and readers.
 
-Set `REDIS_NAVIGATION_CACHE=enabled` and purge the tier's Cloudflare data tag
-after the new configuration is serving traffic. A staging origin fill reports
-`X-MRTDown-Navigation-Source: redis` when it serves Navigation from Redis and
-`sql` when it falls back. Check the header on a Cloudflare `MISS` because an
-edge hit replays the origin fill's header. To roll back, unset
-`REDIS_NAVIGATION_CACHE` and purge the tier's data tag. Seed again before
-re-enabling the reader if a pull ran while publication was disabled.
+Send an authenticated `POST /internal/api/tasks/pull` with
+`{"seedNavigationCache":true}` to repair publications without importing data.
+The workflow takes the canonical pull lease, requires a successful fingerprint,
+and completes a new shared generation before publishing all cache families.
+It activates matching departure inputs before purging the tier's data tag.
+
+A staging origin fill reports `X-MRTDown-Navigation-Source: redis` or `sql`.
+Check on a Cloudflare `MISS`; an edge hit replays the origin fill's header.
+Missing or unavailable navigation falls back to SQL with `no-store`.
 
 ## Completed Issue Profiles
 
-Enable `REDIS_ISSUE_PROFILE_CACHE=enabled` after seeding Navigation on the
-same deployed revision. The seed task also records the active generation in
-Postgres. Keep `REDIS_NAVIGATION_CACHE` on its own setting for targeted
-rollback. With Issue Profile caching enabled, the pull publishes the shared
-generation and Navigation value.
+An Issue Profile with ended intervals can fill Redis only when a repeatable-read
+Postgres snapshot sees the published generation marked complete. The pull marks
+it updating with the first live canonical write. Reads use `MGET` to fetch the
+active generation and profile atomically. A conditional write prevents delayed
+fills after generation advances. Entries are limited to 128 KiB and expire at
+Singapore midnight. Cloudflare freshness is capped at that same midnight.
 
-An Issue Profile with ended intervals can fill Redis only when a
-repeatable-read Postgres snapshot sees the published generation marked
-complete. The pull marks it updating with the first live canonical write.
-Reads use `MGET` to fetch the active generation and profile atomically. A
-conditional Redis write prevents delayed fills from publishing after the
-generation advances. Entries are limited to 128 KiB and expire at Singapore
-midnight. Cache hits can populate Cloudflare for up to 15 minutes, capped at
-the same midnight.
-SQL responses bypass shared caching while the reader is enabled.
-
-On staging origin requests, check `X-MRTDown-Issue-Profile-Source`. A cold
-completed issue returns `sql` with `no-store`, then returns `redis` on the
-next origin request. HTML and Markdown share a Redis entry. For rollback,
-unset `REDIS_ISSUE_PROFILE_CACHE` and purge the tier's data tag.
+On staging, a cold completed issue returns `X-MRTDown-Issue-Profile-Source: sql`
+with `no-store`, then `redis` on the next origin request. HTML and Markdown share
+an entry. Misses and ineligible profiles still need SQL.
 
 ## Range-reference inputs
 
-`REDIS_RANGE_REFERENCE_CACHE` enables reference reuse for overview/system map,
-history/day, issues-day, and weekly-report range readers. The default is SQL;
-`publish` enables publication only, and `enabled` adds reads. It operates
-independently of the service-path and page-profile flags.
+The reference cache remains part of SQL recovery when the complete published
+range snapshot is unavailable. Its seven projected row sets cover lines, line
+operators, services, revisions, stations, station codes and station landmarks.
+Holidays and live issue inputs remain SQL reads on that recovery path.
 
-After deploying with the existing timetable pin, use the authenticated pull
-task with `{"seedRangeReferenceCache":true}` to publish the current completed
-generation. This seed requires a completed canonical fingerprint, takes the
-pull lease, and neither imports data nor advances generation. Keep seeds
-separate from other seed/import options. Reads may be enabled while seeding;
-misses use SQL with `no-store`. Purge the tier's data tag after enabling reads.
+Use `{"seedRangeReferenceCache":true}` on the authenticated pull task to repair
+the current completed generation under the pull lease. It requires a completed
+canonical fingerprint and neither imports nor advances generation. Keep seeds
+separate from other seed/import options.
 
-The versioned key is
-`mrtdown:<tier>:range-references:v1:<generation>`. Its seven projected row sets
-are lines, line operators, services, revisions, stations, station codes, and
-station-landmark relationships. Unused lookup dictionaries and metadata are
-omitted from range assembly. Holidays remain a date-only SQL read; issues,
-events, evidence, and rider reports remain live. Paths reuse their existing
-separate entry. Arrival and entity-profile readers are unchanged.
+Entries use `mrtdown:<tier>:range-references:v1:<generation>`. Each must match the
+completed generation read in the same repeatable-read transaction as recovery
+SQL and service paths. Missing, incomplete, invalid, oversized or unavailable
+entries use SQL in that snapshot with `no-store`. The entry has a 512 KiB JSON
+ceiling, bounded `GETRANGE`, 24-hour retention, one five-minute decoded process
+memo and one shared in-flight load. Returned rows are copied.
 
-Each enabled range read obtains the SQL generation once in a read-only
-repeatable-read transaction shared by both cache readers and all range SQL.
-Each entry must match that completed generation. Missing, incomplete, invalid,
-oversized, or unavailable entries use SQL in the same snapshot with `no-store`.
-The reference entry has a 512 KiB JSON ceiling, bounded `GETRANGE`, 24-hour
-retention, one five-minute decoded process memo, and one shared in-flight load.
-Rows are copied for each request; branch/revision selection stays request-time.
-
-Pulls publish after generation completion and before edge purge/fingerprint
-completion, including Navigation seeds that advance generation. Unchanged
-manifests renew identical reference contents. Same-generation retries compare
-row sets, preserving the first publication's table-row order; different data
-fails publication. Redis failures retry the workflow. Oversize entries stay on
-SQL. Holiday sync/manual refresh needs no reference invalidation because dates
-stay in SQL. Facts/statistics/sitemap rebuilds do not change this generation.
-Canonical reference repairs must mark updating before writes, complete a new
-generation, republish, and purge; a seed cannot replace changed contents under
-an existing generation.
+Pulls publish after generation completion and before purge/fingerprint completion.
+Same-generation retries compare row sets while preserving the first row order;
+different data fails publication. Oversize entries stay on SQL; Redis failures
+retry the workflow. Canonical reference repairs must mark updating before writes,
+complete a new generation, republish and purge. A seed cannot replace changed
+contents under an existing generation.
 
 Staging exposes `X-MRTDown-Range-References-Source` (`redis`, `memory`, `sql`).
-`range_reference_cache_read` logs source, range, and attributed payload bytes;
-`range_reference_cache_transfer` records bytes received, including rejected
-entries. A shared read attributes payload bytes once. Verify response parity,
-zero seven-table reference SQL on hits, SQL holiday/live-issue reads, both flag
-combinations, and coherent fallback. Disable only `REDIS_RANGE_REFERENCE_CACHE`
-and purge the data tag to roll back. Measure provider egress/latency and Redis
-usage over matched windows after a separately authorized production enablement.
+`range_reference_cache_read` records source and attributed bytes;
+`range_reference_cache_transfer` includes rejected payloads.
 
 ## Service-path inputs
 
-`REDIS_SERVICE_PATH_CACHE` controls path reuse for overview/system map,
-history/day, and weekly-report range readers. The default is direct SQL.
-`publish` enables pull publication only; `enabled` also enables reads. This
-setting is independent of Navigation and completed Issue Profiles.
+Service paths also remain a consumer of the completed generation during SQL
+range recovery. Station profiles and other direct SQL readers keep their own
+paths. Use `{"seedServicePathCache":true}` on the authenticated pull task to
+repair the current completed generation under the pull lease, without importing,
+advancing generation or republishing other caches. Keep seeds separate.
 
-Deploy with the existing timetable pin. Reads may be `enabled` immediately:
-cache misses use Postgres while the seed runs. `publish` mode is also available
-when inspecting an entry before enabling reads. After confirming a successful
-canonical fingerprint, trigger the authenticated pull task with
-`{"seedServicePathCache":true}`. The task takes the pull lease and publishes
-paths for the current completed SQL generation. It does not import data,
-advance the generation, or republish other caches. Do not combine a seed with
-other seed or timetable inputs. Confirm the workflow releases its lease.
-
-Entries use `mrtdown:<tier>:service-paths:v1:<generation>` and contain only
-path columns, with a 512 KiB JSON ceiling and 24-hour Redis retention. Successful
-pulls publish before the edge purge and fingerprint completion. An unchanged
-manifest renews identical path data's retention without advancing the generation
-or purging. Different contents under the same generation fail publication.
+Entries use `mrtdown:<tier>:service-paths:v1:<generation>`, with a 512 KiB JSON
+ceiling, bounded `GETRANGE` and 24-hour retention. Successful pulls publish before
+purge/fingerprint completion. Same-generation different contents fail publication.
 Oversize data remains on SQL; Redis publication failures retry the workflow.
 
-Each enabled range read uses one read-only repeatable-read SQL snapshot for
-generation, issue discovery, revisions, and assembly. Only matching completed
-generations can reuse paths. Missing, invalid, oversized, or unavailable entries,
-and incomplete promotion, fall back through that snapshot with `no-store`.
-The process retains at most one decoded entry for five minutes and shares one
-in-flight load. Returned rows are copied so assembly cannot mutate the memo.
-SQL generation validation still runs on every request. Other range references
-can use the independent [reference reader](#range-reference-inputs); live
-intervals, holidays, and rider reports stay on their existing paths.
+Recovery uses a read-only repeatable-read transaction for generation, issue
+selection and assembly. Missing, invalid, oversized or unavailable entries and
+incomplete promotion fall back through that snapshot with `no-store`. The process
+retains one decoded entry for five minutes and shares one in-flight load. Returned
+rows are copied. Warm matching entries eliminate dataset path queries.
 
-Purge the tier's data tag after the enabled setting is serving traffic.
-Staging responses expose `X-MRTDown-Service-Paths-Source` as `redis`, `memory`,
-or `sql`. Structured `service_path_cache_read` logs record source, range, and
-attributed Redis payload bytes; a shared load attributes bytes to its initiating
-request. `service_path_cache_transfer` logs record actual received payload bytes,
-including rejected values. A bounded `GETRANGE` caps each read at the size
-ceiling plus one byte. Failed commands have no measured response-byte total.
-
-Verify the four route families against SQL, an empty range, a correction,
-publication crossing a read, and a cold process. Warm hits must execute zero
-dataset path queries. Station profiles and arrivals retain their current SQL
-readers. To roll back, unset only `REDIS_SERVICE_PATH_CACHE` and purge the data
-tag. Production enablement still requires the aggregate usage evidence below.
+Staging exposes `X-MRTDown-Service-Paths-Source` (`redis`, `memory`, `sql`).
+`service_path_cache_read` attributes a shared load's bytes to its initiating
+request; `service_path_cache_transfer` includes rejected payloads.
 
 ## Published zero-SQL range inputs
 
-`REDIS_RANGE_SNAPSHOT` accepts `publish` (writer only), `enabled` (writer and
-reader), or unset (disabled). This is a separate opt-in path from the reference
-and service-path caches. It serves canonical range assembly for history,
-issues-day, overview/map and report range inputs. Optional community signals,
-weekly archive/sitemap reads, entity profiles and arrivals still have their
-existing SQL dependencies; this flag alone cannot make the entire site sleep.
+With Redis configured, history, issues-day, overview/map and report range inputs
+select a completed snapshot before any SQL connection or generation read.
+Entity profiles, statistics, Issue Profile misses and disruption dispatch still
+have SQL dependencies; this does not establish sustained whole-site Neon sleep.
 
-The producer loads canonical source rows from one read-only repeatable-read
-snapshot after page-profile completion. It excludes evidence bodies and rider
-reports. The consumer validates the encoding, digest and row schemas, selects
-latest-period candidates and assembles using the request's clock. Time passing,
-including midnight or an issue ending, does not need SQL or republication.
+The producer reads canonical rows in one repeatable-read transaction after
+page-profile completion. It excludes evidence bodies and rider reports. Consumers
+validate encoding, digest and row schemas, then select latest-period candidates
+and assemble at the request clock. Midnight and issue endings need no refill.
 
-Redis keys use `mrtdown:{<tier>:range-snapshot:v1}` (one cluster hash slot):
-`active` names an immutable
-`payload:<sha256>` containing gzip/base64 canonical input rows. Limits are
-4 MiB encoded and 24 MiB expanded JSON. The payload and pointer commit in one
-atomic compare-and-swap operation. Each head has a unique publication ID, so
-a delayed producer must retry even if the inputs changed and then changed back.
-Readers keep using the last completed snapshot throughout
-an import. The active pointer and payload have no TTL; superseded
-payloads expire after 24 hours. Each process memoizes one decoded payload but
-checks the active pointer in Redis on every read. Cold processes use Redis,
-not a SQL generation check. A missing/invalid/unavailable snapshot uses SQL
-with `no-store`; requests never publish replacements.
+Keys use `mrtdown:{<tier>:range-snapshot:v1}`. The `active` pointer names an
+immutable `payload:<sha256>` of gzip/base64 source rows, limited to 4 MiB encoded
+and 24 MiB expanded JSON. Atomic compare-and-swap uses a unique publication ID
+to reject delayed producers, including changes that later revert. The last
+completed snapshot remains readable during import. Active keys persist;
+superseded payloads expire after 24 hours. Each process memoizes one decoded
+payload and checks the pointer on every read. Missing/invalid/unavailable inputs
+use SQL with `no-store`; requests never publish replacements.
 
-A `completed` fingerprint is recorded only after canonical publication, purge
-and the SQL fingerprint succeed. With reads enabled, unchanged scheduled pulls
-fetch upstream metadata and validate this external checkpoint and payload
-before acquiring a SQL lease. Missing payloads/checkpoints or changed inputs
-take the normal writer/recovery path. Reviews, rebuilds and explicit seeds
-always retain that path. Publish-only mode retains existing renewal behavior.
-Writers clear the checkpoint before import or projection work can mutate SQL,
-while retaining the serving snapshot. A failed rebuild therefore cannot stop
-the next ordinary poll from reaching SQL recovery.
-Failure cleanup uses a short-lived external writer marker to avoid opening SQL
-when an upstream-only preflight failed before lease acquisition.
+The external `completed` fingerprint follows all publications, purge and the SQL
+fingerprint. Unchanged pulls validate upstream metadata, payloads and coherent
+range/sitemap/arrival heads before acquiring a SQL lease. Changed or explicit
+inputs and missing state keep the writer/repair path. Writers invalidate the
+checkpoint before import or rebuild mutations. An external writer marker keeps
+preflight failure cleanup from opening SQL before lease acquisition.
 
-Unless the holiday preflight below proves a completed unchanged source, every
-holiday workflow run with publication enabled republishes before purging, even
-if the holiday rows are unchanged. This retries publication or
-purge failures after an earlier sync committed.
-The publisher reads both completion metadata and source rows in the same
-repeatable-read transaction; an updating canonical generation is rejected.
-Manual facts rebuilds do not change its canonical source inputs. Canonical SQL
-repairs must complete promotion and republish before considering the change
-public; direct unsupported writes are not made fresh by a reader TTL.
-
-For rollout, deploy with the flag unset, then set `publish` and run the normal
-authenticated pull. Unchanged inputs repair the snapshot without importing or
-advancing generation. Validate payload size and cold/warm SQL parity in staging,
-then enable reads and purge the public data tag. Staging exposes
-`X-MRTDown-Range-Snapshot-Source`; structured `range_snapshot_read` events report
-`redis`, `memory` or `sql` and payload bytes. Verify zero SQL for canonical
-range hits and for unchanged scheduled pulls, including failure cleanup.
-Rollback by unsetting only this flag and purging the data tag; existing SQL and
-reference/path readers remain available. A successful local check does not
-establish production sleep; use the [sleep plan](../plans/active/neon-sleep.md)
-for remaining wake-ups and eventual provider-level acceptance.
+Holiday runs republish before purging unless the holiday preflight proves a
+completed unchanged source. Manual facts rebuilds do not change range inputs.
+Canonical SQL repairs must complete promotion and republish. An authenticated
+empty pull repairs unchanged inputs without importing or advancing generation.
+Check `X-MRTDown-Range-Snapshot-Source` and `range_snapshot_read` for source and
+bytes; verify cold/warm parity and zero SQL on healthy hits.
 
 ## Published sitemap inputs
 
-`REDIS_SITEMAP_SNAPSHOT` defaults off. Use `publish` to seed from an
-authenticated canonical pull or `POST /internal/api/tasks/facts`; then use
-`enabled` to serve `/sitemap.xml` without SQL on healthy cold/warm hits.
-Validate identical sitemap paths against SQL and check `sitemap_source` in
-Server-Timing (`redis`, `memory` or `sql`) before activation. Purge the tier's
-data tag when changing reader settings. Unset the flag to roll back.
+Canonical pulls and authenticated `POST /internal/api/tasks/facts` publish
+sitemap IDs and date bounds from a completed repeatable-read SQL snapshot.
+They rebuild inputs rather than trusting a mutable SQL projection. Publication
+uses the bounded atomic store under `mrtdown:{<tier>:sitemap:v1}`; active data
+persists and partial promotion preserves the previous head. Unchanged pulls
+verify fingerprint, generation and payload before skipping SQL.
 
-Publication rebuilds IDs and issue date bounds in a completed repeatable-read
-SQL snapshot, rather than trusting a projection that a concurrent facts task
-could have rebuilt during promotion. It uses the existing bounded atomic store
-under `mrtdown:{<tier>:sitemap:v1}`; active data persists until superseded.
-Failed/partial promotion preserves the previous head. Unchanged pulls verify
-the payload, fingerprint and generation before skipping SQL; absent or corrupt
-inputs enter the existing pull repair path. Without the range snapshot gate,
-pulls retain their existing SQL preflight behavior.
-
-Requests recompute the Singapore date, weekly/year archive paths and empty
-archive month bounds. Holiday and community-report changes do not affect these
-IDs/bounds. Missing, invalid or unavailable Redis inputs fall back lazily to the
-SQL sitemap snapshot, including the legacy earliest-date lookup when needed.
+Requests recompute Singapore dates, archive paths and empty archive month bounds.
+Missing/invalid/unavailable inputs fall back lazily to the SQL sitemap snapshot,
+including the legacy earliest-date lookup when needed. Check `sitemap_source`
+in Server-Timing and compare sitemap paths with SQL after repair.
 
 ## Unchanged holiday checks
 
-`REDIS_PUBLIC_HOLIDAY_PREFLIGHT=enabled` is off by default. After one complete
-holiday workflow, a matching normalized, nonempty data.gov.sg source skips SQL
-and the writer lease. The source includes names and hashes, not just dates.
-Range publication mode is part of the identity; enabled range publication also
-requires a valid payload. Empty, truncated or unavailable upstream responses
-fail before database access. Missing/corrupt Redis state cannot authorize a skip.
+After one completed holiday workflow, a matching normalized nonempty data.gov.sg
+source and valid range payload skip SQL and its writer lease. Source identity
+includes names and hashes. Empty, truncated or unavailable upstream responses
+fail before database access; missing/corrupt Redis state cannot authorize a skip.
 
-Holiday writers share the canonical pull lease. Pending fact dates are stored
-transactionally with holiday changes in SQL and retained until rebuild,
-publication and purge succeed. The Redis receipt is written last. A superseded
-workflow cannot certify a newer writer; start a new workflow if it reports
-`Holiday sync superseded`. Failed attempts release their lease; a process crash
-relies on the existing lease expiry. No schedule frequency changes are needed.
+Holiday writers share the canonical pull lease. Pending fact dates commit with
+holiday changes and remain until facts, publication and purge succeed. Writers
+invalidate the Redis receipt before mutation; Redis failure stops the write for
+retry. The receipt is written last. A superseded workflow cannot certify a newer
+writer; start a new workflow after `Holiday sync superseded`. Failed attempts
+release their lease; crashes rely on lease expiry.
 
-Writers invalidate the receipt even with skip reads disabled when `REDIS_URL`
-is configured. Redis failure then stops the write before mutation, for retry.
-The two persistent keys are under
-`mrtdown:{<tier>:range-snapshot:v1}:public-holidays:{writer,completed}`; they do
-not expire or cause periodic SQL refills.
-
-For activation, first deploy this code to **all** holiday writers and let any
-old holiday workflows finish. Delete only the tier's `public-holidays:completed`
-key, configure Redis consistently, enable the flag, then run the authenticated
-holiday task once to seed a receipt. A second unchanged run should contain only
-`check-published-public-holidays`; observe workflow steps without querying SQL.
-Validate this separately in staging before production activation. Roll back by
-disabling the flag; keep Redis configured for writer invalidation. Clear and
-reseed the receipt after any out-of-band holiday SQL edit, older-code writer,
-or writes made without Redis configured.
-
-This removes the healthy monthly holiday wake-up only. Weekly disruption-report
-dispatch retains SQL as its durable recovery queue, including moderation and
-failed delivery. Arrival reports use a separate cache. Entity/profile readers,
-statistics, genuine writes and repairs remain independent wake-ups.
+Persistent keys are under
+`mrtdown:{<tier>:range-snapshot:v1}:public-holidays:{writer,completed}`. After any
+out-of-band holiday SQL edit, older-code writer, Redis restore or writes without
+Redis, clear only the tier's `public-holidays:completed` key and run the
+holiday task to repair. The next unchanged run should contain only initialization
+and `check-published-public-holidays`. Observe steps without querying SQL.
 
 ## Published arrival metadata
 
-`REDIS_ARRIVAL_SNAPSHOT=publish` publishes admission history, attested canonical
-topology, projection headers, coverage days/scopes and display names during a
-completed pull. Unset disables it. Public serving is controlled separately by
-`REDIS_ARRIVAL_READS`; publishing alone leaves arrivals on SQL.
+Completed pulls publish admission history, attested canonical topology,
+projection headers, coverage days/scopes and display names together in a
+read-only repeatable-read transaction. The publisher verifies topology and the
+retained admission chain and rejects incomplete projections for current topology.
 
-The publisher captures these inputs together in a read-only repeatable-read
-transaction. It verifies the topology attestation and retained admission chain,
-and rejects an incomplete projection for the current topology. Publication uses
-the same bounded gzip/base64, unique publication ID and atomic head swap as the
-range snapshot, under `mrtdown:{<tier>:arrival-inputs:v1}`. Active data has no
-TTL. The separate namespace leaves range-reader rollback independent.
+The bounded atomic store under `mrtdown:{<tier>:arrival-inputs:v1}` keeps active
+data persistent. Bounds are 100 retained versions/projection headers, 10,000 day
+rows, 100,000 scope rows, 4 MiB encoded and 24 MiB expanded JSON. A violation
+fails publication and preserves the preceding head; inputs are never truncated.
 
-Bounds are 100 retained versions/projection headers, 10,000 day rows, 100,000
-scope rows, 4 MiB encoded and 24 MiB expanded JSON. A bound violation fails
-publication and preserves the preceding head; rows are never truncated into a
-valid snapshot. November 22 production sizing found 53,680 scopes and 44 days
-across two projections. This is sizing evidence, not a production publication.
-
-For a separate staging rollout, deploy with the flag unset, then configure
-`publish` and send an authenticated empty pull. Even when the range checkpoint
-is current, missing/invalid arrival metadata forces the normal SQL repair path.
-Both snapshots must publish before purge and checkpoint completion. A healthy
-snapshot with the same generation and fingerprint preserves the SQL-free
-unchanged-pull path. Check `arrival_inputs_published`, payload size and a cold
-validated read before considering the separate serving flag below. Unset this
-flag to stop publication; reader activation remains independent.
+Missing or invalid metadata forces SQL repair even when the range checkpoint
+is current. All required inputs must publish before purge and checkpoint
+completion. Check `arrival_inputs_published` and cold validated reads after repair.
 
 ## Published departure partitions
 
-`REDIS_ARRIVAL_DEPARTURES=publish` requires `REDIS_ARRIVAL_SNAPSHOT=publish`.
-Both default off. This publishes compact station/projection partitions.
-Explicit source dates, shared memberships, platforms,
-unknown timing and overnight offsets are retained.
+Compact station/projection partitions retain explicit dates, shared memberships,
+platforms, unknown timing and overnight offsets. New or damaged partitions publish
+in separate durable steps; unchanged completed projections reuse verified hashes.
+The atomic manifest binds departures to the exact arrival metadata digest.
+Purge and checkpoint completion follow activation.
 
-The pull publishes one station per durable step, then atomically activates a
-manifest tied to the arrival metadata. Purge and checkpoint completion follow.
-Unchanged completed projections reuse verified partitions on later pulls.
-Missing/corrupt partitions and rebuilt projections regenerate; older manifests
-without projection digests require one full publication before reuse.
 Limits are 1,000 partitions, 20,000 distinct calls per partition, 8 MiB expanded
 and 2 MiB encoded per partition, and 64 MiB total encoded partitions. Failures
-preserve the previous manifest. Active parts persist; pending and retired parts
-expire after 24 hours. Restart the pull if pending parts expire before activation.
+preserve the previous manifest. Active parts persist; pending/retired parts expire
+after 24 hours. Restart a pull if pending parts expire before activation. Metadata,
+canonical attestation, projection identity and the writer lease are checked before
+activation. Never resume an obsolete publication against newer canonical inputs.
 
-For staging validation, deploy with flags unset, enable both producers and
-trigger an authenticated empty pull. Check `arrival_departures_published`, total
-bytes and publication latency; repeat the unchanged pull and confirm it finishes
-before SQL lease acquisition. Production table/index sizing was about 1.7 GB;
-compressed payload size and staging latency remain unmeasured. Validate both
-before production publication. Unset the departure flag to stop its producer.
-The [Neon sleep plan](../plans/active/neon-sleep.md#arrivals-follow-up) tracks
-rider-report caching and public serving separately.
+Check `arrival_departures_published`, total bytes and latency after repair.
+Unchanged polls should finish before SQL lease acquisition. The
+[sleep plan](../plans/active/neon-sleep.md) records completed rollout evidence.
 
 ## Recent arrival reports
 
-`REDIS_ARRIVAL_REPORTS` defaults off. `publish` refreshes Redis after accepted
-SQL submissions; `enabled` also lets report reads use it. Non-platform report hits, empty
-results and clock expiry use no SQL. SQL-backed schedule requests retain report
-SQL fallback; published schedule requests omit missing/unavailable reports. A missing or dirty report input gets one bounded repair attempt on
-that request. Missing topology falls back without repairing reports.
+Accepted SQL submissions invalidate and refresh Redis. Non-platform report hits,
+initialized-empty results and clock expiry need no SQL. SQL-backed schedules
+retain report fallback and a bounded missing/dirty-cache repair attempt;
+published schedules omit unavailable optional reports. Platform queries omit them.
 
-Before enabling reads, run `publish` on **every report writer**, drain old
-instances, and republish arrival metadata with revision recency. Seed with
-`repairArrivalReportCache(db)` from
-[`crowdArrivalReportCache.server.ts`](../../app/util/crowdArrivalReportCache.server.ts),
-or let the first enabled read initialize it. Repair loads at most 10,000 recent
-accepted rows; exceeding the bound keeps SQL fallback. There is no timer or
-expiry refill. The cache contains no reporter identities. Apply the generated
-nullable `destination_station_id` migration before deploying the updated report
-writer.
-Each new report preserves its validated destination through SQL and Redis;
-mismatched or legacy rows without that identity are omitted from cached reads.
-No destination is backfilled from potentially changed topology.
+Repair runs after an accepted report or when a SQL-backed read finds missing or
+dirty cache state. There is no operator seed task, and published schedule reads
+do not repair reports. After Redis restore or eviction, reports may stay omitted
+until one of those repair paths runs.
 
-Redis invalidation failure rejects a submission before insertion. Publication
-failure after commit preserves the accepted report and leaves the cache unknown
-until repair. Writers and repairs share a SQL lock; Redis WATCH/MULTI rejects
-delayed publishers. Readiness and scopes share one hash so eviction stays unknown.
+Repair loads at most 10,000 recent accepted rows; exceeding the bound keeps SQL
+fallback. There is no timer or expiry refill. The cache contains no reporter
+identities. Reports preserve the validated destination; mismatched/legacy rows
+are omitted rather than relabelled from newer topology.
 
-Rollback reads to `publish` first. Turn publication off only after all enabled
-readers have drained. Reseed before re-enabling after any writer ran without
-publication, direct SQL report edits, or a Redis restore. No flags were enabled
-as part of this implementation; staging measurement and full public serving
-remain separate gates.
+Invalidation failure rejects submission before insertion. Publication failure
+after commit preserves the accepted report and leaves the cache unknown until
+repair. Writers/repairs share a SQL lock; Redis WATCH/MULTI fences delayed
+publishers. Readiness and scopes share one hash so eviction remains unknown.
+Direct SQL edits and writers without Redis do not refresh the report cache.
 
 ## Published arrivals reader
 
-`REDIS_ARRIVAL_READS=enabled` opts the public v2 endpoint into published inputs.
-It defaults off and does not enable either producer. The reader requires metadata
-and a departure manifest with matching generation, fingerprint and metadata
-payload digest. It reads only the selected station/projection partitions, with
-bounded decoding and digest/identity checks. Selection, Singapore service dates
-(including 24+ hour tails), display labels and limits use the SQL path's shared
-policy and assembly code at the request clock. Empty or incomplete coverage is a
-normal response, distinct from an unavailable required snapshot.
+The public v2 endpoint requires metadata and departure heads with matching
+generation, fingerprint and metadata digest. It reads selected station/projection
+partitions with bounded decoding and digest/identity checks. Shared SQL-path
+policy and assembly preserve scope validation, Singapore dates and 24+ hour tails,
+labels, limits and covered-empty responses at the request clock.
 
-Missing, mismatched or corrupt required inputs select SQL recovery lazily. A
-cached scope rejection checks SQL's completed generation: a changed or updating
-generation selects SQL validation, covering newly promoted platforms before
-snapshot publication. A matching generation retains the cached 400. Valid scopes
-never perform this generation check. No request-side departure publication or
-repair is attempted. With a healthy publication, neither a cold process nor
-midnight needs SQL. Branch-level reports
-use `REDIS_ARRIVAL_REPORTS=enabled` and the same metadata snapshot; expiry and
-initialized-empty reports remain SQL-free. Disabled, dirty or unavailable optional
-reports are omitted on this path, leaving the timetable usable. Writers or an
-explicit report seed restore missing signals. Platform queries omit reports.
-
-Keep public reads off until the publish-only staging payload-size and latency
-gates above pass. Then compare cold/warm v2 responses against SQL, including
-empty coverage, midnight and report expiry, before a separate activation decision.
-Rollback by unsetting `REDIS_ARRIVAL_READS`; producers can remain in `publish`.
-No deployment or flags were changed by the reader implementation. Other public
-profiles, sitemap/statistics and background readers still independently wake SQL;
-this endpoint alone does not establish production-wide Neon sleep.
+Missing/mismatched/corrupt required inputs select SQL recovery lazily. Only cached
+scope rejections check SQL's completed generation: changed/updating generations
+select SQL validation for newly promoted scopes; matching generations retain 400.
+Valid published scopes never make this check. Requests do not publish or repair
+departures. Healthy cold/warm reads, midnight and report expiry need no SQL.
+Dirty/unavailable optional reports are omitted until an accepted report or a
+SQL-backed repair restores them. Arrivals responses remain `no-store`.
 
 ## Redis usage evidence
 

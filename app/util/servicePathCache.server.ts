@@ -26,17 +26,6 @@ const cache = createGenerationCache({
 export const getServicePathCacheKey = cache.getKey;
 export const readCachedServicePaths = cache.read;
 
-export function isServicePathCacheEnabled() {
-  return process.env.REDIS_SERVICE_PATH_CACHE === 'enabled';
-}
-
-export function isServicePathCachePublicationEnabled() {
-  return (
-    isServicePathCacheEnabled() ||
-    process.env.REDIS_SERVICE_PATH_CACHE === 'publish'
-  );
-}
-
 /** Read through the transaction that owns issue discovery and dataset assembly. */
 export async function readServicePathsForSnapshot(
   generation: string | undefined,

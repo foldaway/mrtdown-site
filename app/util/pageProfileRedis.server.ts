@@ -5,10 +5,6 @@ const REDIS_TIMEOUT_MS = 500;
 let redis: Redis | undefined;
 let connecting: Promise<void> | undefined;
 
-export function isIssueProfileCacheEnabled() {
-  return process.env.REDIS_ISSUE_PROFILE_CACHE === 'enabled';
-}
-
 export function getNavigationCacheKey() {
   const tier = process.env.TIER ?? 'development';
   if (!/^[a-z0-9_-]+$/.test(tier)) {

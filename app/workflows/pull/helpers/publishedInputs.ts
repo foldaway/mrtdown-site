@@ -1,29 +1,17 @@
 import { WorkflowNonRetryableError } from '@upstash/workflow';
-import {
-  isSitemapSnapshotPublicationEnabled,
-  sitemapSnapshotStore,
-} from '~/util/sitemapSnapshot.server';
-import {
-  arrivalDepartureStore,
-  isArrivalDeparturePublicationEnabled,
-} from '~/util/arrivalDepartureStore.server';
-import {
-  arrivalInputSnapshotStore,
-  isArrivalInputPublicationEnabled,
-} from '~/util/arrivalInputSnapshot.server';
-import {
-  isRangeSnapshotEnabled,
-  rangeSnapshotStore,
-} from '~/util/rangeSnapshotStore.server';
+import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
+import { arrivalInputSnapshotStore } from '~/util/arrivalInputSnapshot.server';
+import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
+import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
 import { fetchManifest } from './fetchManifest';
 import { getCanonicalManifestFingerprint } from './manifestFingerprint';
 import { type PullParams, resolveCombinedReleaseIndex } from './pullParams';
 
 /** External-only preflight: no SQL imports or lease acquisition. */
 export async function canSkipPublishedCanonicalPull(params: PullParams) {
-  // Publish-only mode keeps the original SQL/legacy-cache renewal behavior.
+  // Local SQL-only pulls and explicit repair requests must acquire the lease.
   if (
-    !isRangeSnapshotEnabled() ||
+    !process.env.REDIS_URL ||
     params.sourceReview ||
     params.rebuildScheduledTimetableProjection ||
     params.seedNavigationCache ||
@@ -44,29 +32,21 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
     );
   const fingerprint = getCanonicalManifestFingerprint(manifest, pinned);
   if (!(await rangeSnapshotStore.isCurrent(fingerprint))) return false;
-  if (isSitemapSnapshotPublicationEnabled()) {
-    const [range, sitemap] = await Promise.all([
-      rangeSnapshotStore.head(),
-      sitemapSnapshotStore.read({ verifyPayload: true }),
-    ]);
-    if (
-      !sitemap ||
-      sitemap.value.fingerprint !== fingerprint ||
-      sitemap.value.generation !== range.value?.generation
-    )
-      return false;
-  }
-  if (!isArrivalInputPublicationEnabled())
-    return !isArrivalDeparturePublicationEnabled();
-  const [range, arrivals] = await Promise.all([
+  const [range, sitemap, arrivals] = await Promise.all([
     rangeSnapshotStore.head(),
+    sitemapSnapshotStore.read({ verifyPayload: true }),
     arrivalInputSnapshotStore.read({ verifyPayload: true }),
   ]);
+  if (
+    !sitemap ||
+    sitemap.value.fingerprint !== fingerprint ||
+    sitemap.value.generation !== range.value?.generation
+  )
+    return false;
   const metadataMatches =
     arrivals?.value.fingerprint === fingerprint &&
     arrivals.value.generation === range.value?.generation;
   if (!metadataMatches || !arrivals) return false;
-  if (!isArrivalDeparturePublicationEnabled()) return true;
   const departures = await arrivalDepartureStore.manifest.read({
     verifyPayload: true,
   });

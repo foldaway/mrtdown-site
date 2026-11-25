@@ -40,9 +40,8 @@ export async function readScheduleTopologyForSnapshot(
 ): Promise<Topology> {
   const startedAt = performance.now();
   const memo = memos.get(db);
-  const enabled = process.env.SCHEDULE_TOPOLOGY_MEMO === 'enabled';
-  const identity = enabled ? await readCanonicalTopologyAttestation(tx) : null;
-  const attestation = identity?.attestation;
+  const identity = await readCanonicalTopologyAttestation(tx);
+  const attestation = identity.attestation;
   const key = attestation
     ? `${attestation.encodingVersion}:${attestation.projectionVersion}:${attestation.sha256}`
     : undefined;
@@ -72,11 +71,11 @@ export async function readScheduleTopologyForSnapshot(
     report('memory', 'hit', 0, 0);
     return topology;
   }
-  // Includes the original completed-promotion gate, even with the memo disabled.
+  // SQL recovery retains the completed-promotion gate.
   const topology = await readLiveScheduleTopology(tx);
   const raw = JSON.stringify(topology);
   const bytes = Buffer.byteLength(raw);
-  let reason = identity?.reason ?? (enabled ? 'cold' : 'disabled');
+  let reason = identity.reason ?? 'cold';
   if (attestation && key) {
     if (
       topology.projectionVersion !== attestation.projectionVersion ||
