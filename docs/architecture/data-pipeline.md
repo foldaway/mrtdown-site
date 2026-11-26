@@ -317,25 +317,17 @@ processed per scheduled run.
 Authenticated dispatch requests can return no work before opening SQL when the
 [community snapshot](../operations/edge-caching.md#public-community-disruption-signals)
 certifies there are no accepted, undispatched clusters or standalone reports.
-SQL remains the queue authority. The proof deliberately ignores scope and
-confidence, so even an accepted row currently ineligible for delivery keeps SQL
-discovery enabled. Failed delivery remains retryable; display expiry does not
-expire queued work. Eligibility and retries currently have no clock-based delay.
-Adding one requires revisiting this proof.
+Accepted rows keep SQL discovery enabled even without sufficient scope or
+confidence; display expiry cannot hide retries. Immediate dispatch and dry runs
+always discover through SQL. Eligibility currently changes only through writes;
+adding a clock-based eligibility or retry deadline requires revisiting the proof.
 
-Submissions, moderation, duplicate membership/scope changes and delivery commits
-already invalidate that snapshot before SQL commit under the publication fence.
-Pending-only inserts and unchanged replays cannot create eligible work; failure
-marking changes diagnostic fields only. Incident locks and delivery marking are
-unchanged. Immediate dispatch and dry runs always discover through SQL.
-
-Missing, dirty, corrupt, unavailable or older snapshots without the queue field
-fall back to SQL. An empty discovery initializes the proof; candidate writes
-refresh it after commit. Older writers using the publication fence safely drop
-the field when rebuilding, forcing fallback until repaired by a current writer.
-Drain any writers predating that fence before initialization, as required for
-community snapshots. Out-of-band SQL changes or Redis restores require the
-existing snapshot repair procedure.
+The existing publication fence invalidates before relevant SQL commits and
+refreshes afterward. Missing, dirty, corrupt, unavailable or older snapshots
+without the queue field fall back to SQL. Empty runs repair the proof from SQL;
+older fenced writers safely omit the field when rebuilding. Drain writers
+predating the fence before initialization. Redis restores, out-of-band SQL edits
+and writes without Redis require the linked snapshot repair procedure.
 
 For failures, look in Sentry for `component:crowd-report-dispatch` and the
 `crowd_report_dispatch` context. Scheduled delivery diagnostics include

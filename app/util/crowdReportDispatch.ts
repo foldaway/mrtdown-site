@@ -835,8 +835,8 @@ export async function dispatchPendingCrowdReports(
   }
 
   const failed = results.filter((result) => !result.success).length;
-  // Initialize old/missing snapshots only after authoritative queue discovery.
-  // Candidate transactions already repair their own committed changes.
+  // Empty runs repair missing/older proofs by checking SQL under the publication
+  // fence. Candidate transactions already repair their own committed changes.
   if (candidates.length === 0) await tryRepairCommunitySignalCache(db);
   return {
     success: failed === 0,

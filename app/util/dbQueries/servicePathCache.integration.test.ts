@@ -2338,7 +2338,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         await liveRedis.quit();
       });
 
-      it('initializes the dispatch checkpoint from SQL and rejects old, missing or uncertain proofs after restart', async () => {
+      it('initializes the dispatch checkpoint from SQL and rejects uncertain proofs', async () => {
         expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
         await dispatchPendingCrowdReports(db, {
           rootUrl: 'https://example.test',
@@ -2371,15 +2371,6 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           .mockRejectedValueOnce(Error('Redis unavailable'));
         expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
         read.mockRestore();
-        vi.resetModules();
-        const coldConnection = await import('~/util/pageProfileRedis.server');
-        vi.spyOn(coldConnection, 'getPageProfileRedis').mockResolvedValue(
-          liveRedis,
-        );
-        const cold = await import('~/util/communitySignalCache.server');
-        queries.length = 0;
-        expect(await cold.canSkipCrowdReportDispatch()).toBe(true);
-        expect(queries).toEqual([]);
       });
 
       it('keeps newly eligible public clusters and failed deliveries retryable beyond display expiry', async () => {
@@ -2468,6 +2459,11 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
             includeCommunitySignals: true,
           }),
         ).toEqual(empty);
+        const coldCheckpoint = await import(
+          '~/util/communitySignalCache.server'
+        );
+        expect(await coldCheckpoint.canSkipCrowdReportDispatch()).toBe(true);
+        expect(queries).toEqual([]);
         const coldSignals = await import('./communitySignals');
         await persistAutomoderatedCrowdReport(db, submission(), abuse('one'), {
           now,
