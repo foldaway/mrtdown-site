@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HOME_OVERVIEW_INITIAL_DATE_COUNT } from '~/constants';
+import { applyPublicDataCacheHeaders } from '~/util/publicResponseCache';
 import { Route as IndexMarkdownRoute } from './index[.]md';
 import { Route as IssueMarkdownRoute } from './issues/$issueId/index[.]md';
 import { Route as LineMarkdownRoute } from './lines/$lineId/index[.]md';
@@ -82,6 +83,7 @@ type RouteWithGet = {
 describe('agent Markdown routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getResponseHeaders.mockReturnValue(new Headers());
   });
 
   it('returns the curated llms.txt entry point as cacheable Markdown', async () => {
@@ -150,6 +152,40 @@ describe('agent Markdown routes', () => {
     await expect(response.text()).resolves.toBe('# station');
     expectMarkdownResponse(response);
   });
+
+  it.each(['healthy', 'SQL recovery'] as const)(
+    'preserves station %s policy on the final Markdown response',
+    async (source) => {
+      mocks.getStationProfileFn.mockResolvedValue({
+        data: { stationId: 'BKP' },
+        included: {},
+      });
+      mocks.getStationMarkdown.mockReturnValue('# station');
+      mocks.getResponseHeaders.mockReturnValue(
+        new Headers(
+          source === 'SQL recovery' ? { 'Cache-Control': 'no-store' } : {},
+        ),
+      );
+      const response = applyPublicDataCacheHeaders(
+        new Request('https://example.com/stations/BKP/index.md'),
+        await getHandler(StationMarkdownRoute)({
+          params: { stationId: 'BKP' },
+        }),
+      );
+      if (source === 'SQL recovery') {
+        expect(response.headers.get('cache-control')).toBe('no-store');
+        expect(response.headers.has('cloudflare-cdn-cache-control')).toBe(
+          false,
+        );
+        expect(response.headers.has('cache-tag')).toBe(false);
+      } else {
+        expectMarkdownResponse(response);
+        expect(response.headers.get('cloudflare-cdn-cache-control')).toContain(
+          'max-age=900',
+        );
+      }
+    },
+  );
 
   it('returns operator Markdown from the operator read model', async () => {
     const operatorPayload = { data: { operatorId: 'SMRT' }, included: {} };

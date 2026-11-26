@@ -41,6 +41,10 @@ import {
 } from '~/util/crowdReports';
 import * as redisConnection from '~/util/pageProfileRedis.server';
 import {
+  createPublishedSnapshotStore,
+  getSnapshotKeyPrefix,
+} from '~/util/publishedSnapshotStore.server';
+import {
   getRangeReferenceCacheKey,
   publishRangeReferenceCache,
 } from '~/util/rangeReferenceCache.server';
@@ -52,6 +56,10 @@ import {
 } from '~/util/servicePathCache.server';
 import { buildSitemapPaths } from '~/util/sitemap.functions';
 import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
+import {
+  publishStationProfileSnapshot,
+  stationProfileSnapshotStore,
+} from '~/util/stationProfileSnapshot.server';
 import { buildWeeklySummary } from '~/util/weeklyReport';
 import {
   canSkipPublicHolidaySync,
@@ -84,6 +92,8 @@ import {
   publishSitemapSnapshot,
   rebuildSitemapSnapshot,
 } from './sitemap';
+import { parseStationProfileSnapshotInputs } from './stationProfileSnapshotInputs';
+import { getStationProfileReadModel } from './stations';
 import { rebuildStatisticsSnapshot } from './statistics';
 
 const store = vi.hoisted(() => new Map<string, string>());
@@ -288,6 +298,254 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
       await admin.end();
     }
   });
+
+  describe.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
+    'published station profiles with real Redis',
+    () => {
+      let stationRedis: Redis;
+      beforeEach(async () => {
+        vi.stubEnv(
+          'TIER',
+          `station_profiles_test_${randomUUID().replaceAll('-', '')}`,
+        );
+        stationRedis = new Redis(process.env.TEST_SNAPSHOT_REDIS_URL ?? '', {
+          lazyConnect: true,
+        });
+        await stationRedis.connect();
+        vi.mocked(redisConnection.getPageProfileRedis).mockResolvedValue(
+          stationRedis,
+        );
+      });
+      afterEach(async () => {
+        const keys = await stationRedis.keys(`mrtdown:*${process.env.TIER}*`);
+        if (keys.length) await stationRedis.del(...keys);
+        await stationRedis.quit();
+      });
+
+      it('matches full SQL profiles cold/warm, aliases, service midnight and incident transitions with SQL disabled', async () => {
+        // Future revision turns the path into a loop at Singapore midnight.
+        await pool.query(
+          "update service_revisions set end_at='2026-11-19' where id='revision'",
+        );
+        await pool.query(`insert into service_revisions (id,service_id,start_at,end_at,estimated_frequency,operating_hours)
+        select 'loop','service','2026-11-19',null,estimated_frequency,operating_hours from service_revisions limit 1`);
+        await pool.query(`insert into service_revision_path_station_entries (service_revision_id,service_id,path_index,station_id,display_code)
+        values ('loop','service',0,'station-1','T1'),('loop','service',1,'station-2','T2'),('loop','service',2,'station-1','T1')`);
+        await pool.query(
+          "insert into station_platform_services (station_id,platform_id,service_id) values ('station-1','platform-1','service')",
+        );
+        await pool.query(
+          "insert into station_platforms (station_id,platform_id,label,line_id,last_updated,boarding_status) values ('station-1','restricted','R','line','2026-11-18','alighting_only')",
+        );
+        await pool.query(
+          "insert into station_platform_services (station_id,platform_id,service_id) values ('station-1','restricted','service')",
+        );
+        await pool.query(
+          "insert into station_exits (station_id,source_id,source_object_id,source_checksum,label,last_updated,geo) values ('station-1','osm',10,'fixture','A','2026-11-18',ST_SetSRID(ST_MakePoint(103,1),4326)),('station-1','osm',11,'fixture','B','2026-11-18',ST_SetSRID(ST_MakePoint(103,1),4326)),('station-1','osm',12,'fixture','B','2026-11-18',ST_SetSRID(ST_MakePoint(103,1),4326))",
+        );
+        await pool.query(
+          "insert into station_codes (line_id,station_id,code,started_at,ended_at,structure_type) values ('line','station-1','FUTURE','2026-12-01',null,'elevated'),('line','station-1','CLOSED','1990-01-01','2000-01-01','underground'),('line','station-2','LEGACY','1990-01-01',null,'underground')",
+        );
+        await pool.query(
+          "update lines set platform_door_count=null,train_car_counts='[]'",
+        );
+        await pool.query(
+          "insert into stations (id,name,town_id,geo,hash) select 'station_1',name,town_id,geo,hash from stations where id='station-1'",
+        );
+        await pool.query(
+          "insert into station_codes (line_id,station_id,code,started_at,structure_type) values ('line','station_1','LEGACY','1990-01-01','underground')",
+        );
+        const clocks = [
+          now.set({ hour: 10, minute: 15 }),
+          now.set({ hour: 10, minute: 30 }),
+          now.endOf('day'),
+          now.plus({ days: 1 }).startOf('day'),
+        ];
+        vi.stubEnv('REDIS_URL', '');
+        const expected = [];
+        for (const clock of clocks) {
+          vi.setSystemTime(clock.toJSDate());
+          expected.push(
+            await getStationProfileReadModel('LEGACY', {
+              includeCommunitySignals: true,
+            }),
+          );
+        }
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        vi.setSystemTime(clocks[0].toJSDate());
+        await signalCache.repairCommunitySignalCache(db);
+        const publication = await publishStationProfileSnapshot('a'.repeat(64));
+        expect(publication?.bytes).toBeLessThan(4 * 1024 * 1024);
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        queries.length = 0;
+        for (const [index, clock] of clocks.entries()) {
+          vi.setSystemTime(clock.toJSDate());
+          for (const id of ['station-1', 'T1', 'LEGACY'])
+            expect(
+              await getStationProfileReadModel(id, {
+                includeCommunitySignals: true,
+              }),
+            ).toEqual(expected[index]);
+        }
+        expect(queries).toEqual([]);
+        await expect(
+          getStationProfileReadModel('unknown'),
+        ).rejects.toMatchObject({ status: 404 });
+        expect(expected[0].data.exits).toEqual([
+          { id: 10, label: 'A' },
+          { id: 12, label: 'B' },
+        ]);
+        expect(expected[0].data.status).toBe('ongoing_disruption');
+        expect(expected[1].data.status).toBe('normal');
+        expect(expected[0].freshUntil).toBe(clocks[1].toMillis());
+        expect(expected[2].freshUntil).toBe(clocks[3].toMillis());
+        expect(
+          expected[3].data.arrivalLines[0].arrivalTimings[0],
+        ).toMatchObject({
+          isLoop: true,
+          viaStationId: 'station-2',
+          platformLabels: ['A'],
+        });
+      });
+
+      it('keeps a crossing read coherent and rejects delayed publication and incomplete imports', async () => {
+        await publishStationProfileSnapshot('a'.repeat(64));
+        const originalRead = stationProfileSnapshotStore.read;
+        const old = await originalRead();
+        if (!old) throw Error('Missing fixture snapshot');
+        const updated = structuredClone(old.inputs);
+        const station = updated.dataset.stationRows.find(
+          (row) => row.id === 'station-1',
+        );
+        if (!station) throw Error('Missing station fixture');
+        station.name = {
+          'en-SG': 'Updated',
+          'zh-Hans': null,
+          ms: null,
+          ta: null,
+        };
+        const coldStore = createPublishedSnapshotStore(
+          async () => stationRedis,
+          'station-profiles',
+          parseStationProfileSnapshotInputs,
+        );
+        const getrange = stationRedis.getrange.bind(stationRedis);
+        // The cold reader has captured the old head when it requests its payload.
+        // Publish before that fetch completes; it must still fetch the old hash.
+        vi.spyOn(stationRedis, 'getrange').mockImplementationOnce(
+          async (key, start, end) => {
+            expect(key).toBe(
+              `${getSnapshotKeyPrefix('station-profiles')}:payload:${old.value.sha256}`,
+            );
+            await stationProfileSnapshotStore.publish(
+              old.raw,
+              updated,
+              'next',
+              'b'.repeat(64),
+            );
+            return getrange(key, start, end);
+          },
+        );
+        vi.spyOn(stationProfileSnapshotStore, 'read').mockImplementationOnce(
+          () => coldStore.read(),
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        const first = await getStationProfileReadModel('station-1');
+        const second = await getStationProfileReadModel('station-1');
+        expect(first.included.stations['station-1'].name['en-SG']).toBe('Test');
+        expect(second.included.stations['station-1'].name['en-SG']).toBe(
+          'Updated',
+        );
+        await expect(
+          stationProfileSnapshotStore.publish(
+            old.raw,
+            old.inputs,
+            'stale',
+            'a'.repeat(64),
+          ),
+        ).rejects.toThrow('superseded');
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        await markPageProfilesUpdating(db);
+        await expect(
+          publishStationProfileSnapshot('a'.repeat(64)),
+        ).rejects.toThrow('completed canonical');
+        expect(await getStationProfileReadModel('station-1')).toEqual(second);
+      });
+
+      it('uses no-store SQL recovery for absent/corrupt inputs and missing signals, while empty/expired signals stay SQL-free', async () => {
+        const baseline = await getStationProfileReadModel('station-1');
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        // Missing signals retain their independent SQL recovery contract.
+        headers.mockClear();
+        expect(
+          (
+            await getStationProfileReadModel('station-1', {
+              includeCommunitySignals: true,
+            })
+          ).data.communitySignals,
+        ).toEqual([]);
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        await signalCache.repairCommunitySignalCache(db);
+        const key = signalCache.getCommunitySignalCacheKey();
+        const raw = JSON.parse((await stationRedis.get(key)) ?? '{}');
+        raw.signals = [
+          {
+            id: 'expired',
+            effect: null,
+            reportCount: 1,
+            lineIds: ['line'],
+            stationIds: ['station-1'],
+            windowStartAt: now.minus({ hours: 3 }).toISO(),
+            windowEndAt: now.minus({ hours: 2 }).toISO(),
+            updatedAt: now.toISO(),
+          },
+        ];
+        await stationRedis.set(key, JSON.stringify(raw));
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        headers.mockClear();
+        expect(
+          await getStationProfileReadModel('station-1', {
+            includeCommunitySignals: true,
+          }),
+        ).toEqual(baseline);
+        expect(headers).not.toHaveBeenCalledWith('Cache-Control', 'no-store');
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        const head = await stationProfileSnapshotStore.head();
+        if (!head.value) throw Error('Missing fixture head');
+        await stationRedis.set(
+          `${getSnapshotKeyPrefix('station-profiles')}:payload:${head.value.sha256}`,
+          'corrupt',
+        );
+        // Cold payload verification cannot turn corruption into a cached 404.
+        expect(
+          await stationProfileSnapshotStore.read({ verifyPayload: true }),
+        ).toBeNull();
+        const coldStore = createPublishedSnapshotStore(
+          async () => stationRedis,
+          'station-profiles',
+          parseStationProfileSnapshotInputs,
+        );
+        vi.spyOn(stationProfileSnapshotStore, 'read').mockImplementationOnce(
+          () => coldStore.read(),
+        );
+        headers.mockClear();
+        expect(await getStationProfileReadModel('station-1')).toEqual(baseline);
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        expect(await getStationProfileReadModel('T1')).toEqual(baseline);
+      });
+    },
+  );
 
   it('serves a published range at different request clocks with no database accessor', async () => {
     const clocks = [now.minus({ hours: 2 }), now, now.plus({ days: 1 })];
@@ -595,6 +853,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
 
     // Direct/seed writes invalidate old receipts before changing SQL.
     await publishRangeSnapshot('a'.repeat(64));
+    await publishStationProfileSnapshot('a'.repeat(64));
     await completePublicHolidaySync(retry.checkpointToken, [rows[1]]);
     expect(await canSkipPublicHolidaySync([rows[1]])).toBe(true);
 

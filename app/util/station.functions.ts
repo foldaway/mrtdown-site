@@ -15,14 +15,21 @@ const InputSchema = z.object({
 export const getStationProfileFn = createServerFn({ method: 'GET' })
   .inputValidator((val) => InputSchema.parse(val))
   .handler(async (val) => {
-    const { freshUntil, ...profile } = await getStationProfileReadModel(
-      val.data.stationId,
-      {
-        includeCommunitySignals: true,
-      },
-    );
-    setResponseHeader(STATION_PROFILE_FRESH_UNTIL_HEADER, String(freshUntil));
-    return profile;
+    try {
+      const { freshUntil, ...profile } = await getStationProfileReadModel(
+        val.data.stationId,
+        {
+          includeCommunitySignals: true,
+        },
+      );
+      setResponseHeader(STATION_PROFILE_FRESH_UNTIL_HEADER, String(freshUntil));
+      return profile;
+    } catch (error) {
+      setResponseHeader('Cache-Control', 'no-store');
+      if (error instanceof Response)
+        error.headers.set('Cache-Control', 'no-store');
+      throw error;
+    }
   });
 
 export const getStationsDirectoryFn = createServerFn({ method: 'GET' }).handler(

@@ -48,10 +48,24 @@ The external completed-fingerprint checkpoint is written after publication,
 purge and the successful SQL fingerprint. Unchanged polls validate
 upstream inputs and the recoverable Redis snapshot before acquiring a SQL
 lease. Changed/explicit inputs and missing snapshots keep the normal writer
-path. This does not remove SQL from arrivals, entity profiles or community
-signals. The [snapshot runbook](../operations/edge-caching.md#published-zero-sql-range-inputs)
+path. Station profiles use a separate published graph; the remaining entity
+profiles and directories still use SQL. The [snapshot runbook](../operations/edge-caching.md#published-zero-sql-range-inputs)
 owns limits and recovery; the [sleep plan](../plans/active/neon-sleep.md)
 tracks the remaining wake-ups.
+
+### Published station profile inputs
+
+Canonical and holiday publication also write a bounded station graph from one
+completed repeatable-read snapshot. It contains source rows for request-time
+membership, service and issue selection, station details, platforms and exits.
+Historical issue references preserve the SQL reader's related-entity scope.
+Community signals retain their independent writer-driven cache and expiry.
+
+HTML, server-function and Markdown station callers share this reader. Valid
+published inputs resolve IDs, aliases and unknown stations without SQL. Missing
+or invalid inputs use lazy SQL recovery with `no-store`; an unchanged canonical
+pull repairs publication before purge and checkpoint completion. See the
+[station snapshot runbook](../operations/edge-caching.md#published-station-profile-inputs).
 
 ### Arrival topology reuse
 

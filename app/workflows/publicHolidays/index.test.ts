@@ -5,6 +5,10 @@ import { rebuildOperationalFactsForDates } from '~/util/dbQueries/operationalFac
 import { publishRangeSnapshot } from '~/util/rangeSnapshot.server';
 import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
 import {
+  publishStationProfileSnapshot,
+  stationProfileSnapshotStore,
+} from '~/util/stationProfileSnapshot.server';
+import {
   acquireOrRenewPullWorkflowLease,
   releasePullWorkflowLease,
 } from '../pull/helpers/workflowLease';
@@ -71,6 +75,10 @@ vi.mock('~/util/dbQueries/operationalFacts.js', () => ({
 vi.mock('~/util/cloudflareCache.js', () => ({
   purgePublicDataCache: vi.fn(async () => {}),
 }));
+vi.mock('~/util/stationProfileSnapshot.server', async (original) => ({
+  ...(await original<typeof import('~/util/stationProfileSnapshot.server')>()),
+  publishStationProfileSnapshot: vi.fn(async () => {}),
+}));
 vi.mock('~/util/rangeSnapshot.server.js', () => ({
   publishRangeSnapshot: vi.fn(async () => undefined),
 }));
@@ -93,6 +101,11 @@ beforeEach(() => {
   vi.stubEnv('REDIS_URL', 'redis://unused');
   vi.spyOn(rangeSnapshotStore, 'read').mockResolvedValue({
     inputs: {},
+    value: { generation: 'g', fingerprint: 'f' },
+  } as never);
+  vi.spyOn(stationProfileSnapshotStore, 'read').mockResolvedValue({
+    inputs: {},
+    value: { generation: 'g', fingerprint: 'f' },
   } as never);
   state.sqlDisabled = false;
   vi.mocked(fetchDataGovPublicHolidays).mockResolvedValue(rows);
@@ -133,15 +146,17 @@ it('skips a completed unchanged source without database access or SQL lease call
   expect(await canSkipPublicHolidaySync(rows)).toBe(false);
 });
 
-it.each(['facts', 'publication', 'purge'] as const)(
+it.each(['facts', 'publication', 'stations', 'purge'] as const)(
   'keeps %s failure retryable and checkpoints only after recovery and pending-date cleanup',
   async (failure) => {
     vi.spyOn(rangeSnapshotStore, 'read').mockResolvedValue({
       inputs: {},
+      value: { generation: 'g', fingerprint: 'f' },
     } as never);
     const failed = {
       facts: rebuildOperationalFactsForDates,
       publication: publishRangeSnapshot,
+      stations: publishStationProfileSnapshot,
       purge: purgePublicDataCache,
     }[failure];
     vi.mocked(failed).mockRejectedValueOnce(Error('interrupted'));

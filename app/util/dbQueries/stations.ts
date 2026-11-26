@@ -1,3 +1,4 @@
+import { setResponseHeader } from '@tanstack/react-start/server';
 import {
   and,
   asc,
@@ -7,6 +8,7 @@ import {
   gt as isAfter,
   isNull,
   or,
+  sql,
 } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import {
@@ -34,6 +36,7 @@ import {
   isLoopPath,
   type StationArrivalBranch,
 } from '~/util/stationArrivalBranches';
+import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
 import {
   type CommunitySignalOptions,
   getPageCommunitySignals,
@@ -49,6 +52,10 @@ import {
   sortIssuesByLatestActivity,
 } from './issueIntervals';
 import { getIssueStaticScope } from './readModelScope';
+import {
+  compareStationProfileIds,
+  selectStationProfileSnapshot,
+} from './stationProfileSnapshotInputs';
 
 export function resolveStationProfileStationId(
   included: { stations: Record<string, Pick<Station, 'id' | 'memberships'>> },
@@ -68,11 +75,11 @@ export function resolveStationProfileStationId(
         })),
     )
     .sort((a, b) => {
-      const lineDiff = a.lineId.localeCompare(b.lineId);
+      const lineDiff = compareStationProfileIds(a.lineId, b.lineId);
       if (lineDiff !== 0) {
         return lineDiff;
       }
-      return a.stationId.localeCompare(b.stationId);
+      return compareStationProfileIds(a.stationId, b.stationId);
     });
 
   return aliasMatches[0]?.stationId ?? null;
@@ -99,8 +106,8 @@ async function resolveStationProfileStationIdFromDb(stationIdOrCode: string) {
         .from(stationCodesTable)
         .where(eq(stationCodesTable.code, stationIdOrCode))
         .orderBy(
-          asc(stationCodesTable.line_id),
-          asc(stationCodesTable.station_id),
+          asc(sql`${stationCodesTable.line_id} COLLATE "C"`),
+          asc(sql`${stationCodesTable.station_id} COLLATE "C"`),
         )
         .limit(1),
   );
@@ -210,16 +217,12 @@ export function getStationProfileFreshUntil(
   return freshUntil;
 }
 
-export async function getStationProfileReadModel(
+async function loadSqlStationProfile(
   stationId: string,
-  options: CommunitySignalOptions = {},
+  options: CommunitySignalOptions,
+  referenceNow: DateTime,
+  cacheHorizon: DateTime,
 ) {
-  const referenceNow = nowSg();
-  // Station codes and service revisions are selected by Singapore date.
-  const cacheHorizon = DateTime.min(
-    referenceNow.plus({ hours: 1 }),
-    referenceNow.startOf('day').plus({ days: 1 }),
-  );
   const { db, stationId: resolvedStationId } =
     await resolveStationProfileStationIdFromDb(stationId);
   if (resolvedStationId == null) {
@@ -324,6 +327,124 @@ export async function getStationProfileReadModel(
     includePublicHolidays: true,
     issueTransitionHorizon: cacheHorizon,
   });
+  const platformRows = await timeDbQuery('station_profile_q_platforms', () =>
+    db
+      .select({
+        id: stationPlatformsTable.platform_id,
+        label: stationPlatformsTable.label,
+        lineId: stationPlatformsTable.line_id,
+        boardingStatus: stationPlatformsTable.boarding_status,
+        serviceId: stationPlatformServicesTable.service_id,
+      })
+      .from(stationPlatformsTable)
+      .leftJoin(
+        stationPlatformServicesTable,
+        and(
+          eq(
+            stationPlatformServicesTable.station_id,
+            stationPlatformsTable.station_id,
+          ),
+          eq(
+            stationPlatformServicesTable.platform_id,
+            stationPlatformsTable.platform_id,
+          ),
+        ),
+      )
+      .where(eq(stationPlatformsTable.station_id, resolvedStationId)),
+  );
+  const exitRows = await timeDbQuery('station_profile_q_exits', () =>
+    db
+      .select({
+        id: stationExitsTable.source_object_id,
+        label: stationExitsTable.label,
+      })
+      .from(stationExitsTable)
+      .where(eq(stationExitsTable.station_id, resolvedStationId))
+      // Duplicate labels keep the final row; break ties the same way in
+      // scoped SQL and whole-network publication, independent of query plans.
+      .orderBy(
+        asc(stationExitsTable.label),
+        asc(stationExitsTable.source_object_id),
+        asc(stationExitsTable.source_id),
+      ),
+  );
+  return {
+    dataset,
+    resolvedStationId,
+    communitySignals,
+    platformRows,
+    exitRows,
+    loadArrivalStationNames: async (
+      ids: string[],
+    ): Promise<Array<{ id: string; name: Record<string, string | null> }>> =>
+      ids.length > 0
+        ? timeDbQuery('station_profile_q_arrival_destinations', () =>
+            db
+              .select({ id: stationsTable.id, name: stationsTable.name })
+              .from(stationsTable)
+              .where(inArray(stationsTable.id, ids)),
+          )
+        : [],
+  };
+}
+
+export async function getStationProfileReadModel(
+  stationId: string,
+  options: CommunitySignalOptions = {},
+) {
+  const referenceNow = nowSg();
+  // Recompute date-based memberships and service revisions on every request.
+  const cacheHorizon = DateTime.min(
+    referenceNow.plus({ hours: 1 }),
+    referenceNow.startOf('day').plus({ days: 1 }),
+  );
+  const snapshot = process.env.REDIS_URL
+    ? await stationProfileSnapshotStore.read()
+    : null;
+  let loaded: Awaited<ReturnType<typeof loadSqlStationProfile>>;
+  if (snapshot) {
+    const selected = selectStationProfileSnapshot(snapshot.inputs, stationId);
+    if (!selected)
+      throw new Response('Station not found', {
+        status: 404,
+        statusText: 'Not Found',
+      });
+    const communitySignals = await getPageCommunitySignals(options, {
+      stationId: selected.resolvedStationId,
+      now: referenceNow,
+    });
+    loaded = {
+      ...selected.assemble(referenceNow, cacheHorizon, communitySignals),
+      communitySignals,
+      loadArrivalStationNames: async (ids) =>
+        snapshot.inputs.dataset.stationRows.filter((row) =>
+          ids.includes(row.id),
+        ),
+    };
+  } else {
+    if (process.env.REDIS_URL) {
+      // Recovery must not leave a shared response cached after inputs are repaired.
+      try {
+        setResponseHeader('Cache-Control', 'no-store');
+      } catch {
+        /* no request context */
+      }
+    }
+    loaded = await loadSqlStationProfile(
+      stationId,
+      options,
+      referenceNow,
+      cacheHorizon,
+    );
+  }
+  const {
+    dataset,
+    resolvedStationId,
+    communitySignals,
+    platformRows,
+    exitRows,
+    loadArrivalStationNames,
+  } = loaded;
   const station = dataset.included.stations[resolvedStationId];
   if (station == null) {
     throw new Error(
@@ -361,41 +482,6 @@ export async function getStationProfileReadModel(
       branch.entries
         .slice(0, -1)
         .some((entry) => entry.stationId === station.id),
-  );
-  const platformRows = await timeDbQuery('station_profile_q_platforms', () =>
-    db
-      .select({
-        id: stationPlatformsTable.platform_id,
-        label: stationPlatformsTable.label,
-        lineId: stationPlatformsTable.line_id,
-        boardingStatus: stationPlatformsTable.boarding_status,
-        serviceId: stationPlatformServicesTable.service_id,
-      })
-      .from(stationPlatformsTable)
-      .leftJoin(
-        stationPlatformServicesTable,
-        and(
-          eq(
-            stationPlatformServicesTable.station_id,
-            stationPlatformsTable.station_id,
-          ),
-          eq(
-            stationPlatformServicesTable.platform_id,
-            stationPlatformsTable.platform_id,
-          ),
-        ),
-      )
-      .where(eq(stationPlatformsTable.station_id, station.id)),
-  );
-  const exitRows = await timeDbQuery('station_profile_q_exits', () =>
-    db
-      .select({
-        id: stationExitsTable.source_object_id,
-        label: stationExitsTable.label,
-      })
-      .from(stationExitsTable)
-      .where(eq(stationExitsTable.station_id, station.id))
-      .orderBy(asc(stationExitsTable.label)),
   );
   const exitsByLabel = new Map(
     exitRows.map((exit) => [exit.label, exit] as const),
@@ -465,15 +551,7 @@ export async function getStationProfileReadModel(
       ),
     ),
   ];
-  const arrivalStationRows =
-    arrivalStationIds.length > 0
-      ? await timeDbQuery('station_profile_q_arrival_destinations', () =>
-          db
-            .select({ id: stationsTable.id, name: stationsTable.name })
-            .from(stationsTable)
-            .where(inArray(stationsTable.id, arrivalStationIds)),
-        )
-      : [];
+  const arrivalStationRows = await loadArrivalStationNames(arrivalStationIds);
   const arrivalStationNames = new Map(
     arrivalStationRows.map(({ id, name }) => [id, parseTranslations(name)]),
   );

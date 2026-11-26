@@ -203,7 +203,7 @@ use SQL with `no-store`; requests never publish replacements.
 
 The external `completed` fingerprint follows all publications, purge and the SQL
 fingerprint. Unchanged pulls validate upstream metadata, payloads and coherent
-range/sitemap/arrival heads before acquiring a SQL lease. Changed or explicit
+range/sitemap/arrival/station heads before acquiring a SQL lease. Changed or explicit
 inputs and missing state keep the writer/repair path. Writers invalidate the
 checkpoint before import or rebuild mutations. An external writer marker keeps
 preflight failure cleanup from opening SQL before lease acquisition.
@@ -214,6 +214,45 @@ Canonical SQL repairs must complete promotion and republish. An authenticated
 empty pull repairs unchanged inputs without importing or advancing generation.
 Check `X-MRTDown-Range-Snapshot-Source` and `range_snapshot_read` for source and
 bytes; verify cold/warm parity and zero SQL on healthy hits.
+
+## Published station profile inputs
+
+With Redis configured, station HTML, server functions and Markdown resolve IDs
+and aliases from `mrtdown:{<tier>:station-profiles:v1}` before opening SQL.
+One source graph supplies scoped profile assembly at the request clock. The
+range payload is unchanged. Station inputs add towns, landmarks, platforms,
+exits and historical issue references; operators and evidence bodies are omitted.
+Community disruption signals remain independently published and expire through
+the existing signal reader.
+
+The shared immutable store caps the graph at 4 MiB encoded and 24 MiB expanded
+JSON, logs `station_profiles_published` bytes, checks digest/schema on cold reads,
+and checks the active head on every request. Its atomic compare-and-swap and
+24-hour previous-payload retention keep crossing reads coherent and reject
+delayed writers. Publication requires a completed canonical generation.
+Canonical and holiday workflows publish before purge and completion; unchanged
+preflights verify the payload and matching generation/fingerprint.
+
+Missing, invalid or unavailable inputs use SQL with `no-store`. Requests do not
+publish replacements. Use an authenticated empty canonical pull to repair, then
+verify a cold and warm profile/code alias against SQL in an isolated environment.
+Station HTML and server-function response deadlines stop at Singapore midnight,
+one hour, or the next relevant incident/signal boundary. Healthy Markdown uses
+the general edge cache policy; SQL-recovery Markdown remains `no-store`.
+Arrival polling retains its separate published inputs and `no-store` contract.
+
+A non-string `active` key causes Redis `WRONGTYPE` errors and cannot be repaired
+by publication retries. After investigating the cause, recover as follows:
+
+1. Stop and drain the canonical-pull and holiday writers that publish station
+   profiles before changing the key.
+2. Run `TYPE 'mrtdown:{<tier>:station-profiles:v1}:active'` against the intended
+   Redis tier. Continue only if it reports a non-string type other than `none`.
+   A string or absent key uses the normal publication repair path.
+3. Run `DEL 'mrtdown:{<tier>:station-profiles:v1}:active'`, deleting only that
+   key. Leave payloads and other namespaces intact.
+4. Restart the writers and run an authenticated canonical pull to publish a new
+   head. Confirm publication succeeds before considering the repair complete.
 
 ## Published sitemap inputs
 
