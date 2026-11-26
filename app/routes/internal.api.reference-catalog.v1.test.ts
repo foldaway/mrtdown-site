@@ -22,7 +22,7 @@ function makeDependencies() {
     }),
     getDb: vi.fn(() => db),
     getReferenceCatalog: vi.fn().mockResolvedValue({
-      recovered: false,
+      usedSqlFallback: false,
       catalog: {
         schemaVersion: 1,
         datasetVersion: '2026-07-19T00:00:00.000Z',
@@ -82,7 +82,7 @@ describe('GET /internal/api/reference-catalog/v1', () => {
     const result = await dependencies.getReferenceCatalog();
     dependencies.getReferenceCatalog.mockResolvedValue({
       ...result,
-      recovered: true,
+      usedSqlFallback: true,
     });
     const response = await handleReferenceCatalogGet(
       makeRequest(),

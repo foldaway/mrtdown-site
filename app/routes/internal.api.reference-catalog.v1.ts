@@ -39,7 +39,7 @@ export async function handleReferenceCatalogGet(
   }
 
   try {
-    const { catalog, recovered } = await dependencies.getReferenceCatalog(
+    const { catalog, usedSqlFallback } = await dependencies.getReferenceCatalog(
       dependencies.getDb,
     );
     return Response.json(
@@ -47,7 +47,9 @@ export async function handleReferenceCatalogGet(
       {
         status: 200,
         headers: {
-          'cache-control': recovered ? 'no-store' : 'private, max-age=300',
+          'cache-control': usedSqlFallback
+            ? 'no-store'
+            : 'private, max-age=300',
         },
       },
     );

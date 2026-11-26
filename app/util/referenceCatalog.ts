@@ -1,7 +1,6 @@
 import type { Translations } from '@mrtdown/core';
 import { asc, eq } from 'drizzle-orm';
 import { DateTime } from 'luxon';
-import type { getDb } from '~/db';
 import {
   linesTable,
   metadataTable,
@@ -9,13 +8,11 @@ import {
   stationsTable,
 } from '~/db/schema';
 
-import { getDefaultDb } from './dbQueries/database';
+import { type AppDb, getDefaultDb } from './dbQueries/database';
 import { reportReferenceSnapshotStore } from './reportReferenceSnapshot.server';
 
 const SG_TIMEZONE = 'Asia/Singapore';
 const DATASET_VERSION_METADATA_KEY = 'manifest_last_pulled_at';
-
-type AppDb = ReturnType<typeof getDb>;
 
 type ReferenceCatalogLineRow = {
   id: string;
@@ -165,7 +162,7 @@ export async function getReferenceCatalog(
           publicCode: code,
         })),
       }),
-      recovered: false,
+      usedSqlFallback: false,
     };
   }
 
@@ -223,6 +220,6 @@ export async function getReferenceCatalog(
       stations,
       memberships,
     }),
-    recovered: Boolean(process.env.REDIS_URL),
+    usedSqlFallback: Boolean(process.env.REDIS_URL),
   };
 }

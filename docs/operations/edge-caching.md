@@ -225,28 +225,24 @@ bytes; verify cold/warm parity and zero SQL on healthy hits.
 ## Published report references
 
 The report form and authenticated producer catalog share
-`mrtdown:{<tier>:report-references:v1}`. Healthy cold and warm reads select this
-completed publication before any SQL connection or generation probe. The form
-keeps all raw option rows for client date selection; both readers apply their
-existing Singapore date rules at request time, including closure dates and
-revision recency. Raw names and nullable values are preserved. Catalog
-`datasetVersion` remains the completed pull timestamp, not a Redis timestamp.
-The range and arrival payloads omit fields required by these contracts, so the
-shared bounded snapshot contains only the original form rows and dataset version.
+`mrtdown:{<tier>:report-references:v1}`. Healthy cold and warm requests use this
+completed publication before opening SQL. Both keep their existing Singapore
+date selection, nullable values, raw names and revision recency; the form also
+returns raw rows for client date selection. Catalog `datasetVersion` remains the
+completed canonical pull timestamp.
 
-The leased canonical pull publishes after completed generation and attested
-promotion checks in one repeatable-read transaction. The existing atomic head,
-size limits and stale-writer checks protect the previous usable publication.
-Unchanged-pull preflight verifies the payload and matching fingerprint/generation;
-missing or invalid inputs enter the existing leased repair path before checkpoint
-completion. An authenticated empty pull repairs unchanged inputs; an explicit
-Navigation seed also republishes them. There is no TTL or request-time refill.
+The leased canonical pull publishes the original form rows and dataset version
+using the existing bounded snapshot store after completed generation and attested
+promotion checks. Atomic activation rejects delayed writers and retains the last
+usable publication during partial imports. Unchanged-pull preflight verifies the
+payload and matching generation/fingerprint. Missing or damaged inputs enter the
+existing leased repair path; an authenticated empty pull or Navigation seed can
+republish them. Requests never refill the snapshot and active inputs have no TTL.
 
-Missing or unavailable publications fall back lazily to SQL with `no-store`;
-local development without Redis retains SQL reads. Catalog authentication still
-runs before input access and successful published responses remain
-`private, max-age=300`. Shared canonical inputs contain no producer credentials
-or private report fields and do not change endpoint access or submission checks.
+Unavailable publications fall back lazily to SQL with `no-store`; development
+without Redis keeps SQL reads. Catalog authentication precedes input access,
+published responses remain `private, max-age=300`, and the shared inputs contain
+only canonical reference data.
 
 ## Published station profile inputs
 

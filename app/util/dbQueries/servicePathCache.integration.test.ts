@@ -559,10 +559,11 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         const corrected = await getCrowdReportFormOptions();
         expect(corrected.lines[0].name['en-SG']).toBe('Corrected');
         const complete = await reportReferenceSnapshotStore.read();
+        if (!complete) throw Error('Completed report references missing');
         const incomplete = {
-          ...complete?.inputs,
+          ...complete.inputs,
           formOptionRows: {
-            ...complete?.inputs.formOptionRows,
+            ...complete.inputs.formOptionRows,
             servicePathEntries: undefined,
           },
         };
@@ -620,7 +621,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         });
         expect(empty).toMatchObject({
           catalog: { lines: [], stations: [], memberships: [] },
-          recovered: false,
+          usedSqlFallback: false,
         });
         expect(headers).not.toHaveBeenCalledWith('Cache-Control', 'no-store');
       });
