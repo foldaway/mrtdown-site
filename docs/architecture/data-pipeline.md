@@ -252,6 +252,13 @@ service time, downtime, and issue summaries for public reads. Facts keep the
 issue counts for lines with unknown start dates or hours. They skip
 service-window and clipped downtime calculations when those inputs are unknown.
 
+Each fact rebuild commits its requested daily rows and station projection
+atomically. A failed batch or station projection leaves the previous fact set
+usable; row computation and inserts remain batched. Profile publication checks
+pending holiday fact dates so unrelated repair cannot combine newly committed
+holidays with unfinished facts. The holiday workflow supplies its completed dates
+after checking its existing writer lease and checkpoint token.
+
 After operational facts, the canonical pull refreshes the persisted statistics
 and sitemap snapshots before purging the public edge-cache tag. Statistics and
 sitemap requests require those successfully rebuilt projections in every

@@ -70,7 +70,15 @@ establish whole-site sleep.
    future/closed/unknown/empty towns, request-clock issue windows and coherent
    station/town relationship corrections. `npm run verify` passed 799 tests across
    102 files with disposable PostGIS/Redis and no skips on November 26. Review
-   and rollout remain separate.
+   and rollout remain separate. PR: [#347](https://github.com/foldaway/mrtdown-site/pull/347).
+6. Producer safety: make all requested fact-date batches and the station projection
+   atomic, and hold profile publication during pending holiday fact repair.
+   Injected final-projection failures preserve every fact table and the previous
+   publication for single-date, explicit-date and range rebuilds. Final
+   `npm run verify` passed 803 tests across 102 files with disposable PostGIS/Redis
+   and no skips on November 26. Source work for this group is complete; review
+   and deployment remain separate. Other audit groups still prevent whole-site
+   sleep acceptance.
 
 Local canonical-corpus validation matched BKP and its BP6 alias cold/warm with
 SQL disabled on November 26 and the December 26 service boundary. The corpus had

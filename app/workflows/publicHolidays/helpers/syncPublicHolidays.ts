@@ -11,7 +11,8 @@ import {
 } from '../../pull/helpers/workflowLease.js';
 import { beginPublicHolidaySync } from './syncCheckpoint.js';
 
-export const PENDING_HOLIDAY_DATES_KEY = 'public_holiday_pending_fact_dates_v1';
+import { PENDING_HOLIDAY_DATES_KEY } from '~/util/dbQueries/operationalFacts';
+export { PENDING_HOLIDAY_DATES_KEY } from '~/util/dbQueries/operationalFacts';
 
 const DATA_GOV_PUBLIC_HOLIDAYS_DATASET_ID =
   'd_8ef23381f9417e4d4254ee8b4dcdb176';
