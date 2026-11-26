@@ -4,10 +4,45 @@ import { fromMarkdown } from 'mdast-util-from-markdown';
 import { toMarkdown } from 'mdast-util-to-markdown';
 import { visit } from 'unist-util-visit';
 
+export const PLAN_HEADINGS = [
+  'Purpose',
+  'Progress',
+  'Surprises & Discoveries',
+  'Decision Log',
+  'Outcomes & Retrospective',
+  'Context and Orientation',
+  'Plan of Work',
+  'Concrete Steps',
+  'Validation and Acceptance',
+  'Idempotence and Recovery',
+  'Artifacts and Notes',
+  'Interfaces and Dependencies',
+].map((heading) => `## ${heading}`);
+
 function headings(tree) {
   return tree.children
     .filter((node) => node.type === 'heading' && node.depth === 2)
     .map((node) => toMarkdown(node).trim());
+}
+
+// GitHub-style heading IDs, including duplicate headings and inline code labels.
+function anchors(tree) {
+  const ids = new Set();
+  visit(tree, 'heading', (node) => {
+    let label = '';
+    visit(node, ['text', 'inlineCode'], (child) => {
+      label += child.value;
+    });
+    const slug = label
+      .toLowerCase()
+      .replace(/[^\p{L}\p{M}\p{N}_\-\s]/gu, '')
+      .replace(/ /g, '-');
+    let id = slug;
+    let suffix = 0;
+    while (ids.has(id)) id = `${slug}-${++suffix}`;
+    ids.add(id);
+  });
+  return ids;
 }
 
 function linkTargets(tree) {
@@ -42,40 +77,75 @@ export function checkDocs(root) {
       .map((entry) => resolve(entry.parentPath, entry.name)),
   ];
 
-  const requiredHeadings = existsSync(templatePath)
-    ? headings(fromMarkdown(readFileSync(templatePath, 'utf8')))
-    : [];
+  const trees = new Map(
+    docs.map((path) => [path, fromMarkdown(readFileSync(path, 'utf8'))]),
+  );
+  const headingAnchors = new Map(
+    [...trees].map(([path, tree]) => [path, anchors(tree)]),
+  );
   const errors = [];
   const indexedPlans = new Set();
 
-  if (requiredHeadings.length === 0) {
-    errors.push('docs/plans/template.md: expected execution plan headings');
+  if (
+    JSON.stringify(
+      trees.has(templatePath) ? headings(trees.get(templatePath)) : [],
+    ) !== JSON.stringify(PLAN_HEADINGS)
+  ) {
+    errors.push(
+      'docs/plans/template.md: use the twelve standard plan headings in order',
+    );
   }
 
   for (const path of docs) {
     const doc = relative(root, path);
-    const tree = fromMarkdown(readFileSync(path, 'utf8'));
+    const tree = trees.get(path);
 
     if (
       relative(planRoot, path).startsWith(`active${sep}`) &&
-      JSON.stringify(headings(tree)) !== JSON.stringify(requiredHeadings)
+      JSON.stringify(headings(tree)) !== JSON.stringify(PLAN_HEADINGS)
     ) {
       errors.push(
         `${doc}: use the headings in docs/plans/template.md in order`,
       );
     }
 
+    if (
+      path === templatePath ||
+      relative(planRoot, path).startsWith(`active${sep}`)
+    ) {
+      const sections = tree.children;
+      for (let i = 0; i < sections.length; i++) {
+        const node = sections[i];
+        if (node.type !== 'heading' || node.depth !== 2) continue;
+        let end = i + 1;
+        while (
+          end < sections.length &&
+          !(sections[end].type === 'heading' && sections[end].depth === 2)
+        )
+          end++;
+        if (
+          !sections
+            .slice(i + 1, end)
+            .some((child) => child.type !== 'heading' && child.type !== 'html')
+        ) {
+          errors.push(`${doc}: empty section ${toMarkdown(node).trim()}`);
+        }
+      }
+    }
+
     for (const { target, isLink } of linkTargets(tree)) {
-      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) continue;
+      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target)) continue;
 
       let linkPath;
+      let fragment;
       try {
         linkPath = decodeURIComponent(target.split(/[?#]/, 1)[0]);
+        fragment = decodeURIComponent(target.split('#').slice(1).join('#'));
       } catch {
         errors.push(`${doc}: invalid encoding in link target ${target}`);
         continue;
       }
-      const linkedPath = resolve(dirname(path), linkPath);
+      const linkedPath = linkPath ? resolve(dirname(path), linkPath) : path;
       const fromRoot = relative(root, linkedPath);
       if (
         isAbsolute(fromRoot) ||
@@ -85,6 +155,13 @@ export function checkDocs(root) {
       ) {
         errors.push(`${doc}: missing repository link target ${target}`);
         continue;
+      }
+      if (fragment && linkedPath.endsWith('.md')) {
+        const ids =
+          headingAnchors.get(linkedPath) ??
+          anchors(fromMarkdown(readFileSync(linkedPath, 'utf8')));
+        if (!ids.has(fragment))
+          errors.push(`${doc}: missing Markdown heading anchor ${target}`);
       }
       if (path === indexPath && isLink) indexedPlans.add(linkedPath);
     }
@@ -111,6 +188,8 @@ if (import.meta.main) {
     console.error(`Documentation check failed:\n- ${errors.join('\n- ')}`);
     process.exitCode = 1;
   } else {
-    console.log('Documentation links, plan index, and active plans are valid.');
+    console.log(
+      'Documentation links, heading anchors, plan index, and active plans are valid.',
+    );
   }
 }

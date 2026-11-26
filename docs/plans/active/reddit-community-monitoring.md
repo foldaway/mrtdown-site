@@ -1,366 +1,144 @@
-# Programmatic Crowd Reports For Reddit Monitoring
+# Verify Reddit monitor integration and cutover
+
+Maintain this living plan using the [planning standard](../README.md#standard-layout).
 
 ## Purpose
 
-### Goals
-
-- Accept structured crowd reports from a small number of registered machine
-  producers without Turnstile or public IP-based rate limiting.
-- Reuse the existing crowd-report schema and downstream behavior wherever the
-  public and programmatic paths have the same semantics.
-- Make producer retries safe with one stable external report ID.
-- Retain enough generic provenance to identify the producer and inspect the
-  upstream source when permitted.
-- Give machine producers a compact canonical line and station catalog for
-  validating parsed identifiers before submission.
-- Keep route names, validation, database fields, and downstream code independent
-  of Reddit.
-- Preserve the existing crawler until the monitor demonstrates equivalent
-  discovery coverage and successful reply monitoring.
-
-### Non-Goals
-
-- Store Reddit threads, comments, usernames, conversation trees, polling state,
-  or Reddit credentials in `mrtdown-site`.
-- Introduce community claims, claim versions, support aggregation, or a second
-  signal lifecycle.
-- Add a separate canonical `community-signal` ingest contract.
-- Reconstruct conversations or correlate Reddit authors in the site.
-- Batch reports in the first version.
-- Publish an npm package or generated OpenAPI client for this small initial
-  boundary.
-- Replace the public human-report endpoint or weaken its Turnstile, abuse, and
-  rate-limit protections.
-- Make Reddit authoritative; the monitor still decides only whether a source
-  object is useful enough to submit as a community report.
+Prove that a source-specific monitor discovers useful Reddit posts and replies
+and delivers each as a safe programmatic crowd report. The site contract and
+monitor runtime exist in source, and the crawler source already removed Reddit.
+Remaining work is to reconcile deployed state and record coverage/cutover evidence.
 
 ## Progress
 
-- [x] Add the authenticated programmatic report endpoint (2026-07-18).
-- [x] Add the reference catalog for producers (2026-07-19).
-- [ ] Integrate the monitor in shadow mode and compare its results with the
-  existing Reddit crawler before cutover.
+- [x] (2026-07-18–19) Implement site endpoint and v1 producer catalog; retain
+  the [delivery record](../completed/programmatic-crowd-reports.md).
+- [x] (2026-11-26) Inspect sibling monitor runtime and crawler removal in source.
+- [ ] Reconcile actual deployments and recover existing rollout evidence.
+- [ ] Compare shadow discovery, parsed replies, retries and moderation.
+- [ ] Verify a complete 24-hour thread workflow and one active delivery path.
 
 ## Surprises & Discoveries
 
-### Measured Workload and Initial Cadence
+July 17 sampling found about 54 posts/day across two target subreddits but only
+one to three genuinely live operational threads/month. Roughly 77–88% of sampled
+replies arrived within three hours. This supports a small initial cadence, but
+old sampling does not prove current discovery coverage.
 
-A 2026-07-17 sample found approximately 54 new posts per day across the two
-target subreddits and about 2.65 daily matches for a deliberately broad rail
-keyword query. Manual sampling suggested only roughly one to three genuinely
-live operational threads per month.
-
-Reply traffic was front-loaded in representative disruption threads: roughly
-77% to 88% of sampled replies arrived within three hours. This supports a small
-fixed workflow schedule rather than a general polling scheduler or adaptive
-watch queue. Start with four polls during the first hour, followed by polls at
-three, six, and 24 hours. Change the cadence only after observing missed useful
-updates or unnecessary request volume.
+The local crawler at `d1b2e1c648b3493441bd1b95ed24dd5b3dca27b1` has no Reddit
+source; [removal commit](https://github.com/foldaway/mrtdown-data-crawler/commit/56c37817a7911ab17559c38a857d6d0b02433cd7)
+dates to July 29. The monitor at `a2df9fe5a8eacfbf98800a18868dfb9c010813f1`
+has public-shadow discovery, parsing, delivery and fixed reply Workflows.
+Its runtime explicitly rejects OAuth as unimplemented. Neither checkout proves
+what is deployed or that the original cutover gates passed.
 
 ## Decision Log
 
-- 2026-07-17: Use a dedicated Worker because frequent mostly-empty Reddit
-  discovery is a better fit for Cloudflare scheduling than waking the
-  scale-to-zero site.
-- 2026-07-18: Keep Reddit discovery in the existing crawler until the new
-  monitor demonstrates equivalent coverage.
-- 2026-07-18: Supersede the community-observation and community-claim designs
-  with a programmatic crowd-report endpoint feeding the existing site pipeline.
-- 2026-07-18: Keep conversations and workflow state entirely in the monitor;
-  each useful post or reply becomes one independent structured report.
-- 2026-07-18: Use one generic external report ID for retry safety instead of an
-  event inbox, claim version, or site-side lifecycle.
-- 2026-07-18: Defer OpenAPI generation until multiple producers or observed
-  contract drift justify it.
-- 2026-07-19: Expose a small authenticated `v1` reference catalog so machine
-  producers can validate parsed IDs without coupling to site-internal tables or
-  vendoring canonical data. Derive aliases only from canonical localized names.
+- 2026-07-17–19 — Keep discovery/state in a dedicated Worker; submit independent
+  structured reports through the existing site pipeline. Use generic producer
+  provenance and stable external IDs rather than a second claim lifecycle.
+- 2026-07-18 — Retain the crawler until equivalent discovery and useful reply
+  handling are demonstrated. This is the original gate; source removal alone
+  does not establish that it passed.
+- 2026-07-19 — Use the small authenticated catalog; defer OpenAPI/client generation
+  until multiple real producers or observed drift justify it.
+- 2026-11-26, documentation review — Do not schedule already-delivered crawler
+  removal or monitor implementation again. Recover existing rollout evidence
+  and validate remaining runtime outcomes.
 
 ## Outcomes & Retrospective
 
-The site endpoint and reference catalog are implemented. Shadow monitoring
-and cutover still require the checks in phases 2 and 3.
+Site and monitor source delivery plus crawler source removal are verified by
+inspection; deployment, shadow comparison and cutover acceptance are unverified.
+This documentation review did not contact Reddit, provision credentials or
+change dispatch.
 
-## Context
+## Context and Orientation
 
-`mrtdown-data-crawler` currently discovers Reddit submissions through an RSS
-search and sends relevant posts into the MRTDown ingestion path once. That has
-worked reliably for more than a year, but it cannot revisit a useful thread to
-find replies that report changing delays, wider impact, corrections, or service
-recovery.
-
-The sibling `mrtdown-reddit-monitor` Cloudflare Worker will take over this
-source-specific work. It will discover potentially relevant posts in
-`r/singapore` and `r/askSingapore`, retain selected conversations in D1, parse
-useful posts and replies into the same structured shape as commuter reports,
-and submit each useful source object as one programmatic crowd report.
-
-`mrtdown-site` does not need a Reddit subsystem. It only needs a small private
-endpoint for authenticated machine producers. Reports received through that
-endpoint should enter the existing crowd-report validation, moderation,
-clustering, presentation, and dispatch pipeline.
-
-Related references:
-
-- [Crowdsourced reports](../completed/crowdsourced-reports.md)
-- [Data pipeline](../../architecture/data-pipeline.md)
-- `app/routes/api.reports.tsx`
-- `app/util/crowdReports.ts`
-- `app/util/crowdReportDispatch.ts`
-- `../mrtdown-reddit-monitor/README.md`
-
-### Chosen approach
-
-Add a generic programmatic crowd-report endpoint to `mrtdown-site` and keep all
-Reddit-specific acquisition and interpretation in `mrtdown-reddit-monitor`.
-
-```text
-Reddit post or useful reply
-  -> mrtdown-reddit-monitor discovers, stores, and parses it
-  -> POST /internal/api/crowd-reports
-  -> existing mrtdown-site crowd-report pipeline
-  -> existing crowd-report dispatch to mrtdown-data
-```
-
-The unit crossing the boundary is a crowd report, not a conversation,
-observation event, claim, or community signal. A relevant thread produces one
-report. A later relevant reply produces another report. For example, a reply
-reporting that service has resumed is submitted with `isStillHappening: false`.
-
-This supersedes the earlier community-observation and community-claim designs.
-Do not add claim lifecycle, cross-source merging, Reddit conversation storage,
-or a parallel community-signal product model to the site.
-
-### Site Boundary
-
-#### Endpoint
-
-Add:
-
-```text
-POST /internal/api/crowd-reports
-Authorization: Bearer <producer secret>
-Content-Type: application/json
-```
-
-Use a producer-specific bearer secret initially. The endpoint should reject
-missing or invalid authentication before parsing or persisting a report. Keep
-the authentication helper separate from the bearer token used by scheduled
-site tasks so credentials can be rotated or revoked independently.
-
-The request should add only generic delivery and provenance fields around the
-existing structured crowd-report input:
-
-```json
-{
-  "externalReportId": "opaque-producer-owned-id",
-  "sourceUrl": "https://example.com/optional-upstream-source",
-  "report": {
-    "reportScope": "line",
-    "observedAt": "2026-07-18T08:00:00+08:00",
-    "lineIds": ["CCL"],
-    "stationIds": [],
-    "effect": "delay",
-    "delayMinutes": 10,
-    "isStillHappening": true
-  }
-}
-```
-
-`externalReportId` is opaque to the site and unique within the authenticated
-producer. The monitor may derive it from a source-object identity, but it
-should not need to expose Reddit fullname syntax. `sourceUrl` is optional,
-bounded, and must use an allowed HTTP or HTTPS origin policy.
-
-The nested `report` uses the existing structured submission fields, excluding
-public-only fields such as `turnstileToken` and `clientFingerprint`.
-
-#### Response and idempotency
-
-Return `202` with the site report ID and moderation status when a report is
-created. Repeating the same producer and `externalReportId` must return the
-original result without creating another report. Reusing the ID with a
-different payload should return `409`, making producer bugs visible rather than
-silently changing a submitted report.
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "site-report-id",
-    "status": "accepted",
-    "duplicateOfId": null,
-    "idempotentReplay": false
-  }
-}
-```
-
-A single database uniqueness constraint on `(producer, external_report_id)` is
-the idempotency boundary. A separate inbox or event table is unnecessary.
-
-#### Persistence
-
-Extend `crowd_reports` with the minimum provenance required by both routes:
-
-- a submission source or producer identifier, defaulting existing and public
-  submissions to `public`;
-- nullable external report ID;
-- nullable upstream source URL;
-- optionally a request payload digest if needed to detect conflicting retries.
-
-Generate the migration through Drizzle. Do not create programmatic-report,
-claim, observation, conversation, or delivery tables in the site.
-
-Refactor the current persistence function into:
-
-- shared structured-report insertion and automoderation;
-- the existing public wrapper, which continues to record Turnstile, hashed
-  client, abuse, and rate-limit state; and
-- a programmatic wrapper, which records producer provenance but does not invent
-  an IP address, Turnstile outcome, or browser fingerprint.
-
-Programmatic submissions should reuse reference validation, duplicate
-detection, clustering, cache invalidation, and dispatch triggering. Producer
-policy may allow one authenticated report to be accepted without satisfying
-the public distinct-IP threshold; this must be explicit at the wrapper call
-site and covered by tests. Do not encode a fake producer identity in the
-`crowd_report_abuse_events` table.
-
-#### Contract ownership
-
-The route's Zod schema in `mrtdown-site` is the runtime source of truth. Keep a
-concise request and response example in this plan and in the monitor README.
-The monitor should treat `400` and `409` as non-retryable contract errors and
-authentication or server failures according to their status and retry policy.
-
-Do not add OpenAPI generation, vendoring, compatibility windows, or generated
-consumer types until the boundary has more than one real producer or manual
-contract drift becomes a demonstrated problem.
-
-#### Reference catalog
-
-Registered producers may use the same bearer credential to call:
-
-```text
-GET /internal/api/reference-catalog/v1
-```
-
-The versioned response contains the last completed canonical dataset-pull
-timestamp, the Singapore reference date used to select active records, active
-line IDs with validity dates, active station entities with localized names and
-flat searchable aliases, public station codes, and station-to-line membership
-validity dates. Aliases are derived from non-empty canonical localized names;
-the site does not invent or maintain a separate alias list.
-
-The catalog is a producer convenience, not an alternative source of truth for
-ingestion. The report endpoint continues validating submitted references at the
-report's observation date, which also protects producers using a briefly stale
-catalog.
-
-### Monitor Boundary
-
-This plan does not implement the sibling Worker, but the site contract assumes
-the following simple behavior:
-
-1. Search configured feeds for new potentially relevant posts.
-2. Parse a relevant post into the structured crowd-report fields.
-3. Store the selected post and its delivery state in D1.
-4. Submit it once through the programmatic endpoint, retrying until the site
-   acknowledges its stable external report ID or returns a non-retryable
-   error.
-5. Start one Cloudflare Workflow for the selected thread.
-6. Re-fetch replies approximately at `+10m`, `+25m`, `+40m`, `+55m`, `+3h`,
-   `+6h`, and `+24h`.
-7. Store and deduplicate replies in D1. Parse only new or materially changed
-   source objects.
-8. Submit each reply that contains a meaningful service update as its own
-   programmatic crowd report.
-9. Complete the workflow after the final poll.
-
-The monitor owns relevance detection, Reddit transport, source storage,
-workflow scheduling, source-object deduplication, parsing, and delivery retry.
-The site neither knows nor cares whether a report originated from a post,
-reply, edit, or another future producer.
+The [producer contract](../../architecture/data-pipeline.md#programmatic-crowd-reports)
+owns credentials, request examples and responses. The sibling
+`mrtdown-reddit-monitor` owns Reddit transport, D1 conversations, parsing, polling
+and delivery state. Its `src/runtime/scheduled-discovery.ts` and
+`src/runtime/reddit-thread-workflow.ts` wire the implemented public-shadow path.
+The crawler's `src/sources/rss.ts` now contains Mastodon/news feeds, not Reddit.
+Public/canonical output may need isolation for shadow evaluation because accepted
+producer reports normally trigger dispatch.
 
 ## Plan of Work
 
-### Phase 1: Add the programmatic endpoint (completed 2026-07-18)
+Inspect the monitor/crawler revisions and environments first. Configure a
+producer and endpoint in a disposable or staging setup with dispatch output
+explicitly controlled. Public-shadow describes the Reddit transport, not a
+guarantee that site output is disabled. Recover the incumbent's dated discovery
+baseline or define a reviewed replacement sample, then inspect useful replies,
+observation times, resolution (`isStillHappening: false`) and irrelevant discussion.
 
-- Define the small authenticated request schema alongside the crowd-report
-  domain code.
-- Add generic provenance and external-ID fields to `crowd_reports` through a
-  generated Drizzle migration.
-- Refactor shared persistence so the public and programmatic routes use the
-  same structured validation and automoderation without sharing public abuse
-  assumptions.
-- Add `POST /internal/api/crowd-reports`.
-- Trigger the existing dispatch and cache-purge behavior after a successful new
-  report.
+The implemented cadence is +10, +25, +40, +55 minutes, +3, +6 and +24 hours;
+change only with evidence of missed updates or wasted work. Each useful reply has its own
+stable external ID. Record retry/replay and moderation outcomes.
 
-Exit criteria:
+Recover trust/coverage approval and cutover receipts if they exist. Otherwise
+validate them in the isolated target before any runtime change. Observe one full
+24-hour workflow and confirm only one deployed source submits Reddit reports.
+Do not repeat source removal; source absence cannot prove the live crawler stopped.
 
-- A valid authenticated request creates one normal crowd report.
-- A retry returns the existing report without duplicating joins, moderation,
-  clustering, cache work, or dispatch.
-- A conflicting retry returns `409`.
-- Invalid credentials and malformed reports are rejected.
-- The public endpoint retains its current behavior.
-- No Reddit-specific route, schema, or table name exists in the site.
-- `npm run verify` passes.
+## Concrete Steps
 
-### Phase 1b: Add the producer reference catalog (completed 2026-07-19)
+From the site root with dependencies and disposable test services configured:
 
-- Add an authenticated `v1` reference-catalog endpoint using the producer
-  credential registry.
-- Project active lines, stations, public codes, and dated memberships directly
-  from the canonical local read model.
-- Version each response with the last completed dataset-pull timestamp.
-- Cover authentication, unavailable datasets, active-date filtering, alias
-  projection, and response caching with deterministic tests.
+```sh
+npm run verify
+```
 
-Exit criteria:
+Expect authentication, schema/reference, idempotency, dispatch and public-route
+regressions to pass. Follow the producer guide for authenticated catalog GET and
+report POST requests in the isolated target; POST persists and can dispatch.
+In the sibling monitor root, run its deterministic check and, for an isolated
+local runtime with local D1/configuration and output controlled, its dev server:
 
-- The monitor can validate line IDs, station IDs, and line membership without
-  copying canonical reference data into its repository.
-- The response is small, deterministic, generic, and explicitly versioned.
-- The submission endpoint remains the authoritative observed-date validator.
-- `npm run verify` passes.
+```sh
+npm ci
+npm run check
+npm run dev
+```
 
-### Phase 2: Integrate the monitor in shadow mode
-
-- Give the monitor a producer credential and the site endpoint URL.
-- Accept reports in staging or private inspection while public/canonical output
-  remains disabled if needed for evaluation.
-- Compare discovered relevant posts with `mrtdown-data-crawler`.
-- Inspect whether parsed replies add useful updates and whether resolution
-  reports behave correctly in the existing pipeline.
-
-Exit criteria:
-
-- Relevant posts are not lost across retries or repeated discovery.
-- Useful replies appear as separate reports with correct observation times.
-- Irrelevant discussion does not produce reports at an unacceptable rate.
-- The team is satisfied with initial report trust and moderation policy.
-
-### Phase 3: Cut over
-
-- Enable the normal crowd-report dispatch behavior for the registered producer.
-- Observe at least one complete 24-hour thread workflow.
-- Disable Reddit discovery and dispatch in `mrtdown-data-crawler`, retaining a
-  short rollback window.
-- Remove the crawler path in a separate focused change after the new path is
-  proven.
-
-Exit criteria:
-
-- The monitor covers new relevant threads at least as well as the crawler.
-- Reply updates reach the existing crowd-report pipeline.
-- Retries do not create duplicate reports or canonical dispatches.
-- Only the monitor/site path produces new Reddit-derived reports.
+These are existing scripts. Dependencies install locally; checks use synthetic
+fixtures. Dev execution can reach external Reddit/AI/site services when configured.
+Consult that repository's README and rollout procedure before any deployed canary;
+this plan does not introduce a shadow-output flag or authorize deployment.
 
 ## Validation and Acceptance
 
-Run `npm run verify` after implementation. The endpoint test suite should cover
-authentication, schema validation, missing station/line references,
-idempotent retry, conflicting retry, programmatic trust policy, dispatch
-triggering, and unchanged public endpoint behavior.
+A relevant post survives rediscovery/retry without duplicate site or canonical
+reports. A useful reply becomes a distinct correctly timed update; resolution
+is preserved. Identical producer/external-ID retries return the original result,
+conflicting payloads return 409, and public protections remain intact. Reviewers
+accept discovery coverage, irrelevant-report rate and trust policy before cutover.
+A full 24-hour workflow and single active delivery path prove the final outcome.
+
+## Idempotence and Recovery
+
+Keep producer/external IDs stable across retries. Treat 400/409 as contract
+errors to inspect rather than endlessly retrying; handle authentication/server
+failures through the monitor's recorded policy. Retain conversation/delivery state.
+On runtime failure, pause monitor delivery and preserve pending D1 state. The
+current crawler source cannot serve as a Reddit fallback; select and review an
+explicit compatible prior revision before restoration, and reconcile overlap
+so two paths do not submit duplicates. Rotate producer credentials independently of scheduled site-task credentials.
+
+## Artifacts and Notes
+
+The [site delivery record](../completed/programmatic-crowd-reports.md) retains
+July findings and decisions. The sibling SHAs above identify obtained source
+evidence; still required are deployed SHAs, target settings without secrets,
+comparison window/counts, reply/retry examples, trust approval,
+24-hour run receipt and rollback-window decision. No production cutover is inferred.
+
+## Interfaces and Dependencies
+
+[Runtime request schema](../../../app/util/programmaticCrowdReports.ts),
+[persistence tests](../../../app/util/programmaticCrowdReportPersistence.test.ts)
+and [catalog](../../../app/util/referenceCatalog.ts) own the site boundary.
+Reports share moderation, clustering and dispatch; the monitor owns source and
+polling state. Do not add Reddit-specific tables, fake IP abuse records, a parallel
+signal lifecycle or an OpenAPI package for this integration.

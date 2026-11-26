@@ -48,24 +48,23 @@ The external completed-fingerprint checkpoint is written after publication,
 purge and the successful SQL fingerprint. Unchanged polls validate
 upstream inputs and the recoverable Redis snapshot before acquiring a SQL
 lease. Changed/explicit inputs and missing snapshots keep the normal writer
-path. Station profiles use a separate published graph; the remaining entity
-profiles and directories still use SQL. The [snapshot runbook](../operations/edge-caching.md#published-zero-sql-range-inputs)
+path. Profiles and directories use a separate published graph. The
+[snapshot runbook](../operations/edge-caching.md#published-zero-sql-range-inputs)
 owns limits and recovery; the [sleep plan](../plans/active/neon-sleep.md)
 tracks the remaining wake-ups.
 
-### Published station profile inputs
+### Published profile and directory inputs
 
-Canonical and holiday publication also write a bounded station graph from one
-completed repeatable-read snapshot. It contains source rows for request-time
-membership, service and issue selection, station details, platforms and exits.
-Historical issue references preserve the SQL reader's related-entity scope.
-Community signals retain their independent writer-driven cache and expiry.
+Canonical and holiday publication write one completed source graph for station,
+line, operator and town profiles and station/line/town directories. Authenticated
+facts rebuilds republish its facts under the same writer boundary. Request-time
+assembly retains dated memberships, issue state and ranking windows; it does not
+synthesize absent facts. HTML, server functions and Markdown share the loaders.
 
-HTML, server-function and Markdown station callers share this reader. Valid
-published inputs resolve IDs, aliases and unknown stations without SQL. Missing
-or invalid inputs use lazy SQL recovery with `no-store`; an unchanged canonical
-pull repairs publication before purge and checkpoint completion. See the
-[station snapshot runbook](../operations/edge-caching.md#published-station-profile-inputs).
+Missing or invalid publications use lazy uncached SQL recovery. The
+[profile runbook](../operations/edge-caching.md#published-station-profile-inputs)
+owns bounds, expiry, pending-holiday guards and repair. Community signals have
+independent write-driven publication and display expiry.
 
 ### Published Issue Profile inputs
 
@@ -77,38 +76,21 @@ and invalid snapshots retain uncached SQL recovery. Holiday/facts rebuilds do no
 change these inputs. See the [runbook](../operations/edge-caching.md#published-issue-profile-inputs)
 for bounds, retention and response-time publication checks.
 
-### Arrival topology reuse
+### Arrival serving and SQL recovery
 
-Finalization also validates and hashes the actual live schedule topology, then
-atomically records `canonical_topology_attestation_v1` with the promotion marker
-and last-pull timestamp. The first live promotion write clears the attestation.
-This also runs without Redis. Pipeline version 7 forces one full pull
-for unchanged upstream inputs; timetable pins, admission and projection reuse
-retain their existing rules.
+Healthy arrival requests use coherent published metadata and departure partitions
+with the existing admission/coverage policy. See the
+[arrivals runbook](../operations/edge-caching.md#published-arrivals-reader).
+The SQL recovery path retains a process-local topology memo validated inside its
+repeatable-read transaction against completed promotion and topology attestation.
+It avoids repeated topology-table transfer but still uses SQL; it cannot prove
+idle suspension. The [reader](../../app/util/dbQueries/scheduleTopologyCache.ts)
+owns memo bounds and diagnostics.
 
-The topology memo reuses this topology inside each Node process. The [reader](../../app/util/dbQueries/scheduleTopologyCache.ts)
-checks promotion and attestation through the arrival request's read-only
-repeatable-read transaction. A warm hit skips all 11 topology-table reads;
-history, eligibility, coverage, departures and display names still use SQL.
-Arrival responses remain `no-store`, and rider reports remain fresh.
-
-The memo holds one object of at most 1 MiB per database handle, cloned for each
-caller. Cold processes, invalid/missing attestation, digest disagreement or
-oversized topology use the original SQL loader. Missing promotion completion
-still fails closed. Page-profile generation and Redis publication do not select
-or validate arrival topology. Facts and holiday rebuilds do not invalidate it.
-
-A completed full pull establishes the attestation; no separate seed is needed.
-Topology repairs must use the promotion protocol; direct table edits must first
-clear the promotion marker and attestation. An older finalizer's last-pull
-timestamp mismatch forces SQL fallback. Validation now happens at finalization,
-so malformed topology prevents that promotion from completing.
-
-`schedule_topology_read` logs source, bypass reason, duration, selected-row count,
-encoded JSON bytes on SQL loads, and promotion token. Counts and bytes are
-diagnostic proxies, not billed network transfer. `schedule_topology_load` and
-`schedule_topology_rows` also appear in Server-Timing. See the [investigation](../investigations/2026-11-18-station-arrival-topology.md)
-for evidence, parity checks and the pending production measurement.
+Canonical finalization establishes attestation; promotion clears it before live
+writes. Direct topology repair must follow that protocol. The
+[November investigation](../investigations/2026-11-18-station-arrival-topology.md)
+records the original SQL-path measurement and parity evidence.
 
 Long timetable imports use `PULL_WORKFLOW_URL` for the signed QStash pull
 endpoint. Production and staging target their direct Fly HTTPS origins so
@@ -161,8 +143,8 @@ Rotate the configured pin and source together after draining active pulls. An
 old signed request can conflict with a new pin, and a stale archive fails
 verification. A pin change forces the next pull to download the archive.
 Keep review and artifact contents out of deployment variables and schedule
-bodies. See the [timetable rollout plan](../plans/active/combined-timetable-pull-rollout.md)
-for staging acceptance and preview options.
+bodies. See [timetable operation](../operations/timetable-imports.md)
+for rotation, replay verification and preview options.
 
 ### Projection and repair
 
@@ -174,8 +156,9 @@ source ordering.
 
 A pull can reuse a completed projection when the release, projector version,
 topology, and date coverage still match. Reuse leaves the stored departures
-untouched. The [rollout plan](../plans/active/combined-timetable-pull-rollout.md)
-records the checks that verified replay.
+untouched. The [November replay record](../plans/completed/combined-timetable-pull-rollout.md)
+records the dated checks; [timetable operation](../operations/timetable-imports.md)
+owns the reusable procedure.
 
 For intentional repair, send `{ "rebuildScheduledTimetableProjection": true }`
 on an authenticated pull. It bypasses the fingerprint skip and projection

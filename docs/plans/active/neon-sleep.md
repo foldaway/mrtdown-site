@@ -1,116 +1,32 @@
-# Let Neon sleep between canonical changes
+# Verify sustained Neon sleep between canonical changes
+
+Maintain this living plan using the [planning standard](../README.md#standard-layout).
 
 ## Purpose
 
-Serve ordinary public reads without opening Postgres, so unchanged canonical
-data can leave Neon suspended. Range, arrival, report and sitemap cache rollouts
-and unchanged-input preflights are complete. Entity/profile, statistics and
-background SQL dependencies remain; production-wide sleep is not established.
+Serve ordinary public requests and unchanged scheduled work without opening
+Postgres, then demonstrate sustained provider suspension under ordinary traffic.
+Source paths exist for the audited route families; production-wide sleep has
+not been established. Recovery, administration and real writes may use SQL.
 
 ## Progress
 
-- [x] Confirm the pre-rollout production compute remained effectively continuously
-  active despite the reference/path caches and arrival topology memo.
-- [x] Publish immutable, bounded range source snapshots and an atomic Redis head.
-- [x] Assemble ranges at the request clock without SQL on a valid snapshot hit.
-- [x] Skip unchanged pulls before acquiring a SQL lease; repair absent snapshots.
-- [x] Cover holiday publication, corruption/fallback, publication races and
-  SQL parity across date boundaries; run repository verification.
-- [x] Separately validate staging and the user-authorized production cutover.
-- [ ] Remove remaining public/background wake-ups and verify sustained sleep.
-
-### Arrivals follow-up
-
-- [x] Separate timetable eligibility, coverage and reviewed rollback decisions
-  from SQL reads so published inputs can reuse the same policy.
-- [x] Publish coherent admission history, topology, projection/coverage metadata
-  and display labels; reject partial promotions and failed projections.
-- [x] Publish bounded departure partitions for all retained covered dates,
-  preserving untimed counts, shared memberships, platforms and 24+ hour tails.
-- [x] Serve recent rider reports, including empty results and expiry, without
-  polling Postgres. Refresh them from their write paths.
-- [x] Prove the complete arrivals endpoint works with SQL disabled across clock,
-  correction, coverage and report changes before a separate activation.
-
-### Community disruption signals follow-up
-
-Source now caches home, station and line public signal inputs separately from
-arrival reports. Writers invalidate/refresh, and an explicit repair command
-initializes empty results. See the [runbook](../../operations/edge-caching.md#public-community-disruption-signals).
-Deployment and production verification remain separate; this change does not
-establish whole-site sleep.
-
-### Public profiles and directories follow-up (audit item 2)
-
-1. Station profiles: publish a separate bounded source graph and share the
-   existing HTML/server-function/Markdown loader. Source implementation and
-   local parity checks are complete. `npm run verify` passed 786 tests across
-   101 files with disposable PostGIS/Redis and no skips on November 26. Review
-   and rollout are separate.
-2. Line profiles: reuse the station source graph with operator labels and dated
-   ranking facts. Complete loader cold/warm SQL parity and repository verification
-   passed locally on November 26 (793 tests, 102 files, no skips, disposable
-   PostGIS/Redis). Review and rollout remain separate. The line directory remains
-   in step 3. First focused PR: [#344](https://github.com/foldaway/mrtdown-site/pull/344).
-3. Station and line directories: reuse the shared graph with persisted active
-   issue-day candidates and latest station disruptions. Local cold/warm complete
-   loader parity preserves future/closed memberships, moving ranking windows,
-   null uptime and absent day facts. `npm run verify` passed 795 tests across
-   102 files with disposable PostGIS/Redis and no skips on November 26. Review
-   and rollout remain separate. PR: [#345](https://github.com/foldaway/mrtdown-site/pull/345).
-4. Operator profiles: reuse the shared graph and issue-scope selector. Full loader
-   cold/warm parity covers historical ownership, empty/unknown operations and
-   incident boundaries with SQL disabled. `npm run verify` passed 797 tests
-   across 102 files with disposable PostGIS/Redis and no skips on November 26.
-   Review and rollout remain separate. There is no separate operator directory
-   loader; line directories include operator labels. PR:
-   [#346](https://github.com/foldaway/mrtdown-site/pull/346).
-5. Town profiles and directory: reuse the existing graph and profile selector.
-   Local full-loader SQL parity covers cold/warm operation with DB access throwing,
-   future/closed/unknown/empty towns, request-clock issue windows and coherent
-   station/town relationship corrections. `npm run verify` passed 799 tests across
-   102 files with disposable PostGIS/Redis and no skips on November 26. Review
-   and rollout remain separate. PR: [#347](https://github.com/foldaway/mrtdown-site/pull/347).
-6. Producer safety: make all requested fact-date batches and the station projection
-   atomic, and hold profile publication during pending holiday fact repair.
-   Injected final-projection failures preserve every fact table and the previous
-   publication for single-date, explicit-date and range rebuilds. Final
-   `npm run verify` passed 803 tests across 102 files with disposable PostGIS/Redis
-   and no skips on November 26. Source work for this group is complete; review
-   and deployment remain separate. Other audit groups still prevent whole-site
-   sleep acceptance.
-
-Local canonical-corpus validation matched BKP and its BP6 alias cold/warm with
-SQL disabled on November 26 and the December 26 service boundary. The corpus had
-233 stations and 765 issues; the station payload was 877,636 encoded bytes
-(limit 4 MiB). These are local source measurements, not production evidence.
-Duplicate exit labels now use the same ID tie-breaker in SQL and publication.
-
-Each slice above covers its named route family. Source completion, review and
-production rollout are separate; sustained whole-site sleep is not established.
-
-### Statistics follow-up (audit item 3)
-
-Source now publishes the persisted statistics rebuild after completed canonical
-promotion and authenticated facts rebuilds. Healthy cold/warm loaders and
-unchanged-pull preflight use Redis without SQL. Recovery uses SQL and bypasses
-shared caching. Rolling windows retain the rebuild clock across midnight and
-cache repair. See the [pipeline boundary](../../architecture/data-pipeline.md#published-statistics).
-Review and rollout are separate; this slice does not establish whole-site sleep.
-
-### Issue Profiles follow-up (audit item 4)
-
-Full issue reads now use the shared bounded snapshot store and request-clock
-assembly. Unknown IDs and invalid inputs retain uncached SQL recovery; the
-[runbook](../../operations/edge-caching.md#published-issue-profile-inputs) owns repair.
-Local checks cover all 765 canonical issues at November 26 and December 26 clocks.
-Deployment and whole-site sustained sleep remain unverified.
+- [x] (2026-11-26 review) Confirm published paths for ranges, arrivals, reports,
+  sitemap, profiles/directories, statistics, report references and idle dispatch.
+- [x] Preserve the separately verified range/arrival production rollout in the
+  [delivery record](../completed/published-serving-inputs.md).
+- [ ] Check the deployed revision and publication readiness for later slices;
+  coordinate their review/rollout separately.
+- [ ] Audit remaining ordinary traffic and background wake-ups on that revision.
+- [ ] Record a representative provider observation window and sustained sleep.
 
 ## Surprises & Discoveries
 
-Before source snapshots, range hits still selected canonical generation, issues
-and holidays, and scheduled pulls acquired a SQL lease before fetching upstream
-metadata. Both patterns defeated idle suspension despite bulk topology caches.
+Bulk topology caches did not establish sleep: readers still checked SQL
+freshness and scheduled pulls acquired a lease before comparing inputs. A valid
+cache hit must avoid connection acquisition as well as row reads. The original
+production rollout exhausted QStash's 1,000-message quota; its obsolete DLQ run
+must not be resumed. See the dated delivery record for exact identities.
 
 ## Decision Log
 
@@ -120,104 +36,95 @@ metadata. Both patterns defeated idle suspension despite bulk topology caches.
   assembled dataset. Retain the active immutable snapshot until superseded;
   requests read its Redis pointer without a SQL generation check. SQL remains
   the recovery path for missing/unavailable snapshots.
+- 2026-11-26, documentation review — Consolidate remaining acceptance here.
+  Keep source delivery and local parity separate from deployment and provider
+  evidence; optional historical egress attribution lives in tech debt.
 
 ## Outcomes & Retrospective
 
-Range, arrivals, reports, sitemap and holiday preflight rollout is complete in
-staging and production at `3fa45dedec3d374a33a5386c9272bd8d5bbee25b`.
-[Staging deployment](https://github.com/foldaway/mrtdown-site/actions/runs/45431025187)
-and [production deployment](https://github.com/foldaway/mrtdown-site/actions/runs/45431344887)
-passed. Both production Machines served healthy origin responses on that SHA.
-Rollout flags have been retired in source; Redis configuration now selects the
-supported cache path. The [runbook](../../operations/edge-caching.md) owns repair.
-This cleanup does not deploy code or remove live secrets.
+The [delivery record](../completed/published-serving-inputs.md) preserves exact
+production receipts, manifest digests, corpus measurements and local checks.
+Source coverage now includes later audit groups; this review did not deploy or
+measure provider sleep. Whole-site acceptance remains open.
 
-- Staging: 184 departure partitions, 7,186,456 encoded bytes, largest 102,544
-  bytes, one projection digest. Initial rebuild took about 6m46s; reuse took 22s.
-- Production: 368 partitions, 15,478,788 bytes, largest 131,012 bytes, two
-  projection digests. Every hash matched the previous publication; active keys
-  were persistent and heads coherent.
-- Publication `wfr_jCkwr7iSMu7yq-jtDTbjz` succeeded in 25,764ms with plan and
-  activation, without any partition publication steps. Departure manifest digest:
-  `6650958b9d37eab43eed5c831c8feccfb342806a4f5b24bd08306593b61c85e8`.
-- Unchanged pull `wfr_PNpNCNWR2dbm5QQytYF2k` finished in 4,501ms with only
-  initialization and canonical preflight. Holiday receipt initialization and
-  subsequent unchanged run `wfr_XxBi2mw3bD7IAPpqEWMll` proved the same boundary
-  in 5,323ms. Both preflights returned true with `DATABASE_URL` unset.
-- Full v2 branch/platform responses matched SQL at a fixed daytime clock,
-  cold/warm without `DATABASE_URL`. Live origin arrivals returned 200 with
-  scheduled/complete coverage and `no-store`. SQL and both sitemap origins matched
-  SHA-256 `13ddf548289a99272ada11e47e01de1252a4ff9cc921ccb1e2969f4627648008`.
+## Context and Orientation
 
-The first production upgrade exhausted QStash's daily 1,000-message quota after
-manifest activation. Failed run `wfr_mPROlIO3fGVs-troZTArq` remains in DLQ as
-evidence; its handler released the lease and the fresh publication recovered
-after quota reset. Do not resume the obsolete run.
-
-Cloudflare accepted the production data-tag purge. Command-line public checks
-encountered a challenge, so these checks establish origin behavior, not edge HIT.
-Neon remains min=max 0.25 CU with a 300-second idle timeout; no compute or plan
-change was made. Entity/profile, statistics, Issue Profile misses and disruption
-dispatch still need SQL. Sustained whole-site sleep remains unverified.
-
-Pre-cleanup verification passed 773 tests across 101 files with local PostGIS and
-Redis and no skips, plus docs/types/lint/format/migration checks. The cleanup
-retains parity, fallback, publication, scope, report and writer safeguards while
-removing obsolete mode combinations. Node 26.5.0 cleanup verification
-(`npm run verify -- -- --maxWorkers=2`) passed 770 tests across 101 files with
-local PostGIS/Redis and no skips. Three obsolete flag-combination cases were
-removed; the existing informational lint suggestion remains.
-
-## Context
-
-[Range reads](../../../app/util/dbQueries/issueRange.ts) own history, overview,
-issues-day and report range assembly. The existing
-[cache runbook](../../operations/edge-caching.md) owns cache operation and repair.
-Canonical pulls already serialize writers with a SQL lease and only finish
-after promotion, derived models, publication and purge. Holiday changes are
-independent inputs and must republish before their purge.
+Canonical SQL remains the relational model. Completed writer publications put
+bounded immutable inputs behind atomic Redis heads; request-time assembly retains
+clock-dependent behavior. Missing/invalid inputs use SQL recovery with `no-store`.
+An unchanged poll verifies publication readiness before taking a SQL lease.
+The [cache runbook](../../operations/edge-caching.md) owns repair and limits;
+the [pipeline](../../architecture/data-pipeline.md) owns ordering and freshness.
+A deployment must contain the expected publishers and readers, not just a merged PR.
 
 ## Plan of Work
 
-### Milestone 1 — Zero-SQL canonical range reads
+First identify the exact deployed SHA, Redis configuration and completed
+publication generations. Verify each later route slice against SQL in an isolated
+environment before its separately authorized rollout. Drain older unfenced writers
+before initializing community queue proofs.
 
-Separate source-row loading from pure clock-dependent dataset assembly. Publish
-compressed, content-addressed source inputs from one completed repeatable-read
-snapshot. Validate bounds, encoding and digest before using the source. Switch
-the Redis head atomically only after the immutable payload exists. Keep the
-previous completed head usable during imports, and reject delayed publication
-with compare-and-swap. Recompute overlap and service/issue state at request time.
+Then trace ordinary home/profile/directory/history/statistics/sitemap, arrival
+polling and report-detail requests plus unchanged canonical/holiday polls and
+idle dispatch. Separate genuine writes, unknown-ID recovery, cache faults and
+admin calls from routine reads. Correct only observed wake-ups with their own
+parity and publication checks.
 
-### Milestone 2 — Unchanged polls do not wake Postgres
+Finally observe provider compute state and compute-time accounting across
+representative ordinary traffic. Agree and record the window duration and route
+mix before measurement; it must span multiple 300-second idle opportunities.
+Use external provider telemetry rather than a SQL monitoring loop. Compare Redis
+usage and response health as well as compute, and explain every remaining wake-up.
 
-Fetch and fingerprint upstream inputs before the SQL lease. A valid published
-head with the same fingerprint can finish without SQL; explicit seeds, reviews,
-rebuilds, missing snapshots and changed inputs retain the existing writer path.
-Publish the successful external checkpoint only after the pull is complete.
+## Concrete Steps
 
-### Milestone 3 — Finish the sleep boundary
+From the repository root, install dependencies and follow the disposable-service
+setup in the [quality guide](../../development/quality.md), then run:
 
-Audit arrival selection/departures, entity profiles, Navigation/Issue Profile
-validation, optional reports, sitemap/statistics and background workflows.
-Publish their required serving inputs on writes. Keep reports/admin/recovery
-wake-ups explicit. Accept production-wide sleep only with provider state and
-compute-time evidence under ordinary traffic, without SQL monitoring waking it.
+```sh
+npm run verify
+```
 
-Start with the arrivals polling path: station pages refresh it every 30 seconds.
-The first follow-up extracts the existing selection policy; the SQL adapter
-still owns one repeatable-read transaction and canonical scope validation.
-Publishers and future snapshot readers must reuse that policy rather than
-relaxing admission or duplicating eligibility rules. Cache source inputs, not
-clock-frozen arrival responses. Midnight alone must not require a SQL refill.
-Arrivals rollout is complete; remaining entity/profile and background SQL reads
-still prevent acceptance of the whole-site sleep boundary.
+Expect no failed checks and no integration skips with the two test URLs set.
+For publication repair, follow the authenticated procedures in the cache runbook;
+those mutate the selected environment and require its deployment context.
+Provider inspection has no repository CLI wrapper: record the selected project,
+branch, deployed SHA, UTC window and exported compute/Redis metrics. Do not run
+SQL probes during the idle observation.
 
 ## Validation and Acceptance
 
-Use local PostGIS and Redis for immutable-publication and SQL-parity checks.
-Valid cached range reads must succeed with a database accessor that throws.
-Check midnight, service revisions, corrected/open-ended periods, holidays,
-empty ranges, invalid/oversized payloads, eviction and overlapping publication.
-An unchanged scheduled pull must call neither getDb nor lease helpers. Changed
-inputs and explicit repair must still complete publication and purge in order.
-Run `npm run verify`; no production fault injection or automatic rollout.
+Healthy cold and warm public loaders must work with SQL access throwing,
+including moving date windows, aliases, empty results and expiry. Unchanged
+polls and certified-empty dispatch must acquire no SQL handle. Changed inputs,
+explicit repair, real writes and unavailable publications must retain coherent
+fallback and publication ordering. Local tests establish these invariants;
+provider suspension and reduced compute time under normal traffic establish the
+production outcome. A few SQL-free probes or a merged cache PR cannot close it.
+
+## Idempotence and Recovery
+
+Repeat read-only audits freely. Repair missing publications through their
+owning writer; retain the last coherent head during failed or partial publication.
+Use the runbook for dirty community caches, pending holiday facts and invalid key
+types. If a rollout fails, restore a compatible application revision and repair
+under the writer fence; never resume obsolete workflow inputs. Retain source
+receipts, timetables and the pre-change telemetry for comparison.
+
+## Artifacts and Notes
+
+Obtained evidence is in [published serving inputs](../completed/published-serving-inputs.md).
+Still required: later-slice deployment SHA/run links, publication generations,
+route/background coverage, provider window boundaries, suspension observations,
+compute-time and Redis cost comparison, and any remaining exception. Do not
+replace dated evidence with assumptions about today's production state.
+
+## Interfaces and Dependencies
+
+The [pull preflight](../../../app/workflows/pull/helpers/publishedInputs.ts)
+and [pull workflow](../../../app/workflows/pull/index.ts) own unchanged-input
+admission and publication. [Published store](../../../app/util/publishedSnapshotStore.server.ts)
+owns atomic heads; [dispatch](../../../app/util/crowdReportDispatch.ts) owns
+queue discovery. Preserve timetable admission, redaction, report freshness,
+request-clock assembly and SQL recovery. Production provider access and separate
+rollout authorization are prerequisites to closing this plan.

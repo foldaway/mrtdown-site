@@ -1,5 +1,10 @@
 # Reduce static reference reads for range pages
 
+> Dated investigation and local handoff. Its pending tasks, switches and SQL
+> descriptions reflect the recorded revision, not current deployment state.
+> Use the [maintained guide](../operations/edge-caching.md) for current operation and the
+> [sleep plan](../plans/active/neon-sleep.md) for remaining acceptance.
+
 Implemented opt-in caching for seven useful range-reference sets, with narrower
 SQL projections and omitted unused lookups. Holidays and live issues remain in
 Postgres. Projection cleanup reduces the current static-input JSON proxy from
@@ -16,8 +21,8 @@ Source review started at clean revision
 `ad8595642e9c731f459acda9d70a69500aa7b264`. The supplied production handoff
 identified `083cf935` (PR #312), Fly release 84, with Navigation, completed
 Issue Profiles and service paths enabled. The
-[Redis plan](../plans/active/redis-page-profile-cache.md) owns that rollout;
-the [egress plan](../plans/active/production-egress-reduction.md) owns wider
+[Redis plan](../plans/completed/redis-page-profile-cache.md) owns that rollout;
+the [egress plan](../plans/completed/production-egress-reduction.md) owns wider
 attribution.
 
 The supplied matched November 18 versus November 17 midnight–9 p.m. PT windows

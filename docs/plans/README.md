@@ -1,83 +1,99 @@
-# Execution Plans
+# Execution plans
 
-## When to write a plan
+Use a PR description or in-session checklist for bounded work. Write a versioned
+plan when ordered PRs, repositories, migration/recovery gates or unresolved
+decisions must survive a handoff. Update an existing plan for the same outcome.
+The [writing guide](../development/writing.md) owns documentation placement and style.
 
-Use an in-session checklist or the PR description for bounded work with a clear
-path to implementation and verification. Routine bug fixes, documentation
-updates, and changes covered by an existing runbook usually fit this approach.
+## Standard layout
 
-Write a versioned plan when ordered milestones span PRs or repositories, when
-a migration or production cutover needs coordinated validation and recovery,
-or when decisions, open questions, or blockers must survive a handoff. A
-routine deploy can follow the existing procedure. A timetable source cutover
-that coordinates release pins, approvals, and workflow schedules needs a plan.
-Update an existing plan when it covers the work. Start one if a checklist grows
-into work that needs durable context.
+Copy the [template](template.md) to `active/<topic>.md` and link it below. Keep
+these level-two headings in order; use lower headings for task-specific detail:
 
-## Maintaining a plan
+1. Purpose
+2. Progress
+3. Surprises & Discoveries
+4. Decision Log
+5. Outcomes & Retrospective
+6. Context and Orientation
+7. Plan of Work
+8. Concrete Steps
+9. Validation and Acceptance
+10. Idempotence and Recovery
+11. Artifacts and Notes
+12. Interfaces and Dependencies
 
-Follow the [writing policy](../development/writing.md). Keep the purpose and
-next step easy to find.
+Keep sections short and specific. An explicit sentence covers a section with
+nothing recorded yet. Put ordered commands, prerequisites and expected output
+in Concrete Steps; retry/rollback in Idempotence and Recovery; receipts in
+Artifacts and Notes; contracts in Interfaces and Dependencies. Keep essential
+assumptions and external decisions understandable from the plan and its owning
+guides without reconstructing a chat.
 
-1. Copy the [shared template](template.md) to `active/<topic>.md` and link it
-   below. Keep its second-level headings in order. Use lower-level headings
-   for subject-specific detail.
-2. Write milestones someone can verify from a fresh checkout. Include enough
-   context and links to run the checks and recognize success.
-3. Update progress, discoveries, decisions, and outcomes as the work proceeds.
-   A handoff should identify the last verified result, the next step, and any
-   blocker.
-4. After acceptance, record the outcome and verification, move the plan to
-   `completed/`, and update the index and inbound links. Carry lasting
-   operating guidance to its subject guide. Link issues or active plans for
-   deferred work. Keep completed plans as historical records.
+Date progress at milestones and handoffs. Split partial steps into completed and
+remaining work, name the next step and blocker, and distinguish source completion,
+local verification and observed deployment. Update discoveries, decisions and
+outcomes as evidence changes. After acceptance, transfer operating guidance to its
+subject guide, move the plan to completed, and fix index/inbound links. Move
+optional follow-ups to [tech debt](tech-debt.md) or issues. Completed records may
+retain their original format and must keep their dated evidence and uncertainty.
 
-Run `npm run check:docs` to check local links, plan index entries, and the
-section order of active plans. The same check runs with `npm run verify`.
+Run `npm run check:docs` for repository links and Markdown heading anchors,
+index coverage, section order and nonempty active-plan sections. It runs inside
+`npm run verify`; mechanical checks do not establish current deployment state.
 
-The repository map and living plans follow OpenAI’s
-[Harness Engineering approach](https://openai.com/index/harness-engineering/)
-and [execution plan guide](https://developers.openai.com/cookbook/articles/codex_exec_plans).
+This is our adapted repository convention, informed by OpenAI's
+[harness engineering material](https://openai.com/index/harness-engineering/)
+and [execution-plan example](https://developers.openai.com/cookbook/articles/codex_exec_plans).
+We use a small entry map, indexed knowledge, resumable plans, observable acceptance,
+safe retries and mechanical checks. Their example folder names and wording are
+not universal requirements. The paired reference is
+[data PR #509](https://github.com/foldaway/mrtdown-data/pull/509) at
+`6db1a722c26acbb283d42d6d9fbef642c9ba521d`.
 
 ## Active
 
-- [Let Neon sleep between canonical changes](active/neon-sleep.md): zero-SQL
-  public serving and unchanged-input checks outside Postgres.
-- [Combined timetable pull rollout](active/combined-timetable-pull-rollout.md):
-  records the November cutover and tracks safe successor projection builds.
-- [Dynamic system map](active/dynamic-system-map.md): canonical schematic map
-  data and data-driven site rendering.
-- [Production performance](active/production-performance.md): public route
-  latency and payload reduction plan.
-- [Production egress reduction](active/production-egress-reduction.md): reduce
-  remaining database transfer from scoped issue, date-range, and static
-  topology reads.
-- [Cache public page profiles in Redis](active/redis-page-profile-cache.md)
-  records the production rollout and pending service-path egress comparison.
-- [Reddit community monitoring](active/reddit-community-monitoring.md):
-  stateful Reddit thread and reply monitoring through authenticated
-  programmatic crowd reports and canonical reference validation.
-- [SEO remediation](active/seo-remediation.md): crawl-clean sitemap output,
-  canonical metadata, locale alternates, and metadata quality fixes.
+| Outcome | Remaining work |
+| --- | --- |
+| [Neon sleep](active/neon-sleep.md) | Verify later deployments, remaining wake-ups and sustained provider sleep. |
+| [Fresh timetable projections](active/successor-projection-builds.md) | Measure fresh/repair runtime and prove bounded retries if needed. |
+| [Generated system map](active/dynamic-system-map.md) | Review baseline, prove consumer import/rendering, migrate timeline versions. |
+| [Production performance](active/production-performance.md) | Measure current latency/payload targets and resolve observed gaps. |
+| [Reddit monitor](active/reddit-community-monitoring.md) | Verify sibling state, shadow comparison, 24-hour workflow and cutover. |
+| [SEO deployment check](active/seo-remediation.md) | Record a complete crawl of the target deployment. |
 
 ## Completed
 
-- [Crowd-reported arrivals](completed/crowd-reported-arrivals.md) restored
-  short-lived branch-level rider reports beside scheduled departures.
-- [Combined timetable departure index](completed/combined-timetable-index.md)
-  indexes effective Singapore service dates and shared journeys with
-  per-service boarding access.
-- [Scoped public read model](completed/scoped-public-read-model.md): replaced
-  request-time complete-dataset reads with typed, entity-scoped readers and
-  verified the production read reduction through cold-cache checks and restart.
-- [Database query decomposition](completed/database-query-decomposition.md):
-  split the monolithic read-model query module into layered dataset, domain,
-  maintenance, and feature modules without changing public responses.
-- [Crowdsourced reports](completed/crowdsourced-reports.md): site-local public
-  report collection, moderation, clustering, and canonical ingest dispatch.
-- [Fly.io migration](completed/fly-migration.md): migration from Cloudflare
-  Workers to a Fly-hosted Node runtime with Upstash workflows and Redis.
-- [Markdown for agents](completed/markdown-for-agents.md): `llms.txt` and
-  app-owned Markdown alternatives for agents and scrapers.
-- [Overhaul read model](completed/overhaul-read-model.md): local
-  Postgres-backed read model migration.
+These records describe delivered work or superseded programs; they do not imply
+that every proposed metric or production gate was accepted. Read each record's
+scope and evidence before using it as a baseline.
+
+- [Published serving inputs](completed/published-serving-inputs.md): range/arrival
+  production receipts; later source slices and local verification.
+- [Redis rollout](completed/redis-page-profile-cache.md): Navigation, completed
+  Issue Profiles and service paths; incremental impact remains unmeasured.
+- [Scoped-query egress work](completed/production-egress-reduction.md): July query
+  delivery and transfer findings; superseded targets were not all met.
+- [November timetable replay](completed/combined-timetable-pull-rollout.md):
+  retained projection reuse and approved publication.
+- [Performance foundations](completed/performance-foundations.md): scoped payloads,
+  statistics and deferred UI source work, without fresh numerical acceptance.
+- [SEO foundations](completed/seo-foundations.md): metadata/sitemap implementation
+  and dated local crawl.
+- [Programmatic reports](completed/programmatic-crowd-reports.md): site endpoint
+  and reference catalog; monitor cutover remains open.
+- [Crowd-reported arrivals](completed/crowd-reported-arrivals.md): short-lived
+  branch observations beside scheduled departures.
+- [Combined departure index](completed/combined-timetable-index.md): effective
+  service dates, shared journeys and boarding access.
+- [Scoped public reads](completed/scoped-public-read-model.md): bounded public
+  readers and dated production read-reduction checks.
+- [Query decomposition](completed/database-query-decomposition.md): layered
+  query modules with preserved responses.
+- [Crowdsourced reports](completed/crowdsourced-reports.md): collection,
+  moderation, clustering and canonical dispatch.
+- [Fly migration](completed/fly-migration.md): Node runtime and Upstash workflows.
+- [Markdown delivery](completed/markdown-for-agents.md): curated discovery and
+  app-owned Markdown alternatives.
+- [Read-model overhaul](completed/overhaul-read-model.md): migration from the
+  retired API client to the local relational model.

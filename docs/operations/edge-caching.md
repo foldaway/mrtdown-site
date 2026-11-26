@@ -509,8 +509,9 @@ Treat Redis INFO as diagnostic point evidence unless server identity and
 counter continuity are established. A missing run identifier, decreasing
 counter, or inconsistent fields prevents a trustworthy window delta. Memory
 alone cannot establish command headroom, cost, or a reader's hit rate. See the
-[production cache plan](../plans/active/redis-page-profile-cache.md#redis-aggregate-usage-and-cost-november-17-pt)
-for the latest account-level evidence and its sampling limits.
+[production cache record](../plans/completed/redis-page-profile-cache.md#redis-aggregate-usage-and-cost-november-17-pt)
+for November 17 account-level evidence and its sampling limits; recheck current
+usage before a new cost or capacity decision.
 
 ## Verification
 
