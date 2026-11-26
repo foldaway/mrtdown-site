@@ -285,6 +285,14 @@ their existing null uptime and operational status. Unknown IDs and missing or
 corrupt publications use uncached SQL recovery. There is no separate operator
 directory loader; line directories already include the operator labels they need.
 
+Town profiles and the town directory reuse the same graph without new stored
+inputs. Profiles expand the historical issue scope, then compute station/town
+status, recent-issue windows and map dates at the request clock. The directory
+retains its raw open-ended station-code rule and raw line metadata, including
+planned starts; it does not adopt the profile's effective-membership policy.
+Station names and town relationships change together at publication. Missing
+inputs and unknown profile IDs retain uncached SQL recovery.
+
 ## Published sitemap inputs
 
 Canonical pulls and authenticated `POST /internal/api/tasks/facts` publish
