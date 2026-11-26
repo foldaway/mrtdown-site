@@ -51,9 +51,13 @@ establish whole-site sleep.
    ranking facts. Complete loader cold/warm SQL parity and repository verification
    passed locally on November 26 (793 tests, 102 files, no skips, disposable
    PostGIS/Redis). Review and rollout remain separate. The line directory remains
-   in step 3.
-3. Station and line directories: preserve current/future/closed membership,
-   latest disruption summaries and persisted-fact ranking at the request date.
+   in step 3. First focused PR: [#344](https://github.com/foldaway/mrtdown-site/pull/344).
+3. Station and line directories: reuse the shared graph with persisted active
+   issue-day candidates and latest station disruptions. Local cold/warm complete
+   loader parity preserves future/closed memberships, moving ranking windows,
+   null uptime and absent day facts. `npm run verify` passed 795 tests across
+   102 files with disposable PostGIS/Redis and no skips on November 26. Review
+   and rollout remain separate.
 4. Operator profiles and any directory callers.
 5. Town profiles and directory, including station details and related scope.
 

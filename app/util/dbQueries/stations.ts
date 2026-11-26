@@ -42,6 +42,7 @@ import {
   getPageCommunitySignals,
 } from './communitySignals';
 import { getDefaultDb, timeDbQuery } from './database';
+import { assembleDirectorySnapshot } from './directorySnapshotInputs';
 import { buildDataset, parseTranslations } from './dataset';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
@@ -663,8 +664,7 @@ export function deriveStationDirectoryOperationalState(
   return memberships.length > 0 ? ('future' as const) : ('closed' as const);
 }
 
-export async function getStationsDirectoryData() {
-  const referenceNow = nowSg();
+async function loadSqlStationsDirectory(referenceNow: DateTime) {
   const referenceDate = isoDate(referenceNow);
   const db = await getDefaultDb();
   const [stationRows, membershipRows, townRows, activeIssueRows, latestRows] =
@@ -732,6 +732,78 @@ export async function getStationsDirectoryData() {
     activeIssueIds.length > 0
       ? await buildDataset(referenceNow, db, activeIssueIds)
       : null;
+  return {
+    stationRows,
+    membershipRows,
+    townRows,
+    latestRows,
+    activeDataset,
+    loadLines: async (ids: string[]) =>
+      ids.length > 0
+        ? timeDbQuery('stations_directory_q_lines', () =>
+            db
+              .select({
+                id: linesTable.id,
+                name: linesTable.name,
+                color: linesTable.color,
+                type: linesTable.type,
+              })
+              .from(linesTable)
+              .where(inArray(linesTable.id, ids)),
+          )
+        : [],
+  };
+}
+
+export async function getStationsDirectoryData() {
+  const referenceNow = nowSg();
+  const referenceDate = isoDate(referenceNow);
+  const snapshot = process.env.REDIS_URL
+    ? await stationProfileSnapshotStore.read()
+    : null;
+  let loaded: Awaited<ReturnType<typeof loadSqlStationsDirectory>>;
+  if (snapshot) {
+    const rows = snapshot.inputs.dataset;
+    loaded = {
+      stationRows: rows.stationRows.map((row) => ({
+        ...row,
+        name: parseTranslations(row.name),
+      })),
+      townRows: rows.townsRows,
+      membershipRows: rows.stationCodesRows
+        .filter((row) => row.ended_at == null || row.ended_at > referenceDate)
+        .map((row) => ({
+          stationId: row.station_id,
+          lineId: row.line_id,
+          code: row.code,
+          startedAt: row.started_at,
+          structureType: row.structure_type,
+        })),
+      latestRows: snapshot.inputs.latestStationDisruptions,
+      activeDataset: assembleDirectorySnapshot(snapshot.inputs, referenceNow),
+      loadLines: async (ids) =>
+        rows.linesRows
+          .filter((row) => ids.includes(row.id))
+          .map((row) => ({ ...row, name: parseTranslations(row.name) })),
+    };
+  } else {
+    if (process.env.REDIS_URL) {
+      try {
+        setResponseHeader('Cache-Control', 'no-store');
+      } catch {
+        /* no request context */
+      }
+    }
+    loaded = await loadSqlStationsDirectory(referenceNow);
+  }
+  const {
+    stationRows,
+    membershipRows,
+    townRows,
+    latestRows,
+    activeDataset,
+    loadLines,
+  } = loaded;
   const issuesByStationId = new Map<string, IssueWithOperationalEffects[]>();
 
   for (const issue of Object.values(activeDataset?.allIssues ?? {})) {
@@ -797,20 +869,7 @@ export async function getStationsDirectoryData() {
       station.memberships.map((membership) => membership.lineId),
     ),
   );
-  const lineRows =
-    lineIds.size > 0
-      ? await timeDbQuery('stations_directory_q_lines', () =>
-          db
-            .select({
-              id: linesTable.id,
-              name: linesTable.name,
-              color: linesTable.color,
-              type: linesTable.type,
-            })
-            .from(linesTable)
-            .where(inArray(linesTable.id, [...lineIds])),
-        )
-      : [];
+  const lineRows = await loadLines([...lineIds]);
 
   return {
     stations,
