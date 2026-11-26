@@ -1,3 +1,6 @@
+import { setResponseHeader } from '@tanstack/react-start/server';
+import type { DateTime } from 'luxon';
+import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
 import { and, eq, gte, inArray, lte, or } from 'drizzle-orm';
 import {
   impactEventEntityFacilitiesTable,
@@ -17,7 +20,8 @@ import {
   getPageCommunitySignals,
 } from './communitySignals';
 import { getDefaultDb, timeDbQuery } from './database';
-import { buildDataset } from './dataset';
+import { assembleDataset, buildDataset } from './dataset';
+import { selectLineProfileSnapshot } from './lineProfileSnapshotInputs';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
@@ -330,12 +334,12 @@ export async function getLinesDirectoryData(days: number) {
   };
 }
 
-export async function getLineProfileReadModel(
+async function loadSqlLineProfile(
   lineId: string,
   days: number,
-  options: CommunitySignalOptions = {},
+  options: CommunitySignalOptions,
+  referenceNow: DateTime,
 ) {
-  const referenceNow = nowSg();
   const referenceDate = isoDate(referenceNow);
   const db = await getDefaultDb();
   const [lineRow] = await timeDbQuery('line_profile_q_root', () =>
@@ -389,7 +393,7 @@ export async function getLineProfileReadModel(
   ];
   const [candidateIssueIds, communitySignals] = await Promise.all([
     getLineCandidateIssueIds(lineId, lineServiceIds, lineStationIds, db),
-    getPageCommunitySignals(options, { lineId }),
+    getPageCommunitySignals(options, { lineId, now: referenceNow }),
   ]);
   const issueScope = await getIssueStaticScope(
     candidateIssueIds,
@@ -460,6 +464,48 @@ export async function getLineProfileReadModel(
     operatorIds: lineOperatorRows.map((row) => row.operatorId),
     includePublicHolidays: true,
   });
+  return { dataset, uptimeFactRows, communitySignals };
+}
+
+export async function getLineProfileReadModel(
+  lineId: string,
+  days: number,
+  options: CommunitySignalOptions = {},
+) {
+  const referenceNow = nowSg();
+  const referenceDate = isoDate(referenceNow);
+  const snapshot = process.env.REDIS_URL
+    ? await stationProfileSnapshotStore.read()
+    : null;
+  let loaded: Awaited<ReturnType<typeof loadSqlLineProfile>>;
+  if (snapshot?.inputs.dataset.linesRows.some((row) => row.id === lineId)) {
+    const communitySignals = await getPageCommunitySignals(options, {
+      lineId,
+      now: referenceNow,
+    });
+    const selected = selectLineProfileSnapshot(
+      snapshot.inputs,
+      lineId,
+      days,
+      referenceNow,
+      communitySignals,
+    );
+    loaded = {
+      dataset: assembleDataset(referenceNow, selected.dataset),
+      uptimeFactRows: selected.uptimeFactRows,
+      communitySignals,
+    };
+  } else {
+    if (process.env.REDIS_URL) {
+      try {
+        setResponseHeader('Cache-Control', 'no-store');
+      } catch {
+        /* no request context */
+      }
+    }
+    loaded = await loadSqlLineProfile(lineId, days, options, referenceNow);
+  }
+  const { dataset, uptimeFactRows, communitySignals } = loaded;
   const line = dataset.included.lines[lineId];
   if (line == null) {
     throw new Error(`Line ${lineId} disappeared while building its read model`);
@@ -484,7 +530,7 @@ export async function getLineProfileReadModel(
   const issueIdsRecent = [...lineIssues]
     .filter((issue) =>
       issue.intervals.some(
-        (interval) => parseDateTime(interval.startAt) <= nowSg(),
+        (interval) => parseDateTime(interval.startAt) <= referenceNow,
       ),
     )
     .sort((a, b) => {
@@ -540,7 +586,7 @@ export async function getLineProfileReadModel(
         })
         .map((station) => station.id),
     ),
-  ];
+  ].sort((a, b) => a.localeCompare(b));
 
   const profile = {
     lineId,

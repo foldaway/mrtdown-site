@@ -15,6 +15,7 @@ import {
 } from '~/util/dbQueries/statistics';
 import { internalMiddleware } from '~/util/internal.middleware';
 import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
+import { publishStationProfileSnapshot } from '~/util/stationProfileSnapshot.server';
 import {
   acquireOrRenewPullWorkflowLease,
   assertPullWorkflowLease,
@@ -80,6 +81,7 @@ export async function handleFactsPost(request: Request) {
     const sitemap = await rebuildSitemapSnapshot();
     if (process.env.REDIS_URL) {
       await assertPullWorkflowLease(db, owner);
+      await publishStationProfileSnapshot();
       await publishStatisticsSnapshot();
       await publishSitemapSnapshot();
       await purgePublicDataCache();

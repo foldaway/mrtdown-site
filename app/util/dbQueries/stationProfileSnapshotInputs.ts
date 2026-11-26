@@ -2,7 +2,13 @@ import { Buffer } from 'node:buffer';
 import { createSelectSchema } from 'drizzle-orm/zod';
 import type { DateTime } from 'luxon';
 import { z } from 'zod';
-import { landmarksTable, stationExitsTable, townsTable } from '~/db/schema';
+import {
+  landmarksTable,
+  lineDayFactsTable,
+  operatorsTable,
+  stationExitsTable,
+  townsTable,
+} from '~/db/schema';
 import type { PublicCrowdReportSignal } from '~/util/crowdReports';
 import {
   assembleDataset,
@@ -14,11 +20,26 @@ import { RangeSnapshotInputsSchema } from './rangeSnapshotInputs';
 
 const audit = { created_at: true, updated_at: true } as const;
 const datasetSchema = RangeSnapshotInputsSchema.extend({
+  operatorsRows: z.array(createSelectSchema(operatorsTable).omit(audit)),
   townsRows: z.array(createSelectSchema(townsTable).omit(audit)),
   landmarksRows: z.array(createSelectSchema(landmarksTable).omit(audit)),
 });
 const schema = z.object({
   dataset: datasetSchema,
+  // Keep dates and all persisted rows: ranking uses a moving request-date
+  // window over stored facts, not newly synthesized days or a refill TTL.
+  lineUptimeFacts: z
+    .array(
+      createSelectSchema(lineDayFactsTable).pick({
+        date: true,
+        line_id: true,
+        service_seconds: true,
+        downtime_disruption_seconds: true,
+        downtime_maintenance_seconds: true,
+        downtime_infra_seconds: true,
+      }),
+    )
+    .max(100_000),
   platforms: z.array(
     z.object({
       stationId: z.string(),
@@ -39,6 +60,7 @@ const schema = z.object({
 });
 export type StationProfileSnapshotInputs = {
   dataset: DatasetInputs;
+  lineUptimeFacts: z.infer<typeof schema>['lineUptimeFacts'];
   platforms: z.infer<typeof schema>['platforms'];
   exits: z.infer<typeof schema>['exits'];
 };

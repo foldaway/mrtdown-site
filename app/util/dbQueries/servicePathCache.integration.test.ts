@@ -1,4 +1,6 @@
 import { nonPublicEvidenceRedactedText } from '@mrtdown/fs';
+import { getLineProfileFn } from '~/util/lines.functions';
+import { getLineProfileReadModel } from './lines';
 import { getIssueFn } from '~/util/issue.functions';
 import {
   getCachedIssueProfile,
@@ -852,6 +854,157 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         const keys = await stationRedis.keys(`mrtdown:*${process.env.TIER}*`);
         if (keys.length) await stationRedis.del(...keys);
         await stationRedis.quit();
+      });
+
+      it('matches complete line loaders cold/warm across issue, service, holiday and rolling-fact boundaries without SQL', async () => {
+        await pool.query(
+          "insert into lines (id,name,type,color,started_at,operating_hours,hash) select 'other',name,type,color,started_at,operating_hours,hash from lines limit 1",
+        );
+        await pool.query(
+          "insert into lines (id,name,type,color,started_at,operating_hours,hash) select 'unknown',name,type,color,null,null,hash from lines limit 1",
+        );
+        await pool.query(
+          "insert into lines (id,name,type,color,started_at,operating_hours,hash) select 'future',name,type,color,'2026-11-19',operating_hours,hash from lines where id='line'",
+        );
+        await pool.query(
+          "insert into station_codes (line_id,station_id,code,started_at,ended_at,structure_type) values ('other','station-1','O1','1990-01-01',null,'underground'),('line','station-2','CLOSED','1990-01-01','2000-01-01','underground'),('future','station-3','F3','2026-11-19',null,'elevated')",
+        );
+        await pool.query(
+          "update service_revisions set end_at='2026-11-19' where id='revision'",
+        );
+        await pool.query(
+          "insert into service_revisions (id,service_id,start_at,end_at,estimated_frequency,operating_hours) select 'loop','service','2026-11-19',null,estimated_frequency,operating_hours from service_revisions limit 1",
+        );
+        await pool.query(
+          "insert into service_revision_path_station_entries (service_revision_id,service_id,path_index,station_id,display_code) values ('loop','service',0,'station-1','T1'),('loop','service',1,'station-2','T2'),('loop','service',2,'station-1','T1')",
+        );
+        await rebuildOperationalFactsRange(2);
+        // Persisted future facts are admitted only when the request reaches them.
+        // Old facts roll out, and no synthesized rows appear when time passes.
+        await pool.query(
+          "insert into line_day_facts (date,line_id,service_seconds,downtime_disruption_seconds,downtime_maintenance_seconds,downtime_infra_seconds,issue_count_disruption,issue_count_maintenance,issue_count_infra,as_of) values ('2026-11-19','other',100,90,0,0,1,0,0,'2026-11-18')",
+        );
+        const clocks = [
+          now.set({ hour: 4 }),
+          now.set({ hour: 10, minute: 15 }),
+          now.set({ hour: 10, minute: 30 }),
+          now.endOf('day'),
+          now.plus({ days: 1 }).startOf('day'),
+          now.plus({ days: 3 }),
+          now.plus({ days: 100 }),
+        ];
+        const cases = clocks.flatMap((clock) =>
+          ['line', 'other', 'unknown', 'future'].map((lineId) => ({
+            clock,
+            lineId,
+          })),
+        );
+        vi.setSystemTime(clocks[0].toJSDate());
+        await persistAutomoderatedCrowdReport(
+          db,
+          {
+            reportScope: 'line',
+            lineIds: ['line', 'other'],
+            stationIds: ['station-3'],
+            observedAt: clocks[0].toISO() ?? '',
+            effect: 'delay',
+            isStillHappening: true,
+          },
+          { ipHash: 'line-profile-test', turnstileOutcome: 'passed' },
+          { now: clocks[0] },
+        );
+        vi.stubEnv('REDIS_URL', '');
+        const expected = [];
+        for (const { clock, lineId } of cases) {
+          vi.setSystemTime(clock.toJSDate());
+          expected.push(await getLineProfileFn({ data: { lineId, days: 2 } }));
+        }
+        expect(expected[0].data.lineSummary.status).toBe('closed_for_day');
+        expect(expected[2].data.lineSummary.uptimeRatio).toBeNull();
+        expect(expected[3].data.lineSummary.status).toBe('future_service');
+        expect(expected[4].data.lineSummary.status).toBe('ongoing_disruption');
+        expect(expected[8].data.lineSummary.status).toBe('normal');
+        expect(expected[4].data.lineSummary.uptimeRank).toBe(2);
+        expect(expected[20].data.lineSummary.uptimeRank).toBe(1);
+        expect(expected[24].data.lineSummary.totalLines).toBe(1);
+        expect(expected[0].data.communitySignals).toHaveLength(1);
+        expect(expected.at(-4)?.data.communitySignals).toEqual([]);
+        expect(expected[0].included.operators).not.toEqual({});
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        vi.setSystemTime(clocks[0].toJSDate());
+        await signalCache.repairCommunitySignalCache(db);
+        await publishStationProfileSnapshot('a'.repeat(64));
+        const cold = createPublishedSnapshotStore(
+          async () => stationRedis,
+          'station-profiles',
+          parseStationProfileSnapshotInputs,
+        );
+        vi.spyOn(stationProfileSnapshotStore, 'read').mockImplementation(
+          cold.read,
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        queries.length = 0;
+        for (const [index, { clock, lineId }] of cases.entries()) {
+          vi.setSystemTime(clock.toJSDate());
+          for (let pass = 0; pass < 2; pass++)
+            expect(
+              await getLineProfileFn({ data: { lineId, days: 2 } }),
+            ).toEqual(expected[index]);
+        }
+        expect(queries).toEqual([]);
+      });
+
+      it('recovers line profiles without caching missing/corrupt inputs, then publishes fact and holiday corrections coherently', async () => {
+        await rebuildOperationalFactsRange(1);
+        vi.stubEnv('REDIS_URL', '');
+        const baseline = await getLineProfileReadModel('line', 90);
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        headers.mockClear();
+        expect(await getLineProfileReadModel('line', 90)).toEqual(baseline);
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        await pool.query('delete from public_holidays');
+        await pool.query(
+          "update lines set operating_hours=null where id='line'",
+        );
+        await rebuildOperationalFactsRange(1);
+        vi.stubEnv('REDIS_URL', '');
+        const corrected = await getLineProfileReadModel('line', 90);
+        expect(corrected.data.lineSummary.uptimeRatio).toBeNull();
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        // Facts and canonical inputs remain together until the next activation.
+        expect(await getLineProfileReadModel('line', 90)).toEqual(baseline);
+        await publishStationProfileSnapshot('a'.repeat(64));
+        const head = await stationProfileSnapshotStore.head();
+        if (!head.value) throw Error('Missing profile publication');
+        await stationRedis.set(
+          `${getSnapshotKeyPrefix('station-profiles')}:payload:${head.value.sha256}`,
+          'corrupt',
+        );
+        const cold = createPublishedSnapshotStore(
+          async () => stationRedis,
+          'station-profiles',
+          parseStationProfileSnapshotInputs,
+        );
+        vi.spyOn(stationProfileSnapshotStore, 'read').mockImplementation(
+          cold.read,
+        );
+        headers.mockClear();
+        expect(await getLineProfileReadModel('line', 90)).toEqual(corrected);
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        expect(await getLineProfileReadModel('line', 90)).toEqual(corrected);
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        headers.mockClear();
+        await expect(
+          getLineProfileReadModel('absent', 90),
+        ).rejects.toMatchObject({ status: 404 });
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
       });
 
       it('matches full SQL profiles cold/warm, aliases, service midnight and incident transitions with SQL disabled', async () => {
