@@ -431,6 +431,36 @@ purge its public data tag using the existing procedure. Verify cold/warm home
 reads and initialized-empty results without SQL. This command does not deploy,
 change schedules or purge the edge automatically.
 
+## Public community report details
+
+With Redis configured, report and cluster detail loaders use a separate bounded
+snapshot of the existing public responses, including historical sources and
+confirmed missing IDs. It preserves pending/accepted/dispatched visibility,
+cluster membership, producer/ongoing eligibility, nullable values, translations
+and direction destinations. Submission text, reporter identities, IP hashes and
+moderation/dispatch internals are excluded. Response cache headers are unchanged.
+
+The community write fence also invalidates these details before commit and
+republishes after submissions, moderation, duplicates, dispatch and fixture
+cleanup. Dispatch failures refresh an individual report's public update time.
+Canonical line/station writers invalidate names, colors and scope changes,
+including cascading removals; pull completion/recovery repairs the snapshot.
+A read rechecks publication before returning either a source or a 404.
+
+The shared snapshot store bounds publication to 10,000 sources, 100,000 member
+or scope rows per query, 24 MiB decoded JSON and 4 MiB encoded Redis data.
+Overflow fails publication without truncation. Missing, dirty, corrupt or
+unavailable state uses the existing SQL projection in a consistent transaction;
+reads do not refill Redis. Invalidation failure rolls back the owning write;
+post-commit publication failure preserves acceptance and SQL fallback.
+Programmatic replays repair missing state without replacing healthy snapshots.
+
+The [community repair command](#public-community-disruption-signals) initializes
+both signals and details, including authoritative empty results. Run it after
+all writer instances have been upgraded, or after eviction, Redis restore,
+out-of-band edits or writes made without Redis. Deployment and production
+verification remain separate from source validation.
+
 ## Recent arrival reports
 
 Accepted SQL submissions invalidate and refresh Redis. Non-platform report hits,

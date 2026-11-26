@@ -23,6 +23,7 @@ import {
   stationsTable,
 } from '~/db/schema';
 import { getClientIp } from './clientIp';
+import { tryRepairCrowdReportSources } from './crowdReportSourceCache.server';
 import {
   tryRepairCommunitySignalCache,
   withCommunitySignalPublication,
@@ -1513,6 +1514,7 @@ export async function findProgrammaticCrowdReportRetry(
     throw new CrowdReportIdempotencyConflictError(report.id);
   }
   await tryRepairCommunitySignalCache(db);
+  await tryRepairCrowdReportSources(db);
   return {
     id: report.id,
     status: report.status,

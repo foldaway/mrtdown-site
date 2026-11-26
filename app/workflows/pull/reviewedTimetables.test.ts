@@ -117,6 +117,10 @@ vi.mock('~/util/reportReferenceSnapshot.server', () => ({
   publishReportReferenceSnapshot: vi.fn(async () => {}),
   reportReferenceSnapshotStore: { read: vi.fn(async () => null) },
 }));
+vi.mock('~/util/crowdReportSourceCache.server', () => ({
+  repairCrowdReportSources: vi.fn(async () => {}),
+  invalidateCrowdReportSources: vi.fn(async () => {}),
+}));
 vi.mock('~/util/issueProfileSnapshot.server', () => ({
   publishIssueProfileSnapshot: vi.fn(async () => {}),
   issueProfileSnapshotStore: { read: vi.fn(async () => null) },

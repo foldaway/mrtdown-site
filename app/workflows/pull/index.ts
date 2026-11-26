@@ -1,3 +1,4 @@
+import { repairCrowdReportSources } from '~/util/crowdReportSourceCache.server';
 import { MRTDownRepository } from '@mrtdown/fs';
 import {
   type WorkflowContext,
@@ -87,6 +88,7 @@ async function publishPullCaches(generation: string, fingerprint?: string) {
   await publishIssueProfileSnapshot(fingerprint);
   await publishArrivalInputSnapshot(fingerprint);
   await publishReportReferenceSnapshot(fingerprint);
+  await repairCrowdReportSources(getDb(), { onlyIfMissing: true });
   // Purge only after the matching departure manifest has activated.
 }
 
@@ -240,6 +242,7 @@ async function executePull(
   if (manifestIsCurrent && !rebuildScheduledTimetableProjection) {
     if (process.env.REDIS_URL) {
       await runPullStep(context, 'repair-range-snapshot', async () => {
+        await repairCrowdReportSources(getDb(), { onlyIfMissing: true });
         await publishRangeSnapshot(manifestFingerprint);
         await publishStationProfileSnapshot(manifestFingerprint);
         await publishIssueProfileSnapshot(manifestFingerprint);

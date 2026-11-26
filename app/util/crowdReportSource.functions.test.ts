@@ -1,7 +1,7 @@
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it, vi } from 'vitest';
-import { getCrowdReportSource } from './crowdReportSource.functions';
+import { getCrowdReportSource } from './crowdReportSource.server';
 
 vi.mock('~/db', () => ({
   getDb: vi.fn(),
@@ -51,9 +51,16 @@ function makeFakeClusterSourceDb(
         updatedAt: '2026-05-24T04:55:00.000Z',
       },
     ],
-    [{ id: 'BPLRT', name: name('Bukit Panjang LRT'), color: '#718472' }],
-    [{ id: 'BP6', name: name('Bukit Panjang') }],
-    reportRows,
+    [
+      {
+        sourceId: 'cluster-1',
+        id: 'BPLRT',
+        name: name('Bukit Panjang LRT'),
+        color: '#718472',
+      },
+    ],
+    [{ sourceId: 'cluster-1', id: 'BP6', name: name('Bukit Panjang') }],
+    reportRows.map((row) => ({ ...row, sourceId: 'cluster-1' })),
     [{ id: 'BP1', name: name('Choa Chu Kang') }],
   ];
   let selectCount = 0;
@@ -73,10 +80,12 @@ function makeFakeClusterSourceDb(
           },
           where(condition: unknown) {
             whereCalls.push(condition);
+            if (selectIndex === 4)
+              return Promise.resolve(selectResults[selectIndex]);
             return this;
           },
           orderBy() {
-            return Promise.resolve(selectResults[selectIndex]);
+            return this;
           },
           limit() {
             return Promise.resolve(selectResults[selectIndex]);
@@ -103,8 +112,15 @@ function makeFakeReportSourceDb(
   const whereCalls: unknown[] = [];
   const selectResults = [
     reportRows,
-    [{ id: 'BPLRT', name: name('Bukit Panjang LRT'), color: '#718472' }],
-    [{ id: 'BP6', name: name('Bukit Panjang') }],
+    [
+      {
+        sourceId: 'report-1',
+        id: 'BPLRT',
+        name: name('Bukit Panjang LRT'),
+        color: '#718472',
+      },
+    ],
+    [{ sourceId: 'report-1', id: 'BP6', name: name('Bukit Panjang') }],
   ];
   let selectCount = 0;
 
@@ -126,7 +142,7 @@ function makeFakeReportSourceDb(
             return this;
           },
           orderBy() {
-            return Promise.resolve(selectResults[selectIndex]);
+            return this;
           },
           limit() {
             return Promise.resolve(selectResults[selectIndex]);
