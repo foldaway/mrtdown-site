@@ -21,6 +21,7 @@ import { publishRangeReferenceCache } from '~/util/rangeReferenceCache.server.js
 import { publishRangeSnapshot } from '~/util/rangeSnapshot.server.js';
 import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server.js';
 import { publishServicePathCache } from '~/util/servicePathCache.server.js';
+import { publishIssueProfileSnapshot } from '~/util/issueProfileSnapshot.server';
 import { publishStationProfileSnapshot } from '~/util/stationProfileSnapshot.server';
 import { getDb } from '../../db/index.js';
 import { completePageProfileGeneration } from '../../db/pageProfileGeneration.js';
@@ -82,6 +83,7 @@ async function publishPullCaches(generation: string, fingerprint?: string) {
   await publishNavigationCache(generation);
   await publishRangeSnapshot(fingerprint);
   await publishStationProfileSnapshot(fingerprint);
+  await publishIssueProfileSnapshot(fingerprint);
   await publishArrivalInputSnapshot(fingerprint);
   // Purge only after the matching departure manifest has activated.
 }
@@ -238,6 +240,7 @@ async function executePull(
       await runPullStep(context, 'repair-range-snapshot', async () => {
         await publishRangeSnapshot(manifestFingerprint);
         await publishStationProfileSnapshot(manifestFingerprint);
+        await publishIssueProfileSnapshot(manifestFingerprint);
         await publishArrivalInputSnapshot(manifestFingerprint);
         await publishStatisticsSnapshot(manifestFingerprint);
         await publishSitemapSnapshot(manifestFingerprint);

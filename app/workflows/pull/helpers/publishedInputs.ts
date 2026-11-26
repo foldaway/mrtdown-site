@@ -1,6 +1,7 @@
 import { WorkflowNonRetryableError } from '@upstash/workflow';
 import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
 import { arrivalInputSnapshotStore } from '~/util/arrivalInputSnapshot.server';
+import { issueProfileSnapshotStore } from '~/util/issueProfileSnapshot.server';
 import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
 import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
 import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
@@ -34,14 +35,19 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
     );
   const fingerprint = getCanonicalManifestFingerprint(manifest, pinned);
   if (!(await rangeSnapshotStore.isCurrent(fingerprint))) return false;
-  const [range, sitemap, arrivals, stations, statistics] = await Promise.all([
-    rangeSnapshotStore.head(),
-    sitemapSnapshotStore.read({ verifyPayload: true }),
-    arrivalInputSnapshotStore.read({ verifyPayload: true }),
-    stationProfileSnapshotStore.read({ verifyPayload: true }),
-    statisticsSnapshotStore.read({ verifyPayload: true }),
-  ]);
+  const [range, sitemap, arrivals, stations, statistics, issues] =
+    await Promise.all([
+      rangeSnapshotStore.head(),
+      sitemapSnapshotStore.read({ verifyPayload: true }),
+      arrivalInputSnapshotStore.read({ verifyPayload: true }),
+      stationProfileSnapshotStore.read({ verifyPayload: true }),
+      statisticsSnapshotStore.read({ verifyPayload: true }),
+      issueProfileSnapshotStore.healthy(),
+    ]);
   if (
+    !issues ||
+    issues.value.fingerprint !== fingerprint ||
+    issues.value.generation !== range.value?.generation ||
     !statistics ||
     statistics.value.fingerprint !== fingerprint ||
     statistics.value.generation !== range.value?.generation ||

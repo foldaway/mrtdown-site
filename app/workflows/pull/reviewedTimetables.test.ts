@@ -52,6 +52,10 @@ import { withSelectedScheduledTimetable } from '~/util/dbQueries/withSelectedSch
 import { publishNavigationCache } from '~/util/navigationCache.server';
 import { assemblePublishedStationArrivals } from '~/util/publishedStationArrivals.server';
 import { publishRangeReferenceCache } from '~/util/rangeReferenceCache.server';
+import {
+  issueProfileSnapshotStore,
+  publishIssueProfileSnapshot,
+} from '~/util/issueProfileSnapshot.server';
 import { publishRangeSnapshot } from '~/util/rangeSnapshot.server';
 import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
 import { publishServicePathCache } from '~/util/servicePathCache.server';
@@ -104,6 +108,10 @@ vi.mock('~/util/arrivalDepartureStore.server', async (original) => ({
 }));
 vi.mock('./helpers/publishArrivalDepartures', () => ({
   publishArrivalDepartures: vi.fn(async () => {}),
+}));
+vi.mock('~/util/issueProfileSnapshot.server', () => ({
+  publishIssueProfileSnapshot: vi.fn(async () => {}),
+  issueProfileSnapshotStore: { healthy: vi.fn(async () => null) },
 }));
 vi.mock('~/util/stationProfileSnapshot.server', () => ({
   publishStationProfileSnapshot: vi.fn(async () => {}),
@@ -359,6 +367,7 @@ beforeEach(() => {
   vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', undefined);
   vi.stubEnv('REDIS_URL', undefined);
   vi.mocked(sitemapSnapshotStore.read).mockResolvedValue(null);
+  vi.mocked(issueProfileSnapshotStore.healthy).mockResolvedValue(null);
   vi.mocked(statisticsSnapshotStore.read).mockResolvedValue(null);
   vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(false);
   vi.mocked(rangeSnapshotStore.hasWriter).mockResolvedValue(false);
@@ -382,6 +391,9 @@ afterEach(async () => {
 describe('published zero-SQL range inputs', () => {
   function healthyArrivalHeads() {
     const fingerprint = getCanonicalManifestFingerprint(manifest);
+    vi.mocked(issueProfileSnapshotStore.healthy).mockResolvedValue({
+      value: { fingerprint, generation: 'complete' },
+    } as never);
     state.arrivalHead = {
       fingerprint,
       generation: 'complete',
@@ -422,6 +434,32 @@ describe('published zero-SQL range inputs', () => {
     await workflow().run();
     expect(getDb).not.toHaveBeenCalled();
     expect(publishSitemapSnapshot).not.toHaveBeenCalled();
+  });
+  it('requires healthy Issue Profile inputs and completes publication before certifying an unchanged pull', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://unused');
+    vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    state.fingerprint = getCanonicalManifestFingerprint(manifest);
+    healthyArrivalHeads();
+    vi.mocked(issueProfileSnapshotStore.healthy).mockResolvedValueOnce(null);
+    vi.mocked(publishIssueProfileSnapshot).mockRejectedValueOnce(
+      Error('issue publication failed'),
+    );
+    const repair = workflow();
+    await expect(repair.run()).rejects.toThrow('issue publication failed');
+    expect(rangeSnapshotStore.complete).not.toHaveBeenCalled();
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    await repair.run();
+    expect(publishIssueProfileSnapshot).toHaveBeenLastCalledWith(
+      state.fingerprint,
+    );
+    expect(rangeSnapshotStore.complete).toHaveBeenCalledWith(state.fingerprint);
+    vi.clearAllMocks();
+    vi.mocked(getDb).mockImplementation(() => {
+      throw Error('SQL must stay asleep');
+    });
+    await workflow().run();
+    expect(getDb).not.toHaveBeenCalled();
+    expect(publishIssueProfileSnapshot).not.toHaveBeenCalled();
   });
   it('repairs missing or mismatched statistics before checkpointing, then skips SQL on healthy polls', async () => {
     vi.stubEnv('REDIS_URL', 'redis://unused');

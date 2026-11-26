@@ -114,18 +114,37 @@ A staging origin fill reports `X-MRTDown-Navigation-Source: redis` or `sql`.
 Check on a Cloudflare `MISS`; an edge hit replays the origin fill's header.
 Missing or unavailable navigation falls back to SQL with `no-store`.
 
-## Completed Issue Profiles
+## Published Issue Profile inputs
 
-An Issue Profile with ended intervals can fill Redis only when a repeatable-read
-Postgres snapshot sees the published generation marked complete. The pull marks
-it updating with the first live canonical write. Reads use `MGET` to fetch the
-active generation and profile atomically. A conditional write prevents delayed
-fills after generation advances. Entries are limited to 128 KiB and expire at
-Singapore midnight. Cloudflare freshness is capped at that same midnight.
+With Redis configured, full HTML, Markdown and server-function Issue Profile
+reads use published source inputs, including cold requests and ongoing/future
+issues. Assembly uses the request clock for intervals, inferred ends, duration
+and date-selected service revisions. Midnight does not refill SQL. Completed
+profiles retain the midnight freshness deadline and 15-minute edge cap;
+ongoing/future profiles remain `no-store`.
 
-On staging, a cold completed issue returns `X-MRTDown-Issue-Profile-Source: sql`
-with `no-store`, then `redis` on the next origin request. HTML and Markdown share
-an entry. Misses and ineligible profiles still need SQL.
+Keys use `mrtdown:{<tier>:issue-profiles:v1}`. A bounded topology/partition
+manifest (4 MiB encoded, 24 MiB JSON) references at most 10,000 immutable issue
+partitions (512 KiB encoded, 2 MiB JSON each, 32 MiB total encoded). Partitions
+contain only assembly rows, static scope and public update projections. Redacted
+text/translations and unused title metadata are excluded. Evidence keeps descending
+timestamps with an ID tie-breaker. The existing atomic head/dependency check
+activates all parts together, rejects delayed publishers and retains the last
+completed publication during import. Active parts persist; superseded parts
+expire after 24 hours.
+
+Canonical pulls publish after generation completion, before purge/checkpoint.
+This covers topology changes, evidence updates/redaction, issue corrections and
+deletions. Holiday/facts rebuilds do not change these scoped inputs. Unchanged
+pulls verify the manifest and every partition before skipping SQL; missing or
+invalid inputs enter the normal leased repair path. The Navigation seed above
+also repairs this publication. Requests never publish replacements.
+
+Missing, corrupt or unavailable inputs recover through read-only repeatable-read
+SQL with `no-store`. IDs absent from the manifest also recover through SQL, so a
+newly promoted ID cannot be hidden by an older publication or a negative cache.
+On staging, `X-MRTDown-Issue-Profile-Source` reports `redis` or `sql`, independently
+of edge eligibility. Deployment and production sleep verification remain separate.
 
 ## Range-reference inputs
 
@@ -184,8 +203,8 @@ request; `service_path_cache_transfer` includes rejected payloads.
 
 With Redis configured, history, issues-day, overview/map and report range inputs
 select a completed snapshot before any SQL connection or generation read.
-Entity profiles, statistics, Issue Profile misses and disruption dispatch still
-have SQL dependencies; this does not establish sustained whole-site Neon sleep.
+Other entity profiles/directories and disruption dispatch still have SQL
+dependencies; this does not establish sustained whole-site Neon sleep.
 
 The producer reads canonical rows in one repeatable-read transaction after
 page-profile completion. It excludes evidence bodies and rider reports. Consumers

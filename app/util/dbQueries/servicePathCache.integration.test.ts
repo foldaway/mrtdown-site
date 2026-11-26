@@ -1,3 +1,12 @@
+import { nonPublicEvidenceRedactedText } from '@mrtdown/fs';
+import { getIssueFn } from '~/util/issue.functions';
+import { getCachedIssueProfile } from '~/util/issueProfileCache.server';
+import {
+  createIssueProfileSnapshotStore,
+  issueProfileSnapshotStore,
+  publishIssueProfileSnapshot,
+} from '~/util/issueProfileSnapshot.server';
+import { getIssueReadModel } from './issue';
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
@@ -119,7 +128,13 @@ vi.mock('~/util/pageProfileRedis.server', () => ({
 }));
 const headers = vi.hoisted(() => vi.fn());
 vi.mock('@tanstack/react-start', () => ({
-  createServerFn: () => ({ handler: (handle: unknown) => handle }),
+  createServerFn: () => {
+    const builder = {
+      handler: (handle: unknown) => handle,
+      inputValidator: (_validate: unknown) => builder,
+    };
+    return builder;
+  },
 }));
 vi.mock('@tanstack/react-start/server', () => ({
   setResponseHeader: headers,
@@ -506,6 +521,299 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         const old = (await statisticsSnapshotStore.read())?.inputs.asOf;
         await publishStatisticsSnapshot();
         expect((await statisticsSnapshotStore.read())?.inputs.asOf).toBe(old);
+      });
+    },
+  );
+
+  describe.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
+    'published Issue Profiles with real Redis',
+    () => {
+      let issueRedis: Redis;
+      beforeEach(async () => {
+        vi.stubEnv(
+          'TIER',
+          `issue_profiles_test_${randomUUID().replaceAll('-', '')}`,
+        );
+        issueRedis = new Redis(process.env.TEST_SNAPSHOT_REDIS_URL ?? '');
+        vi.mocked(redisConnection.getPageProfileRedis).mockResolvedValue(
+          issueRedis,
+        );
+        await recordCanonicalManifestFingerprint(db, 'a'.repeat(64));
+      });
+      afterEach(async () => {
+        const keys = await issueRedis.keys(`mrtdown:*${process.env.TIER}*`);
+        if (keys.length) await issueRedis.del(...keys);
+        await issueRedis.quit();
+      });
+      it('matches full SQL cold/warm across midnight, future/ongoing/recurring/inferred intervals and service revisions', async () => {
+        await pool.query(
+          "update service_revisions set end_at='2026-11-19' where id='revision'",
+        );
+        await pool.query(`insert into service_revisions (id,service_id,start_at,end_at,estimated_frequency,operating_hours)
+          select 'loop','service','2026-11-19',null,estimated_frequency,operating_hours from service_revisions limit 1`);
+        await pool.query(`insert into service_revision_path_station_entries (service_revision_id,service_id,path_index,station_id,display_code)
+          values ('loop','service',0,'station-1','T1'),('loop','service',1,'station-2','T2'),('loop','service',2,'station-1','T1')`);
+        await pool.query(
+          "update lines set platform_door_count=null,train_car_counts='[]'",
+        );
+        await pool.query(`insert into issues(id,type,title,title_meta,hash)
+          select extra.id,kind,title,'{"private":"never publish"}',hash from issues cross join (values ('inferred','disruption'::issue_type),('open','infra'::issue_type),('recurring','maintenance'::issue_type)) as extra(id,kind) where issues.id='issue'`);
+        await pool.query(`insert into impact_events(id,ts,issue_id,type) values
+          ('inferred-period','2026-11-18T10:00:00+08:00','inferred','periods.set'),
+          ('open-period','2026-11-18T10:00:00+08:00','open','periods.set'),
+          ('recurring-period','2026-11-18T10:00:00+08:00','recurring','periods.set')`);
+        await pool.query(`insert into impact_event_periods(impact_event_id,index,start_ts,end_ts) values
+          ('inferred-period',0,'2026-11-18T10:00:00+08:00',null),
+          ('open-period',0,'2026-11-18T10:00:00+08:00',null),
+          ('recurring-period',0,'2026-11-18T23:50:00+08:00','2026-11-19T00:10:00+08:00'),
+          ('recurring-period',1,'2026-11-19T00:20:00+08:00','2026-11-19T00:30:00+08:00')`);
+        await pool.query(
+          `insert into impact_event_entity_services(impact_event_id,service_id) values ('recurring-period','service')`,
+        );
+        await pool.query(
+          `insert into evidences(id,issue_id,type,text,render,source_url,ts) values
+          ('redacted','issue','report.public',$1,'{"text":{"en-SG":"private translation"}}','https://example.com/redacted','2026-11-18T10:30:00+08:00'),
+          ('first','issue','report.public','Public update','{"text":{"en-SG":"Public update","zh-Hans":"更新","ms":null,"ta":null}}','https://example.com/update','2026-11-18T10:30:00+08:00'),
+          ('inferred-evidence','inferred','report.public','Still delayed',null,'https://example.com/inferred','2026-11-18T10:00:00+08:00')`,
+          [nonPublicEvidenceRedactedText],
+        );
+        const clocks = [
+          '2026-11-18T09:59:00',
+          '2026-11-18T10:15:00',
+          '2026-11-18T10:30:00',
+          '2026-11-18T23:59:59',
+          '2026-11-19T00:00:00',
+          '2026-11-19T00:10:00',
+          '2026-11-19T00:20:00',
+          '2026-11-19T00:30:00',
+          '2026-11-20T00:00:00',
+        ].map((iso) => DateTime.fromISO(iso, { zone: 'Asia/Singapore' }));
+        const ids = ['issue', 'inferred', 'open', 'recurring'];
+        const expected = [];
+        for (const clock of clocks)
+          expected.push(
+            await Promise.all(
+              ids.map((id) => getIssueReadModel(id, clock, db)),
+            ),
+          );
+        const publication = await publishIssueProfileSnapshot();
+        expect(publication?.issues).toBe(4);
+        expect(publication?.partitionBytes).toBeLessThan(32 * 1024 * 1024);
+        const part = await issueProfileSnapshotStore.read('issue');
+        expect(JSON.stringify(part)).not.toContain('private translation');
+        expect(JSON.stringify(part)).not.toContain('never publish');
+        expect(part?.part.updates[1]).toMatchObject({
+          text: '',
+          textTranslations: null,
+          isTextRedacted: true,
+        });
+        const cold = createIssueProfileSnapshotStore(async () => issueRedis);
+        vi.spyOn(issueProfileSnapshotStore, 'read').mockImplementation((id) =>
+          cold.read(id),
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        queries.length = 0;
+        for (let pass = 0; pass < 2; pass++)
+          for (const [i, clock] of clocks.entries()) {
+            for (const [j, id] of ids.entries()) {
+              const result = await getCachedIssueProfile(id, clock);
+              expect(result.profile).toEqual(expected[i][j]);
+              expect(result.source).toBe('redis');
+              vi.setSystemTime(clock.toJSDate());
+              expect(await getIssueFn({ data: { issueId: id } })).toEqual(
+                expected[i][j],
+              );
+              const intervals = expected[i][j].included.issues[id].intervals;
+              expect(result.expiresAt != null).toBe(
+                intervals.length > 0 &&
+                  intervals.every((interval) => interval.status === 'ended'),
+              );
+            }
+          }
+        expect(queries).toEqual([]);
+        expect(expected[1][0].included.issues.issue.intervals[0].status).toBe(
+          'ongoing',
+        );
+        expect(expected[2][0].included.issues.issue.intervals[0].status).toBe(
+          'ended',
+        );
+        expect(
+          expected.at(-1)?.[1].included.issues.inferred.intervals[0].status,
+        ).toBe('ended');
+      });
+      it('publishes corrections/redactions/deletions and recovers new or unknown IDs without negative caching', async () => {
+        await pool.query(
+          `insert into evidences(id,issue_id,type,text,source_url,ts) values ('evidence','issue','report.public','Original','https://example.com','2026-11-18T10:00:00+08:00')`,
+        );
+        await publishIssueProfileSnapshot();
+        await pool.query(
+          "update evidences set text=$1, render='{}' where id='evidence'",
+          [nonPublicEvidenceRedactedText],
+        );
+        await pool.query(
+          "update issues set title=jsonb_set(title,'{en-SG}',$1::jsonb) where id='issue'",
+          [JSON.stringify('Corrected')],
+        );
+        await completePageProfileGeneration(db, 'corrected');
+        await publishIssueProfileSnapshot();
+        const expected = await getIssueReadModel('issue', now, db);
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        expect((await getCachedIssueProfile('issue', now)).profile).toEqual(
+          expected,
+        );
+        expect(expected.data.updates[0]).toMatchObject({
+          text: '',
+          isTextRedacted: true,
+        });
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        await expect(getCachedIssueProfile('new', now)).rejects.toMatchObject({
+          status: 404,
+        });
+        await pool.query(
+          "insert into issues(id,type,title,title_meta,hash) select 'new',type,title,title_meta,hash from issues where id='issue'",
+        );
+        expect((await getCachedIssueProfile('new', now)).source).toBe('sql');
+        await publishIssueProfileSnapshot();
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        expect((await getCachedIssueProfile('new', now)).source).toBe('redis');
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        await pool.query("delete from issues where id='issue'");
+        await publishIssueProfileSnapshot();
+        await expect(getCachedIssueProfile('issue', now)).rejects.toMatchObject(
+          { status: 404 },
+        );
+      });
+      it('keeps crossing reads coherent and retains the usable head after partial preparation', async () => {
+        await publishIssueProfileSnapshot();
+        const old = await issueProfileSnapshotStore.read('issue');
+        if (!old) throw Error('Missing fixture publication');
+        const baseline = (await getCachedIssueProfile('issue', now)).profile;
+        await pool.query(
+          "update issues set title=jsonb_set(title,'{en-SG}',$1::jsonb) where id='issue'",
+          [JSON.stringify('Next issue')],
+        );
+        await completePageProfileGeneration(db, 'next');
+        const prepare = issueProfileSnapshotStore.parts.prepare;
+        vi.spyOn(
+          issueProfileSnapshotStore.parts,
+          'prepare',
+        ).mockImplementationOnce(async (...args) => {
+          const ref = await prepare(...args);
+          await issueRedis.del(
+            `${getSnapshotKeyPrefix('issue-profiles')}:partition:${ref.sha256}`,
+          );
+          return ref;
+        });
+        await expect(publishIssueProfileSnapshot()).rejects.toThrow(
+          'partition missing',
+        );
+        expect((await issueProfileSnapshotStore.manifest.head()).raw).toEqual(
+          old.snapshot.raw,
+        );
+        expect((await getCachedIssueProfile('issue', now)).profile).toEqual(
+          baseline,
+        );
+        const cold = createIssueProfileSnapshotStore(async () => issueRedis);
+        vi.spyOn(issueProfileSnapshotStore, 'read').mockImplementation((id) =>
+          cold.read(id),
+        );
+        const getrange = issueRedis.getrangeBuffer.bind(issueRedis);
+        let crossed = false;
+        vi.spyOn(issueRedis, 'getrangeBuffer').mockImplementation(
+          async (...args) => {
+            if (
+              !crossed &&
+              args[0] ===
+                `${getSnapshotKeyPrefix('issue-profiles')}:partition:${old.snapshot.inputs.partitions[0].sha256}`
+            ) {
+              crossed = true;
+              await publishIssueProfileSnapshot();
+              vi.mocked(database.getDefaultDb).mockRejectedValue(
+                Error('SQL must stay asleep'),
+              );
+            }
+            return getrange(...args);
+          },
+        );
+        expect((await getCachedIssueProfile('issue', now)).profile).toEqual(
+          baseline,
+        );
+        expect(crossed).toBe(true);
+        expect(
+          (await getCachedIssueProfile('issue', now)).profile.included.issues
+            .issue.title['en-SG'],
+        ).toBe('Next issue');
+        expect(
+          await issueRedis.ttl(
+            `${getSnapshotKeyPrefix('issue-profiles')}:partition:${old.snapshot.inputs.partitions[0].sha256}`,
+          ),
+        ).toBeGreaterThan(0);
+      });
+      it('repairs missing/corrupt required inputs, preserves the last completed head and rejects delayed publishers', async () => {
+        await publishIssueProfileSnapshot();
+        const old = await issueProfileSnapshotStore.manifest.read();
+        if (!old) throw Error('Missing fixture publication');
+        const expected = await getIssueReadModel('issue', now, db);
+        const ref = old.inputs.partitions[0];
+        const prefix = getSnapshotKeyPrefix('issue-profiles');
+        await issueRedis.set(`${prefix}:partition:${ref.sha256}`, 'corrupt');
+        expect(await issueProfileSnapshotStore.healthy()).toBeNull();
+        expect(await getCachedIssueProfile('issue', now)).toMatchObject({
+          profile: expected,
+          source: 'sql',
+        });
+        await publishIssueProfileSnapshot();
+        expect(await issueProfileSnapshotStore.healthy()).not.toBeNull();
+        await issueRedis.del(`${prefix}:partition:${ref.sha256}`);
+        expect(await issueProfileSnapshotStore.healthy()).toBeNull();
+        await publishIssueProfileSnapshot();
+        await expect(
+          issueProfileSnapshotStore.manifest.publish(
+            old.raw,
+            old.inputs,
+            'delayed',
+            'a'.repeat(64),
+          ),
+        ).rejects.toThrow('superseded');
+        await markPageProfilesUpdating(db);
+        const active = (await issueProfileSnapshotStore.manifest.head()).raw;
+        await expect(publishIssueProfileSnapshot()).rejects.toThrow(
+          'completed canonical',
+        );
+        expect((await issueProfileSnapshotStore.manifest.head()).raw).toEqual(
+          active,
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        expect((await getCachedIssueProfile('issue', now)).profile).toEqual(
+          expected,
+        );
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        const cold = createIssueProfileSnapshotStore(async () => issueRedis);
+        vi.spyOn(issueProfileSnapshotStore, 'read').mockImplementation((id) =>
+          cold.read(id),
+        );
+        const head = await issueProfileSnapshotStore.manifest.head();
+        await issueRedis.set(
+          `${prefix}:payload:${head.value?.sha256}`,
+          'corrupt',
+        );
+        expect(await getCachedIssueProfile('issue', now)).toMatchObject({
+          profile: expected,
+          source: 'sql',
+        });
+        await issueRedis.del(`${prefix}:active`);
+        expect(await getCachedIssueProfile('issue', now)).toMatchObject({
+          profile: expected,
+          source: 'sql',
+        });
       });
     },
   );

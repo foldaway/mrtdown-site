@@ -1,5 +1,5 @@
 import type { Service as CoreService } from '@mrtdown/core';
-import { getTableColumns, inArray, sql } from 'drizzle-orm';
+import { asc, getTableColumns, inArray, sql } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
 import {
   evidencesTable,
@@ -595,6 +595,11 @@ export async function readDatasetInputs(
                   impactEventEntityServicesTable.impact_event_id,
                   serviceEntityEventIds,
                 ),
+              )
+              // Scoped and whole-network query plans must preserve branch order.
+              .orderBy(
+                asc(impactEventEntityServicesTable.impact_event_id),
+                asc(impactEventEntityServicesTable.service_id),
               ),
           )
         : ([] as DatasetImpactEventEntityService[]),
