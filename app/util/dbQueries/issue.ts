@@ -1,9 +1,9 @@
-import { desc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import { evidencesTable, issuesTable } from '~/db/schema';
 import { type AppDbReader, getDefaultDb, timeDbQuery } from './database';
 import { buildDataset } from './dataset';
 import { nowSg } from './dateTime';
-import { selectIncludedEntities } from './includedEntities';
+import { assembleIssueProfile } from './issueProfileSnapshotInputs';
 import { toIssueUpdate } from './issueEvidence';
 import { getIssueStaticScope } from './readModelScope';
 
@@ -36,27 +36,15 @@ export async function getIssueReadModel(
         .select()
         .from(evidencesTable)
         .where(eq(evidencesTable.issue_id, issueId))
-        .orderBy(desc(evidencesTable.ts)),
+        .orderBy(desc(evidencesTable.ts), asc(evidencesTable.id)),
     ),
   ]);
   const dataset = await buildDataset(referenceNow, db, [issueId], staticScope);
-  const issue = dataset.allIssues[issueId];
-  if (issue == null) {
-    throw new Error(
-      `Issue ${issueId} disappeared while building its read model`,
-    );
-  }
-
-  return {
-    data: {
-      id: issueId,
-      updates: evidenceRows.map(toIssueUpdate),
-    },
-    included: selectIncludedEntities(dataset.included, dataset.allIssues, {
-      issueIds: [issueId],
-      includeStationMembershipLines: true,
-    }),
-  };
+  return assembleIssueProfile(
+    issueId,
+    dataset,
+    evidenceRows.map(toIssueUpdate),
+  );
 }
 
 /** @deprecated Use the explicitly scoped read-model name. */

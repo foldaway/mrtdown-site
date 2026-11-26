@@ -1,235 +1,74 @@
-import {
-  CauseSubtypeSchema,
-  EvidenceTypeSchema,
-  IssueSchema,
-  LandmarkSchema,
-  LineSchema,
-  OperatorSchema,
-  StationSchema,
-  TownSchema,
-  TranslationsSchema,
-} from '@mrtdown/core';
 import type { DateTime } from 'luxon';
-import { z } from 'zod';
-import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import { getDefaultDb } from './dbQueries/database';
-import { isoDate } from './dbQueries/dateTime';
 import { getIssueReadModel } from './dbQueries/issue';
-import { parseNavigationCacheEntry } from './navigationCache.server';
 import {
-  getNavigationCacheKey,
-  getPageProfileRedis,
-} from './pageProfileRedis.server';
-
-type IssueProfile = Awaited<ReturnType<typeof getIssueReadModel>>;
-
-const MAX_PROFILE_BYTES = 128 * 1024;
-const MAX_CACHEABLE_ID_LENGTH = 256;
-
-const timestamps = z.iso.datetime({ offset: true });
-const CompletedIssueSchema = IssueSchema.omit({ titleMeta: true }).extend({
-  subtypes: z.array(CauseSubtypeSchema),
-  durationSeconds: z.number(),
-  lineIds: z.array(z.string()),
-  branchesAffected: z.array(
-    z.object({
-      lineId: z.string(),
-      branchId: z.string(),
-      serviceName: TranslationsSchema.optional(),
-      stationIds: z.array(z.string()),
-      wholeServiceRevisions: z
-        .array(
-          z.object({
-            id: z.string(),
-            startAt: z.string().nullable(),
-            endAt: z.string().nullable(),
-            updatedAt: z.string(),
-            stationIds: z.array(z.string()),
-          }),
-        )
-        .optional(),
-    }),
-  ),
-  intervals: z
-    .array(
-      z.object({
-        startAt: timestamps,
-        endAt: timestamps,
-        status: z.literal('ended'),
-      }),
-    )
-    .min(1),
-});
-
-const CompletedProfileSchema = z.object({
-  data: z.object({
-    id: z.string(),
-    updates: z.array(
-      z.object({
-        type: EvidenceTypeSchema,
-        text: z.string(),
-        textTranslations: TranslationsSchema.nullable(),
-        isTextRedacted: z.boolean(),
-        sourceUrl: z.string(),
-        createdAt: z.string(),
-      }),
-    ),
-  }),
-  included: z.object({
-    issues: z.record(z.string(), CompletedIssueSchema),
-    lines: z.record(
-      z.string(),
-      z
-        .object(LineSchema.shape)
-        .omit({ serviceIds: true })
-        .extend({
-          // The Postgres read model uses an empty array for unknown counts.
-          trainCarCounts: LineSchema.shape.trainCarCounts.or(z.tuple([])),
-        }),
-    ),
-    stations: z.record(
-      z.string(),
-      z
-        .object(StationSchema.shape)
-        .omit({ stationCodes: true })
-        .extend({
-          memberships: z.array(
-            StationSchema.shape.stationCodes.element.extend({
-              endedAt: z.string().optional(),
-              branchId: z.string(),
-              sequenceOrder: z.number(),
-            }),
-          ),
-        }),
-    ),
-    towns: z.record(z.string(), TownSchema),
-    landmarks: z.record(z.string(), LandmarkSchema),
-    operators: z.record(z.string(), OperatorSchema),
-  }),
-}) satisfies z.ZodType<IssueProfile>;
-
-// Compare and set together so a delayed fill cannot publish after its
-// generation stops being active.
-const WRITE_CURRENT_GENERATION = `
-local raw = redis.call('GET', KEYS[1])
-if not raw then return false end
-local ok, entry = pcall(cjson.decode, raw)
-if not ok or type(entry) ~= 'table' or entry.generation ~= ARGV[1] then return false end
-redis.call('SET', KEYS[2], ARGV[2], 'PXAT', ARGV[3])
-return 1
-`;
-
-type IssueCacheLookup = NonNullable<Awaited<ReturnType<typeof lookupProfile>>>;
-
-const inFlightFills = new Map<string, Promise<IssueProfile>>();
-
-function decodeProfile(raw: string | null, issueId: string) {
-  if (raw == null || Buffer.byteLength(raw) > MAX_PROFILE_BYTES) return null;
-  try {
-    const profile = CompletedProfileSchema.parse(JSON.parse(raw));
-    if (
-      profile.data.id === issueId &&
-      Object.hasOwn(profile.included.issues, issueId) &&
-      profile.included.issues[issueId].id === issueId
-    ) {
-      return profile;
-    }
-  } catch {
-    // A malformed cache value can be replaced from the current SQL snapshot.
-  }
-  return null;
-}
-
-async function lookupProfile(issueId: string, referenceNow: DateTime) {
-  if (issueId.length > MAX_CACHEABLE_ID_LENGTH) return null;
-  const navigationKey = getNavigationCacheKey();
-  const redis = await getPageProfileRedis();
-  const observedNavigation = await redis.get(navigationKey);
-  const active = parseNavigationCacheEntry(observedNavigation);
-  if (active == null) return null;
-
-  // Keep both keys in the same slot so MGET observes them atomically.
-  const cacheKey = `{${navigationKey}}:issue:${encodeURIComponent(active.generation)}:${isoDate(referenceNow)}:${encodeURIComponent(issueId)}`;
-  const expiresAt = referenceNow.plus({ days: 1 }).startOf('day').toMillis();
-  const [currentNavigation, raw] = await redis.mget(navigationKey, cacheKey);
-  if (currentNavigation !== observedNavigation) return null;
-  const profile = decodeProfile(raw, issueId);
-  return {
-    navigationKey,
-    cacheKey,
-    generation: active.generation,
-    expiresAt,
-    redis,
-    profile,
-  };
-}
-
-async function loadIssueProfile(
-  issueId: string,
-  referenceNow: DateTime,
-  lookup: IssueCacheLookup | null,
-) {
-  const db = await getDefaultDb();
-  const { generation, profile } = await db.transaction(
-    async (tx) => {
-      const generation =
-        lookup && (await readCompletedPageProfileGeneration(tx));
-      const profile = await getIssueReadModel(issueId, referenceNow, tx);
-      return { generation, profile };
-    },
-    { isolationLevel: 'repeatable read', accessMode: 'read only' },
-  );
-  if (
-    lookup == null ||
-    generation !== lookup.generation ||
-    Date.now() >= lookup.expiresAt
-  ) {
-    return profile;
-  }
-
-  const completed = CompletedProfileSchema.safeParse(profile);
-  if (
-    !completed.success ||
-    !Object.hasOwn(completed.data.included.issues, issueId)
-  ) {
-    return profile;
-  }
-
-  const raw = JSON.stringify(completed.data);
-  if (Buffer.byteLength(raw) > MAX_PROFILE_BYTES) return profile;
-
-  await lookup.redis
-    .eval(
-      WRITE_CURRENT_GENERATION,
-      2,
-      lookup.navigationKey,
-      lookup.cacheKey,
-      lookup.generation,
-      raw,
-      lookup.expiresAt,
-    )
-    .catch(() => undefined);
-  return profile;
-}
+  assembleIssueProfileSnapshot,
+  selectIssueProfileSnapshot,
+} from './dbQueries/issueProfileSnapshotInputs';
+import { issueProfileSnapshotStore } from './issueProfileSnapshot.server';
+import {
+  ISSUE_PROFILE_FRESH_UNTIL_HEADER,
+  ISSUE_PROFILE_PUBLICATION_HEADER,
+} from './publicResponseCache';
 
 export async function getCachedIssueProfile(
   issueId: string,
   referenceNow: DateTime,
 ) {
-  const lookup = await lookupProfile(issueId, referenceNow).catch(() => null);
-  if (lookup?.profile) {
-    return { profile: lookup.profile, expiresAt: lookup.expiresAt };
+  const published = process.env.REDIS_URL
+    ? await issueProfileSnapshotStore.readSelected((inputs) =>
+        selectIssueProfileSnapshot(inputs, issueId),
+      )
+    : null;
+  if (published?.inputs) {
+    const profile = assembleIssueProfileSnapshot(
+      published.inputs,
+      referenceNow,
+    );
+    const intervals = profile.included.issues[issueId].intervals;
+    // Keep the existing completed-only edge policy. Ongoing durations change
+    // with every request; future/recurring intervals must not freeze at the edge.
+    const completed =
+      intervals.length > 0 &&
+      intervals.every((interval) => interval.status === 'ended');
+    return {
+      profile,
+      source: 'redis' as const,
+      publicationId: published.value.publicationId,
+      expiresAt: completed
+        ? referenceNow.plus({ days: 1 }).startOf('day').toMillis()
+        : undefined,
+    };
   }
-  if (lookup == null) {
-    return { profile: await loadIssueProfile(issueId, referenceNow, null) };
-  }
+  const db = await getDefaultDb();
+  const profile = await db.transaction(
+    (tx) => getIssueReadModel(issueId, referenceNow, tx),
+    { isolationLevel: 'repeatable read', accessMode: 'read only' },
+  );
+  return { profile, source: 'sql' as const, publicationId: undefined };
+}
 
-  let fill = inFlightFills.get(lookup.cacheKey);
-  if (fill == null) {
-    fill = loadIssueProfile(issueId, referenceNow, lookup).finally(() => {
-      inFlightFills.delete(lookup.cacheKey);
-    });
-    inFlightFills.set(lookup.cacheKey, fill);
+/** Withdraw shared caching if publication advanced while rendering. */
+export async function revalidateIssueProfileResponse(response: Response) {
+  const publicationId = response.headers.get(ISSUE_PROFILE_PUBLICATION_HEADER);
+  if (!response.headers.has(ISSUE_PROFILE_FRESH_UNTIL_HEADER) && !publicationId)
+    return response;
+  let current = false;
+  try {
+    current =
+      publicationId != null &&
+      (await issueProfileSnapshotStore.head()).value?.publicationId ===
+        publicationId;
+  } catch {
+    // Unavailable Redis cannot certify that this response is still current.
   }
-  return { profile: await fill };
+  const headers = new Headers(response.headers);
+  headers.delete(ISSUE_PROFILE_PUBLICATION_HEADER);
+  // Reuse the normal expired-deadline handling to strip all shared-cache headers.
+  if (!current) headers.set(ISSUE_PROFILE_FRESH_UNTIL_HEADER, '0');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

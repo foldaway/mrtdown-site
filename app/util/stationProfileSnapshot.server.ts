@@ -1,8 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import {
-  impactEventEntityFacilitiesTable,
-  impactEventEntityServicesTable,
   landmarksTable,
   stationExitsTable,
   stationPlatformServicesTable,
@@ -40,12 +38,13 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
         dataset,
         townsRows,
         landmarksRows,
-        platforms,
-        exits,
-        serviceReferences,
-        facilityReferences,
+        stationPlatformRows,
+        stationExitRows,
       ] = await Promise.all([
-        readDatasetInputs(tx, undefined, undefined, { references }),
+        readDatasetInputs(tx, undefined, undefined, {
+          references,
+          includeHistoricalIssueReferences: true,
+        }),
         tx
           .select({
             id: townsTable.id,
@@ -97,22 +96,6 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
             asc(stationExitsTable.source_object_id),
             asc(stationExitsTable.source_id),
           ),
-        // Profile candidate/scope SQL includes historical references, even when
-        // a newer state event supersedes them. Range assembly omits these.
-        tx
-          .select({
-            impact_event_id: impactEventEntityServicesTable.impact_event_id,
-            service_id: impactEventEntityServicesTable.service_id,
-          })
-          .from(impactEventEntityServicesTable),
-        tx
-          .select({
-            impact_event_id: impactEventEntityFacilitiesTable.impact_event_id,
-            station_id: impactEventEntityFacilitiesTable.station_id,
-            line_id: impactEventEntityFacilitiesTable.line_id,
-            kind: impactEventEntityFacilitiesTable.kind,
-          })
-          .from(impactEventEntityFacilitiesTable),
       ]);
       return {
         generation,
@@ -122,11 +105,9 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
             ...dataset,
             townsRows,
             landmarksRows,
-            impactEventServiceRows: serviceReferences,
-            impactEventFacilityRows: facilityReferences,
           },
-          platforms,
-          exits,
+          platforms: stationPlatformRows,
+          exits: stationExitRows,
         },
       };
     },

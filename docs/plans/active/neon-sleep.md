@@ -71,6 +71,14 @@ shared caching. Rolling windows retain the rebuild clock across midnight and
 cache repair. See the [pipeline boundary](../../architecture/data-pipeline.md#published-statistics).
 Review and rollout are separate; this slice does not establish whole-site sleep.
 
+### Issue Profiles follow-up (audit item 4)
+
+Full issue reads now use the shared bounded snapshot store and request-clock
+assembly. Unknown IDs and invalid inputs retain uncached SQL recovery; the
+[runbook](../../operations/edge-caching.md#published-issue-profile-inputs) owns repair.
+Local checks cover all 765 canonical issues at November 26 and December 26 clocks.
+Deployment and whole-site sustained sleep remain unverified.
+
 ## Surprises & Discoveries
 
 Before source snapshots, range hits still selected canonical generation, issues

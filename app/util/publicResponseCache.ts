@@ -6,6 +6,7 @@ export const PUBLIC_CLOUDFLARE_CACHE_CONTROL = `public, max-age=${PUBLIC_EDGE_TT
 export const STATION_PROFILE_FRESH_UNTIL_HEADER =
   'X-MRTDown-Station-Fresh-Until';
 export const ISSUE_PROFILE_FRESH_UNTIL_HEADER = 'X-MRTDown-Issue-Fresh-Until';
+export const ISSUE_PROFILE_PUBLICATION_HEADER = 'X-MRTDown-Issue-Publication';
 
 export type PublicCacheKind =
   | 'html'

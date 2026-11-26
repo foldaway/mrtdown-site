@@ -114,18 +114,25 @@ A staging origin fill reports `X-MRTDown-Navigation-Source: redis` or `sql`.
 Check on a Cloudflare `MISS`; an edge hit replays the origin fill's header.
 Missing or unavailable navigation falls back to SQL with `no-store`.
 
-## Completed Issue Profiles
+## Published Issue Profile inputs
 
-An Issue Profile with ended intervals can fill Redis only when a repeatable-read
-Postgres snapshot sees the published generation marked complete. The pull marks
-it updating with the first live canonical write. Reads use `MGET` to fetch the
-active generation and profile atomically. A conditional write prevents delayed
-fills after generation advances. Entries are limited to 128 KiB and expire at
-Singapore midnight. Cloudflare freshness is capped at that same midnight.
+HTML, Markdown and server-function Issue Profile reads assemble published source
+rows and public updates at the request clock, including cold, ongoing/future and
+Singapore-midnight requests. Redacted text/translations and unused title metadata
+are excluded; evidence keeps descending timestamps with an ID tie-breaker.
 
-On staging, a cold completed issue returns `X-MRTDown-Issue-Profile-Source: sql`
-with `no-store`, then `redis` on the next origin request. HTML and Markdown share
-an entry. Misses and ineligible profiles still need SQL.
+`mrtdown:{<tier>:issue-profiles:v1}` uses the shared immutable snapshot store:
+at most 10,000 issues, 4 MiB encoded and 24 MiB expanded JSON. Readers copy only
+one issue's scope and updates. Publication requires a completed canonical snapshot
+and atomically replaces the head; active data persists and superseded data expires
+after 24 hours. Missing/invalid inputs enter the standard leased repair path before
+purge/checkpoint. The Navigation seed above also repairs this publication.
+
+Completed profiles retain the midnight deadline and 15-minute edge cap. After
+rendering, the server rechecks the Redis publication ID; superseded or unverifiable
+responses use `no-store`. Ongoing/future and SQL recovery responses also use
+`no-store`. Unknown IDs recover through SQL instead of caching a negative result.
+On staging, `X-MRTDown-Issue-Profile-Source` reports `redis` or `sql`.
 
 ## Range-reference inputs
 
@@ -184,8 +191,8 @@ request; `service_path_cache_transfer` includes rejected payloads.
 
 With Redis configured, history, issues-day, overview/map and report range inputs
 select a completed snapshot before any SQL connection or generation read.
-Entity profiles, statistics, Issue Profile misses and disruption dispatch still
-have SQL dependencies; this does not establish sustained whole-site Neon sleep.
+Other entity profiles/directories and disruption dispatch still have SQL
+dependencies; this does not establish sustained whole-site Neon sleep.
 
 The producer reads canonical rows in one repeatable-read transaction after
 page-profile completion. It excludes evidence bodies and rider reports. Consumers

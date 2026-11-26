@@ -4,7 +4,12 @@ import type { DateTime } from 'luxon';
 import { z } from 'zod';
 import { landmarksTable, stationExitsTable, townsTable } from '~/db/schema';
 import type { PublicCrowdReportSignal } from '~/util/crowdReports';
-import { assembleDataset, type DatasetInputs } from './dataset';
+import {
+  assembleDataset,
+  type DatasetInputs,
+  scopeDatasetInputs,
+} from './dataset';
+import { getIssueScopeFromInputs } from './readModelScope';
 import { RangeSnapshotInputsSchema } from './rangeSnapshotInputs';
 
 const audit = { created_at: true, updated_at: true } as const;
@@ -88,42 +93,7 @@ export function selectStationProfileSnapshot(
       .filter((row) => candidateEvents.has(row.id))
       .map((row) => row.issue_id),
   );
-  const eventIds = new Set(
-    rows.impactEventRows
-      .filter((row) => issueIds.has(row.issue_id))
-      .map((row) => row.id),
-  );
-  const facilities = rows.impactEventFacilityRows.filter((row) =>
-    eventIds.has(row.impact_event_id),
-  );
-  const services = new Set(
-    rows.impactEventServiceRows
-      .filter((row) => eventIds.has(row.impact_event_id))
-      .map((row) => row.service_id),
-  );
-  const affectedLines = new Set([
-    ...facilities.flatMap((row) => (row.line_id ? [row.line_id] : [])),
-    ...rows.serviceRows
-      .filter((row) => services.has(row.id))
-      .map((row) => row.line_id),
-  ]);
-  const affectedServices = new Set(
-    rows.serviceRows
-      .filter((row) => affectedLines.has(row.line_id))
-      .map((row) => row.id),
-  );
-  const affectedStations = new Set([
-    ...facilities.map((row) => row.station_id),
-    ...rows.servicePathRows
-      .filter((row) => affectedServices.has(row.service_id))
-      .map((row) => row.station_id),
-  ]);
-  const issueLines = new Set([
-    ...affectedLines,
-    ...rows.stationCodesRows
-      .filter((row) => affectedStations.has(row.station_id))
-      .map((row) => row.line_id),
-  ]);
+  const issueScope = getIssueScopeFromInputs(rows, issueIds);
   return {
     resolvedStationId,
     assemble(
@@ -133,12 +103,12 @@ export function selectStationProfileSnapshot(
     ) {
       const stationIds = new Set([
         resolvedStationId,
-        ...affectedStations,
+        ...issueScope.stationIds,
         ...signals.flatMap((signal) => signal.stationIds),
       ]);
       const lineIds = new Set([
         ...stationLines,
-        ...issueLines,
+        ...issueScope.lineIds,
         ...signals.flatMap((signal) => signal.lineIds),
         ...rows.stationCodesRows
           .filter((row) => stationIds.has(row.station_id))
@@ -159,40 +129,18 @@ export function selectStationProfileSnapshot(
           .filter((row) => stationIds.has(row.station_id))
           .map((row) => row.landmark_id),
       );
-      const scoped = {
-        ...rows,
-        linesRows: rows.linesRows.filter((row) => lineIds.has(row.id)),
-        lineOperatorsRows: rows.lineOperatorsRows.filter((row) =>
-          lineIds.has(row.line_id),
-        ),
-        stationRows: rows.stationRows.filter((row) => stationIds.has(row.id)),
-        stationCodesRows: rows.stationCodesRows.filter((row) =>
-          stationIds.has(row.station_id),
-        ),
-        stationLandmarksRows: rows.stationLandmarksRows.filter((row) =>
-          stationIds.has(row.station_id),
-        ),
-        serviceRows: rows.serviceRows.filter((row) => serviceIds.has(row.id)),
-        serviceRevisionRows: rows.serviceRevisionRows.filter((row) =>
-          serviceIds.has(row.service_id),
-        ),
-        servicePathRows: rows.servicePathRows.filter((row) =>
-          serviceIds.has(row.service_id),
-        ),
-        townsRows: rows.townsRows.filter((row) => townIds.has(row.id)),
-        landmarksRows: rows.landmarksRows.filter((row) =>
-          landmarkIds.has(row.id),
-        ),
-        issueRows: rows.issueRows.filter((row) => issueIds.has(row.id)),
+      const scope = {
+        lineIds: [...lineIds],
+        serviceIds: [...serviceIds],
+        stationIds: [...stationIds],
+        townIds: [...townIds],
+        landmarkIds: [...landmarkIds],
+        issueTransitionHorizon: horizon,
       };
+      const scoped = scopeDatasetInputs(rows, scope, issueIds);
       return {
         resolvedStationId,
-        dataset: assembleDataset(referenceNow, scoped as DatasetInputs, {
-          lineIds: [...lineIds],
-          serviceIds: [...serviceIds],
-          stationIds: [...stationIds],
-          issueTransitionHorizon: horizon,
-        }),
+        dataset: assembleDataset(referenceNow, scoped, scope),
         platformRows: inputs.platforms.filter(
           (row) => row.stationId === resolvedStationId,
         ),

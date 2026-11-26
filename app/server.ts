@@ -4,6 +4,7 @@ import handler, { createServerEntry } from '@tanstack/react-start/server-entry';
 import type { Root } from 'xast';
 import { toXml } from 'xast-util-to-xml';
 import { getUnsupportedAgentMarkdownResponse } from './util/agentMarkdown';
+import { revalidateIssueProfileResponse } from './util/issueProfileCache.server';
 import { applyPublicDataCacheHeaders } from './util/publicResponseCache';
 import {
   addSentryAnonymousUserCookie,
@@ -40,6 +41,7 @@ async function appFetch(request: Request) {
     }
     throw error;
   }
+  response = await revalidateIssueProfileResponse(response);
   const elapsedMs = performance.now() - startedAt;
   const responseWithHeaders = applyPublicDataCacheHeaders(
     request,

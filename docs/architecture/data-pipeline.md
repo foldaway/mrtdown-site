@@ -67,6 +67,16 @@ or invalid inputs use lazy SQL recovery with `no-store`; an unchanged canonical
 pull repairs publication before purge and checkpoint completion. See the
 [station snapshot runbook](../operations/edge-caching.md#published-station-profile-inputs).
 
+### Published Issue Profile inputs
+
+Full Issue Profile reads share the bounded snapshot store and station scope
+helpers. Canonical pulls and explicit repair publish completed source rows and
+public updates before purge/checkpoint; requests assemble at their own clock.
+Unused title metadata and redacted text/translations are excluded. Unknown IDs
+and invalid snapshots retain uncached SQL recovery. Holiday/facts rebuilds do not
+change these inputs. See the [runbook](../operations/edge-caching.md#published-issue-profile-inputs)
+for bounds, retention and response-time publication checks.
+
 ### Arrival topology reuse
 
 Finalization also validates and hashes the actual live schedule topology, then

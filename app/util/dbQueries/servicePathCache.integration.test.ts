@@ -1,3 +1,20 @@
+import { nonPublicEvidenceRedactedText } from '@mrtdown/fs';
+import { getIssueFn } from '~/util/issue.functions';
+import {
+  getCachedIssueProfile,
+  revalidateIssueProfileResponse,
+} from '~/util/issueProfileCache.server';
+import {
+  issueProfileSnapshotStore,
+  publishIssueProfileSnapshot,
+} from '~/util/issueProfileSnapshot.server';
+import { getIssueReadModel } from './issue';
+import { parseIssueProfileSnapshotInputs } from './issueProfileSnapshotInputs';
+import {
+  applyPublicDataCacheHeaders,
+  ISSUE_PROFILE_FRESH_UNTIL_HEADER,
+  ISSUE_PROFILE_PUBLICATION_HEADER,
+} from '~/util/publicResponseCache';
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
@@ -119,7 +136,13 @@ vi.mock('~/util/pageProfileRedis.server', () => ({
 }));
 const headers = vi.hoisted(() => vi.fn());
 vi.mock('@tanstack/react-start', () => ({
-  createServerFn: () => ({ handler: (handle: unknown) => handle }),
+  createServerFn: () => {
+    const builder = {
+      handler: (handle: unknown) => handle,
+      inputValidator: (_validate: unknown) => builder,
+    };
+    return builder;
+  },
 }));
 vi.mock('@tanstack/react-start/server', () => ({
   setResponseHeader: headers,
@@ -506,6 +529,304 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         const old = (await statisticsSnapshotStore.read())?.inputs.asOf;
         await publishStatisticsSnapshot();
         expect((await statisticsSnapshotStore.read())?.inputs.asOf).toBe(old);
+      });
+    },
+  );
+
+  describe.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
+    'published Issue Profiles with real Redis',
+    () => {
+      let issueRedis: Redis;
+      beforeEach(async () => {
+        vi.stubEnv(
+          'TIER',
+          `issue_profiles_test_${randomUUID().replaceAll('-', '')}`,
+        );
+        issueRedis = new Redis(process.env.TEST_SNAPSHOT_REDIS_URL ?? '');
+        vi.mocked(redisConnection.getPageProfileRedis).mockResolvedValue(
+          issueRedis,
+        );
+        await recordCanonicalManifestFingerprint(db, 'a'.repeat(64));
+      });
+      afterEach(async () => {
+        const keys = await issueRedis.keys(`mrtdown:*${process.env.TIER}*`);
+        if (keys.length) await issueRedis.del(...keys);
+        await issueRedis.quit();
+      });
+      const request = new Request('https://example.com/issues/issue', {
+        headers: { 'x-tsr-serverfn': 'true' },
+      });
+      function rendered(body: string) {
+        const response = new Response(body, {
+          headers: { 'Content-Type': 'text/html' },
+        });
+        for (const [key, value] of headers.mock.calls)
+          response.headers.set(key, value);
+        return response;
+      }
+      const finalize = async (response: Response) =>
+        applyPublicDataCacheHeaders(
+          request,
+          await revalidateIssueProfileResponse(response),
+        );
+      it('matches full SQL cold/warm across midnight, future/ongoing/recurring/inferred intervals and service revisions', async () => {
+        await pool.query(
+          "update service_revisions set end_at='2026-11-19' where id='revision'",
+        );
+        await pool.query(`insert into service_revisions (id,service_id,start_at,end_at,estimated_frequency,operating_hours)
+          select 'loop','service','2026-11-19',null,estimated_frequency,operating_hours from service_revisions limit 1`);
+        await pool.query(`insert into service_revision_path_station_entries (service_revision_id,service_id,path_index,station_id,display_code)
+          values ('loop','service',0,'station-1','T1'),('loop','service',1,'station-2','T2'),('loop','service',2,'station-1','T1')`);
+        await pool.query(
+          "update lines set platform_door_count=null,train_car_counts='[]'",
+        );
+        await pool.query(`insert into issues(id,type,title,title_meta,hash)
+          select extra.id,kind,title,'{"private":"never publish"}',hash from issues cross join (values ('inferred','disruption'::issue_type),('open','infra'::issue_type),('recurring','maintenance'::issue_type)) as extra(id,kind) where issues.id='issue'`);
+        await pool.query(`insert into impact_events(id,ts,issue_id,type) values
+          ('inferred-period','2026-11-18T10:00:00+08:00','inferred','periods.set'),
+          ('open-period','2026-11-18T10:00:00+08:00','open','periods.set'),
+          ('recurring-period','2026-11-18T10:00:00+08:00','recurring','periods.set')`);
+        await pool.query(`insert into impact_event_periods(impact_event_id,index,start_ts,end_ts) values
+          ('inferred-period',0,'2026-11-18T10:00:00+08:00',null),
+          ('open-period',0,'2026-11-18T10:00:00+08:00',null),
+          ('recurring-period',0,'2026-11-18T23:50:00+08:00','2026-11-19T00:10:00+08:00'),
+          ('recurring-period',1,'2026-11-19T00:20:00+08:00','2026-11-19T00:30:00+08:00')`);
+        await pool.query(
+          `insert into impact_event_entity_services(impact_event_id,service_id) values ('recurring-period','service')`,
+        );
+        await pool.query(
+          `insert into evidences(id,issue_id,type,text,render,source_url,ts) values
+          ('redacted','issue','report.public',$1,'{"text":{"en-SG":"private translation"}}','https://example.com/redacted','2026-11-18T10:30:00+08:00'),
+          ('first','issue','report.public','Public update','{"text":{"en-SG":"Public update","zh-Hans":"更新","ms":null,"ta":null}}','https://example.com/update','2026-11-18T10:30:00+08:00'),
+          ('inferred-evidence','inferred','report.public','Still delayed',null,'https://example.com/inferred','2026-11-18T10:00:00+08:00')`,
+          [nonPublicEvidenceRedactedText],
+        );
+        const clocks = [
+          '2026-11-18T09:59:00',
+          '2026-11-18T10:15:00',
+          '2026-11-18T10:30:00',
+          '2026-11-18T23:59:59',
+          '2026-11-19T00:00:00',
+          '2026-11-19T00:10:00',
+          '2026-11-19T00:20:00',
+          '2026-11-19T00:30:00',
+          '2026-11-20T00:00:00',
+        ].map((iso) => DateTime.fromISO(iso, { zone: 'Asia/Singapore' }));
+        const ids = ['issue', 'inferred', 'open', 'recurring'];
+        const expected = [];
+        for (const clock of clocks)
+          expected.push(
+            await Promise.all(
+              ids.map((id) => getIssueReadModel(id, clock, db)),
+            ),
+          );
+        const publication = await publishIssueProfileSnapshot();
+        expect(publication?.bytes).toBeLessThan(4 * 1024 * 1024);
+        const part = await issueProfileSnapshotStore.read();
+        expect(JSON.stringify(part)).not.toContain('private translation');
+        expect(JSON.stringify(part)).not.toContain('never publish');
+        expect(part?.inputs.updates.issue[1]).toMatchObject({
+          text: '',
+          textTranslations: null,
+          isTextRedacted: true,
+        });
+        const cold = createPublishedSnapshotStore(
+          async () => issueRedis,
+          'issue-profiles',
+          parseIssueProfileSnapshotInputs,
+        );
+        vi.spyOn(issueProfileSnapshotStore, 'readSelected').mockImplementation(
+          cold.readSelected,
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        queries.length = 0;
+        for (let pass = 0; pass < 2; pass++)
+          for (const [i, clock] of clocks.entries()) {
+            for (const [j, id] of ids.entries()) {
+              headers.mockClear();
+              vi.setSystemTime(clock.toJSDate());
+              expect(await getIssueFn({ data: { issueId: id } })).toEqual(
+                expected[i][j],
+              );
+              const intervals = expected[i][j].included.issues[id].intervals;
+              const completed =
+                intervals.length > 0 &&
+                intervals.every((interval) => interval.status === 'ended');
+              expect(headers).toHaveBeenCalledWith(
+                completed ? ISSUE_PROFILE_FRESH_UNTIL_HEADER : 'Cache-Control',
+                completed
+                  ? String(clock.plus({ days: 1 }).startOf('day').toMillis())
+                  : 'no-store',
+              );
+            }
+          }
+        expect(queries).toEqual([]);
+        expect(expected[1][0].included.issues.issue.intervals[0].status).toBe(
+          'ongoing',
+        );
+        expect(expected[2][0].included.issues.issue.intervals[0].status).toBe(
+          'ended',
+        );
+        expect(
+          expected.at(-1)?.[1].included.issues.inferred.intervals[0].status,
+        ).toBe('ended');
+      });
+      it('publishes corrections/redactions/deletions and recovers new or unknown IDs without negative caching', async () => {
+        await pool.query(
+          `insert into evidences(id,issue_id,type,text,source_url,ts) values ('evidence','issue','report.public','Original','https://example.com','2026-11-18T10:00:00+08:00')`,
+        );
+        await publishIssueProfileSnapshot();
+        headers.mockClear();
+        const pendingBody = JSON.stringify(
+          await getIssueFn({ data: { issueId: 'issue' } }),
+        );
+        const pending = rendered(pendingBody);
+        await pool.query(
+          "update evidences set text=$1, render='{}' where id='evidence'",
+          [nonPublicEvidenceRedactedText],
+        );
+        await pool.query(
+          "update issues set title=jsonb_set(title,'{en-SG}',$1::jsonb) where id='issue'",
+          [JSON.stringify('Corrected')],
+        );
+        await completePageProfileGeneration(db, 'corrected');
+        await publishIssueProfileSnapshot();
+        const expected = await getIssueReadModel('issue', now, db);
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        queries.length = 0;
+        // Rendering began before redaction/publication and completes after its purge.
+        for (const contentType of [
+          'text/html',
+          'text/markdown',
+          'application/json',
+        ]) {
+          const response = pending.clone();
+          response.headers.set('Content-Type', contentType);
+          const guarded = await finalize(response);
+          expect(guarded.headers.get('Cache-Control')).toBe('no-store');
+          expect(guarded.headers.has('Cloudflare-CDN-Cache-Control')).toBe(
+            false,
+          );
+          expect(guarded.headers.has('Cache-Tag')).toBe(false);
+          expect(guarded.headers.has(ISSUE_PROFILE_FRESH_UNTIL_HEADER)).toBe(
+            false,
+          );
+          expect(guarded.headers.has(ISSUE_PROFILE_PUBLICATION_HEADER)).toBe(
+            false,
+          );
+          expect(await guarded.text()).toContain('Original');
+        }
+        headers.mockClear();
+        expect(await getIssueFn({ data: { issueId: 'issue' } })).toEqual(
+          expected,
+        );
+        const current = rendered(JSON.stringify(expected));
+        expect(
+          (await finalize(current.clone())).headers.get(
+            'Cloudflare-CDN-Cache-Control',
+          ),
+        ).toContain('public, max-age=');
+        expect(
+          (await finalize(current.clone())).headers.has(
+            ISSUE_PROFILE_PUBLICATION_HEADER,
+          ),
+        ).toBe(false);
+        vi.spyOn(issueProfileSnapshotStore, 'head')
+          .mockResolvedValueOnce({ raw: Buffer.alloc(0), value: undefined })
+          .mockRejectedValueOnce(Error('Redis unavailable'));
+        for (let i = 0; i < 2; i++) {
+          const response = await finalize(current.clone());
+          expect(response.headers.get('Cache-Control')).toBe('no-store');
+          expect(await response.text()).toBe(JSON.stringify(expected));
+        }
+        expect(queries).toEqual([]);
+        expect((await getCachedIssueProfile('issue', now)).profile).toEqual(
+          expected,
+        );
+        expect(expected.data.updates[0]).toMatchObject({
+          text: '',
+          isTextRedacted: true,
+        });
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        headers.mockClear();
+        await expect(
+          getIssueFn({ data: { issueId: 'new' } }),
+        ).rejects.toMatchObject({ status: 404 });
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        await pool.query(
+          "insert into issues(id,type,title,title_meta,hash) select 'new',type,title,title_meta,hash from issues where id='issue'",
+        );
+        headers.mockClear();
+        await getIssueFn({ data: { issueId: 'new' } });
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        vi.stubEnv('REDIS_URL', '');
+        expect((await getCachedIssueProfile('new', now)).source).toBe('sql');
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        await publishIssueProfileSnapshot();
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        expect((await getCachedIssueProfile('new', now)).source).toBe('redis');
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        await pool.query("delete from issues where id='issue'");
+        await publishIssueProfileSnapshot();
+        await expect(getCachedIssueProfile('issue', now)).rejects.toMatchObject(
+          { status: 404 },
+        );
+      });
+      it('retains completed inputs during failed promotion and recovers missing/corrupt snapshots', async () => {
+        await publishIssueProfileSnapshot();
+        const active = await issueProfileSnapshotStore.read();
+        if (!active) throw Error('Missing fixture publication');
+        const expected = await getIssueReadModel('issue', now, db);
+        await expect(
+          issueProfileSnapshotStore.publish(
+            active.raw,
+            { ...active.inputs, updates: {} },
+            'invalid',
+            'a'.repeat(64),
+          ),
+        ).rejects.toThrow('incomplete');
+        await markPageProfilesUpdating(db);
+        await expect(publishIssueProfileSnapshot()).rejects.toThrow(
+          'completed canonical',
+        );
+        expect((await issueProfileSnapshotStore.head()).raw).toEqual(
+          active.raw,
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        expect((await getCachedIssueProfile('issue', now)).profile).toEqual(
+          expected,
+        );
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        const key = `${getSnapshotKeyPrefix('issue-profiles')}:payload:${active.value.sha256}`;
+        for (const corrupt of [true, false]) {
+          if (corrupt) await issueRedis.set(key, 'corrupt');
+          else await issueRedis.del(key);
+          expect(
+            await issueProfileSnapshotStore.read({ verifyPayload: true }),
+          ).toBeNull();
+          const recovery = createPublishedSnapshotStore(
+            async () => issueRedis,
+            'issue-profiles',
+            parseIssueProfileSnapshotInputs,
+          );
+          vi.spyOn(
+            issueProfileSnapshotStore,
+            'readSelected',
+          ).mockImplementation(recovery.readSelected);
+          headers.mockClear();
+          expect(await getIssueFn({ data: { issueId: 'issue' } })).toEqual(
+            expected,
+          );
+          expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        }
       });
     },
   );
