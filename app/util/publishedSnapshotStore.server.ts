@@ -93,7 +93,11 @@ export function createPublishedSnapshotStore<T>(
     return { raw, value: parseHead(raw) };
   }
 
-  async function read({ verifyPayload = false } = {}) {
+  // Select before copying so scoped readers need not clone unrelated evidence.
+  async function readSelected<R>(
+    select: (inputs: T) => R,
+    { verifyPayload = false } = {},
+  ) {
     try {
       const current = await head();
       if (!current.value) return null;
@@ -102,7 +106,7 @@ export function createPublishedSnapshotStore<T>(
         return {
           ...current,
           value: current.value,
-          inputs: structuredClone(memo.inputs),
+          inputs: structuredClone(select(memo.inputs)),
           source: 'memory' as const,
           redisBytes: 0,
         };
@@ -125,7 +129,7 @@ export function createPublishedSnapshotStore<T>(
       return {
         ...current,
         value: current.value,
-        inputs: structuredClone(memo.inputs),
+        inputs: structuredClone(select(memo.inputs)),
         source: 'redis' as const,
         redisBytes: Buffer.byteLength(encoded),
       };
@@ -186,5 +190,7 @@ export function createPublishedSnapshotStore<T>(
     return { ...next, bytes };
   }
 
-  return { read, head, publish };
+  const read = (options?: { verifyPayload?: boolean }) =>
+    readSelected((inputs) => inputs, options);
+  return { read, readSelected, head, publish };
 }

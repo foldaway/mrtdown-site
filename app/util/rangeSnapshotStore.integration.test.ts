@@ -159,6 +159,27 @@ describe.skipIf(!url)('immutable range snapshots with Redis', () => {
     expect((await first.read())?.inputs.publicHolidayRows).toHaveLength(1);
   });
 
+  it('copies only selected inputs without exposing the memo to caller mutation', async () => {
+    const store = createPublishedSnapshotStore(
+      connect,
+      'range-snapshot',
+      (value) => value as DatasetInputs,
+    );
+    await store.publish(
+      '',
+      { ...inputs, publicHolidayRows: [{ date: '2026-12-25' }] },
+      'complete',
+      fingerprint,
+    );
+    const selected = await store.readSelected((rows) => rows.publicHolidayRows);
+    expect(selected?.inputs).toEqual([{ date: '2026-12-25' }]);
+    if (!selected) throw Error('Missing selected snapshot');
+    selected.inputs[0].date = '2026-12-26';
+    expect((await store.read())?.inputs.publicHolidayRows).toEqual([
+      { date: '2026-12-25' },
+    ]);
+  });
+
   it('rejects delayed publication even when inputs change and then return to their original value', async () => {
     const store = createRangeSnapshotStore(connect);
     await store.publish('', inputs, 'complete', fingerprint);

@@ -116,37 +116,23 @@ Missing or unavailable navigation falls back to SQL with `no-store`.
 
 ## Published Issue Profile inputs
 
-With Redis configured, full HTML, Markdown and server-function Issue Profile
-reads use published source inputs, including cold requests and ongoing/future
-issues. Assembly uses the request clock for intervals, inferred ends, duration
-and date-selected service revisions. Midnight does not refill SQL. Completed
-profiles retain the midnight freshness deadline and 15-minute edge cap;
-ongoing/future profiles remain `no-store`. Before setting edge cache headers, the
-server rechecks the publication ID in Redis after rendering. Superseded or
-unverifiable responses retain their coherent view with `no-store`.
+HTML, Markdown and server-function Issue Profile reads assemble published source
+rows and public updates at the request clock, including cold, ongoing/future and
+Singapore-midnight requests. Redacted text/translations and unused title metadata
+are excluded; evidence keeps descending timestamps with an ID tie-breaker.
 
-Keys use `mrtdown:{<tier>:issue-profiles:v1}`. A bounded topology/partition
-manifest (4 MiB encoded, 24 MiB JSON) references at most 10,000 immutable issue
-partitions (512 KiB encoded, 2 MiB JSON each, 32 MiB total encoded). Partitions
-contain only assembly rows, static scope and public update projections. Redacted
-text/translations and unused title metadata are excluded. Evidence keeps descending
-timestamps with an ID tie-breaker. The existing atomic head/dependency check
-activates all parts together, rejects delayed publishers and retains the last
-completed publication during import. Active parts persist; superseded parts
-expire after 24 hours.
+`mrtdown:{<tier>:issue-profiles:v1}` uses the shared immutable snapshot store:
+at most 10,000 issues, 4 MiB encoded and 24 MiB expanded JSON. Readers copy only
+one issue's scope and updates. Publication requires a completed canonical snapshot
+and atomically replaces the head; active data persists and superseded data expires
+after 24 hours. Missing/invalid inputs enter the standard leased repair path before
+purge/checkpoint. The Navigation seed above also repairs this publication.
 
-Canonical pulls publish after generation completion, before purge/checkpoint.
-This covers topology changes, evidence updates/redaction, issue corrections and
-deletions. Holiday/facts rebuilds do not change these scoped inputs. Unchanged
-pulls verify the manifest and every partition before skipping SQL; missing or
-invalid inputs enter the normal leased repair path. The Navigation seed above
-also repairs this publication. Requests never publish replacements.
-
-Missing, corrupt or unavailable inputs recover through read-only repeatable-read
-SQL with `no-store`. IDs absent from the manifest also recover through SQL, so a
-newly promoted ID cannot be hidden by an older publication or a negative cache.
-On staging, `X-MRTDown-Issue-Profile-Source` reports `redis` or `sql`, independently
-of edge eligibility. Deployment and production sleep verification remain separate.
+Completed profiles retain the midnight deadline and 15-minute edge cap. After
+rendering, the server rechecks the Redis publication ID; superseded or unverifiable
+responses use `no-store`. Ongoing/future and SQL recovery responses also use
+`no-store`. Unknown IDs recover through SQL instead of caching a negative result.
+On staging, `X-MRTDown-Issue-Profile-Source` reports `redis` or `sql`.
 
 ## Range-reference inputs
 

@@ -111,7 +111,7 @@ vi.mock('./helpers/publishArrivalDepartures', () => ({
 }));
 vi.mock('~/util/issueProfileSnapshot.server', () => ({
   publishIssueProfileSnapshot: vi.fn(async () => {}),
-  issueProfileSnapshotStore: { healthy: vi.fn(async () => null) },
+  issueProfileSnapshotStore: { read: vi.fn(async () => null) },
 }));
 vi.mock('~/util/stationProfileSnapshot.server', () => ({
   publishStationProfileSnapshot: vi.fn(async () => {}),
@@ -367,7 +367,7 @@ beforeEach(() => {
   vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', undefined);
   vi.stubEnv('REDIS_URL', undefined);
   vi.mocked(sitemapSnapshotStore.read).mockResolvedValue(null);
-  vi.mocked(issueProfileSnapshotStore.healthy).mockResolvedValue(null);
+  vi.mocked(issueProfileSnapshotStore.read).mockResolvedValue(null);
   vi.mocked(statisticsSnapshotStore.read).mockResolvedValue(null);
   vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(false);
   vi.mocked(rangeSnapshotStore.hasWriter).mockResolvedValue(false);
@@ -391,7 +391,7 @@ afterEach(async () => {
 describe('published zero-SQL range inputs', () => {
   function healthyArrivalHeads() {
     const fingerprint = getCanonicalManifestFingerprint(manifest);
-    vi.mocked(issueProfileSnapshotStore.healthy).mockResolvedValue({
+    vi.mocked(issueProfileSnapshotStore.read).mockResolvedValue({
       value: { fingerprint, generation: 'complete' },
     } as never);
     state.arrivalHead = {
@@ -440,7 +440,7 @@ describe('published zero-SQL range inputs', () => {
     vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
     state.fingerprint = getCanonicalManifestFingerprint(manifest);
     healthyArrivalHeads();
-    vi.mocked(issueProfileSnapshotStore.healthy).mockResolvedValueOnce(null);
+    vi.mocked(issueProfileSnapshotStore.read).mockResolvedValueOnce(null);
     vi.mocked(publishIssueProfileSnapshot).mockRejectedValueOnce(
       Error('issue publication failed'),
     );

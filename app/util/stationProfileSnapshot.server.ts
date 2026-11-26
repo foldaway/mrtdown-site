@@ -34,64 +34,69 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
       if (!generation || !identity)
         throw new Error('Station profiles require completed canonical inputs');
       const references = await readRangeReferenceRows(tx);
-      const [dataset, townsRows, landmarksRows, platforms, exits] =
-        await Promise.all([
-          readDatasetInputs(tx, undefined, undefined, {
-            references,
-            includeHistoricalIssueReferences: true,
-          }),
-          tx
-            .select({
-              id: townsTable.id,
-              name: townsTable.name,
-              hash: townsTable.hash,
-            })
-            .from(townsTable),
-          tx
-            .select({
-              id: landmarksTable.id,
-              name: landmarksTable.name,
-              hash: landmarksTable.hash,
-            })
-            .from(landmarksTable),
-          tx
-            .select({
-              stationId: stationPlatformsTable.station_id,
-              id: stationPlatformsTable.platform_id,
-              label: stationPlatformsTable.label,
-              lineId: stationPlatformsTable.line_id,
-              boardingStatus: stationPlatformsTable.boarding_status,
-              serviceId: stationPlatformServicesTable.service_id,
-            })
-            .from(stationPlatformsTable)
-            .leftJoin(
-              stationPlatformServicesTable,
-              and(
-                eq(
-                  stationPlatformServicesTable.station_id,
-                  stationPlatformsTable.station_id,
-                ),
-                eq(
-                  stationPlatformServicesTable.platform_id,
-                  stationPlatformsTable.platform_id,
-                ),
+      const [
+        dataset,
+        townsRows,
+        landmarksRows,
+        stationPlatformRows,
+        stationExitRows,
+      ] = await Promise.all([
+        readDatasetInputs(tx, undefined, undefined, {
+          references,
+          includeHistoricalIssueReferences: true,
+        }),
+        tx
+          .select({
+            id: townsTable.id,
+            name: townsTable.name,
+            hash: townsTable.hash,
+          })
+          .from(townsTable),
+        tx
+          .select({
+            id: landmarksTable.id,
+            name: landmarksTable.name,
+            hash: landmarksTable.hash,
+          })
+          .from(landmarksTable),
+        tx
+          .select({
+            stationId: stationPlatformsTable.station_id,
+            id: stationPlatformsTable.platform_id,
+            label: stationPlatformsTable.label,
+            lineId: stationPlatformsTable.line_id,
+            boardingStatus: stationPlatformsTable.boarding_status,
+            serviceId: stationPlatformServicesTable.service_id,
+          })
+          .from(stationPlatformsTable)
+          .leftJoin(
+            stationPlatformServicesTable,
+            and(
+              eq(
+                stationPlatformServicesTable.station_id,
+                stationPlatformsTable.station_id,
+              ),
+              eq(
+                stationPlatformServicesTable.platform_id,
+                stationPlatformsTable.platform_id,
               ),
             ),
-          tx
-            .select({
-              stationId: stationExitsTable.station_id,
-              id: stationExitsTable.source_object_id,
-              label: stationExitsTable.label,
-            })
-            .from(stationExitsTable)
-            // Duplicate labels keep the final row; break ties the same way in
-            // scoped SQL and whole-network publication, independent of query plans.
-            .orderBy(
-              asc(stationExitsTable.label),
-              asc(stationExitsTable.source_object_id),
-              asc(stationExitsTable.source_id),
-            ),
-        ]);
+          ),
+        tx
+          .select({
+            stationId: stationExitsTable.station_id,
+            id: stationExitsTable.source_object_id,
+            label: stationExitsTable.label,
+          })
+          .from(stationExitsTable)
+          // Duplicate labels keep the final row; break ties the same way in
+          // scoped SQL and whole-network publication, independent of query plans.
+          .orderBy(
+            asc(stationExitsTable.label),
+            asc(stationExitsTable.source_object_id),
+            asc(stationExitsTable.source_id),
+          ),
+      ]);
       return {
         generation,
         fingerprint: identity,
@@ -101,8 +106,8 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
             townsRows,
             landmarksRows,
           },
-          platforms,
-          exits,
+          platforms: stationPlatformRows,
+          exits: stationExitRows,
         },
       };
     },

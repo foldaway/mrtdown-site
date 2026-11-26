@@ -73,19 +73,11 @@ Review and rollout are separate; this slice does not establish whole-site sleep.
 
 ### Issue Profiles follow-up (audit item 4)
 
-Source now publishes bounded topology and immutable per-issue inputs after each
-completed canonical promotion and explicit cache repair. Full issue reads assemble
-at the request clock without SQL on healthy inputs, including ongoing/future
-issues and Singapore midnight. Unknown IDs and invalid inputs retain uncached SQL
-recovery. The [runbook](../../operations/edge-caching.md#published-issue-profile-inputs)
-owns limits and repair. Review and rollout remain separate; this does not establish
-whole-site sustained sleep.
-
-Local validation on November 26 matched all 765 canonical issues cold/warm with
-SQL disabled at November 26 and December 26 clocks. Topology/manifest used about
-116 KB encoded, issue partitions 2.8 MB total and 48 KB at largest. `npm run verify`
-passed 794 tests across 103 files with disposable PostGIS/Redis and no skips.
-These are source/local measurements; deployment and sustained sleep are unverified.
+Full issue reads now use the shared bounded snapshot store and request-clock
+assembly. Unknown IDs and invalid inputs retain uncached SQL recovery; the
+[runbook](../../operations/edge-caching.md#published-issue-profile-inputs) owns repair.
+Local checks cover all 765 canonical issues at November 26 and December 26 clocks.
+Deployment and whole-site sustained sleep remain unverified.
 
 ## Surprises & Discoveries
 

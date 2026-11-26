@@ -5,11 +5,11 @@ import {
   revalidateIssueProfileResponse,
 } from '~/util/issueProfileCache.server';
 import {
-  createIssueProfileSnapshotStore,
   issueProfileSnapshotStore,
   publishIssueProfileSnapshot,
 } from '~/util/issueProfileSnapshot.server';
 import { getIssueReadModel } from './issue';
+import { parseIssueProfileSnapshotInputs } from './issueProfileSnapshotInputs';
 import {
   applyPublicDataCacheHeaders,
   ISSUE_PROFILE_FRESH_UNTIL_HEADER,
@@ -553,6 +553,22 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         if (keys.length) await issueRedis.del(...keys);
         await issueRedis.quit();
       });
+      const request = new Request('https://example.com/issues/issue', {
+        headers: { 'x-tsr-serverfn': 'true' },
+      });
+      function rendered(body: string) {
+        const response = new Response(body, {
+          headers: { 'Content-Type': 'text/html' },
+        });
+        for (const [key, value] of headers.mock.calls)
+          response.headers.set(key, value);
+        return response;
+      }
+      const finalize = async (response: Response) =>
+        applyPublicDataCacheHeaders(
+          request,
+          await revalidateIssueProfileResponse(response),
+        );
       it('matches full SQL cold/warm across midnight, future/ongoing/recurring/inferred intervals and service revisions', async () => {
         await pool.query(
           "update service_revisions set end_at='2026-11-19' where id='revision'",
@@ -605,19 +621,22 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
             ),
           );
         const publication = await publishIssueProfileSnapshot();
-        expect(publication?.issues).toBe(4);
-        expect(publication?.partitionBytes).toBeLessThan(32 * 1024 * 1024);
-        const part = await issueProfileSnapshotStore.read('issue');
+        expect(publication?.bytes).toBeLessThan(4 * 1024 * 1024);
+        const part = await issueProfileSnapshotStore.read();
         expect(JSON.stringify(part)).not.toContain('private translation');
         expect(JSON.stringify(part)).not.toContain('never publish');
-        expect(part?.part.updates[1]).toMatchObject({
+        expect(part?.inputs.updates.issue[1]).toMatchObject({
           text: '',
           textTranslations: null,
           isTextRedacted: true,
         });
-        const cold = createIssueProfileSnapshotStore(async () => issueRedis);
-        vi.spyOn(issueProfileSnapshotStore, 'read').mockImplementation((id) =>
-          cold.read(id),
+        const cold = createPublishedSnapshotStore(
+          async () => issueRedis,
+          'issue-profiles',
+          parseIssueProfileSnapshotInputs,
+        );
+        vi.spyOn(issueProfileSnapshotStore, 'readSelected').mockImplementation(
+          cold.readSelected,
         );
         vi.mocked(database.getDefaultDb).mockRejectedValue(
           Error('SQL must stay asleep'),
@@ -626,17 +645,20 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         for (let pass = 0; pass < 2; pass++)
           for (const [i, clock] of clocks.entries()) {
             for (const [j, id] of ids.entries()) {
-              const result = await getCachedIssueProfile(id, clock);
-              expect(result.profile).toEqual(expected[i][j]);
-              expect(result.source).toBe('redis');
+              headers.mockClear();
               vi.setSystemTime(clock.toJSDate());
               expect(await getIssueFn({ data: { issueId: id } })).toEqual(
                 expected[i][j],
               );
               const intervals = expected[i][j].included.issues[id].intervals;
-              expect(result.expiresAt != null).toBe(
+              const completed =
                 intervals.length > 0 &&
-                  intervals.every((interval) => interval.status === 'ended'),
+                intervals.every((interval) => interval.status === 'ended');
+              expect(headers).toHaveBeenCalledWith(
+                completed ? ISSUE_PROFILE_FRESH_UNTIL_HEADER : 'Cache-Control',
+                completed
+                  ? String(clock.plus({ days: 1 }).startOf('day').toMillis())
+                  : 'no-store',
               );
             }
           }
@@ -660,9 +682,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         const pendingBody = JSON.stringify(
           await getIssueFn({ data: { issueId: 'issue' } }),
         );
-        const pendingHeaders = new Headers();
-        for (const [key, value] of headers.mock.calls)
-          pendingHeaders.set(key, value);
+        const pending = rendered(pendingBody);
         await pool.query(
           "update evidences set text=$1, render='{}' where id='evidence'",
           [nonPublicEvidenceRedactedText],
@@ -684,27 +704,44 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           'text/markdown',
           'application/json',
         ]) {
-          pendingHeaders.set('Content-Type', contentType);
-          const response = applyPublicDataCacheHeaders(
-            new Request('https://example.com/issues/issue', {
-              headers: { 'x-tsr-serverfn': 'true' },
-            }),
-            await revalidateIssueProfileResponse(
-              new Response(pendingBody, { headers: pendingHeaders }),
-            ),
+          const response = pending.clone();
+          response.headers.set('Content-Type', contentType);
+          const guarded = await finalize(response);
+          expect(guarded.headers.get('Cache-Control')).toBe('no-store');
+          expect(guarded.headers.has('Cloudflare-CDN-Cache-Control')).toBe(
+            false,
           );
+          expect(guarded.headers.has('Cache-Tag')).toBe(false);
+          expect(guarded.headers.has(ISSUE_PROFILE_FRESH_UNTIL_HEADER)).toBe(
+            false,
+          );
+          expect(guarded.headers.has(ISSUE_PROFILE_PUBLICATION_HEADER)).toBe(
+            false,
+          );
+          expect(await guarded.text()).toContain('Original');
+        }
+        headers.mockClear();
+        expect(await getIssueFn({ data: { issueId: 'issue' } })).toEqual(
+          expected,
+        );
+        const current = rendered(JSON.stringify(expected));
+        expect(
+          (await finalize(current.clone())).headers.get(
+            'Cloudflare-CDN-Cache-Control',
+          ),
+        ).toContain('public, max-age=');
+        expect(
+          (await finalize(current.clone())).headers.has(
+            ISSUE_PROFILE_PUBLICATION_HEADER,
+          ),
+        ).toBe(false);
+        vi.spyOn(issueProfileSnapshotStore, 'head')
+          .mockResolvedValueOnce({ raw: Buffer.alloc(0), value: undefined })
+          .mockRejectedValueOnce(Error('Redis unavailable'));
+        for (let i = 0; i < 2; i++) {
+          const response = await finalize(current.clone());
           expect(response.headers.get('Cache-Control')).toBe('no-store');
-          expect(response.headers.has('Cloudflare-CDN-Cache-Control')).toBe(
-            false,
-          );
-          expect(response.headers.has('Cache-Tag')).toBe(false);
-          expect(response.headers.has(ISSUE_PROFILE_FRESH_UNTIL_HEADER)).toBe(
-            false,
-          );
-          expect(response.headers.has(ISSUE_PROFILE_PUBLICATION_HEADER)).toBe(
-            false,
-          );
-          expect(await response.text()).toContain('Original');
+          expect(await response.text()).toBe(JSON.stringify(expected));
         }
         expect(queries).toEqual([]);
         expect((await getCachedIssueProfile('issue', now)).profile).toEqual(
@@ -715,13 +752,20 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           isTextRedacted: true,
         });
         vi.mocked(database.getDefaultDb).mockResolvedValue(db);
-        await expect(getCachedIssueProfile('new', now)).rejects.toMatchObject({
-          status: 404,
-        });
+        headers.mockClear();
+        await expect(
+          getIssueFn({ data: { issueId: 'new' } }),
+        ).rejects.toMatchObject({ status: 404 });
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
         await pool.query(
           "insert into issues(id,type,title,title_meta,hash) select 'new',type,title,title_meta,hash from issues where id='issue'",
         );
+        headers.mockClear();
+        await getIssueFn({ data: { issueId: 'new' } });
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        vi.stubEnv('REDIS_URL', '');
         expect((await getCachedIssueProfile('new', now)).source).toBe('sql');
+        vi.stubEnv('REDIS_URL', 'redis://unused');
         await publishIssueProfileSnapshot();
         vi.mocked(database.getDefaultDb).mockRejectedValue(
           Error('SQL must stay asleep'),
@@ -734,105 +778,25 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           { status: 404 },
         );
       });
-      it('keeps crossing reads coherent and retains the usable head after partial preparation', async () => {
+      it('retains completed inputs during failed promotion and recovers missing/corrupt snapshots', async () => {
         await publishIssueProfileSnapshot();
-        const old = await issueProfileSnapshotStore.read('issue');
-        if (!old) throw Error('Missing fixture publication');
-        const baseline = (await getCachedIssueProfile('issue', now)).profile;
-        await pool.query(
-          "update issues set title=jsonb_set(title,'{en-SG}',$1::jsonb) where id='issue'",
-          [JSON.stringify('Next issue')],
-        );
-        await completePageProfileGeneration(db, 'next');
-        const prepare = issueProfileSnapshotStore.parts.prepare;
-        vi.spyOn(
-          issueProfileSnapshotStore.parts,
-          'prepare',
-        ).mockImplementationOnce(async (...args) => {
-          const ref = await prepare(...args);
-          await issueRedis.del(
-            `${getSnapshotKeyPrefix('issue-profiles')}:partition:${ref.sha256}`,
-          );
-          return ref;
-        });
-        await expect(publishIssueProfileSnapshot()).rejects.toThrow(
-          'partition missing',
-        );
-        expect((await issueProfileSnapshotStore.manifest.head()).raw).toEqual(
-          old.snapshot.raw,
-        );
-        expect((await getCachedIssueProfile('issue', now)).profile).toEqual(
-          baseline,
-        );
-        const cold = createIssueProfileSnapshotStore(async () => issueRedis);
-        vi.spyOn(issueProfileSnapshotStore, 'read').mockImplementation((id) =>
-          cold.read(id),
-        );
-        const getrange = issueRedis.getrangeBuffer.bind(issueRedis);
-        let crossed = false;
-        vi.spyOn(issueRedis, 'getrangeBuffer').mockImplementation(
-          async (...args) => {
-            if (
-              !crossed &&
-              args[0] ===
-                `${getSnapshotKeyPrefix('issue-profiles')}:partition:${old.snapshot.inputs.partitions[0].sha256}`
-            ) {
-              crossed = true;
-              await publishIssueProfileSnapshot();
-              vi.mocked(database.getDefaultDb).mockRejectedValue(
-                Error('SQL must stay asleep'),
-              );
-            }
-            return getrange(...args);
-          },
-        );
-        expect((await getCachedIssueProfile('issue', now)).profile).toEqual(
-          baseline,
-        );
-        expect(crossed).toBe(true);
-        expect(
-          (await getCachedIssueProfile('issue', now)).profile.included.issues
-            .issue.title['en-SG'],
-        ).toBe('Next issue');
-        expect(
-          await issueRedis.ttl(
-            `${getSnapshotKeyPrefix('issue-profiles')}:partition:${old.snapshot.inputs.partitions[0].sha256}`,
-          ),
-        ).toBeGreaterThan(0);
-      });
-      it('repairs missing/corrupt required inputs, preserves the last completed head and rejects delayed publishers', async () => {
-        await publishIssueProfileSnapshot();
-        const old = await issueProfileSnapshotStore.manifest.read();
-        if (!old) throw Error('Missing fixture publication');
+        const active = await issueProfileSnapshotStore.read();
+        if (!active) throw Error('Missing fixture publication');
         const expected = await getIssueReadModel('issue', now, db);
-        const ref = old.inputs.partitions[0];
-        const prefix = getSnapshotKeyPrefix('issue-profiles');
-        await issueRedis.set(`${prefix}:partition:${ref.sha256}`, 'corrupt');
-        expect(await issueProfileSnapshotStore.healthy()).toBeNull();
-        expect(await getCachedIssueProfile('issue', now)).toMatchObject({
-          profile: expected,
-          source: 'sql',
-        });
-        await publishIssueProfileSnapshot();
-        expect(await issueProfileSnapshotStore.healthy()).not.toBeNull();
-        await issueRedis.del(`${prefix}:partition:${ref.sha256}`);
-        expect(await issueProfileSnapshotStore.healthy()).toBeNull();
-        await publishIssueProfileSnapshot();
         await expect(
-          issueProfileSnapshotStore.manifest.publish(
-            old.raw,
-            old.inputs,
-            'delayed',
+          issueProfileSnapshotStore.publish(
+            active.raw,
+            { ...active.inputs, updates: {} },
+            'invalid',
             'a'.repeat(64),
           ),
-        ).rejects.toThrow('superseded');
+        ).rejects.toThrow('incomplete');
         await markPageProfilesUpdating(db);
-        const active = (await issueProfileSnapshotStore.manifest.head()).raw;
         await expect(publishIssueProfileSnapshot()).rejects.toThrow(
           'completed canonical',
         );
-        expect((await issueProfileSnapshotStore.manifest.head()).raw).toEqual(
-          active,
+        expect((await issueProfileSnapshotStore.head()).raw).toEqual(
+          active.raw,
         );
         vi.mocked(database.getDefaultDb).mockRejectedValue(
           Error('SQL must stay asleep'),
@@ -841,24 +805,28 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           expected,
         );
         vi.mocked(database.getDefaultDb).mockResolvedValue(db);
-        const cold = createIssueProfileSnapshotStore(async () => issueRedis);
-        vi.spyOn(issueProfileSnapshotStore, 'read').mockImplementation((id) =>
-          cold.read(id),
-        );
-        const head = await issueProfileSnapshotStore.manifest.head();
-        await issueRedis.set(
-          `${prefix}:payload:${head.value?.sha256}`,
-          'corrupt',
-        );
-        expect(await getCachedIssueProfile('issue', now)).toMatchObject({
-          profile: expected,
-          source: 'sql',
-        });
-        await issueRedis.del(`${prefix}:active`);
-        expect(await getCachedIssueProfile('issue', now)).toMatchObject({
-          profile: expected,
-          source: 'sql',
-        });
+        const key = `${getSnapshotKeyPrefix('issue-profiles')}:payload:${active.value.sha256}`;
+        for (const corrupt of [true, false]) {
+          if (corrupt) await issueRedis.set(key, 'corrupt');
+          else await issueRedis.del(key);
+          expect(
+            await issueProfileSnapshotStore.read({ verifyPayload: true }),
+          ).toBeNull();
+          const recovery = createPublishedSnapshotStore(
+            async () => issueRedis,
+            'issue-profiles',
+            parseIssueProfileSnapshotInputs,
+          );
+          vi.spyOn(
+            issueProfileSnapshotStore,
+            'readSelected',
+          ).mockImplementation(recovery.readSelected);
+          headers.mockClear();
+          expect(await getIssueFn({ data: { issueId: 'issue' } })).toEqual(
+            expected,
+          );
+          expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        }
       });
     },
   );

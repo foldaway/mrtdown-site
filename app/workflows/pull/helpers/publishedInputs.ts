@@ -42,7 +42,7 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
       arrivalInputSnapshotStore.read({ verifyPayload: true }),
       stationProfileSnapshotStore.read({ verifyPayload: true }),
       statisticsSnapshotStore.read({ verifyPayload: true }),
-      issueProfileSnapshotStore.healthy(),
+      issueProfileSnapshotStore.read({ verifyPayload: true }),
     ]);
   if (
     !issues ||

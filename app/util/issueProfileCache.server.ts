@@ -1,7 +1,10 @@
 import type { DateTime } from 'luxon';
 import { getDefaultDb } from './dbQueries/database';
 import { getIssueReadModel } from './dbQueries/issue';
-import { assembleIssueProfileSnapshot } from './dbQueries/issueProfileSnapshotInputs';
+import {
+  assembleIssueProfileSnapshot,
+  selectIssueProfileSnapshot,
+} from './dbQueries/issueProfileSnapshotInputs';
 import { issueProfileSnapshotStore } from './issueProfileSnapshot.server';
 import {
   ISSUE_PROFILE_FRESH_UNTIL_HEADER,
@@ -13,12 +16,13 @@ export async function getCachedIssueProfile(
   referenceNow: DateTime,
 ) {
   const published = process.env.REDIS_URL
-    ? await issueProfileSnapshotStore.read(issueId)
+    ? await issueProfileSnapshotStore.readSelected((inputs) =>
+        selectIssueProfileSnapshot(inputs, issueId),
+      )
     : null;
-  if (published) {
+  if (published?.inputs) {
     const profile = assembleIssueProfileSnapshot(
-      published.snapshot.inputs.topology,
-      published.part,
+      published.inputs,
       referenceNow,
     );
     const intervals = profile.included.issues[issueId].intervals;
@@ -30,7 +34,7 @@ export async function getCachedIssueProfile(
     return {
       profile,
       source: 'redis' as const,
-      publicationId: published.snapshot.value.publicationId,
+      publicationId: published.value.publicationId,
       expiresAt: completed
         ? referenceNow.plus({ days: 1 }).startOf('day').toMillis()
         : undefined,
@@ -53,7 +57,7 @@ export async function revalidateIssueProfileResponse(response: Response) {
   try {
     current =
       publicationId != null &&
-      (await issueProfileSnapshotStore.manifest.head()).value?.publicationId ===
+      (await issueProfileSnapshotStore.head()).value?.publicationId ===
         publicationId;
   } catch {
     // Unavailable Redis cannot certify that this response is still current.

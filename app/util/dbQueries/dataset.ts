@@ -727,6 +727,12 @@ export function scopeDatasetInputs(
   const stationIds = new Set(scope.stationIds);
   const townIds = new Set(scope.townIds);
   const landmarkIds = new Set(scope.landmarkIds);
+  const impactEventRows = rows.impactEventRows.filter((row) =>
+    issueIds.has(row.issue_id),
+  );
+  const eventIds = new Set(impactEventRows.map((row) => row.id));
+  const byEvent = (row: { impact_event_id: string }) =>
+    eventIds.has(row.impact_event_id);
   return {
     ...rows,
     linesRows: rows.linesRows.filter((row) => lineIds.has(row.id)),
@@ -750,6 +756,20 @@ export function scopeDatasetInputs(
     townsRows: rows.townsRows.filter((row) => townIds.has(row.id)),
     landmarksRows: rows.landmarksRows.filter((row) => landmarkIds.has(row.id)),
     issueRows: rows.issueRows.filter((row) => issueIds.has(row.id)),
+    latestEvidenceRows: rows.latestEvidenceRows.filter((row) =>
+      issueIds.has(row.issue_id),
+    ),
+    impactEventRows,
+    impactEventPeriodRows: rows.impactEventPeriodRows.filter(byEvent),
+    impactEventServiceRows: rows.impactEventServiceRows.filter(byEvent),
+    impactEventFacilityRows: rows.impactEventFacilityRows.filter(byEvent),
+    impactEventCauseRows: rows.impactEventCauseRows.filter(byEvent),
+    impactEventServiceScopeRows:
+      rows.impactEventServiceScopeRows.filter(byEvent),
+    impactEventServiceEffectRows:
+      rows.impactEventServiceEffectRows.filter(byEvent),
+    impactEventFacilityEffectRows:
+      rows.impactEventFacilityEffectRows.filter(byEvent),
   } as DatasetInputs;
 }
 
