@@ -22,7 +22,7 @@ import {
 import { getDefaultDb, timeDbQuery } from './database';
 import { assembleDataset, buildDataset } from './dataset';
 import { assembleDirectorySnapshot } from './directorySnapshotInputs';
-import { selectLineProfileSnapshot } from './lineProfileSnapshotInputs';
+import { selectLineProfileSnapshot } from './profileSnapshotInputs';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';

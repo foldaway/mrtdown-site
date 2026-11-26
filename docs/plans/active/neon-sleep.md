@@ -57,8 +57,13 @@ establish whole-site sleep.
    loader parity preserves future/closed memberships, moving ranking windows,
    null uptime and absent day facts. `npm run verify` passed 795 tests across
    102 files with disposable PostGIS/Redis and no skips on November 26. Review
-   and rollout remain separate.
-4. Operator profiles and any directory callers.
+   and rollout remain separate. PR: [#345](https://github.com/foldaway/mrtdown-site/pull/345).
+4. Operator profiles: reuse the shared graph and issue-scope selector. Full loader
+   cold/warm parity covers historical ownership, empty/unknown operations and
+   incident boundaries with SQL disabled. `npm run verify` passed 797 tests
+   across 102 files with disposable PostGIS/Redis and no skips on November 26.
+   Review and rollout remain separate. There is no separate operator directory
+   loader; line directories include operator labels.
 5. Town profiles and directory, including station details and related scope.
 
 Local canonical-corpus validation matched BKP and its BP6 alias cold/warm with

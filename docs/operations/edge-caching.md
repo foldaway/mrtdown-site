@@ -277,6 +277,14 @@ by publication retries. After investigating the cause, recover as follows:
 4. Restart the writers and run an authenticated canonical pull to publish a new
    head. Confirm publication succeeds before considering the repair complete.
 
+Operator HTML, server functions and Markdown also reuse the profile graph. The
+[shared selector](../../app/util/dbQueries/profileSnapshotInputs.ts) retains all
+canonical ownership rows, including historical/future associations, and expands
+historical issue candidates before request-clock assembly. Empty operators keep
+their existing null uptime and operational status. Unknown IDs and missing or
+corrupt publications use uncached SQL recovery. There is no separate operator
+directory loader; line directories already include the operator labels they need.
+
 ## Published sitemap inputs
 
 Canonical pulls and authenticated `POST /internal/api/tasks/facts` publish
