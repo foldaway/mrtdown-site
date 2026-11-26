@@ -79,7 +79,7 @@ export function StationGuide({
       aria-labelledby="station-guide-title"
       className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
     >
-      <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 sm:px-6">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2 sm:px-6">
         <h2
           id="station-guide-title"
           className="font-bold text-base text-gray-900 leading-tight dark:text-gray-100"
@@ -100,7 +100,7 @@ export function StationGuide({
               key={lineId}
               style={{ borderInlineStartColor: lineColors[lineId] }}
             >
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 pb-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 pb-1.5">
                 <h3
                   className="font-semibold text-gray-900 text-sm dark:text-gray-100"
                   id={`station-guide-line-${lineId}`}
@@ -151,7 +151,7 @@ export function StationGuide({
       {hasArrivals && <TimetableSources states={states} />}
       {exits.length > 0 && (
         <div className="border-gray-200 border-t dark:border-gray-700">
-          <div className="flex items-center gap-2 px-4 py-2.5 sm:px-6">
+          <div className="flex items-center gap-2 px-4 py-2 sm:px-6">
             <h3
               className="shrink-0 font-semibold text-gray-700 text-xs uppercase tracking-wide dark:text-gray-300"
               id="station-exits-title"

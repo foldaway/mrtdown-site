@@ -11,15 +11,11 @@ export function ArrivalTimingDisplay({
   reportButton,
 }: ArrivalTimingDisplayProps) {
   return (
-    <div className="rounded-lg bg-gray-50 ring-1 ring-gray-200/80 ring-inset dark:bg-gray-900/45 dark:ring-white/10">
-      <div className="flex min-h-11 flex-wrap content-center items-baseline gap-x-2.5 gap-y-1 px-1.5 py-1.5 text-start tabular-nums sm:px-3">
+    <div className="flex items-center gap-1 rounded-lg bg-gray-50 px-1.5 py-1.5 text-start ring-1 ring-gray-200/80 ring-inset dark:bg-gray-900/45 dark:ring-white/10">
+      <div className="flex min-h-7 min-w-0 flex-1 flex-wrap content-center items-baseline gap-x-2 gap-y-1 tabular-nums">
         {children}
       </div>
-      {reportButton && (
-        <div className="mx-1.5 flex justify-start border-gray-200/75 border-t sm:mx-3 dark:border-white/10">
-          <div className="-ms-1">{reportButton}</div>
-        </div>
-      )}
+      {reportButton && <div className="shrink-0">{reportButton}</div>}
     </div>
   );
 }
@@ -49,10 +45,10 @@ export function NoArrivalTimes({ emptyWindow }: NoArrivalTimesProps) {
   return (
     <div
       aria-live="polite"
-      className="min-w-0 max-w-full [overflow-wrap:anywhere]"
+      className="flex min-w-0 max-w-full items-center gap-1.5 [overflow-wrap:anywhere]"
     >
       <ArrivalTimeValue unavailable>—</ArrivalTimeValue>
-      <p className="mt-1 text-gray-600 text-xs leading-snug dark:text-gray-400">
+      <p className="text-gray-600 text-xs leading-snug dark:text-gray-400">
         {emptyWindow ? (
           <FormattedMessage
             id="station.arrivals.empty_window"

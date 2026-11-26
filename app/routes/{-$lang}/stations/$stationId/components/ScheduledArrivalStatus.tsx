@@ -55,12 +55,12 @@ export function ScheduledArrivalStatus({
     ({ departures }) => departures.length > 0,
   );
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       {data.timings.map((timing) => {
         const [next, following] = timing.departures;
         return (
           <div
-            className="border-gray-200 dark:border-gray-700 [&+&]:border-t [&+&]:pt-2"
+            className="border-gray-200 dark:border-gray-700 [&+&]:border-t [&+&]:pt-1"
             key={JSON.stringify(timing.platforms.map(({ id }) => id))}
           >
             <ArrivalServiceRow

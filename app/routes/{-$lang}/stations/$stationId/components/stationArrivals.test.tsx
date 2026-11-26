@@ -148,7 +148,7 @@ describe('station guide arrival sources', () => {
       'ready',
       Date.parse('2026-10-24T16:10:15Z'),
     );
-    expect(elapsed).not.toContain('0 min');
+    expect(elapsed.replace(/<[^>]*>/g, '')).not.toContain('0 min');
     expect(elapsed).toMatch(
       /class="sr-only">then<\/span>.*<strong[^>]*>.*5 min<\/strong>/,
     );

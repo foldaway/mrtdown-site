@@ -21,11 +21,11 @@ export function ArrivalServiceRow({
     <div
       className={
         children != null
-          ? 'grid grid-cols-[minmax(0,1fr)_minmax(0,44%)] items-start gap-x-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,12rem)] sm:gap-x-4'
+          ? 'grid grid-cols-[minmax(0,1fr)_minmax(0,44%)] items-center gap-x-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,13rem)] sm:gap-x-4'
           : undefined
       }
     >
-      <div className="flex min-h-11 min-w-0 items-center gap-2 sm:gap-3">
+      <div className="flex min-h-10 min-w-0 items-center gap-2 sm:gap-3">
         {platformLabels.length > 0 ? (
           <ul className="flex max-w-[3.5rem] shrink-0 flex-wrap gap-1">
             {platformLabels.map((label) => (
@@ -50,7 +50,7 @@ export function ArrivalServiceRow({
         </div>
       </div>
       {children != null && (
-        <div className="wrap-break-word flex min-h-11 min-w-0 flex-col justify-center text-end">
+        <div className="wrap-break-word flex min-h-10 min-w-0 flex-col justify-center text-end">
           {children}
         </div>
       )}

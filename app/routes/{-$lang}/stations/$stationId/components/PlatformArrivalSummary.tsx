@@ -65,7 +65,7 @@ export function ServiceArrivalSummary({
     />
   ) : null;
   return (
-    <li className="py-2">
+    <li className="py-1.5">
       {data?.source === 'scheduled' ? (
         <ScheduledArrivalStatus
           data={data}
