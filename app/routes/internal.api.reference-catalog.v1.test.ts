@@ -22,12 +22,15 @@ function makeDependencies() {
     }),
     getDb: vi.fn(() => db),
     getReferenceCatalog: vi.fn().mockResolvedValue({
-      schemaVersion: 1,
-      datasetVersion: '2026-07-19T00:00:00.000Z',
-      referenceDate: '2026-07-19',
-      lines: [],
-      stations: [],
-      memberships: [],
+      recovered: false,
+      catalog: {
+        schemaVersion: 1,
+        datasetVersion: '2026-07-19T00:00:00.000Z',
+        referenceDate: '2026-07-19',
+        lines: [],
+        stations: [],
+        memberships: [],
+      },
     }),
   };
 }
@@ -70,8 +73,25 @@ describe('GET /internal/api/reference-catalog/v1', () => {
       },
     });
     expect(dependencies.getReferenceCatalog).toHaveBeenCalledWith(
-      dependencies.db,
+      dependencies.getDb,
     );
+  });
+
+  it('keeps SQL recovery responses out of caches', async () => {
+    const dependencies = makeDependencies();
+    const result = await dependencies.getReferenceCatalog();
+    dependencies.getReferenceCatalog.mockResolvedValue({
+      ...result,
+      recovered: true,
+    });
+    const response = await handleReferenceCatalogGet(
+      makeRequest(),
+      ENVIRONMENT,
+      dependencies as never,
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(dependencies.getDb).not.toHaveBeenCalled();
   });
 
   it('returns a retryable response when no completed dataset is available', async () => {

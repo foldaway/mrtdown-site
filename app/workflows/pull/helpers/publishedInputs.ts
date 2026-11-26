@@ -3,6 +3,7 @@ import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
 import { arrivalInputSnapshotStore } from '~/util/arrivalInputSnapshot.server';
 import { issueProfileSnapshotStore } from '~/util/issueProfileSnapshot.server';
 import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
+import { reportReferenceSnapshotStore } from '~/util/reportReferenceSnapshot.server';
 import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
 import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
 import { statisticsSnapshotStore } from '~/util/statisticsSnapshot.server';
@@ -35,7 +36,7 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
     );
   const fingerprint = getCanonicalManifestFingerprint(manifest, pinned);
   if (!(await rangeSnapshotStore.isCurrent(fingerprint))) return false;
-  const [range, sitemap, arrivals, stations, statistics, issues] =
+  const [range, sitemap, arrivals, stations, statistics, issues, reports] =
     await Promise.all([
       rangeSnapshotStore.head(),
       sitemapSnapshotStore.read({ verifyPayload: true }),
@@ -43,8 +44,12 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
       stationProfileSnapshotStore.read({ verifyPayload: true }),
       statisticsSnapshotStore.read({ verifyPayload: true }),
       issueProfileSnapshotStore.read({ verifyPayload: true }),
+      reportReferenceSnapshotStore.read({ verifyPayload: true }),
     ]);
   if (
+    !reports ||
+    reports.value.fingerprint !== fingerprint ||
+    reports.value.generation !== range.value?.generation ||
     !issues ||
     issues.value.fingerprint !== fingerprint ||
     issues.value.generation !== range.value?.generation ||

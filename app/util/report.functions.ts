@@ -1,16 +1,10 @@
 import type { Translations } from '@mrtdown/core';
 import { createServerFn } from '@tanstack/react-start';
-import { asc } from 'drizzle-orm';
+import { setResponseHeader } from '@tanstack/react-start/server';
 import { DateTime } from 'luxon';
-import { getDb } from '~/db';
-import {
-  linesTable,
-  serviceRevisionPathStationEntriesTable,
-  serviceRevisionsTable,
-  servicesTable,
-  stationCodesTable,
-  stationsTable,
-} from '~/db/schema';
+import { getDefaultDb } from './dbQueries/database';
+import { readCrowdReportFormOptionRows } from './dbQueries/reportReferenceInputs';
+import { reportReferenceSnapshotStore } from './reportReferenceSnapshot.server';
 import { selectServiceRevisionForReferenceDate } from './serviceRevisions';
 
 const SG_TIMEZONE = 'Asia/Singapore';
@@ -281,96 +275,27 @@ export function buildCrowdReportFormOptions({
 export const getCrowdReportFormOptionsFn = createServerFn({
   method: 'GET',
 }).handler(async () => {
-  const db = getDb();
   const referenceDate =
     DateTime.now().setZone(SG_TIMEZONE).toISODate() ??
     new Date().toISOString().slice(0, 10);
-  const [
-    lines,
-    stations,
-    stationCodes,
-    services,
-    serviceRevisionRows,
-    servicePathEntries,
-  ] = await Promise.all([
-    db
-      .select({
-        id: linesTable.id,
-        name: linesTable.name,
-        color: linesTable.color,
-        startedAt: linesTable.started_at,
-        endedAt: linesTable.ended_at,
-      })
-      .from(linesTable)
-      .orderBy(asc(linesTable.id)),
-    db
-      .select({
-        id: stationsTable.id,
-        name: stationsTable.name,
-      })
-      .from(stationsTable)
-      .orderBy(asc(stationsTable.id)),
-    db
-      .select({
-        lineId: stationCodesTable.line_id,
-        stationId: stationCodesTable.station_id,
-        code: stationCodesTable.code,
-        startedAt: stationCodesTable.started_at,
-        endedAt: stationCodesTable.ended_at,
-      })
-      .from(stationCodesTable)
-      .orderBy(asc(stationCodesTable.code)),
-    db
-      .select({
-        id: servicesTable.id,
-        lineId: servicesTable.line_id,
-      })
-      .from(servicesTable)
-      .orderBy(asc(servicesTable.id)),
-    db
-      .select({
-        id: serviceRevisionsTable.id,
-        serviceId: serviceRevisionsTable.service_id,
-        start_at: serviceRevisionsTable.start_at,
-        end_at: serviceRevisionsTable.end_at,
-        updated_at: serviceRevisionsTable.updated_at,
-      })
-      .from(serviceRevisionsTable)
-      .orderBy(serviceRevisionsTable.service_id, serviceRevisionsTable.id),
-    db
-      .select({
-        serviceRevisionId:
-          serviceRevisionPathStationEntriesTable.service_revision_id,
-        serviceId: serviceRevisionPathStationEntriesTable.service_id,
-        stationId: serviceRevisionPathStationEntriesTable.station_id,
-        pathIndex: serviceRevisionPathStationEntriesTable.path_index,
-      })
-      .from(serviceRevisionPathStationEntriesTable),
-  ]);
-  const revisionKeysWithPath = new Set(
-    servicePathEntries.map(
-      ({ serviceId, serviceRevisionId }) =>
-        `${serviceId}::${serviceRevisionId}`,
-    ),
-  );
-  const serviceRevisions = serviceRevisionRows.filter((revision) =>
-    revisionKeysWithPath.has(`${revision.serviceId}::${revision.id}`),
-  );
-
+  const published = process.env.REDIS_URL
+    ? await reportReferenceSnapshotStore.read()
+    : null;
+  if (!published && process.env.REDIS_URL)
+    setResponseHeader('Cache-Control', 'no-store');
+  const rows =
+    published?.inputs.formOptionRows ??
+    (await readCrowdReportFormOptionRows(await getDefaultDb()));
+  // The server function has always returned Date objects in these raw rows.
   const formOptionRows = {
-    lines,
-    stations,
-    stationCodes,
-    services,
-    serviceRevisions,
-    servicePathEntries,
+    ...rows,
+    serviceRevisions: rows.serviceRevisions.map((row) => ({
+      ...row,
+      updated_at: new Date(row.updated_at),
+    })),
   };
-
   return {
-    ...buildCrowdReportFormOptions({
-      referenceDate,
-      ...formOptionRows,
-    }),
+    ...buildCrowdReportFormOptions({ referenceDate, ...formOptionRows }),
     formOptionRows,
   };
 });

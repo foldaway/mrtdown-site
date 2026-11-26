@@ -1,3 +1,12 @@
+import { handleReferenceCatalogGet } from '~/routes/internal.api.reference-catalog.v1';
+import { authenticateCrowdReportProducer } from '~/util/programmaticCrowdReports';
+import { getReferenceCatalog } from '~/util/referenceCatalog';
+import { getCrowdReportFormOptionsFn as getCrowdReportFormOptions } from '~/util/report.functions';
+import {
+  publishReportReferenceSnapshot,
+  reportReferenceSnapshotStore,
+} from '~/util/reportReferenceSnapshot.server';
+import { parseReportReferenceInputs } from './reportReferenceInputs';
 import { nonPublicEvidenceRedactedText } from '@mrtdown/fs';
 import { getTownProfileFn, getTownsFn } from '~/util/town.functions';
 import { getTownProfileReadModel } from './towns';
@@ -347,6 +356,276 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
       await admin.end();
     }
   });
+
+  describe.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
+    'published report references with real Redis',
+    () => {
+      let reportRedis: Redis;
+      const prefix = () => getSnapshotKeyPrefix('report-references');
+      beforeEach(async () => {
+        vi.stubEnv(
+          'TIER',
+          `report_refs_test_${randomUUID().replaceAll('-', '')}`,
+        );
+        reportRedis = new Redis(process.env.TEST_SNAPSHOT_REDIS_URL ?? '');
+        vi.mocked(redisConnection.getPageProfileRedis).mockResolvedValue(
+          reportRedis,
+        );
+        await recordCanonicalManifestFingerprint(db, 'c'.repeat(64));
+      });
+      afterEach(async () => {
+        const keys = await reportRedis.keys(`mrtdown:*${process.env.TIER}*`);
+        if (keys.length) await reportRedis.del(...keys);
+        await reportRedis.quit();
+      });
+      function coldReader() {
+        const cold = createPublishedSnapshotStore(
+          async () => reportRedis,
+          'report-references',
+          parseReportReferenceInputs,
+        );
+        vi.spyOn(reportReferenceSnapshotStore, 'read').mockImplementation(
+          cold.read,
+        );
+        return cold;
+      }
+      const environment = {
+        CROWD_REPORT_PRODUCERS: JSON.stringify({
+          monitor: {
+            token: 'monitor-secret-token',
+            sourceOrigins: ['https://www.reddit.com'],
+          },
+        }),
+      };
+      const request = (token = 'monitor-secret-token') =>
+        new Request('https://example.com/internal/api/reference-catalog/v1', {
+          headers: { authorization: `Bearer ${token}` },
+        });
+      it('matches the complete form and authenticated catalog cold/warm across Singapore midnight and revision recency', async () => {
+        await pool.query(
+          `insert into lines (id,name,type,color,started_at,ended_at,hash) select id || suffix,name,type,color,starts::date,ends::date,hash from lines cross join (values ('-unknown',null,null),('-future','2026-11-19',null),('-closed','2000-01-01','2026-11-17')) as extra(suffix,starts,ends)`,
+        );
+        await pool.query(`insert into station_codes (line_id,station_id,code,started_at,ended_at,structure_type) values
+          ('line-unknown','station-1','U1','2000-01-01',null,'underground'),
+          ('line-future','station-1','F1','2026-11-19',null,'underground'),
+          ('line-closed','station-1','C1','2000-01-01','2026-11-17','underground')`);
+        await pool.query(
+          "update station_codes set started_at='2026-11-19' where code='T3'",
+        );
+        await pool.query(
+          "update station_codes set ended_at='2026-11-18' where code='LEGACY'",
+        );
+        // Same effective date and ending: updated_at, then id, resolve recency.
+        await pool.query(`insert into service_revisions (id,service_id,start_at,end_at,updated_at,operating_hours)
+          values ('next-old','service','2026-11-19',null,'2026-11-17','{}'),('next-new','service','2026-11-19',null,'2026-11-18','{}'),('pathless','service','2026-11-20',null,'2026-11-20','{}')`);
+        await pool.query(`insert into service_revision_path_station_entries (service_revision_id,service_id,path_index,station_id,display_code)
+          values ('next-old','service',0,'station-2','T2'),('next-old','service',1,'station-1','T1'),
+          ('next-new','service',0,'station-3','T3'),('next-new','service',1,'station-1','T1'),('next-new','service',2,'station-3','T3')`);
+        await pool.query("update stations set name = $1 where id='station-1'", [
+          {
+            'en-SG': 'Alpha',
+            'zh-Hans': null,
+            ms: ' Alpha ',
+            ta: null,
+            en: 'Legacy Alpha',
+          },
+        ]);
+        await sync.finalizePull(db, { canonicalTopologyComplete: true });
+        const before = DateTime.fromISO('2026-11-18T23:59:59+08:00');
+        const after = before.plus({ seconds: 1 });
+        vi.stubEnv('REDIS_URL', undefined);
+        const baselines = [];
+        for (const time of [before, after]) {
+          vi.setSystemTime(time.toJSDate());
+          baselines.push({
+            form: await getCrowdReportFormOptions(),
+            catalog: (await getReferenceCatalog(() => db)).catalog,
+          });
+        }
+        expect(baselines[0].form.lineStationPaths.line).toEqual([
+          ['station-1', 'station-2'],
+        ]);
+        expect(baselines[1].form.lineStationPaths.line).toEqual([
+          ['station-3', 'station-1', 'station-3'],
+        ]);
+        expect(baselines[0].form.lines.map((line) => line.id)).toEqual([
+          'line',
+          'line-unknown',
+        ]);
+        expect(baselines[1].catalog.lines.map((line) => line.id)).toEqual([
+          'line',
+          'line-future',
+        ]);
+        expect(
+          baselines[0].form.formOptionRows.serviceRevisions.map(
+            (row) => row.id,
+          ),
+        ).not.toContain('pathless');
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        const published = await publishReportReferenceSnapshot();
+        expect(
+          await reportRedis.ttl(`${prefix()}:payload:${published?.sha256}`),
+        ).toBe(-1);
+        const noDb = vi.fn(() => {
+          throw Error('SQL must stay asleep');
+        });
+        vi.mocked(database.getDefaultDb).mockImplementation(noDb);
+        queries.length = 0;
+        headers.mockClear();
+        for (const [index, time] of [before, after].entries()) {
+          vi.setSystemTime(time.toJSDate());
+          coldReader();
+          for (let requestIndex = 0; requestIndex < 2; requestIndex++)
+            expect(await getCrowdReportFormOptions()).toEqual(
+              baselines[index].form,
+            );
+          const cold = coldReader();
+          for (let requestIndex = 0; requestIndex < 2; requestIndex++) {
+            const response = await handleReferenceCatalogGet(
+              request(),
+              environment,
+              {
+                authenticateProducer: authenticateCrowdReportProducer,
+                getDb: noDb,
+                getReferenceCatalog,
+              },
+            );
+            expect(response.status).toBe(200);
+            expect(response.headers.get('cache-control')).toBe(
+              'private, max-age=300',
+            );
+            expect(await response.json()).toEqual({
+              success: true,
+              data: baselines[index].catalog,
+            });
+          }
+          expect((await cold.read())?.source).toBe('memory');
+        }
+        expect(queries).toEqual([]);
+        expect(noDb).not.toHaveBeenCalled();
+        expect(headers).not.toHaveBeenCalledWith('Cache-Control', 'no-store');
+        vi.mocked(reportReferenceSnapshotStore.read).mockClear();
+        const denied = await handleReferenceCatalogGet(
+          request('wrong-secret'),
+          environment,
+          {
+            authenticateProducer: authenticateCrowdReportProducer,
+            getDb: noDb,
+            getReferenceCatalog,
+          },
+        );
+        expect(denied.status).toBe(401);
+        expect(reportReferenceSnapshotStore.read).not.toHaveBeenCalled();
+      });
+      it('retains completed inputs through partial imports and delayed writers, and recovers missing/corrupt data without caching SQL', async () => {
+        const first = await publishReportReferenceSnapshot();
+        const baseline = await getCrowdReportFormOptions();
+        await markPageProfilesUpdating(db);
+        await pool.query("update lines set name = $1 where id='line'", [
+          { 'en-SG': 'Corrected', 'zh-Hans': null, ms: null, ta: null },
+        ]);
+        await expect(publishReportReferenceSnapshot()).rejects.toThrow(
+          'completed canonical inputs',
+        );
+        expect(await getCrowdReportFormOptions()).toEqual(baseline);
+        await completePageProfileGeneration(db, 'next');
+        await pool.query(
+          "delete from metadata where key='canonical_topology_promotion_complete_v1'",
+        );
+        await expect(publishReportReferenceSnapshot()).rejects.toThrow(
+          'completed promotion',
+        );
+        expect((await reportReferenceSnapshotStore.head()).value?.sha256).toBe(
+          first?.sha256,
+        );
+        await sync.finalizePull(db, { canonicalTopologyComplete: true });
+        const entered = Promise.withResolvers<void>();
+        const resume = Promise.withResolvers<void>();
+        const activate = reportReferenceSnapshotStore.publish;
+        vi.spyOn(
+          reportReferenceSnapshotStore,
+          'publish',
+        ).mockImplementationOnce(async (...args) => {
+          entered.resolve();
+          await resume.promise;
+          return activate(...args);
+        });
+        const delayed = publishReportReferenceSnapshot();
+        const rejected = expect(delayed).rejects.toThrow('superseded');
+        await entered.promise;
+        await publishReportReferenceSnapshot();
+        resume.resolve();
+        await rejected;
+        const corrected = await getCrowdReportFormOptions();
+        expect(corrected.lines[0].name['en-SG']).toBe('Corrected');
+        const complete = await reportReferenceSnapshotStore.read();
+        const incomplete = {
+          ...complete?.inputs,
+          formOptionRows: {
+            ...complete?.inputs.formOptionRows,
+            servicePathEntries: undefined,
+          },
+        };
+        await expect(
+          reportReferenceSnapshotStore.publish(
+            (await reportReferenceSnapshotStore.head()).raw,
+            incomplete as never,
+            'bad',
+            'c'.repeat(64),
+          ),
+        ).rejects.toThrow();
+        const current = await reportReferenceSnapshotStore.head();
+        for (const damage of ['missing', 'corrupt']) {
+          if (damage === 'missing') await reportRedis.del(`${prefix()}:active`);
+          else
+            await reportRedis.set(
+              `${prefix()}:payload:${current.value?.sha256}`,
+              'corrupt',
+            );
+          coldReader();
+          headers.mockClear();
+          expect(await getCrowdReportFormOptions()).toEqual(corrected);
+          expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+          const response = await handleReferenceCatalogGet(
+            request(),
+            environment,
+            {
+              authenticateProducer: authenticateCrowdReportProducer,
+              getDb: () => db,
+              getReferenceCatalog,
+            },
+          );
+          expect(response.status).toBe(200);
+          expect(response.headers.get('cache-control')).toBe('no-store');
+          await publishReportReferenceSnapshot();
+          expect(
+            await reportReferenceSnapshotStore.read({ verifyPayload: true }),
+          ).not.toBeNull();
+        }
+        // Empty active options are authoritative, distinct from an absent payload.
+        await pool.query("update lines set ended_at='2026-01-01'");
+        await sync.finalizePull(db, { canonicalTopologyComplete: true });
+        await publishReportReferenceSnapshot();
+        coldReader();
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        headers.mockClear();
+        expect(await getCrowdReportFormOptions()).toMatchObject({
+          lines: [],
+          stations: [],
+        });
+        const empty = await getReferenceCatalog(() => {
+          throw Error('SQL must stay asleep');
+        });
+        expect(empty).toMatchObject({
+          catalog: { lines: [], stations: [], memberships: [] },
+          recovered: false,
+        });
+        expect(headers).not.toHaveBeenCalledWith('Cache-Control', 'no-store');
+      });
+    },
+  );
 
   describe.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
     'published statistics with real Redis',

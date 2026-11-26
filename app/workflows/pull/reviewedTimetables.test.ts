@@ -1,3 +1,7 @@
+import {
+  publishReportReferenceSnapshot,
+  reportReferenceSnapshotStore,
+} from '~/util/reportReferenceSnapshot.server';
 import { randomUUID } from 'node:crypto';
 import { access, mkdtemp, readdir, readFile } from 'node:fs/promises';
 import type { Manifest, ScheduledTimetableSourceReview } from '@mrtdown/core';
@@ -108,6 +112,10 @@ vi.mock('~/util/arrivalDepartureStore.server', async (original) => ({
 }));
 vi.mock('./helpers/publishArrivalDepartures', () => ({
   publishArrivalDepartures: vi.fn(async () => {}),
+}));
+vi.mock('~/util/reportReferenceSnapshot.server', () => ({
+  publishReportReferenceSnapshot: vi.fn(async () => {}),
+  reportReferenceSnapshotStore: { read: vi.fn(async () => null) },
 }));
 vi.mock('~/util/issueProfileSnapshot.server', () => ({
   publishIssueProfileSnapshot: vi.fn(async () => {}),
@@ -368,6 +376,7 @@ beforeEach(() => {
   vi.stubEnv('REDIS_URL', undefined);
   vi.mocked(sitemapSnapshotStore.read).mockResolvedValue(null);
   vi.mocked(issueProfileSnapshotStore.read).mockResolvedValue(null);
+  vi.mocked(reportReferenceSnapshotStore.read).mockResolvedValue(null);
   vi.mocked(statisticsSnapshotStore.read).mockResolvedValue(null);
   vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(false);
   vi.mocked(rangeSnapshotStore.hasWriter).mockResolvedValue(false);
@@ -391,6 +400,9 @@ afterEach(async () => {
 describe('published zero-SQL range inputs', () => {
   function healthyArrivalHeads() {
     const fingerprint = getCanonicalManifestFingerprint(manifest);
+    vi.mocked(reportReferenceSnapshotStore.read).mockResolvedValue({
+      value: { fingerprint, generation: 'complete' },
+    } as never);
     vi.mocked(issueProfileSnapshotStore.read).mockResolvedValue({
       value: { fingerprint, generation: 'complete' },
     } as never);
@@ -411,6 +423,42 @@ describe('published zero-SQL range inputs', () => {
     } as never);
     vi.mocked(arrivalDepartureStore.ready).mockResolvedValue(true);
   }
+  it('repairs required report references before checkpointing and skips healthy unchanged polls without SQL', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://unused');
+    vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    state.fingerprint = getCanonicalManifestFingerprint(manifest);
+    healthyArrivalHeads();
+    vi.mocked(reportReferenceSnapshotStore.read).mockResolvedValueOnce(null);
+    vi.mocked(publishReportReferenceSnapshot).mockRejectedValueOnce(
+      Error('report references failed'),
+    );
+    const repair = workflow();
+    await expect(repair.run()).rejects.toThrow('report references failed');
+    expect(rangeSnapshotStore.complete).not.toHaveBeenCalled();
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    await repair.run();
+    expect(publishReportReferenceSnapshot).toHaveBeenLastCalledWith(
+      state.fingerprint,
+    );
+    expect(rangeSnapshotStore.complete).toHaveBeenCalledWith(state.fingerprint);
+    expect(fetchArchive).not.toHaveBeenCalled();
+    vi.mocked(reportReferenceSnapshotStore.read).mockResolvedValueOnce({
+      value: { fingerprint: state.fingerprint, generation: 'old' },
+    } as never);
+    vi.clearAllMocks();
+    await workflow().run();
+    expect(publishReportReferenceSnapshot).toHaveBeenCalledOnce();
+    vi.mocked(getDb).mockImplementation(() => {
+      throw Error('SQL must stay asleep');
+    });
+    vi.clearAllMocks();
+    await workflow().run();
+    expect(getDb).not.toHaveBeenCalled();
+    expect(publishReportReferenceSnapshot).not.toHaveBeenCalled();
+    expect(reportReferenceSnapshotStore.read).toHaveBeenCalledWith({
+      verifyPayload: true,
+    });
+  });
   it('repairs sitemap inputs before completion and keeps healthy unchanged polls SQL-free', async () => {
     vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
@@ -646,6 +694,9 @@ describe('published zero-SQL range inputs', () => {
     const run = workflow();
     await run.run();
     expect(publishRangeSnapshot).toHaveBeenCalledWith(
+      getCanonicalManifestFingerprint(manifest),
+    );
+    expect(publishReportReferenceSnapshot).toHaveBeenCalledWith(
       getCanonicalManifestFingerprint(manifest),
     );
     expect(publishArrivalInputSnapshot).toHaveBeenCalledWith(

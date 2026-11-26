@@ -39,14 +39,16 @@ export async function handleReferenceCatalogGet(
   }
 
   try {
-    const catalog = await dependencies.getReferenceCatalog(
-      dependencies.getDb(),
+    const { catalog, recovered } = await dependencies.getReferenceCatalog(
+      dependencies.getDb,
     );
     return Response.json(
       { success: true, data: catalog },
       {
         status: 200,
-        headers: { 'cache-control': 'private, max-age=300' },
+        headers: {
+          'cache-control': recovered ? 'no-store' : 'private, max-age=300',
+        },
       },
     );
   } catch (error) {
