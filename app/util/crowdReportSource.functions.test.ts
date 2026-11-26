@@ -85,7 +85,8 @@ function makeFakeClusterSourceDb(
             return this;
           },
           orderBy() {
-            return this;
+            const result = Promise.resolve(selectResults[selectIndex]);
+            return Object.assign(result, { limit: () => result });
           },
           limit() {
             return Promise.resolve(selectResults[selectIndex]);
@@ -142,7 +143,8 @@ function makeFakeReportSourceDb(
             return this;
           },
           orderBy() {
-            return this;
+            const result = Promise.resolve(selectResults[selectIndex]);
+            return Object.assign(result, { limit: () => result });
           },
           limit() {
             return Promise.resolve(selectResults[selectIndex]);

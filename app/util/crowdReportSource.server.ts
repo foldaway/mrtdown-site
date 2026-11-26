@@ -29,6 +29,15 @@ function toIsoString(value: Date | string | null) {
 // Publication reads the same projection in bounded batches, including historical sources.
 const MAX_SOURCES = 10_000;
 const MAX_MEMBERS = 100_000;
+
+function readSourceRows<T>(
+  query: PromiseLike<T[]> & { limit(count: number): PromiseLike<T[]> },
+  sourceId: string | undefined,
+) {
+  // Bound full publication while retaining the original single-source SQL fallback.
+  return sourceId == null ? query.limit(MAX_MEMBERS + 1) : query;
+}
+
 function groupRows<T extends { sourceId: string | null }>(rows: T[]) {
   const groups = new Map<string, Omit<T, 'sourceId'>[]>();
   for (const { sourceId, ...row } of rows) {
@@ -137,60 +146,66 @@ async function getClusterSources(
   const ids = clusters.map(({ id }) => id);
 
   const [lines, stations, members] = await Promise.all([
-    db
-      .select({
-        sourceId: crowdReportClusterLinesTable.cluster_id,
-        id: linesTable.id,
-        name: linesTable.name,
-        color: linesTable.color,
-      })
-      .from(crowdReportClusterLinesTable)
-      .innerJoin(
-        linesTable,
-        eq(crowdReportClusterLinesTable.line_id, linesTable.id),
-      )
-      .where(inArray(crowdReportClusterLinesTable.cluster_id, ids))
-      .orderBy(asc(linesTable.id))
-      .limit(sourceId == null ? MAX_MEMBERS + 1 : Number.MAX_SAFE_INTEGER),
-    db
-      .select({
-        sourceId: crowdReportClusterStationsTable.cluster_id,
-        id: stationsTable.id,
-        name: stationsTable.name,
-      })
-      .from(crowdReportClusterStationsTable)
-      .innerJoin(
-        stationsTable,
-        eq(crowdReportClusterStationsTable.station_id, stationsTable.id),
-      )
-      .where(inArray(crowdReportClusterStationsTable.cluster_id, ids))
-      .orderBy(asc(stationsTable.id))
-      .limit(sourceId == null ? MAX_MEMBERS + 1 : Number.MAX_SAFE_INTEGER),
-    db
-      .select({
-        sourceId: crowdReportsTable.cluster_id,
-        observedAt: crowdReportsTable.observed_at,
-        directionText: crowdReportsTable.direction_text,
-        delayMinutes: crowdReportsTable.delay_minutes,
-        stillHappening: crowdReportsTable.still_happening,
-      })
-      .from(crowdReportsTable)
-      .where(
-        and(
-          inArray(crowdReportsTable.cluster_id, ids),
-          inArray(crowdReportsTable.status, [
-            'accepted',
-            'duplicate',
-            'dispatched',
-          ]),
-          or(
-            eq(crowdReportsTable.still_happening, true),
-            ne(crowdReportsTable.producer, 'public'),
+    readSourceRows(
+      db
+        .select({
+          sourceId: crowdReportClusterLinesTable.cluster_id,
+          id: linesTable.id,
+          name: linesTable.name,
+          color: linesTable.color,
+        })
+        .from(crowdReportClusterLinesTable)
+        .innerJoin(
+          linesTable,
+          eq(crowdReportClusterLinesTable.line_id, linesTable.id),
+        )
+        .where(inArray(crowdReportClusterLinesTable.cluster_id, ids))
+        .orderBy(asc(linesTable.id)),
+      sourceId,
+    ),
+    readSourceRows(
+      db
+        .select({
+          sourceId: crowdReportClusterStationsTable.cluster_id,
+          id: stationsTable.id,
+          name: stationsTable.name,
+        })
+        .from(crowdReportClusterStationsTable)
+        .innerJoin(
+          stationsTable,
+          eq(crowdReportClusterStationsTable.station_id, stationsTable.id),
+        )
+        .where(inArray(crowdReportClusterStationsTable.cluster_id, ids))
+        .orderBy(asc(stationsTable.id)),
+      sourceId,
+    ),
+    readSourceRows(
+      db
+        .select({
+          sourceId: crowdReportsTable.cluster_id,
+          observedAt: crowdReportsTable.observed_at,
+          directionText: crowdReportsTable.direction_text,
+          delayMinutes: crowdReportsTable.delay_minutes,
+          stillHappening: crowdReportsTable.still_happening,
+        })
+        .from(crowdReportsTable)
+        .where(
+          and(
+            inArray(crowdReportsTable.cluster_id, ids),
+            inArray(crowdReportsTable.status, [
+              'accepted',
+              'duplicate',
+              'dispatched',
+            ]),
+            or(
+              eq(crowdReportsTable.still_happening, true),
+              ne(crowdReportsTable.producer, 'public'),
+            ),
           ),
-        ),
-      )
-      .orderBy(desc(crowdReportsTable.observed_at))
-      .limit(sourceId == null ? MAX_MEMBERS + 1 : Number.MAX_SAFE_INTEGER),
+        )
+        .orderBy(desc(crowdReportsTable.observed_at)),
+      sourceId,
+    ),
   ]);
 
   if (sourceId == null && members.length > MAX_MEMBERS)
@@ -280,32 +295,36 @@ async function getReportSources(
   const ids = reports.map(({ id }) => id);
 
   const [lines, stations] = await Promise.all([
-    db
-      .select({
-        sourceId: crowdReportLinesTable.report_id,
-        id: linesTable.id,
-        name: linesTable.name,
-        color: linesTable.color,
-      })
-      .from(crowdReportLinesTable)
-      .innerJoin(linesTable, eq(crowdReportLinesTable.line_id, linesTable.id))
-      .where(inArray(crowdReportLinesTable.report_id, ids))
-      .orderBy(asc(linesTable.id))
-      .limit(sourceId == null ? MAX_MEMBERS + 1 : Number.MAX_SAFE_INTEGER),
-    db
-      .select({
-        sourceId: crowdReportStationsTable.report_id,
-        id: stationsTable.id,
-        name: stationsTable.name,
-      })
-      .from(crowdReportStationsTable)
-      .innerJoin(
-        stationsTable,
-        eq(crowdReportStationsTable.station_id, stationsTable.id),
-      )
-      .where(inArray(crowdReportStationsTable.report_id, ids))
-      .orderBy(asc(stationsTable.id))
-      .limit(sourceId == null ? MAX_MEMBERS + 1 : Number.MAX_SAFE_INTEGER),
+    readSourceRows(
+      db
+        .select({
+          sourceId: crowdReportLinesTable.report_id,
+          id: linesTable.id,
+          name: linesTable.name,
+          color: linesTable.color,
+        })
+        .from(crowdReportLinesTable)
+        .innerJoin(linesTable, eq(crowdReportLinesTable.line_id, linesTable.id))
+        .where(inArray(crowdReportLinesTable.report_id, ids))
+        .orderBy(asc(linesTable.id)),
+      sourceId,
+    ),
+    readSourceRows(
+      db
+        .select({
+          sourceId: crowdReportStationsTable.report_id,
+          id: stationsTable.id,
+          name: stationsTable.name,
+        })
+        .from(crowdReportStationsTable)
+        .innerJoin(
+          stationsTable,
+          eq(crowdReportStationsTable.station_id, stationsTable.id),
+        )
+        .where(inArray(crowdReportStationsTable.report_id, ids))
+        .orderBy(asc(stationsTable.id)),
+      sourceId,
+    ),
   ]);
 
   if (

@@ -80,12 +80,12 @@ export async function repairCrowdReportSources(
     )
       return;
     // A fresh token plus the store's CAS fences delayed commands after SQL lock release.
-    await invalidateCrowdReportSources(tx);
-    const expected = await crowdReportSourceStore.head();
-    const rows = await readPublicCrowdReportSources(tx);
     const identity = randomUUID();
+    const expected = JSON.stringify({ pending: identity });
+    await (await getPageProfileRedis()).set(headKey(), expected);
+    const rows = await readPublicCrowdReportSources(tx);
     await crowdReportSourceStore.publish(
-      expected.raw,
+      expected,
       rows,
       identity,
       snapshotDigest(JSON.stringify(rows)),

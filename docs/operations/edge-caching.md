@@ -433,33 +433,27 @@ change schedules or purge the edge automatically.
 
 ## Public community report details
 
-With Redis configured, report and cluster detail loaders use a separate bounded
-snapshot of the existing public responses, including historical sources and
-confirmed missing IDs. It preserves pending/accepted/dispatched visibility,
-cluster membership, producer/ongoing eligibility, nullable values, translations
-and direction destinations. Submission text, reporter identities, IP hashes and
-moderation/dispatch internals are excluded. Response cache headers are unchanged.
+Report and cluster detail loaders use a separate bounded Redis snapshot of the
+existing public projection, including historical sources and authoritative
+missing IDs. The SQL reader and publisher share visibility and redaction rules.
+Reads recheck publication before returning a source or a 404.
 
-The community write fence also invalidates these details before commit and
-republishes after submissions, moderation, duplicates, dispatch and fixture
-cleanup. Dispatch failures refresh an individual report's public update time.
-Canonical line/station writers invalidate names, colors and scope changes,
-including cascading removals; pull completion/recovery repairs the snapshot.
-A read rechecks publication before returning either a source or a 404.
+The community write fence invalidates details before commit and refreshes them
+after submissions, moderation, duplicates, dispatch and fixture cleanup.
+Dispatch failures refresh an individual report's public update time. Canonical
+line/station writers invalidate reference edits and cascading removals; pull
+completion/recovery repairs the snapshot.
 
-The shared snapshot store bounds publication to 10,000 sources, 100,000 member
-or scope rows per query, 24 MiB decoded JSON and 4 MiB encoded Redis data.
-Overflow fails publication without truncation. Missing, dirty, corrupt or
-unavailable state uses the existing SQL projection in a consistent transaction;
-reads do not refill Redis. Invalidation failure rolls back the owning write;
-post-commit publication failure preserves acceptance and SQL fallback.
-Programmatic replays repair missing state without replacing healthy snapshots.
+Publication allows 10,000 sources, 100,000 member or scope rows per query,
+24 MiB decoded JSON and 4 MiB encoded Redis data. Overflow fails publication
+without truncation. Missing, dirty, corrupt or unavailable state uses SQL;
+reads do not refill Redis. Write failure and replay repair follow the
+[community publication contract](#public-community-disruption-signals).
 
-The [community repair command](#public-community-disruption-signals) initializes
-both signals and details, including authoritative empty results. Run it after
-all writer instances have been upgraded, or after eviction, Redis restore,
-out-of-band edits or writes made without Redis. Deployment and production
-verification remain separate from source validation.
+The existing community repair command initializes both signals and details,
+including empty results. Run it after upgrading all writers, or after eviction,
+Redis restore, out-of-band edits or writes made without Redis. Deployment and
+production verification remain separate.
 
 ## Recent arrival reports
 

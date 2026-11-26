@@ -66,7 +66,6 @@ export async function withCommunitySignalPublication<T>(
     return await db.transaction(async (tx) => {
       const result = await write(tx);
       if (publish && hasDisplayChanges(result)) {
-        await lockCommunitySignalPublication(tx);
         await invalidateCrowdReportSources(tx);
         // A unique dirty value fences even a delayed invalidation of an already
         // dirty key. Failure here rolls back before accepting a display change.
