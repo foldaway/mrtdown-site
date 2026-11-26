@@ -1,22 +1,21 @@
 import type { IssueType } from '@mrtdown/core';
+import { setResponseHeader } from '@tanstack/react-start/server';
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
+import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import {
   issueDayFactsTable,
   lineDayFactsTable,
   statisticsSnapshotsTable,
 } from '~/db/schema';
-import type {
-  ChartEntry,
-  IncludedEntities,
-  Issue,
-  TimeScaleChart,
-} from '~/types';
+import type { ChartEntry, Issue } from '~/types';
 import {
   recordServerTiming,
   timeServerSpan,
   timeSyncServerSpan,
 } from '~/util/serverTiming';
+import { statisticsSnapshotStore } from '~/util/statisticsSnapshot.server';
+import { readCanonicalManifestFingerprint } from '~/workflows/pull/helpers/manifestFingerprint';
 import {
   buildCountChart,
   type IssueDayFactRow,
@@ -25,7 +24,7 @@ import {
 } from './analyticsShared';
 import { type AppDb, getDefaultDb, isUndefinedTableError } from './database';
 import { type BaseDataset, buildDataset } from './dataset';
-import { isoDate, isoDateTime, nowSg } from './dateTime';
+import { isoDate, isoDateTime, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import {
   addIssueTypeCount,
@@ -46,30 +45,18 @@ import {
   getWindowEnd,
   getWindowStart,
 } from './lineAnalytics';
+import {
+  assertCompleteStatisticsSnapshot,
+  parseStatisticsSnapshotPayload,
+  type StatisticsSnapshotPayload,
+  type SystemAnalytics,
+} from './statisticsSnapshotInputs';
 
-export type SystemAnalytics = {
-  timeScaleChartsIssueCount: TimeScaleChart[];
-  timeScaleChartsIssueDuration: TimeScaleChart[];
-  chartTotalIssueCountByLine: {
-    title: string;
-    data: ChartEntry[];
-  };
-  chartTotalIssueCountByStation: {
-    title: string;
-    data: ChartEntry[];
-  };
-  chartRollingYearHeatmap: {
-    title: string;
-    data: ChartEntry[];
-  };
-  issueIdsDisruptionLongest: string[];
-};
-
-type StatisticsSnapshotPayload = {
-  kind: 'statistics_snapshot.v1';
-  data: SystemAnalytics;
-  included: IncludedEntities;
-};
+export type { SystemAnalytics } from './statisticsSnapshotInputs';
+export {
+  assertCompleteStatisticsSnapshot,
+  parseStatisticsSnapshotPayload,
+} from './statisticsSnapshotInputs';
 
 type StatisticsTimeWindow = {
   title: string;
@@ -448,105 +435,20 @@ function buildDailyIssueTypeCountsFromIssues(
 
 const STATISTICS_SNAPSHOT_ID = 'latest';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isSystemAnalytics(value: unknown): value is SystemAnalytics {
-  return (
-    isRecord(value) &&
-    Array.isArray(
-      (value as Partial<SystemAnalytics>).timeScaleChartsIssueCount,
-    ) &&
-    Array.isArray(
-      (value as Partial<SystemAnalytics>).timeScaleChartsIssueDuration,
-    ) &&
-    Array.isArray(
-      (value as Partial<SystemAnalytics>).chartTotalIssueCountByLine?.data,
-    ) &&
-    Array.isArray(
-      (value as Partial<SystemAnalytics>).chartTotalIssueCountByStation?.data,
-    ) &&
-    Array.isArray(
-      (value as Partial<SystemAnalytics>).chartRollingYearHeatmap?.data,
-    ) &&
-    Array.isArray((value as Partial<SystemAnalytics>).issueIdsDisruptionLongest)
-  );
-}
-
-function isIncludedEntities(value: unknown): value is IncludedEntities {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return (
-    isRecord(value.issues) &&
-    isRecord(value.lines) &&
-    isRecord(value.stations) &&
-    isRecord(value.operators) &&
-    isRecord(value.towns) &&
-    isRecord(value.landmarks)
-  );
-}
-
-function isStatisticsSnapshotPayload(
-  value: unknown,
-): value is StatisticsSnapshotPayload {
-  return (
-    isRecord(value) &&
-    value.kind === 'statistics_snapshot.v1' &&
-    isSystemAnalytics(value.data) &&
-    isIncludedEntities(value.included)
-  );
-}
-
-export function parseStatisticsSnapshotPayload(value: unknown): {
-  data: SystemAnalytics;
-  included: IncludedEntities | null;
-} | null {
-  if (isStatisticsSnapshotPayload(value)) {
-    return {
-      data: value.data,
-      included: value.included,
-    };
-  }
-
-  if (isSystemAnalytics(value)) {
-    return {
-      data: value,
-      included: null,
-    };
-  }
-
-  return null;
-}
-
-export function assertCompleteStatisticsSnapshot(
-  snapshot: ReturnType<typeof parseStatisticsSnapshotPayload>,
-): asserts snapshot is {
-  data: SystemAnalytics;
-  included: IncludedEntities;
-} {
-  if (snapshot?.included == null) {
-    throw new Error(
-      'Statistics snapshot is missing or incomplete. Apply database migrations, then run the canonical data pull or POST /internal/api/tasks/facts before serving /statistics.',
-    );
-  }
-}
-
-async function getLatestStatisticsSnapshot(db?: AppDb) {
+async function readStatisticsSnapshotRow(db?: AppDb) {
   const database = db ?? (await getDefaultDb());
   try {
     const [snapshot] = await timeServerSpan('statistics_snapshot_query', () =>
       database
         .select({
           data: statisticsSnapshotsTable.data,
+          asOf: statisticsSnapshotsTable.as_of,
         })
         .from(statisticsSnapshotsTable)
         .where(eq(statisticsSnapshotsTable.id, STATISTICS_SNAPSHOT_ID))
         .limit(1),
     );
-    return parseStatisticsSnapshotPayload(snapshot?.data);
+    return snapshot;
   } catch (error) {
     if (isUndefinedTableError(error)) {
       return null;
@@ -754,9 +656,22 @@ async function buildStatisticsDataFromDataset(
   });
 }
 
-export async function rebuildStatisticsSnapshot(db?: AppDb) {
+export async function rebuildStatisticsSnapshot(
+  db?: AppDb,
+  generation?: string,
+) {
+  const database = db ?? (await getDefaultDb());
+  return database.transaction(
+    (tx) => rebuildStatisticsSnapshotInTransaction(tx, generation),
+    { isolationLevel: 'repeatable read' },
+  );
+}
+
+async function rebuildStatisticsSnapshotInTransaction(
+  database: AppDb,
+  generation?: string,
+) {
   return timeServerSpan('statistics_snapshot_rebuild', async () => {
-    const database = db ?? (await getDefaultDb());
     const asOf = isoDateTime(nowSg());
     const dataset = await buildDataset(nowSg(), database);
     const data = await buildStatisticsDataFromDataset(dataset, database);
@@ -765,6 +680,8 @@ export async function rebuildStatisticsSnapshot(db?: AppDb) {
     );
     const snapshotPayload = {
       kind: 'statistics_snapshot.v1',
+      generation:
+        generation ?? (await readCompletedPageProfileGeneration(database)),
       data,
       included,
     } satisfies StatisticsSnapshotPayload;
@@ -794,7 +711,26 @@ export async function rebuildStatisticsSnapshot(db?: AppDb) {
 
 export async function getStatisticsData() {
   return timeServerSpan('statistics_data', async () => {
-    const snapshot = await getLatestStatisticsSnapshot();
+    const published = process.env.REDIS_URL
+      ? await statisticsSnapshotStore.read()
+      : null;
+    if (published) {
+      recordServerTiming('statistics_source', 0, `source=${published.source}`);
+      return {
+        data: published.inputs.data,
+        included: published.inputs.included,
+      };
+    }
+    if (process.env.REDIS_URL) {
+      try {
+        setResponseHeader('Cache-Control', 'no-store');
+      } catch {
+        /* no request context */
+      }
+    }
+    const snapshot = parseStatisticsSnapshotPayload(
+      (await readStatisticsSnapshotRow())?.data,
+    );
     assertCompleteStatisticsSnapshot(snapshot);
     recordServerTiming('statistics_included', 0, 'source=snapshot');
     return {
@@ -802,4 +738,55 @@ export async function getStatisticsData() {
       included: snapshot.included,
     };
   });
+}
+
+/** Publish the persisted rebuild, never a clock-refreshed request projection. */
+export async function publishStatisticsSnapshot(fingerprint?: string) {
+  if (!process.env.REDIS_URL) return;
+  const expected = await statisticsSnapshotStore.head();
+  const db = await getDefaultDb();
+  const snapshot = await db.transaction(
+    async (tx) => {
+      const generation = await readCompletedPageProfileGeneration(tx);
+      const identity =
+        fingerprint ?? (await readCanonicalManifestFingerprint(tx));
+      if (!generation || !identity)
+        throw new Error(
+          'Statistics publication requires completed canonical inputs',
+        );
+      let row = await readStatisticsSnapshotRow(tx);
+      assertCompleteStatisticsSnapshot(
+        parseStatisticsSnapshotPayload(row?.data),
+      );
+      // Pre-upgrade or interrupted writers may leave a projection from another
+      // generation. Repair once in this coherent SQL snapshot, not on public hits.
+      if ((row?.data as StatisticsSnapshotPayload).generation !== generation) {
+        await rebuildStatisticsSnapshotInTransaction(tx, generation);
+        row = await readStatisticsSnapshotRow(tx);
+      }
+      const inputs = parseStatisticsSnapshotPayload(row?.data);
+      assertCompleteStatisticsSnapshot(inputs);
+      if (!row) throw new Error('Statistics snapshot missing after rebuild');
+      return {
+        generation,
+        fingerprint: identity,
+        inputs: {
+          kind: 'statistics_inputs.v1' as const,
+          asOf: isoDateTime(parseDateTime(row.asOf)),
+          ...inputs,
+        },
+      };
+    },
+    { isolationLevel: 'repeatable read' },
+  );
+  const result = await statisticsSnapshotStore.publish(
+    expected.raw,
+    snapshot.inputs,
+    snapshot.generation,
+    snapshot.fingerprint,
+  );
+  console.info(
+    JSON.stringify({ event: 'statistics_snapshot_published', ...result }),
+  );
+  return result;
 }

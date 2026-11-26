@@ -47,6 +47,7 @@ import { retentionReview } from '~/util/dbQueries/scheduledTimetableRetention.fi
 import { createTimetableSelectionPolicy } from '~/util/dbQueries/scheduledTimetableSelection';
 import { publishSitemapSnapshot } from '~/util/dbQueries/sitemap';
 import { getStationProfileReadModel } from '~/util/dbQueries/stations';
+import { publishStatisticsSnapshot } from '~/util/dbQueries/statistics';
 import { withSelectedScheduledTimetable } from '~/util/dbQueries/withSelectedScheduledTimetable';
 import { publishNavigationCache } from '~/util/navigationCache.server';
 import { assemblePublishedStationArrivals } from '~/util/publishedStationArrivals.server';
@@ -59,6 +60,7 @@ import {
   publishStationProfileSnapshot,
   stationProfileSnapshotStore,
 } from '~/util/stationProfileSnapshot.server';
+import { statisticsSnapshotStore } from '~/util/statisticsSnapshot.server';
 import { combinedTimetableArchiveFixture } from './helpers/combinedTimetableArchive.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
 import { fetchManifest } from './helpers/fetchManifest';
@@ -241,7 +243,11 @@ vi.mock('~/util/dbQueries/projectScheduledTimetable', async (original) => {
 vi.mock('~/util/dbQueries/operationalFacts', () => ({
   rebuildOperationalFactsRange: vi.fn(async () => []),
 }));
+vi.mock('~/util/statisticsSnapshot.server', () => ({
+  statisticsSnapshotStore: { read: vi.fn(async () => null) },
+}));
 vi.mock('~/util/dbQueries/statistics', () => ({
+  publishStatisticsSnapshot: vi.fn(async () => {}),
   rebuildStatisticsSnapshot: vi.fn(async () => ({
     asOf: 'test',
     issueIdsDisruptionLongest: [],
@@ -353,6 +359,7 @@ beforeEach(() => {
   vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', undefined);
   vi.stubEnv('REDIS_URL', undefined);
   vi.mocked(sitemapSnapshotStore.read).mockResolvedValue(null);
+  vi.mocked(statisticsSnapshotStore.read).mockResolvedValue(null);
   vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(false);
   vi.mocked(rangeSnapshotStore.hasWriter).mockResolvedValue(false);
   state.fingerprint = undefined;
@@ -380,6 +387,9 @@ describe('published zero-SQL range inputs', () => {
       generation: 'complete',
       sha256: 'a'.repeat(64),
     };
+    vi.mocked(statisticsSnapshotStore.read).mockResolvedValue({
+      value: { fingerprint, generation: 'complete' },
+    } as never);
     vi.mocked(sitemapSnapshotStore.read).mockResolvedValue({
       value: { fingerprint, generation: 'complete' },
     } as never);
@@ -412,6 +422,39 @@ describe('published zero-SQL range inputs', () => {
     await workflow().run();
     expect(getDb).not.toHaveBeenCalled();
     expect(publishSitemapSnapshot).not.toHaveBeenCalled();
+  });
+  it('repairs missing or mismatched statistics before checkpointing, then skips SQL on healthy polls', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://unused');
+    vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    healthyArrivalHeads();
+    state.fingerprint = getCanonicalManifestFingerprint(manifest);
+    vi.mocked(statisticsSnapshotStore.read).mockResolvedValueOnce(null);
+    vi.mocked(publishStatisticsSnapshot).mockRejectedValueOnce(
+      Error('statistics publication failed'),
+    );
+    const repair = workflow();
+    await expect(repair.run()).rejects.toThrow('statistics publication failed');
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(rangeSnapshotStore.complete).not.toHaveBeenCalled();
+    await repair.run();
+    expect(publishStatisticsSnapshot).toHaveBeenLastCalledWith(
+      state.fingerprint,
+    );
+    expect(rangeSnapshotStore.complete).toHaveBeenCalledWith(state.fingerprint);
+    expect(fetchArchive).not.toHaveBeenCalled();
+    vi.mocked(statisticsSnapshotStore.read).mockResolvedValueOnce({
+      value: { fingerprint: state.fingerprint, generation: 'old' },
+    } as never);
+    vi.clearAllMocks();
+    await workflow().run();
+    expect(publishStatisticsSnapshot).toHaveBeenCalled();
+    vi.mocked(getDb).mockImplementation(() => {
+      throw Error('SQL must stay asleep');
+    });
+    vi.clearAllMocks();
+    await workflow().run();
+    expect(getDb).not.toHaveBeenCalled();
+    expect(publishStatisticsSnapshot).not.toHaveBeenCalled();
   });
   it('repairs missing station inputs before purge and completion, then rejects mismatched generations', async () => {
     vi.stubEnv('REDIS_URL', 'redis://unused');

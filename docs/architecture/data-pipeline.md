@@ -248,6 +248,32 @@ sitemap requests require those successfully rebuilt projections in every
 environment. Missing or invalid snapshots fail with instructions to apply
 migrations and run the canonical pull or authenticated facts rebuild.
 
+### Published statistics
+
+With Redis configured, `/statistics` reads the bounded immutable
+[statistics publication](../../app/util/statisticsSnapshot.server.ts). Healthy
+cold and warm reads use no SQL or freshness probes. Active payloads persist;
+replaced payloads expire after 24 hours. Missing, invalid or unavailable Redis
+inputs recover lazily from SQL with `Cache-Control: no-store`. SQL-only local
+reads retain the existing missing/incomplete snapshot errors.
+
+The canonical pull publishes after generation completion, before purge and the
+unchanged-input checkpoint. The authenticated facts task shares the writer
+lease, rebuilds and republishes, and invalidates that checkpoint before mutation
+so the next canonical pull repairs interrupted publication. The unchanged-pull
+preflight verifies the statistics payload and matching fingerprint/generation.
+Publication rejects partial generations and delayed activation. Legacy complete
+SQL snapshots without generation provenance need one coherent rebuild during
+repair; incomplete snapshots still require the documented rebuild.
+
+Charts, longest-disruption references and included entities retain the persisted
+rebuild clock (`as_of`), including ongoing-issue durations and rolling windows.
+Midnight or an unchanged-pull repair does not advance them. They advance on the
+next statistics rebuild, as before; this cache does not promise daily freshness
+when an unchanged canonical pull skips rebuilding. Holiday sync changes service
+windows in line facts but does not rebuild the statistics projection; its issue
+counts and durations do not depend on holiday service hours.
+
 ## Crowd Report Dispatch
 
 Accepted reports trigger a best-effort dispatch after commit. Pending reports

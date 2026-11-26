@@ -62,6 +62,15 @@ Duplicate exit labels now use the same ID tie-breaker in SQL and publication.
 
 Do not infer completion of this group or whole-site sleep from the station slice.
 
+### Statistics follow-up (audit item 3)
+
+Source now publishes the persisted statistics rebuild after completed canonical
+promotion and authenticated facts rebuilds. Healthy cold/warm loaders and
+unchanged-pull preflight use Redis without SQL. Recovery uses SQL and bypasses
+shared caching. Rolling windows retain the rebuild clock across midnight and
+cache repair. See the [pipeline boundary](../../architecture/data-pipeline.md#published-statistics).
+Review and rollout are separate; this slice does not establish whole-site sleep.
+
 ## Surprises & Discoveries
 
 Before source snapshots, range hits still selected canonical generation, issues

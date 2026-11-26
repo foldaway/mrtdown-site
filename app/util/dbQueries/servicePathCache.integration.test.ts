@@ -60,6 +60,11 @@ import {
   publishStationProfileSnapshot,
   stationProfileSnapshotStore,
 } from '~/util/stationProfileSnapshot.server';
+import { getStatisticsFn } from '~/util/statistics.functions';
+import {
+  parseStatisticsInputs,
+  statisticsSnapshotStore,
+} from '~/util/statisticsSnapshot.server';
 import { buildWeeklySummary } from '~/util/weeklyReport';
 import {
   canSkipPublicHolidaySync,
@@ -94,7 +99,11 @@ import {
 } from './sitemap';
 import { parseStationProfileSnapshotInputs } from './stationProfileSnapshotInputs';
 import { getStationProfileReadModel } from './stations';
-import { rebuildStatisticsSnapshot } from './statistics';
+import {
+  getStatisticsData,
+  publishStatisticsSnapshot,
+  rebuildStatisticsSnapshot,
+} from './statistics';
 
 const store = vi.hoisted(() => new Map<string, string>());
 const redis = vi.hoisted(() => ({
@@ -109,6 +118,9 @@ vi.mock('~/util/pageProfileRedis.server', () => ({
   getPageProfileRedis: vi.fn(async () => redis),
 }));
 const headers = vi.hoisted(() => vi.fn());
+vi.mock('@tanstack/react-start', () => ({
+  createServerFn: () => ({ handler: (handle: unknown) => handle }),
+}));
 vi.mock('@tanstack/react-start/server', () => ({
   setResponseHeader: headers,
   getResponseHeader: vi.fn(),
@@ -298,6 +310,205 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
       await admin.end();
     }
   });
+
+  describe.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
+    'published statistics with real Redis',
+    () => {
+      let statisticsRedis: Redis;
+      const prefix = () => getSnapshotKeyPrefix('statistics');
+      beforeEach(async () => {
+        vi.stubEnv(
+          'TIER',
+          `statistics_test_${randomUUID().replaceAll('-', '')}`,
+        );
+        statisticsRedis = new Redis(process.env.TEST_SNAPSHOT_REDIS_URL ?? '', {
+          lazyConnect: true,
+        });
+        await statisticsRedis.connect();
+        vi.mocked(redisConnection.getPageProfileRedis).mockResolvedValue(
+          statisticsRedis,
+        );
+        await recordCanonicalManifestFingerprint(db, 'c'.repeat(64));
+      });
+      afterEach(async () => {
+        const keys = await statisticsRedis.keys(
+          `mrtdown:*${process.env.TIER}*`,
+        );
+        if (keys.length) await statisticsRedis.del(...keys);
+        await statisticsRedis.quit();
+      });
+      function coldReader() {
+        const cold = createPublishedSnapshotStore(
+          async () => statisticsRedis,
+          'statistics',
+          parseStatisticsInputs,
+        );
+        vi.spyOn(statisticsSnapshotStore, 'read').mockImplementation(cold.read);
+        return cold;
+      }
+      it('serves the full nonempty loader cold/warm without SQL and preserves rebuild windows across midnight and repair', async () => {
+        await rebuildOperationalFactsRange(1);
+        const rebuilt = await rebuildStatisticsSnapshot();
+        const baseline = await getStatisticsFn();
+        expect(baseline.data.issueIdsDisruptionLongest).toEqual(['issue']);
+        expect(
+          baseline.data.chartTotalIssueCountByLine.data[0].payload.totalIssues,
+        ).toBe(1);
+        expect(baseline.included.issues.issue.title['en-SG']).toBe(
+          'Original issue',
+        );
+        expect(
+          baseline.data.chartRollingYearHeatmap.data.at(-1)?.payload.disruption,
+        ).toBe(1);
+        const published = await publishStatisticsSnapshot();
+        expect(
+          await statisticsRedis.ttl(`${prefix()}:payload:${published?.sha256}`),
+        ).toBe(-1);
+        vi.setSystemTime(now.plus({ days: 1 }).toJSDate());
+        // Repair republishes the persisted rebuild rather than moving its clock.
+        await publishStatisticsSnapshot();
+        expect((await statisticsSnapshotStore.read())?.inputs.asOf).toBe(
+          rebuilt.asOf,
+        );
+        const cold = coldReader();
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        headers.mockClear();
+        queries.length = 0;
+        expect(await getStatisticsFn()).toEqual(baseline);
+        expect((await cold.read())?.source).toBe('memory');
+        expect(await getStatisticsFn()).toEqual(baseline);
+        expect(headers).not.toHaveBeenCalledWith('Cache-Control', 'no-store');
+        expect(queries).toEqual([]);
+      });
+      it('keeps completed inputs through partial promotion and rejects delayed activation after a newer facts rebuild', async () => {
+        await rebuildStatisticsSnapshot();
+        const first = await publishStatisticsSnapshot();
+        const baseline = await getStatisticsData();
+        await markPageProfilesUpdating(db);
+        await pool.query("update issues set title = $1 where id='issue'", [
+          {
+            ...baseline.included.issues.issue.title,
+            'en-SG': 'Corrected issue',
+          },
+        ]);
+        await rebuildStatisticsSnapshot(undefined, 'next');
+        await expect(publishStatisticsSnapshot()).rejects.toThrow(
+          'completed canonical inputs',
+        );
+        expect(await getStatisticsData()).toEqual(baseline);
+        await completePageProfileGeneration(db, 'next');
+        const entered = Promise.withResolvers<void>();
+        const resume = Promise.withResolvers<void>();
+        const activate = statisticsSnapshotStore.publish;
+        vi.spyOn(statisticsSnapshotStore, 'publish').mockImplementationOnce(
+          async (...args) => {
+            entered.resolve();
+            await resume.promise;
+            return activate(...args);
+          },
+        );
+        const delayed = publishStatisticsSnapshot();
+        const rejected = expect(delayed).rejects.toThrow('superseded');
+        await entered.promise;
+        vi.setSystemTime(now.plus({ days: 1 }).toJSDate());
+        await pool.query("update issues set title = $1 where id='issue'", [
+          {
+            ...baseline.included.issues.issue.title,
+            'en-SG': 'Latest facts rebuild',
+          },
+        ]);
+        await rebuildStatisticsSnapshot();
+        await publishStatisticsSnapshot();
+        resume.resolve();
+        await rejected;
+        expect(
+          (await getStatisticsData()).included.issues.issue.title['en-SG'],
+        ).toBe('Latest facts rebuild');
+        expect(
+          await statisticsRedis.ttl(`${prefix()}:payload:${first?.sha256}`),
+        ).toBeGreaterThan(0);
+      });
+      it('recovers missing, corrupt and unavailable Redis data through SQL, retaining incomplete snapshot errors', async () => {
+        await rebuildStatisticsSnapshot();
+        const baseline = await getStatisticsData();
+        for (const failure of [
+          'missing',
+          'corrupt',
+          'incomplete',
+          'unavailable',
+        ]) {
+          const published = await publishStatisticsSnapshot();
+          coldReader();
+          if (failure === 'missing')
+            await statisticsRedis.del(`${prefix()}:active`);
+          if (failure === 'corrupt')
+            await statisticsRedis.set(
+              `${prefix()}:payload:${published?.sha256}`,
+              'corrupt',
+            );
+          if (failure === 'incomplete') {
+            const unchecked = createPublishedSnapshotStore(
+              async () => statisticsRedis,
+              'statistics',
+              (value) => value,
+            );
+            await unchecked.publish(
+              (await unchecked.head()).raw,
+              {
+                kind: 'statistics_inputs.v1',
+                asOf: now.toISO(),
+                data: baseline.data,
+              },
+              generation,
+              'c'.repeat(64),
+            );
+          }
+          if (failure === 'unavailable')
+            vi.spyOn(statisticsRedis, 'getrangeBuffer').mockRejectedValueOnce(
+              Error('unavailable'),
+            );
+          headers.mockClear();
+          queries.length = 0;
+          expect(await getStatisticsFn()).toEqual(baseline);
+          expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+          expect(
+            queries.filter((q) => q.includes('from "statistics_snapshots"')),
+          ).toHaveLength(1);
+        }
+        await statisticsRedis.del(`${prefix()}:active`);
+        await pool.query(
+          "update statistics_snapshots set data = $1 where id='latest'",
+          [baseline.data],
+        );
+        await expect(getStatisticsFn()).rejects.toThrow(
+          'missing or incomplete',
+        );
+        await expect(publishStatisticsSnapshot()).rejects.toThrow(
+          'missing or incomplete',
+        );
+      });
+      it('repairs a complete legacy SQL projection once before publication', async () => {
+        await rebuildStatisticsSnapshot();
+        await pool.query(
+          "update statistics_snapshots set data = data - 'generation' where id='latest'",
+        );
+        await publishStatisticsSnapshot();
+        const cached = await getStatisticsData();
+        vi.stubEnv('REDIS_URL', undefined);
+        expect(await getStatisticsData()).toEqual(cached);
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        vi.mocked(redisConnection.getPageProfileRedis).mockResolvedValue(
+          statisticsRedis,
+        );
+        vi.setSystemTime(now.plus({ days: 1 }).toJSDate());
+        const old = (await statisticsSnapshotStore.read())?.inputs.asOf;
+        await publishStatisticsSnapshot();
+        expect((await statisticsSnapshotStore.read())?.inputs.asOf).toBe(old);
+      });
+    },
+  );
 
   describe.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
     'published station profiles with real Redis',
