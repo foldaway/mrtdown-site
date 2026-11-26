@@ -162,6 +162,7 @@ const redis = vi.hoisted(() => ({
   expire: vi.fn(),
   eval: vi.fn(),
   del: vi.fn(),
+  duplicate: vi.fn(),
 }));
 vi.mock('~/util/pageProfileRedis.server', () => ({
   getPageProfileRedis: vi.fn(async () => redis),
@@ -261,6 +262,30 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         return 'OK';
       },
     );
+    redis.duplicate.mockImplementation(() => {
+      const writes: (() => Promise<unknown>)[] = [];
+      const transaction = {
+        expire(key: string, seconds: number) {
+          writes.push(() => redis.expire(key, seconds));
+          return transaction;
+        },
+        set(key: string, raw: string) {
+          writes.push(() => redis.set(key, raw));
+          return transaction;
+        },
+        async exec() {
+          const results = [];
+          for (const write of writes) results.push([null, await write()]);
+          return results;
+        },
+      };
+      return {
+        connect: async () => {},
+        watch: async () => {},
+        multi: () => transaction,
+        disconnect: () => {},
+      };
+    });
     redis.expire.mockResolvedValue(1);
     redis.del.mockImplementation(async (key: string) =>
       Number(store.delete(key)),
@@ -2618,7 +2643,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           liveRedis,
         );
         await pool.query(
-          'TRUNCATE crowd_reports, crowd_report_clusters CASCADE',
+          'TRUNCATE crowd_reports, crowd_report_clusters, crowd_report_rate_limits CASCADE',
         );
         await publishRangeSnapshot('a'.repeat(64));
       });
@@ -3011,6 +3036,83 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         log.mockRestore();
       });
 
+      it('retires invalidated payloads across failed repairs and keeps republished content persistent', async () => {
+        vi.spyOn(dbConnection, 'getDb').mockReturnValue(db);
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        await insertStandalone();
+        const prefix = getSnapshotKeyPrefix('community-report-sources');
+        const first = await crowdReportSourceStore.head();
+        const firstKey = `${prefix}:payload:${first.value?.sha256}`;
+        await repairCrowdReportSources(db);
+        expect(await liveRedis.ttl(firstKey)).toBe(-1);
+        const delayed = liveRedis.duplicate();
+        const duplicate = vi
+          .spyOn(liveRedis, 'duplicate')
+          .mockReturnValueOnce(delayed);
+        const watch = delayed.watch.bind(delayed);
+        vi.spyOn(delayed, 'watch').mockImplementationOnce(async (key) => {
+          const result = await watch(key);
+          const newer = await crowdReportSourceStore.read();
+          if (!newer) throw Error('Missing newer publication');
+          await crowdReportSourceStore.publish(
+            newer.raw,
+            newer.inputs,
+            'newer',
+            newer.value.fingerprint,
+          );
+          return result;
+        });
+        await expect(repairCrowdReportSources(db)).rejects.toThrow(
+          'superseded',
+        );
+        duplicate.mockRestore();
+        expect(await crowdReportSourceStore.read()).not.toBeNull();
+        expect(await liveRedis.ttl(firstKey)).toBe(-1);
+        const invalidation = vi
+          .spyOn(liveRedis, 'duplicate')
+          .mockImplementationOnce(() => {
+            throw Error('Retirement unavailable');
+          });
+        await expect(
+          signalCache.withCommunitySignalPublication(db, (tx) =>
+            tx.execute(sql`delete from crowd_reports where id='standalone'`),
+          ),
+        ).rejects.toThrow('Retirement unavailable');
+        invalidation.mockRestore();
+        expect(await detail('report', 'standalone')).toMatchObject({
+          id: 'standalone',
+        });
+        const publication = vi
+          .spyOn(crowdReportSourceStore, 'publish')
+          .mockRejectedValueOnce(Error('Repair unavailable'));
+        await signalCache.withCommunitySignalPublication(db, (tx) =>
+          tx.execute(
+            sql`update crowd_reports set status='rejected' where id='standalone'`,
+          ),
+        );
+        publication.mockRestore();
+        expect(await crowdReportSourceStore.read()).toBeNull();
+        expect(await liveRedis.ttl(firstKey)).toBeGreaterThan(0);
+        await repairCrowdReportSources(db);
+        await signalCache.withCommunitySignalPublication(db, (tx) =>
+          tx.execute(
+            sql`update crowd_reports set status='accepted' where id='standalone'`,
+          ),
+        );
+        // Returning to identical content removes the old retention deadline.
+        expect((await crowdReportSourceStore.head()).value?.sha256).toBe(
+          first.value?.sha256,
+        );
+        for (const key of await liveRedis.keys(`${prefix}:payload:*`)) {
+          const ttl = await liveRedis.ttl(key);
+          if (key === firstKey) expect(ttl).toBe(-1);
+          else {
+            expect(ttl).toBeGreaterThan(0);
+            expect(ttl).toBeLessThanOrEqual(86400);
+          }
+        }
+      });
+
       it('leaves an oversized source index unavailable rather than publishing truncated misses', async () => {
         vi.spyOn(dbConnection, 'getDb').mockReturnValue(db);
         vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -3295,8 +3397,10 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           externalReportId: 'external',
           requestPayloadDigest: 'digest',
         };
+        const duplicate = liveRedis.duplicate.bind(liveRedis);
         const connect = vi
           .spyOn(liveRedis, 'duplicate')
+          .mockImplementationOnce(() => duplicate())
           .mockImplementationOnce(() => {
             throw Error('publication unavailable');
           });

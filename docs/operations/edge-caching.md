@@ -442,7 +442,9 @@ The community write fence invalidates details before commit and refreshes them
 after submissions, moderation, duplicates, dispatch and fixture cleanup.
 Dispatch failures refresh an individual report's public update time. Canonical
 line/station writers invalidate reference edits and cascading removals; pull
-completion/recovery repairs the snapshot.
+completion/recovery attempts best-effort repair so detail-cache overflow cannot
+block canonical publication. Superseded payloads expire after 24 hours; an active
+payload stays persistent.
 
 Publication allows 10,000 sources, 100,000 member or scope rows per query,
 24 MiB decoded JSON and 4 MiB encoded Redis data. Overflow fails publication

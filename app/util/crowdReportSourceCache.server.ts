@@ -57,14 +57,35 @@ export const crowdReportSourceStore = createPublishedSnapshotStore(
 const headKey = () =>
   `${getSnapshotKeyPrefix('community-report-sources')}:active`;
 
+async function markCrowdReportSourcesPending() {
+  const redis = (await getPageProfileRedis()).duplicate();
+  try {
+    await redis.connect();
+    // WATCH fences delayed invalidations after the SQL transaction lock is gone.
+    await redis.watch(headKey());
+    const current = await crowdReportSourceStore.head();
+    const pending = JSON.stringify({ pending: randomUUID() });
+    const transaction = redis.multi();
+    if (current.value) {
+      transaction.expire(
+        `${getSnapshotKeyPrefix('community-report-sources')}:payload:${current.value.sha256}`,
+        24 * 60 * 60,
+      );
+    }
+    const result = await transaction.set(headKey(), pending).exec();
+    if (!result || result.some(([error]) => error))
+      throw Error('Community report source invalidation failed or superseded');
+    return pending;
+  } finally {
+    redis.disconnect();
+  }
+}
+
 /** Called at the end of owning transactions, after incident/reference work. */
 export async function invalidateCrowdReportSources(tx: AppDbTransaction) {
   if (!process.env.REDIS_URL) return;
   await lockCommunitySignalPublication(tx);
-  await (await getPageProfileRedis()).set(
-    headKey(),
-    JSON.stringify({ pending: randomUUID() }),
-  );
+  await markCrowdReportSourcesPending();
 }
 
 export async function repairCrowdReportSources(
@@ -81,8 +102,7 @@ export async function repairCrowdReportSources(
       return;
     // A fresh token plus the store's CAS fences delayed commands after SQL lock release.
     const identity = randomUUID();
-    const expected = JSON.stringify({ pending: identity });
-    await (await getPageProfileRedis()).set(headKey(), expected);
+    const expected = await markCrowdReportSourcesPending();
     const rows = await readPublicCrowdReportSources(tx);
     await crowdReportSourceStore.publish(
       expected,
