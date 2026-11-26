@@ -26,7 +26,10 @@ import {
   crowdReportsTable,
 } from '~/db/schema';
 import { purgePublicDataCache } from './cloudflareCache';
-import { withCommunitySignalPublication } from './communitySignalCache.server';
+import {
+  tryRepairCommunitySignalCache,
+  withCommunitySignalPublication,
+} from './communitySignalCache.server';
 import { getCrowdReportClusterDirection } from './crowdReportClustering';
 import { captureCrowdReportDispatchAfterSubmissionFailure } from './crowdReportDispatchDiagnostics';
 import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
@@ -832,6 +835,9 @@ export async function dispatchPendingCrowdReports(
   }
 
   const failed = results.filter((result) => !result.success).length;
+  // Empty runs repair missing/older proofs by checking SQL under the publication
+  // fence. Candidate transactions already repair their own committed changes.
+  if (candidates.length === 0) await tryRepairCommunitySignalCache(db);
   return {
     success: failed === 0,
     count: candidates.length,

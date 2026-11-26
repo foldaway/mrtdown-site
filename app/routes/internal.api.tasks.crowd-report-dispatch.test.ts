@@ -1,12 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb } from '~/db';
+import { canSkipCrowdReportDispatch } from '~/util/communitySignalCache.server';
 import {
   dispatchPendingCrowdReports,
   getDispatchableCrowdReportCandidates,
 } from '~/util/crowdReportDispatch';
 import { captureCrowdReportDispatchRequestFailure } from '~/util/crowdReportDispatchDiagnostics';
 import { handleCrowdReportDispatchPost } from './internal.api.tasks.crowd-report-dispatch';
+import { internalMiddleware } from '~/util/internal.middleware';
 
+vi.mock('@tanstack/react-start', () => ({
+  createMiddleware: () => ({ server: (handler: unknown) => handler }),
+}));
+vi.mock('~/util/communitySignalCache.server', () => ({
+  canSkipCrowdReportDispatch: vi.fn(),
+}));
 vi.mock('~/db', () => ({ getDb: vi.fn(() => ({})) }));
 vi.mock('~/util/crowdReportDispatch', () => ({
   dispatchPendingCrowdReports: vi.fn(),
@@ -29,6 +37,7 @@ function request(body?: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(canSkipCrowdReportDispatch).mockResolvedValue(false);
   vi.stubEnv('VITE_ROOT_URL', 'https://www.mrtdown.org');
   vi.stubEnv('CROWD_REPORT_DISPATCH_GITHUB_TOKEN', 'github-secret');
 });
@@ -92,6 +101,7 @@ describe('crowd report dispatch request diagnostics', () => {
   });
 
   it('accepts a dry run without dispatching or reporting a failure', async () => {
+    vi.mocked(canSkipCrowdReportDispatch).mockResolvedValue(true);
     vi.mocked(getDispatchableCrowdReportCandidates).mockResolvedValue([]);
     const response = await handleCrowdReportDispatchPost(
       request('{"dryRun":true}'),
@@ -104,7 +114,47 @@ describe('crowd report dispatch request diagnostics', () => {
       candidates: [],
     });
     expect(dispatchPendingCrowdReports).not.toHaveBeenCalled();
+    expect(canSkipCrowdReportDispatch).not.toHaveBeenCalled();
     expect(captureCrowdReportDispatchRequestFailure).not.toHaveBeenCalled();
+  });
+
+  it('authenticates healthy no-work requests without SQL discovery or dispatch locks', async () => {
+    vi.stubEnv('DEV', false);
+    vi.stubEnv('INTERNAL_API_TOKENS', 'internal-secret');
+    vi.mocked(canSkipCrowdReportDispatch).mockResolvedValue(true);
+    const originalGetDb = vi.mocked(getDb).getMockImplementation();
+    const db = vi.mocked(getDb).mockImplementation(() => {
+      throw Error('SQL must stay asleep');
+    });
+    const dispatch = vi
+      .mocked(dispatchPendingCrowdReports)
+      .mockRejectedValue(Error('Dispatch locks must stay asleep'));
+    const authenticate = internalMiddleware as unknown as (context: {
+      request: Request;
+      next: () => Promise<Response>;
+    }) => Promise<Response>;
+    const req = request('{}');
+    const next = vi.fn(() => handleCrowdReportDispatchPost(req));
+    try {
+      expect((await authenticate({ request: req, next })).status).toBe(401);
+      expect(canSkipCrowdReportDispatch).not.toHaveBeenCalled();
+      req.headers.set('authorization', 'Bearer internal-secret');
+      const response = await authenticate({ request: req, next });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        success: true,
+        count: 0,
+        dispatched: 0,
+        failed: 0,
+        results: [],
+      });
+      expect(db).not.toHaveBeenCalled();
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(getDispatchableCrowdReportCandidates).not.toHaveBeenCalled();
+    } finally {
+      if (originalGetDb) db.mockImplementation(originalGetDb);
+      dispatch.mockReset();
+    }
   });
 
   it.each([undefined, '{}'])(

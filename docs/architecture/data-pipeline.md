@@ -314,6 +314,21 @@ canonical pull. Use
 `CROWD_REPORT_DISPATCH_LIMIT` to tune the maximum number of dispatch candidates
 processed per scheduled run.
 
+Authenticated dispatch requests can return no work before opening SQL when the
+[community snapshot](../operations/edge-caching.md#public-community-disruption-signals)
+certifies there are no accepted, undispatched clusters or standalone reports.
+Accepted rows keep SQL discovery enabled even without sufficient scope or
+confidence; display expiry cannot hide retries. Immediate dispatch and dry runs
+always discover through SQL. Eligibility currently changes only through writes;
+adding a clock-based eligibility or retry deadline requires revisiting the proof.
+
+The existing publication fence invalidates before relevant SQL commits and
+refreshes afterward. Missing, dirty, corrupt, unavailable or older snapshots
+without the queue field fall back to SQL. Empty runs repair the proof from SQL;
+older fenced writers safely omit the field when rebuilding. Drain writers
+predating the fence before initialization. Redis restores, out-of-band SQL edits
+and writes without Redis require the linked snapshot repair procedure.
+
 For failures, look in Sentry for `component:crowd-report-dispatch` and the
 `crowd_report_dispatch` context. Scheduled delivery diagnostics include
 QStash message and schedule IDs. Submission-triggered failures carry

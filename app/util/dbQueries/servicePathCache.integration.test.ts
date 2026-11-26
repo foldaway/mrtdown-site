@@ -24,7 +24,7 @@ import {
 } from '~/util/publicResponseCache';
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import Redis from 'ioredis';
 import { DateTime } from 'luxon';
@@ -2338,6 +2338,99 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         await liveRedis.quit();
       });
 
+      it('initializes the dispatch checkpoint from SQL and rejects uncertain proofs', async () => {
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
+        await dispatchPendingCrowdReports(db, {
+          rootUrl: 'https://example.test',
+          token: 'token',
+        });
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(true);
+        const key = signalCache.getCommunitySignalCacheKey();
+        const raw = await liveRedis.get(key);
+        const snapshot = JSON.parse(raw ?? '{}');
+        // An older writer can rebuild display data but cannot certify the queue.
+        const { dispatchQueueEmpty: _empty, ...oldSnapshot } = snapshot;
+        for (const value of [
+          '',
+          '{broken',
+          JSON.stringify({ ...snapshot, dispatchQueueEmpty: null }),
+          JSON.stringify({ pending: 'writer' }),
+          JSON.stringify(oldSnapshot),
+        ]) {
+          if (value) await liveRedis.set(key, value);
+          else await liveRedis.del(key);
+          expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
+        }
+        await signalCache.tryRepairCommunitySignalCache(db);
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(true);
+        vi.setSystemTime(now.minus({ milliseconds: 1 }).toJSDate());
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
+        vi.setSystemTime(now.toJSDate());
+        const read = vi
+          .spyOn(liveRedis, 'getrange')
+          .mockRejectedValueOnce(Error('Redis unavailable'));
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
+        read.mockRestore();
+      });
+
+      it('keeps newly eligible public clusters and failed deliveries retryable beyond display expiry', async () => {
+        await persistAutomoderatedCrowdReport(db, submission(), abuse('one'), {
+          now,
+        });
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(true);
+        await persistAutomoderatedCrowdReport(db, submission(), abuse('two'), {
+          now,
+        });
+        await persistAutomoderatedCrowdReport(
+          db,
+          submission(),
+          abuse('three'),
+          { now },
+        );
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
+        const options = { rootUrl: 'https://example.test', token: 'token' };
+        const fetcher = vi
+          .fn()
+          .mockRejectedValueOnce(Error('GitHub unavailable'));
+        expect(
+          (await dispatchPendingCrowdReports(db, options, fetcher)).failed,
+        ).toBe(1);
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
+        vi.setSystemTime(now.plus({ days: 7 }).toJSDate());
+        expect(await signalCache.readCachedCommunitySignals()).toMatchObject({
+          status: 'ready',
+          signals: [],
+        });
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
+        fetcher.mockResolvedValue(new Response(null, { status: 204 }));
+        expect(
+          (await dispatchPendingCrowdReports(db, options, fetcher)).dispatched,
+        ).toBe(1);
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(true);
+      });
+
+      it('discovers a legacy backlog before initializing and never certifies accepted rows without scope', async () => {
+        await pool.query(
+          "insert into crowd_reports (id,observed_at,text,status) values ('legacy',$1,'legacy','accepted')",
+          [now.toISO()],
+        );
+        const options = { rootUrl: 'https://example.test', token: 'token' };
+        expect((await dispatchPendingCrowdReports(db, options)).count).toBe(0);
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
+        await signalCache.withCommunitySignalPublication(db, async (tx) => {
+          await tx.execute(
+            sql`insert into crowd_report_lines (report_id,line_id) values ('legacy','line')`,
+          );
+        });
+        const fetcher = vi
+          .fn()
+          .mockResolvedValue(new Response(null, { status: 204 }));
+        expect(
+          (await dispatchPendingCrowdReports(db, options, fetcher)).dispatched,
+        ).toBe(1);
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(true);
+      });
+
       it('serves the whole homepage cold/warm and initialized-empty with SQL disabled, then expires by request clock', async () => {
         await signalCache.repairCommunitySignalCache(db);
         const empty = await page();
@@ -2366,6 +2459,11 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
             includeCommunitySignals: true,
           }),
         ).toEqual(empty);
+        const coldCheckpoint = await import(
+          '~/util/communitySignalCache.server'
+        );
+        expect(await coldCheckpoint.canSkipCrowdReportDispatch()).toBe(true);
+        expect(queries).toEqual([]);
         const coldSignals = await import('./communitySignals');
         await persistAutomoderatedCrowdReport(db, submission(), abuse('one'), {
           now,
@@ -2562,6 +2660,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           { now },
         );
         expect(accepted.created).toBe(true);
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
         expect((await signalCache.readCachedCommunitySignals()).status).toBe(
           'missing',
         );
@@ -2591,6 +2690,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           fetcher,
         );
         expect(result.failed).toBe(0);
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(true);
         expect(await sqlSignals()).toEqual([]);
         expect(await signalCache.readCachedCommunitySignals()).toEqual({
           status: 'ready',
@@ -2641,10 +2741,10 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           );
           expect(duplicate.results[0].skipped).toBe(true);
           expect(fetcher).toHaveBeenCalledTimes(1);
-          const unrelated = persistAutomoderatedCrowdReport(
+          const unrelated = persistAutomoderatedProgrammaticCrowdReport(
             db,
             { ...submission(), effect: 'crowding' },
-            abuse('unrelated'),
+            { ...delivery, externalReportId: 'unrelated' },
             { now },
           );
           // A blocked global lock would time out this assertion; always release
@@ -2661,6 +2761,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
             ]),
           ).resolves.toMatchObject({ status: 'accepted' });
           await signalCache.repairCommunitySignalCache(db);
+          expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
           expect((await signalCache.readCachedCommunitySignals()).status).toBe(
             'ready',
           );
@@ -2672,6 +2773,8 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           expect((await dispatch).failed).toBe(0);
         }
         const expected = await sqlSignals();
+        // Completion of the older dispatch must not hide the newer queue write.
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
         expect(expected).toHaveLength(1);
         expect(expected[0].effect).toBe('crowding');
         expect(await signalCache.readCachedCommunitySignals()).toEqual({
@@ -2804,6 +2907,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         await expect(
           signalCache.repairCommunitySignalCache(db),
         ).rejects.toThrow('superseded');
+        expect(await signalCache.canSkipCrowdReportDispatch()).toBe(false);
         expect((await signalCache.readCachedCommunitySignals()).status).toBe(
           'missing',
         );
