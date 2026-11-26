@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { createSelectSchema } from 'drizzle-orm/zod';
 import type { DateTime } from 'luxon';
 import { z } from 'zod';
@@ -41,6 +42,11 @@ export const parseStationProfileSnapshotInputs = (
 ): StationProfileSnapshotInputs =>
   schema.parse(value) as StationProfileSnapshotInputs;
 
+/** Match PostgreSQL UTF-8 COLLATE "C", independent of process locale. */
+export function compareStationProfileIds(a: string, b: string) {
+  return Buffer.compare(Buffer.from(a), Buffer.from(b));
+}
+
 /** Mirror the SQL reader's candidate and static scope, before clock selection. */
 export function selectStationProfileSnapshot(
   inputs: StationProfileSnapshotInputs,
@@ -53,8 +59,8 @@ export function selectStationProfileSnapshot(
         .filter((row) => row.code === idOrCode)
         .sort(
           (a, b) =>
-            a.line_id.localeCompare(b.line_id) ||
-            a.station_id.localeCompare(b.station_id),
+            compareStationProfileIds(a.line_id, b.line_id) ||
+            compareStationProfileIds(a.station_id, b.station_id),
         )[0]?.station_id;
   if (!resolvedStationId) return null;
   const stationLines = new Set(

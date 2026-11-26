@@ -236,9 +236,23 @@ preflights verify the payload and matching generation/fingerprint.
 Missing, invalid or unavailable inputs use SQL with `no-store`. Requests do not
 publish replacements. Use an authenticated empty canonical pull to repair, then
 verify a cold and warm profile/code alias against SQL in an isolated environment.
-Station response deadlines still stop at Singapore midnight, one hour, or the
-next relevant incident/signal boundary. Arrival polling retains its separate
-published inputs and `no-store` contract.
+Station HTML and server-function response deadlines stop at Singapore midnight,
+one hour, or the next relevant incident/signal boundary. Healthy Markdown uses
+the general edge cache policy; SQL-recovery Markdown remains `no-store`.
+Arrival polling retains its separate published inputs and `no-store` contract.
+
+A non-string `active` key causes Redis `WRONGTYPE` errors and cannot be repaired
+by publication retries. After investigating the cause, recover as follows:
+
+1. Stop and drain the canonical-pull and holiday writers that publish station
+   profiles before changing the key.
+2. Run `TYPE 'mrtdown:{<tier>:station-profiles:v1}:active'` against the intended
+   Redis tier. Continue only if it reports a non-string type other than `none`.
+   A string or absent key uses the normal publication repair path.
+3. Run `DEL 'mrtdown:{<tier>:station-profiles:v1}:active'`, deleting only that
+   key. Leave payloads and other namespaces intact.
+4. Restart the writers and run an authenticated canonical pull to publish a new
+   head. Confirm publication succeeds before considering the repair complete.
 
 ## Published sitemap inputs
 

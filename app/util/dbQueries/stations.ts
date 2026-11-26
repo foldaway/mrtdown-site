@@ -8,6 +8,7 @@ import {
   gt as isAfter,
   isNull,
   or,
+  sql,
 } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import {
@@ -51,7 +52,10 @@ import {
   sortIssuesByLatestActivity,
 } from './issueIntervals';
 import { getIssueStaticScope } from './readModelScope';
-import { selectStationProfileSnapshot } from './stationProfileSnapshotInputs';
+import {
+  compareStationProfileIds,
+  selectStationProfileSnapshot,
+} from './stationProfileSnapshotInputs';
 
 export function resolveStationProfileStationId(
   included: { stations: Record<string, Pick<Station, 'id' | 'memberships'>> },
@@ -71,11 +75,11 @@ export function resolveStationProfileStationId(
         })),
     )
     .sort((a, b) => {
-      const lineDiff = a.lineId.localeCompare(b.lineId);
+      const lineDiff = compareStationProfileIds(a.lineId, b.lineId);
       if (lineDiff !== 0) {
         return lineDiff;
       }
-      return a.stationId.localeCompare(b.stationId);
+      return compareStationProfileIds(a.stationId, b.stationId);
     });
 
   return aliasMatches[0]?.stationId ?? null;
@@ -102,8 +106,8 @@ async function resolveStationProfileStationIdFromDb(stationIdOrCode: string) {
         .from(stationCodesTable)
         .where(eq(stationCodesTable.code, stationIdOrCode))
         .orderBy(
-          asc(stationCodesTable.line_id),
-          asc(stationCodesTable.station_id),
+          asc(sql`${stationCodesTable.line_id} COLLATE "C"`),
+          asc(sql`${stationCodesTable.station_id} COLLATE "C"`),
         )
         .limit(1),
   );

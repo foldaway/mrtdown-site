@@ -26,6 +26,8 @@ export const getStationProfileFn = createServerFn({ method: 'GET' })
       return profile;
     } catch (error) {
       setResponseHeader('Cache-Control', 'no-store');
+      if (error instanceof Response)
+        error.headers.set('Cache-Control', 'no-store');
       throw error;
     }
   });

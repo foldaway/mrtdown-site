@@ -349,6 +349,12 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         await pool.query(
           "update lines set platform_door_count=null,train_car_counts='[]'",
         );
+        await pool.query(
+          "insert into stations (id,name,town_id,geo,hash) select 'station_1',name,town_id,geo,hash from stations where id='station-1'",
+        );
+        await pool.query(
+          "insert into station_codes (line_id,station_id,code,started_at,structure_type) values ('line','station_1','LEGACY','1990-01-01','underground')",
+        );
         const clocks = [
           now.set({ hour: 10, minute: 15 }),
           now.set({ hour: 10, minute: 30 }),
@@ -420,16 +426,30 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           ms: null,
           ta: null,
         };
-        vi.spyOn(stationProfileSnapshotStore, 'read').mockImplementationOnce(
-          async () => {
+        const coldStore = createPublishedSnapshotStore(
+          async () => stationRedis,
+          'station-profiles',
+          parseStationProfileSnapshotInputs,
+        );
+        const getrange = stationRedis.getrange.bind(stationRedis);
+        // The cold reader has captured the old head when it requests its payload.
+        // Publish before that fetch completes; it must still fetch the old hash.
+        vi.spyOn(stationRedis, 'getrange').mockImplementationOnce(
+          async (key, start, end) => {
+            expect(key).toBe(
+              `${getSnapshotKeyPrefix('station-profiles')}:payload:${old.value.sha256}`,
+            );
             await stationProfileSnapshotStore.publish(
               old.raw,
               updated,
               'next',
               'b'.repeat(64),
             );
-            return old;
+            return getrange(key, start, end);
           },
+        );
+        vi.spyOn(stationProfileSnapshotStore, 'read').mockImplementationOnce(
+          () => coldStore.read(),
         );
         vi.mocked(database.getDefaultDb).mockRejectedValue(
           Error('SQL must stay asleep'),

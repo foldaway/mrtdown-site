@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { getResponseHeaders } from '@tanstack/react-start/server';
 import { createPublicMarkdownResponse } from '~/util/agentMarkdown';
 import { getStationMarkdown } from '~/util/agentMarkdownContent';
 import { getStationProfileFn } from '~/util/station.functions';
@@ -15,6 +16,7 @@ export const Route = createFileRoute('/stations/$stationId/index.md')({
           getStationMarkdown(profile, {
             rootUrl: import.meta.env.VITE_ROOT_URL,
           }),
+          { headers: [...getResponseHeaders()] },
         );
       },
     },
