@@ -9,6 +9,10 @@ import {
   PAGE_COMMUNITY_SIGNAL_POLICY,
   type PublicCrowdReportSignal,
 } from './crowdReports';
+import {
+  invalidateCrowdReportSources,
+  tryRepairCrowdReportSources,
+} from './crowdReportSourceCache.server';
 import type { AppDb, AppDbTransaction } from './dbQueries/database';
 import { getPageProfileRedis } from './pageProfileRedis.server';
 
@@ -45,7 +49,7 @@ export function getCommunitySignalCacheKey() {
   return `mrtdown:${tier}:community-signals:v1`;
 }
 
-async function lockCommunitySignalPublication(tx: AppDbTransaction) {
+export async function lockCommunitySignalPublication(tx: AppDbTransaction) {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended('community-signal-publication', 0::bigint))`,
   );
@@ -62,7 +66,7 @@ export async function withCommunitySignalPublication<T>(
     return await db.transaction(async (tx) => {
       const result = await write(tx);
       if (publish && hasDisplayChanges(result)) {
-        await lockCommunitySignalPublication(tx);
+        await invalidateCrowdReportSources(tx);
         // A unique dirty value fences even a delayed invalidation of an already
         // dirty key. Failure here rolls back before accepting a display change.
         const redis = await getPageProfileRedis();
@@ -76,7 +80,10 @@ export async function withCommunitySignalPublication<T>(
   } finally {
     // Repair committed writes and rolled-back attempts alike. A committed write
     // stays accepted if publication fails; unknown data continues to use SQL.
-    if (publish) await tryRepairCommunitySignalCache(db);
+    if (publish) {
+      await tryRepairCommunitySignalCache(db);
+      await tryRepairCrowdReportSources(db);
+    }
   }
 }
 

@@ -431,6 +431,32 @@ purge its public data tag using the existing procedure. Verify cold/warm home
 reads and initialized-empty results without SQL. This command does not deploy,
 change schedules or purge the edge automatically.
 
+## Public community report details
+
+Report and cluster detail loaders use a separate bounded Redis snapshot of the
+existing public projection, including historical sources and authoritative
+missing IDs. The SQL reader and publisher share visibility and redaction rules.
+Reads recheck publication before returning a source or a 404.
+
+The community write fence invalidates details before commit and refreshes them
+after submissions, moderation, duplicates, dispatch and fixture cleanup.
+Dispatch failures refresh an individual report's public update time. Canonical
+line/station writers invalidate reference edits and cascading removals; pull
+completion/recovery attempts best-effort repair so detail-cache overflow cannot
+block canonical publication. Superseded payloads expire after 24 hours; an active
+payload stays persistent.
+
+Publication allows 10,000 sources, 100,000 member or scope rows per query,
+24 MiB decoded JSON and 4 MiB encoded Redis data. Overflow fails publication
+without truncation. Missing, dirty, corrupt or unavailable state uses SQL;
+reads do not refill Redis. Write failure and replay repair follow the
+[community publication contract](#public-community-disruption-signals).
+
+The existing community repair command initializes both signals and details,
+including empty results. Run it after upgrading all writers, or after eviction,
+Redis restore, out-of-band edits or writes made without Redis. Deployment and
+production verification remain separate.
+
 ## Recent arrival reports
 
 Accepted SQL submissions invalidate and refresh Redis. Non-platform report hits,

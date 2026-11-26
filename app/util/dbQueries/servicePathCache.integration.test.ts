@@ -7,6 +7,13 @@ import {
   reportReferenceSnapshotStore,
 } from '~/util/reportReferenceSnapshot.server';
 import { parseReportReferenceInputs } from './reportReferenceInputs';
+import * as dbConnection from '~/db';
+import { getCrowdReportSourceFn } from '~/util/crowdReportSource.functions';
+import { getCrowdReportSource } from '~/util/crowdReportSource.server';
+import {
+  crowdReportSourceStore,
+  repairCrowdReportSources,
+} from '~/util/crowdReportSourceCache.server';
 import { nonPublicEvidenceRedactedText } from '@mrtdown/fs';
 import { getTownProfileFn, getTownsFn } from '~/util/town.functions';
 import { getTownProfileReadModel } from './towns';
@@ -62,6 +69,8 @@ import * as signalCache from '~/util/communitySignalCache.server';
 import {
   dispatchPendingCrowdReports,
   getDispatchableCrowdReportCandidates,
+  markCrowdReportDispatchFailure,
+  markCrowdReportDispatchSuccess,
 } from '~/util/crowdReportDispatch';
 import {
   automoderateCrowdReport,
@@ -153,6 +162,7 @@ const redis = vi.hoisted(() => ({
   expire: vi.fn(),
   eval: vi.fn(),
   del: vi.fn(),
+  duplicate: vi.fn(),
 }));
 vi.mock('~/util/pageProfileRedis.server', () => ({
   getPageProfileRedis: vi.fn(async () => redis),
@@ -252,6 +262,30 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         return 'OK';
       },
     );
+    redis.duplicate.mockImplementation(() => {
+      const writes: (() => Promise<unknown>)[] = [];
+      const transaction = {
+        expire(key: string, seconds: number) {
+          writes.push(() => redis.expire(key, seconds));
+          return transaction;
+        },
+        set(key: string, raw: string) {
+          writes.push(() => redis.set(key, raw));
+          return transaction;
+        },
+        async exec() {
+          const results = [];
+          for (const write of writes) results.push([null, await write()]);
+          return results;
+        },
+      };
+      return {
+        connect: async () => {},
+        watch: async () => {},
+        multi: () => transaction,
+        disconnect: () => {},
+      };
+    });
     redis.expire.mockResolvedValue(1);
     redis.del.mockImplementation(async (key: string) =>
       Number(store.delete(key)),
@@ -343,6 +377,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     await completePageProfileGeneration(db, generation);
     queries.length = 0;
     headers.mockClear();
+    redis.set.mockClear();
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -2608,7 +2643,7 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           liveRedis,
         );
         await pool.query(
-          'TRUNCATE crowd_reports, crowd_report_clusters CASCADE',
+          'TRUNCATE crowd_reports, crowd_report_clusters, crowd_report_rate_limits CASCADE',
         );
         await publishRangeSnapshot('a'.repeat(64));
       });
@@ -2709,6 +2744,441 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           (await dispatchPendingCrowdReports(db, options, fetcher)).dispatched,
         ).toBe(1);
         expect(await signalCache.canSkipCrowdReportDispatch()).toBe(true);
+      });
+
+      const detail = (kind: 'cluster' | 'report', sourceId: string) =>
+        getCrowdReportSourceFn({ data: { kind, sourceId } } as never);
+      const sourceHeadKey = () =>
+        `${getSnapshotKeyPrefix('community-report-sources')}:active`;
+      const insertStandalone = (id = 'standalone') =>
+        signalCache.withCommunitySignalPublication(db, async (tx) => {
+          await tx.execute(sql`insert into crowd_reports
+            (id,observed_at,text,status,effect,direction_text,delay_minutes,still_happening,producer,source_url,dispatch_error)
+            values (${id},${now.toISO()},'private report text','accepted',null,'towards:station-3',null,null,'trusted','private-reporter','private-error')`);
+          await tx.execute(
+            sql`insert into crowd_report_lines (report_id,line_id) values (${id},'line')`,
+          );
+          await tx.execute(
+            sql`insert into crowd_report_stations (report_id,station_id) values (${id},'station-1')`,
+          );
+        });
+
+      it('serves full detail loaders cold/warm for both kinds and authoritative misses without SQL', async () => {
+        await repairCrowdReportSources(db);
+        const sqlAccess = vi
+          .spyOn(dbConnection, 'getDb')
+          .mockImplementation(() => {
+            throw Error('Empty detail state must use Redis');
+          });
+        await expect(detail('report', 'unknown')).rejects.toMatchObject({
+          status: 404,
+        });
+        const report = await persistAutomoderatedCrowdReport(
+          db,
+          submission(),
+          abuse('one'),
+          { now },
+        );
+        await insertStandalone();
+        const clusterId = (
+          await pool.query('select cluster_id from crowd_reports where id=$1', [
+            report.id,
+          ])
+        ).rows[0].cluster_id;
+        // The detail policy intentionally includes pending clusters and historical sources.
+        const requests = [
+          { kind: 'cluster' as const, sourceId: clusterId },
+          { kind: 'report' as const, sourceId: 'standalone' },
+        ];
+        const expected = await Promise.all(
+          requests.map((input) => getCrowdReportSource(db, input)),
+        );
+        expect(expected[0]).toMatchObject({
+          status: 'pending',
+          reportCount: 1,
+        });
+        expect(expected[1]).toMatchObject({
+          effect: null,
+          delayMinutes: null,
+          stillHappening: null,
+          directionStation: { id: 'station-3' },
+          stations: [{ id: 'station-1' }],
+        });
+        sqlAccess.mockImplementation(() => {
+          throw Error('Detail SQL must stay asleep');
+        });
+        queries.length = 0;
+        for (let read = 0; read < 2; read++) {
+          for (const [index, input] of requests.entries())
+            expect(await detail(input.kind, input.sourceId)).toEqual(
+              expected[index],
+            );
+          await expect(detail('report', 'unknown')).rejects.toMatchObject({
+            status: 404,
+          });
+          await expect(detail('report', report.id)).rejects.toMatchObject({
+            status: 404,
+          });
+        }
+        vi.resetModules();
+        const coldRedis = await import('~/util/pageProfileRedis.server');
+        vi.spyOn(coldRedis, 'getPageProfileRedis').mockResolvedValue(liveRedis);
+        const coldDb = await import('~/db');
+        vi.spyOn(coldDb, 'getDb').mockImplementation(() => {
+          throw Error('Cold detail SQL must stay asleep');
+        });
+        const cold = await import('~/util/crowdReportSource.functions');
+        for (const [index, input] of requests.entries())
+          expect(
+            await cold.getCrowdReportSourceFn({ data: input } as never),
+          ).toEqual(expected[index]);
+        expect(queries).toEqual([]);
+        const published = await crowdReportSourceStore.read({
+          verifyPayload: true,
+        });
+        expect(JSON.stringify(published?.inputs)).not.toContain('private');
+        expect(JSON.stringify(published?.inputs)).not.toContain('producer');
+        expect(JSON.stringify(published?.inputs)).not.toContain('sourceId');
+      });
+
+      it('refreshes duplicate membership, moderation, dispatch and corrected scope/reference data', async () => {
+        vi.spyOn(dbConnection, 'getDb').mockReturnValue(db);
+        const first = await persistAutomoderatedCrowdReport(
+          db,
+          submission(),
+          abuse('one'),
+          { now },
+        );
+        const clusterId = (
+          await pool.query('select cluster_id from crowd_reports where id=$1', [
+            first.id,
+          ])
+        ).rows[0].cluster_id;
+        const second = await persistAutomoderatedCrowdReport(
+          db,
+          submission('station-2'),
+          abuse('two'),
+          { now },
+        );
+        expect(await detail('cluster', clusterId)).toMatchObject({
+          status: 'pending',
+          reportCount: 2,
+          stations: [{ id: 'station-1' }, { id: 'station-2' }],
+        });
+        await automoderateCrowdReport(
+          db,
+          second.id,
+          {
+            ...submission(),
+            observedAt: now.minus({ hours: 7 }).toISO() ?? '',
+            isStillHappening: false,
+          },
+          { now },
+        );
+        expect(await detail('cluster', clusterId)).toEqual(
+          await getCrowdReportSource(db, {
+            kind: 'cluster',
+            sourceId: clusterId,
+          }),
+        );
+        expect(await detail('cluster', clusterId)).toMatchObject({
+          reportCount: 1,
+        });
+        await insertStandalone();
+        const candidate = {
+          kind: 'report' as const,
+          id: 'standalone',
+          reportIds: ['standalone'],
+          payload: {} as never,
+        };
+        const before = await detail('report', 'standalone');
+        await markCrowdReportDispatchFailure(
+          db,
+          candidate,
+          Error('private failure'),
+        );
+        const failed = await detail('report', 'standalone');
+        expect(failed).toEqual(
+          await getCrowdReportSource(db, {
+            kind: 'report',
+            sourceId: 'standalone',
+          }),
+        );
+        expect(failed.updatedAt).not.toBe(before.updatedAt);
+        await markCrowdReportDispatchSuccess(db, candidate, now.toISO() ?? '');
+        expect(await detail('report', 'standalone')).toMatchObject({
+          status: 'dispatched',
+          dispatchedAt: expect.any(String),
+        });
+        await signalCache.withCommunitySignalPublication(db, async (tx) => {
+          await tx.execute(
+            sql`delete from crowd_report_stations where report_id='standalone'`,
+          );
+          await tx.execute(
+            sql`insert into crowd_report_stations (report_id,station_id) values ('standalone','station-2')`,
+          );
+        });
+        expect(await detail('report', 'standalone')).toMatchObject({
+          stations: [{ id: 'station-2' }],
+        });
+        // Use the actual canonical reference writers, including their invalidation.
+        const references = scheduledTimetableCanonicalFixture(3).canonical;
+        await sync.insertLinesStaging(db, [
+          {
+            ...references.lines[0],
+            hash: 'corrected',
+            color: '#123456',
+            name: { ...references.lines[0].name, 'en-SG': 'Corrected line' },
+          },
+        ]);
+        await sync.insertStationsStaging(db, [
+          {
+            ...references.stations[2],
+            hash: 'corrected',
+            name: {
+              ...references.stations[2].name,
+              'en-SG': 'Corrected destination',
+            },
+          },
+        ]);
+        await sync.syncStations(db);
+        await sync.syncLines(db);
+        await sync.truncateStagingTables(db);
+        expect(await crowdReportSourceStore.read()).toBeNull();
+        const corrected = await detail('report', 'standalone');
+        expect(corrected.directionStation?.name['en-SG']).toBe(
+          'Corrected destination',
+        );
+        expect(corrected.lines[0]).toMatchObject({
+          color: '#123456',
+          name: { 'en-SG': 'Corrected line' },
+        });
+        await repairCrowdReportSources(db);
+        vi.mocked(dbConnection.getDb).mockImplementation(() => {
+          throw Error('Corrected reads must use Redis');
+        });
+        expect(await detail('report', 'standalone')).toEqual(corrected);
+        await signalCache.withCommunitySignalPublication(db, (tx) =>
+          tx.execute(sql`delete from crowd_reports where id='standalone'`),
+        );
+        await expect(detail('report', 'standalone')).rejects.toMatchObject({
+          status: 404,
+        });
+      });
+
+      it('falls back for missing/invalid/dirty state, preserves accepted writes and repairs on replay', async () => {
+        vi.spyOn(dbConnection, 'getDb').mockReturnValue(db);
+        await insertStandalone();
+        const expected = await detail('report', 'standalone');
+        for (const raw of ['', '{}', '{broken', '{"pending":"writer"}']) {
+          if (raw) await liveRedis.set(sourceHeadKey(), raw);
+          else await liveRedis.del(sourceHeadKey());
+          expect(await detail('report', 'standalone')).toEqual(expected);
+          expect(await liveRedis.get(sourceHeadKey())).toBe(raw || null);
+        }
+        await repairCrowdReportSources(db);
+        const current = await crowdReportSourceStore.head();
+        const payloadKey = `${getSnapshotKeyPrefix('community-report-sources')}:payload:${current.value?.sha256}`;
+        await liveRedis.set(payloadKey, 'corrupt');
+        const coldStore = createPublishedSnapshotStore(
+          async () => liveRedis,
+          'community-report-sources',
+          () => {
+            throw Error('Corrupt payload must not parse');
+          },
+        );
+        expect(await coldStore.read()).toBeNull();
+        await repairCrowdReportSources(db, { onlyIfMissing: true });
+        const unavailable = vi
+          .spyOn(liveRedis, 'getrangeBuffer')
+          .mockRejectedValueOnce(Error('Redis unavailable'));
+        expect(await detail('report', 'standalone')).toEqual(expected);
+        unavailable.mockRestore();
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const publish = vi
+          .spyOn(crowdReportSourceStore, 'publish')
+          .mockRejectedValueOnce(Error('Publication unavailable'));
+        const delivery = {
+          producer: 'trusted',
+          externalReportId: 'repair-source',
+          requestPayloadDigest: 'digest',
+        };
+        const accepted = await persistAutomoderatedProgrammaticCrowdReport(
+          db,
+          { ...submission(), directionText: 'towards:station-2' },
+          delivery,
+          { now },
+        );
+        expect(accepted.created).toBe(true);
+        expect(await crowdReportSourceStore.read()).toBeNull();
+        publish.mockRestore();
+        expect(
+          await findProgrammaticCrowdReportRetry(db, delivery),
+        ).toMatchObject({ id: accepted.id, created: false });
+        expect(await crowdReportSourceStore.read()).not.toBeNull();
+        const invalidation = vi
+          .spyOn(liveRedis, 'set')
+          .mockRejectedValueOnce(Error('Invalidation unavailable'));
+        await expect(
+          signalCache.withCommunitySignalPublication(db, (tx) =>
+            tx.execute(sql`delete from crowd_reports where id='standalone'`),
+          ),
+        ).rejects.toThrow('Invalidation unavailable');
+        invalidation.mockRestore();
+        expect(await detail('report', 'standalone')).toEqual(expected);
+        await liveRedis.del(sourceHeadKey());
+        vi.mocked(dbConnection.getDb).mockImplementation(() => {
+          throw Error('SQL unavailable');
+        });
+        await expect(detail('report', 'standalone')).rejects.toThrow(
+          'SQL unavailable',
+        );
+        log.mockRestore();
+      });
+
+      it('retires invalidated payloads across failed repairs and keeps republished content persistent', async () => {
+        vi.spyOn(dbConnection, 'getDb').mockReturnValue(db);
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        await insertStandalone();
+        const prefix = getSnapshotKeyPrefix('community-report-sources');
+        const first = await crowdReportSourceStore.head();
+        const firstKey = `${prefix}:payload:${first.value?.sha256}`;
+        await repairCrowdReportSources(db);
+        expect(await liveRedis.ttl(firstKey)).toBe(-1);
+        const delayed = liveRedis.duplicate();
+        const duplicate = vi
+          .spyOn(liveRedis, 'duplicate')
+          .mockReturnValueOnce(delayed);
+        const watch = delayed.watch.bind(delayed);
+        vi.spyOn(delayed, 'watch').mockImplementationOnce(async (key) => {
+          const result = await watch(key);
+          const newer = await crowdReportSourceStore.read();
+          if (!newer) throw Error('Missing newer publication');
+          await crowdReportSourceStore.publish(
+            newer.raw,
+            newer.inputs,
+            'newer',
+            newer.value.fingerprint,
+          );
+          return result;
+        });
+        await expect(repairCrowdReportSources(db)).rejects.toThrow(
+          'superseded',
+        );
+        duplicate.mockRestore();
+        expect(await crowdReportSourceStore.read()).not.toBeNull();
+        expect(await liveRedis.ttl(firstKey)).toBe(-1);
+        const invalidation = vi
+          .spyOn(liveRedis, 'duplicate')
+          .mockImplementationOnce(() => {
+            throw Error('Retirement unavailable');
+          });
+        await expect(
+          signalCache.withCommunitySignalPublication(db, (tx) =>
+            tx.execute(sql`delete from crowd_reports where id='standalone'`),
+          ),
+        ).rejects.toThrow('Retirement unavailable');
+        invalidation.mockRestore();
+        expect(await detail('report', 'standalone')).toMatchObject({
+          id: 'standalone',
+        });
+        const publication = vi
+          .spyOn(crowdReportSourceStore, 'publish')
+          .mockRejectedValueOnce(Error('Repair unavailable'));
+        await signalCache.withCommunitySignalPublication(db, (tx) =>
+          tx.execute(
+            sql`update crowd_reports set status='rejected' where id='standalone'`,
+          ),
+        );
+        publication.mockRestore();
+        expect(await crowdReportSourceStore.read()).toBeNull();
+        expect(await liveRedis.ttl(firstKey)).toBeGreaterThan(0);
+        await repairCrowdReportSources(db);
+        await signalCache.withCommunitySignalPublication(db, (tx) =>
+          tx.execute(
+            sql`update crowd_reports set status='accepted' where id='standalone'`,
+          ),
+        );
+        // Returning to identical content removes the old retention deadline.
+        expect((await crowdReportSourceStore.head()).value?.sha256).toBe(
+          first.value?.sha256,
+        );
+        for (const key of await liveRedis.keys(`${prefix}:payload:*`)) {
+          const ttl = await liveRedis.ttl(key);
+          if (key === firstKey) expect(ttl).toBe(-1);
+          else {
+            expect(ttl).toBeGreaterThan(0);
+            expect(ttl).toBeLessThanOrEqual(86400);
+          }
+        }
+      });
+
+      it('leaves an oversized source index unavailable rather than publishing truncated misses', async () => {
+        vi.spyOn(dbConnection, 'getDb').mockReturnValue(db);
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        await signalCache.withCommunitySignalPublication(db, async (tx) => {
+          await tx.execute(sql`insert into crowd_reports (id,observed_at,text,status)
+            select 'overflow-' || n,${now.toISO()}::timestamptz,'private','accepted' from generate_series(1,10001) n`);
+          await tx.execute(sql`insert into crowd_report_lines (report_id,line_id)
+            select id,'line' from crowd_reports`);
+        });
+        expect(await crowdReportSourceStore.read()).toBeNull();
+        await expect(repairCrowdReportSources(db)).rejects.toThrow(
+          'Too many public report sources',
+        );
+        expect(await detail('report', 'overflow-10001')).toMatchObject({
+          id: 'overflow-10001',
+        });
+      });
+
+      it('rechecks positive and negative reads across writer publication and fences a delayed repair', async () => {
+        await insertStandalone();
+        vi.spyOn(dbConnection, 'getDb').mockImplementation(() => {
+          throw Error('Racing reads must use the current publication');
+        });
+        const head = crowdReportSourceStore.head.bind(crowdReportSourceStore);
+        vi.spyOn(crowdReportSourceStore, 'head').mockImplementationOnce(
+          async () => {
+            await signalCache.withCommunitySignalPublication(db, (tx) =>
+              tx.execute(
+                sql`update crowd_reports set status='rejected' where id='standalone'`,
+              ),
+            );
+            return head();
+          },
+        );
+        await expect(detail('report', 'standalone')).rejects.toMatchObject({
+          status: 404,
+        });
+        vi.mocked(crowdReportSourceStore.head).mockImplementationOnce(
+          async () => {
+            await insertStandalone('new-id');
+            return head();
+          },
+        );
+        expect(await detail('report', 'new-id')).toMatchObject({
+          id: 'new-id',
+        });
+        const publish = crowdReportSourceStore.publish.bind(
+          crowdReportSourceStore,
+        );
+        vi.spyOn(crowdReportSourceStore, 'publish').mockImplementationOnce(
+          async (...args) => {
+            await liveRedis.set(
+              sourceHeadKey(),
+              '{"pending":"delayed-writer"}',
+            );
+            return publish(...args);
+          },
+        );
+        await expect(repairCrowdReportSources(db)).rejects.toThrow(
+          'superseded',
+        );
+        expect(await crowdReportSourceStore.read()).toBeNull();
+        await repairCrowdReportSources(db);
+        expect(await detail('report', 'new-id')).toMatchObject({
+          id: 'new-id',
+        });
       });
 
       it('serves the whole homepage cold/warm and initialized-empty with SQL disabled, then expires by request clock', async () => {
@@ -2927,8 +3397,10 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           externalReportId: 'external',
           requestPayloadDigest: 'digest',
         };
+        const duplicate = liveRedis.duplicate.bind(liveRedis);
         const connect = vi
           .spyOn(liveRedis, 'duplicate')
+          .mockImplementationOnce(() => duplicate())
           .mockImplementationOnce(() => {
             throw Error('publication unavailable');
           });

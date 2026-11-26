@@ -27,6 +27,7 @@ export type SnapshotRedis = Pick<
   'getrange' | 'getrangeBuffer' | 'set' | 'eval' | 'del'
 >;
 export type SnapshotNamespace =
+  | 'community-report-sources'
   | 'issue-profiles'
   | 'station-profiles'
   | 'range-snapshot'

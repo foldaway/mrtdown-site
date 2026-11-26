@@ -568,7 +568,9 @@ export async function markCrowdReportDispatchFailure(
   error: unknown,
 ) {
   const message = error instanceof Error ? error.message : String(error);
-  await markCrowdReportDispatchFailureInTransaction(db, candidate, message);
+  await withCommunitySignalPublication(db, (tx) =>
+    markCrowdReportDispatchFailureInTransaction(tx, candidate, message),
+  );
 }
 
 async function markCrowdReportDispatchSuccessInTransaction(

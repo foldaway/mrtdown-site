@@ -30,6 +30,7 @@ import { relations } from '~/db/relations';
 import { ZipStore } from '~/helpers/ZipStore';
 import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
 import { publishArrivalInputSnapshot } from '~/util/arrivalInputSnapshot.server';
+import { tryRepairCrowdReportSources } from '~/util/crowdReportSourceCache.server';
 import { purgePublicDataCache } from '~/util/cloudflareCache';
 import {
   parseArrivalInputs,
@@ -116,6 +117,10 @@ vi.mock('./helpers/publishArrivalDepartures', () => ({
 vi.mock('~/util/reportReferenceSnapshot.server', () => ({
   publishReportReferenceSnapshot: vi.fn(async () => {}),
   reportReferenceSnapshotStore: { read: vi.fn(async () => null) },
+}));
+vi.mock('~/util/crowdReportSourceCache.server', () => ({
+  tryRepairCrowdReportSources: vi.fn(async () => {}),
+  invalidateCrowdReportSources: vi.fn(async () => {}),
 }));
 vi.mock('~/util/issueProfileSnapshot.server', () => ({
   publishIssueProfileSnapshot: vi.fn(async () => {}),
@@ -688,6 +693,46 @@ describe('published zero-SQL range inputs', () => {
     expect(purgePublicDataCache).toHaveBeenCalled();
     expect(fetchArchive).not.toHaveBeenCalled();
   });
+
+  it.each([false, true])(
+    'completes canonical publication despite detail repair overflow (unchanged: %s)',
+    async (unchanged) => {
+      vi.stubEnv('REDIS_URL', 'redis://unused');
+      const fingerprint = getCanonicalManifestFingerprint(manifest);
+      if (unchanged) state.fingerprint = fingerprint;
+      // Exercise the real best-effort wrapper; the separate Redis/SQL scenario
+      // verifies that actual overflow keeps detail state dirty and falls back.
+      const actual = await vi.importActual<
+        typeof import('~/util/crowdReportSourceCache.server')
+      >('~/util/crowdReportSourceCache.server');
+      vi.mocked(tryRepairCrowdReportSources).mockImplementationOnce(
+        actual.tryRepairCrowdReportSources,
+      );
+      vi.mocked(getDb).mockReturnValue({
+        transaction: vi
+          .fn()
+          .mockRejectedValue(Error('Too many public report sources')),
+      } as never);
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        await workflow().run();
+        expect(tryRepairCrowdReportSources).toHaveBeenCalledOnce();
+        expect(log).toHaveBeenCalledWith(
+          'Community report source publication failed',
+          expect.anything(),
+        );
+        expect(publishReportReferenceSnapshot).toHaveBeenCalledWith(
+          fingerprint,
+        );
+        expect(publishArrivalDepartures).toHaveBeenCalledOnce();
+        expect(rangeSnapshotStore.complete).toHaveBeenCalledWith(fingerprint);
+        if (!unchanged)
+          expect(recordCanonicalManifestFingerprint).toHaveBeenCalled();
+      } finally {
+        log.mockRestore();
+      }
+    },
+  );
 
   it('publishes changed inputs before purge and checkpoints after the SQL fingerprint', async () => {
     vi.stubEnv('REDIS_URL', 'redis://unused');

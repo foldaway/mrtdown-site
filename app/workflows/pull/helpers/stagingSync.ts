@@ -80,6 +80,7 @@ import {
   withDbDiagnostics as withSharedDbDiagnostics,
 } from '../../../util/dbDiagnostics.js';
 import { readLiveScheduleTopology } from '../../../util/dbQueries/readLiveScheduleTopology.js';
+import { invalidateCrowdReportSources } from '../../../util/crowdReportSourceCache.server';
 import { MANIFEST_FINGERPRINT_METADATA_KEY } from './manifestFingerprint.js';
 
 /** Max rows per `insert().values()` batch to stay within driver/param limits. */
@@ -660,6 +661,7 @@ export async function syncLines(db: Db): Promise<void> {
         }
       }
     }
+    await invalidateCrowdReportSources(tx);
   });
 }
 
@@ -725,6 +727,7 @@ export async function deleteLineOrphans(db: Db): Promise<void> {
             .where(eq(linesNextTable.id, linesTable.id)),
         ),
       );
+    await invalidateCrowdReportSources(tx);
   });
 }
 
@@ -875,6 +878,7 @@ export async function syncStations(db: Db): Promise<void> {
         }
       }
     }
+    await invalidateCrowdReportSources(tx);
   });
 }
 
@@ -974,6 +978,7 @@ export async function deleteStationOrphans(db: Db): Promise<void> {
             .where(eq(stationsNextTable.id, stationsTable.id)),
         ),
       );
+    await invalidateCrowdReportSources(tx);
   });
 }
 
