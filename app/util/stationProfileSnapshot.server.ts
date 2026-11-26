@@ -1,7 +1,9 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import {
   landmarksTable,
+  issueDayFactsTable,
+  stationIssueFactsTable,
   lineDayFactsTable,
   operatorsTable,
   stationExitsTable,
@@ -44,6 +46,8 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
         stationExitRows,
         operatorsRows,
         lineUptimeFacts,
+        activeIssueDays,
+        latestStationDisruptions,
       ] = await Promise.all([
         readDatasetInputs(tx, undefined, undefined, {
           references,
@@ -122,6 +126,26 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
           })
           .from(lineDayFactsTable)
           .orderBy(asc(lineDayFactsTable.date), asc(lineDayFactsTable.line_id)),
+        tx
+          .select({
+            date: issueDayFactsTable.date,
+            issue_id: issueDayFactsTable.issue_id,
+          })
+          .from(issueDayFactsTable)
+          .where(eq(issueDayFactsTable.active_anytime, true)),
+        tx
+          .selectDistinctOn([stationIssueFactsTable.station_id], {
+            stationId: stationIssueFactsTable.station_id,
+            issueId: stationIssueFactsTable.issue_id,
+            latestActivityAt: stationIssueFactsTable.latest_activity_at,
+          })
+          .from(stationIssueFactsTable)
+          .where(eq(stationIssueFactsTable.issue_type, 'disruption'))
+          .orderBy(
+            asc(stationIssueFactsTable.station_id),
+            desc(stationIssueFactsTable.latest_activity_at),
+            desc(stationIssueFactsTable.issue_id),
+          ),
       ]);
       return {
         generation,
@@ -134,6 +158,8 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
             landmarksRows,
           },
           lineUptimeFacts,
+          activeIssueDays,
+          latestStationDisruptions,
           platforms: stationPlatformRows,
           exits: stationExitRows,
         },

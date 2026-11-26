@@ -1,5 +1,6 @@
 import { nonPublicEvidenceRedactedText } from '@mrtdown/fs';
-import { getLineProfileFn } from '~/util/lines.functions';
+import { getStationsDirectoryFn } from '~/util/station.functions';
+import { getLinesDirectoryFn, getLineProfileFn } from '~/util/lines.functions';
 import { getLineProfileReadModel } from './lines';
 import { getIssueFn } from '~/util/issue.functions';
 import {
@@ -117,7 +118,10 @@ import {
   rebuildSitemapSnapshot,
 } from './sitemap';
 import { parseStationProfileSnapshotInputs } from './stationProfileSnapshotInputs';
-import { getStationProfileReadModel } from './stations';
+import {
+  getStationsDirectoryData,
+  getStationProfileReadModel,
+} from './stations';
 import {
   getStatisticsData,
   publishStatisticsSnapshot,
@@ -854,6 +858,117 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         const keys = await stationRedis.keys(`mrtdown:*${process.env.TIER}*`);
         if (keys.length) await stationRedis.del(...keys);
         await stationRedis.quit();
+      });
+
+      it('matches full station and line directories cold/warm across membership, incident and persisted-fact date boundaries without SQL', async () => {
+        await pool.query(
+          "insert into lines (id,name,type,color,started_at,operating_hours,hash) select 'unknown',name,type,color,null,null,hash from lines limit 1",
+        );
+        await pool.query(
+          "insert into station_codes (line_id,station_id,code,started_at,ended_at,structure_type) values ('unknown','station-1','U1','2026-11-19',null,'elevated')",
+        );
+        await pool.query(
+          "update station_codes set started_at='2026-11-19' where station_id='station-2'",
+        );
+        await pool.query(
+          "update station_codes set ended_at='2026-11-19' where station_id='station-3'",
+        );
+        await pool.query('update impact_event_periods set end_ts=null');
+        await rebuildOperationalFactsRange(2);
+        const clocks = [
+          now.set({ hour: 9 }),
+          now.set({ hour: 10, minute: 15 }),
+          now.plus({ days: 1 }).startOf('day'),
+          now.plus({ days: 100 }),
+        ];
+        vi.stubEnv('REDIS_URL', '');
+        const expected = [];
+        for (const clock of clocks) {
+          vi.setSystemTime(clock.toJSDate());
+          expected.push({
+            stations: await getStationsDirectoryFn(),
+            lines: await getLinesDirectoryFn(),
+          });
+        }
+        expect(
+          expected[0].stations.stations.find((row) => row.id === 'station-2')
+            ?.operationalState,
+        ).toBe('future');
+        expect(
+          expected[1].stations.stations.find((row) => row.id === 'station-1')
+            ?.status,
+        ).toBe('ongoing_disruption');
+        expect(
+          expected[2].stations.stations.find((row) => row.id === 'station-3')
+            ?.operationalState,
+        ).toBe('closed');
+        expect(
+          expected[2].stations.stations.find((row) => row.id === 'station-1')
+            ?.status,
+        ).toBe('normal');
+        expect(
+          expected[3].lines.data.lines.every((row) => row.uptimeRatio == null),
+        ).toBe(true);
+        expect(
+          expected[1].stations.stations[0].latestDisruption,
+        ).not.toBeNull();
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        const cold = createPublishedSnapshotStore(
+          async () => stationRedis,
+          'station-profiles',
+          parseStationProfileSnapshotInputs,
+        );
+        vi.spyOn(stationProfileSnapshotStore, 'read').mockImplementation(
+          cold.read,
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        queries.length = 0;
+        for (const [index, clock] of clocks.entries()) {
+          vi.setSystemTime(clock.toJSDate());
+          for (let pass = 0; pass < 2; pass++) {
+            expect(await getStationsDirectoryFn()).toEqual(
+              expected[index].stations,
+            );
+            expect(await getLinesDirectoryFn()).toEqual(expected[index].lines);
+          }
+        }
+        expect(queries).toEqual([]);
+      });
+
+      it('recovers missing directory inputs uncached, then publishes empty facts and corrected latest disruptions', async () => {
+        await rebuildOperationalFactsRange(1);
+        vi.stubEnv('REDIS_URL', '');
+        const before = await getStationsDirectoryData();
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        headers.mockClear();
+        expect(await getStationsDirectoryFn()).toEqual(before);
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        headers.mockClear();
+        await getLinesDirectoryFn();
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        await pool.query('delete from station_issue_facts');
+        await pool.query('delete from issue_day_facts');
+        await pool.query('delete from line_day_facts cascade');
+        expect(await getStationsDirectoryFn()).toEqual(before);
+        vi.stubEnv('REDIS_URL', '');
+        const after = {
+          stations: await getStationsDirectoryFn(),
+          lines: await getLinesDirectoryFn(),
+        };
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        expect(await getStationsDirectoryFn()).toEqual(after.stations);
+        expect(await getLinesDirectoryFn()).toEqual(after.lines);
+        expect(
+          after.stations.stations.every((row) => row.latestDisruption == null),
+        ).toBe(true);
       });
 
       it('matches complete line loaders cold/warm across issue, service, holiday and rolling-fact boundaries without SQL', async () => {

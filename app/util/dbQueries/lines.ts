@@ -21,6 +21,7 @@ import {
 } from './communitySignals';
 import { getDefaultDb, timeDbQuery } from './database';
 import { assembleDataset, buildDataset } from './dataset';
+import { assembleDirectorySnapshot } from './directorySnapshotInputs';
 import { selectLineProfileSnapshot } from './lineProfileSnapshotInputs';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
@@ -215,8 +216,7 @@ async function getLineCandidateIssueIds(
   ];
 }
 
-export async function getLinesDirectoryData(days: number) {
-  const referenceNow = nowSg();
+async function loadSqlLinesDirectory(days: number, referenceNow: DateTime) {
   const referenceDate = isoDate(referenceNow);
   const startDate = isoDate(
     referenceNow.startOf('day').minus({ days: days - 1 }),
@@ -259,6 +259,37 @@ export async function getLinesDirectoryData(days: number) {
     db,
     activeIssueRows.map((row) => row.issueId),
   );
+  return { dataset, uptimeFactRows };
+}
+
+export async function getLinesDirectoryData(days: number) {
+  const referenceNow = nowSg();
+  const referenceDate = isoDate(referenceNow);
+  const snapshot = process.env.REDIS_URL
+    ? await stationProfileSnapshotStore.read()
+    : null;
+  let loaded: Awaited<ReturnType<typeof loadSqlLinesDirectory>>;
+  if (snapshot) {
+    const start = isoDate(
+      referenceNow.startOf('day').minus({ days: days - 1 }),
+    );
+    loaded = {
+      dataset: assembleDirectorySnapshot(snapshot.inputs, referenceNow),
+      uptimeFactRows: snapshot.inputs.lineUptimeFacts.filter(
+        (row) => row.date >= start && row.date <= referenceDate,
+      ),
+    };
+  } else {
+    if (process.env.REDIS_URL) {
+      try {
+        setResponseHeader('Cache-Control', 'no-store');
+      } catch {
+        /* no request context */
+      }
+    }
+    loaded = await loadSqlLinesDirectory(days, referenceNow);
+  }
+  const { dataset, uptimeFactRows } = loaded;
   const lines = Object.values(dataset.included.lines);
   const uptimeByLineId = aggregateLineUptimeFacts(uptimeFactRows);
   const summaries = rankLineSummaries(

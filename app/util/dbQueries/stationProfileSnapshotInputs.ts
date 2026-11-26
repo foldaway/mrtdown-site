@@ -4,6 +4,7 @@ import type { DateTime } from 'luxon';
 import { z } from 'zod';
 import {
   landmarksTable,
+  issueDayFactsTable,
   lineDayFactsTable,
   operatorsTable,
   stationExitsTable,
@@ -26,6 +27,23 @@ const datasetSchema = RangeSnapshotInputsSchema.extend({
 });
 const schema = z.object({
   dataset: datasetSchema,
+  activeIssueDays: z
+    .array(
+      createSelectSchema(issueDayFactsTable).pick({
+        date: true,
+        issue_id: true,
+      }),
+    )
+    .max(100_000),
+  latestStationDisruptions: z
+    .array(
+      z.object({
+        stationId: z.string(),
+        issueId: z.string(),
+        latestActivityAt: z.string(),
+      }),
+    )
+    .max(10_000),
   // Keep dates and all persisted rows: ranking uses a moving request-date
   // window over stored facts, not newly synthesized days or a refill TTL.
   lineUptimeFacts: z
@@ -60,6 +78,8 @@ const schema = z.object({
 });
 export type StationProfileSnapshotInputs = {
   dataset: DatasetInputs;
+  activeIssueDays: z.infer<typeof schema>['activeIssueDays'];
+  latestStationDisruptions: z.infer<typeof schema>['latestStationDisruptions'];
   lineUptimeFacts: z.infer<typeof schema>['lineUptimeFacts'];
   platforms: z.infer<typeof schema>['platforms'];
   exits: z.infer<typeof schema>['exits'];

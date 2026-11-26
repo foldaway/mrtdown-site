@@ -258,7 +258,11 @@ exactly as SQL does. Passing midnight does not synthesize new facts or trigger S
 All persisted dates are published (bounded to 100,000 rows and the shared byte
 limits); an empty fact set retains null/rank semantics. Facts advance only on
 canonical, holiday or authenticated facts rebuilds. Missing line IDs retain
-uncached SQL recovery. This slice does not migrate the line directory.
+uncached SQL recovery. Station and line directories use the same publication, including persisted
+active issue-day candidates and each station's latest disruption projection.
+Requests select those candidates by date and recompute incident state. They do
+not infer missing day facts from an ongoing canonical issue; future memberships,
+closed stations and empty/unknown uptime retain the SQL policy.
 
 A non-string `active` key causes Redis `WRONGTYPE` errors and cannot be repaired
 by publication retries. After investigating the cause, recover as follows:
