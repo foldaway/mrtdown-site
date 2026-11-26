@@ -40,6 +40,28 @@ initializes empty results. See the [runbook](../../operations/edge-caching.md#pu
 Deployment and production verification remain separate; this change does not
 establish whole-site sleep.
 
+### Public profiles and directories follow-up (audit item 2)
+
+1. Station profiles: publish a separate bounded source graph and share the
+   existing HTML/server-function/Markdown loader. Source implementation and
+   local parity checks are complete. `npm run verify` passed 786 tests across
+   101 files with disposable PostGIS/Redis and no skips on November 26. Review
+   and rollout are separate.
+2. Station directory: preserve current/future/closed membership and latest
+   disruption summaries from published inputs.
+3. Line profiles and directory: preserve service directions, loops and issue
+   scope with request-time selection.
+4. Operator profiles and their directory callers.
+5. Town profiles and directory, including station details and related scope.
+
+Local canonical-corpus validation matched BKP and its BP6 alias cold/warm with
+SQL disabled on November 26 and the December 26 service boundary. The corpus had
+233 stations and 765 issues; the station payload was 877,636 encoded bytes
+(limit 4 MiB). These are local source measurements, not production evidence.
+Duplicate exit labels now use the same ID tie-breaker in SQL and publication.
+
+Do not infer completion of this group or whole-site sleep from the station slice.
+
 ## Surprises & Discoveries
 
 Before source snapshots, range hits still selected canonical generation, issues

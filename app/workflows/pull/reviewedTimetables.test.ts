@@ -3,12 +3,11 @@ import { access, mkdtemp, readdir, readFile } from 'node:fs/promises';
 import type { Manifest, ScheduledTimetableSourceReview } from '@mrtdown/core';
 import {
   hashBytes,
-  type ScheduledTimetableRollbackOptions,
   ScheduledTimetableRequestScopeSchema,
+  type ScheduledTimetableRollbackOptions,
 } from '@mrtdown/fs';
 import type { WorkflowContext } from '@upstash/workflow';
 import { drizzle } from 'drizzle-orm/node-postgres';
-
 import { zipSync } from 'fflate';
 import { Pool } from 'pg';
 import {
@@ -25,38 +24,41 @@ import { getDb } from '~/db';
 import { completePageProfileGeneration } from '~/db/pageProfileGeneration';
 import { relations } from '~/db/relations';
 import { ZipStore } from '~/helpers/ZipStore';
-import { purgePublicDataCache } from '~/util/cloudflareCache';
 import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
 import { publishArrivalInputSnapshot } from '~/util/arrivalInputSnapshot.server';
+import { purgePublicDataCache } from '~/util/cloudflareCache';
 import {
   parseArrivalInputs,
   readArrivalInputHistory,
   selectArrivalInputCoverage,
 } from '~/util/dbQueries/arrivalInputs';
-import { readDeparturePartition } from '~/util/dbQueries/readDeparturePartition';
-import { readStationArrivalSource } from '~/util/dbQueries/readStationArrivalSource';
-import { assemblePublishedStationArrivals } from '~/util/publishedStationArrivals.server';
 import { expandDeparturePartition } from '~/util/dbQueries/departurePartition';
-import { readArrivalInputs } from '~/util/dbQueries/readArrivalInputs';
-import { createTimetableSelectionPolicy } from '~/util/dbQueries/scheduledTimetableSelection';
 import {
   COMBINED_DEPARTURE_PROJECTOR_VERSION,
   projectScheduledTimetable,
   SCHEDULED_DEPARTURE_PROJECTOR_VERSION,
 } from '~/util/dbQueries/projectScheduledTimetable';
 import { queryIndexedScheduledDepartures } from '~/util/dbQueries/queryIndexedScheduledDepartures';
+import { readArrivalInputs } from '~/util/dbQueries/readArrivalInputs';
+import { readDeparturePartition } from '~/util/dbQueries/readDeparturePartition';
+import { readStationArrivalSource } from '~/util/dbQueries/readStationArrivalSource';
 import { retainScheduledTimetable } from '~/util/dbQueries/retainScheduledTimetable';
 import { retentionReview } from '~/util/dbQueries/scheduledTimetableRetention.fixture';
+import { createTimetableSelectionPolicy } from '~/util/dbQueries/scheduledTimetableSelection';
+import { publishSitemapSnapshot } from '~/util/dbQueries/sitemap';
 import { getStationProfileReadModel } from '~/util/dbQueries/stations';
 import { withSelectedScheduledTimetable } from '~/util/dbQueries/withSelectedScheduledTimetable';
-import { publishArrivalDepartures } from './helpers/publishArrivalDepartures';
 import { publishNavigationCache } from '~/util/navigationCache.server';
+import { assemblePublishedStationArrivals } from '~/util/publishedStationArrivals.server';
 import { publishRangeReferenceCache } from '~/util/rangeReferenceCache.server';
 import { publishRangeSnapshot } from '~/util/rangeSnapshot.server';
 import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
-import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
-import { publishSitemapSnapshot } from '~/util/dbQueries/sitemap';
 import { publishServicePathCache } from '~/util/servicePathCache.server';
+import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
+import {
+  publishStationProfileSnapshot,
+  stationProfileSnapshotStore,
+} from '~/util/stationProfileSnapshot.server';
 import { combinedTimetableArchiveFixture } from './helpers/combinedTimetableArchive.fixture';
 import { fetchArchive } from './helpers/fetchArchive';
 import { fetchManifest } from './helpers/fetchManifest';
@@ -66,6 +68,7 @@ import {
   MANIFEST_FINGERPRINT_METADATA_KEY,
   recordCanonicalManifestFingerprint,
 } from './helpers/manifestFingerprint';
+import { publishArrivalDepartures } from './helpers/publishArrivalDepartures';
 import type { PullParams } from './helpers/pullParams';
 import { scheduledTimetableArchiveFixture } from './helpers/scheduledTimetableArchive.fixture';
 import { scheduledTimetableCanonicalFixture } from './helpers/scheduledTimetableCanonical.fixture';
@@ -99,6 +102,14 @@ vi.mock('~/util/arrivalDepartureStore.server', async (original) => ({
 }));
 vi.mock('./helpers/publishArrivalDepartures', () => ({
   publishArrivalDepartures: vi.fn(async () => {}),
+}));
+vi.mock('~/util/stationProfileSnapshot.server', () => ({
+  publishStationProfileSnapshot: vi.fn(async () => {}),
+  stationProfileSnapshotStore: {
+    read: vi.fn(async () =>
+      state.arrivalHead ? { value: state.arrivalHead } : null,
+    ),
+  },
 }));
 vi.mock('~/util/rangeSnapshot.server', () => ({
   publishRangeSnapshot: vi.fn(async () => {}),
@@ -401,6 +412,33 @@ describe('published zero-SQL range inputs', () => {
     await workflow().run();
     expect(getDb).not.toHaveBeenCalled();
     expect(publishSitemapSnapshot).not.toHaveBeenCalled();
+  });
+  it('repairs missing station inputs before purge and completion, then rejects mismatched generations', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://unused');
+    vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    healthyArrivalHeads();
+    vi.mocked(stationProfileSnapshotStore.read).mockResolvedValueOnce(null);
+    state.fingerprint = getCanonicalManifestFingerprint(manifest);
+    vi.mocked(publishStationProfileSnapshot).mockRejectedValueOnce(
+      Error('station publication failed'),
+    );
+    const run = workflow();
+    await expect(run.run()).rejects.toThrow('station publication failed');
+    expect(purgePublicDataCache).not.toHaveBeenCalled();
+    expect(rangeSnapshotStore.complete).not.toHaveBeenCalled();
+    await run.run();
+    expect(publishStationProfileSnapshot).toHaveBeenLastCalledWith(
+      state.fingerprint,
+    );
+    expect(
+      vi.mocked(publishStationProfileSnapshot).mock.invocationCallOrder.at(-1),
+    ).toBeLessThan(vi.mocked(purgePublicDataCache).mock.invocationCallOrder[0]);
+    vi.clearAllMocks();
+    vi.mocked(stationProfileSnapshotStore.read).mockResolvedValueOnce({
+      value: { fingerprint: state.fingerprint, generation: 'old' },
+    } as never);
+    await workflow().run();
+    expect(publishStationProfileSnapshot).toHaveBeenCalledOnce();
   });
   it('holds purge and checkpoint completion until departure publication succeeds', async () => {
     vi.stubEnv('REDIS_URL', 'redis://unused');

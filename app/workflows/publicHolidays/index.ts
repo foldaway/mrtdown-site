@@ -5,6 +5,7 @@ import { metadataTable } from '~/db/schema.js';
 import { purgePublicDataCache } from '~/util/cloudflareCache.js';
 import { rebuildOperationalFactsForDates } from '~/util/dbQueries/operationalFacts.js';
 import { publishRangeSnapshot } from '~/util/rangeSnapshot.server.js';
+import { publishStationProfileSnapshot } from '~/util/stationProfileSnapshot.server';
 import {
   assertPullWorkflowLease,
   releasePullWorkflowLease,
@@ -59,6 +60,7 @@ export const publicHolidaysWorkflow = createWorkflow<Params, void>(
           Boolean(process.env.REDIS_URL)
         ) {
           await publishRangeSnapshot();
+          await publishStationProfileSnapshot();
           await purgePublicDataCache();
         }
         // Publication can take time; never clear repair dates after losing the

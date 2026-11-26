@@ -3,6 +3,7 @@ import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
 import { arrivalInputSnapshotStore } from '~/util/arrivalInputSnapshot.server';
 import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
 import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
+import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
 import { fetchManifest } from './fetchManifest';
 import { getCanonicalManifestFingerprint } from './manifestFingerprint';
 import { type PullParams, resolveCombinedReleaseIndex } from './pullParams';
@@ -32,12 +33,16 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
     );
   const fingerprint = getCanonicalManifestFingerprint(manifest, pinned);
   if (!(await rangeSnapshotStore.isCurrent(fingerprint))) return false;
-  const [range, sitemap, arrivals] = await Promise.all([
+  const [range, sitemap, arrivals, stations] = await Promise.all([
     rangeSnapshotStore.head(),
     sitemapSnapshotStore.read({ verifyPayload: true }),
     arrivalInputSnapshotStore.read({ verifyPayload: true }),
+    stationProfileSnapshotStore.read({ verifyPayload: true }),
   ]);
   if (
+    !stations ||
+    stations.value.fingerprint !== fingerprint ||
+    stations.value.generation !== range.value?.generation ||
     !sitemap ||
     sitemap.value.fingerprint !== fingerprint ||
     sitemap.value.generation !== range.value?.generation

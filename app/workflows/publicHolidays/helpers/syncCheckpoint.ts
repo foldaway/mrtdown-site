@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { getPageProfileRedis } from '~/util/pageProfileRedis.server';
 import { getSnapshotKeyPrefix } from '~/util/publishedSnapshotStore.server';
 import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
+import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
 import type { PublicHolidaySyncRow } from './syncPublicHolidays';
 
 const key = (suffix: string) =>
@@ -31,7 +32,16 @@ export async function canSkipPublicHolidaySync(
     const completed = await redis.getrange(key('completed'), 0, 200);
     if (!token || completed !== `${token}:${sourceIdentity(rows)}`)
       return false;
-    return Boolean(await rangeSnapshotStore.read({ verifyPayload: true }));
+    const [range, stations] = await Promise.all([
+      rangeSnapshotStore.read({ verifyPayload: true }),
+      stationProfileSnapshotStore.read({ verifyPayload: true }),
+    ]);
+    return Boolean(
+      range &&
+        stations &&
+        range.value.generation === stations.value.generation &&
+        range.value.fingerprint === stations.value.fingerprint,
+    );
   } catch {
     return false;
   }
