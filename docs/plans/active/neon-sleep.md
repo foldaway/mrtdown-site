@@ -63,8 +63,14 @@ establish whole-site sleep.
    incident boundaries with SQL disabled. `npm run verify` passed 797 tests
    across 102 files with disposable PostGIS/Redis and no skips on November 26.
    Review and rollout remain separate. There is no separate operator directory
-   loader; line directories include operator labels.
-5. Town profiles and directory, including station details and related scope.
+   loader; line directories include operator labels. PR:
+   [#346](https://github.com/foldaway/mrtdown-site/pull/346).
+5. Town profiles and directory: reuse the existing graph and profile selector.
+   Local full-loader SQL parity covers cold/warm operation with DB access throwing,
+   future/closed/unknown/empty towns, request-clock issue windows and coherent
+   station/town relationship corrections. `npm run verify` passed 799 tests across
+   102 files with disposable PostGIS/Redis and no skips on November 26. Review
+   and rollout remain separate.
 
 Local canonical-corpus validation matched BKP and its BP6 alias cold/warm with
 SQL disabled on November 26 and the December 26 service boundary. The corpus had
@@ -72,7 +78,8 @@ SQL disabled on November 26 and the December 26 service boundary. The corpus had
 (limit 4 MiB). These are local source measurements, not production evidence.
 Duplicate exit labels now use the same ID tie-breaker in SQL and publication.
 
-Do not infer completion of this group or whole-site sleep from the station slice.
+Each slice above covers its named route family. Source completion, review and
+production rollout are separate; sustained whole-site sleep is not established.
 
 ### Statistics follow-up (audit item 3)
 

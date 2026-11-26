@@ -1,4 +1,6 @@
 import { nonPublicEvidenceRedactedText } from '@mrtdown/fs';
+import { getTownProfileFn, getTownsFn } from '~/util/town.functions';
+import { getTownProfileReadModel } from './towns';
 import { getOperatorProfileFn } from '~/util/operator.functions';
 import { getOperatorProfileReadModel } from './operators';
 import { getStationsDirectoryFn } from '~/util/station.functions';
@@ -860,6 +862,139 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         const keys = await stationRedis.keys(`mrtdown:*${process.env.TIER}*`);
         if (keys.length) await stationRedis.del(...keys);
         await stationRedis.quit();
+      });
+
+      it('matches complete town profiles and directory cold/warm with SQL disabled across effective memberships and issue windows', async () => {
+        for (const id of ['empty', 'planned', 'closed', 'unknown'])
+          await pool.query(
+            'insert into towns (id,name,hash) select $1,name,hash from towns limit 1',
+            [id],
+          );
+        await pool.query(
+          "update stations set town_id='planned' where id='station-3'",
+        );
+        await pool.query(
+          "update station_codes set started_at='2026-11-19' where station_id in ('station-2','station-3')",
+        );
+        await pool.query(
+          "update station_codes set ended_at='2026-11-19' where code='LEGACY'",
+        );
+        await pool.query(
+          "insert into lines (id,name,type,color,started_at,operating_hours,hash) select 'unknown',name,type,color,null,null,hash from lines limit 1",
+        );
+        await pool.query(
+          "insert into stations (id,name,town_id,geo,hash) select 'closed-station',name,'closed',geo,hash from stations limit 1",
+        );
+        await pool.query(
+          "insert into stations (id,name,town_id,geo,hash) select 'unknown-station',name,'unknown',geo,hash from stations limit 1",
+        );
+        await pool.query(
+          "insert into station_codes (line_id,station_id,code,started_at,ended_at,structure_type) values ('line','closed-station','CLOSED','1990-01-01','2000-01-01','underground'),('unknown','unknown-station','U1','2000-01-01',null,'underground')",
+        );
+        const clocks = [
+          now.set({ hour: 4 }),
+          now.set({ hour: 10, minute: 15 }),
+          now.set({ hour: 10, minute: 30 }),
+          now.plus({ days: 1 }).startOf('day'),
+          now.plus({ days: 100 }),
+        ];
+        const cases = clocks.flatMap((clock) =>
+          ['town', 'empty', 'planned', 'closed', 'unknown'].map((townId) => ({
+            clock,
+            townId,
+          })),
+        );
+        vi.stubEnv('REDIS_URL', '');
+        const expected = [];
+        for (const { clock, townId } of cases) {
+          vi.setSystemTime(clock.toJSDate());
+          expected.push(await getTownProfileFn({ data: { townId } }));
+        }
+        const directory = await getTownsFn();
+        expect(expected[0].data.status).toBe('closed_for_day');
+        expect(expected[1].data.status).toBe('not_in_service');
+        expect(expected[2].data.status).toBe('future_service');
+        expect(expected[3].data.status).toBe('not_in_service');
+        expect(expected[4].data.status).toBe('unknown');
+        expect(expected[5].data.status).toBe('ongoing_disruption');
+        expect(expected[10].data.status).toBe('normal');
+        expect(expected[20].data.issueIdsRecent).toEqual([]);
+        expect(
+          directory.data.towns.find((row) => row.townId === 'planned')?.lineIds,
+        ).toEqual(['line']);
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        const cold = createPublishedSnapshotStore(
+          async () => stationRedis,
+          'station-profiles',
+          parseStationProfileSnapshotInputs,
+        );
+        vi.spyOn(stationProfileSnapshotStore, 'read').mockImplementation(
+          cold.read,
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        queries.length = 0;
+        for (const [index, { clock, townId }] of cases.entries()) {
+          vi.setSystemTime(clock.toJSDate());
+          for (let pass = 0; pass < 2; pass++) {
+            expect(await getTownProfileFn({ data: { townId } })).toEqual(
+              expected[index],
+            );
+            expect(await getTownsFn()).toEqual(directory);
+          }
+        }
+        expect(queries).toEqual([]);
+      });
+
+      it('recovers missing town inputs uncached and publishes corrected town/station relationships together', async () => {
+        vi.stubEnv('REDIS_URL', '');
+        const before = {
+          profile: await getTownProfileFn({ data: { townId: 'town' } }),
+          directory: await getTownsFn(),
+        };
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        headers.mockClear();
+        expect(await getTownProfileFn({ data: { townId: 'town' } })).toEqual(
+          before.profile,
+        );
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        headers.mockClear();
+        expect(await getTownsFn()).toEqual(before.directory);
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        await pool.query(
+          "insert into towns (id,name,hash) select 'new-town',name,hash from towns limit 1",
+        );
+        await pool.query(
+          "update stations set town_id='new-town' where id='station-2'",
+        );
+        expect(await getTownProfileFn({ data: { townId: 'town' } })).toEqual(
+          before.profile,
+        );
+        expect(await getTownsFn()).toEqual(before.directory);
+        vi.stubEnv('REDIS_URL', '');
+        const after = {
+          profile: await getTownProfileFn({ data: { townId: 'town' } }),
+          directory: await getTownsFn(),
+        };
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        expect(await getTownProfileFn({ data: { townId: 'town' } })).toEqual(
+          after.profile,
+        );
+        expect(await getTownsFn()).toEqual(after.directory);
+        expect(after.profile.data.stationIds).not.toContain('station-2');
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        headers.mockClear();
+        await expect(getTownProfileReadModel('absent')).rejects.toMatchObject({
+          status: 404,
+        });
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
       });
 
       it('matches complete operator loaders cold/warm with SQL disabled across clocks, memberships, empty and unknown operations', async () => {

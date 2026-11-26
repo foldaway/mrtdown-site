@@ -1,3 +1,6 @@
+import { setResponseHeader } from '@tanstack/react-start/server';
+import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
+import { selectProfileDatasetInputs } from './profileSnapshotInputs';
 import type { IssueType } from '@mrtdown/core';
 import { eq, inArray, isNull, or } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
@@ -20,7 +23,12 @@ import type {
   Station,
 } from '~/types';
 import { getDefaultDb, timeDbQuery } from './database';
-import { buildDataset, parseTranslations } from './dataset';
+import {
+  assembleDataset,
+  buildDataset,
+  parseTranslations,
+  type DatasetInputs,
+} from './dataset';
 import { isoDate, isoDateTime, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
@@ -302,7 +310,7 @@ export function mergeTownReadModelScope(input: {
   };
 }
 
-export async function getTownsData() {
+async function loadSqlTownsDirectory() {
   const db = await getDefaultDb();
   const [townRows, stationRows, membershipRows] = await Promise.all([
     timeDbQuery('towns_directory_q_towns', () =>
@@ -323,6 +331,65 @@ export async function getTownsData() {
         .where(isNull(stationCodesTable.ended_at)),
     ),
   ]);
+  return {
+    townRows,
+    stationRows,
+    membershipRows,
+    loadLines: async (
+      lineIds: string[],
+    ): Promise<
+      [DatasetInputs['linesRows'], DatasetInputs['lineOperatorsRows']]
+    > =>
+      lineIds.length > 0
+        ? Promise.all([
+            timeDbQuery('towns_directory_q_lines', () =>
+              db
+                .select()
+                .from(linesTable)
+                .where(inArray(linesTable.id, lineIds)),
+            ),
+            timeDbQuery('towns_directory_q_line_operators', () =>
+              db
+                .select()
+                .from(lineOperatorsTable)
+                .where(inArray(lineOperatorsTable.line_id, lineIds)),
+            ),
+          ])
+        : [[], []],
+  };
+}
+
+export async function getTownsData() {
+  const snapshot = process.env.REDIS_URL
+    ? await stationProfileSnapshotStore.read()
+    : null;
+  let loaded: Awaited<ReturnType<typeof loadSqlTownsDirectory>>;
+  if (snapshot) {
+    const rows = snapshot.inputs.dataset;
+    loaded = {
+      townRows: rows.townsRows,
+      stationRows: rows.stationRows.map(({ id, townId }) => ({ id, townId })),
+      // The directory deliberately uses only open-ended codes, including planned
+      // starts. Town profiles select effective memberships at the request clock.
+      membershipRows: rows.stationCodesRows
+        .filter((row) => row.ended_at == null)
+        .map((row) => ({ stationId: row.station_id, lineId: row.line_id })),
+      loadLines: async (ids) => [
+        rows.linesRows.filter((row) => ids.includes(row.id)),
+        rows.lineOperatorsRows.filter((row) => ids.includes(row.line_id)),
+      ],
+    };
+  } else {
+    if (process.env.REDIS_URL) {
+      try {
+        setResponseHeader('Cache-Control', 'no-store');
+      } catch {
+        /* no request context */
+      }
+    }
+    loaded = await loadSqlTownsDirectory();
+  }
+  const { townRows, stationRows, membershipRows, loadLines } = loaded;
   const stationIdsByTownId = Map.groupBy(
     stationRows,
     (station) => station.townId,
@@ -352,20 +419,7 @@ export async function getTownsData() {
     };
   });
   const lineIds = [...new Set(towns.flatMap((town) => town.lineIds))];
-  const [lineRows, lineOperatorRows] =
-    lineIds.length > 0
-      ? await Promise.all([
-          timeDbQuery('towns_directory_q_lines', () =>
-            db.select().from(linesTable).where(inArray(linesTable.id, lineIds)),
-          ),
-          timeDbQuery('towns_directory_q_line_operators', () =>
-            db
-              .select()
-              .from(lineOperatorsTable)
-              .where(inArray(lineOperatorsTable.line_id, lineIds)),
-          ),
-        ])
-      : [[], []];
+  const [lineRows, lineOperatorRows] = await loadLines(lineIds);
   const lineOperatorsByLineId = Map.groupBy(
     lineOperatorRows,
     (operator) => operator.line_id,
@@ -412,8 +466,7 @@ export async function getTownsData() {
   };
 }
 
-export async function getTownProfileReadModel(townId: string) {
-  const referenceNow = nowSg();
+async function loadSqlTownProfile(townId: string, referenceNow: DateTime) {
   const db = await getDefaultDb();
   const [townRow] = await timeDbQuery('town_profile_q_root', () =>
     db
@@ -442,7 +495,7 @@ export async function getTownProfileReadModel(townId: string) {
         .from(stationsTable),
     ),
   ]);
-  const townStationIds = townStationRows.map((row) => row.id);
+  const townStationIds = townStationRows.map((row) => row.id).sort();
   const townStationCodeRows =
     townStationIds.length > 0
       ? await timeDbQuery('town_profile_q_station_codes', () =>
@@ -505,6 +558,58 @@ export async function getTownProfileReadModel(townId: string) {
     townIds: [townId],
     includePublicHolidays: true,
   });
+  return { dataset, townStationIds, allStationNameRows };
+}
+
+export async function getTownProfileReadModel(townId: string) {
+  const referenceNow = nowSg();
+  const snapshot = process.env.REDIS_URL
+    ? await stationProfileSnapshotStore.read()
+    : null;
+  let loaded: Awaited<ReturnType<typeof loadSqlTownProfile>>;
+  if (snapshot?.inputs.dataset.townsRows.some((row) => row.id === townId)) {
+    const rows = snapshot.inputs.dataset;
+    const townStationIds = rows.stationRows
+      .filter((row) => row.townId === townId)
+      .map((row) => row.id)
+      .sort();
+    const lineIds = [
+      ...new Set(
+        rows.stationCodesRows
+          .filter((row) => townStationIds.includes(row.station_id))
+          .map((row) => row.line_id),
+      ),
+    ];
+    const serviceIds = rows.serviceRows
+      .filter((row) => lineIds.includes(row.line_id))
+      .map((row) => row.id);
+    loaded = {
+      townStationIds,
+      allStationNameRows: rows.stationRows.map(({ id, name }) => ({
+        id,
+        name: parseTranslations(name),
+      })),
+      dataset: assembleDataset(
+        referenceNow,
+        selectProfileDatasetInputs(rows, {
+          lineIds,
+          serviceIds,
+          stationIds: townStationIds,
+          townIds: [townId],
+        }),
+      ),
+    };
+  } else {
+    if (process.env.REDIS_URL) {
+      try {
+        setResponseHeader('Cache-Control', 'no-store');
+      } catch {
+        /* no request context */
+      }
+    }
+    loaded = await loadSqlTownProfile(townId, referenceNow);
+  }
+  const { dataset, townStationIds, allStationNameRows } = loaded;
   const town = dataset.included.towns[townId];
   if (town == null) {
     throw new Error(`Town ${townId} disappeared while building its read model`);
