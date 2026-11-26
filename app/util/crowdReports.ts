@@ -1597,64 +1597,70 @@ export async function persistAutomoderatedProgrammaticCrowdReport(
   const idFactory = options.idFactory ?? (() => crypto.randomUUID());
   const reportId = idFactory();
 
-  return withCommunitySignalPublication(db, async (tx) => {
-    const [insertedReport] = await tx
-      .insert(crowdReportsTable)
-      .values(buildCrowdReportInsertValues(reportId, submission, delivery))
-      .onConflictDoNothing({
-        target: [
-          crowdReportsTable.producer,
-          crowdReportsTable.external_report_id,
-        ],
-      })
-      .returning({ id: crowdReportsTable.id });
+  return withCommunitySignalPublication(
+    db,
+    async (tx) => {
+      const [insertedReport] = await tx
+        .insert(crowdReportsTable)
+        .values(buildCrowdReportInsertValues(reportId, submission, delivery))
+        .onConflictDoNothing({
+          target: [
+            crowdReportsTable.producer,
+            crowdReportsTable.external_report_id,
+          ],
+        })
+        .returning({ id: crowdReportsTable.id });
 
-    if (insertedReport == null) {
-      const existingReport = await selectProgrammaticCrowdReport(
+      if (insertedReport == null) {
+        const existingReport = await selectProgrammaticCrowdReport(
+          tx,
+          delivery.producer,
+          delivery.externalReportId,
+        );
+        if (existingReport == null) {
+          throw new Error(
+            'Conflicting programmatic report could not be loaded',
+          );
+        }
+        if (
+          existingReport.requestPayloadDigest !== delivery.requestPayloadDigest
+        ) {
+          throw new CrowdReportIdempotencyConflictError(existingReport.id);
+        }
+        return {
+          id: existingReport.id,
+          status: existingReport.status,
+          duplicateOfId: existingReport.duplicateOfId,
+          created: false as const,
+        };
+      }
+
+      await insertCrowdReportReferencesInTransaction(tx, reportId, submission);
+      await tx.insert(crowdReportModerationEventsTable).values({
+        id: idFactory(),
+        report_id: reportId,
+        actor: 'system',
+        action: 'submitted',
+        note: `Report submitted by authenticated producer ${delivery.producer}`,
+      });
+
+      const moderated = await automoderateCrowdReportInTransaction(
         tx,
-        delivery.producer,
-        delivery.externalReportId,
+        reportId,
+        submission,
+        duplicateWindowMinutes,
+        idFactory,
+        now,
+        undefined,
+        undefined,
+        undefined,
+        true,
       );
-      if (existingReport == null) {
-        throw new Error('Conflicting programmatic report could not be loaded');
-      }
-      if (
-        existingReport.requestPayloadDigest !== delivery.requestPayloadDigest
-      ) {
-        throw new CrowdReportIdempotencyConflictError(existingReport.id);
-      }
-      return {
-        id: existingReport.id,
-        status: existingReport.status,
-        duplicateOfId: existingReport.duplicateOfId,
-        created: false as const,
-      };
-    }
 
-    await insertCrowdReportReferencesInTransaction(tx, reportId, submission);
-    await tx.insert(crowdReportModerationEventsTable).values({
-      id: idFactory(),
-      report_id: reportId,
-      actor: 'system',
-      action: 'submitted',
-      note: `Report submitted by authenticated producer ${delivery.producer}`,
-    });
-
-    const moderated = await automoderateCrowdReportInTransaction(
-      tx,
-      reportId,
-      submission,
-      duplicateWindowMinutes,
-      idFactory,
-      now,
-      undefined,
-      undefined,
-      undefined,
-      true,
-    );
-
-    return { ...moderated, created: true as const };
-  });
+      return { ...moderated, created: true as const };
+    },
+    (result) => result.created,
+  );
 }
 
 export async function getPublicCrowdReportSignals(
@@ -1763,18 +1769,19 @@ export async function getPublicCrowdReportSignals(
     reportMetricRows.map((metrics) => [metrics.clusterId, metrics]),
   );
 
+  const linesByClusterId = Map.groupBy(lineRows, (row) => row.clusterId);
+  const stationsByClusterId = Map.groupBy(stationRows, (row) => row.clusterId);
+
   return clusterRows
     .flatMap((cluster) => {
       const reportMetrics = reportMetricsByClusterId.get(cluster.id);
       if (reportMetrics == null) {
         return [];
       }
-      const lineIds = lineRows
-        .filter((row) => row.clusterId === cluster.id)
+      const lineIds = (linesByClusterId.get(cluster.id) ?? [])
         .map((row) => row.lineId)
         .sort((a, b) => a.localeCompare(b));
-      const stationIds = stationRows
-        .filter((row) => row.clusterId === cluster.id)
+      const stationIds = (stationsByClusterId.get(cluster.id) ?? [])
         .map((row) => row.stationId)
         .sort((a, b) => a.localeCompare(b));
 

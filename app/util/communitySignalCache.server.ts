@@ -47,15 +47,17 @@ async function lockCommunitySignalPublication(tx: AppDbTransaction) {
   );
 }
 
-/** All display-changing writers take this lock before their incident locks. */
+/** Fence display changes just before commit, after all incident work/locks. */
 export async function withCommunitySignalPublication<T>(
   db: AppDb,
   write: (tx: AppDbTransaction) => Promise<T>,
+  hasDisplayChanges: (result: T) => boolean = () => true,
 ): Promise<T> {
   const publish = Boolean(process.env.REDIS_URL);
   try {
     return await db.transaction(async (tx) => {
-      if (publish) {
+      const result = await write(tx);
+      if (publish && hasDisplayChanges(result)) {
         await lockCommunitySignalPublication(tx);
         // A unique dirty value fences even a delayed invalidation of an already
         // dirty key. Failure here rolls back before accepting a display change.
@@ -65,7 +67,7 @@ export async function withCommunitySignalPublication<T>(
           JSON.stringify({ pending: crypto.randomUUID() }),
         );
       }
-      return write(tx);
+      return result;
     });
   } finally {
     // Repair committed writes and rolled-back attempts alike. A committed write
@@ -77,20 +79,30 @@ export async function withCommunitySignalPublication<T>(
 export async function tryRepairCommunitySignalCache(db: AppDb) {
   if (!process.env.REDIS_URL) return;
   try {
-    await repairCommunitySignalCache(db);
+    await repairCommunitySignalCache(db, { onlyIfMissing: true });
   } catch (error) {
     console.error('Community signal cache publication failed', { error });
   }
 }
 
 /** Explicit initialization/repair, independent of canonical pulls and timers. */
-export async function repairCommunitySignalCache(db: AppDb) {
+export async function repairCommunitySignalCache(
+  db: AppDb,
+  options: { onlyIfMissing?: boolean } = {},
+) {
   await db.transaction(async (tx) => {
     await lockCommunitySignalPublication(tx);
+    // Replays and rolled-back attempts must not dirty a healthy snapshot. Check
+    // inside the lock so a preceding writer/repair can satisfy this request.
+    if (
+      options.onlyIfMissing &&
+      (await readCachedCommunitySignals()).status === 'ready'
+    )
+      return;
     const redis = (await getPageProfileRedis()).duplicate();
     try {
       await redis.connect();
-      // The SQL lock excludes writers; WATCH also fences commands that execute
+      // The SQL lock excludes writer commits; WATCH also fences commands that execute
       // after a timeout has released that lock. No older repair can win later.
       await redis.set(
         getCommunitySignalCacheKey(),

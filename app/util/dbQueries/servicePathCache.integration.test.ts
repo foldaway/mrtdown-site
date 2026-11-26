@@ -1043,13 +1043,20 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
             );
         }
         await signalCache.repairCommunitySignalCache(db);
-        for (const scope of [
+        const scopes = [
           {},
           { stationId: 'station-1' },
           { stationId: 'station-2' },
           { lineId: 'line' },
-        ]) {
-          const expected = await sqlSignals(scope);
+        ];
+        const expectations = await Promise.all(
+          scopes.map((scope) => sqlSignals(scope)),
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('Scoped reads must use Redis'),
+        );
+        for (const [index, scope] of scopes.entries()) {
+          const expected = expectations[index];
           expect(
             await getPageCommunitySignals(
               { includeCommunitySignals: true },
@@ -1180,6 +1187,159 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           signals: [],
         });
         log.mockRestore();
+      });
+
+      it('keeps slow dispatch outside publication while unrelated writers and repair finish', async () => {
+        const delivery = {
+          producer: 'trusted',
+          externalReportId: 'slow-dispatch',
+          requestPayloadDigest: 'digest',
+        };
+        await persistAutomoderatedProgrammaticCrowdReport(
+          db,
+          submission(),
+          delivery,
+          { now },
+        );
+        const candidates = await getDispatchableCrowdReportCandidates(db, {
+          rootUrl: 'https://example.test',
+        });
+        const started = Promise.withResolvers<void>();
+        const response = Promise.withResolvers<Response>();
+        const fetcher = vi.fn(() => {
+          started.resolve();
+          return response.promise;
+        });
+        const dispatch = dispatchPendingCrowdReports(
+          db,
+          { token: 'token', rootUrl: 'https://example.test', candidates },
+          fetcher,
+        );
+        await started.promise;
+        const ready = await liveRedis.get(
+          signalCache.getCommunitySignalCacheKey(),
+        );
+        try {
+          expect((await signalCache.readCachedCommunitySignals()).status).toBe(
+            'ready',
+          );
+          // The incident lock still excludes a second send of the same candidate.
+          const duplicate = await dispatchPendingCrowdReports(
+            db,
+            { token: 'token', rootUrl: 'https://example.test', candidates },
+            fetcher,
+          );
+          expect(duplicate.results[0].skipped).toBe(true);
+          expect(fetcher).toHaveBeenCalledTimes(1);
+          const unrelated = persistAutomoderatedCrowdReport(
+            db,
+            { ...submission(), effect: 'crowding' },
+            abuse('unrelated'),
+            { now },
+          );
+          // A blocked global lock would time out this assertion; always release
+          // the fake response in finally so failed tests cannot strand SQL work.
+          await expect(
+            Promise.race([
+              unrelated,
+              new Promise((_, reject) =>
+                setTimeout(
+                  () => reject(Error('Unrelated writer blocked by dispatch')),
+                  1000,
+                ),
+              ),
+            ]),
+          ).resolves.toMatchObject({ status: 'accepted' });
+          await signalCache.repairCommunitySignalCache(db);
+          expect((await signalCache.readCachedCommunitySignals()).status).toBe(
+            'ready',
+          );
+          expect(
+            await liveRedis.get(signalCache.getCommunitySignalCacheKey()),
+          ).not.toEqual(ready);
+        } finally {
+          response.resolve(new Response(null, { status: 204 }));
+          expect((await dispatch).failed).toBe(0);
+        }
+        const expected = await sqlSignals();
+        expect(expected).toHaveLength(1);
+        expect(expected[0].effect).toBe('crowding');
+        expect(await signalCache.readCachedCommunitySignals()).toEqual({
+          status: 'ready',
+          signals: expected,
+        });
+      });
+
+      it('keeps healthy replay snapshots and rechecks conditional repairs under the publication lock', async () => {
+        const delivery = {
+          producer: 'trusted',
+          externalReportId: 'replay',
+          requestPayloadDigest: 'digest',
+        };
+        const report = await persistAutomoderatedProgrammaticCrowdReport(
+          db,
+          submission(),
+          delivery,
+          { now },
+        );
+        const ready = await liveRedis.get(
+          signalCache.getCommunitySignalCacheKey(),
+        );
+        const writes = vi.spyOn(liveRedis, 'set');
+        const publications = vi.spyOn(liveRedis, 'duplicate');
+        const readers = vi.spyOn(db, 'select');
+        readers.mockClear();
+        expect(
+          await findProgrammaticCrowdReportRetry(db, delivery),
+        ).toMatchObject({ id: report.id, created: false });
+        expect(readers).toHaveBeenCalledTimes(1);
+        // The persistence helper's conflict path also represents an unchanged replay.
+        expect(
+          await persistAutomoderatedProgrammaticCrowdReport(
+            db,
+            submission(),
+            delivery,
+            { now },
+          ),
+        ).toMatchObject({ id: report.id, created: false });
+        expect(writes).not.toHaveBeenCalled();
+        expect(publications).not.toHaveBeenCalled();
+        expect(
+          await liveRedis.get(signalCache.getCommunitySignalCacheKey()),
+        ).toEqual(ready);
+        writes.mockRestore();
+        publications.mockRestore();
+        readers.mockRestore();
+        await liveRedis.set(
+          signalCache.getCommunitySignalCacheKey(),
+          JSON.stringify({ pending: 'repair' }),
+        );
+        // The first repair blocks at publication while a conditional repair queues
+        // on the SQL lock. The latter must recheck the newly healthy snapshot.
+        const publisher = liveRedis.duplicate();
+        vi.spyOn(liveRedis, 'duplicate').mockReturnValueOnce(publisher);
+        const watch = publisher.watch.bind(publisher);
+        const started = Promise.withResolvers<void>();
+        const resume = Promise.withResolvers<void>();
+        vi.spyOn(publisher, 'watch').mockImplementationOnce(async (key) => {
+          const result = await watch(key);
+          started.resolve();
+          await resume.promise;
+          return result;
+        });
+        const first = signalCache.repairCommunitySignalCache(db);
+        await started.promise;
+        const second = signalCache.repairCommunitySignalCache(db, {
+          onlyIfMissing: true,
+        });
+        resume.resolve();
+        await Promise.all([first, second]);
+        expect(await signalCache.readCachedCommunitySignals()).toEqual({
+          status: 'ready',
+          signals: await sqlSignals(),
+        });
+        // Only the first repair needs a dedicated WATCH connection.
+        expect(liveRedis.duplicate).toHaveBeenCalledTimes(1);
       });
 
       it('keeps missing, corrupt, unavailable and failed writes distinct from initialized empty', async () => {

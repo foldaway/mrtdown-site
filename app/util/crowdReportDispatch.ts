@@ -505,6 +505,7 @@ export async function dispatchCrowdReportPayloadToGitHub(
   }, timeoutMs);
 
   let response: Response;
+  let responseText: string;
   try {
     response = await fetchImpl(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,
@@ -524,6 +525,7 @@ export async function dispatchCrowdReportPayloadToGitHub(
         signal: controller.signal,
       },
     );
+    responseText = await response.text();
   } catch (error) {
     if (controller.signal.aborted) {
       throw new Error(
@@ -535,7 +537,6 @@ export async function dispatchCrowdReportPayloadToGitHub(
     clearTimeout(timeoutId);
   }
 
-  const responseText = await response.text();
   if (!response.ok) {
     throw new Error(
       `GitHub repository_dispatch failed with ${response.status}: ${responseText.slice(

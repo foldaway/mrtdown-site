@@ -297,8 +297,10 @@ Moderation, public/programmatic submissions, duplicates, dispatch and fixture
 cleanup invalidate before committing display changes, then refresh from SQL.
 Invalidation failure rejects the write before commit; publication failure after
 commit preserves acceptance and leaves SQL fallback available. Failed attempts
-and programmatic replays also attempt repair. A shared SQL lock and Redis
-WATCH/MULTI fence concurrent and delayed writers. Canonical publication remains
+and programmatic replays repair only missing/dirty snapshots, preserving healthy
+entries. The publication lock is taken after incident work, just before commit;
+GitHub requests keep only their incident-specific dispatch lock. A shared SQL
+lock and Redis WATCH/MULTI fence concurrent and delayed writers. Canonical publication remains
 independent of community activity.
 
 The single persistent `mrtdown:<tier>:community-signals:v1` key contains at most

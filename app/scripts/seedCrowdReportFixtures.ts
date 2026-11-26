@@ -17,6 +17,7 @@ import {
   type CrowdReportSubmission,
   persistAutomoderatedCrowdReport,
 } from '../util/crowdReports.js';
+import { getPageProfileRedis } from '../util/pageProfileRedis.server';
 
 const { Pool } = pg;
 
@@ -300,6 +301,12 @@ async function main(): Promise<void> {
     );
   } finally {
     await pool.end();
+    if (process.env.REDIS_URL) {
+      await getPageProfileRedis().then(
+        (redis) => redis.disconnect(),
+        () => {},
+      );
+    }
   }
 }
 
