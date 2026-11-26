@@ -285,6 +285,42 @@ Check `arrival_departures_published`, total bytes and latency after repair.
 Unchanged polls should finish before SQL lease acquisition. The
 [sleep plan](../plans/active/neon-sleep.md) records completed rollout evidence.
 
+## Public community disruption signals
+
+With Redis configured, home, station and line community-signal reads use public
+cluster inputs, including initialized-empty results, without SQL. Other profile
+reads still have independent SQL dependencies. The existing ongoing-report,
+confidence and producer policy is shared with the SQL reader. Requests filter
+scope before the 20-signal limit and apply the 90-minute expiry at their clock.
+
+Moderation, public/programmatic submissions, duplicates, dispatch and fixture
+cleanup invalidate before committing display changes, then refresh from SQL.
+Invalidation failure rejects the write before commit; publication failure after
+commit preserves acceptance and leaves SQL fallback available. Failed attempts
+and programmatic replays repair only missing/dirty snapshots, preserving healthy
+entries. The publication lock is taken after incident work, just before commit;
+GitHub requests keep only their incident-specific dispatch lock. A shared SQL
+lock and Redis WATCH/MULTI fence concurrent and delayed writers. Canonical publication remains
+independent of community activity.
+
+The single persistent `mrtdown:<tier>:community-signals:v1` key contains at most
+10,000 eligible clusters and 4 MiB of public fields, with no reporter identities
+or submission text. Bounds fail publication rather than truncate scoped results.
+Missing, dirty, corrupt or unavailable state uses SQL with `no-store`; public
+reads never refill it. Expiry alone needs no SQL or scheduled refresh.
+
+Initialize after deploying all writers, or repair after eviction, Redis restore,
+out-of-band SQL edits or writes made without Redis:
+
+```sh
+npm run cache:community-signals:repair
+```
+
+Run with the target environment's `DATABASE_URL`, `REDIS_URL` and `TIER`, then
+purge its public data tag using the existing procedure. Verify cold/warm home
+reads and initialized-empty results without SQL. This command does not deploy,
+change schedules or purge the edge automatically.
+
 ## Recent arrival reports
 
 Accepted SQL submissions invalidate and refresh Redis. Non-platform report hits,

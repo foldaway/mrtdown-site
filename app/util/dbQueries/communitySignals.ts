@@ -1,9 +1,11 @@
+import { setResponseHeader } from '@tanstack/react-start/server';
 import type { DateTime } from 'luxon';
-import { getPublicCrowdReportSignals } from '~/util/crowdReports';
+import { readCachedCommunitySignals } from '~/util/communitySignalCache.server';
+import {
+  getPublicCrowdReportSignals,
+  PAGE_COMMUNITY_SIGNAL_POLICY,
+} from '~/util/crowdReports';
 import { getDefaultDb } from './database';
-
-const DISPLAY_MIN_REPORT_COUNT = 1;
-const DISPLAY_MIN_DISTINCT_REPORTERS = 1;
 
 export type CommunitySignalOptions = {
   includeCommunitySignals?: boolean;
@@ -17,11 +19,15 @@ export async function getPageCommunitySignals(
     return [];
   }
 
+  if (process.env.REDIS_URL) {
+    const cached = await readCachedCommunitySignals(scope);
+    if (cached.status === 'ready') return cached.signals;
+    setResponseHeader('Cache-Control', 'no-store');
+  }
+
   const communitySignalsDb = await getDefaultDb();
   return getPublicCrowdReportSignals(communitySignalsDb, {
     ...scope,
-    includeUnconfirmedClusters: true,
-    minDistinctIpHashes: DISPLAY_MIN_DISTINCT_REPORTERS,
-    minReportCount: DISPLAY_MIN_REPORT_COUNT,
+    ...PAGE_COMMUNITY_SIGNAL_POLICY,
   });
 }

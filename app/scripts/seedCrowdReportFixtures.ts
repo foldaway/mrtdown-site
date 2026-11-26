@@ -11,11 +11,13 @@ import {
   stationCodesTable,
   stationsTable,
 } from '../db/schema.js';
+import { withCommunitySignalPublication } from '../util/communitySignalCache.server';
 import {
   type CrowdReportAbuseContext,
   type CrowdReportSubmission,
   persistAutomoderatedCrowdReport,
 } from '../util/crowdReports.js';
+import { getPageProfileRedis } from '../util/pageProfileRedis.server';
 
 const { Pool } = pg;
 
@@ -204,7 +206,7 @@ function buildFixtureSubmissions(
 }
 
 async function clearExistingSyntheticCrowdReports(db: Db) {
-  await db.transaction(async (tx) => {
+  await withCommunitySignalPublication(db, async (tx) => {
     await tx
       .update(crowdReportsTable)
       .set({
@@ -299,6 +301,12 @@ async function main(): Promise<void> {
     );
   } finally {
     await pool.end();
+    if (process.env.REDIS_URL) {
+      await getPageProfileRedis().then(
+        (redis) => redis.disconnect(),
+        () => {},
+      );
+    }
   }
 }
 

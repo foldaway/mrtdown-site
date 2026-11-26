@@ -831,6 +831,42 @@ describe('dispatchCrowdReportPayloadToGitHub', () => {
     );
   });
 
+  it('keeps the dispatch timeout active while reading the response body', async () => {
+    const payload = IngestPayloadSchema.parse({
+      content: [
+        {
+          source: 'crowd-report',
+          reportId: 'report:report-1',
+          text: 'A community report describes this issue.',
+          createdAt: '2026-05-24T04:40:00.000Z',
+          observedAt: '2026-05-24T12:30:00.000+08:00',
+          lineIds: ['BPLRT'],
+          reportCount: 1,
+          url: 'https://mrtdown.example/community-reports/report/report-1',
+        },
+      ],
+    });
+    const fetchImpl = vi.fn(
+      async (_url: RequestInfo | URL, init?: RequestInit) =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              init?.signal?.addEventListener('abort', () =>
+                controller.error(new DOMException('Aborted', 'AbortError')),
+              );
+            },
+          }),
+        ),
+    );
+    await expect(
+      dispatchCrowdReportPayloadToGitHub(
+        payload,
+        { token: 'github-token', timeoutMs: 10 },
+        fetchImpl,
+      ),
+    ).rejects.toThrow('GitHub repository_dispatch timed out after 10ms');
+  });
+
   it('times out hanging GitHub dispatch requests', async () => {
     const payload = IngestPayloadSchema.parse({
       content: [

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import Redis from 'ioredis';
 import { DateTime } from 'luxon';
 import { Pool } from 'pg';
 import {
@@ -24,6 +25,21 @@ import {
   serviceRevisionPathStationEntriesTable as paths,
   stationsTable,
 } from '~/db/schema';
+import * as signalCache from '~/util/communitySignalCache.server';
+import {
+  dispatchPendingCrowdReports,
+  getDispatchableCrowdReportCandidates,
+} from '~/util/crowdReportDispatch';
+import {
+  automoderateCrowdReport,
+  type CrowdReportSubmission,
+  findProgrammaticCrowdReportRetry,
+  getPublicCrowdReportSignals,
+  persistAutomoderatedCrowdReport,
+  persistAutomoderatedProgrammaticCrowdReport,
+  persistCrowdReport,
+} from '~/util/crowdReports';
+import * as redisConnection from '~/util/pageProfileRedis.server';
 import {
   getRangeReferenceCacheKey,
   publishRangeReferenceCache,
@@ -34,11 +50,9 @@ import {
   getServicePathCacheKey,
   publishServicePathCache,
 } from '~/util/servicePathCache.server';
+import { buildSitemapPaths } from '~/util/sitemap.functions';
+import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
 import { buildWeeklySummary } from '~/util/weeklyReport';
-import {
-  acquireOrRenewPullWorkflowLease,
-  releasePullWorkflowLease,
-} from '~/workflows/pull/helpers/workflowLease';
 import {
   canSkipPublicHolidaySync,
   completePublicHolidaySync,
@@ -50,6 +64,11 @@ import {
 import { recordCanonicalManifestFingerprint } from '~/workflows/pull/helpers/manifestFingerprint';
 import { scheduledTimetableCanonicalFixture } from '~/workflows/pull/helpers/scheduledTimetableCanonical.fixture';
 import * as sync from '~/workflows/pull/helpers/stagingSync';
+import {
+  acquireOrRenewPullWorkflowLease,
+  releasePullWorkflowLease,
+} from '~/workflows/pull/helpers/workflowLease';
+import { getPageCommunitySignals } from './communitySignals';
 import * as database from './database';
 import { buildDataset } from './dataset';
 import {
@@ -65,8 +84,6 @@ import {
   publishSitemapSnapshot,
   rebuildSitemapSnapshot,
 } from './sitemap';
-import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
-import { buildSitemapPaths } from '~/util/sitemap.functions';
 import { rebuildStatisticsSnapshot } from './statistics';
 
 const store = vi.hoisted(() => new Map<string, string>());
@@ -79,7 +96,7 @@ const redis = vi.hoisted(() => ({
   del: vi.fn(),
 }));
 vi.mock('~/util/pageProfileRedis.server', () => ({
-  getPageProfileRedis: async () => redis,
+  getPageProfileRedis: vi.fn(async () => redis),
 }));
 const headers = vi.hoisted(() => vi.fn());
 vi.mock('@tanstack/react-start/server', () => ({
@@ -146,6 +163,9 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
   beforeEach(async () => {
     vi.stubEnv('TIER', 'staging');
     vi.stubEnv('REDIS_URL', 'redis://unused');
+    vi.mocked(redisConnection.getPageProfileRedis).mockResolvedValue(
+      redis as unknown as Redis,
+    );
 
     vi.setSystemTime(now.toJSDate());
     vi.spyOn(database, 'getDefaultDb').mockResolvedValue(db);
@@ -389,6 +409,9 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     vi.stubEnv('REDIS_URL', undefined);
     const expected = await outputs();
     vi.stubEnv('REDIS_URL', 'redis://unused');
+    vi.mocked(redisConnection.getPageProfileRedis).mockResolvedValue(
+      redis as unknown as Redis,
+    );
     expect(expected.overview).not.toEqual(before.overview);
     await publishRangeSnapshot('a'.repeat(64));
     expect((await rangeSnapshotStore.head()).value?.sha256).not.toBe(original);
@@ -576,6 +599,9 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     expect(await canSkipPublicHolidaySync([rows[1]])).toBe(true);
 
     vi.stubEnv('REDIS_URL', 'redis://unused');
+    vi.mocked(redisConnection.getPageProfileRedis).mockResolvedValue(
+      redis as unknown as Redis,
+    );
     await syncPublicHolidays(db, [rows[1]]);
     expect(await canSkipPublicHolidaySync([rows[1]])).toBe(false);
   });
@@ -660,6 +686,9 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
       vi.stubEnv('REDIS_URL', undefined);
       const sql = await getSitemapData();
       vi.stubEnv('REDIS_URL', 'redis://unused');
+      vi.mocked(redisConnection.getPageProfileRedis).mockResolvedValue(
+        redis as unknown as Redis,
+      );
       vi.mocked(database.getDefaultDb).mockRejectedValue(
         Error('SQL must stay asleep'),
       );
@@ -744,6 +773,9 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
       vi.stubEnv('REDIS_URL', undefined);
       const baseline = await readAt();
       vi.stubEnv('REDIS_URL', 'redis://unused');
+      vi.mocked(redisConnection.getPageProfileRedis).mockResolvedValue(
+        redis as unknown as Redis,
+      );
       const cached = await readAt();
       expect(cached).toEqual(baseline);
       expect(
@@ -847,4 +879,541 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     vi.stubEnv('REDIS_URL', undefined);
     expect(await range()).toEqual(corrected);
   });
+  describe.skipIf(!process.env.TEST_SNAPSHOT_REDIS_URL)(
+    'public community signals with Redis',
+    () => {
+      let liveRedis: Redis;
+      let tier: string;
+      const submission = (stationId = 'station-1'): CrowdReportSubmission => ({
+        reportScope: 'line',
+        lineIds: ['line'],
+        stationIds: [stationId],
+        observedAt: now.toJSDate().toISOString(),
+        effect: 'delay',
+        isStillHappening: true,
+      });
+      const abuse = (id: string) => ({
+        ipHash: `private-ip-${id}`,
+        turnstileOutcome: 'passed',
+      });
+      const page = () => getOverviewData(30, { includeCommunitySignals: true });
+      const sqlSignals = (scope = {}) =>
+        getPublicCrowdReportSignals(db, {
+          includeUnconfirmedClusters: true,
+          minReportCount: 1,
+          minDistinctIpHashes: 1,
+          ...scope,
+        });
+      beforeEach(async () => {
+        tier = `community_test_${randomUUID().replaceAll('-', '')}`;
+        vi.stubEnv('TIER', tier);
+        vi.stubEnv('REDIS_URL', process.env.TEST_SNAPSHOT_REDIS_URL);
+        const redisUrl = process.env.TEST_SNAPSHOT_REDIS_URL;
+        if (!redisUrl) throw Error('TEST_SNAPSHOT_REDIS_URL missing');
+        liveRedis = new Redis(redisUrl, {
+          lazyConnect: true,
+        });
+        await liveRedis.connect();
+        vi.spyOn(redisConnection, 'getPageProfileRedis').mockResolvedValue(
+          liveRedis,
+        );
+        await pool.query(
+          'TRUNCATE crowd_reports, crowd_report_clusters CASCADE',
+        );
+        await publishRangeSnapshot('a'.repeat(64));
+      });
+      afterEach(async () => {
+        const keys = await liveRedis.keys(`mrtdown:*${tier}*`);
+        if (keys.length) await liveRedis.del(...keys);
+        await liveRedis.quit();
+      });
+
+      it('serves the whole homepage cold/warm and initialized-empty with SQL disabled, then expires by request clock', async () => {
+        await signalCache.repairCommunitySignalCache(db);
+        const empty = await page();
+        expect(empty.data.communitySignals).toEqual([]);
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        queries.length = 0;
+        expect(await page()).toEqual(empty);
+        expect(await page()).toEqual(empty);
+        // Reload the readers to discard all process-local snapshot state.
+        vi.resetModules();
+        const coldRedisConnection = await import(
+          '~/util/pageProfileRedis.server'
+        );
+        vi.spyOn(coldRedisConnection, 'getPageProfileRedis').mockResolvedValue(
+          liveRedis,
+        );
+        const coldDatabase = await import('./database');
+        vi.spyOn(coldDatabase, 'getDefaultDb').mockRejectedValue(
+          Error('Cold SQL must stay asleep'),
+        );
+        const coldOverview = await import('./overview');
+        expect(
+          await coldOverview.getOverviewData(30, {
+            includeCommunitySignals: true,
+          }),
+        ).toEqual(empty);
+        const coldSignals = await import('./communitySignals');
+        await persistAutomoderatedCrowdReport(db, submission(), abuse('one'), {
+          now,
+        });
+        const expected = await sqlSignals();
+        expect(expected).toHaveLength(1);
+        for (let read = 0; read < 2; read++) {
+          expect((await page()).data.communitySignals).toEqual(expected);
+          expect(
+            (
+              await coldOverview.getOverviewData(30, {
+                includeCommunitySignals: true,
+              })
+            ).data.communitySignals,
+          ).toEqual(expected);
+        }
+        for (const scope of [
+          { lineId: 'line' },
+          { stationId: 'station-1' },
+          { stationId: 'station-2' },
+        ]) {
+          expect(
+            await coldSignals.getPageCommunitySignals(
+              { includeCommunitySignals: true },
+              scope,
+            ),
+          ).toEqual(await sqlSignals(scope));
+        }
+        const raw = await liveRedis.get(
+          signalCache.getCommunitySignalCacheKey(),
+        );
+        expect(raw).not.toContain('private-ip');
+        expect(raw).not.toContain('producer');
+        expect(
+          await liveRedis.ttl(signalCache.getCommunitySignalCacheKey()),
+        ).toBe(-1);
+        queries.length = 0;
+        for (const clock of [
+          now.plus({ minutes: 90 }),
+          now.plus({ minutes: 90, milliseconds: 1 }),
+        ]) {
+          vi.setSystemTime(clock.toJSDate());
+          expect(
+            (
+              await coldOverview.getOverviewData(30, {
+                includeCommunitySignals: true,
+              })
+            ).data.communitySignals,
+          ).toEqual(
+            clock.toMillis() === now.plus({ minutes: 90 }).toMillis()
+              ? expected
+              : [],
+          );
+        }
+        expect(queries).toEqual([]);
+      });
+
+      it('preserves confidence, producer eligibility, scope-before-limit and SQL ordering', async () => {
+        // More than a page of clusters prevents an accidental global top-20 cache.
+        for (let index = 0; index < 28; index++) {
+          const id = `cluster-${index.toString().padStart(2, '0')}`;
+          await pool.query(
+            "insert into crowd_report_clusters (id,effect,window_start_at,window_end_at) values ($1,'delay',$2,$2)",
+            [id, now.toISO()],
+          );
+          if (index !== 23)
+            await pool.query(
+              'insert into crowd_report_cluster_stations (cluster_id,station_id) values ($1,$2)',
+              [id, index === 27 ? 'station-2' : 'station-1'],
+            );
+          await pool.query(
+            "insert into crowd_reports (id,observed_at,text,status,cluster_id,still_happening,producer) values ($1,$2,'private text',$3,$1,$4,$5)",
+            [
+              id,
+              now.minus({ minutes: index }).toISO(),
+              index === 22 ? 'rejected' : 'accepted',
+              index !== 21,
+              index === 20 ? 'trusted' : 'public',
+            ],
+          );
+          if (index !== 19 && index !== 20)
+            await pool.query(
+              "insert into crowd_report_abuse_events (id,report_id,ip_hash,turnstile_outcome,rate_limit_bucket_start_at) values ($1,$1,'private-hash','passed',$2)",
+              [id, now.toISO()],
+            );
+        }
+        await signalCache.repairCommunitySignalCache(db);
+        const scopes = [
+          {},
+          { stationId: 'station-1' },
+          { stationId: 'station-2' },
+          { lineId: 'line' },
+        ];
+        const expectations = await Promise.all(
+          scopes.map((scope) => sqlSignals(scope)),
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('Scoped reads must use Redis'),
+        );
+        for (const [index, scope] of scopes.entries()) {
+          const expected = expectations[index];
+          expect(
+            await getPageCommunitySignals(
+              { includeCommunitySignals: true },
+              scope,
+            ),
+          ).toEqual(expected);
+        }
+        const all = await getPageCommunitySignals({
+          includeCommunitySignals: true,
+        });
+        expect(all.map((row) => row.id)).toContain('cluster-20');
+        expect(all.map((row) => row.id)).not.toContain('cluster-19');
+        expect(all.map((row) => row.id)).not.toContain('cluster-21');
+        expect(all.map((row) => row.id)).not.toContain('cluster-22');
+        expect(all.map((row) => row.id)).not.toContain('cluster-23');
+        expect(
+          await liveRedis.get(signalCache.getCommunitySignalCacheKey()),
+        ).not.toContain('private');
+      });
+
+      it('publishes standalone moderation and removes a rejected report from current metrics', async () => {
+        await signalCache.repairCommunitySignalCache(db);
+        const report = await persistCrowdReport(
+          db,
+          submission(),
+          abuse('moderated'),
+          { now },
+        );
+        expect(await signalCache.readCachedCommunitySignals()).toEqual({
+          status: 'ready',
+          signals: [],
+        });
+        await automoderateCrowdReport(db, report.id, submission(), { now });
+        expect(await signalCache.readCachedCommunitySignals()).toEqual({
+          status: 'ready',
+          signals: await sqlSignals(),
+        });
+        expect(await sqlSignals()).toHaveLength(1);
+        await automoderateCrowdReport(
+          db,
+          report.id,
+          {
+            ...submission(),
+            observedAt: now.minus({ hours: 7 }).toJSDate().toISOString(),
+            isStillHappening: false,
+          },
+          { now },
+        );
+        expect(await sqlSignals()).toEqual([]);
+        expect(await signalCache.readCachedCommunitySignals()).toEqual({
+          status: 'ready',
+          signals: [],
+        });
+      });
+
+      it('publishes concurrent duplicates and dispatch, and repairs committed publication failures on replay', async () => {
+        await signalCache.repairCommunitySignalCache(db);
+        await Promise.all([
+          persistAutomoderatedCrowdReport(db, submission(), abuse('one'), {
+            now,
+          }),
+          persistAutomoderatedCrowdReport(
+            db,
+            submission('station-2'),
+            abuse('two'),
+            { now },
+          ),
+        ]);
+        let signals = await sqlSignals();
+        expect(signals).toHaveLength(1);
+        expect(signals[0]).toMatchObject({
+          reportCount: 2,
+          stationIds: ['station-1', 'station-2'],
+        });
+        expect(
+          await getPageCommunitySignals({ includeCommunitySignals: true }),
+        ).toEqual(signals);
+        const delivery = {
+          producer: 'trusted',
+          externalReportId: 'external',
+          requestPayloadDigest: 'digest',
+        };
+        const connect = vi
+          .spyOn(liveRedis, 'duplicate')
+          .mockImplementationOnce(() => {
+            throw Error('publication unavailable');
+          });
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const accepted = await persistAutomoderatedProgrammaticCrowdReport(
+          db,
+          submission(),
+          delivery,
+          { now },
+        );
+        expect(accepted.created).toBe(true);
+        expect((await signalCache.readCachedCommunitySignals()).status).toBe(
+          'missing',
+        );
+        signals = await sqlSignals();
+        expect(signals[0].reportCount).toBe(3);
+        expect(
+          await getPageCommunitySignals({ includeCommunitySignals: true }),
+        ).toEqual(signals);
+        connect.mockRestore();
+        expect(
+          await findProgrammaticCrowdReportRetry(db, delivery),
+        ).toMatchObject({ id: accepted.id, created: false });
+        expect(await signalCache.readCachedCommunitySignals()).toEqual({
+          status: 'ready',
+          signals,
+        });
+        const candidates = await getDispatchableCrowdReportCandidates(db, {
+          rootUrl: 'https://example.test',
+        });
+        expect(candidates).toHaveLength(1);
+        const fetcher = vi
+          .fn()
+          .mockResolvedValue(new Response(null, { status: 204 }));
+        const result = await dispatchPendingCrowdReports(
+          db,
+          { rootUrl: 'https://example.test', token: 'token', candidates },
+          fetcher,
+        );
+        expect(result.failed).toBe(0);
+        expect(await sqlSignals()).toEqual([]);
+        expect(await signalCache.readCachedCommunitySignals()).toEqual({
+          status: 'ready',
+          signals: [],
+        });
+        log.mockRestore();
+      });
+
+      it('keeps slow dispatch outside publication while unrelated writers and repair finish', async () => {
+        const delivery = {
+          producer: 'trusted',
+          externalReportId: 'slow-dispatch',
+          requestPayloadDigest: 'digest',
+        };
+        await persistAutomoderatedProgrammaticCrowdReport(
+          db,
+          submission(),
+          delivery,
+          { now },
+        );
+        const candidates = await getDispatchableCrowdReportCandidates(db, {
+          rootUrl: 'https://example.test',
+        });
+        const started = Promise.withResolvers<void>();
+        const response = Promise.withResolvers<Response>();
+        const fetcher = vi.fn(() => {
+          started.resolve();
+          return response.promise;
+        });
+        const dispatch = dispatchPendingCrowdReports(
+          db,
+          { token: 'token', rootUrl: 'https://example.test', candidates },
+          fetcher,
+        );
+        await started.promise;
+        const ready = await liveRedis.get(
+          signalCache.getCommunitySignalCacheKey(),
+        );
+        try {
+          expect((await signalCache.readCachedCommunitySignals()).status).toBe(
+            'ready',
+          );
+          // The incident lock still excludes a second send of the same candidate.
+          const duplicate = await dispatchPendingCrowdReports(
+            db,
+            { token: 'token', rootUrl: 'https://example.test', candidates },
+            fetcher,
+          );
+          expect(duplicate.results[0].skipped).toBe(true);
+          expect(fetcher).toHaveBeenCalledTimes(1);
+          const unrelated = persistAutomoderatedCrowdReport(
+            db,
+            { ...submission(), effect: 'crowding' },
+            abuse('unrelated'),
+            { now },
+          );
+          // A blocked global lock would time out this assertion; always release
+          // the fake response in finally so failed tests cannot strand SQL work.
+          await expect(
+            Promise.race([
+              unrelated,
+              new Promise((_, reject) =>
+                setTimeout(
+                  () => reject(Error('Unrelated writer blocked by dispatch')),
+                  1000,
+                ),
+              ),
+            ]),
+          ).resolves.toMatchObject({ status: 'accepted' });
+          await signalCache.repairCommunitySignalCache(db);
+          expect((await signalCache.readCachedCommunitySignals()).status).toBe(
+            'ready',
+          );
+          expect(
+            await liveRedis.get(signalCache.getCommunitySignalCacheKey()),
+          ).not.toEqual(ready);
+        } finally {
+          response.resolve(new Response(null, { status: 204 }));
+          expect((await dispatch).failed).toBe(0);
+        }
+        const expected = await sqlSignals();
+        expect(expected).toHaveLength(1);
+        expect(expected[0].effect).toBe('crowding');
+        expect(await signalCache.readCachedCommunitySignals()).toEqual({
+          status: 'ready',
+          signals: expected,
+        });
+      });
+
+      it('keeps healthy replay snapshots and rechecks conditional repairs under the publication lock', async () => {
+        const delivery = {
+          producer: 'trusted',
+          externalReportId: 'replay',
+          requestPayloadDigest: 'digest',
+        };
+        const report = await persistAutomoderatedProgrammaticCrowdReport(
+          db,
+          submission(),
+          delivery,
+          { now },
+        );
+        const ready = await liveRedis.get(
+          signalCache.getCommunitySignalCacheKey(),
+        );
+        const writes = vi.spyOn(liveRedis, 'set');
+        const publications = vi.spyOn(liveRedis, 'duplicate');
+        const readers = vi.spyOn(db, 'select');
+        readers.mockClear();
+        expect(
+          await findProgrammaticCrowdReportRetry(db, delivery),
+        ).toMatchObject({ id: report.id, created: false });
+        expect(readers).toHaveBeenCalledTimes(1);
+        // The persistence helper's conflict path also represents an unchanged replay.
+        expect(
+          await persistAutomoderatedProgrammaticCrowdReport(
+            db,
+            submission(),
+            delivery,
+            { now },
+          ),
+        ).toMatchObject({ id: report.id, created: false });
+        expect(writes).not.toHaveBeenCalled();
+        expect(publications).not.toHaveBeenCalled();
+        expect(
+          await liveRedis.get(signalCache.getCommunitySignalCacheKey()),
+        ).toEqual(ready);
+        writes.mockRestore();
+        publications.mockRestore();
+        readers.mockRestore();
+        await liveRedis.set(
+          signalCache.getCommunitySignalCacheKey(),
+          JSON.stringify({ pending: 'repair' }),
+        );
+        // The first repair blocks at publication while a conditional repair queues
+        // on the SQL lock. The latter must recheck the newly healthy snapshot.
+        const publisher = liveRedis.duplicate();
+        vi.spyOn(liveRedis, 'duplicate').mockReturnValueOnce(publisher);
+        const watch = publisher.watch.bind(publisher);
+        const started = Promise.withResolvers<void>();
+        const resume = Promise.withResolvers<void>();
+        vi.spyOn(publisher, 'watch').mockImplementationOnce(async (key) => {
+          const result = await watch(key);
+          started.resolve();
+          await resume.promise;
+          return result;
+        });
+        const first = signalCache.repairCommunitySignalCache(db);
+        await started.promise;
+        const second = signalCache.repairCommunitySignalCache(db, {
+          onlyIfMissing: true,
+        });
+        resume.resolve();
+        await Promise.all([first, second]);
+        expect(await signalCache.readCachedCommunitySignals()).toEqual({
+          status: 'ready',
+          signals: await sqlSignals(),
+        });
+        // Only the first repair needs a dedicated WATCH connection.
+        expect(liveRedis.duplicate).toHaveBeenCalledTimes(1);
+      });
+
+      it('keeps missing, corrupt, unavailable and failed writes distinct from initialized empty', async () => {
+        await persistAutomoderatedCrowdReport(db, submission(), abuse('one'), {
+          now,
+        });
+        const expected = await sqlSignals();
+        for (const raw of ['', '{}', '{broken']) {
+          if (raw)
+            await liveRedis.set(signalCache.getCommunitySignalCacheKey(), raw);
+          else await liveRedis.del(signalCache.getCommunitySignalCacheKey());
+          expect(
+            (await signalCache.readCachedCommunitySignals()).status,
+          ).not.toBe('ready');
+          expect(
+            await getPageCommunitySignals({ includeCommunitySignals: true }),
+          ).toEqual(expected);
+          expect(
+            await liveRedis.get(signalCache.getCommunitySignalCacheKey()),
+          ).toBe(raw || null);
+        }
+        await signalCache.repairCommunitySignalCache(db);
+        const read = vi
+          .spyOn(liveRedis, 'getrange')
+          .mockRejectedValueOnce(Error('Redis unavailable'));
+        expect(
+          await getPageCommunitySignals({ includeCommunitySignals: true }),
+        ).toEqual(expected);
+        read.mockRestore();
+        const set = vi
+          .spyOn(liveRedis, 'set')
+          .mockRejectedValueOnce(Error('invalidation unavailable'));
+        await expect(
+          persistAutomoderatedCrowdReport(db, submission(), abuse('two'), {
+            now,
+          }),
+        ).rejects.toThrow('invalidation unavailable');
+        expect(await sqlSignals()).toEqual(expected);
+        set.mockRestore();
+        const publisher = liveRedis.duplicate();
+        vi.spyOn(liveRedis, 'duplicate').mockReturnValueOnce(publisher);
+        const watch = publisher.watch.bind(publisher);
+        vi.spyOn(publisher, 'watch').mockImplementationOnce(async (key) => {
+          const result = await watch(key);
+          // A timed-out older invalidation can land after repair has begun.
+          await liveRedis.set(
+            signalCache.getCommunitySignalCacheKey(),
+            JSON.stringify({ pending: 'delayed' }),
+          );
+          return result;
+        });
+        await expect(
+          signalCache.repairCommunitySignalCache(db),
+        ).rejects.toThrow('superseded');
+        expect((await signalCache.readCachedCommunitySignals()).status).toBe(
+          'missing',
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL unavailable'),
+        );
+        await expect(page()).rejects.toThrow('SQL unavailable');
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        await signalCache.repairCommunitySignalCache(db);
+        const select = vi
+          .spyOn(db, 'transaction')
+          .mockRejectedValueOnce(Error('SQL unavailable'));
+        await expect(
+          signalCache.repairCommunitySignalCache(db),
+        ).rejects.toThrow('SQL unavailable');
+        select.mockRestore();
+        expect((await signalCache.readCachedCommunitySignals()).status).toBe(
+          'ready',
+        );
+      });
+    },
+  );
 });

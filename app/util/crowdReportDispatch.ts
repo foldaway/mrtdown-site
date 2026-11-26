@@ -26,9 +26,10 @@ import {
   crowdReportsTable,
 } from '~/db/schema';
 import { purgePublicDataCache } from './cloudflareCache';
+import { withCommunitySignalPublication } from './communitySignalCache.server';
+import { getCrowdReportClusterDirection } from './crowdReportClustering';
 import { captureCrowdReportDispatchAfterSubmissionFailure } from './crowdReportDispatchDiagnostics';
 import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
-import { getCrowdReportClusterDirection } from './crowdReportClustering';
 
 const DEFAULT_DISPATCH_OWNER = 'foldaway';
 const DEFAULT_DISPATCH_REPO = 'mrtdown-data';
@@ -504,6 +505,7 @@ export async function dispatchCrowdReportPayloadToGitHub(
   }, timeoutMs);
 
   let response: Response;
+  let responseText: string;
   try {
     response = await fetchImpl(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,
@@ -523,6 +525,7 @@ export async function dispatchCrowdReportPayloadToGitHub(
         signal: controller.signal,
       },
     );
+    responseText = await response.text();
   } catch (error) {
     if (controller.signal.aborted) {
       throw new Error(
@@ -534,7 +537,6 @@ export async function dispatchCrowdReportPayloadToGitHub(
     clearTimeout(timeoutId);
   }
 
-  const responseText = await response.text();
   if (!response.ok) {
     throw new Error(
       `GitHub repository_dispatch failed with ${response.status}: ${responseText.slice(
@@ -552,7 +554,7 @@ export async function markCrowdReportDispatchSuccess(
   candidate: CrowdReportDispatchCandidate,
   dispatchedAt = DateTime.now().toUTC().toISO() ?? new Date().toISOString(),
 ) {
-  return db.transaction((tx) =>
+  return withCommunitySignalPublication(db, (tx) =>
     markCrowdReportDispatchSuccessInTransaction(tx, candidate, dispatchedAt),
   );
 }
@@ -718,7 +720,7 @@ async function dispatchCrowdReportCandidateWithLock(
   config: CrowdReportDispatchConfig,
   fetchImpl: typeof fetch,
 ) {
-  return db.transaction(async (tx) => {
+  return withCommunitySignalPublication(db, async (tx) => {
     if (!(await tryAcquireCrowdReportDispatchLock(tx, candidate))) {
       return { skipped: true as const };
     }
