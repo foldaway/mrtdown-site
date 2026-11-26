@@ -11,11 +11,7 @@ export function PlatformSign({ color, label }: PlatformSignProps) {
       <span
         aria-hidden="true"
         className="flex h-7 min-w-6 shrink-0 flex-col items-center justify-center rounded-xs px-0.5 text-white shadow-sm"
-        style={{
-          backgroundColor: color,
-          // Keep white letters readable on the brighter line colors.
-          backgroundImage: 'linear-gradient(#0006, #0006)',
-        }}
+        style={{ backgroundColor: color }}
       >
         <span className="font-bold text-sm leading-none">{label}</span>
         <span className="mt-0.5 h-1.5 w-4 rounded-xs bg-white/90" />
