@@ -2,6 +2,8 @@ import { and, asc, eq } from 'drizzle-orm';
 import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
 import {
   landmarksTable,
+  lineDayFactsTable,
+  operatorsTable,
   stationExitsTable,
   stationPlatformServicesTable,
   stationPlatformsTable,
@@ -21,7 +23,7 @@ export const stationProfileSnapshotStore = createPublishedSnapshotStore(
   parseStationProfileSnapshotInputs,
 );
 
-/** Keep one completed graph in one bounded payload, independent of range inputs. */
+/** Shared station/line profile graph and facts from one completed SQL snapshot. */
 export async function publishStationProfileSnapshot(fingerprint?: string) {
   if (!process.env.REDIS_URL) return;
   const expected = await stationProfileSnapshotStore.head();
@@ -40,6 +42,8 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
         landmarksRows,
         stationPlatformRows,
         stationExitRows,
+        operatorsRows,
+        lineUptimeFacts,
       ] = await Promise.all([
         readDatasetInputs(tx, undefined, undefined, {
           references,
@@ -96,6 +100,28 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
             asc(stationExitsTable.source_object_id),
             asc(stationExitsTable.source_id),
           ),
+        tx
+          .select({
+            id: operatorsTable.id,
+            name: operatorsTable.name,
+            founded_at: operatorsTable.founded_at,
+            url: operatorsTable.url,
+            hash: operatorsTable.hash,
+          })
+          .from(operatorsTable),
+        tx
+          .select({
+            date: lineDayFactsTable.date,
+            line_id: lineDayFactsTable.line_id,
+            service_seconds: lineDayFactsTable.service_seconds,
+            downtime_disruption_seconds:
+              lineDayFactsTable.downtime_disruption_seconds,
+            downtime_maintenance_seconds:
+              lineDayFactsTable.downtime_maintenance_seconds,
+            downtime_infra_seconds: lineDayFactsTable.downtime_infra_seconds,
+          })
+          .from(lineDayFactsTable)
+          .orderBy(asc(lineDayFactsTable.date), asc(lineDayFactsTable.line_id)),
       ]);
       return {
         generation,
@@ -103,9 +129,11 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
         inputs: {
           dataset: {
             ...dataset,
+            operatorsRows,
             townsRows,
             landmarksRows,
           },
+          lineUptimeFacts,
           platforms: stationPlatformRows,
           exits: stationExitRows,
         },

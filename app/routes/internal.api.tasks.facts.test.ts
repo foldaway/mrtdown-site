@@ -7,6 +7,7 @@ import {
   publishStatisticsSnapshot,
   rebuildStatisticsSnapshot,
 } from '~/util/dbQueries/statistics';
+import { publishStationProfileSnapshot } from '~/util/stationProfileSnapshot.server';
 import { rangeSnapshotStore } from '~/util/rangeSnapshotStore.server';
 import {
   acquireOrRenewPullWorkflowLease,
@@ -31,6 +32,9 @@ vi.mock('~/util/dbQueries/statistics', () => ({
 vi.mock('~/util/dbQueries/sitemap', () => ({
   rebuildSitemapSnapshot: vi.fn(async () => ({})),
   publishSitemapSnapshot: vi.fn(async () => {}),
+}));
+vi.mock('~/util/stationProfileSnapshot.server', () => ({
+  publishStationProfileSnapshot: vi.fn(async () => {}),
 }));
 vi.mock('~/util/rangeSnapshotStore.server', () => ({
   rangeSnapshotStore: { invalidateCompletion: vi.fn(async () => {}) },
@@ -76,6 +80,7 @@ it('keeps interrupted publication repairable, releases the lease and publishes a
   ).toBeLessThan(
     vi.mocked(rebuildOperationalFactsRange).mock.invocationCallOrder[0],
   );
+  expect(publishStationProfileSnapshot).toHaveBeenCalledOnce();
   expect(purgePublicDataCache).not.toHaveBeenCalled();
   expect(releasePullWorkflowLease).toHaveBeenCalledOnce();
   expect((await handleFactsPost(request())).status).toBe(200);
@@ -91,6 +96,12 @@ it('keeps interrupted publication repairable, releases the lease and publishes a
   );
   expect(
     vi.mocked(publishSitemapSnapshot).mock.invocationCallOrder.at(-1),
+  ).toBeLessThan(
+    vi.mocked(purgePublicDataCache).mock.invocationCallOrder.at(-1) ?? 0,
+  );
+  expect(publishStationProfileSnapshot).toHaveBeenCalledTimes(2);
+  expect(
+    vi.mocked(publishStationProfileSnapshot).mock.invocationCallOrder.at(-1),
   ).toBeLessThan(
     vi.mocked(purgePublicDataCache).mock.invocationCallOrder.at(-1) ?? 0,
   );

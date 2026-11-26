@@ -47,11 +47,14 @@ establish whole-site sleep.
    local parity checks are complete. `npm run verify` passed 786 tests across
    101 files with disposable PostGIS/Redis and no skips on November 26. Review
    and rollout are separate.
-2. Station directory: preserve current/future/closed membership and latest
-   disruption summaries from published inputs.
-3. Line profiles and directory: preserve service directions, loops and issue
-   scope with request-time selection.
-4. Operator profiles and their directory callers.
+2. Line profiles: reuse the station source graph with operator labels and dated
+   ranking facts. Complete loader cold/warm SQL parity and repository verification
+   passed locally on November 26 (793 tests, 102 files, no skips, disposable
+   PostGIS/Redis). Review and rollout remain separate. The line directory remains
+   in step 3.
+3. Station and line directories: preserve current/future/closed membership,
+   latest disruption summaries and persisted-fact ranking at the request date.
+4. Operator profiles and any directory callers.
 5. Town profiles and directory, including station details and related scope.
 
 Local canonical-corpus validation matched BKP and its BP6 alias cold/warm with

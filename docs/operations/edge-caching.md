@@ -228,7 +228,8 @@ With Redis configured, station HTML, server functions and Markdown resolve IDs
 and aliases from `mrtdown:{<tier>:station-profiles:v1}` before opening SQL.
 One source graph supplies scoped profile assembly at the request clock. The
 range payload is unchanged. Station inputs add towns, landmarks, platforms,
-exits and historical issue references; operators and evidence bodies are omitted.
+exits and historical issue references. Line profiles reuse this graph, adding
+operator labels and dated uptime ranking facts; evidence bodies are omitted.
 Community disruption signals remain independently published and expire through
 the existing signal reader.
 
@@ -237,7 +238,8 @@ JSON, logs `station_profiles_published` bytes, checks digest/schema on cold read
 and checks the active head on every request. Its atomic compare-and-swap and
 24-hour previous-payload retention keep crossing reads coherent and reject
 delayed writers. Publication requires a completed canonical generation.
-Canonical and holiday workflows publish before purge and completion; unchanged
+Canonical and holiday workflows publish before purge and completion; authenticated
+facts rebuilds republish the graph and facts before purge. Unchanged
 preflights verify the payload and matching generation/fingerprint.
 
 Missing, invalid or unavailable inputs use SQL with `no-store`. Requests do not
@@ -247,6 +249,16 @@ Station HTML and server-function response deadlines stop at Singapore midnight,
 one hour, or the next relevant incident/signal boundary. Healthy Markdown uses
 the general edge cache policy; SQL-recovery Markdown remains `no-store`.
 Arrival polling retains its separate published inputs and `no-store` contract.
+
+Line HTML, server functions and Markdown share the line loader and preserve the
+existing general edge policy. Assembly recomputes service/issue state and graphs
+at the request clock. Ranking compares the live root-line ratio with persisted
+facts for other lines, selecting their dated rows in the moving requested window,
+exactly as SQL does. Passing midnight does not synthesize new facts or trigger SQL.
+All persisted dates are published (bounded to 100,000 rows and the shared byte
+limits); an empty fact set retains null/rank semantics. Facts advance only on
+canonical, holiday or authenticated facts rebuilds. Missing line IDs retain
+uncached SQL recovery. This slice does not migrate the line directory.
 
 A non-string `active` key causes Redis `WRONGTYPE` errors and cannot be repaired
 by publication retries. After investigating the cause, recover as follows:
