@@ -69,7 +69,6 @@ export function ServiceArrivalSummary({
       {data?.source === 'scheduled' ? (
         <ScheduledArrivalStatus
           data={data}
-          hasDepartures={hasDepartures}
           heading={heading}
           reportButton={reportButton}
           lineColor={lineColor}

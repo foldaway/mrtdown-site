@@ -112,12 +112,15 @@ afterEach(() => {
 });
 
 describe('station guide arrival sources', () => {
-  it('shows the next two departures per platform group as read-only times', () => {
+  it('shows the next three departures per platform group as read-only times', () => {
     const html = renderRow(scheduled);
-    expect(html).toMatch(/>2 <span[^>]*>min<\/span>/);
+    expect(html).toMatch(/>2 <span[^>]*>mins<\/span>/);
     expect(html).toMatch(
-      /class="sr-only">then<\/span>.*<svg[^>]*aria-hidden="true"[^>]*>.*<strong[^>]*>.*≈.*7 min<\/strong>/,
+      /class="sr-only">then<\/span>.*≈.*7 <span[^>]*>mins<\/span>/,
     );
+    expect(html).toMatch(/>2 <span class="sr-only">mins<\/span>/);
+    expect(html).toMatch(/>7 <span class="sr-only">mins<\/span>/);
+    expect(html).toMatch(/>12 <span class="(?!sr-only)[^"]+">mins<\/span>/);
     expect(html).not.toContain('aria-expanded');
     expect(html).not.toContain('Scheduled times');
     expect(html).toContain('Approximate scheduled');
@@ -135,24 +138,78 @@ describe('station guide arrival sources', () => {
     expect(html).not.toContain(departure.providerTripId);
   });
 
-  it('uses clock times for stale responses and departures whose scheduled time has passed', () => {
+  it('limits each platform group to three upcoming departures', () => {
+    if (scheduled.source !== 'scheduled') throw new Error('fixture');
+    const html = renderRow({
+      ...scheduled,
+      timings: scheduled.timings.map((timing, index) =>
+        index === 0
+          ? {
+              ...timing,
+              departures: [
+                ...timing.departures,
+                {
+                  ...timing.departures[0],
+                  time: '2026-10-24T16:25:00Z',
+                  stopSequence: '005',
+                },
+              ],
+            }
+          : timing,
+      ),
+    });
+    expect(html).toMatch(/>12 <span[^>]*>mins<\/span>/);
+    expect(html).not.toMatch(/>17 <span[^>]*>mins<\/span>/);
+  });
+
+  it('labels stale clock times and advances past elapsed departures in fresh responses', () => {
     const stale = renderRow(scheduled, 'error');
     expect(stale).toContain('Showing the last known response');
-    expect(stale).not.toMatch(/>2 <span[^>]*>min<\/span>/);
+    expect(stale).not.toMatch(/>2 <span[^>]*>mins<\/span>/);
     expect(stale).not.toContain('>7 min<');
-    expect(stale.match(/<time/g)).toHaveLength(3);
+    expect(stale.match(/<time/g)).toHaveLength(4);
+    expect(stale).toContain('>Scheduled</p>');
     expect(stale).toContain('12:10 am');
-    expect(stale).not.toContain('12:20 am');
+    expect(stale).toContain('12:20 am');
     const elapsed = renderRow(
       scheduled,
       'ready',
       Date.parse('2026-10-24T16:10:15Z'),
     );
-    expect(elapsed.replace(/<[^>]*>/g, '')).not.toContain('0 min');
+    expect(elapsed.replace(/<[^>]*>/g, '')).not.toMatch(/\b0 mins\b/);
+    expect(elapsed).toMatch(/≈.*5 <span[^>]*>mins<\/span>/);
     expect(elapsed).toMatch(
-      /class="sr-only">then<\/span>.*<strong[^>]*>.*5 min<\/strong>/,
+      /class="sr-only">then<\/span>.*10 <span[^>]*>mins<\/span>/,
     );
-    expect(elapsed.match(/<time/g)).toHaveLength(1);
+    expect(elapsed).not.toContain('<time');
+    expect(elapsed).not.toContain('12:10 am');
+  });
+
+  it('advances at the scheduled instant and keeps the next three upcoming departures', () => {
+    const html = renderRow(
+      scheduled,
+      'ready',
+      Date.parse('2026-10-24T16:10:00Z'),
+    );
+    expect(html).toMatch(/≈.*5 <span[^>]*>mins<\/span>/);
+    expect(html).toMatch(
+      /class="sr-only">then<\/span>.*10 <span[^>]*>mins<\/span>/,
+    );
+    expect(html).not.toContain('<time');
+    expect(html.replace(/<[^>]*>/g, '')).not.toMatch(/\b0 mins\b/);
+  });
+
+  it('shows a neutral empty state when every returned departure has passed', () => {
+    const html = renderRow(
+      scheduled,
+      'ready',
+      Date.parse('2026-10-24T16:20:01Z'),
+      async () => {},
+    );
+    expect(html).toContain('No upcoming times');
+    expect(html).not.toContain('None in the next hour');
+    expect(html).not.toContain('<time');
+    expect(html).toContain('Report an arrival');
   });
 
   it('keeps the one-hour boundary in minutes', () => {
@@ -161,7 +218,7 @@ describe('station guide arrival sources', () => {
       'ready',
       Date.parse('2026-10-24T15:10:00Z'),
     );
-    expect(html).toMatch(/>60 <span[^>]*>min<\/span>/);
+    expect(html).toMatch(/>60 <span[^>]*>mins<\/span>/);
     expect(html).not.toContain('1h 0m');
   });
 
@@ -169,7 +226,7 @@ describe('station guide arrival sources', () => {
     const recent = { ...scheduled, recentCrowdArrival };
     const html = renderRow(recent, 'ready', undefined, async () => {});
     expect(html).toContain('Rider-reported arrival');
-    expect(html).toMatch(/>2 <span[^>]*>min<\/span>/);
+    expect(html).toMatch(/>2 <span[^>]*>mins<\/span>/);
     expect(html).toContain('Report an arrival');
     const expired = renderRow(
       recent,
@@ -190,7 +247,7 @@ describe('station guide arrival sources', () => {
     expect(html).toContain('>Report</button>');
     expect(html).toContain(`hidden="" id="${triggers[0]?.[1]}"`);
     const report = html.indexOf('aria-label="Report an arrival"');
-    expect(report).toBeGreaterThan(html.indexOf('class="sr-only">then</span>'));
+    expect(report).toBeGreaterThan(html.indexOf('>then</span>'));
     expect(html).not.toContain('<section');
   });
 
@@ -226,7 +283,7 @@ describe('station guide arrival sources', () => {
     ] as const) {
       const row = renderRow(data, 'ready', undefined, onArrivalReported);
       expect(row).toContain(message);
-      expect(row).toContain('>—</span>');
+      expect(row).not.toContain('>—</span>');
       expect(row.includes('Report an arrival')).toBe(canReport);
       const withReport = renderRow({ ...data, recentCrowdArrival });
       expect(withReport).toContain(message);
@@ -238,7 +295,7 @@ describe('station guide arrival sources', () => {
       timings: scheduled.timings,
     });
     expect(partialWithTimes).not.toContain('Incomplete timetable');
-    expect(partialWithTimes).toMatch(/>2 <span[^>]*>min<\/span>/);
+    expect(partialWithTimes).toMatch(/>2 <span[^>]*>mins<\/span>/);
     expect(partialWithTimes).not.toContain('Timetable unavailable');
     expect(renderRow(empty, 'error')).toContain(
       'Showing the last known response',

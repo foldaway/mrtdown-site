@@ -1,4 +1,3 @@
-import { ArrowLongRightIcon } from '@heroicons/react/16/solid';
 import type { ReactNode } from 'react';
 import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
 import type { StationArrivalsV2 } from '~/util/stationArrivalsV2';
@@ -15,7 +14,6 @@ type ScheduledDeparture =
 
 type ScheduledArrivalStatusProps = {
   data: ScheduledResponse;
-  hasDepartures: boolean;
   heading: ReactNode;
   reportButton?: ReactNode;
   lineColor: string;
@@ -24,7 +22,6 @@ type ScheduledArrivalStatusProps = {
 
 export function ScheduledArrivalStatus({
   data,
-  hasDepartures,
   heading,
   reportButton,
   lineColor,
@@ -36,6 +33,15 @@ export function ScheduledArrivalStatus({
     now != null &&
     Math.max(now, Date.parse(data.window.startInstant)) <
       Date.parse(data.window.endInstant);
+  const timings = data.timings.map((timing) => ({
+    ...timing,
+    // Advance to the next scheduled train between refreshes rather than
+    // turning an elapsed countdown into a large clock time.
+    departures: timing.departures.filter(
+      ({ time }) => now == null || Date.parse(time) > now,
+    ),
+  }));
+  const hasDepartures = timings.some(({ departures }) => departures.length > 0);
 
   if (!hasDepartures) {
     return (
@@ -45,19 +51,24 @@ export function ScheduledArrivalStatus({
         platformLabels={[]}
       >
         <ArrivalTimingDisplay reportButton={reportButton}>
-          <NoArrivalTimes emptyWindow={emptyWindow} />
+          <NoArrivalTimes
+            elapsed={data.timings.some(
+              ({ departures }) => departures.length > 0,
+            )}
+            emptyWindow={emptyWindow}
+          />
         </ArrivalTimingDisplay>
       </ArrivalServiceRow>
     );
   }
 
-  const firstTimedGroup = data.timings.find(
+  const firstTimedGroup = timings.find(
     ({ departures }) => departures.length > 0,
   );
   return (
     <div className="space-y-1">
-      {data.timings.map((timing) => {
-        const [next, following] = timing.departures;
+      {timings.map((timing, index) => {
+        const departures = timing.departures.slice(0, 3);
         return (
           <div
             className="border-gray-200 dark:border-gray-700 [&+&]:border-t [&+&]:pt-1"
@@ -74,19 +85,38 @@ export function ScheduledArrivalStatus({
               <ArrivalTimingDisplay
                 reportButton={timing === firstTimedGroup ? reportButton : null}
               >
-                {next ? (
-                  <>
-                    <DepartureTime departure={next} now={now} />
-                    {following && (
-                      <DepartureTime
-                        departure={following}
-                        following
-                        now={now}
-                      />
+                {departures.length > 0 ? (
+                  <div className="flex flex-1 flex-col">
+                    {now == null && (
+                      <p className="pt-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                        <FormattedMessage
+                          id="station.arrivals.scheduled_label"
+                          defaultMessage="Scheduled"
+                        />
+                      </p>
                     )}
-                  </>
+                    <div
+                      className="-mx-2 grid min-h-8 flex-1 items-stretch"
+                      style={{
+                        gridTemplateColumns: `${'2.25rem '.repeat(departures.length - 1)}minmax(0, 1fr)`,
+                      }}
+                    >
+                      {departures.map((departure, index) => (
+                        <DepartureTime
+                          departure={departure}
+                          following={index > 0}
+                          key={JSON.stringify(departure)}
+                          now={now}
+                          showUnit={index === departures.length - 1}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ) : (
-                  <NoArrivalTimes emptyWindow={emptyWindow} />
+                  <NoArrivalTimes
+                    elapsed={data.timings[index].departures.length > 0}
+                    emptyWindow={emptyWindow}
+                  />
                 )}
               </ArrivalTimingDisplay>
             </ArrivalServiceRow>
@@ -101,13 +131,24 @@ type DepartureTimeProps = {
   departure: ScheduledDeparture;
   following?: boolean;
   now: number | null;
+  showUnit: boolean;
 };
 
-function DepartureTime({ departure, following, now }: DepartureTimeProps) {
+function DepartureTime({
+  departure,
+  following,
+  now,
+  showUnit,
+}: DepartureTimeProps) {
   const intl = useIntl();
-  const minutes =
-    now == null ? 0 : Math.ceil((Date.parse(departure.time) - now) / 60_000);
-  const duration = minutes > 0 ? formatWait(minutes, intl, following) : null;
+  const duration =
+    now == null
+      ? null
+      : formatWait(
+          Math.ceil((Date.parse(departure.time) - now) / 60_000),
+          intl,
+          showUnit,
+        );
   const clock = (
     <time dateTime={departure.time}>
       {formatClockTime(departure.time, intl)}
@@ -115,59 +156,48 @@ function DepartureTime({ departure, following, now }: DepartureTimeProps) {
   );
 
   const value = (
-    <>
+    <ArrivalTimeValue clock={now == null} secondary={following}>
       {departure.precision !== 'exact' && <ApproximateTime />}
       {duration ?? clock}
-    </>
+    </ArrivalTimeValue>
   );
 
   return following ? (
-    <span className="inline-flex items-center gap-1 text-[11px] text-gray-600 leading-snug sm:text-xs dark:text-gray-400">
+    <span
+      className={`inline-flex min-w-0 items-center border-gray-200/80 border-s py-1.5 dark:border-white/10 ${showUnit ? 'justify-start ps-2 text-start' : 'justify-center text-center'}`}
+    >
       <FormattedMessage
         id="station.arrival_timings.then"
         defaultMessage="<label>then</label> {time}"
         values={{
-          label: (label) => (
-            <>
-              <span className="sr-only">{label}</span>
-              <ArrowLongRightIcon
-                aria-hidden="true"
-                className="size-3.5 shrink-0 text-gray-500 dark:text-gray-400"
-              />
-            </>
-          ),
-          time: (
-            <strong className="whitespace-nowrap font-medium">{value}</strong>
-          ),
+          label: (label) => <span className="sr-only">{label}</span>,
+          time: value,
         }}
       />
     </span>
   ) : (
-    <ArrivalTimeValue>{value}</ArrivalTimeValue>
+    <span className="inline-flex min-w-0 items-center justify-center py-1.5 text-center">
+      {value}
+    </span>
   );
 }
 
-function formatWait(minutes: number, intl: IntlShape, following = false) {
-  const unit = (text: ReactNode) =>
-    following ? (
-      text
-    ) : (
-      <span className="font-medium text-[0.7em] tracking-normal">{text}</span>
-    );
-  if (minutes > 60) {
-    return intl.formatMessage(
-      {
-        id: 'station.arrival_timings.hours_and_minutes',
-        defaultMessage:
-          '{hours, number}<unit>h</unit> {minutes, number}<unit>m</unit>',
-      },
-      { hours: Math.floor(minutes / 60), minutes: minutes % 60, unit },
-    );
-  }
+function formatWait(minutes: number, intl: IntlShape, showUnit: boolean) {
+  const unit = (text: ReactNode) => (
+    <span
+      className={
+        showUnit
+          ? 'font-medium text-gray-500 text-xs tracking-normal dark:text-gray-400'
+          : 'sr-only'
+      }
+    >
+      {text}
+    </span>
+  );
   return intl.formatMessage(
     {
       id: 'station.arrival_timings.compact_minutes',
-      defaultMessage: '{minutes, number} <unit>min</unit>',
+      defaultMessage: '{minutes, number} <unit>mins</unit>',
     },
     { minutes, unit },
   );
