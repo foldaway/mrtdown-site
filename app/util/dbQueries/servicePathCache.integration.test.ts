@@ -1302,10 +1302,18 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     await publishRangeReferenceCache(generation);
     const original = store.get(getServicePathCacheKey(generation)) ?? '';
     const paused = Promise.withResolvers<string>();
-    redis.getrange.mockReturnValueOnce(paused.promise);
+    let readingOldPaths = false;
+    redis.getrange.mockImplementation(async (key: string) => {
+      if (key === getServicePathCacheKey(generation)) {
+        readingOldPaths = true;
+        return paused.promise;
+      }
+      return store.get(key) ?? '';
+    });
     const inFlight = range();
     try {
-      await vi.waitFor(() => expect(redis.getrange).toHaveBeenCalledTimes(2));
+      // Setup also reads Redis; wait for this read's established SQL snapshot.
+      await vi.waitFor(() => expect(readingOldPaths).toBe(true));
       const nextGeneration = randomUUID();
       // Publish both changes after the pending read established its old SQL snapshot.
       await db.transaction(async (tx) => {
