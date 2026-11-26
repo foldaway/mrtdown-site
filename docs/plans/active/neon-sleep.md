@@ -32,6 +32,14 @@ background SQL dependencies remain; production-wide sleep is not established.
 - [x] Prove the complete arrivals endpoint works with SQL disabled across clock,
   correction, coverage and report changes before a separate activation.
 
+### Community disruption signals follow-up
+
+Source now caches home, station and line public signal inputs separately from
+arrival reports. Writers invalidate/refresh, and an explicit repair command
+initializes empty results. See the [runbook](../../operations/edge-caching.md#public-community-disruption-signals).
+Deployment and production verification remain separate; this change does not
+establish whole-site sleep.
+
 ## Surprises & Discoveries
 
 Before source snapshots, range hits still selected canonical generation, issues

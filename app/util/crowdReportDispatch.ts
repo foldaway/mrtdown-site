@@ -26,9 +26,10 @@ import {
   crowdReportsTable,
 } from '~/db/schema';
 import { purgePublicDataCache } from './cloudflareCache';
+import { withCommunitySignalPublication } from './communitySignalCache.server';
+import { getCrowdReportClusterDirection } from './crowdReportClustering';
 import { captureCrowdReportDispatchAfterSubmissionFailure } from './crowdReportDispatchDiagnostics';
 import { buildCrowdReportDispatchLockKey } from './crowdReportLocks';
-import { getCrowdReportClusterDirection } from './crowdReportClustering';
 
 const DEFAULT_DISPATCH_OWNER = 'foldaway';
 const DEFAULT_DISPATCH_REPO = 'mrtdown-data';
@@ -552,7 +553,7 @@ export async function markCrowdReportDispatchSuccess(
   candidate: CrowdReportDispatchCandidate,
   dispatchedAt = DateTime.now().toUTC().toISO() ?? new Date().toISOString(),
 ) {
-  return db.transaction((tx) =>
+  return withCommunitySignalPublication(db, (tx) =>
     markCrowdReportDispatchSuccessInTransaction(tx, candidate, dispatchedAt),
   );
 }
@@ -718,7 +719,7 @@ async function dispatchCrowdReportCandidateWithLock(
   config: CrowdReportDispatchConfig,
   fetchImpl: typeof fetch,
 ) {
-  return db.transaction(async (tx) => {
+  return withCommunitySignalPublication(db, async (tx) => {
     if (!(await tryAcquireCrowdReportDispatchLock(tx, candidate))) {
       return { skipped: true as const };
     }

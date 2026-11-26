@@ -32,7 +32,8 @@
     "db:seed:fixtures": "tsx app/scripts/seedFixtures.ts",
     "db:seed:crowd-report-fixtures": "tsx app/scripts/seedCrowdReportFixtures.ts",
     "db:preview:prepare": "npm run db:reset && npm run db:migrate:debug",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "cache:community-signals:repair": "tsx app/scripts/repairCommunitySignalCache.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

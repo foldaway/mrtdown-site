@@ -11,6 +11,7 @@ import {
   stationCodesTable,
   stationsTable,
 } from '../db/schema.js';
+import { withCommunitySignalPublication } from '../util/communitySignalCache.server';
 import {
   type CrowdReportAbuseContext,
   type CrowdReportSubmission,
@@ -204,7 +205,7 @@ function buildFixtureSubmissions(
 }
 
 async function clearExistingSyntheticCrowdReports(db: Db) {
-  await db.transaction(async (tx) => {
+  await withCommunitySignalPublication(db, async (tx) => {
     await tx
       .update(crowdReportsTable)
       .set({

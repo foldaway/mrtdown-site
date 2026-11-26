@@ -23,6 +23,10 @@ import {
   stationsTable,
 } from '~/db/schema';
 import { getClientIp } from './clientIp';
+import {
+  tryRepairCommunitySignalCache,
+  withCommunitySignalPublication,
+} from './communitySignalCache.server';
 import { buildCrowdReportClusteringLockKey } from './crowdReportClustering';
 import {
   type DuplicateCrowdReport,
@@ -41,6 +45,12 @@ const DEFAULT_PUBLIC_SIGNAL_MIN_REPORTS = 3;
 const DEFAULT_PUBLIC_SIGNAL_MIN_DISTINCT_IP_HASHES = 2;
 export const DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES = 90;
 const DEFAULT_PUBLIC_SIGNAL_LIMIT = 20;
+export const PAGE_COMMUNITY_SIGNAL_POLICY = {
+  includeUnconfirmedClusters: true,
+  minReportCount: 1,
+  minDistinctIpHashes: 1,
+  limit: DEFAULT_PUBLIC_SIGNAL_LIMIT,
+} as const;
 const AUTO_REJECT_RESOLVED_STALE_HOURS = 6;
 const AUTO_REJECT_UNCONFIRMED_STALE_HOURS = 12;
 export const MAX_CROWD_REPORT_REQUEST_BYTES = 10_000;
@@ -1054,7 +1064,7 @@ export async function automoderateCrowdReport(
     options.duplicateWindowMinutes ?? DEFAULT_DUPLICATE_WINDOW_MINUTES;
   const now = options.now ?? DateTime.now().setZone(SG_TIMEZONE);
 
-  return db.transaction((tx) =>
+  return withCommunitySignalPublication(db, (tx) =>
     automoderateCrowdReportInTransaction(
       tx,
       reportId,
@@ -1502,6 +1512,7 @@ export async function findProgrammaticCrowdReportRetry(
   if (report.requestPayloadDigest !== delivery.requestPayloadDigest) {
     throw new CrowdReportIdempotencyConflictError(report.id);
   }
+  await tryRepairCommunitySignalCache(db);
   return {
     id: report.id,
     status: report.status,
@@ -1547,7 +1558,7 @@ export async function persistAutomoderatedCrowdReport(
   const idFactory = options.idFactory ?? (() => crypto.randomUUID());
   const reportId = idFactory();
 
-  return db.transaction(async (tx) => {
+  return withCommunitySignalPublication(db, async (tx) => {
     const report = await persistCrowdReportInTransaction(
       tx,
       submission,
@@ -1586,7 +1597,7 @@ export async function persistAutomoderatedProgrammaticCrowdReport(
   const idFactory = options.idFactory ?? (() => crypto.randomUUID());
   const reportId = idFactory();
 
-  return db.transaction(async (tx) => {
+  return withCommunitySignalPublication(db, async (tx) => {
     const [insertedReport] = await tx
       .insert(crowdReportsTable)
       .values(buildCrowdReportInsertValues(reportId, submission, delivery))
@@ -1647,7 +1658,7 @@ export async function persistAutomoderatedProgrammaticCrowdReport(
 }
 
 export async function getPublicCrowdReportSignals(
-  db: AppDb,
+  db: CrowdReportReadableDb,
   options: {
     lineId?: string;
     stationId?: string;
@@ -1706,6 +1717,7 @@ export async function getPublicCrowdReportSignals(
       desc(
         getCrowdReportClusterOngoingWindowEndAtSql(crowdReportClustersTable.id),
       ),
+      desc(crowdReportClustersTable.id),
     )
     .limit(options.limit ?? DEFAULT_PUBLIC_SIGNAL_LIMIT);
 
