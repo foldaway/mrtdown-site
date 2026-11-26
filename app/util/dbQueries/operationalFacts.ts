@@ -1,15 +1,23 @@
 import { setImmediate as setImmediatePromise } from 'node:timers/promises';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { DateTime } from 'luxon';
+import { z } from 'zod';
 import {
   issueDayFactsTable,
+  metadataTable,
   lineDayFactsTable,
   lineDayIssueIntervalsTable,
   stationIssueFactsTable,
 } from '~/db/schema';
 import type { Line } from '~/types';
 import { issueContributesToLineDowntime } from '~/util/issueOperationalEffects';
-import { type AppDb, chunk, getDefaultDb } from './database';
+import {
+  type AppDb,
+  type AppDbTransaction,
+  type AppDbReader,
+  chunk,
+  getDefaultDb,
+} from './database';
 import { type BaseDataset, buildCompleteDataset } from './dataset';
 import {
   isoDate,
@@ -34,6 +42,26 @@ import {
   sumIntervalSeconds,
 } from './issueIntervals';
 import { isLineFuture, serviceWindowForDate } from './serviceOperations';
+
+export const PENDING_HOLIDAY_DATES_KEY = 'public_holiday_pending_fact_dates_v1';
+
+/** A repair must not publish committed holidays with unfinished derived facts. */
+export async function assertCompletedHolidayFacts(
+  db: AppDbReader,
+  completedDates: readonly string[] = [],
+) {
+  const [pending] = await db
+    .select({ value: metadataTable.value })
+    .from(metadataTable)
+    .where(eq(metadataTable.key, PENDING_HOLIDAY_DATES_KEY));
+  const dates = pending
+    ? z.array(z.iso.date()).parse(JSON.parse(pending.value))
+    : [];
+  if (dates.some((date) => !completedDates.includes(date)))
+    throw Error(
+      'Finish the pending public-holiday workflow before publishing profiles',
+    );
+}
 
 const OPERATIONAL_FACTS_REBUILD_DAY_BATCH = 5;
 
@@ -239,7 +267,7 @@ async function buildOperationalFactRowsForDates(
 }
 
 async function replaceOperationalFactRows(
-  database: AppDb,
+  tx: AppDbTransaction,
   rowsByDate: OperationalFactRowsForDate[],
 ) {
   const dates = rowsByDate.map((rows) => rows.date);
@@ -249,52 +277,48 @@ async function replaceOperationalFactRows(
     (rows) => rows.lineIssueIntervalRows,
   );
 
-  await database.transaction(async (tx) => {
-    for (const batch of chunk(dates, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
-      if (batch.length === 0) {
-        continue;
-      }
-      await tx
-        .delete(issueDayFactsTable)
-        .where(inArray(issueDayFactsTable.date, batch));
-      await tx
-        .delete(lineDayFactsTable)
-        .where(inArray(lineDayFactsTable.date, batch));
+  for (const batch of chunk(dates, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
+    if (batch.length === 0) {
+      continue;
     }
+    await tx
+      .delete(issueDayFactsTable)
+      .where(inArray(issueDayFactsTable.date, batch));
+    await tx
+      .delete(lineDayFactsTable)
+      .where(inArray(lineDayFactsTable.date, batch));
+  }
 
-    for (const batch of chunk(issueRows, 500)) {
-      if (batch.length > 0) {
-        await tx.insert(issueDayFactsTable).values(batch);
-      }
+  for (const batch of chunk(issueRows, 500)) {
+    if (batch.length > 0) {
+      await tx.insert(issueDayFactsTable).values(batch);
     }
-    for (const batch of chunk(lineRows, 500)) {
-      if (batch.length > 0) {
-        await tx.insert(lineDayFactsTable).values(batch);
-      }
+  }
+  for (const batch of chunk(lineRows, 500)) {
+    if (batch.length > 0) {
+      await tx.insert(lineDayFactsTable).values(batch);
     }
-    for (const batch of chunk(lineIssueIntervalRows, 500)) {
-      if (batch.length > 0) {
-        await tx.insert(lineDayIssueIntervalsTable).values(batch);
-      }
+  }
+  for (const batch of chunk(lineIssueIntervalRows, 500)) {
+    if (batch.length > 0) {
+      await tx.insert(lineDayIssueIntervalsTable).values(batch);
     }
-  });
+  }
 }
 
 async function replaceStationIssueFactRows(
-  database: AppDb,
+  tx: AppDbTransaction,
   dataset: BaseDataset,
   asOf: DateTime,
 ) {
   const rows = buildStationIssueFactRows(dataset, asOf);
 
-  await database.transaction(async (tx) => {
-    await tx.delete(stationIssueFactsTable);
-    for (const batch of chunk(rows, 500)) {
-      if (batch.length > 0) {
-        await tx.insert(stationIssueFactsTable).values(batch);
-      }
+  await tx.delete(stationIssueFactsTable);
+  for (const batch of chunk(rows, 500)) {
+    if (batch.length > 0) {
+      await tx.insert(stationIssueFactsTable).values(batch);
     }
-  });
+  }
 }
 
 async function rebuildOperationalFactsForDateFromDataset(
@@ -306,8 +330,10 @@ async function rebuildOperationalFactsForDateFromDataset(
   const database = db ?? (await getDefaultDb());
   const rows = buildOperationalFactRowsForDate(date, dataset, context);
 
-  await replaceOperationalFactRows(database, [rows]);
-  await replaceStationIssueFactRows(database, dataset, date.endOf('day'));
+  await database.transaction(async (tx) => {
+    await replaceOperationalFactRows(tx, [rows]);
+    await replaceStationIssueFactRows(tx, dataset, date.endOf('day'));
+  });
 
   return {
     date: rows.date,
@@ -367,22 +393,24 @@ export async function rebuildOperationalFactsForDates(
     lineCount: number;
   }> = [];
 
-  for (const batch of chunk(dateTimes, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
-    const rowsByDate = await buildOperationalFactRowsForDates(
-      batch,
-      dataset,
-      context,
-    );
-    await replaceOperationalFactRows(database, rowsByDate);
-    results.push(
-      ...rowsByDate.map((rows) => ({
-        date: rows.date,
-        issueCount: rows.issueRows.length,
-        lineCount: rows.lineRows.length,
-      })),
-    );
-  }
-  await replaceStationIssueFactRows(database, dataset, latestDate.endOf('day'));
+  await database.transaction(async (tx) => {
+    for (const batch of chunk(dateTimes, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
+      const rowsByDate = await buildOperationalFactRowsForDates(
+        batch,
+        dataset,
+        context,
+      );
+      await replaceOperationalFactRows(tx, rowsByDate);
+      results.push(
+        ...rowsByDate.map((rows) => ({
+          date: rows.date,
+          issueCount: rows.issueRows.length,
+          lineCount: rows.lineRows.length,
+        })),
+      );
+    }
+    await replaceStationIssueFactRows(tx, dataset, latestDate.endOf('day'));
+  });
 
   return results;
 }
@@ -409,25 +437,23 @@ export async function rebuildOperationalFactsRange(
   const dates = Array.from({ length: days }, (_, index) =>
     normalizedEnd.minus({ days: days - 1 - index }),
   );
-  for (const batch of chunk(dates, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
-    const rowsByDate = await buildOperationalFactRowsForDates(
-      batch,
-      dataset,
-      context,
-    );
-    await replaceOperationalFactRows(database, rowsByDate);
-    results.push(
-      ...rowsByDate.map((rows) => ({
-        date: rows.date,
-        issueCount: rows.issueRows.length,
-        lineCount: rows.lineRows.length,
-      })),
-    );
-  }
-  await replaceStationIssueFactRows(
-    database,
-    dataset,
-    normalizedEnd.endOf('day'),
-  );
+  await database.transaction(async (tx) => {
+    for (const batch of chunk(dates, OPERATIONAL_FACTS_REBUILD_DAY_BATCH)) {
+      const rowsByDate = await buildOperationalFactRowsForDates(
+        batch,
+        dataset,
+        context,
+      );
+      await replaceOperationalFactRows(tx, rowsByDate);
+      results.push(
+        ...rowsByDate.map((rows) => ({
+          date: rows.date,
+          issueCount: rows.issueRows.length,
+          lineCount: rows.lineRows.length,
+        })),
+      );
+    }
+    await replaceStationIssueFactRows(tx, dataset, normalizedEnd.endOf('day'));
+  });
   return results;
 }

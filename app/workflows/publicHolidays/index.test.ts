@@ -174,6 +174,9 @@ it.each(['facts', 'publication', 'stations', 'purge'] as const)(
     ).toBeLessThan(
       vi.mocked(purgePublicDataCache).mock.invocationCallOrder.at(-1) ?? 0,
     );
+    expect(publishStationProfileSnapshot).toHaveBeenLastCalledWith(undefined, [
+      '2026-12-25',
+    ]);
     expect(state.where).toHaveBeenCalledOnce();
     expect(await canSkipPublicHolidaySync(rows)).toBe(true);
     vi.mocked(rangeSnapshotStore.read).mockResolvedValue(null);

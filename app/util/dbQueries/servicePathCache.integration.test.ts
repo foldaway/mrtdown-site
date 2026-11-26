@@ -114,7 +114,11 @@ import {
   getHistoryYearSummaryData,
 } from './history';
 import { getIssuesOverlappingRange } from './issueRange';
-import { rebuildOperationalFactsRange } from './operationalFacts';
+import {
+  rebuildOperationalFactsForDate,
+  rebuildOperationalFactsForDates,
+  rebuildOperationalFactsRange,
+} from './operationalFacts';
 import { getOverviewData, getSystemMapData } from './overview';
 import {
   getSitemapData,
@@ -862,6 +866,101 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         const keys = await stationRedis.keys(`mrtdown:*${process.env.TIER}*`);
         if (keys.length) await stationRedis.del(...keys);
         await stationRedis.quit();
+      });
+
+      it.each(['range', 'dates', 'single'] as const)(
+        'rolls back all %s fact replacements if the final station projection fails',
+        async (kind) => {
+          await rebuildOperationalFactsRange(6);
+          await publishStationProfileSnapshot('a'.repeat(64));
+          const head = await stationProfileSnapshotStore.head();
+          const tables = [
+            'line_day_facts',
+            'issue_day_facts',
+            'line_day_issue_intervals',
+            'station_issue_facts',
+          ];
+          const readFacts = async () =>
+            Promise.all(
+              tables.map((table) =>
+                pool
+                  .query(
+                    `select to_jsonb(t) as row from ${table} t order by to_jsonb(t)::text`,
+                  )
+                  .then((result) => result.rows),
+              ),
+            );
+          const before = await readFacts();
+          await pool.query('update lines set operating_hours=null');
+          await pool.query(
+            `create function fail_profile_facts() returns trigger language plpgsql as $$ begin raise exception 'forced fact rebuild failure'; end $$`,
+          );
+          await pool.query(
+            'create trigger fail_profile_facts before insert on station_issue_facts for each row execute function fail_profile_facts()',
+          );
+          const rebuild = () =>
+            kind === 'range'
+              ? rebuildOperationalFactsRange(6)
+              : kind === 'dates'
+                ? rebuildOperationalFactsForDates(
+                    Array.from(
+                      { length: 6 },
+                      (_, index) =>
+                        now.minus({ days: index }).toISODate() ?? '',
+                    ),
+                  )
+                : rebuildOperationalFactsForDate(now);
+          try {
+            await expect(rebuild()).rejects.toMatchObject({
+              cause: { message: 'forced fact rebuild failure' },
+            });
+            expect(await readFacts()).toEqual(before);
+            expect((await stationProfileSnapshotStore.head()).raw).toEqual(
+              head.raw,
+            );
+          } finally {
+            await pool.query(
+              'drop trigger fail_profile_facts on station_issue_facts',
+            );
+            await pool.query('drop function fail_profile_facts()');
+          }
+          await rebuild();
+          await publishStationProfileSnapshot('a'.repeat(64));
+          expect(await readFacts()).not.toEqual(before);
+          expect((await stationProfileSnapshotStore.head()).raw).not.toEqual(
+            head.raw,
+          );
+        },
+      );
+
+      it('holds profile publication while committed holiday changes still need their workflow facts', async () => {
+        await rebuildOperationalFactsRange(1);
+        await publishStationProfileSnapshot('a'.repeat(64));
+        const before = await stationProfileSnapshotStore.head();
+        const result = await syncPublicHolidays(db, [
+          normalizeDataGovPublicHolidayRecord({
+            date: '2026-11-19',
+            holiday: 'Changed holiday',
+          }),
+        ]);
+        await expect(
+          publishStationProfileSnapshot('a'.repeat(64)),
+        ).rejects.toThrow('pending public-holiday workflow');
+        expect((await stationProfileSnapshotStore.head()).raw).toEqual(
+          before.raw,
+        );
+        await rebuildOperationalFactsForDates(result.changedDates, db);
+        await expect(
+          publishStationProfileSnapshot('a'.repeat(64), []),
+        ).rejects.toThrow('pending public-holiday workflow');
+        await publishStationProfileSnapshot(
+          'a'.repeat(64),
+          result.changedDates,
+        );
+        expect(
+          (await stationProfileSnapshotStore.read())?.inputs.dataset
+            .publicHolidayRows,
+        ).toEqual([{ date: '2026-11-18' }, { date: '2026-11-19' }]);
       });
 
       it('matches complete town profiles and directory cold/warm with SQL disabled across effective memberships and issue windows', async () => {
@@ -1895,8 +1994,9 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     expect(await canSkipPublicHolidaySync([rows[1]])).toBe(false);
 
     // Direct/seed writes invalidate old receipts before changing SQL.
+    await rebuildOperationalFactsForDates(retry.changedDates, db);
     await publishRangeSnapshot('a'.repeat(64));
-    await publishStationProfileSnapshot('a'.repeat(64));
+    await publishStationProfileSnapshot('a'.repeat(64), retry.changedDates);
     await completePublicHolidaySync(retry.checkpointToken, [rows[1]]);
     expect(await canSkipPublicHolidaySync([rows[1]])).toBe(true);
 

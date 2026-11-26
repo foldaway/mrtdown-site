@@ -12,6 +12,7 @@ import {
   townsTable,
 } from '~/db/schema';
 import { readCanonicalManifestFingerprint } from '~/workflows/pull/helpers/manifestFingerprint';
+import { assertCompletedHolidayFacts } from './dbQueries/operationalFacts';
 import { getDefaultDb } from './dbQueries/database';
 import { readDatasetInputs } from './dbQueries/dataset';
 import { readRangeReferenceRows } from './dbQueries/rangeReferences';
@@ -25,8 +26,14 @@ export const stationProfileSnapshotStore = createPublishedSnapshotStore(
   parseStationProfileSnapshotInputs,
 );
 
-/** Shared station/line profile graph and facts from one completed SQL snapshot. */
-export async function publishStationProfileSnapshot(fingerprint?: string) {
+/**
+ * Shared profile/directory graph and facts from one completed SQL snapshot.
+ * Only the leased holiday workflow supplies dates, after its facts step succeeds.
+ */
+export async function publishStationProfileSnapshot(
+  fingerprint?: string,
+  completedHolidayDates: readonly string[] = [],
+) {
   if (!process.env.REDIS_URL) return;
   const expected = await stationProfileSnapshotStore.head();
   const db = await getDefaultDb();
@@ -37,6 +44,7 @@ export async function publishStationProfileSnapshot(fingerprint?: string) {
         fingerprint ?? (await readCanonicalManifestFingerprint(tx));
       if (!generation || !identity)
         throw new Error('Station profiles require completed canonical inputs');
+      await assertCompletedHolidayFacts(tx, completedHolidayDates);
       const references = await readRangeReferenceRows(tx);
       const [
         dataset,

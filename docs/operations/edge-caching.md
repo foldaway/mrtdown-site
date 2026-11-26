@@ -243,8 +243,14 @@ facts rebuilds republish the graph and facts before purge. Unchanged
 preflights verify the payload and matching generation/fingerprint.
 
 Missing, invalid or unavailable inputs use SQL with `no-store`. Requests do not
-publish replacements. Use an authenticated empty canonical pull to repair, then
-verify a cold and warm profile/code alias against SQL in an isolated environment.
+publish replacements. Fact rebuilds commit all requested dates and the station
+projection in one transaction, retaining bounded row batches. Failed rebuilds
+leave the previous fact set intact. Profile publication refuses pending holiday
+repairs unless the active holiday workflow has completed those exact fact dates
+under its existing lease and checkpoint token. Finish/retry that holiday workflow
+before canonical publication repair when this guard reports pending work.
+
+Use an authenticated empty canonical pull to repair, then verify a cold and warm profile/code alias against SQL in an isolated environment.
 Station HTML and server-function response deadlines stop at Singapore midnight,
 one hour, or the next relevant incident/signal boundary. Healthy Markdown uses
 the general edge cache policy; SQL-recovery Markdown remains `no-store`.
@@ -258,8 +264,10 @@ exactly as SQL does. Passing midnight does not synthesize new facts or trigger S
 All persisted dates are published (bounded to 100,000 rows and the shared byte
 limits); an empty fact set retains null/rank semantics. Facts advance only on
 canonical, holiday or authenticated facts rebuilds. Missing line IDs retain
-uncached SQL recovery. Station and line directories use the same publication, including persisted
-active issue-day candidates and each station's latest disruption projection.
+uncached SQL recovery.
+
+Station and line directories use the same publication, including persisted active
+issue-day candidates and each station's latest disruption projection.
 Requests select those candidates by date and recompute incident state. They do
 not infer missing day facts from an ongoing canonical issue; future memberships,
 closed stations and empty/unknown uptime retain the SQL policy.
