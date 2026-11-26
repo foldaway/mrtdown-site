@@ -1,12 +1,20 @@
 import { nonPublicEvidenceRedactedText } from '@mrtdown/fs';
 import { getIssueFn } from '~/util/issue.functions';
-import { getCachedIssueProfile } from '~/util/issueProfileCache.server';
+import {
+  getCachedIssueProfile,
+  revalidateIssueProfileResponse,
+} from '~/util/issueProfileCache.server';
 import {
   createIssueProfileSnapshotStore,
   issueProfileSnapshotStore,
   publishIssueProfileSnapshot,
 } from '~/util/issueProfileSnapshot.server';
 import { getIssueReadModel } from './issue';
+import {
+  applyPublicDataCacheHeaders,
+  ISSUE_PROFILE_FRESH_UNTIL_HEADER,
+  ISSUE_PROFILE_PUBLICATION_HEADER,
+} from '~/util/publicResponseCache';
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
@@ -648,6 +656,13 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
           `insert into evidences(id,issue_id,type,text,source_url,ts) values ('evidence','issue','report.public','Original','https://example.com','2026-11-18T10:00:00+08:00')`,
         );
         await publishIssueProfileSnapshot();
+        headers.mockClear();
+        const pendingBody = JSON.stringify(
+          await getIssueFn({ data: { issueId: 'issue' } }),
+        );
+        const pendingHeaders = new Headers();
+        for (const [key, value] of headers.mock.calls)
+          pendingHeaders.set(key, value);
         await pool.query(
           "update evidences set text=$1, render='{}' where id='evidence'",
           [nonPublicEvidenceRedactedText],
@@ -662,6 +677,36 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         vi.mocked(database.getDefaultDb).mockRejectedValue(
           Error('SQL must stay asleep'),
         );
+        queries.length = 0;
+        // Rendering began before redaction/publication and completes after its purge.
+        for (const contentType of [
+          'text/html',
+          'text/markdown',
+          'application/json',
+        ]) {
+          pendingHeaders.set('Content-Type', contentType);
+          const response = applyPublicDataCacheHeaders(
+            new Request('https://example.com/issues/issue', {
+              headers: { 'x-tsr-serverfn': 'true' },
+            }),
+            await revalidateIssueProfileResponse(
+              new Response(pendingBody, { headers: pendingHeaders }),
+            ),
+          );
+          expect(response.headers.get('Cache-Control')).toBe('no-store');
+          expect(response.headers.has('Cloudflare-CDN-Cache-Control')).toBe(
+            false,
+          );
+          expect(response.headers.has('Cache-Tag')).toBe(false);
+          expect(response.headers.has(ISSUE_PROFILE_FRESH_UNTIL_HEADER)).toBe(
+            false,
+          );
+          expect(response.headers.has(ISSUE_PROFILE_PUBLICATION_HEADER)).toBe(
+            false,
+          );
+          expect(await response.text()).toContain('Original');
+        }
+        expect(queries).toEqual([]);
         expect((await getCachedIssueProfile('issue', now)).profile).toEqual(
           expected,
         );

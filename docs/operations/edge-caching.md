@@ -121,7 +121,9 @@ reads use published source inputs, including cold requests and ongoing/future
 issues. Assembly uses the request clock for intervals, inferred ends, duration
 and date-selected service revisions. Midnight does not refill SQL. Completed
 profiles retain the midnight freshness deadline and 15-minute edge cap;
-ongoing/future profiles remain `no-store`.
+ongoing/future profiles remain `no-store`. Before setting edge cache headers, the
+server rechecks the publication ID in Redis after rendering. Superseded or
+unverifiable responses retain their coherent view with `no-store`.
 
 Keys use `mrtdown:{<tier>:issue-profiles:v1}`. A bounded topology/partition
 manifest (4 MiB encoded, 24 MiB JSON) references at most 10,000 immutable issue

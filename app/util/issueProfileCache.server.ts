@@ -3,6 +3,10 @@ import { getDefaultDb } from './dbQueries/database';
 import { getIssueReadModel } from './dbQueries/issue';
 import { assembleIssueProfileSnapshot } from './dbQueries/issueProfileSnapshotInputs';
 import { issueProfileSnapshotStore } from './issueProfileSnapshot.server';
+import {
+  ISSUE_PROFILE_FRESH_UNTIL_HEADER,
+  ISSUE_PROFILE_PUBLICATION_HEADER,
+} from './publicResponseCache';
 
 export async function getCachedIssueProfile(
   issueId: string,
@@ -26,6 +30,7 @@ export async function getCachedIssueProfile(
     return {
       profile,
       source: 'redis' as const,
+      publicationId: published.snapshot.value.publicationId,
       expiresAt: completed
         ? referenceNow.plus({ days: 1 }).startOf('day').toMillis()
         : undefined,
@@ -36,5 +41,30 @@ export async function getCachedIssueProfile(
     (tx) => getIssueReadModel(issueId, referenceNow, tx),
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
   );
-  return { profile, source: 'sql' as const };
+  return { profile, source: 'sql' as const, publicationId: undefined };
+}
+
+/** Withdraw shared caching if publication advanced while rendering. */
+export async function revalidateIssueProfileResponse(response: Response) {
+  const publicationId = response.headers.get(ISSUE_PROFILE_PUBLICATION_HEADER);
+  if (!response.headers.has(ISSUE_PROFILE_FRESH_UNTIL_HEADER) && !publicationId)
+    return response;
+  let current = false;
+  try {
+    current =
+      publicationId != null &&
+      (await issueProfileSnapshotStore.manifest.head()).value?.publicationId ===
+        publicationId;
+  } catch {
+    // Unavailable Redis cannot certify that this response is still current.
+  }
+  const headers = new Headers(response.headers);
+  headers.delete(ISSUE_PROFILE_PUBLICATION_HEADER);
+  // Reuse the normal expired-deadline handling to strip all shared-cache headers.
+  if (!current) headers.set(ISSUE_PROFILE_FRESH_UNTIL_HEADER, '0');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

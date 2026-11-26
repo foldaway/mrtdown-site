@@ -3,7 +3,10 @@ import { setResponseHeader } from '@tanstack/react-start/server';
 import { z } from 'zod';
 import { nowSg } from './dbQueries/dateTime';
 import { getCachedIssueProfile } from './issueProfileCache.server';
-import { ISSUE_PROFILE_FRESH_UNTIL_HEADER } from './publicResponseCache';
+import {
+  ISSUE_PROFILE_FRESH_UNTIL_HEADER,
+  ISSUE_PROFILE_PUBLICATION_HEADER,
+} from './publicResponseCache';
 import { recordServerTiming } from './serverTiming';
 
 const InputSchema = z.object({
@@ -17,10 +20,8 @@ export const getIssueFn = createServerFn({ method: 'GET' })
 
     const startedAt = performance.now();
     try {
-      const { profile, expiresAt, source } = await getCachedIssueProfile(
-        issueId,
-        nowSg(),
-      );
+      const { profile, expiresAt, source, publicationId } =
+        await getCachedIssueProfile(issueId, nowSg());
       recordServerTiming(
         'issue_profile_load',
         performance.now() - startedAt,
@@ -29,11 +30,12 @@ export const getIssueFn = createServerFn({ method: 'GET' })
       if (process.env.TIER === 'staging') {
         setResponseHeader('X-MRTDown-Issue-Profile-Source', source);
       }
-      if (expiresAt == null) {
+      if (expiresAt == null || publicationId == null) {
         // SQL recovery and clock-dependent durations must bypass shared caches.
         setResponseHeader('Cache-Control', 'no-store');
       } else {
         setResponseHeader(ISSUE_PROFILE_FRESH_UNTIL_HEADER, String(expiresAt));
+        setResponseHeader(ISSUE_PROFILE_PUBLICATION_HEADER, publicationId);
       }
       return profile;
     } catch (error) {
