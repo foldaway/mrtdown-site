@@ -32,6 +32,7 @@ export type SnapshotNamespace =
   | 'range-snapshot'
   | 'sitemap'
   | 'statistics'
+  | 'report-references'
   | 'arrival-inputs'
   | 'arrival-departures';
 

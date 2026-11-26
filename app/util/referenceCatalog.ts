@@ -1,7 +1,6 @@
 import type { Translations } from '@mrtdown/core';
 import { asc, eq } from 'drizzle-orm';
 import { DateTime } from 'luxon';
-import type { getDb } from '~/db';
 import {
   linesTable,
   metadataTable,
@@ -9,10 +8,11 @@ import {
   stationsTable,
 } from '~/db/schema';
 
+import { type AppDb, getDefaultDb } from './dbQueries/database';
+import { reportReferenceSnapshotStore } from './reportReferenceSnapshot.server';
+
 const SG_TIMEZONE = 'Asia/Singapore';
 const DATASET_VERSION_METADATA_KEY = 'manifest_last_pulled_at';
-
-type AppDb = ReturnType<typeof getDb>;
 
 type ReferenceCatalogLineRow = {
   id: string;
@@ -138,7 +138,7 @@ export function buildReferenceCatalog({
 }
 
 export async function getReferenceCatalog(
-  db: AppDb,
+  getDatabase: () => AppDb | Promise<AppDb> = getDefaultDb,
   now = DateTime.now().setZone(SG_TIMEZONE),
 ) {
   const referenceDate = now.toISODate();
@@ -146,6 +146,27 @@ export async function getReferenceCatalog(
     throw new ReferenceCatalogUnavailableError('Reference date is unavailable');
   }
 
+  const published = process.env.REDIS_URL
+    ? await reportReferenceSnapshotStore.read()
+    : null;
+  if (published) {
+    const { datasetVersion, formOptionRows: rows } = published.inputs;
+    return {
+      catalog: buildReferenceCatalog({
+        datasetVersion,
+        referenceDate,
+        lines: rows.lines,
+        stations: rows.stations,
+        memberships: rows.stationCodes.map(({ code, ...row }) => ({
+          ...row,
+          publicCode: code,
+        })),
+      }),
+      usedSqlFallback: false,
+    };
+  }
+
+  const db = await getDatabase();
   const [metadataRows, lines, stations, memberships] = await Promise.all([
     db
       .select({ value: metadataTable.value })
@@ -191,11 +212,14 @@ export async function getReferenceCatalog(
     );
   }
 
-  return buildReferenceCatalog({
-    datasetVersion,
-    referenceDate,
-    lines,
-    stations,
-    memberships,
-  });
+  return {
+    catalog: buildReferenceCatalog({
+      datasetVersion,
+      referenceDate,
+      lines,
+      stations,
+      memberships,
+    }),
+    usedSqlFallback: Boolean(process.env.REDIS_URL),
+  };
 }
