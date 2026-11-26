@@ -12,7 +12,10 @@ import {
   publishSitemapSnapshot,
   rebuildSitemapSnapshot,
 } from '~/util/dbQueries/sitemap.js';
-import { rebuildStatisticsSnapshot } from '~/util/dbQueries/statistics.js';
+import {
+  publishStatisticsSnapshot,
+  rebuildStatisticsSnapshot,
+} from '~/util/dbQueries/statistics.js';
 import { publishNavigationCache } from '~/util/navigationCache.server.js';
 import { publishRangeReferenceCache } from '~/util/rangeReferenceCache.server.js';
 import { publishRangeSnapshot } from '~/util/rangeSnapshot.server.js';
@@ -72,6 +75,7 @@ async function publishPullCaches(generation: string, fingerprint?: string) {
   await completePageProfileGeneration(getDb(), generation);
   // Local pulls still promote SQL without Redis infrastructure.
   if (!process.env.REDIS_URL) return purgePublicDataCache();
+  await publishStatisticsSnapshot(fingerprint);
   await publishSitemapSnapshot(fingerprint);
   await publishServicePathCache(generation);
   await publishRangeReferenceCache(generation);
@@ -235,6 +239,7 @@ async function executePull(
         await publishRangeSnapshot(manifestFingerprint);
         await publishStationProfileSnapshot(manifestFingerprint);
         await publishArrivalInputSnapshot(manifestFingerprint);
+        await publishStatisticsSnapshot(manifestFingerprint);
         await publishSitemapSnapshot(manifestFingerprint);
       });
       await publishDepartureCaches(context, manifestFingerprint);
@@ -503,7 +508,7 @@ async function executePull(
     'rebuild-statistics-snapshot',
     async () => {
       console.log('[PULL] Rebuilding statistics snapshot...');
-      return rebuildStatisticsSnapshot();
+      return rebuildStatisticsSnapshot(undefined, context.workflowRunId);
     },
   );
 

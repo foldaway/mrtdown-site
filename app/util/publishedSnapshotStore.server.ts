@@ -30,6 +30,7 @@ export type SnapshotNamespace =
   | 'station-profiles'
   | 'range-snapshot'
   | 'sitemap'
+  | 'statistics'
   | 'arrival-inputs'
   | 'arrival-departures';
 
