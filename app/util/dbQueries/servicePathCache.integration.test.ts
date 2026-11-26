@@ -1,4 +1,6 @@
 import { nonPublicEvidenceRedactedText } from '@mrtdown/fs';
+import { getOperatorProfileFn } from '~/util/operator.functions';
+import { getOperatorProfileReadModel } from './operators';
 import { getStationsDirectoryFn } from '~/util/station.functions';
 import { getLinesDirectoryFn, getLineProfileFn } from '~/util/lines.functions';
 import { getLineProfileReadModel } from './lines';
@@ -858,6 +860,112 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         const keys = await stationRedis.keys(`mrtdown:*${process.env.TIER}*`);
         if (keys.length) await stationRedis.del(...keys);
         await stationRedis.quit();
+      });
+
+      it('matches complete operator loaders cold/warm with SQL disabled across clocks, memberships, empty and unknown operations', async () => {
+        await pool.query(
+          "insert into operators (id,name,founded_at,url,hash) select 'empty',name,founded_at,url,hash from operators limit 1",
+        );
+        await pool.query(
+          "insert into operators (id,name,founded_at,url,hash) select 'planned',name,founded_at,url,hash from operators limit 1",
+        );
+        await pool.query(
+          "insert into lines (id,name,type,color,started_at,operating_hours,hash) select 'unknown',name,type,color,null,null,hash from lines limit 1",
+        );
+        await pool.query(
+          "insert into lines (id,name,type,color,started_at,operating_hours,hash) select 'future',name,type,color,'2026-11-19',operating_hours,hash from lines where id='line'",
+        );
+        await pool.query(
+          "insert into line_operators (line_id,operator_id,started_at,ended_at,hash) values ('unknown','operator','2027-01-01',null,'fixture'),('future','planned','2026-11-19',null,'fixture')",
+        );
+        await pool.query(
+          "update line_operators set ended_at='2020-01-01' where line_id='line'",
+        );
+        const clocks = [
+          now.set({ hour: 4 }),
+          now.set({ hour: 10, minute: 15 }),
+          now.set({ hour: 10, minute: 30 }),
+          now.plus({ days: 1 }).startOf('day'),
+        ];
+        const cases = clocks.flatMap((clock) =>
+          ['operator', 'empty', 'planned'].map((operatorId) => ({
+            clock,
+            operatorId,
+          })),
+        );
+        vi.stubEnv('REDIS_URL', '');
+        const expected = [];
+        for (const { clock, operatorId } of cases) {
+          vi.setSystemTime(clock.toJSDate());
+          expected.push(
+            await getOperatorProfileFn({ data: { operatorId, days: 90 } }),
+          );
+        }
+        expect(expected[0].data.lineIds).toContain('line'); // Historical ownership remains in scope.
+        expect(expected[0].data.currentOperationalStatus).toBe('unknown');
+        expect(expected[1].data.aggregateUptimeRatio).toBeNull();
+        expect(expected[1].data.totalStationsOperated).toBe(0);
+        expect(expected[2].data.currentOperationalStatus).toBe(
+          'all_lines_closed_for_day',
+        );
+        expect(expected[3].data.currentOperationalStatus).toBe(
+          'some_lines_disrupted',
+        );
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        const cold = createPublishedSnapshotStore(
+          async () => stationRedis,
+          'station-profiles',
+          parseStationProfileSnapshotInputs,
+        );
+        vi.spyOn(stationProfileSnapshotStore, 'read').mockImplementation(
+          cold.read,
+        );
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        queries.length = 0;
+        for (const [index, { clock, operatorId }] of cases.entries()) {
+          vi.setSystemTime(clock.toJSDate());
+          for (let pass = 0; pass < 2; pass++)
+            expect(
+              await getOperatorProfileFn({ data: { operatorId, days: 90 } }),
+            ).toEqual(expected[index]);
+        }
+        expect(queries).toEqual([]);
+      });
+
+      it('recovers operator inputs uncached and publishes ownership and holiday corrections together', async () => {
+        vi.stubEnv('REDIS_URL', '');
+        const before = await getOperatorProfileReadModel('operator', 90);
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        headers.mockClear();
+        expect(await getOperatorProfileReadModel('operator', 90)).toEqual(
+          before,
+        );
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        await pool.query('delete from line_operators');
+        await pool.query('delete from public_holidays');
+        expect(await getOperatorProfileReadModel('operator', 90)).toEqual(
+          before,
+        );
+        vi.stubEnv('REDIS_URL', '');
+        const after = await getOperatorProfileReadModel('operator', 90);
+        vi.stubEnv('REDIS_URL', 'redis://unused');
+        await publishStationProfileSnapshot('a'.repeat(64));
+        vi.mocked(database.getDefaultDb).mockRejectedValue(
+          Error('SQL must stay asleep'),
+        );
+        expect(await getOperatorProfileReadModel('operator', 90)).toEqual(
+          after,
+        );
+        expect(after.data.lineIds).toEqual([]);
+        vi.mocked(database.getDefaultDb).mockResolvedValue(db);
+        await expect(
+          getOperatorProfileReadModel('absent', 90),
+        ).rejects.toMatchObject({ status: 404 });
+        expect(headers).toHaveBeenCalledWith('Cache-Control', 'no-store');
       });
 
       it('matches full station and line directories cold/warm across membership, incident and persisted-fact date boundaries without SQL', async () => {

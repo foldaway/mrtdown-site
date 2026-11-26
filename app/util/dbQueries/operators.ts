@@ -1,3 +1,7 @@
+import { setResponseHeader } from '@tanstack/react-start/server';
+import type { DateTime } from 'luxon';
+import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
+import { selectProfileDatasetInputs } from './profileSnapshotInputs';
 import { eq, inArray, or } from 'drizzle-orm';
 import {
   impactEventEntityFacilitiesTable,
@@ -11,7 +15,7 @@ import {
 } from '~/db/schema';
 import type { LineSummary, LineSummaryStatus } from '~/types';
 import { getDefaultDb, timeDbQuery } from './database';
-import { buildDataset } from './dataset';
+import { assembleDataset, buildDataset } from './dataset';
 import { nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueDurationByType, pickIssueTypes } from './issueAnalytics';
@@ -120,11 +124,10 @@ export function mergeOperatorReadModelScope(input: {
   };
 }
 
-export async function getOperatorProfileReadModel(
+async function loadSqlOperatorProfile(
   operatorId: string,
-  days: number,
+  referenceNow: DateTime,
 ) {
-  const referenceNow = nowSg();
   const db = await getDefaultDb();
   const [operatorRow] = await timeDbQuery('operator_profile_q_root', () =>
     db
@@ -146,7 +149,9 @@ export async function getOperatorProfileReadModel(
       .from(lineOperatorsTable)
       .where(eq(lineOperatorsTable.operator_id, operatorId)),
   );
-  const lineIds = [...new Set(operatorLineRows.map((row) => row.lineId))];
+  const lineIds = [
+    ...new Set(operatorLineRows.map((row) => row.lineId)),
+  ].sort();
   const serviceRows =
     lineIds.length > 0
       ? await timeDbQuery('operator_profile_q_services', () =>
@@ -227,6 +232,67 @@ export async function getOperatorProfileReadModel(
     operatorIds: [operatorId],
     includePublicHolidays: true,
   });
+  return { dataset, lineIds };
+}
+
+export async function getOperatorProfileReadModel(
+  operatorId: string,
+  days: number,
+) {
+  const referenceNow = nowSg();
+  const snapshot = process.env.REDIS_URL
+    ? await stationProfileSnapshotStore.read()
+    : null;
+  let loaded: Awaited<ReturnType<typeof loadSqlOperatorProfile>>;
+  if (
+    snapshot?.inputs.dataset.operatorsRows.some((row) => row.id === operatorId)
+  ) {
+    const rows = snapshot.inputs.dataset;
+    const lineIds = [
+      ...new Set(
+        rows.lineOperatorsRows
+          .filter((row) => row.operator_id === operatorId)
+          .map((row) => row.line_id),
+      ),
+    ].sort();
+    const serviceIds = new Set(
+      rows.serviceRows
+        .filter((row) => lineIds.includes(row.line_id))
+        .map((row) => row.id),
+    );
+    const stationIds = [
+      ...new Set([
+        ...rows.servicePathRows
+          .filter((row) => serviceIds.has(row.service_id))
+          .map((row) => row.station_id),
+        ...rows.stationCodesRows
+          .filter((row) => lineIds.includes(row.line_id))
+          .map((row) => row.station_id),
+      ]),
+    ];
+    loaded = {
+      lineIds,
+      dataset: assembleDataset(
+        referenceNow,
+        selectProfileDatasetInputs(rows, {
+          lineIds,
+          serviceIds: [...serviceIds],
+          stationIds,
+          operatorIds: [operatorId],
+        }),
+      ),
+    };
+  } else {
+    if (process.env.REDIS_URL) {
+      try {
+        setResponseHeader('Cache-Control', 'no-store');
+      } catch {
+        /* no request context */
+      }
+    }
+    loaded = await loadSqlOperatorProfile(operatorId, referenceNow);
+  }
+  const { dataset, lineIds } = loaded;
   const operator = dataset.included.operators[operatorId];
   if (operator == null) {
     throw new Error(
