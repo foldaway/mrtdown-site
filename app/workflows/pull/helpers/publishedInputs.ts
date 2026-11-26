@@ -36,16 +36,23 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
     );
   const fingerprint = getCanonicalManifestFingerprint(manifest, pinned);
   if (!(await rangeSnapshotStore.isCurrent(fingerprint))) return false;
-  const [range, sitemap, arrivals, stations, statistics, issues, reports] =
-    await Promise.all([
-      rangeSnapshotStore.head(),
-      sitemapSnapshotStore.read({ verifyPayload: true }),
-      arrivalInputSnapshotStore.read({ verifyPayload: true }),
-      stationProfileSnapshotStore.read({ verifyPayload: true }),
-      statisticsSnapshotStore.read({ verifyPayload: true }),
-      issueProfileSnapshotStore.read({ verifyPayload: true }),
-      reportReferenceSnapshotStore.read({ verifyPayload: true }),
-    ]);
+  // Cold payload decoding shares the event loop and Redis command deadline.
+  // Finish each verification before queuing another large payload read.
+  const range = await rangeSnapshotStore.head();
+  const sitemap = await sitemapSnapshotStore.read({ verifyPayload: true });
+  const arrivals = await arrivalInputSnapshotStore.read({
+    verifyPayload: true,
+  });
+  const stations = await stationProfileSnapshotStore.read({
+    verifyPayload: true,
+  });
+  const statistics = await statisticsSnapshotStore.read({
+    verifyPayload: true,
+  });
+  const issues = await issueProfileSnapshotStore.read({ verifyPayload: true });
+  const reports = await reportReferenceSnapshotStore.read({
+    verifyPayload: true,
+  });
   if (
     !reports ||
     reports.value.fingerprint !== fingerprint ||

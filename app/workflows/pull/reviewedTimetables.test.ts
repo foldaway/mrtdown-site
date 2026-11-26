@@ -29,7 +29,10 @@ import { completePageProfileGeneration } from '~/db/pageProfileGeneration';
 import { relations } from '~/db/relations';
 import { ZipStore } from '~/helpers/ZipStore';
 import { arrivalDepartureStore } from '~/util/arrivalDepartureStore.server';
-import { publishArrivalInputSnapshot } from '~/util/arrivalInputSnapshot.server';
+import {
+  arrivalInputSnapshotStore,
+  publishArrivalInputSnapshot,
+} from '~/util/arrivalInputSnapshot.server';
 import { tryRepairCrowdReportSources } from '~/util/crowdReportSourceCache.server';
 import { purgePublicDataCache } from '~/util/cloudflareCache';
 import {
@@ -428,6 +431,36 @@ describe('published zero-SQL range inputs', () => {
     } as never);
     vi.mocked(arrivalDepartureStore.ready).mockResolvedValue(true);
   }
+  it('keeps unchanged polls SQL-free when cold verifications cannot share a command deadline', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://unused');
+    vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    healthyArrivalHeads();
+    let verifying = false;
+    for (const store of [
+      sitemapSnapshotStore,
+      arrivalInputSnapshotStore,
+      stationProfileSnapshotStore,
+      statisticsSnapshotStore,
+      issueProfileSnapshotStore,
+      reportReferenceSnapshotStore,
+    ]) {
+      const healthy = await store.read({ verifyPayload: true });
+      vi.mocked(store.read).mockImplementationOnce(async () => {
+        // Model a cold decode exhausting the deadline of a queued command.
+        if (verifying) return null;
+        verifying = true;
+        await Promise.resolve();
+        verifying = false;
+        return healthy as never;
+      });
+    }
+    vi.mocked(getDb).mockImplementation(() => {
+      throw Error('SQL must stay asleep');
+    });
+    await workflow().run();
+    expect(getDb).not.toHaveBeenCalled();
+    expect(publishReportReferenceSnapshot).not.toHaveBeenCalled();
+  });
   it('repairs required report references before checkpointing and skips healthy unchanged polls without SQL', async () => {
     vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
