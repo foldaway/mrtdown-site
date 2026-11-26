@@ -8,7 +8,7 @@ import {
   stationCodesTable,
 } from '~/db/schema';
 import { type AppDbReader, timeDbQuery, timeDbRowsQuery } from './database';
-import type { DatasetStaticScope } from './dataset';
+import type { DatasetInputs, DatasetStaticScope } from './dataset';
 
 type IssueReferenceRows = {
   facilityRows: Array<
@@ -37,6 +37,56 @@ export function deriveIssueInitialScope(referenceRows: IssueReferenceRows) {
     stationIds: [
       ...new Set(referenceRows.facilityRows.map((row) => row.station_id)),
     ],
+  };
+}
+
+/** Expand historical issue references against a completed published topology. */
+export function getIssueScopeFromInputs(
+  rows: DatasetInputs,
+  issueIds: ReadonlySet<string>,
+): DatasetStaticScope {
+  const eventIds = new Set(
+    rows.impactEventRows
+      .filter((row) => issueIds.has(row.issue_id))
+      .map((row) => row.id),
+  );
+  const initial = deriveIssueInitialScope({
+    facilityRows: rows.impactEventFacilityRows.filter((row) =>
+      eventIds.has(row.impact_event_id),
+    ),
+    serviceRows: rows.impactEventServiceRows.filter((row) =>
+      eventIds.has(row.impact_event_id),
+    ),
+  });
+  const affectedLines = new Set([
+    ...initial.lineIds,
+    ...rows.serviceRows
+      .filter((row) => initial.serviceIds.includes(row.id))
+      .map((row) => row.line_id),
+  ]);
+  const affectedServices = new Set(
+    rows.serviceRows
+      .filter((row) => affectedLines.has(row.line_id))
+      .map((row) => row.id),
+  );
+  const stationIds = new Set([
+    ...initial.stationIds,
+    ...rows.servicePathRows
+      .filter((row) => affectedServices.has(row.service_id))
+      .map((row) => row.station_id),
+  ]);
+  const lineIds = new Set([
+    ...affectedLines,
+    ...rows.stationCodesRows
+      .filter((row) => stationIds.has(row.station_id))
+      .map((row) => row.line_id),
+  ]);
+  return {
+    lineIds: [...lineIds],
+    serviceIds: rows.serviceRows
+      .filter((row) => lineIds.has(row.line_id))
+      .map((row) => row.id),
+    stationIds: [...stationIds],
   };
 }
 

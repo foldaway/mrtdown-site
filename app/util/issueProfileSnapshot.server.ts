@@ -1,11 +1,7 @@
 import { asc, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { readCompletedPageProfileGeneration } from '~/db/pageProfileGeneration';
-import {
-  evidencesTable,
-  impactEventEntityFacilitiesTable,
-  impactEventEntityServicesTable,
-} from '~/db/schema';
+import { evidencesTable } from '~/db/schema';
 import { readCanonicalManifestFingerprint } from '~/workflows/pull/helpers/manifestFingerprint';
 import { getDefaultDb } from './dbQueries/database';
 import { readDatasetInputs } from './dbQueries/dataset';
@@ -134,8 +130,11 @@ export async function publishIssueProfileSnapshot(fingerprint?: string) {
       if (!generation || !identity)
         throw new Error('Issue Profiles require completed canonical inputs');
       const references = await readRangeReferenceRows(tx);
-      const [dataset, evidences, services, facilities] = await Promise.all([
-        readDatasetInputs(tx, undefined, undefined, { references }),
+      const [dataset, evidences] = await Promise.all([
+        readDatasetInputs(tx, undefined, undefined, {
+          references,
+          includeHistoricalIssueReferences: true,
+        }),
         // Only the public update projection leaves this transaction. In particular,
         // redacted render translations and unused source fields are never published.
         tx
@@ -149,8 +148,6 @@ export async function publishIssueProfileSnapshot(fingerprint?: string) {
           })
           .from(evidencesTable)
           .orderBy(desc(evidencesTable.ts), asc(evidencesTable.id)),
-        tx.select().from(impactEventEntityServicesTable),
-        tx.select().from(impactEventEntityFacilitiesTable),
       ]);
       if (dataset.issueRows.length > MAX_ISSUES)
         throw new Error('Too many Issue Profiles');
@@ -165,10 +162,6 @@ export async function publishIssueProfileSnapshot(fingerprint?: string) {
         fingerprint: identity,
         dataset,
         updates,
-        references: {
-          impactEventServiceRows: services,
-          impactEventFacilityRows: facilities,
-        },
       };
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
@@ -179,7 +172,6 @@ export async function publishIssueProfileSnapshot(fingerprint?: string) {
     const part = selectIssueProfilePartition(
       source.dataset,
       issue.id,
-      source.references,
       source.updates.get(issue.id) ?? [],
     );
     const ref = await issueProfileSnapshotStore.parts.prepare(

@@ -119,6 +119,8 @@ type DatasetReferenceInputs = {
   // Supplied rows must belong to the caller's SQL snapshot or its completed generation.
   servicePaths?: readonly ServicePathRow[];
   references?: RangeReferenceRows;
+  // Profile scope includes references superseded by later state events.
+  includeHistoricalIssueReferences?: boolean;
 };
 
 function omitAuditTimestamps<TColumns extends Record<string, unknown>>(
@@ -559,8 +561,11 @@ export async function readDatasetInputs(
   const serviceScopeEventIds = impactEventRows
     .filter((event) => event.type === 'service_scopes.set')
     .map((event) => event.id);
+  const entityEventIds = inputs.includeHistoricalIssueReferences
+    ? impactEventRows.map((event) => event.id)
+    : selectedStateEventIds;
   const serviceEntityEventIds = [
-    ...new Set([...selectedStateEventIds, ...serviceScopeEventIds]),
+    ...new Set([...entityEventIds, ...serviceScopeEventIds]),
   ];
   const [
     impactEventPeriodRows,
@@ -603,7 +608,7 @@ export async function readDatasetInputs(
               ),
           )
         : ([] as DatasetImpactEventEntityService[]),
-      selectedStateEventIds.length > 0
+      entityEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_facilities', () =>
             database
               .select(impactEventEntityFacilitiesReadColumns)
@@ -611,7 +616,7 @@ export async function readDatasetInputs(
               .where(
                 inArray(
                   impactEventEntityFacilitiesTable.impact_event_id,
-                  selectedStateEventIds,
+                  entityEventIds,
                 ),
               ),
           )
@@ -710,6 +715,43 @@ export async function readDatasetInputs(
 }
 
 export type DatasetInputs = Awaited<ReturnType<typeof readDatasetInputs>>;
+
+/** Apply the same entity scope to published station and issue source rows. */
+export function scopeDatasetInputs(
+  rows: DatasetInputs,
+  scope: DatasetStaticScope,
+  issueIds: ReadonlySet<string>,
+): DatasetInputs {
+  const lineIds = new Set(scope.lineIds);
+  const serviceIds = new Set(scope.serviceIds);
+  const stationIds = new Set(scope.stationIds);
+  const townIds = new Set(scope.townIds);
+  const landmarkIds = new Set(scope.landmarkIds);
+  return {
+    ...rows,
+    linesRows: rows.linesRows.filter((row) => lineIds.has(row.id)),
+    lineOperatorsRows: rows.lineOperatorsRows.filter((row) =>
+      lineIds.has(row.line_id),
+    ),
+    stationRows: rows.stationRows.filter((row) => stationIds.has(row.id)),
+    stationCodesRows: rows.stationCodesRows.filter((row) =>
+      stationIds.has(row.station_id),
+    ),
+    stationLandmarksRows: rows.stationLandmarksRows.filter((row) =>
+      stationIds.has(row.station_id),
+    ),
+    serviceRows: rows.serviceRows.filter((row) => serviceIds.has(row.id)),
+    serviceRevisionRows: rows.serviceRevisionRows.filter((row) =>
+      serviceIds.has(row.service_id),
+    ),
+    servicePathRows: rows.servicePathRows.filter((row) =>
+      serviceIds.has(row.service_id),
+    ),
+    townsRows: rows.townsRows.filter((row) => townIds.has(row.id)),
+    landmarksRows: rows.landmarksRows.filter((row) => landmarkIds.has(row.id)),
+    issueRows: rows.issueRows.filter((row) => issueIds.has(row.id)),
+  } as DatasetInputs;
+}
 
 /** Pure request-clock assembly; published inputs never freeze current state. */
 export function assembleDataset(

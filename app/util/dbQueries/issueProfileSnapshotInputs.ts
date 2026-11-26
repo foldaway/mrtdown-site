@@ -4,11 +4,11 @@ import { z } from 'zod';
 import {
   assembleDataset,
   type DatasetInputs,
-  type DatasetStaticScope,
+  scopeDatasetInputs,
 } from './dataset';
 import { selectIncludedEntities } from './includedEntities';
 import { RangeSnapshotInputsSchema } from './rangeSnapshotInputs';
-import { deriveIssueInitialScope } from './readModelScope';
+import { getIssueScopeFromInputs } from './readModelScope';
 
 const issueFields = {
   issueRows: true,
@@ -76,10 +76,6 @@ export function parseIssueProfilePartition(value: unknown) {
 export function selectIssueProfilePartition(
   rows: DatasetInputs,
   issueId: string,
-  references: Pick<
-    DatasetInputs,
-    'impactEventServiceRows' | 'impactEventFacilityRows'
-  >,
   updates: IssueUpdate[],
 ): IssueProfilePartition {
   const eventIds = new Set(
@@ -87,46 +83,9 @@ export function selectIssueProfilePartition(
       .filter((row) => row.issue_id === issueId)
       .map((row) => row.id),
   );
-  const initial = deriveIssueInitialScope({
-    facilityRows: references.impactEventFacilityRows.filter((row) =>
-      eventIds.has(row.impact_event_id),
-    ),
-    serviceRows: references.impactEventServiceRows.filter((row) =>
-      eventIds.has(row.impact_event_id),
-    ),
-  });
-  const affectedLines = new Set([
-    ...initial.lineIds,
-    ...rows.serviceRows
-      .filter((row) => initial.serviceIds.includes(row.id))
-      .map((row) => row.line_id),
-  ]);
-  const affectedServices = new Set(
-    rows.serviceRows
-      .filter((row) => affectedLines.has(row.line_id))
-      .map((row) => row.id),
-  );
-  const stationIds = new Set([
-    ...initial.stationIds,
-    ...rows.servicePathRows
-      .filter((row) => affectedServices.has(row.service_id))
-      .map((row) => row.station_id),
-  ]);
-  const lineIds = new Set([
-    ...affectedLines,
-    ...rows.stationCodesRows
-      .filter((row) => stationIds.has(row.station_id))
-      .map((row) => row.line_id),
-  ]);
   return parseIssueProfilePartition({
     issueId,
-    scope: {
-      lineIds: [...lineIds],
-      serviceIds: rows.serviceRows
-        .filter((row) => lineIds.has(row.line_id))
-        .map((row) => row.id),
-      stationIds: [...stationIds],
-    },
+    scope: getIssueScopeFromInputs(rows, new Set([issueId])),
     dataset: {
       issueRows: rows.issueRows
         .filter((row) => row.id === issueId)
@@ -186,38 +145,14 @@ export function assembleIssueProfileSnapshot(
   part: IssueProfilePartition,
   now: DateTime,
 ) {
-  const scope: DatasetStaticScope = part.scope;
-  const rows: DatasetInputs = {
-    ...topology,
-    ...part.dataset,
-    linesRows: topology.linesRows.filter((row) =>
-      scope.lineIds.includes(row.id),
-    ),
-    lineOperatorsRows: topology.lineOperatorsRows.filter((row) =>
-      scope.lineIds.includes(row.line_id),
-    ),
-    serviceRows: topology.serviceRows.filter((row) =>
-      scope.serviceIds.includes(row.id),
-    ),
-    serviceRevisionRows: topology.serviceRevisionRows.filter((row) =>
-      scope.serviceIds.includes(row.service_id),
-    ),
-    servicePathRows: topology.servicePathRows.filter((row) =>
-      scope.serviceIds.includes(row.service_id),
-    ),
-    stationRows: topology.stationRows.filter((row) =>
-      scope.stationIds.includes(row.id),
-    ),
-    stationCodesRows: topology.stationCodesRows.filter((row) =>
-      scope.stationIds.includes(row.station_id),
-    ),
-    stationLandmarksRows: topology.stationLandmarksRows.filter((row) =>
-      scope.stationIds.includes(row.station_id),
-    ),
-  } as DatasetInputs;
+  const rows = scopeDatasetInputs(
+    { ...topology, ...part.dataset } as DatasetInputs,
+    part.scope,
+    new Set([part.issueId]),
+  );
   return assembleIssueProfile(
     part.issueId,
-    assembleDataset(now, rows, scope),
+    assembleDataset(now, rows, part.scope),
     part.updates,
   );
 }

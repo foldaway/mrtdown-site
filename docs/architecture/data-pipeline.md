@@ -73,7 +73,9 @@ Canonical publication writes a bounded topology/manifest and per-issue source
 partitions from one completed repeatable-read snapshot. The shared Issue Profile
 assembler selects intervals, duration and service revisions at the request clock.
 Public evidence updates are projected before publication; redacted text and
-translations and unused title metadata never enter partitions.
+translations and unused title metadata never enter partitions. Station and issue
+snapshots share historical-reference acquisition, scope expansion and entity
+filtering through the dataset reader and scope helpers.
 
 Every canonical/evidence writer promotes through the pull workflow. New pulls,
 unchanged-input repair and the Navigation seed publish before purge/completion.
