@@ -391,7 +391,9 @@ independent of community activity.
 
 The single persistent `mrtdown:<tier>:community-signals:v1` key contains at most
 10,000 eligible clusters and 4 MiB of public fields, with no reporter identities
-or submission text. Bounds fail publication rather than truncate scoped results.
+or submission text, plus the conservative
+[dispatch queue empty proof](../architecture/data-pipeline.md#crowd-report-dispatch).
+Bounds fail publication rather than truncate scoped results.
 Missing, dirty, corrupt or unavailable state uses SQL with `no-store`; public
 reads never refill it. Expiry alone needs no SQL or scheduled refresh.
 

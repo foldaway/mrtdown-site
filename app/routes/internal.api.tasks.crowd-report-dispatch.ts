@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 import { getDb } from '~/db';
+import { canSkipCrowdReportDispatch } from '~/util/communitySignalCache.server';
 import {
   dispatchPendingCrowdReports,
   getCrowdReportDispatchLimit,
@@ -83,12 +84,11 @@ export async function handleCrowdReportDispatchPost(request: Request) {
     );
   }
 
-  const db = getDb();
   const limit =
     parsed.data.limit ??
     getCrowdReportDispatchLimit(process.env.CROWD_REPORT_DISPATCH_LIMIT);
   if (parsed.data.dryRun) {
-    const candidates = await getDispatchableCrowdReportCandidates(db, {
+    const candidates = await getDispatchableCrowdReportCandidates(getDb(), {
       kind: parsed.data.kind,
       limit,
       rootUrl,
@@ -116,7 +116,17 @@ export async function handleCrowdReportDispatchPost(request: Request) {
     );
   }
 
-  const result = await dispatchPendingCrowdReports(db, {
+  if (await canSkipCrowdReportDispatch()) {
+    return Response.json({
+      success: true,
+      count: 0,
+      dispatched: 0,
+      failed: 0,
+      results: [],
+    });
+  }
+
+  const result = await dispatchPendingCrowdReports(getDb(), {
     kind: parsed.data.kind,
     limit,
     rootUrl,

@@ -2,6 +2,7 @@ import { IngestContentCrowdReportEffectSchema } from '@mrtdown/ingest-contracts'
 import { sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
+import { crowdReportClustersTable, crowdReportsTable } from '~/db/schema';
 import {
   DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES,
   getPublicCrowdReportSignals,
@@ -18,6 +19,9 @@ const timestamp = z
   .refine((value) => Number.isFinite(Date.parse(value)));
 const snapshotSchema = z.object({
   initializedAt: z.number().finite(),
+  // Optional for rolling upgrades: snapshots from older writers prove nothing
+  // about the durable dispatch queue.
+  dispatchQueueEmpty: z.boolean().optional(),
   signals: z
     .array(
       z.object({
@@ -96,7 +100,8 @@ export async function repairCommunitySignalCache(
     // inside the lock so a preceding writer/repair can satisfy this request.
     if (
       options.onlyIfMissing &&
-      (await readCachedCommunitySignals()).status === 'ready'
+      (await readCommunitySignalSnapshot().catch(() => undefined))
+        ?.dispatchQueueEmpty != null
     )
       return;
     const redis = (await getPageProfileRedis()).duplicate();
@@ -115,8 +120,27 @@ export async function repairCommunitySignalCache(
         ...PAGE_COMMUNITY_SIGNAL_POLICY,
         limit: MAX_SIGNALS + 1,
       });
+      // A conservative superset of dispatch eligibility. Ignore confidence and
+      // scope so pending retries cannot be hidden by an empty display snapshot.
+      // Neither eligibility nor retry has a request-clock transition today.
+      const queue = await tx.execute<{ empty: boolean }>(sql`
+        select not exists (
+          select 1 from ${crowdReportClustersTable}
+          where ${crowdReportClustersTable.status} = 'accepted'
+            and ${crowdReportClustersTable.dispatched_at} is null
+        ) and not exists (
+          select 1 from ${crowdReportsTable}
+          where ${crowdReportsTable.status} = 'accepted'
+            and ${crowdReportsTable.dispatched_at} is null
+            and ${crowdReportsTable.cluster_id} is null
+        ) as empty
+      `);
       const raw = JSON.stringify(
-        snapshotSchema.parse({ initializedAt, signals }),
+        snapshotSchema.parse({
+          initializedAt,
+          signals,
+          dispatchQueueEmpty: queue.rows[0]?.empty === true,
+        }),
       );
       if (Buffer.byteLength(raw) > MAX_BYTES)
         throw Error('Community signal cache byte limit exceeded');
@@ -136,31 +160,40 @@ type CachedSignals =
   | { status: 'ready'; signals: PublicCrowdReportSignal[] }
   | { status: 'missing' | 'unavailable' };
 
+async function readCommunitySignalSnapshot() {
+  const redis = await getPageProfileRedis();
+  const raw = await redis.getrange(getCommunitySignalCacheKey(), 0, MAX_BYTES);
+  if (!raw || Buffer.byteLength(raw) > MAX_BYTES) return;
+  const parsed = snapshotSchema.safeParse(JSON.parse(raw));
+  return parsed.success ? parsed.data : undefined;
+}
+
+/** Missing, old, dirty, corrupt and unavailable snapshots always require SQL. */
+export async function canSkipCrowdReportDispatch() {
+  try {
+    const snapshot = await readCommunitySignalSnapshot();
+    return (
+      snapshot?.dispatchQueueEmpty === true &&
+      snapshot.initializedAt <= Date.now()
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function readCachedCommunitySignals(
   scope: { lineId?: string; stationId?: string; now?: DateTime } = {},
 ): Promise<CachedSignals> {
   try {
-    const redis = await getPageProfileRedis();
-    const raw = await redis.getrange(
-      getCommunitySignalCacheKey(),
-      0,
-      MAX_BYTES,
-    );
-    if (!raw || Buffer.byteLength(raw) > MAX_BYTES)
-      return { status: 'missing' };
-    const parsed = snapshotSchema.safeParse(JSON.parse(raw));
+    const snapshot = await readCommunitySignalSnapshot();
     const now = (scope.now ?? DateTime.now()).toMillis();
     // A historical clock may need reports outside the publication window.
-    if (
-      !parsed.success ||
-      !Number.isFinite(now) ||
-      now < parsed.data.initializedAt
-    )
+    if (!snapshot || !Number.isFinite(now) || now < snapshot.initializedAt)
       return { status: 'missing' };
     const activeSince = now - DEFAULT_PUBLIC_SIGNAL_MAX_AGE_MINUTES * 60_000;
     return {
       status: 'ready',
-      signals: parsed.data.signals
+      signals: snapshot.signals
         .filter(
           (signal) =>
             Date.parse(signal.windowEndAt) >= activeSince &&
