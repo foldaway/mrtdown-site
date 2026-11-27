@@ -37,7 +37,14 @@ export async function readPublishedStationArrivals(
   let generation: string | undefined;
   try {
     const [metadata, departures] = await Promise.all([
-      arrivalInputSnapshotStore.read(),
+      arrivalInputSnapshotStore.readSelected((inputs) => ({
+        ...inputs,
+        // Coverage selection only consumes this station. Keep all alternatives
+        // and dates so platform, loop and midnight decisions remain unchanged.
+        scopes: inputs.scopes.filter(
+          (row) => row.station_id === options.scope.stationId,
+        ),
+      })),
       arrivalDepartureStore.manifest.read(),
     ]);
     // Separate producer steps can expose different heads during promotion.

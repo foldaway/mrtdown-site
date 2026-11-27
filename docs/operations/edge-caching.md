@@ -496,6 +496,18 @@ departures. Healthy cold/warm reads, midnight and report expiry need no SQL.
 Dirty/unavailable optional reports are omitted until an accepted report or a
 SQL-backed repair restores them. Arrivals responses remain `no-store`.
 
+Arrival metadata copies retain only coverage rows for the requested station,
+including all dates and boarding alternatives. Ordinary snapshot readers still
+check their own heads, but concurrent cold reads of the same immutable payload
+share its fetch and decode. Each caller receives its own selected copy;
+publication readiness checks always inspect Redis independently.
+
+The shared public-cache client allows 500 ms to connect and 1,500 ms per command.
+The command budget accommodates response handling alongside snapshot decoding and
+page rendering. An unresponsive established connection can therefore delay SQL
+recovery by about a second more than the former 500 ms budget. Automatic command
+retries remain disabled; unavailable or invalid required inputs still use SQL.
+
 ## Redis usage evidence
 
 Use the configured database's Upstash Usage and billing views, or the
