@@ -58,6 +58,7 @@ function branchSummary(
   if (branch.coverage === 'whole-service') {
     const range = stationRange(branch, stations, locale);
     if (branch.isLoop === false && range != null) return range;
+    if (branch.isLoop === true && serviceName != null) return serviceName;
     const entireService = format({
       id: 'issue.entire_service',
       defaultMessage: 'Entire service',
@@ -137,21 +138,59 @@ function areaSummary(
   ].join(' / ');
 }
 
-function summaryText(
+function isServiceArea(area: AffectedArea) {
+  return (
+    area.kind === 'service-path' &&
+    area.branches.every(
+      (branch) =>
+        branch.coverage === 'whole-service' ||
+        (branch.coverage === 'unknown' && branch.branch.serviceName != null),
+    )
+  );
+}
+
+function summaryContent(
   line: AffectedLineArea,
   stations: Record<string, Station>,
   locale: string,
   intl: ReturnType<typeof useIntl>,
 ) {
   if (line.wholeLine) {
-    return intl.formatMessage({
-      id: 'issue.entire_line',
-      defaultMessage: 'Entire line',
-    });
+    return (
+      <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+        {intl.formatMessage({
+          id: 'issue.entire_line',
+          defaultMessage: 'Entire line',
+        })}
+      </span>
+    );
   }
-  return line.areas
-    .map((area) => areaSummary(area, stations, locale, intl.formatMessage))
-    .join(' · ');
+  return line.areas.map((area, index) => {
+    const key = area.branches
+      .map((branch) => `${branch.branch.branchId}:${branch.stretchIndex}`)
+      .join('|');
+    const serviceArea = isServiceArea(area);
+    return serviceArea ? (
+      <span
+        key={key}
+        className="inline-flex min-w-0 rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+      >
+        <span className="sr-only">
+          {intl.formatMessage({
+            id: 'general.affected_services',
+            defaultMessage: 'Affected services',
+          })}
+          :{' '}
+        </span>
+        {areaSummary(area, stations, locale, intl.formatMessage)}
+      </span>
+    ) : (
+      <span key={key} className="min-w-0">
+        {index > 0 && !isServiceArea(line.areas[index - 1]) && '· '}
+        {areaSummary(area, stations, locale, intl.formatMessage)}
+      </span>
+    );
+  });
 }
 
 function StationList({
@@ -253,7 +292,9 @@ export const AffectedAreaSummary: React.FC<Props> = ({ issue, interval }) => {
               >
                 {area.lineId}
               </span>
-              <span>{summaryText(area, stations, intl.locale, intl)}</span>
+              <span className="flex min-w-0 flex-wrap items-center gap-1">
+                {summaryContent(area, stations, intl.locale, intl)}
+              </span>
             </span>
           );
         })}
