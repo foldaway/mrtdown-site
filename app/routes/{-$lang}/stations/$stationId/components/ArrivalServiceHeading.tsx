@@ -62,13 +62,16 @@ export function ArrivalServiceHeading({
   const distinctDirections =
     new Set(
       timings.map((item) =>
-        item.isLoop && item.viaStationId && item.viaStationName
-          ? `via:${item.viaStationId}`
-          : `towards:${item.destinationStationId}`,
+        JSON.stringify([
+          item.isLoop && directionViaId(item)
+            ? null
+            : item.destinationStationId,
+          directionViaId(item),
+        ]),
       ),
     ).size > 1;
   const hasDirection = timings.some(
-    (item) => item.viaStationName || item.destinationName,
+    (item) => directionViaId(item) || item.destinationName,
   );
 
   return (
@@ -95,43 +98,65 @@ export function ArrivalServiceHeading({
   );
 }
 
+function directionViaId(timing: ArrivalTiming) {
+  return timing.viaStationId &&
+    timing.viaStationName &&
+    (timing.isLoop || timing.viaStationId !== timing.destinationStationId)
+    ? timing.viaStationId
+    : null;
+}
+
 type ArrivalDirectionProps = { timing: ArrivalTiming };
 
 function ArrivalDirection({ timing }: ArrivalDirectionProps) {
-  const intl = useIntl();
-  const showVia = timing.isLoop && timing.viaStationId && timing.viaStationName;
-  const stationId = showVia ? timing.viaStationId : timing.destinationStationId;
-  const stationTranslations = showVia
-    ? timing.viaStationName
-    : timing.destinationName;
-  const name = stationTranslations
-    ? getLocalizedTranslation(stationTranslations, intl.locale)
-    : null;
-  const station =
-    name && stationId ? (
-      <Link
-        className="underline decoration-gray-400 underline-offset-2 hover:decoration-current dark:decoration-gray-500"
-        params={{ stationId }}
-        to="/{-$lang}/stations/$stationId"
-      >
-        {name}
-      </Link>
-    ) : (
-      name
-    );
-
-  if (!station) return null;
-  return showVia ? (
+  const viaId = directionViaId(timing);
+  const via = viaId ? (
+    <DirectionStation stationId={viaId} name={timing.viaStationName} />
+  ) : null;
+  const destination = timing.destinationName ? (
+    <DirectionStation
+      stationId={timing.destinationStationId}
+      name={timing.destinationName}
+    />
+  ) : null;
+  const viaLabel = via ? (
     <FormattedMessage
       id="station.arrivals.via"
       defaultMessage="via {station}"
-      values={{ station }}
+      values={{ station: via }}
     />
+  ) : null;
+  if (timing.isLoop && viaLabel) return viaLabel;
+  if (!destination) return viaLabel;
+  return (
+    <>
+      <FormattedMessage
+        id="station.arrivals.towards"
+        defaultMessage="towards {station}"
+        values={{ station: destination }}
+      />
+      {viaLabel && <> {viaLabel}</>}
+    </>
+  );
+}
+
+type DirectionStationProps = {
+  stationId?: string | null;
+  name?: ArrivalTiming['destinationName'];
+};
+
+function DirectionStation({ stationId, name }: DirectionStationProps) {
+  const intl = useIntl();
+  const label = name ? getLocalizedTranslation(name, intl.locale) : null;
+  return label && stationId ? (
+    <Link
+      className="underline decoration-gray-400 underline-offset-2 hover:decoration-current dark:decoration-gray-500"
+      params={{ stationId }}
+      to="/{-$lang}/stations/$stationId"
+    >
+      {label}
+    </Link>
   ) : (
-    <FormattedMessage
-      id="station.arrivals.towards"
-      defaultMessage="towards {station}"
-      values={{ station }}
-    />
+    label
   );
 }

@@ -36,6 +36,7 @@ import {
   isLoopPath,
   loopPlatformViaStations,
   loopViaStationId,
+  nonLoopViaStationIds,
   type StationArrivalBranch,
 } from '~/util/stationArrivalBranches';
 import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
@@ -533,13 +534,14 @@ export async function getStationProfileReadModel(
       boardablePlatformLabelsByServiceId.set(serviceId, labels);
     }
   }
+  const nonLoopVias = nonLoopViaStationIds(arrivalBranches, station.id);
   const arrivalDirections = arrivalBranches.map((branch) => {
     const destination = branch.entries.at(-1);
     const isLoop =
       destination != null && isLoopPath(branch.entries, destination.stationId);
     const viaStationId = isLoop
       ? loopViaStationId(branch.entries, station.id)
-      : undefined;
+      : nonLoopVias.get(branch.id);
     const platformViaStations = isLoop
       ? loopPlatformViaStations(branch.entries, branch.id, station.id).filter(
           ({ platformId }) =>

@@ -12,6 +12,7 @@ import {
   serializeStationArrivalsV2,
 } from '~/util/stationArrivalsV2';
 import { ArrivalReports } from './ArrivalReports';
+import { ArrivalServiceHeading } from './ArrivalServiceHeading';
 import {
   groupArrivalSummaries,
   sharedArrivalDisplay,
@@ -123,6 +124,61 @@ afterEach(() => {
 });
 
 describe('station guide arrival sources', () => {
+  it('shows the destination and waypoint together for a non-loop service', () => {
+    const viaTiming = {
+      ...timing,
+      viaStationId: 'waypoint',
+      viaStationName: { ...display.destinationName, 'en-SG': 'Waypoint' },
+    };
+    const render = (arrivalTiming: typeof timing) =>
+      renderToStaticMarkup(
+        <IntlProvider locale="en-SG" defaultLocale="en-SG">
+          <ArrivalServiceHeading timing={arrivalTiming} />
+        </IntlProvider>,
+      );
+    expect(render(viaTiming)).toContain(
+      `towards <span data-station-id="${timing.destinationStationId}">Destination</span> via <span data-station-id="waypoint">Waypoint</span>`,
+    );
+    expect(
+      render({
+        ...viaTiming,
+        viaStationId: timing.destinationStationId ?? undefined,
+      }),
+    ).not.toContain('via ');
+    expect(render({ ...viaTiming, viaStationName: undefined })).not.toContain(
+      'via ',
+    );
+    expect(render(timing)).toContain('towards ');
+    expect(render(timing)).not.toContain('via ');
+  });
+
+  it('keeps distinct non-loop waypoints visible when services share a destination', () => {
+    const first = {
+      ...timing,
+      viaStationId: 'via-a',
+      viaStationName: { ...display.destinationName, 'en-SG': 'Waypoint A' },
+    };
+    const second = {
+      ...timing,
+      serviceId: 'other-service',
+      serviceName: { ...timing.serviceName, 'en-SG': 'Other service' },
+      viaStationId: 'via-b',
+      viaStationName: { ...display.destinationName, 'en-SG': 'Waypoint B' },
+    };
+    const html = renderToStaticMarkup(
+      <IntlProvider locale="en-SG" defaultLocale="en-SG">
+        <ArrivalServiceHeading timing={first} additionalTimings={[second]} />
+      </IntlProvider>,
+    );
+    expect(html.match(/towards /g)).toHaveLength(2);
+    expect(html).toContain(
+      'via <span data-station-id="via-a">Waypoint A</span>',
+    );
+    expect(html).toContain(
+      'via <span data-station-id="via-b">Waypoint B</span>',
+    );
+  });
+
   it('explains the A/B loop directions on platform 2 while platform 1 keeps the shared destination', () => {
     if (scheduled.source !== 'scheduled') throw new Error('fixture');
     const stationName = (value: string) => ({

@@ -45,6 +45,56 @@ export function loopViaStationId(
   return nextStations.size === 1 ? [...nextStations][0] : undefined;
 }
 
+type ArrivalPath = {
+  id: string;
+  lineId: string;
+  entries: readonly { stationId: string }[];
+};
+
+/** A via is useful where non-loop services offer different paths to one terminus. */
+export function nonLoopViaStationIds(
+  branches: ArrivalPath[],
+  stationId: string,
+) {
+  const directions = branches.flatMap((branch) => {
+    const destination = branch.entries.at(-1)?.stationId;
+    const visits = branch.entries.flatMap((entry, index) =>
+      entry.stationId === stationId ? [index] : [],
+    );
+    if (
+      !destination ||
+      isLoopPath(branch.entries, destination) ||
+      visits.length !== 1 ||
+      visits[0] >= branch.entries.length - 1
+    )
+      return [];
+    return [
+      {
+        ...branch,
+        destination,
+        remaining: branch.entries
+          .slice(visits[0] + 1, -1)
+          .map((entry) => entry.stationId),
+      },
+    ];
+  });
+  const vias = new Map<string, string>();
+  for (const branch of directions) {
+    const alternatives = directions.filter(
+      (other) =>
+        other.id !== branch.id &&
+        other.lineId === branch.lineId &&
+        other.destination === branch.destination,
+    );
+    if (!alternatives.length) continue;
+    const via = branch.remaining.find((candidate) =>
+      alternatives.every((other) => !other.remaining.includes(candidate)),
+    );
+    if (via) vias.set(branch.id, via);
+  }
+  return vias;
+}
+
 /** Reviewed BP6_B allocation: platform 2 boards the outbound loop visit. */
 export function loopPlatformViaStations(
   path: readonly { stationId: string }[],

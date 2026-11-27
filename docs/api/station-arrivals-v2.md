@@ -38,6 +38,12 @@ HTTP 500. The legacy frequency endpoint at
 
 ## Station guide directions
 
+Non-loop services show “towards Y via X” when alternative services on the same
+line take different paths to the same terminus. X is an intermediate station
+unique to the remaining route; the hint disappears after the routes rejoin.
+Single routes and identical remaining paths show only the destination.
+Loop directions keep their “via X” label.
+
 The station guide can add a platform-specific direction to its canonical branch
 metadata. At Bukit Panjang, platform 2 serves A via Senja and B via Petir;
 platform 1 serves the common return towards Choa Chu Kang. The explicit
