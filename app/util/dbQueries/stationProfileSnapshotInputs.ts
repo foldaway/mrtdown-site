@@ -3,8 +3,8 @@ import { createSelectSchema } from 'drizzle-orm/zod';
 import type { DateTime } from 'luxon';
 import { z } from 'zod';
 import {
-  landmarksTable,
   issueDayFactsTable,
+  landmarksTable,
   lineDayFactsTable,
   operatorsTable,
   stationExitsTable,
@@ -16,8 +16,8 @@ import {
   type DatasetInputs,
   scopeDatasetInputs,
 } from './dataset';
-import { getIssueScopeFromInputs } from './readModelScope';
 import { RangeSnapshotInputsSchema } from './rangeSnapshotInputs';
+import { getIssueScopeFromInputs } from './readModelScope';
 
 const audit = { created_at: true, updated_at: true } as const;
 const datasetSchema = RangeSnapshotInputsSchema.extend({
@@ -173,6 +173,7 @@ export function selectStationProfileSnapshot(
       );
       const scope = {
         lineIds: [...lineIds],
+        completeLineIds: [...lineIds],
         serviceIds: [...serviceIds],
         stationIds: [...stationIds],
         townIds: [...townIds],

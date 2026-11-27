@@ -1,19 +1,30 @@
 import type {
   CauseSubtype,
   Issue as CoreIssue,
-  IssueType,
   Landmark as CoreLandmark,
   Line as CoreLine,
   Operator as CoreOperator,
   Service as CoreService,
   Station as CoreStation,
   Town as CoreTown,
+  IssueType,
 } from '@mrtdown/core';
 import type { AffectedServiceRevision } from '~/util/affectedServiceRevisions';
 
 type StationCode = CoreStation['stationCodes'][number];
 
-export type Line = Omit<CoreLine, 'serviceIds'>;
+export type Line = Omit<CoreLine, 'serviceIds'> & {
+  /** Present only when the read model loaded every service on this line. */
+  serviceCoverage?: Array<{
+    id: string;
+    revisions: Array<
+      Pick<
+        AffectedServiceRevision,
+        'id' | 'startAt' | 'endAt' | 'updatedAt' | 'isLoop'
+      >
+    >;
+  }>;
+};
 
 type StationLineMembership = Pick<
   StationCode,
@@ -33,6 +44,8 @@ export type IssueAffectedBranch = {
   branchId: string;
   serviceName?: CoreService['name'];
   stationIds: string[];
+  /** Ordered, disjoint affected stretches on this service. */
+  stationStretches?: string[][];
   wholeServiceRevisions?: AffectedServiceRevision[];
 };
 
@@ -40,6 +53,10 @@ export type IssueInterval = {
   startAt: string;
   endAt: string | null;
   status: 'ongoing' | 'ended' | 'future';
+  /** Scope snapshot selected through this occurrence, when available. */
+  branchesAffected?: IssueAffectedBranch[];
+  /** Topology reference instant used for that scope snapshot. */
+  affectedScopeAt?: string;
 };
 
 export type Issue = Omit<CoreIssue, 'titleMeta'> & {

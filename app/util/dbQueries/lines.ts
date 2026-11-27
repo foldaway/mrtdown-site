@@ -1,7 +1,6 @@
 import { setResponseHeader } from '@tanstack/react-start/server';
-import type { DateTime } from 'luxon';
-import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
 import { and, eq, gte, inArray, lte, or } from 'drizzle-orm';
+import type { DateTime } from 'luxon';
 import {
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
@@ -15,15 +14,15 @@ import {
   stationCodesTable,
 } from '~/db/schema';
 import { countLineStations } from '~/util/lineBranches';
+import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
 import {
   type CommunitySignalOptions,
   getPageCommunitySignals,
 } from './communitySignals';
 import { getDefaultDb, timeDbQuery } from './database';
 import { assembleDataset, buildDataset } from './dataset';
-import { assembleDirectorySnapshot } from './directorySnapshotInputs';
-import { selectLineProfileSnapshot } from './profileSnapshotInputs';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
+import { assembleDirectorySnapshot } from './directorySnapshotInputs';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
 import {
@@ -32,6 +31,7 @@ import {
   buildUptimeGraph,
   rankLineSummaries,
 } from './lineAnalytics';
+import { selectLineProfileSnapshot } from './profileSnapshotInputs';
 import { getIssueStaticScope } from './readModelScope';
 
 type LineUptimeFact = Pick<
@@ -490,6 +490,9 @@ async function loadSqlLineProfile(
   ];
   const dataset = await buildDataset(referenceNow, db, candidateIssueIds, {
     lineIds,
+    completeLineIds: [
+      ...new Set([lineId, ...(issueScope.completeLineIds ?? [])]),
+    ],
     serviceIds: initialScope.serviceIds,
     stationIds: initialScope.stationIds,
     operatorIds: lineOperatorRows.map((row) => row.operatorId),
@@ -522,7 +525,12 @@ export async function getLineProfileReadModel(
       communitySignals,
     );
     loaded = {
-      dataset: assembleDataset(referenceNow, selected.dataset),
+      dataset: assembleDataset(
+        referenceNow,
+        selected.dataset,
+        undefined,
+        selected.completeLineIds,
+      ),
       uptimeFactRows: selected.uptimeFactRows,
       communitySignals,
     };

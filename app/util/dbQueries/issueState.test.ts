@@ -1,9 +1,48 @@
+import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
 import {
   deriveServiceScopeStationIds,
+  deriveServiceScopeStationStretches,
+  selectIssueScopeSnapshot,
   selectLatestServiceEvents,
   selectServiceBranchSourceEvents,
 } from './issueState';
+
+describe('selectIssueScopeSnapshot', () => {
+  const now = DateTime.fromISO('2025-05-01T00:00:00+08:00');
+
+  it('excludes a whole-service update at the end of the April 2025 occurrence', () => {
+    const snapshot = selectIssueScopeSnapshot(
+      [
+        { ts: '2025-04-23T07:20:51+08:00', scope: 'segment' },
+        { ts: '2025-04-23T09:00:51+08:00', scope: 'whole' },
+      ],
+      {
+        startAt: '2025-04-23T07:00:00+08:00',
+        endAt: '2025-04-23T09:00:51+08:00',
+      },
+      now,
+    );
+    expect(snapshot.events.map((event) => event.scope)).toEqual(['segment']);
+    expect(snapshot.referenceAt).toBe('2025-04-23T09:00:50.999+08:00');
+  });
+
+  it('uses planned service topology but only already known events for a future occurrence', () => {
+    const snapshot = selectIssueScopeSnapshot(
+      [
+        { ts: '2025-04-01T00:00:00+08:00' },
+        { ts: '2025-05-02T00:00:00+08:00' },
+      ],
+      {
+        startAt: '2025-05-10T08:00:00+08:00',
+        endAt: '2025-05-10T10:00:00+08:00',
+      },
+      now,
+    );
+    expect(snapshot.events).toHaveLength(1);
+    expect(snapshot.referenceAt).toBe('2025-05-10T08:00:00.000+08:00');
+  });
+});
 
 describe('deriveServiceScopeStationIds', () => {
   const BRANCH_STATION_IDS = ['NS1', 'NS2', 'NS3', 'NS4', 'NS5'];
@@ -100,6 +139,51 @@ describe('deriveServiceScopeStationIds', () => {
         },
       ]),
     ).toEqual(BRANCH_STATION_IDS);
+  });
+});
+
+describe('deriveServiceScopeStationStretches', () => {
+  const path = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+  it('keeps disjoint stretches separate and merges touching scopes', () => {
+    expect(
+      deriveServiceScopeStationStretches(path, [
+        {
+          type: 'service.segment',
+          station_id: null,
+          from_station_id: 'A',
+          to_station_id: 'B',
+        },
+        {
+          type: 'service.point',
+          station_id: 'C',
+          from_station_id: null,
+          to_station_id: null,
+        },
+        {
+          type: 'service.segment',
+          station_id: null,
+          from_station_id: 'E',
+          to_station_id: 'F',
+        },
+      ]),
+    ).toEqual([
+      ['A', 'B', 'C'],
+      ['E', 'F'],
+    ]);
+  });
+
+  it('does not substitute a whole path for an unresolvable scope', () => {
+    expect(
+      deriveServiceScopeStationStretches(path, [
+        {
+          type: 'service.segment',
+          station_id: null,
+          from_station_id: 'X',
+          to_station_id: 'Y',
+        },
+      ]),
+    ).toEqual([]);
   });
 });
 

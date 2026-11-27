@@ -1,7 +1,5 @@
-import { setResponseHeader } from '@tanstack/react-start/server';
-import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
-import { selectProfileDatasetInputs } from './profileSnapshotInputs';
 import type { IssueType } from '@mrtdown/core';
+import { setResponseHeader } from '@tanstack/react-start/server';
 import { eq, inArray, isNull, or } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
 import {
@@ -22,12 +20,14 @@ import type {
   LineSummaryStatus,
   Station,
 } from '~/types';
+import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
 import { getDefaultDb, timeDbQuery } from './database';
 import {
   assembleDataset,
   buildDataset,
-  parseTranslations,
+  completeLineIdsFromInputs,
   type DatasetInputs,
+  parseTranslations,
 } from './dataset';
 import { isoDate, isoDateTime, nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
@@ -37,8 +37,9 @@ import {
   issueOverlapsRange,
   sortIssuesByLatestActivity,
 } from './issueIntervals';
+import { selectProfileDatasetInputs } from './profileSnapshotInputs';
 import { getIssueStaticScope } from './readModelScope';
-import { isLineOperatingNow, isLineFuture } from './serviceOperations';
+import { isLineFuture, isLineOperatingNow } from './serviceOperations';
 
 export type TownStationStatus = LineSummaryStatus | 'not_in_service';
 
@@ -553,6 +554,9 @@ async function loadSqlTownProfile(townId: string, referenceNow: DateTime) {
         ...stationMembershipRows.map((row) => row.lineId),
       ]),
     ],
+    completeLineIds: [
+      ...new Set([...townLineIds, ...(issueScope.completeLineIds ?? [])]),
+    ],
     serviceIds: initialScope.serviceIds,
     stationIds: initialScope.stationIds,
     townIds: [townId],
@@ -583,6 +587,12 @@ export async function getTownProfileReadModel(townId: string) {
     const serviceIds = rows.serviceRows
       .filter((row) => lineIds.includes(row.line_id))
       .map((row) => row.id);
+    const selected = selectProfileDatasetInputs(rows, {
+      lineIds,
+      serviceIds,
+      stationIds: townStationIds,
+      townIds: [townId],
+    });
     loaded = {
       townStationIds,
       allStationNameRows: rows.stationRows.map(({ id, name }) => ({
@@ -591,12 +601,9 @@ export async function getTownProfileReadModel(townId: string) {
       })),
       dataset: assembleDataset(
         referenceNow,
-        selectProfileDatasetInputs(rows, {
-          lineIds,
-          serviceIds,
-          stationIds: townStationIds,
-          townIds: [townId],
-        }),
+        selected,
+        undefined,
+        completeLineIdsFromInputs(rows, selected),
       ),
     };
   } else {

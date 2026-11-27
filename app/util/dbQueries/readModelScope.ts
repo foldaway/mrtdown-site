@@ -87,6 +87,7 @@ export function getIssueScopeFromInputs(
       .filter((row) => lineIds.has(row.line_id))
       .map((row) => row.id),
     stationIds: [...stationIds],
+    completeLineIds: [...lineIds],
   };
 }
 
@@ -221,5 +222,6 @@ export async function getIssueStaticScope(
     lineIds,
     serviceIds: serviceRows.map((row) => row.id),
     stationIds: affectedStationIds,
+    completeLineIds: lineIds,
   };
 }
