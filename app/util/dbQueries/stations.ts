@@ -34,6 +34,7 @@ import {
 } from '~/util/crowdReports';
 import {
   isLoopPath,
+  loopViaStationId,
   type StationArrivalBranch,
 } from '~/util/stationArrivalBranches';
 import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
@@ -42,9 +43,9 @@ import {
   getPageCommunitySignals,
 } from './communitySignals';
 import { getDefaultDb, timeDbQuery } from './database';
-import { assembleDirectorySnapshot } from './directorySnapshotInputs';
 import { buildDataset, parseTranslations } from './dataset';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
+import { assembleDirectorySnapshot } from './directorySnapshotInputs';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
 import {
@@ -536,10 +537,7 @@ export async function getStationProfileReadModel(
     const isLoop =
       destination != null && isLoopPath(branch.entries, destination.stationId);
     const viaStationId = isLoop
-      ? branch.entries[
-          branch.entries.findIndex((entry) => entry.stationId === station.id) +
-            1
-        ]?.stationId
+      ? loopViaStationId(branch.entries, station.id)
       : undefined;
     return { branch, destination, isLoop, viaStationId };
   });

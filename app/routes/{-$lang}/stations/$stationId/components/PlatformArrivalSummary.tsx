@@ -8,6 +8,10 @@ import {
   CrowdArrivalReport,
   RecentCrowdArrival,
 } from './CrowdArrivalReport';
+import {
+  type ArrivalSummaryMember,
+  sharedArrivalDisplay,
+} from './groupArrivalSummaries';
 import { ScheduledArrivalStatus } from './ScheduledArrivalStatus';
 import type { BranchArrivalState } from './stationArrivalRefresh';
 import type { ArrivalTiming } from './stationGuide.types';
@@ -15,6 +19,8 @@ import type { ArrivalTiming } from './stationGuide.types';
 type ServiceArrivalSummaryProps = {
   arrivalTiming: ArrivalTiming;
   arrivalState?: BranchArrivalState;
+  sharedArrivals?: ArrivalSummaryMember[];
+  showReports?: boolean;
   lineColor: string;
   now: number | null;
   onArrivalReported?: () => Promise<void>;
@@ -23,6 +29,8 @@ type ServiceArrivalSummaryProps = {
 export function ServiceArrivalSummary({
   arrivalTiming,
   arrivalState,
+  sharedArrivals = [],
+  showReports = true,
   lineColor,
   now,
   onArrivalReported,
@@ -30,33 +38,64 @@ export function ServiceArrivalSummary({
   const reportPanelId = useId();
   const [reportExpanded, setReportExpanded] = useState(false);
   const data = arrivalState?.data;
-  const report = data?.recentCrowdArrival;
-  const recentReport =
-    report && now != null && now < Date.parse(report.expiresAt) ? report : null;
-  const hasDepartures =
-    data?.source === 'scheduled' &&
-    data.timings.some(({ departures }) => departures.length > 0);
-  const reportable =
-    data &&
-    (hasDepartures ||
-      (data.scope.stationId !== data.scope.destinationStationId &&
-        (data.source === 'unavailable' || !data.coverage.complete)));
+  const members = [
+    { arrivalTiming, arrivalState, showReports },
+    ...sharedArrivals,
+  ];
+  const sharedDisplay = sharedArrivalDisplay(members);
+  const reportable = members.filter(({ arrivalState, showReports }) => {
+    const data = arrivalState?.data;
+    return (
+      showReports !== false &&
+      data &&
+      ((data.source === 'scheduled' &&
+        data.timings.some(({ departures }) => departures.length > 0)) ||
+        (data.scope.stationId !== data.scope.destinationStationId &&
+          (data.source === 'unavailable' || !data.coverage.complete)))
+    );
+  });
+  const reportData = reportable[0]?.arrivalState?.data;
   const reportForm =
-    reportable && onArrivalReported ? (
+    reportable.length > 0 && sharedArrivals.length > 0 && onArrivalReported ? (
+      <div hidden={!reportExpanded} id={reportPanelId}>
+        {reportable.map(({ arrivalTiming, arrivalState }, index) => {
+          const data = arrivalState?.data;
+          if (!data) return null;
+          return (
+            <div className="mt-2" key={JSON.stringify(data.scope)}>
+              <ArrivalServiceHeading timing={arrivalTiming} />
+              <CrowdArrivalReport
+                expanded={reportExpanded}
+                panelId={`${reportPanelId}-${index}`}
+                scope={data.scope}
+                onSubmitted={onArrivalReported}
+              />
+            </div>
+          );
+        })}
+      </div>
+    ) : reportable.length === 1 && reportData && onArrivalReported ? (
       <CrowdArrivalReport
-        key={JSON.stringify(data.scope)}
+        key={JSON.stringify(reportData.scope)}
         expanded={reportExpanded}
         panelId={reportPanelId}
         scope={{
-          stationId: data.scope.stationId,
-          lineId: data.scope.lineId,
-          serviceId: data.scope.serviceId,
-          destinationStationId: data.scope.destinationStationId,
+          stationId: reportData.scope.stationId,
+          lineId: reportData.scope.lineId,
+          serviceId: reportData.scope.serviceId,
+          destinationStationId: reportData.scope.destinationStationId,
         }}
         onSubmitted={onArrivalReported}
       />
     ) : null;
-  const heading = <ArrivalServiceHeading timing={arrivalTiming} />;
+  const heading = (
+    <ArrivalServiceHeading
+      timing={arrivalTiming}
+      additionalTimings={sharedArrivals.map(
+        ({ arrivalTiming }) => arrivalTiming,
+      )}
+    />
+  );
   const reportButton = reportForm ? (
     <ArrivalReportButton
       expanded={reportExpanded}
@@ -68,7 +107,8 @@ export function ServiceArrivalSummary({
     <li className="py-1.5">
       {data?.source === 'scheduled' ? (
         <ScheduledArrivalStatus
-          data={data}
+          data={sharedDisplay?.data ?? data}
+          departureServices={sharedDisplay?.departureServices}
           heading={heading}
           reportButton={reportButton}
           lineColor={lineColor}
@@ -89,9 +129,31 @@ export function ServiceArrivalSummary({
         </ArrivalServiceRow>
       )}
       {arrivalTiming.destinationStationId != null && (
-        <ArrivalRefreshNotice state={arrivalState} />
+        <ArrivalRefreshNotice
+          state={
+            members.find((member) => member.arrivalState?.status === 'loading')
+              ?.arrivalState ?? arrivalState
+          }
+        />
       )}
-      {recentReport && <RecentCrowdArrival report={recentReport} />}
+      {members.map(({ arrivalTiming, arrivalState, showReports }) => {
+        const report = arrivalState?.data?.recentCrowdArrival;
+        if (
+          showReports === false ||
+          !report ||
+          now == null ||
+          now >= Date.parse(report.expiresAt)
+        )
+          return null;
+        return (
+          <div key={arrivalTiming.serviceId}>
+            {sharedArrivals.length > 0 && (
+              <ArrivalServiceHeading timing={arrivalTiming} />
+            )}
+            <RecentCrowdArrival report={report} />
+          </div>
+        );
+      })}
       {reportForm}
     </li>
   );

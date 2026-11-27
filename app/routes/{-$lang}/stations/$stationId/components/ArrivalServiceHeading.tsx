@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import {
   defineMessages,
   FormattedMessage,
+  type IntlShape,
   type MessageDescriptor,
   useIntl,
 } from 'react-intl';
@@ -28,20 +29,36 @@ const shortServiceNames: Partial<Record<string, MessageDescriptor>> =
     },
   });
 
-type ArrivalServiceHeadingProps = { timing: ArrivalTiming };
+type ArrivalServiceHeadingProps = {
+  timing: ArrivalTiming;
+  additionalTimings?: ArrivalTiming[];
+};
 
-export function ArrivalServiceHeading({ timing }: ArrivalServiceHeadingProps) {
-  const intl = useIntl();
+function serviceLabel(timing: ArrivalTiming, intl: IntlShape) {
   const shortName = Object.hasOwn(shortServiceNames, timing.serviceId)
     ? shortServiceNames[timing.serviceId]
     : undefined;
-  const serviceName = shortName
+  return shortName
     ? intl.formatMessage(shortName)
     : getLocalizedTranslation(timing.serviceName, intl.locale);
-  const stationId = timing.isLoop
-    ? timing.viaStationId
-    : timing.destinationStationId;
-  const stationTranslations = timing.isLoop
+}
+
+export function ArrivalServiceHeading({
+  timing,
+  additionalTimings = [],
+}: ArrivalServiceHeadingProps) {
+  const intl = useIntl();
+  const serviceName = intl.formatList(
+    [
+      ...new Set(
+        [timing, ...additionalTimings].map((item) => serviceLabel(item, intl)),
+      ),
+    ],
+    { type: 'conjunction' },
+  );
+  const showVia = timing.isLoop && timing.viaStationId && timing.viaStationName;
+  const stationId = showVia ? timing.viaStationId : timing.destinationStationId;
+  const stationTranslations = showVia
     ? timing.viaStationName
     : timing.destinationName;
   const name = stationTranslations
@@ -67,7 +84,7 @@ export function ArrivalServiceHeading({ timing }: ArrivalServiceHeadingProps) {
       </p>
       {station && (
         <p className="text-gray-600 text-xs leading-snug dark:text-gray-400">
-          {timing.isLoop ? (
+          {showVia ? (
             <FormattedMessage
               id="station.arrivals.via"
               defaultMessage="via {station}"

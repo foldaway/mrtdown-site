@@ -24,3 +24,18 @@ export function isLoopPath(
     path.at(-1)?.stationId === anchor
   );
 }
+
+/** A branch-wide via label is safe only when every boarding visit agrees. */
+export function loopViaStationId(
+  path: readonly { stationId: string }[],
+  stationId: string,
+) {
+  const nextStations = new Set(
+    path.flatMap((entry, index) =>
+      entry.stationId === stationId && index < path.length - 1
+        ? [path[index + 1].stationId]
+        : [],
+    ),
+  );
+  return nextStations.size === 1 ? [...nextStations][0] : undefined;
+}

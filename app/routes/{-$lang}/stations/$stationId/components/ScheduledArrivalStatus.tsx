@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
+import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
 import type { StationArrivalsV2 } from '~/util/stationArrivalsV2';
 import { ArrivalServiceRow } from './ArrivalServiceRow';
 import {
@@ -7,6 +8,7 @@ import {
   ArrivalTimingDisplay,
   NoArrivalTimes,
 } from './ArrivalTimingDisplay';
+import type { ArrivalTiming } from './stationGuide.types';
 
 type ScheduledResponse = Extract<StationArrivalsV2, { source: 'scheduled' }>;
 type ScheduledDeparture =
@@ -18,6 +20,7 @@ type ScheduledArrivalStatusProps = {
   reportButton?: ReactNode;
   lineColor: string;
   now: number | null;
+  departureServices?: ReadonlyMap<ScheduledDeparture, ArrivalTiming[]>;
 };
 
 export function ScheduledArrivalStatus({
@@ -26,6 +29,7 @@ export function ScheduledArrivalStatus({
   reportButton,
   lineColor,
   now,
+  departureServices,
 }: ScheduledArrivalStatusProps) {
   // A fresh response can be newer than the last sampled client clock.
   const emptyWindow =
@@ -108,6 +112,7 @@ export function ScheduledArrivalStatus({
                           key={JSON.stringify(departure)}
                           now={now}
                           showUnit={index === departures.length - 1}
+                          services={departureServices?.get(departure)}
                         />
                       ))}
                     </div>
@@ -132,6 +137,7 @@ type DepartureTimeProps = {
   following?: boolean;
   now: number | null;
   showUnit: boolean;
+  services?: ArrivalTiming[];
 };
 
 function DepartureTime({
@@ -139,8 +145,17 @@ function DepartureTime({
   following,
   now,
   showUnit,
+  services,
 }: DepartureTimeProps) {
   const intl = useIntl();
+  const serviceNames = services?.map(({ serviceName }) =>
+    getLocalizedTranslation(serviceName, intl.locale),
+  );
+  const serviceLabels = services?.map(({ serviceId }, index) => {
+    if (serviceId === 'BPLRT_A') return 'A';
+    if (serviceId === 'BPLRT_B') return 'B';
+    return serviceNames?.[index];
+  });
   const duration =
     now == null
       ? null
@@ -155,11 +170,27 @@ function DepartureTime({
     </time>
   );
 
-  const value = (
+  const timeValue = (
     <ArrivalTimeValue clock={now == null} secondary={following}>
       {departure.precision !== 'exact' && <ApproximateTime />}
       {duration ?? clock}
     </ArrivalTimeValue>
+  );
+  const value = services ? (
+    <span className="flex min-w-0 flex-col items-center">
+      {timeValue}
+      <span
+        className="text-[9px] text-gray-500 leading-tight dark:text-gray-400"
+        title={intl.formatList(serviceNames ?? [], { type: 'conjunction' })}
+      >
+        <span aria-hidden="true">{serviceLabels?.join(' / ')}</span>
+        <span className="sr-only">
+          {intl.formatList(serviceNames ?? [], { type: 'conjunction' })}
+        </span>
+      </span>
+    </span>
+  ) : (
+    timeValue
   );
 
   return following ? (
