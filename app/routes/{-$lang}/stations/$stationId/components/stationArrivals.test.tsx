@@ -11,6 +11,12 @@ import {
   type StationArrivalsV2,
   serializeStationArrivalsV2,
 } from '~/util/stationArrivalsV2';
+import { ArrivalReports } from './ArrivalReports';
+import { ArrivalServiceHeading } from './ArrivalServiceHeading';
+import {
+  groupArrivalSummaries,
+  sharedArrivalDisplay,
+} from './groupArrivalSummaries';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { StationGuide } from './StationGuide';
 import {
@@ -86,13 +92,19 @@ function renderRow(
 ) {
   return renderToStaticMarkup(
     <IntlProvider locale="en-SG" defaultLocale="en-SG">
-      <ServiceArrivalSummary
-        arrivalTiming={timing}
-        arrivalState={{ data, status }}
-        lineColor="#123456"
-        now={now}
+      <ArrivalReports
+        stationId={scheduled.scope.stationId}
+        timings={[timing]}
+        states={{ [key]: { data, status } }}
         onArrivalReported={onArrivalReported}
-      />
+      >
+        <ServiceArrivalSummary
+          arrivalTiming={timing}
+          arrivalState={{ data, status }}
+          lineColor="#123456"
+          now={now}
+        />
+      </ArrivalReports>
     </IntlProvider>,
   );
 }
@@ -112,6 +124,611 @@ afterEach(() => {
 });
 
 describe('station guide arrival sources', () => {
+  it.each([
+    { status: 'ready' as const, complete: false },
+    { status: 'error' as const, complete: true },
+    { status: 'error' as const, complete: false },
+  ])(
+    'keeps platform directions on unmerged $status schedules with complete=$complete',
+    ({ status, complete }) => {
+      if (scheduled.source !== 'scheduled') throw new Error('fixture');
+      const stationName = (value: string) => ({
+        ...display.destinationName,
+        'en-SG': value,
+      });
+      const branches = [
+        { serviceId: 'BPLRT_A', viaId: 'SNJ', viaName: 'Senja' },
+        { serviceId: 'BPLRT_B', viaId: 'PTR', viaName: 'Petir' },
+      ].map((service) => ({
+        ...timing,
+        lineId: 'BPLRT',
+        serviceId: service.serviceId,
+        destinationStationId: 'CCK',
+        destinationName: stationName('Choa Chu Kang'),
+        isLoop: true as const,
+        platformViaStations: [
+          {
+            platformId: 'BKP_BPLRT_2',
+            stationId: service.viaId,
+            stationName: stationName(service.viaName),
+          },
+        ],
+      }));
+      const states: ArrivalStates = Object.fromEntries(
+        branches.map((branch) => [
+          arrivalBranchKey(
+            branch.lineId,
+            branch.serviceId,
+            branch.destinationStationId,
+          ),
+          {
+            status,
+            data: {
+              ...scheduled,
+              scope: {
+                stationId: 'BKP',
+                lineId: branch.lineId,
+                serviceId: branch.serviceId,
+                destinationStationId: 'CCK',
+              },
+              coverage: { ...scheduled.coverage, complete },
+              timings: scheduled.timings.map((platform, index) => ({
+                ...platform,
+                platforms: [
+                  { id: `BKP_BPLRT_${index + 1}`, label: String(index + 1) },
+                ],
+              })),
+            },
+          },
+        ]),
+      );
+      // Error responses must retain headings even when their saved trains have
+      // elapsed: the UI still displays those departures as stale clock times.
+      const now = Date.parse(
+        status === 'error' ? '2026-10-24T16:30:00Z' : '2026-10-24T16:08:30Z',
+      );
+      const groups = groupArrivalSummaries(branches, states, now);
+      expect(groups).toHaveLength(4);
+      expect(groups.every((group) => group.length === 1)).toBe(true);
+      for (const [member] of groups) {
+        expect(member.arrivalState?.status).toBe(status);
+        expect(member.arrivalState?.data?.coverage.complete).toBe(complete);
+      }
+      expect(
+        groups
+          .flat()
+          .map(({ arrivalTiming }) => arrivalTiming.viaStationId)
+          .filter(Boolean),
+      ).toEqual(['SNJ', 'PTR']);
+      const html = renderToStaticMarkup(
+        <IntlProvider locale="en-SG" defaultLocale="en-SG">
+          {groups.map(([member]) => (
+            <ServiceArrivalSummary
+              {...member}
+              key={JSON.stringify(member.arrivalState?.data)}
+              lineColor="#748477"
+              now={now}
+            />
+          ))}
+        </IntlProvider>,
+      );
+      expect(html).toContain(
+        'towards <span data-station-id="CCK">Choa Chu Kang</span> via <span data-station-id="SNJ">Senja</span>',
+      );
+      expect(html).toContain(
+        'towards <span data-station-id="CCK">Choa Chu Kang</span> via <span data-station-id="PTR">Petir</span>',
+      );
+      if (status === 'error') {
+        expect(html).toContain('Showing the last known response');
+        expect(html.match(/<time /g)).toHaveLength(8);
+      } else {
+        expect(html).not.toContain('<time ');
+        expect(html).not.toContain('Refresh failed');
+      }
+    },
+  );
+
+  it('shows the destination and waypoint together for a non-loop service', () => {
+    const viaTiming = {
+      ...timing,
+      viaStationId: 'waypoint',
+      viaStationName: { ...display.destinationName, 'en-SG': 'Waypoint' },
+    };
+    const render = (arrivalTiming: typeof timing) =>
+      renderToStaticMarkup(
+        <IntlProvider locale="en-SG" defaultLocale="en-SG">
+          <ArrivalServiceHeading timing={arrivalTiming} />
+        </IntlProvider>,
+      );
+    expect(render(viaTiming)).toContain(
+      `towards <span data-station-id="${timing.destinationStationId}">Destination</span> via <span data-station-id="waypoint">Waypoint</span>`,
+    );
+    expect(
+      render({
+        ...viaTiming,
+        viaStationId: timing.destinationStationId ?? undefined,
+      }),
+    ).not.toContain('via ');
+    expect(render({ ...viaTiming, viaStationName: undefined })).not.toContain(
+      'via ',
+    );
+    expect(render(timing)).toContain('towards ');
+    expect(render(timing)).not.toContain('via ');
+  });
+
+  it('keeps distinct non-loop waypoints visible when services share a destination', () => {
+    const first = {
+      ...timing,
+      viaStationId: 'via-a',
+      viaStationName: { ...display.destinationName, 'en-SG': 'Waypoint A' },
+    };
+    const second = {
+      ...timing,
+      serviceId: 'other-service',
+      serviceName: { ...timing.serviceName, 'en-SG': 'Other service' },
+      viaStationId: 'via-b',
+      viaStationName: { ...display.destinationName, 'en-SG': 'Waypoint B' },
+    };
+    const html = renderToStaticMarkup(
+      <IntlProvider locale="en-SG" defaultLocale="en-SG">
+        <ArrivalServiceHeading timing={first} additionalTimings={[second]} />
+      </IntlProvider>,
+    );
+    expect(html.match(/towards /g)).toHaveLength(1);
+    expect(html).toContain(
+      'via <span data-station-id="via-a">Waypoint A</span>',
+    );
+    expect(html).toContain(
+      'via <span data-station-id="via-b">Waypoint B</span>',
+    );
+  });
+
+  it('explains the A/B loop directions on platform 2 while platform 1 keeps the shared destination', () => {
+    if (scheduled.source !== 'scheduled') throw new Error('fixture');
+    const stationName = (value: string) => ({
+      'en-SG': value,
+      'zh-Hans': null,
+      ms: null,
+      ta: null,
+    });
+    const branches = [
+      {
+        serviceId: 'BPLRT_A',
+        name: 'Service A',
+        viaId: 'SNJ',
+        viaName: 'Senja',
+      },
+      {
+        serviceId: 'BPLRT_B',
+        name: 'Service B',
+        viaId: 'PTR',
+        viaName: 'Petir',
+      },
+    ].map((service) => ({
+      ...timing,
+      lineId: 'BPLRT',
+      serviceId: service.serviceId,
+      serviceName: stationName(service.name),
+      destinationStationId: 'CCK',
+      destinationName: stationName('Choa Chu Kang'),
+      isLoop: true as const,
+      platformViaStations: [
+        {
+          platformId: 'BKP_BPLRT_2',
+          stationId: service.viaId,
+          stationName: stationName(service.viaName),
+        },
+      ],
+    }));
+    const states: ArrivalStates = Object.fromEntries(
+      branches.map((branch) => [
+        arrivalBranchKey(
+          branch.lineId,
+          branch.serviceId,
+          branch.destinationStationId,
+        ),
+        {
+          status: 'ready',
+          data: {
+            ...scheduled,
+            scope: {
+              ...scheduled.scope,
+              stationId: 'BKP',
+              lineId: branch.lineId,
+              serviceId: branch.serviceId,
+              destinationStationId: 'CCK',
+            },
+            timings: scheduled.timings.map((platform, index) => ({
+              ...platform,
+              platforms: [
+                { id: `BKP_BPLRT_${index + 1}`, label: String(index + 1) },
+              ],
+            })),
+          },
+        },
+      ]),
+    );
+    const groups = groupArrivalSummaries(branches, states, null);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((group) => group.length)).toEqual([2, 2]);
+    const html = renderToStaticMarkup(
+      <IntlProvider locale="en-SG" defaultLocale="en-SG">
+        {groups.map(([first, ...sharedArrivals]) => (
+          <ServiceArrivalSummary
+            {...first}
+            sharedArrivals={sharedArrivals}
+            key={JSON.stringify(first.arrivalState?.data)}
+            lineColor="#748477"
+            now={null}
+          />
+        ))}
+      </IntlProvider>,
+    );
+    expect(
+      html.match(/towards <span data-station-id="CCK">Choa Chu Kang/g),
+    ).toHaveLength(2);
+    expect(html).toContain('A via <span data-station-id="SNJ">Senja</span>');
+    expect(html).toContain('B via <span data-station-id="PTR">Petir</span>');
+    expect(html.match(/>Service A and Service B<\/p>/g)).toHaveLength(2);
+    // The exact platform-2 label must include the shared terminus, even though
+    // its API request uses loop=true for the complete out-and-back journey.
+    expect(html.replace(/<[^>]*>/g, '')).toContain(
+      'towards Choa Chu Kang · A via Senja · B via Petir',
+    );
+    const platform2 = groups[1][0].arrivalState?.data;
+    if (platform2?.source !== 'scheduled') throw new Error('fixture');
+    const alternatives = {
+      ...states,
+      [arrivalBranchKey(branches[0].lineId, branches[0].serviceId, 'CCK')]: {
+        status: 'ready' as const,
+        data: {
+          ...platform2,
+          timings: platform2.timings.map((item) => ({
+            ...item,
+            platforms: [
+              { id: 'BKP_BPLRT_1', label: '1' },
+              { id: 'BKP_BPLRT_2', label: '2' },
+            ],
+          })),
+        },
+      },
+    };
+    expect(
+      groupArrivalSummaries([branches[0]], alternatives, null)[0][0]
+        .arrivalTiming.viaStationId,
+    ).toBeUndefined();
+  });
+
+  it('keeps branch report targets outside rows when platforms expire and shared groups split', () => {
+    if (scheduled.source !== 'scheduled') throw new Error('fixture');
+    const otherTiming = { ...timing, serviceId: 'other-service' };
+    const states: ArrivalStates = {
+      [key]: {
+        status: 'ready',
+        data: {
+          ...scheduled,
+          timings: scheduled.timings.map((platform) => ({
+            ...platform,
+            departures: platform.departures.slice(0, 1),
+          })),
+        },
+      },
+      [arrivalBranchKey(
+        timing.lineId,
+        otherTiming.serviceId,
+        timing.destinationStationId,
+      )]: {
+        status: 'ready',
+        data: {
+          ...scheduled,
+          scope: { ...scheduled.scope, serviceId: otherTiming.serviceId },
+          timings: [
+            {
+              ...scheduled.timings[0],
+              departures: [scheduled.timings[0].departures[1]],
+            },
+          ],
+        },
+      },
+    };
+    const render = (now: number) =>
+      renderToStaticMarkup(
+        <IntlProvider locale="en-SG" defaultLocale="en-SG">
+          <ArrivalReports
+            stationId={scheduled.scope.stationId}
+            timings={[timing, otherTiming]}
+            states={states}
+            onArrivalReported={async () => {}}
+          >
+            <ul>
+              {groupArrivalSummaries([timing, otherTiming], states, now).map(
+                ([first, ...sharedArrivals]) => (
+                  <ServiceArrivalSummary
+                    {...first}
+                    sharedArrivals={sharedArrivals}
+                    key={JSON.stringify(first.arrivalState?.data)}
+                    lineColor="#748477"
+                    now={now}
+                  />
+                ),
+              )}
+            </ul>
+          </ArrivalReports>
+        </IntlProvider>,
+      );
+    const before = render(Date.parse('2026-10-24T16:09:00Z'));
+    const after = render(Date.parse('2026-10-24T16:10:15Z'));
+    const formIds = (html: string) =>
+      [...html.matchAll(/id="([^"]+-form)"/g)].map((match) => match[1]);
+    expect(formIds(before)).toHaveLength(2);
+    expect(formIds(after)).toEqual(formIds(before));
+    for (const html of [before, after]) {
+      expect(html.indexOf(`id="${formIds(html)[0]}"`)).toBeGreaterThan(
+        html.lastIndexOf('</ul>'),
+      );
+    }
+    expect(before.match(/aria-label="Report an arrival"/g)).toHaveLength(1);
+    expect(after.match(/aria-label="Report an arrival"/g)).toHaveLength(2);
+  });
+
+  it('preserves separate trips within one service when they share a time slot', () => {
+    if (scheduled.source !== 'scheduled') throw new Error('fixture');
+    const platform = scheduled.timings[0];
+    const firstDeparture = platform.departures[0];
+    const members = [timing.serviceId, 'other-service'].map((serviceId) => ({
+      arrivalTiming: { ...timing, serviceId },
+      arrivalState: {
+        status: 'ready' as const,
+        data: {
+          ...scheduled,
+          scope: { ...scheduled.scope, serviceId },
+          timings: [
+            {
+              ...platform,
+              departures:
+                serviceId === timing.serviceId
+                  ? [
+                      firstDeparture,
+                      {
+                        ...firstDeparture,
+                        providerTripId: 'second-simultaneous-trip',
+                      },
+                    ]
+                  : [firstDeparture],
+            },
+          ],
+        },
+      },
+    }));
+    const combined = sharedArrivalDisplay(members);
+    expect(combined?.data.timings[0].departures).toHaveLength(2);
+    expect(members[0].arrivalState.data.timings[0].departures).toHaveLength(2);
+  });
+
+  it('renders matching A/B schedules once per platform while retaining both services and report scopes', () => {
+    if (scheduled.source !== 'scheduled') throw new Error('fixture');
+    const serviceA = {
+      ...timing,
+      serviceName: { ...timing.serviceName, 'en-SG': 'Service A' },
+    };
+    const serviceB = {
+      ...timing,
+      serviceId: 'service-b',
+      serviceName: { ...timing.serviceName, 'en-SG': 'Service B' },
+    };
+    const secondSchedule = {
+      ...scheduled,
+      scope: { ...scheduled.scope, serviceId: serviceB.serviceId },
+      timings: scheduled.timings.map((timing) => ({
+        ...timing,
+        departures: timing.departures.map((departure) => ({
+          ...departure,
+          providerTripId: `different-${departure.providerTripId}`,
+        })),
+      })),
+      recentCrowdArrival,
+    };
+    const states: ArrivalStates = {
+      [key]: { data: scheduled, status: 'ready' },
+      [arrivalBranchKey(
+        timing.lineId,
+        serviceB.serviceId,
+        timing.destinationStationId,
+      )]: {
+        data: secondSchedule,
+        status: 'ready',
+      },
+    };
+    const groups = groupArrivalSummaries([serviceA, serviceB], states, null);
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toHaveLength(2);
+    expect(groups[0][1].arrivalState?.data?.scope.serviceId).toBe(
+      serviceB.serviceId,
+    );
+    const html = renderToStaticMarkup(
+      <IntlProvider locale="en-SG" defaultLocale="en-SG">
+        <ArrivalReports
+          stationId={scheduled.scope.stationId}
+          timings={[serviceA, serviceB]}
+          states={states}
+          onArrivalReported={async () => {}}
+        >
+          {groups.map(([first, ...sharedArrivals]) => (
+            <ServiceArrivalSummary
+              {...first}
+              sharedArrivals={sharedArrivals}
+              key={JSON.stringify(first.arrivalState?.data)}
+              lineColor="#748477"
+              now={Date.parse('2026-10-24T16:08:30Z')}
+            />
+          ))}
+        </ArrivalReports>
+      </IntlProvider>,
+    );
+    expect(html.match(/>Service A and Service B<\/p>/g)).toHaveLength(2);
+    expect(html.match(/>12 <span/g)).toHaveLength(1);
+    expect(html.match(/aria-label="Report an arrival"/g)).toHaveLength(1);
+    expect(html).toContain('>Service A</p>');
+    expect(html).toContain('>Service B</p>');
+    expect(html).toContain('Rider-reported arrival');
+
+    for (const [changed, expectedCount] of [
+      [
+        {
+          ...secondSchedule,
+          coverage: { ...secondSchedule.coverage, complete: false },
+        },
+        4,
+      ],
+      [
+        {
+          ...secondSchedule,
+          timings: secondSchedule.timings.map((item) => ({
+            ...item,
+            platforms: item.platforms.map((platform) => ({
+              ...platform,
+              id: `other-${platform.id}`,
+            })),
+          })),
+        },
+        4,
+      ],
+      [
+        {
+          ...secondSchedule,
+          timings: secondSchedule.timings.map((item) => ({
+            ...item,
+            departures: item.departures.map((departure) => ({
+              ...departure,
+              time: '2026-10-24T16:25:00Z',
+            })),
+          })),
+        },
+        2,
+      ],
+      [
+        {
+          ...secondSchedule,
+          timings: secondSchedule.timings.map((item, index) =>
+            index === 0
+              ? item
+              : {
+                  ...item,
+                  departures: item.departures.map((departure) => ({
+                    ...departure,
+                    time: '2026-10-24T16:25:00Z',
+                  })),
+                },
+          ),
+        },
+        2,
+      ],
+    ] as const) {
+      expect(
+        groupArrivalSummaries(
+          [serviceA, serviceB],
+          {
+            ...states,
+            [arrivalBranchKey(
+              timing.lineId,
+              serviceB.serviceId,
+              timing.destinationStationId,
+            )]: {
+              data: changed,
+              status: 'ready',
+            },
+          },
+          null,
+        ),
+      ).toHaveLength(expectedCount);
+    }
+    expect(
+      groupArrivalSummaries(
+        [serviceA, { ...serviceB, viaStationId: 'other-direction' }],
+        states,
+        null,
+      ),
+    ).toHaveLength(4);
+
+    const mixedGroups = groupArrivalSummaries(
+      [serviceA, serviceB],
+      {
+        ...states,
+        [arrivalBranchKey(
+          timing.lineId,
+          serviceB.serviceId,
+          timing.destinationStationId,
+        )]: {
+          status: 'ready',
+          data: {
+            ...secondSchedule,
+            timings: secondSchedule.timings.map((item) => ({
+              ...item,
+              departures: item.departures.map((departure, index) =>
+                index === 2
+                  ? { ...departure, time: '2026-10-24T16:25:00Z' }
+                  : departure,
+              ),
+            })),
+          },
+        },
+      },
+      null,
+    );
+    expect(mixedGroups).toHaveLength(2);
+    const mixed = sharedArrivalDisplay(mixedGroups[0]);
+    const slots = mixed?.data.timings[0].departures;
+    expect(slots?.map(({ time }) => time)).toEqual([
+      '2026-10-24T16:10:00Z',
+      '2026-10-24T16:15:00Z',
+      '2026-10-24T16:20:00Z',
+      '2026-10-24T16:25:00Z',
+    ]);
+    expect(
+      slots?.map((departure) =>
+        mixed?.departureServices
+          ?.get(departure)
+          ?.map(({ serviceId }) => serviceId),
+      ),
+    ).toEqual([
+      [timing.serviceId, serviceB.serviceId],
+      [timing.serviceId, serviceB.serviceId],
+      [timing.serviceId],
+      [serviceB.serviceId],
+    ]);
+  });
+
+  it('uses the final destination when a loop has no unambiguous branch-wide via', () => {
+    const html = renderToStaticMarkup(
+      <IntlProvider locale="en-SG" defaultLocale="en-SG">
+        <ServiceArrivalSummary
+          arrivalTiming={{
+            ...timing,
+            isLoop: true,
+            serviceName: { ...timing.serviceName, 'en-SG': 'Service A' },
+            destinationStationId: 'CCK',
+            destinationName: {
+              'en-SG': 'Choa Chu Kang',
+              'zh-Hans': null,
+              ms: null,
+              ta: null,
+            },
+          }}
+          arrivalState={{ data: scheduled, status: 'ready' }}
+          lineColor="#748477"
+          now={null}
+        />
+      </IntlProvider>,
+    );
+    // Both platform groups keep their departures, without borrowing the
+    // outbound visit's direction for the return visit.
+    expect(
+      html.match(/towards <span data-station-id="CCK">Choa Chu Kang/g),
+    ).toHaveLength(2);
+    expect(html).not.toContain('via ');
+    expect(html.match(/<time/g)).toHaveLength(4);
+  });
+
   it('shows the next three departures per platform group as read-only times', () => {
     const html = renderRow(scheduled);
     expect(html).toMatch(/>2 <span[^>]*>mins<\/span>/);
@@ -490,7 +1107,9 @@ describe('station guide refresh session', () => {
     expect(html).toMatch(
       />Clockwise<\/p>.*via <span data-station-id="via-station">Destination<\/span>/,
     );
-    expect(html).not.toContain('towards');
+    expect(html).toMatch(
+      /towards <span data-station-id="[^"]+">Destination<\/span> via <span data-station-id="via-station">Destination<\/span>/,
+    );
     expect(html).not.toContain('D1');
     expect(html).toContain('12:10 am');
   });

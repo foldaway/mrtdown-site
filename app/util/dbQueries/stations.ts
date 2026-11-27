@@ -34,6 +34,9 @@ import {
 } from '~/util/crowdReports';
 import {
   isLoopPath,
+  loopPlatformViaStations,
+  loopViaStationId,
+  nonLoopViaStationIds,
   type StationArrivalBranch,
 } from '~/util/stationArrivalBranches';
 import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
@@ -42,9 +45,9 @@ import {
   getPageCommunitySignals,
 } from './communitySignals';
 import { getDefaultDb, timeDbQuery } from './database';
-import { assembleDirectorySnapshot } from './directorySnapshotInputs';
 import { buildDataset, parseTranslations } from './dataset';
 import { isoDate, nowSg, parseDateTime } from './dateTime';
+import { assembleDirectorySnapshot } from './directorySnapshotInputs';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueTypes } from './issueAnalytics';
 import {
@@ -531,24 +534,36 @@ export async function getStationProfileReadModel(
       boardablePlatformLabelsByServiceId.set(serviceId, labels);
     }
   }
+  const nonLoopVias = nonLoopViaStationIds(arrivalBranches, station.id);
   const arrivalDirections = arrivalBranches.map((branch) => {
     const destination = branch.entries.at(-1);
     const isLoop =
       destination != null && isLoopPath(branch.entries, destination.stationId);
     const viaStationId = isLoop
-      ? branch.entries[
-          branch.entries.findIndex((entry) => entry.stationId === station.id) +
-            1
-        ]?.stationId
-      : undefined;
-    return { branch, destination, isLoop, viaStationId };
+      ? loopViaStationId(branch.entries, station.id)
+      : nonLoopVias.get(branch.id);
+    const platformViaStations = isLoop
+      ? loopPlatformViaStations(branch.entries, branch.id, station.id).filter(
+          ({ platformId }) =>
+            platforms.some(
+              (platform) =>
+                platform.id === platformId &&
+                platform.boardingStatus == null &&
+                platform.serviceIds.includes(branch.id),
+            ),
+        )
+      : [];
+    return { branch, destination, isLoop, viaStationId, platformViaStations };
   });
   const arrivalStationIds = [
     ...new Set(
-      arrivalDirections.flatMap(({ destination, viaStationId }) =>
-        [destination?.stationId, viaStationId].filter(
-          (stationId): stationId is string => stationId != null,
-        ),
+      arrivalDirections.flatMap(
+        ({ destination, viaStationId, platformViaStations }) =>
+          [
+            destination?.stationId,
+            viaStationId,
+            ...platformViaStations.map(({ stationId }) => stationId),
+          ].filter((stationId): stationId is string => stationId != null),
       ),
     ),
   ];
@@ -557,7 +572,7 @@ export async function getStationProfileReadModel(
     arrivalStationRows.map(({ id, name }) => [id, parseTranslations(name)]),
   );
   const arrivalServices = arrivalDirections.map(
-    ({ branch, destination, isLoop, viaStationId }) => {
+    ({ branch, destination, isLoop, viaStationId, platformViaStations }) => {
       const viaStationName = viaStationId
         ? arrivalStationNames.get(viaStationId)
         : undefined;
@@ -573,6 +588,18 @@ export async function getStationProfileReadModel(
         ...(isLoop ? { isLoop: true as const } : {}),
         ...(viaStationId && viaStationName
           ? { viaStationId, viaStationName }
+          : {}),
+        ...(platformViaStations.length
+          ? {
+              platformViaStations: platformViaStations.flatMap(
+                ({ platformId, stationId }) => {
+                  const stationName = arrivalStationNames.get(stationId);
+                  return stationName
+                    ? [{ platformId, stationId, stationName }]
+                    : [];
+                },
+              ),
+            }
           : {}),
       };
     },

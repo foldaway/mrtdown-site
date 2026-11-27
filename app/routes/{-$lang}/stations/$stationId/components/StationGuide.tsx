@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { FormattedMessage } from 'react-intl';
 import { BetaBadge } from '~/components/BetaBadge';
 import type { Station } from '~/types';
+import { ArrivalReports } from './ArrivalReports';
+import { groupArrivalSummaries } from './groupArrivalSummaries';
 import { ServiceArrivalSummary } from './PlatformArrivalSummary';
 import { ExitSign } from './StationGuideSigns';
 import { StationLineFacts } from './StationLineFacts';
@@ -116,25 +118,47 @@ export function StationGuide({
                 <StationLineFacts facts={facts} referenceAt={referenceAt} />
               </div>
               {timings.length > 0 && (
-                <ul className="divide-y divide-gray-200 border-gray-200 border-t dark:divide-gray-700 dark:border-gray-700">
-                  {timings.map((arrivalTiming) => {
-                    const key = arrivalBranchKey(
-                      lineId,
-                      arrivalTiming.serviceId,
-                      arrivalTiming.destinationStationId,
-                    );
-                    return (
-                      <ServiceArrivalSummary
-                        arrivalTiming={arrivalTiming}
-                        key={key}
-                        arrivalState={states[key]}
-                        lineColor={lineColors[lineId]}
-                        now={now}
-                        onArrivalReported={refreshAfterReport}
-                      />
-                    );
-                  })}
-                </ul>
+                <ArrivalReports
+                  key={`${stationId}:${lineId}`}
+                  stationId={stationId}
+                  timings={timings}
+                  states={states}
+                  onArrivalReported={refreshAfterReport}
+                >
+                  <ul className="divide-y divide-gray-200 border-gray-200 border-t dark:divide-gray-700 dark:border-gray-700">
+                    {groupArrivalSummaries(timings, states, now).map(
+                      (members) => {
+                        const [first, ...sharedArrivals] = members;
+                        const key = JSON.stringify(
+                          members.map(({ arrivalTiming }) =>
+                            arrivalBranchKey(
+                              lineId,
+                              arrivalTiming.serviceId,
+                              arrivalTiming.destinationStationId,
+                            ),
+                          ),
+                        );
+                        const platformKey =
+                          first.arrivalState?.data?.source === 'scheduled'
+                            ? first.arrivalState.data.timings
+                                .flatMap((timing) =>
+                                  timing.platforms.map(({ id }) => id),
+                                )
+                                .sort()
+                            : [];
+                        return (
+                          <ServiceArrivalSummary
+                            {...first}
+                            sharedArrivals={sharedArrivals}
+                            key={JSON.stringify([key, platformKey])}
+                            lineColor={lineColors[lineId]}
+                            now={now}
+                          />
+                        );
+                      },
+                    )}
+                  </ul>
+                </ArrivalReports>
               )}
             </section>
           ))}

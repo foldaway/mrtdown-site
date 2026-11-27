@@ -36,6 +36,26 @@ Invalid syntax or canonical scope returns HTTP 400. Unexpected failures return
 HTTP 500. The legacy frequency endpoint at
 `GET /api/stations/{stationId}/arrivals` returns HTTP 410.
 
+## Station guide directions
+
+Non-loop services show “towards Y via X” when alternative services on the same
+line take different paths to the same terminus. X is an intermediate station
+unique to the remaining route; the hint disappears after the routes rejoin.
+Single routes and identical remaining paths show only the destination.
+Labels show the known destination and useful via point regardless of the loop
+query flag. Shared rows name the common destination once, then list each
+service's via point.
+
+The station guide can add a platform-specific direction to its canonical branch
+metadata. At Bukit Panjang, platform 2 shows “towards Choa Chu Kang · A via Senja
+· B via Petir”;
+platform 1 serves the common return towards Choa Chu Kang. The explicit
+`BKP_BPLRT_2` allocation follows `BP6_B` in the
+[original GTFS capture](https://sources.mrtdown.org/blobs/schedule/ceb07f9c91de86559212eb48c1feac6455452900fad49cf009414a66c2f17efe.zip).
+The hint requires the matching canonical loop legs and an active boarding
+platform for that service. Alternative platform sets receive it only when all
+platforms agree. It does not change scheduled departures or report scopes.
+
 ## Reporting an arrival
 
 `POST /api/arrival-reports` accepts the canonical branch IDs and an integer
