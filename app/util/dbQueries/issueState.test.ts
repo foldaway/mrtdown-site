@@ -5,8 +5,26 @@ import {
   deriveServiceScopeStationStretches,
   selectIssueScopeSnapshot,
   selectLatestServiceEvents,
+  selectOperationalScopeInterval,
   selectServiceBranchSourceEvents,
 } from './issueState';
+
+describe('selectOperationalScopeInterval', () => {
+  it('uses the active occurrence before a later planned occurrence', () => {
+    const active = {
+      startAt: '2026-11-18T10:00:00+08:00',
+      endAt: '2026-11-18T14:00:00+08:00',
+      status: 'ongoing' as const,
+    };
+    const future = {
+      startAt: '2026-11-19T10:00:00+08:00',
+      endAt: '2026-11-19T14:00:00+08:00',
+      status: 'future' as const,
+    };
+    expect(selectOperationalScopeInterval([active, future])).toBe(active);
+    expect(selectOperationalScopeInterval([future])).toBeUndefined();
+  });
+});
 
 describe('selectIssueScopeSnapshot', () => {
   const now = DateTime.fromISO('2025-05-01T00:00:00+08:00');
@@ -246,14 +264,17 @@ describe('selectLatestServiceEvents', () => {
       { impact_event_id: 'other-issue', service_id: 'northbound' },
     ];
 
-    expect(
-      selectLatestServiceEvents(
+    expect([
+      ...selectLatestServiceEvents(
         events,
         references,
         'issue-1',
         'service_scopes.set',
-      ).map((event) => event.id),
-    ).toEqual(['north-latest', 'south-latest']);
+      ),
+    ]).toEqual([
+      ['northbound', expect.objectContaining({ id: 'north-latest' })],
+      ['southbound', expect.objectContaining({ id: 'south-latest' })],
+    ]);
   });
 
   it('uses event ids as a deterministic timestamp tie-breaker per service', () => {
@@ -281,7 +302,37 @@ describe('selectLatestServiceEvents', () => {
         })),
         'issue-1',
         'service_scopes.set',
-      ).map((event) => event.id),
-    ).toEqual(['scope-b']);
+      ).get('northbound')?.id,
+    ).toBe('scope-b');
+  });
+
+  it('keeps an older shared event only for services without a newer update', () => {
+    const events = [
+      {
+        id: 'shared',
+        issue_id: 'issue-1',
+        type: 'service_scopes.set',
+        ts: '2025-01-01T00:00:00+08:00',
+      },
+      {
+        id: 'north-new',
+        issue_id: 'issue-1',
+        type: 'service_scopes.set',
+        ts: '2025-01-02T00:00:00+08:00',
+      },
+    ] as const;
+    const selected = selectLatestServiceEvents(
+      events,
+      [
+        { impact_event_id: 'shared', service_id: 'northbound' },
+        { impact_event_id: 'shared', service_id: 'southbound' },
+        { impact_event_id: 'north-new', service_id: 'northbound' },
+      ],
+      'issue-1',
+      'service_scopes.set',
+    );
+
+    expect(selected.get('northbound')?.id).toBe('north-new');
+    expect(selected.get('southbound')?.id).toBe('shared');
   });
 });

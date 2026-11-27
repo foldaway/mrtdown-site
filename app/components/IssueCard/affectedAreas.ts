@@ -93,7 +93,9 @@ function resolveBranch(
     const stationIds =
       revision != null
         ? sourceIds.filter((id) => stations[id] != null)
-        : orderedStationIds(branch, sourceIds, stations);
+        : branch.stationStretches != null
+          ? sourceIds.filter((id) => stations[id] != null)
+          : orderedStationIds(branch, sourceIds, stations);
     const complete =
       sourceIds.length > 0 && stationIds.length === sourceIds.length;
     return {

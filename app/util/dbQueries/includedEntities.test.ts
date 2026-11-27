@@ -78,6 +78,71 @@ describe('selectIncludedEntities', () => {
     expect(included.issues[issue.id]).not.toHaveProperty('facilityEffectKinds');
   });
 
+  it('includes stations and lines from earlier occurrence scopes', () => {
+    const issue = buildIssue('recurring', 'maintenance', [
+      {
+        startAt: '2025-01-01T08:00:00+08:00',
+        endAt: '2025-01-01T09:00:00+08:00',
+        status: 'ended',
+        branchesAffected: [
+          {
+            lineId: TEST_FEEDER_LINE.id,
+            branchId: 'older-service',
+            stationIds: ['older', 'shared'],
+            stationStretches: [['older', 'shared']],
+            wholeServiceRevisions: [
+              {
+                id: 'older-revision',
+                startAt: '2025-01-01',
+                endAt: null,
+                updatedAt: '2025-01-01T00:00:00Z',
+                stationIds: ['older', 'shared', 'revision-only'],
+                isLoop: false,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    issue.branchesAffected = [
+      {
+        lineId: TEST_LINE.id,
+        branchId: 'latest-service',
+        stationIds: ['shared'],
+      },
+    ];
+    const stations = Object.fromEntries(
+      ['older', 'shared', 'revision-only'].map((id) => [
+        id,
+        { ...TEST_STATION, id },
+      ]),
+    );
+
+    const included = selectIncludedEntities(
+      {
+        lines: {
+          [TEST_LINE.id]: TEST_LINE,
+          [TEST_FEEDER_LINE.id]: TEST_FEEDER_LINE,
+        },
+        stations,
+        operators: {},
+        towns: {},
+        landmarks: {},
+      },
+      { [issue.id]: issue },
+      { issueIds: [issue.id] },
+    );
+
+    expect(Object.keys(included.stations).sort()).toEqual([
+      'older',
+      'revision-only',
+      'shared',
+    ]);
+    expect(Object.keys(included.lines).sort()).toEqual(
+      [TEST_FEEDER_LINE.id, TEST_LINE.id].sort(),
+    );
+  });
+
   it('keeps explicitly requested lines when no selected issue references them', () => {
     const included = selectIncludedEntities(
       {

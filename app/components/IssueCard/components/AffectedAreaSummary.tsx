@@ -8,7 +8,7 @@ import { Link } from '@tanstack/react-router';
 import { useIntl } from 'react-intl';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import type { Issue, IssueInterval, Station } from '~/types';
+import type { IssueInterval, Station } from '~/types';
 import {
   type AffectedArea,
   type AffectedLineArea,
@@ -18,7 +18,6 @@ import {
 import { AffectedStationList } from './AffectedStationList';
 
 interface Props {
-  issue: Issue;
   interval: IssueInterval;
 }
 
@@ -192,12 +191,12 @@ function summaryContent(
   });
 }
 
-export const AffectedAreaSummary: React.FC<Props> = ({ issue, interval }) => {
+export const AffectedAreaSummary: React.FC<Props> = ({ interval }) => {
   const intl = useIntl();
   const { lines, stations } = useIncludedEntities();
   const scopeAt = interval.affectedScopeAt ?? interval.startAt;
   const affectedLines = getAffectedLineAreas(
-    interval.branchesAffected ?? issue.branchesAffected,
+    interval.branchesAffected ?? [],
     lines,
     stations,
     scopeAt,

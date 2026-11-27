@@ -241,4 +241,21 @@ describe('getAffectedLineAreas', () => {
       ['D'],
     ]);
   });
+
+  it('preserves an explicit stretch crossing the end of a loop', () => {
+    const [area] = getAffectedLineAreas(
+      [
+        {
+          lineId: 'L1',
+          branchId: 'S1',
+          stationIds: ['A', 'C'],
+          stationStretches: [['C', 'A']],
+        },
+      ],
+      { L1: line('L1', ['S1']) },
+      stations,
+      referenceAt,
+    );
+    expect(area.areas[0].stationIds).toEqual(['C', 'A']);
+  });
 });

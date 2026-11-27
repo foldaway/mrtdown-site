@@ -64,6 +64,7 @@ import {
   deriveServiceScopeStationStretches,
   selectIssueScopeSnapshot,
   selectLatestServiceEvents,
+  selectOperationalScopeInterval,
   selectServiceBranchSourceEvents,
 } from './issueState';
 import type { RangeReferenceRows } from './rangeReferences';
@@ -590,6 +591,7 @@ export async function readDatasetInputs(
   const entityEventIds = inputs.includeHistoricalIssueReferences
     ? impactEventRows.map((event) => event.id)
     : selectedStateEventIds;
+  const facilityEntityEventIds = impactEventRows.map((event) => event.id);
   const serviceEntityEventIds = [
     ...new Set([...entityEventIds, ...serviceScopeEventIds]),
   ];
@@ -634,7 +636,7 @@ export async function readDatasetInputs(
               ),
           )
         : ([] as DatasetImpactEventEntityService[]),
-      entityEventIds.length > 0
+      facilityEntityEventIds.length > 0
         ? timeDbQuery('dataset_q_impact_event_facilities', () =>
             database
               .select(impactEventEntityFacilitiesReadColumns)
@@ -642,7 +644,7 @@ export async function readDatasetInputs(
               .where(
                 inArray(
                   impactEventEntityFacilitiesTable.impact_event_id,
-                  entityEventIds,
+                  facilityEntityEventIds,
                 ),
               ),
           )
@@ -1447,11 +1449,9 @@ export function assembleDataset(
         row.id,
         'service_scopes.set',
       );
-      for (const event of serviceScopeEvents) {
+      for (const [serviceId, event] of serviceScopeEvents) {
         const scopes = serviceScopesByImpactEventId[event.id] ?? [];
-        for (const reference of serviceRowsByImpactEventId[event.id] ?? []) {
-          serviceScopeRowsByServiceId.set(reference.service_id, scopes);
-        }
+        serviceScopeRowsByServiceId.set(serviceId, scopes);
       }
 
       for (const event of stateEvents) {
@@ -1490,52 +1490,53 @@ export function assembleDataset(
         }
       }
 
-      const sourceEvents =
-        serviceScopeEvents.length > 0
-          ? serviceScopeEvents
-          : selectServiceBranchSourceEvents(stateEvents);
-      for (const event of sourceEvents) {
-        for (const serviceRef of serviceRowsByImpactEventId[event.id] ?? []) {
-          const branch = branchByServiceId[serviceRef.service_id];
-          const service = serviceById[serviceRef.service_id];
-          if (branch == null || service == null) continue;
-          const scopeRows =
-            serviceScopeRowsByServiceId.get(serviceRef.service_id) ?? [];
-          const wholeServiceRevisions = scopeRows.some(
-            (scope) => scope.type === 'service.whole',
-          )
-            ? affectedServiceRevisionsByServiceId[serviceRef.service_id]
-            : undefined;
-          const revision = selectAffectedServiceRevisionForReferenceAt(
-            affectedServiceRevisionsByServiceId[serviceRef.service_id] ?? [],
-            scopeReferenceAt,
-          );
-          const revisionActive =
-            revision != null &&
-            serviceRevisionIsActiveOn(
-              { start_at: revision.startAt, end_at: revision.endAt },
-              isoDate(parseDateTime(scopeReferenceAt)),
+      const sourceServiceIds =
+        serviceScopeEvents.size > 0
+          ? [...serviceScopeEvents.keys()]
+          : selectServiceBranchSourceEvents(stateEvents).flatMap((event) =>
+              (serviceRowsByImpactEventId[event.id] ?? []).map(
+                (reference) => reference.service_id,
+              ),
             );
-          const path = revisionActive ? revision.stationIds : branch.stationIds;
-          serviceBranches.set(branch.id, {
-            lineId: service.line_id,
-            branchId: branch.id,
-            serviceName: branch.name,
-            stationIds: deriveServiceScopeStationIds(
-              path,
-              scopeRows,
-              revisionActive ? revision.stationIds : undefined,
-            ),
-            stationStretches: revisionActive
-              ? deriveServiceScopeStationStretches(
-                  path,
-                  scopeRows,
-                  revision.stationIds,
-                )
-              : [],
-            wholeServiceRevisions,
-          });
-        }
+      for (const serviceId of new Set(sourceServiceIds)) {
+        const branch = branchByServiceId[serviceId];
+        const service = serviceById[serviceId];
+        if (branch == null || service == null) continue;
+        const scopeRows = serviceScopeRowsByServiceId.get(serviceId) ?? [];
+        const wholeServiceRevisions = scopeRows.some(
+          (scope) => scope.type === 'service.whole',
+        )
+          ? affectedServiceRevisionsByServiceId[serviceId]
+          : undefined;
+        const revision = selectAffectedServiceRevisionForReferenceAt(
+          affectedServiceRevisionsByServiceId[serviceId] ?? [],
+          scopeReferenceAt,
+        );
+        const revisionActive =
+          revision != null &&
+          serviceRevisionIsActiveOn(
+            { start_at: revision.startAt, end_at: revision.endAt },
+            isoDate(parseDateTime(scopeReferenceAt)),
+          );
+        const path = revisionActive ? revision.stationIds : branch.stationIds;
+        serviceBranches.set(branch.id, {
+          lineId: service.line_id,
+          branchId: branch.id,
+          serviceName: branch.name,
+          stationIds: deriveServiceScopeStationIds(
+            path,
+            scopeRows,
+            revisionActive ? revision.stationIds : undefined,
+          ),
+          stationStretches: revisionActive
+            ? deriveServiceScopeStationStretches(
+                path,
+                scopeRows,
+                revision.stationIds,
+              )
+            : [],
+          wholeServiceRevisions,
+        });
       }
 
       return [...serviceBranches.values(), ...facilityBranches.values()].filter(
@@ -1555,13 +1556,20 @@ export function assembleDataset(
         snapshot.referenceAt,
       );
     }
-    const branchesAffected = buildAffectedBranches(
-      issueEvents,
-      intervals.at(-1)?.affectedScopeAt ?? isoDateTime(referenceNow),
-    );
+    const branchesAffected =
+      selectOperationalScopeInterval(intervals)?.branchesAffected ??
+      buildAffectedBranches(
+        issueEvents,
+        intervals.at(-1)?.affectedScopeAt ?? isoDateTime(referenceNow),
+      );
 
     const lineIds = [
-      ...new Set(branchesAffected.map((branch) => branch.lineId)),
+      ...new Set(
+        [
+          ...branchesAffected,
+          ...intervals.flatMap((interval) => interval.branchesAffected ?? []),
+        ].map((branch) => branch.lineId),
+      ),
     ];
     const durationSeconds = sumIntervalSeconds(
       intervals.map((interval) => ({

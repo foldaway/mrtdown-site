@@ -3,7 +3,15 @@ import type {
   impactEventServiceScopesTable,
   impactEventsTable,
 } from '~/db/schema';
+import type { IssueInterval } from '~/types';
 import { isoDateTime, parseDateTime } from './dateTime';
+
+/** Keep the issue's current station scope while a later occurrence is planned. */
+export function selectOperationalScopeInterval(
+  intervals: readonly IssueInterval[],
+) {
+  return intervals.findLast((interval) => interval.status === 'ongoing');
+}
 
 /** Use the last instant of a past occurrence; an end-time update belongs after it. */
 export function selectIssueScopeSnapshot<T extends { ts: string }>(
@@ -191,5 +199,5 @@ export function selectLatestServiceEvents<
     }
   }
 
-  return [...latestByServiceId.values()];
+  return latestByServiceId;
 }

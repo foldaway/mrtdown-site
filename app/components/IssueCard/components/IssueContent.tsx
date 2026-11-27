@@ -26,7 +26,7 @@ export const IssueContent: React.FC<Props> = (props) => {
         </h3>
       </Link>
 
-      <AffectedAreaSummary issue={issue} interval={interval} />
+      <AffectedAreaSummary interval={interval} />
 
       <div className="mt-1.5 flex text-gray-500 text-xs sm:hidden dark:text-gray-400">
         <IssueTimestamp interval={interval} className="shrink-0" />

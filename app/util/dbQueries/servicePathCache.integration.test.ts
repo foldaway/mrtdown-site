@@ -2543,6 +2543,90 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     expect(await range()).toEqual(baseline);
   });
 
+  it('keeps current station status on the active service revision before a future occurrence', async () => {
+    vi.stubEnv('REDIS_URL', undefined);
+    await pool.query("update issues set type='maintenance' where id='issue'");
+    await pool.query(
+      "update impact_event_periods set end_ts='2026-11-18T14:00:00+08:00' where impact_event_id='period'",
+    );
+    await pool.query(
+      "insert into impact_event_periods (impact_event_id,index,start_ts,end_ts) values ('period',1,'2026-11-19T10:00:00+08:00','2026-11-19T14:00:00+08:00')",
+    );
+    await pool.query(
+      "update service_revisions set end_at='2026-11-19' where id='revision'",
+    );
+    await pool.query(
+      "delete from service_revision_path_station_entries where service_revision_id='revision' and station_id='station-3'",
+    );
+    await pool.query(
+      "insert into service_revisions (id,service_id,start_at,end_at,operating_hours) select 'future',service_id,'2026-11-19',null,operating_hours from service_revisions where id='revision'",
+    );
+    await pool.query(
+      "insert into service_revision_path_station_entries (service_revision_id,service_id,station_id,display_code,path_index) values ('future','service','station-2','T2F',0),('future','service','station-3','T3F',1)",
+    );
+    await pool.query(
+      "insert into impact_events (id,ts,issue_id,type) values ('whole','2026-11-18T10:00:00+08:00','issue','service_scopes.set')",
+    );
+    await pool.query(
+      "insert into impact_event_entity_services (impact_event_id,service_id) values ('whole','service')",
+    );
+    await pool.query(
+      "insert into impact_event_service_scopes (impact_event_id,index,type) values ('whole',0,'service.whole')",
+    );
+
+    const dataset = await buildDataset(now, db, ['issue']);
+    const issue = dataset.allIssues.issue;
+    expect(issue.branchesAffected[0].stationIds).toEqual([
+      'station-1',
+      'station-2',
+    ]);
+    expect(
+      issue.intervals.map(
+        (interval) => interval.branchesAffected?.[0].stationIds,
+      ),
+    ).toEqual([
+      ['station-1', 'station-2'],
+      ['station-2', 'station-3'],
+    ]);
+    expect((await getStationProfileReadModel('station-1')).data.status).toBe(
+      'ongoing_maintenance',
+    );
+    expect((await getStationProfileReadModel('station-3')).data.status).toBe(
+      'normal',
+    );
+  });
+
+  it('loads facility references selected by an earlier occurrence', async () => {
+    vi.stubEnv('REDIS_URL', undefined);
+    await pool.query(
+      "insert into issues (id,type,title,title_meta,hash) select 'facility','infra',title,title_meta,hash from issues where id='issue'",
+    );
+    await pool.query(
+      `insert into impact_events (id,ts,issue_id,type) values
+        ('facility-period','2026-11-18T10:00:00+08:00','facility','periods.set'),
+        ('facility-old','2026-11-18T10:05:00+08:00','facility','facility_effects.set'),
+        ('facility-new','2026-11-18T11:00:00+08:00','facility','facility_effects.set')`,
+    );
+    await pool.query(
+      `insert into impact_event_periods (impact_event_id,index,start_ts,end_ts) values
+        ('facility-period',0,'2026-11-18T10:00:00+08:00','2026-11-18T10:30:00+08:00'),
+        ('facility-period',1,'2026-11-18T11:30:00+08:00','2026-11-18T13:00:00+08:00')`,
+    );
+    await pool.query(
+      `insert into impact_event_entity_facilities (impact_event_id,station_id,line_id,kind) values
+        ('facility-old','station-1','line','lift'),
+        ('facility-new','station-2','line','lift')`,
+    );
+
+    const issue = (await buildDataset(now, db, ['facility'])).allIssues
+      .facility;
+    expect(
+      issue.intervals.map(
+        (interval) => interval.branchesAffected?.[0].stationIds,
+      ),
+    ).toEqual([['station-1'], ['station-2']]);
+  });
+
   it('keeps old issue and path data together across publication, then reads the correction', async () => {
     const baseline = await range();
     await publishServicePathCache(generation);
