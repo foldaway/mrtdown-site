@@ -170,7 +170,7 @@ describe('station guide arrival sources', () => {
         <ArrivalServiceHeading timing={first} additionalTimings={[second]} />
       </IntlProvider>,
     );
-    expect(html.match(/towards /g)).toHaveLength(2);
+    expect(html.match(/towards /g)).toHaveLength(1);
     expect(html).toContain(
       'via <span data-station-id="via-a">Waypoint A</span>',
     );
@@ -262,10 +262,15 @@ describe('station guide arrival sources', () => {
     );
     expect(
       html.match(/towards <span data-station-id="CCK">Choa Chu Kang/g),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expect(html).toContain('A via <span data-station-id="SNJ">Senja</span>');
     expect(html).toContain('B via <span data-station-id="PTR">Petir</span>');
     expect(html.match(/>Service A and Service B<\/p>/g)).toHaveLength(2);
+    // The exact platform-2 label must include the shared terminus, even though
+    // its API request uses loop=true for the complete out-and-back journey.
+    expect(html.replace(/<[^>]*>/g, '')).toContain(
+      'towards Choa Chu Kang · A via Senja · B via Petir',
+    );
     const platform2 = groups[1][0].arrivalState?.data;
     if (platform2?.source !== 'scheduled') throw new Error('fixture');
     const alternatives = {
@@ -998,7 +1003,9 @@ describe('station guide refresh session', () => {
     expect(html).toMatch(
       />Clockwise<\/p>.*via <span data-station-id="via-station">Destination<\/span>/,
     );
-    expect(html).not.toContain('towards');
+    expect(html).toMatch(
+      /towards <span data-station-id="[^"]+">Destination<\/span> via <span data-station-id="via-station">Destination<\/span>/,
+    );
     expect(html).not.toContain('D1');
     expect(html).toContain('12:10 am');
   });

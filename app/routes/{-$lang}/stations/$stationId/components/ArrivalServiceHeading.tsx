@@ -62,17 +62,20 @@ export function ArrivalServiceHeading({
   const distinctDirections =
     new Set(
       timings.map((item) =>
-        JSON.stringify([
-          item.isLoop && directionViaId(item)
-            ? null
-            : item.destinationStationId,
-          directionViaId(item),
-        ]),
+        JSON.stringify([item.destinationStationId, directionViaId(item)]),
       ),
     ).size > 1;
   const hasDirection = timings.some(
     (item) => directionViaId(item) || item.destinationName,
   );
+  const commonDestination =
+    distinctDirections &&
+    timings.every(
+      (item) =>
+        directionViaId(item) &&
+        item.destinationName &&
+        item.destinationStationId === timing.destinationStationId,
+    );
 
   return (
     <>
@@ -81,12 +84,18 @@ export function ArrivalServiceHeading({
       </p>
       {hasDirection && (
         <p className="text-gray-600 text-xs leading-snug dark:text-gray-400">
+          {commonDestination && (
+            <>
+              <ArrivalDestination timing={timing} />
+              {' · '}
+            </>
+          )}
           {distinctDirections ? (
             timings.map((item, index) => (
               <span key={item.serviceId}>
                 {index > 0 && ' · '}
                 {serviceLabel(item, intl, true)}{' '}
-                <ArrivalDirection timing={item} />
+                <ArrivalDirection timing={item} viaOnly={commonDestination} />
               </span>
             ))
           ) : (
@@ -101,23 +110,17 @@ export function ArrivalServiceHeading({
 function directionViaId(timing: ArrivalTiming) {
   return timing.viaStationId &&
     timing.viaStationName &&
-    (timing.isLoop || timing.viaStationId !== timing.destinationStationId)
+    timing.viaStationId !== timing.destinationStationId
     ? timing.viaStationId
     : null;
 }
 
-type ArrivalDirectionProps = { timing: ArrivalTiming };
+type ArrivalDirectionProps = { timing: ArrivalTiming; viaOnly?: boolean };
 
-function ArrivalDirection({ timing }: ArrivalDirectionProps) {
+function ArrivalDirection({ timing, viaOnly }: ArrivalDirectionProps) {
   const viaId = directionViaId(timing);
   const via = viaId ? (
     <DirectionStation stationId={viaId} name={timing.viaStationName} />
-  ) : null;
-  const destination = timing.destinationName ? (
-    <DirectionStation
-      stationId={timing.destinationStationId}
-      name={timing.destinationName}
-    />
   ) : null;
   const viaLabel = via ? (
     <FormattedMessage
@@ -126,17 +129,32 @@ function ArrivalDirection({ timing }: ArrivalDirectionProps) {
       values={{ station: via }}
     />
   ) : null;
-  if (timing.isLoop && viaLabel) return viaLabel;
-  if (!destination) return viaLabel;
+  if (viaOnly) return viaLabel;
+  if (!timing.destinationName) return viaLabel;
   return (
     <>
-      <FormattedMessage
-        id="station.arrivals.towards"
-        defaultMessage="towards {station}"
-        values={{ station: destination }}
-      />
+      <ArrivalDestination timing={timing} />
       {viaLabel && <> {viaLabel}</>}
     </>
+  );
+}
+
+type ArrivalDestinationProps = { timing: ArrivalTiming };
+
+function ArrivalDestination({ timing }: ArrivalDestinationProps) {
+  return (
+    <FormattedMessage
+      id="station.arrivals.towards"
+      defaultMessage="towards {station}"
+      values={{
+        station: (
+          <DirectionStation
+            stationId={timing.destinationStationId}
+            name={timing.destinationName}
+          />
+        ),
+      }}
+    />
   );
 }
 

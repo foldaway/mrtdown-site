@@ -42,10 +42,13 @@ Non-loop services show “towards Y via X” when alternative services on the sa
 line take different paths to the same terminus. X is an intermediate station
 unique to the remaining route; the hint disappears after the routes rejoin.
 Single routes and identical remaining paths show only the destination.
-Loop directions keep their “via X” label.
+Labels show the known destination and useful via point regardless of the loop
+query flag. Shared rows name the common destination once, then list each
+service's via point.
 
 The station guide can add a platform-specific direction to its canonical branch
-metadata. At Bukit Panjang, platform 2 serves A via Senja and B via Petir;
+metadata. At Bukit Panjang, platform 2 shows “towards Choa Chu Kang · A via Senja
+· B via Petir”;
 platform 1 serves the common return towards Choa Chu Kang. The explicit
 `BKP_BPLRT_2` allocation follows `BP6_B` in the
 [original GTFS capture](https://sources.mrtdown.org/blobs/schedule/ceb07f9c91de86559212eb48c1feac6455452900fad49cf009414a66c2f17efe.zip).
