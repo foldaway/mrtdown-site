@@ -1,6 +1,8 @@
 import Redis from 'ioredis';
 
-const REDIS_TIMEOUT_MS = 500;
+const REDIS_CONNECT_TIMEOUT_MS = 500;
+// Large snapshot reads share the event loop with decoding and page rendering.
+const REDIS_COMMAND_TIMEOUT_MS = 1_500;
 
 let redis: Redis | undefined;
 let connecting: Promise<void> | undefined;
@@ -20,8 +22,8 @@ export async function getPageProfileRedis() {
       throw new Error('REDIS_URL is required for the page profile cache');
     const client = new Redis(url, {
       lazyConnect: true,
-      connectTimeout: REDIS_TIMEOUT_MS,
-      commandTimeout: REDIS_TIMEOUT_MS,
+      connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+      commandTimeout: REDIS_COMMAND_TIMEOUT_MS,
       enableOfflineQueue: false,
       enableReadyCheck: false,
       autoResendUnfulfilledCommands: false,

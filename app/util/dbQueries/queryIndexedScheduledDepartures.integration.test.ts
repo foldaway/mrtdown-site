@@ -817,12 +817,12 @@ describe.skipIf(!url)('indexed departure window', () => {
           Error('Cache hit must not open default SQL'),
         );
         // Fresh stores exercise cold decoding, then their ordinary memory path.
-        vi.spyOn(arrivalInputSnapshotStore, 'read').mockImplementation(
+        vi.spyOn(arrivalInputSnapshotStore, 'readSelected').mockImplementation(
           createPublishedSnapshotStore(
             getPageProfileRedis,
             'arrival-inputs',
             parseArrivalInputs,
-          ).read,
+          ).readSelected,
         );
         vi.spyOn(arrivalDepartureStore.manifest, 'read').mockImplementation(
           createArrivalDepartureStore(getPageProfileRedis).manifest.read,
@@ -835,6 +835,26 @@ describe.skipIf(!url)('indexed departure window', () => {
         }
         await redis.del(`mrtdown:${schema}:arrival-reports:v1`);
         await redis.quit();
+      });
+
+      it('copies only station coverage while retaining every date and boarding alternative', async () => {
+        const full = await arrivalInputSnapshotStore.read();
+        if (!full) throw Error('Missing arrival metadata');
+        expect(
+          full.inputs.scopes.some((row) => row.station_id !== scope.stationId),
+        ).toBe(true);
+        const published = await readPublishedStationArrivals({
+          scope,
+          referenceInstant: window.startInstant,
+          endInstant: window.endInstant,
+        });
+        expect(published?.inputs).toEqual({
+          ...full.inputs,
+          scopes: full.inputs.scopes.filter(
+            (row) => row.station_id === scope.stationId,
+          ),
+        });
+        expect(appDatabase.getDb).not.toHaveBeenCalled();
       });
 
       it('serves complete cold/warm responses through midnight, 24+ tails, empty coverage and report expiry without SQL', async () => {

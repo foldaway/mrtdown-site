@@ -37,6 +37,8 @@ and deployment before acting.
 - [Arrival topology, November 18](investigations/2026-11-18-station-arrival-topology.md)
   and [range egress, November 18](investigations/2026-11-18-range-reference-egress.md):
   snapshot consistency and SQL transfer findings.
+- [Cold cache SQL fallbacks, November 26](investigations/2026-11-26-cold-cache-sql-fallbacks.md):
+  concurrent cold-read reproduction, hardening results and attribution limits.
 - [Completed plan index](plans/README.md#completed): implementation and rollout
   receipts, with local verification distinguished from production evidence.
 - [Overhaul baseline](history/overhaul-baseline.md): original API-client migration.

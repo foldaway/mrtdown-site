@@ -85,7 +85,11 @@ export function createPublishedSnapshotStore<T>(
   parseInputs: (value: unknown) => T,
 ) {
   const prefix = () => getSnapshotKeyPrefix(namespace);
-  let memo: { hash: string; inputs: T } | undefined;
+  let memo: { key: string; inputs: T } | undefined;
+  type Payload = { inputs: T; redisBytes: number } | null;
+  const loading = new Map<string, Promise<Payload>>();
+  let nextLoad = 0;
+  let memoLoad = 0;
   const headKey = () => `${prefix()}:active`;
   const payloadKey = (hash: string) => `${prefix()}:payload:${hash}`;
 
@@ -93,6 +97,24 @@ export function createPublishedSnapshotStore<T>(
     const redis = await connect();
     const raw = await redis.getrangeBuffer(headKey(), 0, MAX_HEAD_BYTES);
     return { raw, value: parseHead(raw) };
+  }
+
+  async function loadPayload(key: string, hash: string): Promise<Payload> {
+    const load = ++nextLoad;
+    const redis = await connect();
+    const encoded = await redis.getrange(key, 0, MAX_ENCODED_BYTES);
+    if (!encoded || Buffer.byteLength(encoded) > MAX_ENCODED_BYTES) return null;
+    if (snapshotDigest(encoded) !== hash) return null;
+    const inputs =
+      memo?.key === key
+        ? memo.inputs
+        : decodeSnapshotPayload(encoded, hash, parseInputs);
+    // A delayed old publication must not evict a more recently loaded memo.
+    if (load >= memoLoad) {
+      memo = { key, inputs };
+      memoLoad = load;
+    }
+    return { inputs, redisBytes: Buffer.byteLength(encoded) };
   }
 
   // Select before copying so scoped readers need not clone unrelated evidence.
@@ -104,7 +126,8 @@ export function createPublishedSnapshotStore<T>(
       const current = await head();
       if (!current.value) return null;
       const hash = current.value.sha256;
-      if (!verifyPayload && memo?.hash === hash) {
+      const key = payloadKey(hash);
+      if (!verifyPayload && memo?.key === key) {
         return {
           ...current,
           value: current.value,
@@ -113,27 +136,29 @@ export function createPublishedSnapshotStore<T>(
           redisBytes: 0,
         };
       }
-      const redis = await connect();
-      const encoded = await redis.getrange(
-        payloadKey(hash),
-        0,
-        MAX_ENCODED_BYTES,
-      );
-      if (!encoded || Buffer.byteLength(encoded) > MAX_ENCODED_BYTES)
-        return null;
-      if (snapshotDigest(encoded) !== hash) return null;
-      if (memo?.hash !== hash) {
-        memo = {
-          hash,
-          inputs: decodeSnapshotPayload(encoded, hash, parseInputs),
-        };
+      let shared = false;
+      let payload: Payload;
+      if (verifyPayload) {
+        // Readiness/repair checks must inspect Redis even while a fill is pending.
+        payload = await loadPayload(key, hash);
+      } else {
+        let pending = loading.get(key);
+        shared = pending != null;
+        if (!pending) {
+          pending = loadPayload(key, hash).finally(() => loading.delete(key));
+          loading.set(key, pending);
+        }
+        payload = await pending;
       }
+      if (!payload) return null;
       return {
         ...current,
         value: current.value,
-        inputs: structuredClone(select(memo.inputs)),
+        // Use this load's inputs: another publication can replace the memo
+        // before a waiting caller resumes. Each caller receives its own copy.
+        inputs: structuredClone(select(payload.inputs)),
         source: 'redis' as const,
-        redisBytes: Buffer.byteLength(encoded),
+        redisBytes: shared ? 0 : payload.redisBytes,
       };
     } catch {
       return null;
