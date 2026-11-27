@@ -1,7 +1,7 @@
 # Rotate or verify a timetable import
 
-A deployment pin identifies approved artifact bytes; it does not approve an
-unseen source release. Coordinate source, pin, retained lineage and schedules
+A signed one-off request identifies approved artifact bytes; it does not approve an
+unseen source release. Coordinate source, retained lineage and schedules
 before an import. The [pipeline guide](../architecture/data-pipeline.md#timetable-admission)
 owns admission, request schema and projection contracts. This guide owns rotation
 and replay operation; the [fresh-build plan](../plans/active/successor-projection-builds.md)
@@ -24,11 +24,11 @@ review does not authorize a reset preview baseline.
 ## Rotate and verify
 
 1. Pause the affected recurring pull and drain active callbacks. Preserve the
-   original source, pin and schedule settings for recovery.
-2. Set the deployment environment's `MRTDOWN_COMBINED_RELEASE_INDEX` from the
-   independent approval, arrange the exact matching source archive, then deploy
-   the intended revision. Normal deploy syncs schedules; check pause state again.
-3. Start an authenticated one-off pull with source review for an unseen release.
+   original source and schedule settings for recovery.
+2. Arrange the exact approved source archive. Normal deploy syncs schedules;
+   check pause state again if deploying the importer.
+3. Start an authenticated one-off pull with the approved
+   `combinedReleaseIndex` and source review for an unseen release.
    Follow its returned run ID to `RUN_SUCCESS`, checking the exact release index
    receipt, fingerprint and lease release. HTTP 202 alone is not completion.
 4. Verify service-date coverage and assigned/unassigned counts against the
@@ -50,11 +50,9 @@ the combined fingerprint must differ or be absent; an unchanged preflight alone
 does not test the projector. If already current, use a disposable staging copy
 with retained projection and only its fingerprint removed, not a shared database.
 
-Before the empty replay, configure the disposable target's deployment pin
-(`MRTDOWN_COMBINED_RELEASE_INDEX`) with the independently approved index and
-use the matching source archive. Confirm the running app received that pin;
-an index supplied only to an earlier one-off import does not configure it for
-this empty request.
+Before the empty replay, retain the approved release through a signed one-off
+pull and use the matching source archive. The workflow reads the index from the
+latest validated retained receipt.
 
 Send an empty pull without source review, request index or rebuild flag. Require
 success, the expected canonical-plus-index fingerprint and unchanged recorded
@@ -70,8 +68,8 @@ restore the expected artifact for retry or start a new pull with the new manifes
 and review. Use the explicit projection rebuild flag only for intentional repair;
 it bypasses both fingerprint skip and reuse.
 
-Drain callbacks before changing a pin/source again. An old signed request can
-conflict with a new pin. Restore temporary staging settings when the experiment
-ends. To return to canonical-only input, clear the pin and deploy that source
-before resuming pulls; this preserves retained releases and projections. Do not
+Drain callbacks before changing the source again. Restore temporary staging
+settings when the experiment ends. A transition from a retained combined release
+to canonical-only input needs an explicit importer change before resuming pulls.
+Do not
 manually delete retained receipts or mutate departure rows to force acceptance.

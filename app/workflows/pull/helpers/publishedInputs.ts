@@ -29,6 +29,9 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
     process.env.MRTDOWN_COMBINED_RELEASE_INDEX,
     params.combinedReleaseIndex,
   );
+  // A completed combined pull has a different fingerprint, so an empty replay
+  // falls through to the retained receipt in SQL. Canonical-only pulls can
+  // still use the external checkpoint without waking the database.
   const manifest = await fetchManifest(dataUrl);
   if (pinned && manifest.scheduledTimetable)
     throw new WorkflowNonRetryableError(

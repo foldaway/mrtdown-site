@@ -39,6 +39,7 @@ import {
 } from './helpers/manifestFingerprint.js';
 import { publishArrivalDepartures } from './helpers/publishArrivalDepartures.js';
 import { canSkipPublishedCanonicalPull } from './helpers/publishedInputs.js';
+import { retainedCombinedReleaseIndex } from './helpers/retainedCombinedReleaseIndex.js';
 import {
   type PullParams,
   PullParamsSchema,
@@ -198,11 +199,16 @@ async function executePull(
       if (dataUrl == null) {
         throw new WorkflowNonRetryableError('MRTDOWN_DATA_URL not set');
       }
-      const pinnedIndex = resolveCombinedReleaseIndex(
+      const requestedIndex = resolveCombinedReleaseIndex(
         process.env.MRTDOWN_COMBINED_RELEASE_INDEX,
         params.combinedReleaseIndex,
       );
       const manifest = await fetchManifest(dataUrl);
+      const pinnedIndex =
+        requestedIndex ??
+        (!manifest.scheduledTimetable
+          ? await retainedCombinedReleaseIndex(getDb())
+          : undefined);
       // Persist this clock and trusted root together; retries must not select a
       // different source or move the admission clock after a failed attempt.
       return {

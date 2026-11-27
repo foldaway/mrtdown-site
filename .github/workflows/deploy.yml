@@ -65,7 +65,6 @@ jobs:
             --local-only \
             --image-label=${{ github.sha }} \
             --env GIT_SHA=${{ github.sha }} \
-            --env "MRTDOWN_COMBINED_RELEASE_INDEX=$MRTDOWN_COMBINED_RELEASE_INDEX" \
             --build-arg TIER=staging \
             --build-arg SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
             --build-arg SENTRY_ORG=${{ secrets.SENTRY_ORG }} \
@@ -78,7 +77,6 @@ jobs:
             --build-arg VITE_ROOT_URL=https://staging.mrtdown.org
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-          MRTDOWN_COMBINED_RELEASE_INDEX: ${{ vars.MRTDOWN_COMBINED_RELEASE_INDEX }}
 
       - name: Sync staging QStash schedules
         run: npm run qstash:schedules:sync

@@ -83,6 +83,7 @@ import {
   recordCanonicalManifestFingerprint,
 } from './helpers/manifestFingerprint';
 import { publishArrivalDepartures } from './helpers/publishArrivalDepartures';
+import { retainedCombinedReleaseIndex } from './helpers/retainedCombinedReleaseIndex';
 import type { PullParams } from './helpers/pullParams';
 import { scheduledTimetableArchiveFixture } from './helpers/scheduledTimetableArchive.fixture';
 import { scheduledTimetableCanonicalFixture } from './helpers/scheduledTimetableCanonical.fixture';
@@ -192,6 +193,9 @@ vi.mock('@mrtdown/fs', async (original) => ({
   },
 }));
 vi.mock('~/db', () => ({ getDb: vi.fn() }));
+vi.mock('./helpers/retainedCombinedReleaseIndex', () => ({
+  retainedCombinedReleaseIndex: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('~/db/pageProfileGeneration', async (original) => ({
   ...(await original<typeof import('~/db/pageProfileGeneration')>()),
   completePageProfileGeneration: vi.fn(async () => {}),
@@ -1241,6 +1245,14 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     >('./helpers/manifestFingerprint');
     vi.mocked(recordCanonicalManifestFingerprint).mockImplementationOnce(
       actual.recordCanonicalManifestFingerprint,
+    );
+    // The admitted receipt supplies the index for an empty recurring pull.
+    vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', undefined);
+    const admission = await vi.importActual<
+      typeof import('./helpers/retainedCombinedReleaseIndex')
+    >('./helpers/retainedCombinedReleaseIndex');
+    vi.mocked(retainedCombinedReleaseIndex).mockImplementationOnce(
+      admission.retainedCombinedReleaseIndex,
     );
     const replay = workflow('');
     try {
