@@ -57,6 +57,9 @@ export async function projectScheduledTimetable(
   ) {
     throw new Error('Unsupported scheduled departure projector version');
   }
+  if (projectorVersion === COMBINED_DEPARTURE_PROJECTOR_VERSION) {
+    return projectCombinedTimetableByDate(db, options);
+  }
   const identity = and(
     eq(projections.manifest_sha256, manifestSha256),
     eq(projections.projector_version, projectorVersion),
@@ -78,10 +81,7 @@ export async function projectScheduledTimetable(
           .select(scheduledTimetableHistoryColumns)
           .from(timetables);
         validateScheduledTimetableHistory(history);
-        const source =
-          projectorVersion === COMBINED_DEPARTURE_PROJECTOR_VERSION
-            ? await combinedProjectionSource(retained, options)
-            : await legacyProjectionSource(retained, options);
+        const source = await legacyProjectionSource(retained, options);
         const metadata = {
           manifest_sha256: manifestSha256,
           projector_version: projectorVersion,
@@ -153,44 +153,15 @@ export async function projectScheduledTimetable(
               })),
             );
           }
-          if ('combined' in date) {
-            let batch: (typeof combinedOccurrences.$inferInsert)[] = [];
-            let memberships: (typeof combinedMemberships.$inferInsert)[] = [];
-            async function flush() {
-              if (batch.length) {
-                await build.insert(combinedOccurrences).values(batch);
-                batch = [];
-              }
-              for (
-                let index = 0;
-                index < memberships.length;
-                index += batchSize
-              ) {
-                await build
-                  .insert(combinedMemberships)
-                  .values(memberships.slice(index, index + batchSize));
-              }
-              memberships = [];
+          let batch: (typeof occurrences.$inferInsert)[] = [];
+          for (const occurrence of date.occurrences) {
+            batch.push({ ...occurrence, projection_id });
+            if (batch.length === batchSize) {
+              await build.insert(occurrences).values(batch);
+              batch = [];
             }
-            for (const row of date.occurrences) {
-              batch.push({ ...row.occurrence, projection_id });
-              for (const member of row.memberships) {
-                memberships.push({ ...member, projection_id });
-              }
-              if (batch.length === batchSize) await flush();
-            }
-            await flush();
-          } else {
-            let batch: (typeof occurrences.$inferInsert)[] = [];
-            for (const occurrence of date.occurrences) {
-              batch.push({ ...occurrence, projection_id });
-              if (batch.length === batchSize) {
-                await build.insert(occurrences).values(batch);
-                batch = [];
-              }
-            }
-            if (batch.length) await build.insert(occurrences).values(batch);
           }
+          if (batch.length) await build.insert(occurrences).values(batch);
         }
         await build
           .update(projections)
@@ -210,6 +181,176 @@ export async function projectScheduledTimetable(
     throw result.error;
   }
   return result.projection;
+}
+
+/** Commit each verified service date independently so a callback retry resumes. */
+async function projectCombinedTimetableByDate(
+  db: ReturnType<typeof getDb>,
+  options: ProjectionOptions,
+) {
+  const { manifestSha256, projectorVersion } = options;
+  const identity = and(
+    eq(projections.manifest_sha256, manifestSha256),
+    eq(projections.projector_version, projectorVersion),
+  );
+  let source: Awaited<ReturnType<typeof combinedProjectionSource>>;
+  try {
+    source = await db.transaction(async (tx) => {
+      const [retained] = await tx
+        .select()
+        .from(timetables)
+        .where(eq(timetables.manifest_sha256, manifestSha256))
+        .for('update');
+      if (!retained)
+        throw new Error('Scheduled timetable manifest is not retained');
+      validateScheduledTimetableHistory(
+        await tx.select(scheduledTimetableHistoryColumns).from(timetables),
+      );
+      return combinedProjectionSource(retained, options);
+    });
+  } catch (error) {
+    await db.update(projections).set({ completed_at: null }).where(identity);
+    throw error;
+  }
+
+  const metadata = {
+    manifest_sha256: manifestSha256,
+    projector_version: projectorVersion,
+    topology_sha256: source.topology.sha256,
+    topology_projection_version: source.topology.projectionVersion,
+    feed_start_date: source.range.startDate,
+    feed_end_date: source.range.endDate,
+    maximum_departure_seconds: source.maximumDepartureSeconds,
+    completed_at: null,
+  };
+  const prepared = await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(projections)
+      .where(identity)
+      .for('update');
+    const matches =
+      existing?.topology_sha256 === metadata.topology_sha256 &&
+      existing.topology_projection_version ===
+        metadata.topology_projection_version &&
+      existing.feed_start_date === metadata.feed_start_date &&
+      existing.feed_end_date === metadata.feed_end_date &&
+      existing.maximum_departure_seconds === metadata.maximum_departure_seconds;
+    if (
+      existing &&
+      matches &&
+      options.reuseCompleted &&
+      existing.completed_at
+    ) {
+      const [coverage] = await tx
+        .select({
+          complete: sql<boolean>`
+            count(*) = (${source.range.endDate}::date - ${source.range.startDate}::date + 1)
+            and min(${days.service_date}) = ${source.range.startDate}::date
+            and max(${days.service_date}) = ${source.range.endDate}::date
+          `,
+        })
+        .from(days)
+        .where(eq(days.projection_id, existing.id));
+      if (coverage.complete)
+        return { projection: { id: existing.id }, complete: true };
+    }
+    const [projection] = await tx
+      .insert(projections)
+      .values(metadata)
+      .onConflictDoUpdate({
+        target: [projections.manifest_sha256, projections.projector_version],
+        set: metadata,
+      })
+      .returning({ id: projections.id });
+    if (!matches || !options.reuseCompleted) {
+      await tx.delete(days).where(eq(days.projection_id, projection.id));
+    }
+    return { projection, complete: false };
+  });
+  if (prepared.complete) return prepared.projection;
+
+  for (const date of source.dates) {
+    await db.transaction(async (tx) => {
+      const [projection] = await tx
+        .select({ id: projections.id })
+        .from(projections)
+        .where(identity)
+        .for('update');
+      if (!projection)
+        throw new Error('Scheduled departure projection disappeared');
+      const projection_id = projection.id;
+      const [written] = await tx
+        .select({ serviceDate: days.service_date })
+        .from(days)
+        .where(
+          and(
+            eq(days.projection_id, projection_id),
+            eq(days.service_date, date.day.service_date),
+          ),
+        )
+        .limit(1);
+      if (written) return;
+      await tx.insert(days).values({ ...date.day, projection_id });
+      for (let index = 0; index < date.scopes.length; index += batchSize) {
+        await tx.insert(scopes).values(
+          date.scopes.slice(index, index + batchSize).map((scope) => ({
+            ...scope,
+            projection_id,
+          })),
+        );
+      }
+      let batch: (typeof combinedOccurrences.$inferInsert)[] = [];
+      let memberships: (typeof combinedMemberships.$inferInsert)[] = [];
+      async function flush() {
+        if (batch.length) {
+          await tx.insert(combinedOccurrences).values(batch);
+          batch = [];
+        }
+        for (let index = 0; index < memberships.length; index += batchSize) {
+          await tx
+            .insert(combinedMemberships)
+            .values(memberships.slice(index, index + batchSize));
+        }
+        memberships = [];
+      }
+      for (const row of date.occurrences) {
+        batch.push({ ...row.occurrence, projection_id });
+        for (const member of row.memberships) {
+          memberships.push({ ...member, projection_id });
+        }
+        if (batch.length === batchSize) await flush();
+      }
+      await flush();
+    });
+  }
+
+  await db.transaction(async (tx) => {
+    const [projection] = await tx
+      .select({ id: projections.id })
+      .from(projections)
+      .where(identity)
+      .for('update');
+    if (!projection)
+      throw new Error('Scheduled departure projection disappeared');
+    const [coverage] = await tx
+      .select({
+        complete: sql<boolean>`
+          count(*) = (${source.range.endDate}::date - ${source.range.startDate}::date + 1)
+          and min(${days.service_date}) = ${source.range.startDate}::date
+          and max(${days.service_date}) = ${source.range.endDate}::date
+        `,
+      })
+      .from(days)
+      .where(eq(days.projection_id, projection.id));
+    if (!coverage.complete)
+      throw new Error('Scheduled departure projection has incomplete dates');
+    await tx
+      .update(projections)
+      .set({ completed_at: sql`clock_timestamp()` })
+      .where(identity);
+  });
+  return prepared.projection;
 }
 
 type Retained = typeof timetables.$inferSelect;

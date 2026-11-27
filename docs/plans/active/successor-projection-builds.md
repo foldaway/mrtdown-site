@@ -14,8 +14,9 @@ reliability for the successor to the November 9–30 release.
 - [x] (2026-11-12) Verify retained projection replay in both environments;
   preserve [November evidence](../completed/combined-timetable-pull-rollout.md).
 - [ ] Select an approved successor and isolate a staging fresh-build experiment.
-- [ ] Record runtime, write counts and retry behavior; decide bounded writes.
-- [ ] If needed, implement resumability and prove fresh/repair acceptance.
+- [x] (2026-11-27) Observe production fresh-build callback retries during the approved Joo Koon correction; choose date-atomic writes.
+- [x] (2026-11-27) Implement combined-date resumability and prove a later-date failure leaves the first date committed, hidden, and reusable.
+- [ ] Complete the production retry and record exact receipt, runtime, coverage and representative departures.
 
 ## Surprises & Discoveries
 
@@ -23,6 +24,12 @@ The November projection committed before QStash timed out; callback retry repeat
 expensive writes. Retained replay avoids that work, while a new release or missing
 date can still require a large transaction. Canonical-only/combined archives can
 share manifest inputs, so the approved index participates in fingerprinting.
+
+The approved Joo Koon correction exposed a fresh combined build that spent more
+than 11 minutes in one SQL transaction and retried the `parse` callback. The retained
+release survived, but the projection had no committed dates. Fly also stopped an
+idle machine during the retry window. Date-atomic writes retain completed dates
+while keeping `completed_at` null until coverage is complete.
 
 ## Decision Log
 
@@ -32,6 +39,9 @@ share manifest inputs, so the approved index participates in fingerprinting.
 - 2026-11-26, documentation review — Separate completed replay from fresh-build
   acceptance; routine rotation belongs in the operating guide. A staging result
   does not authorize production import or Pages publication.
+- 2026-11-27 — Keep legacy projection behavior for this recovery. Combined
+  projection validates retained evidence before writing, commits one date per
+  transaction, and marks completion only after the full date range exists.
 
 ## Outcomes & Retrospective
 

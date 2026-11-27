@@ -20,9 +20,13 @@ import {
 } from '~/db/scheduledDepartures.schema';
 import { scheduledTimetablesTable as timetables } from '~/db/scheduledTimetables.schema';
 import { scheduledTimetableArchiveFixture } from '~/workflows/pull/helpers/scheduledTimetableArchive.fixture';
+import { combinedTimetableArchiveFixture } from '~/workflows/pull/helpers/combinedTimetableArchive.fixture';
 import { scheduledTimetableCanonicalFixture } from '~/workflows/pull/helpers/scheduledTimetableCanonical.fixture';
 import { projectScheduledTimetable } from './projectScheduledTimetable';
-import { retainScheduledTimetable } from './retainScheduledTimetable';
+import {
+  retainCombinedTimetable,
+  retainScheduledTimetable,
+} from './retainScheduledTimetable';
 import { retentionReview } from './scheduledTimetableRetention.fixture';
 import {
   type IndexedTimetableScope,
@@ -160,6 +164,7 @@ describe.skipIf(!url)('retained timetable projector', () => {
       '20261024214325_superb_violations',
       '20261025200054_violet_energizer',
       '20261108020149_combined_timetable_retention',
+      '20261108050132_combined_departure_index',
     ]) {
       await pool.query(
         await readFile(
@@ -583,5 +588,108 @@ describe.skipIf(!url)('retained timetable projector', () => {
     expect(await db().select().from(occurrences)).toHaveLength(1004);
     expect((await storedProjection(projection.id)).completed_at).not.toBeNull();
     expect(await storedProjection(older.id)).toEqual(older);
+  });
+
+  it('resumes a combined projection after a failed later service date', async () => {
+    const combined = combinedTimetableArchiveFixture();
+    const combinedDirectory = await mkdtemp(
+      join(tmpdir(), 'mrtdown-combined-projector-test-'),
+    );
+    try {
+      for (const [path, bytes] of Object.entries(combined.snapshot.files)) {
+        const file = join(combinedDirectory, path);
+        await mkdir(join(file, '..'), { recursive: true });
+        await writeFile(file, bytes);
+      }
+      const sourceReview = {
+        ...retentionReview(bundle, bundle, 'successor'),
+        successor: {
+          manifestSha256: combined.index.manifestSha256,
+          snapshotSha256: combined.capture.sha256,
+        },
+        reviewedAt: '2026-11-03T00:00:00Z',
+      };
+      const retained = await retainCombinedTimetable(
+        db(),
+        combined.index,
+        {
+          manifestBytes: combined.files.manifestBytes,
+          timetableBytes: combined.files.timetableBytes,
+          releaseBytes: combined.files.releaseBytes,
+        },
+        combined.topology,
+        { importInstant: '2026-11-03T00:01:00Z', sourceReview },
+      );
+      expect(retained.status).toBe('retained');
+      const combinedOptions = {
+        manifestSha256: combined.index.manifestSha256,
+        projectorVersion: 2 as const,
+        canonicalDataDir: join(combinedDirectory, 'data'),
+        reuseCompleted: true,
+      };
+      await pool.query(`CREATE FUNCTION fail_combined_later_date()
+        RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+          IF NEW.service_date = '2026-11-30' THEN
+            RAISE EXCEPTION 'synthetic later date failure';
+          END IF;
+          RETURN NEW;
+        END $$`);
+      await pool.query(`CREATE TRIGGER fail_combined_later_date
+        BEFORE INSERT ON combined_departure_occurrences
+        FOR EACH ROW EXECUTE FUNCTION fail_combined_later_date()`);
+      await expect(
+        projectScheduledTimetable(db(), combinedOptions),
+      ).rejects.toThrow('Failed query');
+      const [incomplete] = await db()
+        .select()
+        .from(projections)
+        .where(eq(projections.manifest_sha256, combined.index.manifestSha256));
+      expect(incomplete.completed_at).toBeNull();
+      expect(
+        (
+          await db()
+            .select()
+            .from(days)
+            .where(eq(days.projection_id, incomplete.id))
+        ).map((day) => day.service_date),
+      ).toEqual(['2026-11-29']);
+      await pool.query(
+        'DROP TRIGGER fail_combined_later_date ON combined_departure_occurrences',
+      );
+      await pool.query('DROP FUNCTION fail_combined_later_date()');
+      await pool.query(`CREATE FUNCTION reject_combined_first_date_rewrite()
+        RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+          IF NEW.service_date = '2026-11-29' THEN
+            RAISE EXCEPTION 'first date was rewritten';
+          END IF;
+          RETURN NEW;
+        END $$`);
+      await pool.query(`CREATE TRIGGER reject_combined_first_date_rewrite
+        BEFORE INSERT ON combined_departure_occurrences
+        FOR EACH ROW EXECUTE FUNCTION reject_combined_first_date_rewrite()`);
+      const resumed = await projectScheduledTimetable(db(), combinedOptions);
+      expect(resumed.id).toBe(incomplete.id);
+      expect((await storedProjection(resumed.id)).completed_at).not.toBeNull();
+      expect(
+        (
+          await db()
+            .select()
+            .from(days)
+            .where(eq(days.projection_id, resumed.id))
+        ).map((day) => day.service_date),
+      ).toEqual(['2026-11-29', '2026-11-30']);
+    } finally {
+      await pool.query(
+        'DROP TRIGGER IF EXISTS reject_combined_first_date_rewrite ON combined_departure_occurrences',
+      );
+      await pool.query(
+        'DROP FUNCTION IF EXISTS reject_combined_first_date_rewrite()',
+      );
+      await pool.query(
+        'DROP TRIGGER IF EXISTS fail_combined_later_date ON combined_departure_occurrences',
+      );
+      await pool.query('DROP FUNCTION IF EXISTS fail_combined_later_date()');
+      await rm(combinedDirectory, { recursive: true, force: true });
+    }
   });
 });
