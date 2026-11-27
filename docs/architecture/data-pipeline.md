@@ -106,7 +106,8 @@ Three checks apply to each new release:
 
 1. **Release identity.** Verify a legacy bundle under
    `data/scheduled-timetable/` against the entry in the configured Pages
-   manifest. Combined releases use the approved pin below.
+   manifest. Combined releases use the approved signed request or the latest
+   validated retained receipt for an empty replay.
 2. **Canonical compatibility.** The importer checks against the canonical
    data from the same archive before staging or projecting the timetable.
 3. **Source order.** Start the pull with an authenticated
@@ -127,21 +128,19 @@ new manifest and its review.
 
 For a combined release, put the producer's `manifest.json`, `timetable.json`
 and `release.json` at the exact `data/combined-timetable/` paths in the canonical
-ZIP. Set the staging or production GitHub deployment environment variable
-`MRTDOWN_COMBINED_RELEASE_INDEX` to the independently approved release index
-JSON (only `manifestSha256` and `releaseSha256`). Deploy passes the value to
-the Fly app at runtime, so the managed daily QStash pull keeps its empty body
-and schedule sync leaves the pin in place. Leave the variable unset for a
-canonical-only source. An authenticated one-off pull can supply
-`combinedReleaseIndex` when no deployment pin is set. When both are present,
-both digests must match. An index from the archive or its origin cannot
-authorize import. One pull accepts one timetable format.
+ZIP. An authenticated one-off pull supplies the independently approved
+`combinedReleaseIndex` (only `manifestSha256` and `releaseSha256`) together with
+the source review. After admission, the managed daily pull keeps its empty body:
+the workflow reads the index from the latest validated retained receipt. An
+index from the archive or its origin cannot authorize import. One pull accepts
+one timetable format. The optional `MRTDOWN_COMBINED_RELEASE_INDEX` override
+remains available for manual recovery; deployment no longer sets it.
 
 The workflow snapshots the resolved index with the source URL, canonical
 manifest and import clock so callbacks keep the same inputs across a deploy.
-Rotate the configured pin and source together after draining active pulls. An
-old signed request can conflict with a new pin, and a stale archive fails
-verification. A pin change forces the next pull to download the archive.
+Change the source after draining active pulls. A stale archive fails verification;
+the next signed request supplies the new index. An empty pull without an
+override reads retained metadata, so it cannot use the external-only preflight.
 Keep review and artifact contents out of deployment variables and schedule
 bodies. See [timetable operation](../operations/timetable-imports.md)
 for rotation, replay verification and preview options.
