@@ -32,6 +32,7 @@ import {
   publishIssueProfileSnapshot,
 } from '~/util/issueProfileSnapshot.server';
 import { getIssueReadModel } from './issue';
+import { buildLineSummary } from './lineAnalytics';
 import { parseIssueProfileSnapshotInputs } from './issueProfileSnapshotInputs';
 import {
   applyPublicDataCacheHeaders,
@@ -2625,6 +2626,59 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
         (interval) => interval.branchesAffected?.[0].stationIds,
       ),
     ).toEqual([['station-1'], ['station-2']]);
+  });
+
+  it('keeps historical line coverage out of current line status', async () => {
+    vi.stubEnv('REDIS_URL', undefined);
+    await pool.query(
+      "insert into lines (id,name,type,color,started_at,operating_hours,hash) select 'other',name,type,color,started_at,operating_hours,hash from lines where id='line'",
+    );
+    await pool.query(
+      "insert into issues (id,type,title,title_meta,hash) select 'facility','disruption',title,title_meta,hash from issues where id='issue'",
+    );
+    await pool.query(
+      `insert into impact_events (id,ts,issue_id,type) values
+        ('facility-period','2026-11-18T10:00:00+08:00','facility','periods.set'),
+        ('facility-old','2026-11-18T10:05:00+08:00','facility','facility_effects.set'),
+        ('facility-new','2026-11-18T11:00:00+08:00','facility','facility_effects.set')`,
+    );
+    await pool.query(
+      `insert into impact_event_periods (impact_event_id,index,start_ts,end_ts) values
+        ('facility-period',0,'2026-11-18T10:00:00+08:00','2026-11-18T10:30:00+08:00'),
+        ('facility-period',1,'2026-11-18T11:30:00+08:00','2026-11-18T13:00:00+08:00')`,
+    );
+    await pool.query(
+      `insert into impact_event_entity_facilities (impact_event_id,station_id,line_id,kind) values
+        ('facility-old','station-1','line','lift'),
+        ('facility-new','station-2','other','lift')`,
+    );
+
+    const dataset = await buildDataset(now, db, ['facility']);
+    const issue = dataset.allIssues.facility;
+    expect(
+      issue.intervals.map((interval) => interval.branchesAffected?.[0].lineId),
+    ).toEqual(['line', 'other']);
+    expect(issue.lineIds).toEqual(['other']);
+    expect(dataset.issuesByLineId.line).toBeUndefined();
+    expect(dataset.issuesByLineId.other).toEqual([issue]);
+    expect(
+      buildLineSummary(
+        dataset.included.lines.line,
+        dataset.issuesByLineId.line ?? [],
+        1,
+        dataset.publicHolidaySet,
+        now,
+      ).status,
+    ).toBe('normal');
+    expect(
+      buildLineSummary(
+        dataset.included.lines.other,
+        dataset.issuesByLineId.other,
+        1,
+        dataset.publicHolidaySet,
+        now,
+      ).status,
+    ).toBe('ongoing_disruption');
   });
 
   it('keeps old issue and path data together across publication, then reads the correction', async () => {

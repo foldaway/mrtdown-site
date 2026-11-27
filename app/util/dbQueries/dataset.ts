@@ -1564,12 +1564,7 @@ export function assembleDataset(
       );
 
     const lineIds = [
-      ...new Set(
-        [
-          ...branchesAffected,
-          ...intervals.flatMap((interval) => interval.branchesAffected ?? []),
-        ].map((branch) => branch.lineId),
-      ),
+      ...new Set(branchesAffected.map((branch) => branch.lineId)),
     ];
     const durationSeconds = sumIntervalSeconds(
       intervals.map((interval) => ({
