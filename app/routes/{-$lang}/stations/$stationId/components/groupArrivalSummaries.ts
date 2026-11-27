@@ -34,23 +34,25 @@ export function groupArrivalSummaries(
       ];
     const member = { arrivalTiming, arrivalState };
     const data = arrivalState?.data;
+    // Failed refreshes render retained departures as clocks, including elapsed
+    // times. Use the same clock policy when selecting their platform headings.
+    const displayNow = arrivalState?.status === 'error' ? null : now;
     if (
       !arrivalState ||
-      arrivalState.status === 'error' ||
       data?.source !== 'scheduled' ||
-      !data.coverage.complete ||
       !data.timings.some((timing) =>
         timing.departures.some(
-          ({ time }) => now == null || Date.parse(time) > now,
+          ({ time }) => displayNow == null || Date.parse(time) > displayNow,
         ),
       )
     ) {
       groups.push([member]);
       continue;
     }
+    const canMerge = arrivalState.status !== 'error' && data.coverage.complete;
     const firstTimed = data.timings.findIndex((timing) =>
       timing.departures.some(
-        ({ time }) => now == null || Date.parse(time) > now,
+        ({ time }) => displayNow == null || Date.parse(time) > displayNow,
       ),
     );
     for (const [index, timing] of data.timings.entries()) {
@@ -76,9 +78,9 @@ export function groupArrivalSummaries(
         showReports: index === firstTimed,
       };
       const departures = timing.departures.filter(
-        ({ time }) => now == null || Date.parse(time) > now,
+        ({ time }) => displayNow == null || Date.parse(time) > displayNow,
       );
-      if (!departures.length) {
+      if (!canMerge || !departures.length) {
         groups.push([platformMember]);
         continue;
       }

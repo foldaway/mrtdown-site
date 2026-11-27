@@ -124,6 +124,110 @@ afterEach(() => {
 });
 
 describe('station guide arrival sources', () => {
+  it.each([
+    { status: 'ready' as const, complete: false },
+    { status: 'error' as const, complete: true },
+    { status: 'error' as const, complete: false },
+  ])(
+    'keeps platform directions on unmerged $status schedules with complete=$complete',
+    ({ status, complete }) => {
+      if (scheduled.source !== 'scheduled') throw new Error('fixture');
+      const stationName = (value: string) => ({
+        ...display.destinationName,
+        'en-SG': value,
+      });
+      const branches = [
+        { serviceId: 'BPLRT_A', viaId: 'SNJ', viaName: 'Senja' },
+        { serviceId: 'BPLRT_B', viaId: 'PTR', viaName: 'Petir' },
+      ].map((service) => ({
+        ...timing,
+        lineId: 'BPLRT',
+        serviceId: service.serviceId,
+        destinationStationId: 'CCK',
+        destinationName: stationName('Choa Chu Kang'),
+        isLoop: true as const,
+        platformViaStations: [
+          {
+            platformId: 'BKP_BPLRT_2',
+            stationId: service.viaId,
+            stationName: stationName(service.viaName),
+          },
+        ],
+      }));
+      const states: ArrivalStates = Object.fromEntries(
+        branches.map((branch) => [
+          arrivalBranchKey(
+            branch.lineId,
+            branch.serviceId,
+            branch.destinationStationId,
+          ),
+          {
+            status,
+            data: {
+              ...scheduled,
+              scope: {
+                stationId: 'BKP',
+                lineId: branch.lineId,
+                serviceId: branch.serviceId,
+                destinationStationId: 'CCK',
+              },
+              coverage: { ...scheduled.coverage, complete },
+              timings: scheduled.timings.map((platform, index) => ({
+                ...platform,
+                platforms: [
+                  { id: `BKP_BPLRT_${index + 1}`, label: String(index + 1) },
+                ],
+              })),
+            },
+          },
+        ]),
+      );
+      // Error responses must retain headings even when their saved trains have
+      // elapsed: the UI still displays those departures as stale clock times.
+      const now = Date.parse(
+        status === 'error' ? '2026-10-24T16:30:00Z' : '2026-10-24T16:08:30Z',
+      );
+      const groups = groupArrivalSummaries(branches, states, now);
+      expect(groups).toHaveLength(4);
+      expect(groups.every((group) => group.length === 1)).toBe(true);
+      for (const [member] of groups) {
+        expect(member.arrivalState?.status).toBe(status);
+        expect(member.arrivalState?.data?.coverage.complete).toBe(complete);
+      }
+      expect(
+        groups
+          .flat()
+          .map(({ arrivalTiming }) => arrivalTiming.viaStationId)
+          .filter(Boolean),
+      ).toEqual(['SNJ', 'PTR']);
+      const html = renderToStaticMarkup(
+        <IntlProvider locale="en-SG" defaultLocale="en-SG">
+          {groups.map(([member]) => (
+            <ServiceArrivalSummary
+              {...member}
+              key={JSON.stringify(member.arrivalState?.data)}
+              lineColor="#748477"
+              now={now}
+            />
+          ))}
+        </IntlProvider>,
+      );
+      expect(html).toContain(
+        'towards <span data-station-id="CCK">Choa Chu Kang</span> via <span data-station-id="SNJ">Senja</span>',
+      );
+      expect(html).toContain(
+        'towards <span data-station-id="CCK">Choa Chu Kang</span> via <span data-station-id="PTR">Petir</span>',
+      );
+      if (status === 'error') {
+        expect(html).toContain('Showing the last known response');
+        expect(html.match(/<time /g)).toHaveLength(8);
+      } else {
+        expect(html).not.toContain('<time ');
+        expect(html).not.toContain('Refresh failed');
+      }
+    },
+  );
+
   it('shows the destination and waypoint together for a non-loop service', () => {
     const viaTiming = {
       ...timing,
@@ -474,7 +578,7 @@ describe('station guide arrival sources', () => {
           ...secondSchedule,
           coverage: { ...secondSchedule.coverage, complete: false },
         },
-        3,
+        4,
       ],
       [
         {
