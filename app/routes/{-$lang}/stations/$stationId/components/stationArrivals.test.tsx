@@ -123,6 +123,117 @@ afterEach(() => {
 });
 
 describe('station guide arrival sources', () => {
+  it('explains the A/B loop directions on platform 2 while platform 1 keeps the shared destination', () => {
+    if (scheduled.source !== 'scheduled') throw new Error('fixture');
+    const stationName = (value: string) => ({
+      'en-SG': value,
+      'zh-Hans': null,
+      ms: null,
+      ta: null,
+    });
+    const branches = [
+      {
+        serviceId: 'BPLRT_A',
+        name: 'Service A',
+        viaId: 'SNJ',
+        viaName: 'Senja',
+      },
+      {
+        serviceId: 'BPLRT_B',
+        name: 'Service B',
+        viaId: 'PTR',
+        viaName: 'Petir',
+      },
+    ].map((service) => ({
+      ...timing,
+      lineId: 'BPLRT',
+      serviceId: service.serviceId,
+      serviceName: stationName(service.name),
+      destinationStationId: 'CCK',
+      destinationName: stationName('Choa Chu Kang'),
+      isLoop: true as const,
+      platformViaStations: [
+        {
+          platformId: 'BKP_BPLRT_2',
+          stationId: service.viaId,
+          stationName: stationName(service.viaName),
+        },
+      ],
+    }));
+    const states: ArrivalStates = Object.fromEntries(
+      branches.map((branch) => [
+        arrivalBranchKey(
+          branch.lineId,
+          branch.serviceId,
+          branch.destinationStationId,
+        ),
+        {
+          status: 'ready',
+          data: {
+            ...scheduled,
+            scope: {
+              ...scheduled.scope,
+              stationId: 'BKP',
+              lineId: branch.lineId,
+              serviceId: branch.serviceId,
+              destinationStationId: 'CCK',
+            },
+            timings: scheduled.timings.map((platform, index) => ({
+              ...platform,
+              platforms: [
+                { id: `BKP_BPLRT_${index + 1}`, label: String(index + 1) },
+              ],
+            })),
+          },
+        },
+      ]),
+    );
+    const groups = groupArrivalSummaries(branches, states, null);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((group) => group.length)).toEqual([2, 2]);
+    const html = renderToStaticMarkup(
+      <IntlProvider locale="en-SG" defaultLocale="en-SG">
+        {groups.map(([first, ...sharedArrivals]) => (
+          <ServiceArrivalSummary
+            {...first}
+            sharedArrivals={sharedArrivals}
+            key={JSON.stringify(first.arrivalState?.data)}
+            lineColor="#748477"
+            now={null}
+          />
+        ))}
+      </IntlProvider>,
+    );
+    expect(
+      html.match(/towards <span data-station-id="CCK">Choa Chu Kang/g),
+    ).toHaveLength(1);
+    expect(html).toContain('A via <span data-station-id="SNJ">Senja</span>');
+    expect(html).toContain('B via <span data-station-id="PTR">Petir</span>');
+    expect(html.match(/>Service A and Service B<\/p>/g)).toHaveLength(2);
+    const platform2 = groups[1][0].arrivalState?.data;
+    if (platform2?.source !== 'scheduled') throw new Error('fixture');
+    const alternatives = {
+      ...states,
+      [arrivalBranchKey(branches[0].lineId, branches[0].serviceId, 'CCK')]: {
+        status: 'ready' as const,
+        data: {
+          ...platform2,
+          timings: platform2.timings.map((item) => ({
+            ...item,
+            platforms: [
+              { id: 'BKP_BPLRT_1', label: '1' },
+              { id: 'BKP_BPLRT_2', label: '2' },
+            ],
+          })),
+        },
+      },
+    };
+    expect(
+      groupArrivalSummaries([branches[0]], alternatives, null)[0][0]
+        .arrivalTiming.viaStationId,
+    ).toBeUndefined();
+  });
+
   it('keeps branch report targets outside rows when platforms expire and shared groups split', () => {
     if (scheduled.source !== 'scheduled') throw new Error('fixture');
     const otherTiming = { ...timing, serviceId: 'other-service' };

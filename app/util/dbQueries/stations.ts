@@ -34,6 +34,7 @@ import {
 } from '~/util/crowdReports';
 import {
   isLoopPath,
+  loopPlatformViaStations,
   loopViaStationId,
   type StationArrivalBranch,
 } from '~/util/stationArrivalBranches';
@@ -539,14 +540,28 @@ export async function getStationProfileReadModel(
     const viaStationId = isLoop
       ? loopViaStationId(branch.entries, station.id)
       : undefined;
-    return { branch, destination, isLoop, viaStationId };
+    const platformViaStations = isLoop
+      ? loopPlatformViaStations(branch.entries, branch.id, station.id).filter(
+          ({ platformId }) =>
+            platforms.some(
+              (platform) =>
+                platform.id === platformId &&
+                platform.boardingStatus == null &&
+                platform.serviceIds.includes(branch.id),
+            ),
+        )
+      : [];
+    return { branch, destination, isLoop, viaStationId, platformViaStations };
   });
   const arrivalStationIds = [
     ...new Set(
-      arrivalDirections.flatMap(({ destination, viaStationId }) =>
-        [destination?.stationId, viaStationId].filter(
-          (stationId): stationId is string => stationId != null,
-        ),
+      arrivalDirections.flatMap(
+        ({ destination, viaStationId, platformViaStations }) =>
+          [
+            destination?.stationId,
+            viaStationId,
+            ...platformViaStations.map(({ stationId }) => stationId),
+          ].filter((stationId): stationId is string => stationId != null),
       ),
     ),
   ];
@@ -555,7 +570,7 @@ export async function getStationProfileReadModel(
     arrivalStationRows.map(({ id, name }) => [id, parseTranslations(name)]),
   );
   const arrivalServices = arrivalDirections.map(
-    ({ branch, destination, isLoop, viaStationId }) => {
+    ({ branch, destination, isLoop, viaStationId, platformViaStations }) => {
       const viaStationName = viaStationId
         ? arrivalStationNames.get(viaStationId)
         : undefined;
@@ -571,6 +586,18 @@ export async function getStationProfileReadModel(
         ...(isLoop ? { isLoop: true as const } : {}),
         ...(viaStationId && viaStationName
           ? { viaStationId, viaStationName }
+          : {}),
+        ...(platformViaStations.length
+          ? {
+              platformViaStations: platformViaStations.flatMap(
+                ({ platformId, stationId }) => {
+                  const stationName = arrivalStationNames.get(stationId);
+                  return stationName
+                    ? [{ platformId, stationId, stationName }]
+                    : [];
+                },
+              ),
+            }
           : {}),
       };
     },

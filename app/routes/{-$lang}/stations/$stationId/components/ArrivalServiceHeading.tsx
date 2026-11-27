@@ -34,7 +34,9 @@ type ArrivalServiceHeadingProps = {
   additionalTimings?: ArrivalTiming[];
 };
 
-function serviceLabel(timing: ArrivalTiming, intl: IntlShape) {
+function serviceLabel(timing: ArrivalTiming, intl: IntlShape, compact = false) {
+  if (compact && timing.serviceId === 'BPLRT_A') return 'A';
+  if (compact && timing.serviceId === 'BPLRT_B') return 'B';
   const shortName = Object.hasOwn(shortServiceNames, timing.serviceId)
     ? shortServiceNames[timing.serviceId]
     : undefined;
@@ -56,6 +58,47 @@ export function ArrivalServiceHeading({
     ],
     { type: 'conjunction' },
   );
+  const timings = [timing, ...additionalTimings];
+  const distinctDirections =
+    new Set(
+      timings.map((item) =>
+        item.isLoop && item.viaStationId && item.viaStationName
+          ? `via:${item.viaStationId}`
+          : `towards:${item.destinationStationId}`,
+      ),
+    ).size > 1;
+  const hasDirection = timings.some(
+    (item) => item.viaStationName || item.destinationName,
+  );
+
+  return (
+    <>
+      <p className="font-medium text-gray-800 text-sm leading-snug dark:text-gray-200">
+        {serviceName}
+      </p>
+      {hasDirection && (
+        <p className="text-gray-600 text-xs leading-snug dark:text-gray-400">
+          {distinctDirections ? (
+            timings.map((item, index) => (
+              <span key={item.serviceId}>
+                {index > 0 && ' · '}
+                {serviceLabel(item, intl, true)}{' '}
+                <ArrivalDirection timing={item} />
+              </span>
+            ))
+          ) : (
+            <ArrivalDirection timing={timing} />
+          )}
+        </p>
+      )}
+    </>
+  );
+}
+
+type ArrivalDirectionProps = { timing: ArrivalTiming };
+
+function ArrivalDirection({ timing }: ArrivalDirectionProps) {
+  const intl = useIntl();
   const showVia = timing.isLoop && timing.viaStationId && timing.viaStationName;
   const stationId = showVia ? timing.viaStationId : timing.destinationStationId;
   const stationTranslations = showVia
@@ -77,28 +120,18 @@ export function ArrivalServiceHeading({
       name
     );
 
-  return (
-    <>
-      <p className="font-medium text-gray-800 text-sm leading-snug dark:text-gray-200">
-        {serviceName}
-      </p>
-      {station && (
-        <p className="text-gray-600 text-xs leading-snug dark:text-gray-400">
-          {showVia ? (
-            <FormattedMessage
-              id="station.arrivals.via"
-              defaultMessage="via {station}"
-              values={{ station }}
-            />
-          ) : (
-            <FormattedMessage
-              id="station.arrivals.towards"
-              defaultMessage="towards {station}"
-              values={{ station }}
-            />
-          )}
-        </p>
-      )}
-    </>
+  if (!station) return null;
+  return showVia ? (
+    <FormattedMessage
+      id="station.arrivals.via"
+      defaultMessage="via {station}"
+      values={{ station }}
+    />
+  ) : (
+    <FormattedMessage
+      id="station.arrivals.towards"
+      defaultMessage="towards {station}"
+      values={{ station }}
+    />
   );
 }

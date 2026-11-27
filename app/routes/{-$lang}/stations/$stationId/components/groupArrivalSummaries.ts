@@ -54,8 +54,23 @@ export function groupArrivalSummaries(
       ),
     );
     for (const [index, timing] of data.timings.entries()) {
+      const viaStations = timing.platforms.map(({ id }) =>
+        arrivalTiming.platformViaStations?.find(
+          ({ platformId }) => platformId === id,
+        ),
+      );
+      const via = viaStations[0];
+      const platformTiming =
+        via &&
+        viaStations.every((station) => station?.stationId === via.stationId)
+          ? {
+              ...arrivalTiming,
+              viaStationId: via.stationId,
+              viaStationName: via.stationName,
+            }
+          : arrivalTiming;
       const platformMember: ArrivalSummaryMember = {
-        arrivalTiming,
+        arrivalTiming: platformTiming,
         arrivalState: { ...arrivalState, data: { ...data, timings: [timing] } },
         // Reports describe the canonical branch, not each platform row.
         showReports: index === firstTimed,
