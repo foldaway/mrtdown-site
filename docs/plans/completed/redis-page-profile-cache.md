@@ -1,40 +1,15 @@
-# Cache public page profiles in Redis
+# Redis page and service-path rollout, November 15–18, 2026
 
-## Purpose
+Navigation, completed Issue Profiles and range service paths were verified in
+production. This closes the rollout record; the optional matched service-path
+measurement is in [tech debt](../tech-debt.md#measure-incremental-cache-egress).
+The broader acceptance target now belongs to [Neon sleep](../active/neon-sleep.md).
+These observations do not establish current deployment state or sustained sleep.
 
-The [Neon sleep plan](neon-sleep.md) owns the next serving-architecture tranche.
-Its goal is zero-SQL public reads and unchanged-input checks, superseding transfer
-reduction as the primary outcome for new work. The rollout history below retains
-the original tranches' acceptance criteria.
+## Decisions and findings
 
-Reduce repeated Postgres reads at the origin with Redis-backed Navigation,
-completed Issue Profiles, and service-path inputs for date-range pages.
-Postgres remains the relational read model and serves cache misses. Public
-URLs, response shapes, and report behavior stay the same.
-
-As of the November 18 cutover, both production Machines serve `083cf935` with
-all three readers enabled. Next: compare matched complete production hours
-against the pre-cutover baseline below. The rollout is verified; its incremental
-egress and latency effects are not yet measured. Keep this plan active until
-that comparison is recorded. No rollout blocker remains.
-
-## Progress
-
-- [x] Implement and verify Navigation and completed Issue Profiles in staging
-  (2026-11-15).
-- [x] Enable both readers in production, fix empty train-car-count compatibility,
-  and evaluate 21 complete hours of the pilot (2026-11-16–17 PT).
-- [x] Attribute remaining SQL reads and select service paths for date-range pages
-  (2026-11-17 PT).
-- [x] Merge service-path caching in PR #312 after local and staging validation;
-  check aggregate Redis usage, cost, and limits (2026-11-17 PT).
-- [x] Deploy `083cf935`, enable service-path reads, seed the completed generation,
-  and verify cached responses on both production Machines (2026-11-17–18 PT).
-- [ ] Compare post-cutover Neon egress per response, Fly latency, and aggregate
-  Redis usage with the recorded baseline; record the decision to retain or
-  roll back the service-path reader.
-
-## Surprises & Discoveries
+The descriptions in this record refer to November 15–18 source and deployment.
+Later snapshot paths supersede their request-time SQL and rollout-flag details.
 
 - The pilot reduced egress per response without observed Neon suspension.
   Remaining live reads matter: an open station page refreshes arrivals for
@@ -48,8 +23,6 @@ that comparison is recorded. No rollout blocker remains.
 - Redis INFO lacked a server run identifier and continuous counters. Aggregate
   usage required the authenticated provider console; key hits and misses do
   not establish route-level cache hit rates.
-
-## Decision Log
 
 - 2026-11-15, Codex — Use the existing Redis deployment for Navigation and
   completed Issue Profiles, retaining Postgres as the relational read model.
@@ -66,7 +39,7 @@ that comparison is recorded. No rollout blocker remains.
   generates. Publish-only mode is optional. Keep each reader independently
   reversible and generation marking independent of the reader flags.
 
-## Outcomes & Retrospective
+## Rollout and measurement evidence
 
 ### Navigation and Issue Profile pilot
 
@@ -237,57 +210,9 @@ or rate-limit series or explicit connection cap was exposed. These rollups
 cannot establish exact incremental cache cost, route hit rates, or limiter
 reliability. No provider settings were changed during inspection.
 
-## Context
+## Current ownership
 
-Cloudflare caches eligible public responses; Redis serves reusable inputs and
-profiles for requests that reach the origin. Production runs two Fly Machines
-in Singapore. The canonical pull publishes after rebuilding the Postgres read
-model and before edge purge/fingerprint completion. Generation checks prevent
-partial imports or concurrent publication from creating reusable mixed data.
-
-The [edge-caching guide](../../operations/edge-caching.md) owns cache contracts,
-seeding and recovery. The [data-pipeline guide](../../architecture/data-pipeline.md)
-owns import ordering. The [egress plan](production-egress-reduction.md) tracks
-remaining topology and query opportunities. Recheck live generation,
-and provider settings before any later cutover; the records above are dated
-observations.
-
-## Plan of Work
-
-### Milestone 1 — Serve Navigation from Redis in staging
-
-Complete. Navigation parity, process restart, and an authenticated Cloudflare
-MISS were verified. Implementation and operating steps live in the
-[Navigation runbook](../../operations/edge-caching.md#redis-navigation-bootstrap).
-
-### Milestone 2 — Cache completed Issue Profiles and measure the pilot
-
-Complete with the user-approved 21-hour observation. The pilot comparison and
-its attribution limits are recorded above. Use the [Issue Profile runbook](../../operations/edge-caching.md#completed-issue-profiles)
-for subsequent operation or rollback.
-
-### Milestone 3 — Reuse service-path inputs for date-range readers
-
-Implementation and production rollout are complete; measurement remains.
-
-1. Collect matched complete post-cutover hours using the measurement handoff
-   above. Record the exact boundaries and traffic or deployment changes.
-2. Compare normalized Neon transfer, Fly p95, source/fallback logs, and aggregate
-   Redis usage. Keep provider accounting windows distinct from app metric windows.
-3. Record the measured result and any follow-up. The rollout switches have
-   been retired; use the runbook to repair inputs or revert the application
-   revision if necessary. Missing entries retain SQL recovery.
-4. After acceptance, move this plan to `completed/` and update inbound links.
-   Keep station-profile and arrival-topology work in the egress plan, with their
-   own snapshot/parity assessment before implementation.
-
-## Validation and Acceptance
-
-Implementation and cutover checks passed as recorded above. Run
-`npm run verify` for repository changes; use the runbook for any further runtime
-change. The remaining work requires provider measurement, not a repeat rollout.
-
-Accept the measurement milestone when the exact comparison windows, normalized
-egress, p95, Redis usage/cost, attribution limits, and retain/rollback decision
-are recorded. A smaller egress total alone is insufficient if traffic fell.
-No suspension or latency improvement has yet been demonstrated.
+The [cache runbook](../../operations/edge-caching.md) owns configuration, repair
+and fallback. Historical flag instructions above describe the rollout era; those
+switches have since been retired. [Original full plan](https://github.com/foldaway/mrtdown-site/blob/fdf2a7b8effd7916f85c7e990b8b50ed7540fc96/docs/plans/active/redis-page-profile-cache.md)
+preserves the superseded milestone instructions and acceptance gates.

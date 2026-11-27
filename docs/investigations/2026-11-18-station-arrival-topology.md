@@ -1,5 +1,10 @@
 # Reuse validated station-arrival topology
 
+> Dated investigation and local handoff. Its pending tasks, switches and SQL
+> descriptions reflect the recorded revision, not current deployment state.
+> Use the [maintained guide](../architecture/data-pipeline.md#arrival-serving-and-sql-recovery) for current operation and the
+> [sleep plan](../plans/active/neon-sleep.md) for remaining acceptance.
+
 Implemented a bounded process memo of the complete schedule-topology projection,
 with its digest attested by canonical promotion in Postgres. Timetable selection
 and departures stay in the existing read-only repeatable-read transaction.
@@ -136,7 +141,7 @@ topology fingerprint or select a timetable. Keep its current range readers intac
   is unconditional. Source/bypass and sizing diagnostics support later measurement.
 - [ ] Validate in staging, then measure a separately authorized production rollout.
 
-The [data-pipeline guide](../architecture/data-pipeline.md#arrival-topology-reuse)
+The [data-pipeline guide](../architecture/data-pipeline.md#arrival-serving-and-sql-recovery)
 owns operation and rollback. The [memo reader](../../app/util/dbQueries/scheduleTopologyCache.ts)
 and [promotion metadata](../../app/db/canonicalTopologyPromotion.ts) own the
 implementation. The digest is a correctness boundary: every supported topology

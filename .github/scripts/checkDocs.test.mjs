@@ -2,7 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
-import { checkDocs } from './checkDocs.mjs';
+import { checkDocs, PLAN_HEADINGS } from './checkDocs.mjs';
+
+const plan = (title) =>
+  `# ${title}\n\n${PLAN_HEADINGS.map((heading) => `${heading}\n\nTask-specific content.`).join('\n\n')}\n`;
 
 let root;
 
@@ -16,8 +19,8 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'mrtdown-check-docs-'));
   writeDoc('AGENTS.md', '# Agents\n');
   writeDoc('README.md', '# Project\n');
-  writeDoc('docs/plans/template.md', '# Template\n\n## Progress\n');
-  writeDoc('docs/plans/active/rollout.md', '# Rollout\n\n## Progress\n');
+  writeDoc('docs/plans/template.md', plan('Template'));
+  writeDoc('docs/plans/active/rollout.md', plan('Rollout'));
   writeDoc('docs/plans/README.md', '- [Rollout](active/rollout.md)\n');
 });
 
@@ -57,10 +60,123 @@ it('ignores Markdown examples in code and checks links with code in their labels
   );
   writeDoc(
     'docs/plans/active/rollout.md',
-    '# Rollout\n\n## Progress\n\n```md\n## Example heading\n```\n',
+    `${plan('Rollout')}\n\`\`\`md\n## Example heading\n\`\`\`\n`,
   );
 
   expect(checkDocs(root)).toEqual([
     'README.md: missing repository link target missing.md',
   ]);
+});
+
+it('checks same-page and cross-file anchors, Unicode, inline code and duplicates', () => {
+  writeDoc(
+    'docs/guide.md',
+    '# Guide\n\n## Café and `code`\n\n## Repeat\n\n## Repeat\n\n## Repeat-1\n',
+  );
+  writeDoc(
+    'README.md',
+    '# Project\n\n[same](#project) [code](docs/guide.md#caf%C3%A9-and-code) [duplicate](docs/guide.md#repeat-1) [collision](docs/guide.md#repeat-1-1)',
+  );
+  expect(checkDocs(root)).toEqual([]);
+  writeDoc('README.md', '[broken](#missing) [other](docs/guide.md#missing)');
+  expect(checkDocs(root)).toEqual([
+    'README.md: missing Markdown heading anchor #missing',
+    'README.md: missing Markdown heading anchor docs/guide.md#missing',
+  ]);
+});
+
+it('rejects malformed encoding, missing plan index links and reordered sections', () => {
+  writeDoc('README.md', '[bad](docs/guide.md#%zz)');
+  writeDoc('docs/plans/README.md', '# Plans\n');
+  writeDoc(
+    'docs/plans/active/rollout.md',
+    plan('Rollout').replace('## Purpose', '## Other'),
+  );
+  expect(checkDocs(root)).toEqual(
+    expect.arrayContaining([
+      'README.md: invalid encoding in link target docs/guide.md#%zz',
+      'docs/plans/active/rollout.md: use the headings in docs/plans/template.md in order',
+      'docs/plans/active/rollout.md: link this plan in docs/plans/README.md',
+    ]),
+  );
+});
+
+it('does not let template drift redefine the standard or accept empty sections', () => {
+  writeDoc('docs/plans/template.md', '# Template\n\n## Progress\n');
+  writeDoc(
+    'docs/plans/active/rollout.md',
+    plan('Rollout').replace(
+      '## Concrete Steps\n\nTask-specific content.',
+      '## Concrete Steps\n\n<!-- pending -->',
+    ),
+  );
+  expect(checkDocs(root)).toEqual(
+    expect.arrayContaining([
+      'docs/plans/template.md: use the twelve standard plan headings in order',
+      'docs/plans/active/rollout.md: empty section ## Concrete Steps',
+    ]),
+  );
+});
+
+it('allows historical completed layouts while checking their links and index', () => {
+  writeDoc(
+    'docs/plans/completed/old.md',
+    '# Old\n\n## Original format\n\n[Guide](../../../README.md)',
+  );
+  writeDoc(
+    'docs/plans/README.md',
+    '[Current](active/rollout.md) [Old](completed/old.md)',
+  );
+  expect(checkDocs(root)).toEqual([]);
+});
+
+it('accepts visible HTML in a plan section but rejects comment-only HTML', () => {
+  writeDoc(
+    'docs/plans/active/rollout.md',
+    plan('Rollout').replace(
+      '## Idempotence and Recovery\n\nTask-specific content.',
+      '## Idempotence and Recovery\n\n<!-- note -->\n<p>No rollback is needed.</p>',
+    ),
+  );
+  expect(checkDocs(root)).toEqual([]);
+  writeDoc(
+    'docs/plans/active/rollout.md',
+    plan('Rollout').replace(
+      '## Idempotence and Recovery\n\nTask-specific content.',
+      '## Idempotence and Recovery\n\n<!-- first -->\n<!-- second -->',
+    ),
+  );
+  expect(checkDocs(root)).toContain(
+    'docs/plans/active/rollout.md: empty section ## Idempotence and Recovery',
+  );
+});
+
+it('accepts explicit HTML anchors independently of duplicate heading slugs', () => {
+  writeDoc(
+    'README.md',
+    '<a name="recovery"></a>\n\n<a id=retry></a>\n\n[Recovery](#recovery) [Retry](#retry) [Other](docs/guide.md#details)',
+  );
+  writeDoc(
+    'docs/guide.md',
+    '<a name="repeat"></a>\n\n<div id=\'repeat-1\'>Details</div>\n\n<span id="details"></span>\n\n## Repeat\n\n## Repeat\n\n[First](#repeat) [Second](#repeat-1) [Back](../README.md#recovery)',
+  );
+  expect(checkDocs(root)).toEqual([]);
+  writeDoc('README.md', '[Extra suffix](docs/guide.md#repeat-2)');
+  expect(checkDocs(root)).toContain(
+    'README.md: missing Markdown heading anchor docs/guide.md#repeat-2',
+  );
+});
+
+it('ignores anchor examples in comments, code and unrelated HTML attributes', () => {
+  writeDoc(
+    'docs/guide.md',
+    '<!-- <a id="comment"></a> -->\n\n`<a id="inline"></a>`\n\n```html\n<a id="fenced"></a>\n```\n\n<div name="wrong-tag" data-id="wrong-attribute" title=\'<a id="quoted">\'></div>',
+  );
+  writeDoc(
+    'README.md',
+    ['comment', 'inline', 'fenced', 'wrong-tag', 'wrong-attribute', 'quoted']
+      .map((id) => `[${id}](docs/guide.md#${id})`)
+      .join(' '),
+  );
+  expect(checkDocs(root)).toHaveLength(6);
 });

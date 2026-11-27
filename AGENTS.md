@@ -14,8 +14,8 @@ the relevant subject guide and use this file to point to it.
   imports and timetable retention in `app/workflows/pull`.
 - [Quality checks](docs/development/quality.md) and
   [generated files](docs/development/generated-files.md).
-- [Writing docs and proposals](docs/development/writing.md) for concise,
-  scannable changes and decision records.
+- [Writing and maintaining docs](docs/development/writing.md) for when to write,
+  where guidance belongs, and concise PR descriptions.
 - [Execution plans](docs/plans/README.md) for choosing a checklist or a
   versioned plan, finding existing work, and recording a handoff.
 
