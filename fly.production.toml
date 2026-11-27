@@ -40,4 +40,4 @@ swap_size_mb = 512
 [[vm]]
   size = 'shared-cpu-2x'
   cpus = 2
-  memory_mb = 512
+  memory_mb = 1024
