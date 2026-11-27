@@ -84,7 +84,7 @@ export const AffectedStationList: React.FC<Props> = (props) => {
               )}
               <span
                 aria-hidden="true"
-                className="-translate-y-1/2 absolute top-1/2 left-[4px] size-2 rounded-full ring-2 ring-gray-50 dark:ring-gray-800"
+                className="-translate-y-1/2 absolute top-1/2 left-[4px] size-2 rounded-full"
                 style={{ backgroundColor: line.color }}
               />
             </>
