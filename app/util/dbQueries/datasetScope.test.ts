@@ -21,4 +21,13 @@ describe('completeLineIdsFromInputs', () => {
 
     expect(completeLineIdsFromInputs(full, selected)).toEqual(['L1']);
   });
+
+  it('does not claim coverage for a line without services', () => {
+    const full = {
+      linesRows: [{ id: 'empty' }, { id: 'active' }],
+      serviceRows: [{ id: 'A', line_id: 'active' }],
+    } as TopologyRows;
+
+    expect(completeLineIdsFromInputs(full, full)).toEqual(['active']);
+  });
 });

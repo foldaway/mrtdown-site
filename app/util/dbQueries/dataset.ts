@@ -129,11 +129,15 @@ export function completeLineIdsFromInputs(
     selected.serviceRows.map((service) => service.id),
   );
   return selected.linesRows
-    .filter((line) =>
-      full.serviceRows
-        .filter((service) => service.line_id === line.id)
-        .every((service) => selectedIds.has(service.id)),
-    )
+    .filter((line) => {
+      const lineServices = full.serviceRows.filter(
+        (service) => service.line_id === line.id,
+      );
+      return (
+        lineServices.length > 0 &&
+        lineServices.every((service) => selectedIds.has(service.id))
+      );
+    })
     .map((line) => line.id);
 }
 
@@ -981,20 +985,22 @@ export function assembleDataset(
   for (const lineId of completeLineIds) {
     const line = linesById[lineId];
     if (line == null) continue;
-    line.serviceCoverage = serviceRows
-      .filter((service) => service.line_id === lineId)
-      .map((service) => ({
-        id: service.id,
-        revisions: (affectedServiceRevisionsByServiceId[service.id] ?? []).map(
-          ({ id, startAt, endAt, updatedAt, isLoop }) => ({
-            id,
-            startAt,
-            endAt,
-            updatedAt,
-            isLoop,
-          }),
-        ),
-      }));
+    const lineServices = serviceRows.filter(
+      (service) => service.line_id === lineId,
+    );
+    if (lineServices.length === 0) continue;
+    line.serviceCoverage = lineServices.map((service) => ({
+      id: service.id,
+      revisions: (affectedServiceRevisionsByServiceId[service.id] ?? []).map(
+        ({ id, startAt, endAt, updatedAt, isLoop }) => ({
+          id,
+          startAt,
+          endAt,
+          updatedAt,
+          isLoop,
+        }),
+      ),
+    }));
   }
 
   const latestRevisionByServiceId = Object.fromEntries(
