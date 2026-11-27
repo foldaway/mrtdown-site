@@ -11,6 +11,7 @@ import {
   type StationArrivalsV2,
   serializeStationArrivalsV2,
 } from '~/util/stationArrivalsV2';
+import { ArrivalReports } from './ArrivalReports';
 import {
   groupArrivalSummaries,
   sharedArrivalDisplay,
@@ -90,13 +91,19 @@ function renderRow(
 ) {
   return renderToStaticMarkup(
     <IntlProvider locale="en-SG" defaultLocale="en-SG">
-      <ServiceArrivalSummary
-        arrivalTiming={timing}
-        arrivalState={{ data, status }}
-        lineColor="#123456"
-        now={now}
+      <ArrivalReports
+        stationId={scheduled.scope.stationId}
+        timings={[timing]}
+        states={{ [key]: { data, status } }}
         onArrivalReported={onArrivalReported}
-      />
+      >
+        <ServiceArrivalSummary
+          arrivalTiming={timing}
+          arrivalState={{ data, status }}
+          lineColor="#123456"
+          now={now}
+        />
+      </ArrivalReports>
     </IntlProvider>,
   );
 }
@@ -116,6 +123,78 @@ afterEach(() => {
 });
 
 describe('station guide arrival sources', () => {
+  it('keeps branch report targets outside rows when platforms expire and shared groups split', () => {
+    if (scheduled.source !== 'scheduled') throw new Error('fixture');
+    const otherTiming = { ...timing, serviceId: 'other-service' };
+    const states: ArrivalStates = {
+      [key]: {
+        status: 'ready',
+        data: {
+          ...scheduled,
+          timings: scheduled.timings.map((platform) => ({
+            ...platform,
+            departures: platform.departures.slice(0, 1),
+          })),
+        },
+      },
+      [arrivalBranchKey(
+        timing.lineId,
+        otherTiming.serviceId,
+        timing.destinationStationId,
+      )]: {
+        status: 'ready',
+        data: {
+          ...scheduled,
+          scope: { ...scheduled.scope, serviceId: otherTiming.serviceId },
+          timings: [
+            {
+              ...scheduled.timings[0],
+              departures: [scheduled.timings[0].departures[1]],
+            },
+          ],
+        },
+      },
+    };
+    const render = (now: number) =>
+      renderToStaticMarkup(
+        <IntlProvider locale="en-SG" defaultLocale="en-SG">
+          <ArrivalReports
+            stationId={scheduled.scope.stationId}
+            timings={[timing, otherTiming]}
+            states={states}
+            onArrivalReported={async () => {}}
+          >
+            <ul>
+              {groupArrivalSummaries([timing, otherTiming], states, now).map(
+                ([first, ...sharedArrivals]) => (
+                  <ServiceArrivalSummary
+                    {...first}
+                    sharedArrivals={sharedArrivals}
+                    key={JSON.stringify(first.arrivalState?.data)}
+                    lineColor="#748477"
+                    now={now}
+                  />
+                ),
+              )}
+            </ul>
+          </ArrivalReports>
+        </IntlProvider>,
+      );
+    const before = render(Date.parse('2026-10-24T16:09:00Z'));
+    const after = render(Date.parse('2026-10-24T16:10:15Z'));
+    const formIds = (html: string) =>
+      [...html.matchAll(/id="([^"]+-form)"/g)].map((match) => match[1]);
+    expect(formIds(before)).toHaveLength(2);
+    expect(formIds(after)).toEqual(formIds(before));
+    for (const html of [before, after]) {
+      expect(html.indexOf(`id="${formIds(html)[0]}"`)).toBeGreaterThan(
+        html.lastIndexOf('</ul>'),
+      );
+    }
+    expect(before.match(/aria-label="Report an arrival"/g)).toHaveLength(1);
+    expect(after.match(/aria-label="Report an arrival"/g)).toHaveLength(2);
+  });
+
   it('preserves separate trips within one service when they share a time slot', () => {
     if (scheduled.source !== 'scheduled') throw new Error('fixture');
     const platform = scheduled.timings[0];
@@ -192,16 +271,22 @@ describe('station guide arrival sources', () => {
     );
     const html = renderToStaticMarkup(
       <IntlProvider locale="en-SG" defaultLocale="en-SG">
-        {groups.map(([first, ...sharedArrivals]) => (
-          <ServiceArrivalSummary
-            {...first}
-            sharedArrivals={sharedArrivals}
-            key={JSON.stringify(first.arrivalState?.data)}
-            lineColor="#748477"
-            now={Date.parse('2026-10-24T16:08:30Z')}
-            onArrivalReported={async () => {}}
-          />
-        ))}
+        <ArrivalReports
+          stationId={scheduled.scope.stationId}
+          timings={[serviceA, serviceB]}
+          states={states}
+          onArrivalReported={async () => {}}
+        >
+          {groups.map(([first, ...sharedArrivals]) => (
+            <ServiceArrivalSummary
+              {...first}
+              sharedArrivals={sharedArrivals}
+              key={JSON.stringify(first.arrivalState?.data)}
+              lineColor="#748477"
+              now={Date.parse('2026-10-24T16:08:30Z')}
+            />
+          ))}
+        </ArrivalReports>
       </IntlProvider>,
     );
     expect(html.match(/>Service A and Service B<\/p>/g)).toHaveLength(2);
