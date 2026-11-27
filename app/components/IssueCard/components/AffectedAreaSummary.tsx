@@ -6,17 +6,16 @@ import {
 } from '@heroicons/react/20/solid';
 import { Link } from '@tanstack/react-router';
 import { useIntl } from 'react-intl';
-import { StationBar } from '~/components/StationBar';
 import { useIncludedEntities } from '~/contexts/IncludedEntities';
 import { getLocalizedTranslation } from '~/helpers/getLocalizedTranslation';
-import { isStationMembershipVisibleAt } from '~/helpers/isStationMembershipVisibleAt';
-import type { Issue, IssueInterval, Line, Station } from '~/types';
+import type { Issue, IssueInterval, Station } from '~/types';
 import {
   type AffectedArea,
   type AffectedLineArea,
   getAffectedLineAreas,
   type ResolvedAffectedBranch,
 } from '../affectedAreas';
+import { AffectedStationList } from './AffectedStationList';
 
 interface Props {
   issue: Issue;
@@ -193,67 +192,6 @@ function summaryContent(
   });
 }
 
-function StationList({
-  branch,
-  line,
-  stations,
-  referenceAt,
-}: {
-  branch: ResolvedAffectedBranch;
-  line: Line;
-  stations: Record<string, Station>;
-  referenceAt: string;
-}) {
-  const intl = useIntl();
-  if (branch.stationIds.length === 0) {
-    return (
-      <p className="px-3 py-2 text-gray-500 text-xs dark:text-gray-400">
-        {intl.formatMessage({
-          id: 'issue.station_details_unavailable',
-          defaultMessage: 'Station details unavailable for this date',
-        })}
-      </p>
-    );
-  }
-
-  return (
-    <ol className="space-y-1 border-gray-200 border-t px-3 py-2 dark:border-gray-700">
-      {branch.stationIds.map((stationId) => {
-        const station = stations[stationId];
-        if (station == null) return null;
-        const memberships = [
-          ...new Map(
-            station.memberships
-              .filter((membership) =>
-                isStationMembershipVisibleAt(membership, referenceAt),
-              )
-              .map((membership) => [
-                `${membership.lineId}:${membership.code}`,
-                membership,
-              ]),
-          ).values(),
-        ].sort((first, second) => {
-          if (first.lineId === line.id) return -1;
-          if (second.lineId === line.id) return 1;
-          return first.lineId.localeCompare(second.lineId);
-        });
-        return (
-          <li key={stationId} className="flex items-center gap-2">
-            <StationBar memberships={memberships} />
-            <Link
-              to="/{-$lang}/stations/$stationId"
-              params={{ stationId }}
-              className="text-gray-700 text-xs hover:underline dark:text-gray-300"
-            >
-              {getLocalizedTranslation(station.name, intl.locale)}
-            </Link>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
 export const AffectedAreaSummary: React.FC<Props> = ({ issue, interval }) => {
   const intl = useIntl();
   const { lines, stations } = useIncludedEntities();
@@ -351,6 +289,7 @@ export const AffectedAreaSummary: React.FC<Props> = ({ issue, interval }) => {
                           intl.formatMessage,
                         ),
                         groupedPoints: true,
+                        stationPoint: true,
                       },
                     ];
                   }
@@ -364,21 +303,30 @@ export const AffectedAreaSummary: React.FC<Props> = ({ issue, interval }) => {
                           )
                         : null,
                     groupedPoints: false,
+                    stationPoint: group.kind === 'station-points',
                   }));
                 });
                 return (
                   <section key={area.lineId} className="mb-4 last:mb-0">
                     <h4 className="mb-2 flex items-center gap-2 font-semibold text-xs">
-                      <span
-                        className="rounded px-1.5 py-0.5 font-bold text-white"
-                        style={{ backgroundColor: line.color }}
+                      <Link
+                        to="/{-$lang}/lines/$lineId"
+                        params={{ lineId: line.id }}
+                        className="inline-flex items-center gap-2 hover:underline"
                       >
-                        {line.id}
-                      </span>
-                      {getLocalizedTranslation(line.name, intl.locale)}
+                        <span
+                          className="rounded px-1.5 py-0.5 font-bold text-white"
+                          style={{ backgroundColor: line.color }}
+                        >
+                          {line.id}
+                        </span>
+                        {getLocalizedTranslation(line.name, intl.locale)}
+                      </Link>
                     </h4>
                     <div className="space-y-1.5">
-                      {entries.map(({ branch, label, groupedPoints }) => {
+                      {entries.map((entry) => {
+                        const { branch, label, groupedPoints, stationPoint } =
+                          entry;
                         const range =
                           groupedPoints ||
                           (branch.isLoop === true &&
@@ -426,11 +374,14 @@ export const AffectedAreaSummary: React.FC<Props> = ({ issue, interval }) => {
                               </span>
                               <ChevronDownIcon className="size-4 shrink-0 text-gray-400 group-open:rotate-180" />
                             </summary>
-                            <StationList
+                            <AffectedStationList
                               branch={branch}
                               line={line}
                               stations={stations}
                               referenceAt={scopeAt}
+                              schematic={
+                                !stationPoint && branch.coverage !== 'unknown'
+                              }
                             />
                           </details>
                         );
