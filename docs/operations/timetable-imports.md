@@ -50,6 +50,12 @@ the combined fingerprint must differ or be absent; an unchanged preflight alone
 does not test the projector. If already current, use a disposable staging copy
 with retained projection and only its fingerprint removed, not a shared database.
 
+Before the empty replay, configure the disposable target's deployment pin
+(`MRTDOWN_COMBINED_RELEASE_INDEX`) with the independently approved index and
+use the matching source archive. Confirm the running app received that pin;
+an index supplied only to an earlier one-off import does not configure it for
+this empty request.
+
 Send an empty pull without source review, request index or rebuild flag. Require
 success, the expected canonical-plus-index fingerprint and unchanged recorded
 projection/receipt/write counters. A second empty pull should skip parse.

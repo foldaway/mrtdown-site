@@ -129,3 +129,54 @@ it('allows historical completed layouts while checking their links and index', (
   );
   expect(checkDocs(root)).toEqual([]);
 });
+
+it('accepts visible HTML in a plan section but rejects comment-only HTML', () => {
+  writeDoc(
+    'docs/plans/active/rollout.md',
+    plan('Rollout').replace(
+      '## Idempotence and Recovery\n\nTask-specific content.',
+      '## Idempotence and Recovery\n\n<!-- note -->\n<p>No rollback is needed.</p>',
+    ),
+  );
+  expect(checkDocs(root)).toEqual([]);
+  writeDoc(
+    'docs/plans/active/rollout.md',
+    plan('Rollout').replace(
+      '## Idempotence and Recovery\n\nTask-specific content.',
+      '## Idempotence and Recovery\n\n<!-- first -->\n<!-- second -->',
+    ),
+  );
+  expect(checkDocs(root)).toContain(
+    'docs/plans/active/rollout.md: empty section ## Idempotence and Recovery',
+  );
+});
+
+it('accepts explicit HTML anchors independently of duplicate heading slugs', () => {
+  writeDoc(
+    'README.md',
+    '<a name="recovery"></a>\n\n<a id=retry></a>\n\n[Recovery](#recovery) [Retry](#retry) [Other](docs/guide.md#details)',
+  );
+  writeDoc(
+    'docs/guide.md',
+    '<a name="repeat"></a>\n\n<div id=\'repeat-1\'>Details</div>\n\n<span id="details"></span>\n\n## Repeat\n\n## Repeat\n\n[First](#repeat) [Second](#repeat-1) [Back](../README.md#recovery)',
+  );
+  expect(checkDocs(root)).toEqual([]);
+  writeDoc('README.md', '[Extra suffix](docs/guide.md#repeat-2)');
+  expect(checkDocs(root)).toContain(
+    'README.md: missing Markdown heading anchor docs/guide.md#repeat-2',
+  );
+});
+
+it('ignores anchor examples in comments, code and unrelated HTML attributes', () => {
+  writeDoc(
+    'docs/guide.md',
+    '<!-- <a id="comment"></a> -->\n\n`<a id="inline"></a>`\n\n```html\n<a id="fenced"></a>\n```\n\n<div name="wrong-tag" data-id="wrong-attribute" title=\'<a id="quoted">\'></div>',
+  );
+  writeDoc(
+    'README.md',
+    ['comment', 'inline', 'fenced', 'wrong-tag', 'wrong-attribute', 'quoted']
+      .map((id) => `[${id}](docs/guide.md#${id})`)
+      .join(' '),
+  );
+  expect(checkDocs(root)).toHaveLength(6);
+});

@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { decode } from 'html-entities';
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import { toMarkdown } from 'mdast-util-to-markdown';
 import { visit } from 'unist-util-visit';
@@ -25,6 +26,10 @@ function headings(tree) {
     .map((node) => toMarkdown(node).trim());
 }
 
+function withoutHtmlComments(html) {
+  return html.replace(/<!--[\s\S]*?(?:-->|$)/g, '');
+}
+
 // GitHub-style heading IDs, including duplicate headings and inline code labels.
 function anchors(tree) {
   const ids = new Set();
@@ -42,7 +47,34 @@ function anchors(tree) {
     while (ids.has(id)) id = `${slug}-${++suffix}`;
     ids.add(id);
   });
-  return ids;
+
+  // Explicit targets do not participate in generated heading suffixes.
+  const explicit = new Set();
+  visit(tree, 'html', ({ value }) => {
+    const tags = withoutHtmlComments(value).matchAll(
+      /<([a-z][\w:-]*)\b((?:"[^"]*"|'[^']*'|[^'">])*)>/gi,
+    );
+    for (const [, tag, attributes] of tags) {
+      for (const [
+        ,
+        name,
+        doubleQuoted,
+        singleQuoted,
+        unquoted,
+      ] of attributes.matchAll(
+        /([^\s=/'">]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g,
+      )) {
+        if (
+          name.toLowerCase() === 'id' ||
+          (tag.toLowerCase() === 'a' && name.toLowerCase() === 'name')
+        ) {
+          const target = doubleQuoted ?? singleQuoted ?? unquoted;
+          if (target) explicit.add(decode(target));
+        }
+      }
+    }
+  });
+  return new Set([...ids, ...explicit]);
 }
 
 function linkTargets(tree) {
@@ -126,7 +158,11 @@ export function checkDocs(root) {
         if (
           !sections
             .slice(i + 1, end)
-            .some((child) => child.type !== 'heading' && child.type !== 'html')
+            .some((child) =>
+              child.type === 'html'
+                ? withoutHtmlComments(child.value).trim() !== ''
+                : child.type !== 'heading',
+            )
         ) {
           errors.push(`${doc}: empty section ${toMarkdown(node).trim()}`);
         }
