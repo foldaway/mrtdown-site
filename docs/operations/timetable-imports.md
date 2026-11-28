@@ -10,14 +10,14 @@ owns remaining runtime/retry acceptance.
 ## Prepare the target
 
 Record the exact environment/deployed SHA, source URL, independently approved
-archive and index digests, retained predecessor receipt and schedule state.
+archive and public index digests, retained predecessor receipt and schedule state.
 Verify lineage against the target environment, not another environment's receipt.
 Production deploy, production import and public Pages publication each require
 their own explicit go-ahead. Recheck live state before those actions.
 
 Preview resets its database on deploy. Before changing a shared Pages source,
 inspect the actual preview importer and choose either an isolated canonical-only
-source or a compatible importer with its own approved baseline and pin. The
+source or a compatible importer with its own approved baseline. The
 November decision to leave preview unchanged is historical; a staging successor
 review does not authorize a reset preview baseline.
 
@@ -25,10 +25,11 @@ review does not authorize a reset preview baseline.
 
 1. Pause the affected recurring pull and drain active callbacks. Preserve the
    original source and schedule settings for recovery.
-2. Arrange the exact approved source archive. Normal deploy syncs schedules;
-   check pause state again if deploying the importer.
-3. Start an authenticated one-off pull with the approved
-   `combinedReleaseIndex` and source review for an unseen release.
+2. Publish the reviewed release through mrtdown-data Pages. Check that its
+   public index, publication receipt and archive agree. Normal deploy syncs
+   schedules; check pause state again if deploying the importer.
+3. Start or observe the site pull. Ordinary releases use the public source
+   review; a reviewed exception can supply an exact review in the request.
    Follow its returned run ID to `RUN_SUCCESS`, checking the exact release index
    receipt, fingerprint and lease release. HTTP 202 alone is not completion.
 4. Verify service-date coverage and assigned/unassigned counts against the
@@ -50,9 +51,8 @@ the combined fingerprint must differ or be absent; an unchanged preflight alone
 does not test the projector. If already current, use a disposable staging copy
 with retained projection and only its fingerprint removed, not a shared database.
 
-Before the empty replay, retain the approved release through a signed one-off
-pull and use the matching source archive. The workflow reads the index from the
-latest validated retained receipt.
+Before the empty replay, retain the approved release and use the matching public
+source archive. The workflow reads the current public index again.
 
 Send an empty pull without source review, request index or rebuild flag. Require
 success, the expected canonical-plus-index fingerprint and unchanged recorded

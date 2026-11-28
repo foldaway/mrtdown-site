@@ -8,8 +8,9 @@ import { sitemapSnapshotStore } from '~/util/sitemapSnapshot.server';
 import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
 import { statisticsSnapshotStore } from '~/util/statisticsSnapshot.server';
 import { fetchManifest } from './fetchManifest';
+import { fetchPublishedTimetable } from './fetchPublishedTimetable';
 import { getCanonicalManifestFingerprint } from './manifestFingerprint';
-import { type PullParams, resolveCombinedReleaseIndex } from './pullParams';
+import type { PullParams } from './pullParams';
 
 /** External-only preflight: no SQL imports or lease acquisition. */
 export async function canSkipPublishedCanonicalPull(params: PullParams) {
@@ -25,19 +26,18 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
     return false;
   const dataUrl = process.env.MRTDOWN_DATA_URL;
   if (!dataUrl) throw new WorkflowNonRetryableError('MRTDOWN_DATA_URL not set');
-  const pinned = resolveCombinedReleaseIndex(
-    process.env.MRTDOWN_COMBINED_RELEASE_INDEX,
-    params.combinedReleaseIndex,
-  );
-  // A completed combined pull has a different fingerprint, so an empty replay
-  // falls through to the retained receipt in SQL. Canonical-only pulls can
-  // still use the external checkpoint without waking the database.
-  const manifest = await fetchManifest(dataUrl);
-  if (pinned && manifest.scheduledTimetable)
+  const [manifest, published] = await Promise.all([
+    fetchManifest(dataUrl),
+    fetchPublishedTimetable(dataUrl, params),
+  ]);
+  if (published.combinedReleaseIndex && manifest.scheduledTimetable)
     throw new WorkflowNonRetryableError(
       'Pull must specify only one scheduled timetable format',
     );
-  const fingerprint = getCanonicalManifestFingerprint(manifest, pinned);
+  const fingerprint = getCanonicalManifestFingerprint(
+    manifest,
+    published.combinedReleaseIndex,
+  );
   if (!(await rangeSnapshotStore.isCurrent(fingerprint))) return false;
   // Cold payload decoding shares the event loop and Redis command deadline.
   // Finish each verification before queuing another large payload read.
@@ -81,11 +81,14 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
   const departures = await arrivalDepartureStore.manifest.read({
     verifyPayload: true,
   });
-  return Boolean(
+  const ready = Boolean(
     departures &&
       departures.value.fingerprint === fingerprint &&
       departures.value.generation === arrivals.value.generation &&
       departures.inputs.arrivalInputsSha256 === arrivals.value.sha256 &&
       (await arrivalDepartureStore.ready(departures)),
   );
+  return ready
+    ? { combinedReleaseIndex: published.combinedReleaseIndex ?? null }
+    : false;
 }

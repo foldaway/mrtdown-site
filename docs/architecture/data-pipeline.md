@@ -8,10 +8,12 @@ or completed published serving inputs, as described below.
 
 The authenticated `POST /internal/api/tasks/pull` queues an import and returns
 its workflow run ID. `GET` on the same route with `workflowRunId` reports that
-exact canonical pull's state. A successful new pull also returns its requested
-`combinedReleaseIndex` after the import, cache publication and lease release
-finish. Publishers must match both the run and release identity before advancing
-their baseline; HTTP 202 alone only means queued. Responses are uncached and omit
+exact canonical pull's state. A successful pull returns the
+`combinedReleaseIndex` it observed, including when the published cache checkpoint
+shows the pull is already current. The receipt follows import, cache publication
+and lease release when those steps are needed. Publishers must match both the
+run and release identity before advancing their baseline; HTTP 202 alone only
+means queued. Responses are uncached and omit
 workflow steps, payloads and headers. Pre-existing runs without the new receipt
 cannot confirm an exact release to an automated publisher.
 
@@ -106,14 +108,15 @@ Three checks apply to each new release:
 
 1. **Release identity.** Verify a legacy bundle under
    `data/scheduled-timetable/` against the entry in the configured Pages
-   manifest. Combined releases use the approved signed request or the latest
-   validated retained receipt for an empty replay.
+   manifest. Combined releases use the current public Pages index, read
+   independently of the archive. A signed request must match that index.
 2. **Canonical compatibility.** The importer checks against the canonical
    data from the same archive before staging or projecting the timetable.
-3. **Source order.** Start the pull with an authenticated
-   `POST /internal/api/tasks/pull` and `{ "sourceReview": <review> }`.
-   Use the exact retained predecessor and advertised successor for the
-   environment. See the [request schema](../../app/workflows/pull/helpers/pullParams.ts).
+3. **Source order.** The public publication receipt supplies the exact source
+   review for an ordinary combined release. The importer verifies it against
+   the retained predecessor and advertised successor. A reviewed exception can
+   supply a source review in an authenticated pull request. See the
+   [request schema](../../app/workflows/pull/helpers/pullParams.ts).
    The recurring pull sends an empty body.
 
 [Retention](../../app/util/dbQueries/retainScheduledTimetable.ts) preserves
@@ -128,21 +131,19 @@ new manifest and its review.
 
 For a combined release, put the producer's `manifest.json`, `timetable.json`
 and `release.json` at the exact `data/combined-timetable/` paths in the canonical
-ZIP. An authenticated one-off pull supplies the independently approved
-`combinedReleaseIndex` (only `manifestSha256` and `releaseSha256`) together with
-the source review. After admission, the managed daily pull keeps its empty body:
-the workflow reads the index from the latest validated retained receipt. An
-index from the archive or its origin cannot authorize import. One pull accepts
-one timetable format. The optional `MRTDOWN_COMBINED_RELEASE_INDEX` override
-remains available for manual recovery; deployment no longer sets it.
+ZIP. Pages publishes `combined-timetable-release-index.json` and
+`combined-timetable-publication.json` outside the archive. The site reads both,
+checks that their index and source review agree, then verifies the archive's
+exact bytes and canonical topology. The managed daily pull keeps its empty
+body. Older published releases without a publication receipt can replay their
+already retained import using the public index; an unseen source still needs
+a signed review. One pull accepts one timetable format.
 
 The workflow snapshots the resolved index with the source URL, canonical
 manifest and import clock so callbacks keep the same inputs across a deploy.
-Change the source after draining active pulls. A stale archive fails verification;
-the next signed request supplies the new index. An empty pull without an
-override reads retained metadata, so it cannot use the external-only preflight.
-Keep review and artifact contents out of deployment variables and schedule
-bodies. See [timetable operation](../operations/timetable-imports.md)
+Change the source after draining active pulls. A stale archive fails verification.
+Keep artifact contents out of deployment variables and schedule bodies. See
+[timetable operation](../operations/timetable-imports.md)
 for rotation, replay verification and preview options.
 
 ### Projection and repair

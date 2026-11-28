@@ -29,6 +29,7 @@ import { getDb } from '../../db/index.js';
 import { completePageProfileGeneration } from '../../db/pageProfileGeneration.js';
 import { fetchArchive } from './helpers/fetchArchive.js';
 import { fetchManifest } from './helpers/fetchManifest.js';
+import { fetchPublishedTimetable } from './helpers/fetchPublishedTimetable.js';
 import { importScheduledTimetableArchive } from './helpers/importScheduledTimetableArchive.js';
 import {
   clearCanonicalManifestFingerprint,
@@ -39,12 +40,7 @@ import {
 } from './helpers/manifestFingerprint.js';
 import { publishArrivalDepartures } from './helpers/publishArrivalDepartures.js';
 import { canSkipPublishedCanonicalPull } from './helpers/publishedInputs.js';
-import { retainedCombinedReleaseIndex } from './helpers/retainedCombinedReleaseIndex.js';
-import {
-  type PullParams,
-  PullParamsSchema,
-  resolveCombinedReleaseIndex,
-} from './helpers/pullParams.js';
+import { type PullParams, PullParamsSchema } from './helpers/pullParams.js';
 import {
   deleteLineOrphans,
   deleteOperatorsTownsLandmarksOrphans,
@@ -74,6 +70,24 @@ import {
 
 const ISSUE_SYNC_BATCH_SIZE = 500;
 const OPERATIONAL_FACTS_REBUILD_DAYS = 400;
+type ManifestSnapshot = {
+  manifest: Awaited<ReturnType<typeof fetchManifest>>;
+  dataUrl: string;
+  importInstant: string;
+  published?: Awaited<ReturnType<typeof fetchPublishedTimetable>>;
+  pinnedIndex?: PullParams['combinedReleaseIndex'] | null;
+};
+
+function completedPreflightIndex(
+  result:
+    | true
+    | { combinedReleaseIndex: PullParams['combinedReleaseIndex'] | null },
+  requested: PullParams['combinedReleaseIndex'],
+) {
+  // Older in-flight runs persisted only true. They used the signed request
+  // index when present and had no independent release identity otherwise.
+  return result === true ? (requested ?? null) : result.combinedReleaseIndex;
+}
 
 async function publishPullCaches(generation: string, fingerprint?: string) {
   await completePageProfileGeneration(getDb(), generation);
@@ -134,7 +148,7 @@ async function publishDepartureCaches(
 async function executePull(
   context: WorkflowContext<PullParams>,
   params: PullParams,
-) {
+): Promise<PullParams['combinedReleaseIndex'] | null> {
   if (params.seedRangeReferenceCache) {
     await runPullStep(context, 'seed-range-reference-cache', async () => {
       if (!process.env.REDIS_URL) {
@@ -149,7 +163,7 @@ async function executePull(
       }
       return publishRangeReferenceCache();
     });
-    return;
+    return null;
   }
   if (params.seedServicePathCache) {
     await runPullStep(context, 'seed-service-path-cache', async () => {
@@ -165,7 +179,7 @@ async function executePull(
       }
       return publishServicePathCache();
     });
-    return;
+    return null;
   }
   if (params.seedNavigationCache) {
     const fingerprint = await runPullStep(
@@ -188,10 +202,10 @@ async function executePull(
       },
     );
     await publishDepartureCaches(context, fingerprint);
-    return;
+    return null;
   }
 
-  const { manifest, dataUrl, importInstant, pinnedIndex } = await runPullStep(
+  const snapshot: ManifestSnapshot = await runPullStep(
     context,
     'manifest',
     async () => {
@@ -199,28 +213,30 @@ async function executePull(
       if (dataUrl == null) {
         throw new WorkflowNonRetryableError('MRTDOWN_DATA_URL not set');
       }
-      const requestedIndex = resolveCombinedReleaseIndex(
-        process.env.MRTDOWN_COMBINED_RELEASE_INDEX,
-        params.combinedReleaseIndex,
-      );
-      const manifest = await fetchManifest(dataUrl);
-      const pinnedIndex =
-        requestedIndex ??
-        (!manifest.scheduledTimetable
-          ? await retainedCombinedReleaseIndex(getDb())
-          : undefined);
+      const [manifest, published] = await Promise.all([
+        fetchManifest(dataUrl),
+        fetchPublishedTimetable(dataUrl, params),
+      ]);
       // Persist this clock and trusted root together; retries must not select a
       // different source or move the admission clock after a failed attempt.
       return {
         manifest,
         dataUrl,
         importInstant: new Date().toISOString(),
-        pinnedIndex,
+        published,
       };
     },
   );
-  const combinedReleaseIndex = pinnedIndex ?? params.combinedReleaseIndex;
-  const { sourceReview, rebuildScheduledTimetableProjection } = params;
+  const { manifest, dataUrl, importInstant } = snapshot;
+  // In-flight QStash runs may resume a manifest step saved by the previous
+  // deployment. Keep its selected index instead of fetching current Pages.
+  const published: Awaited<ReturnType<typeof fetchPublishedTimetable>> =
+    snapshot.published ?? {
+      combinedReleaseIndex: snapshot.pinnedIndex ?? params.combinedReleaseIndex,
+      sourceReview: params.sourceReview,
+    };
+  const { combinedReleaseIndex, sourceReview } = published;
+  const { rebuildScheduledTimetableProjection } = params;
   if (combinedReleaseIndex && manifest.scheduledTimetable) {
     throw new WorkflowNonRetryableError(
       'Pull must specify only one scheduled timetable format',
@@ -269,7 +285,7 @@ async function executePull(
       );
     }
     console.log('[PULL] Canonical manifest unchanged; skipping pull');
-    return;
+    return combinedReleaseIndex ?? null;
   }
 
   if (process.env.REDIS_URL) {
@@ -558,6 +574,7 @@ async function executePull(
   });
 
   console.log('[PULL] Pull complete', counts);
+  return combinedReleaseIndex ?? null;
 }
 
 export const pullWorkflow = createWorkflow<
@@ -576,12 +593,18 @@ export const pullWorkflow = createWorkflow<
     }
     const params = parsed.data;
     if (process.env.REDIS_URL) {
-      const unchanged = await context.run('check-published-range-inputs', () =>
+      const unchanged:
+        | Awaited<ReturnType<typeof canSkipPublishedCanonicalPull>>
+        | true = await context.run('check-published-range-inputs', () =>
         canSkipPublishedCanonicalPull(params),
       );
-      if (unchanged) {
-        return { combinedReleaseIndex: params.combinedReleaseIndex ?? null };
-      }
+      if (unchanged)
+        return {
+          combinedReleaseIndex: completedPreflightIndex(
+            unchanged,
+            params.combinedReleaseIndex,
+          ),
+        };
       // Persist whether SQL lease acquisition can have occurred. Failure
       // cleanup must not wake SQL after a failed external-only preflight.
       await context.run('mark-range-snapshot-writer', () =>
@@ -597,7 +620,7 @@ export const pullWorkflow = createWorkflow<
       );
     }
 
-    await executePull(context, parsed.data);
+    const combinedReleaseIndex = await executePull(context, parsed.data);
     await context.run('release-pull-lease', async () =>
       releasePullWorkflowLease(getDb(), context.workflowRunId),
     );
@@ -606,7 +629,7 @@ export const pullWorkflow = createWorkflow<
         rangeSnapshotStore.finishWriter(context.workflowRunId),
       );
     }
-    return { combinedReleaseIndex: parsed.data.combinedReleaseIndex ?? null };
+    return { combinedReleaseIndex };
   },
   {
     failureFunction: async ({ context }) => {
