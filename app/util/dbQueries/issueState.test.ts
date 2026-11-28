@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   deriveServiceScopeStationIds,
+  deriveServiceScopeStationStretches,
   selectLatestServiceEvents,
   selectServiceBranchSourceEvents,
 } from './issueState';
@@ -100,6 +101,31 @@ describe('deriveServiceScopeStationIds', () => {
         },
       ]),
     ).toEqual(BRANCH_STATION_IDS);
+  });
+});
+
+describe('deriveServiceScopeStationStretches', () => {
+  it('keeps disjoint areas separate and preserves a loop boundary', () => {
+    expect(
+      deriveServiceScopeStationStretches(
+        ['A', 'B', 'C', 'D'],
+        [
+          {
+            type: 'service.segment',
+            station_id: null,
+            from_station_id: 'D',
+            to_station_id: 'A',
+          },
+          {
+            type: 'service.point',
+            station_id: 'B',
+            from_station_id: null,
+            to_station_id: null,
+          },
+        ],
+        true,
+      ),
+    ).toEqual([['D', 'A'], ['B']]);
   });
 });
 

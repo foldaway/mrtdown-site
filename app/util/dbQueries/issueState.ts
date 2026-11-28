@@ -65,6 +65,42 @@ export function deriveServiceScopeStationIds(
   return scopedStationIds.length > 0 ? scopedStationIds : [...branchStationIds];
 }
 
+/** Preserve separate scopes and their travel order for the card summary. */
+export function deriveServiceScopeStationStretches(
+  path: readonly string[],
+  scopes: readonly ImpactEventServiceScopeRow[],
+  isLoop = false,
+) {
+  if (
+    scopes.length === 0 ||
+    scopes.some((scope) => scope.type === 'service.whole')
+  ) {
+    return [[...path]];
+  }
+  const stretches = scopes.flatMap((scope) => {
+    if (scope.type === 'service.point' && scope.station_id != null) {
+      return path.includes(scope.station_id) ? [[scope.station_id]] : [];
+    }
+    if (
+      scope.type !== 'service.segment' ||
+      scope.from_station_id == null ||
+      scope.to_station_id == null
+    ) {
+      return [];
+    }
+    const from = path.indexOf(scope.from_station_id);
+    const to = path.indexOf(scope.to_station_id);
+    if (from < 0 || to < 0) return [];
+    if (from <= to) return [path.slice(from, to + 1)];
+    return [
+      isLoop
+        ? [...path.slice(from), ...path.slice(0, to + 1)]
+        : path.slice(to, from + 1).reverse(),
+    ];
+  });
+  return stretches.length > 0 ? stretches : [[...path]];
+}
+
 type ImpactEventStateRow = Pick<
   typeof impactEventsTable.$inferSelect,
   'id' | 'type'

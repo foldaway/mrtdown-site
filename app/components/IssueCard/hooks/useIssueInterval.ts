@@ -1,112 +1,62 @@
-import { DateTime, Interval } from 'luxon';
+import { DateTime } from 'luxon';
 import { useMemo } from 'react';
 import type { Issue, IssueInterval } from '~/types';
 import type { IssueCardContext } from '../types';
 
+const SG_TIMEZONE = 'Asia/Singapore';
+
+function latest(
+  intervals: readonly IssueInterval[],
+): IssueInterval | undefined {
+  return [...intervals].sort(
+    (a, b) =>
+      DateTime.fromISO(b.startAt).toMillis() -
+      DateTime.fromISO(a.startAt).toMillis(),
+  )[0];
+}
+
+export function selectIssueInterval(
+  intervals: readonly IssueInterval[],
+  context: IssueCardContext,
+): IssueInterval | null {
+  if (intervals.length === 0) return null;
+
+  if (context.type === 'now') {
+    const ongoing = latest(
+      intervals.filter((interval) => interval.status === 'ongoing'),
+    );
+    if (ongoing != null) return ongoing;
+
+    const future = intervals
+      .filter((interval) => interval.status === 'future')
+      .sort(
+        (a, b) =>
+          DateTime.fromISO(a.startAt).toMillis() -
+          DateTime.fromISO(b.startAt).toMillis(),
+      )[0];
+    return future ?? latest(intervals) ?? null;
+  }
+
+  const start = DateTime.fromISO(context.date, { zone: SG_TIMEZONE });
+  const end = start.plus({
+    days: context.type === 'history.week' ? 7 : context.days,
+  });
+  const matching = intervals.filter((interval) => {
+    const intervalStart = DateTime.fromISO(interval.startAt);
+    const intervalEnd =
+      interval.endAt != null ? DateTime.fromISO(interval.endAt) : null;
+    return intervalStart < end && (intervalEnd == null || intervalEnd > start);
+  });
+
+  // A station can list older issues outside the current history window.
+  return latest(matching.length > 0 ? matching : intervals) ?? null;
+}
+
 export const useIssueInterval = (
   issue: Issue,
   context: IssueCardContext,
-): IssueInterval | null => {
-  return useMemo(() => {
-    let intervalsSorted: IssueInterval[];
-
-    switch (context.type) {
-      case 'now': {
-        intervalsSorted = issue.intervals.sort((a, b) => {
-          switch (a.status) {
-            case 'ongoing':
-            case 'future': {
-              return -1;
-            }
-          }
-
-          switch (b.status) {
-            case 'ongoing':
-            case 'future': {
-              return 1;
-            }
-          }
-
-          return 0;
-        });
-        break;
-      }
-      case 'history.week': {
-        const contextDate = DateTime.fromISO(context.date);
-        const intervalWeek = Interval.fromDateTimes(
-          contextDate,
-          contextDate.plus({ week: 1 }),
-        );
-
-        intervalsSorted = issue.intervals.sort((a, b) => {
-          const dateTimeStartAtA = DateTime.fromISO(a.startAt);
-          const dateTimeEndAtA =
-            a.endAt != null ? DateTime.fromISO(a.endAt) : DateTime.now();
-          const intervalA = Interval.fromDateTimes(
-            dateTimeStartAtA,
-            dateTimeEndAtA,
-          );
-
-          if (intervalA.overlaps(intervalWeek)) {
-            return -1;
-          }
-
-          const dateTimeStartAtB = DateTime.fromISO(b.startAt);
-          const dateTimeEndAtB =
-            b.endAt != null ? DateTime.fromISO(b.endAt) : DateTime.now();
-          const intervalB = Interval.fromDateTimes(
-            dateTimeStartAtB,
-            dateTimeEndAtB,
-          );
-
-          if (intervalB.overlaps(intervalWeek)) {
-            return 1;
-          }
-
-          return 0;
-        });
-
-        break;
-      }
-      case 'history.days': {
-        const contextDate = DateTime.fromISO(context.date);
-        const intervalDays = Interval.fromDateTimes(
-          contextDate,
-          contextDate.plus({ days: context.days }),
-        );
-
-        intervalsSorted = issue.intervals.sort((a, b) => {
-          const dateTimeStartAtA = DateTime.fromISO(a.startAt);
-          const dateTimeEndAtA =
-            a.endAt != null ? DateTime.fromISO(a.endAt) : DateTime.now();
-          const intervalA = Interval.fromDateTimes(
-            dateTimeStartAtA,
-            dateTimeEndAtA,
-          );
-
-          if (intervalA.overlaps(intervalDays)) {
-            return -1;
-          }
-
-          const dateTimeStartAtB = DateTime.fromISO(b.startAt);
-          const dateTimeEndAtB =
-            b.endAt != null ? DateTime.fromISO(b.endAt) : DateTime.now();
-          const intervalB = Interval.fromDateTimes(
-            dateTimeStartAtB,
-            dateTimeEndAtB,
-          );
-
-          if (intervalB.overlaps(intervalDays)) {
-            return 1;
-          }
-
-          return 0;
-        });
-
-        break;
-      }
-    }
-
-    return intervalsSorted?.[0] ?? null;
-  }, [issue.intervals, context]);
-};
+): IssueInterval | null =>
+  useMemo(
+    () => selectIssueInterval(issue.intervals, context),
+    [issue.intervals, context],
+  );

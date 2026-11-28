@@ -33,6 +33,8 @@ export type IssueAffectedBranch = {
   branchId: string;
   serviceName?: CoreService['name'];
   stationIds: string[];
+  stationStretches?: string[][];
+  isLoop?: boolean;
   wholeServiceRevisions?: AffectedServiceRevision[];
 };
 

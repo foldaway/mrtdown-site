@@ -9,6 +9,7 @@ export type AffectedServiceRevision = {
   endAt: string | null;
   updatedAt: string;
   stationIds: string[];
+  isLoop?: boolean;
 };
 
 export function selectAffectedServiceRevisionForReferenceAt(

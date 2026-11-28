@@ -60,6 +60,7 @@ import {
 } from './issueIntervals';
 import {
   deriveServiceScopeStationIds,
+  deriveServiceScopeStationStretches,
   selectLatestServiceEvents,
   selectServiceBranchSourceEvents,
 } from './issueState';
@@ -942,6 +943,7 @@ export function assembleDataset(
                   ? revision.updated_at.toISOString()
                   : revision.updated_at,
               stationIds: [...new Set(entries)],
+              isLoop: new Set(entries).size < entries.length,
             },
           ];
         },
@@ -1459,21 +1461,24 @@ export function assembleDataset(
           intervals[0]?.startAt ??
           serviceScopeEventByServiceId.get(serviceRef.service_id)?.ts ??
           isoDateTime(referenceNow);
-        const referenceRevision =
-          wholeServiceRevisions != null
-            ? selectAffectedServiceRevisionForReferenceAt(
-                wholeServiceRevisions,
-                issueReferenceAt,
-              )
-            : undefined;
+        const referenceRevision = selectAffectedServiceRevisionForReferenceAt(
+          affectedServiceRevisionsByServiceId[serviceRef.service_id] ?? [],
+          issueReferenceAt,
+        );
         serviceBranches.set(branch.id, {
           lineId: service.line_id,
           branchId: branch.id,
           serviceName: branch.name,
+          isLoop: referenceRevision?.isLoop,
           stationIds: deriveServiceScopeStationIds(
             branch.stationIds,
             scopeRows,
             referenceRevision?.stationIds,
+          ),
+          stationStretches: deriveServiceScopeStationStretches(
+            referenceRevision?.stationIds ?? branch.stationIds,
+            scopeRows,
+            referenceRevision?.isLoop,
           ),
           wholeServiceRevisions,
         });
