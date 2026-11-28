@@ -83,7 +83,7 @@ import {
   recordCanonicalManifestFingerprint,
 } from './helpers/manifestFingerprint';
 import { publishArrivalDepartures } from './helpers/publishArrivalDepartures';
-import { retainedCombinedReleaseIndex } from './helpers/retainedCombinedReleaseIndex';
+import { fetchPublishedTimetable } from './helpers/fetchPublishedTimetable';
 import type { PullParams } from './helpers/pullParams';
 import { scheduledTimetableArchiveFixture } from './helpers/scheduledTimetableArchive.fixture';
 import { scheduledTimetableCanonicalFixture } from './helpers/scheduledTimetableCanonical.fixture';
@@ -193,8 +193,8 @@ vi.mock('@mrtdown/fs', async (original) => ({
   },
 }));
 vi.mock('~/db', () => ({ getDb: vi.fn() }));
-vi.mock('./helpers/retainedCombinedReleaseIndex', () => ({
-  retainedCombinedReleaseIndex: vi.fn().mockResolvedValue(undefined),
+vi.mock('./helpers/fetchPublishedTimetable', () => ({
+  fetchPublishedTimetable: vi.fn(),
 }));
 vi.mock('~/db/pageProfileGeneration', async (original) => ({
   ...(await original<typeof import('~/db/pageProfileGeneration')>()),
@@ -320,6 +320,10 @@ const manifest: Manifest = {
   rights: { licenseData: 'test', sourceRegistry: 'test' },
 };
 function advertise(bundle = baseline, snapshot = canonical.archive()) {
+  vi.mocked(fetchPublishedTimetable).mockResolvedValue({
+    combinedReleaseIndex: undefined,
+    sourceReview: undefined,
+  });
   vi.mocked(fetchManifest).mockResolvedValue({
     ...snapshot.manifest,
     scheduledTimetable: bundle.entry,
@@ -342,6 +346,10 @@ function advertiseCombined({
   snapshot = combined.snapshot,
   releaseBytes = combined.files.releaseBytes,
 } = {}) {
+  vi.mocked(fetchPublishedTimetable).mockResolvedValue({
+    combinedReleaseIndex: combined.index,
+    sourceReview: undefined,
+  });
   vi.mocked(fetchManifest).mockResolvedValue(snapshot.manifest);
   vi.mocked(fetchArchive).mockResolvedValue(
     Buffer.from(
@@ -384,7 +392,6 @@ function workflow(requestPayload?: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('MRTDOWN_DATA_URL', 'https://data.example.com');
-  vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', undefined);
   vi.stubEnv('REDIS_URL', undefined);
   vi.mocked(sitemapSnapshotStore.read).mockResolvedValue(null);
   vi.mocked(issueProfileSnapshotStore.read).mockResolvedValue(null);
@@ -398,6 +405,10 @@ beforeEach(() => {
   vi.mocked(arrivalDepartureStore.ready).mockResolvedValue(false);
   vi.mocked(getDb).mockReturnValue({} as ReturnType<typeof getDb>);
   vi.mocked(fetchManifest).mockResolvedValue(manifest);
+  vi.mocked(fetchPublishedTimetable).mockResolvedValue({
+    combinedReleaseIndex: undefined,
+    sourceReview: undefined,
+  });
   vi.mocked(fetchArchive).mockResolvedValue(Buffer.from(zipSync({})));
 });
 afterEach(async () => {
@@ -930,6 +941,10 @@ describe('range-reference publication workflow', () => {
 describe('pull timetable admission', () => {
   it('requires a trusted index even when the combined archive contains its own index', async () => {
     advertiseCombined();
+    vi.mocked(fetchPublishedTimetable).mockResolvedValue({
+      combinedReleaseIndex: undefined,
+      sourceReview: undefined,
+    });
     await expect(workflow().run()).rejects.toThrow(
       'independently trusted release index',
     );
@@ -948,42 +963,8 @@ describe('pull timetable admission', () => {
     expect(recordCanonicalManifestFingerprint).not.toHaveBeenCalled();
   });
 
-  it.each(['manifestSha256', 'releaseSha256'] as const)(
-    'rejects a requested index with a different %s even if the pull could skip',
-    async (field) => {
-      advertiseCombined();
-      vi.stubEnv(
-        'MRTDOWN_COMBINED_RELEASE_INDEX',
-        JSON.stringify(combined.index),
-      );
-      state.fingerprint = getCanonicalManifestFingerprint(
-        combined.snapshot.manifest,
-        combined.index,
-      );
-      await expect(
-        workflow({
-          combinedReleaseIndex: { ...combined.index, [field]: '0'.repeat(64) },
-        }).run(),
-      ).rejects.toThrow('differs from MRTDOWN_COMBINED_RELEASE_INDEX');
-      expect(fetchManifest).not.toHaveBeenCalled();
-      expect(fetchArchive).not.toHaveBeenCalled();
-    },
-  );
-
-  it('rejects invalid deployment pins without falling back to a signed index', async () => {
-    vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', '{}');
-    await expect(
-      workflow({ combinedReleaseIndex: combined.index }).run(),
-    ).rejects.toThrow('Invalid MRTDOWN_COMBINED_RELEASE_INDEX');
-    expect(fetchManifest).not.toHaveBeenCalled();
-  });
-
-  it('keeps the original pin across callbacks and checks a rotated pin despite unchanged canonical data', async () => {
+  it('keeps the discovered release across callbacks and checks changed public evidence', async () => {
     advertiseCombined();
-    vi.stubEnv(
-      'MRTDOWN_COMBINED_RELEASE_INDEX',
-      JSON.stringify(combined.index),
-    );
     state.fingerprint = getCanonicalManifestFingerprint(
       combined.snapshot.manifest,
     );
@@ -999,14 +980,21 @@ describe('pull timetable admission', () => {
       ...combined.index,
       releaseSha256: hashBytes(releaseBytes),
     };
-    vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', JSON.stringify(rotated));
     advertiseCombined({ releaseBytes });
+    vi.mocked(fetchPublishedTimetable).mockResolvedValue({
+      combinedReleaseIndex: rotated,
+      sourceReview: undefined,
+    });
     await expect(pull.run()).rejects.toThrow('expected SHA-256');
     expect(fetchManifest).toHaveBeenCalledOnce();
 
-    // A new run sees the deployment pin. Even a successful old combined
-    // fingerprint cannot make a stale archive acceptable after rotation.
+    // A new run sees the publisher's current index. A successful old
+    // fingerprint cannot make changed release evidence acceptable.
     advertiseCombined();
+    vi.mocked(fetchPublishedTimetable).mockResolvedValue({
+      combinedReleaseIndex: rotated,
+      sourceReview: undefined,
+    });
     state.fingerprint = getCanonicalManifestFingerprint(
       combined.snapshot.manifest,
       combined.index,
@@ -1198,12 +1186,8 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       )
     ).rows;
 
-  it('finishes an empty signed pull using the pinned, previously projected release without rewriting departures', async () => {
+  it('finishes an empty pull using the published, previously projected release without rewriting departures', async () => {
     advertiseCombined();
-    vi.stubEnv(
-      'MRTDOWN_COMBINED_RELEASE_INDEX',
-      JSON.stringify(combined.index),
-    );
     await expect(workflow('').run()).rejects.toThrow('source-review-required');
     expect(await rows()).toEqual([]);
 
@@ -1246,14 +1230,7 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     vi.mocked(recordCanonicalManifestFingerprint).mockImplementationOnce(
       actual.recordCanonicalManifestFingerprint,
     );
-    // The admitted receipt supplies the index for an empty recurring pull.
-    vi.stubEnv('MRTDOWN_COMBINED_RELEASE_INDEX', undefined);
-    const admission = await vi.importActual<
-      typeof import('./helpers/retainedCombinedReleaseIndex')
-    >('./helpers/retainedCombinedReleaseIndex');
-    vi.mocked(retainedCombinedReleaseIndex).mockImplementationOnce(
-      admission.retainedCombinedReleaseIndex,
-    );
+    // The public index supplies the identity for an empty recurring pull.
     const replay = workflow('');
     try {
       await replay.run();
@@ -1282,10 +1259,10 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       releaseSha256: hashBytes(releaseBytes),
     };
     advertiseCombined({ releaseBytes });
-    vi.stubEnv(
-      'MRTDOWN_COMBINED_RELEASE_INDEX',
-      JSON.stringify(changedEvidence),
-    );
+    vi.mocked(fetchPublishedTimetable).mockResolvedValue({
+      combinedReleaseIndex: changedEvidence,
+      sourceReview: undefined,
+    });
     await expect(workflow('').run()).rejects.toThrow(
       'retained-combined-release-index-mismatch',
     );
@@ -1332,7 +1309,11 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       },
       reviewedAt: '2026-11-03T00:00:00Z',
     };
-    await workflow({ combinedReleaseIndex, sourceReview }).run();
+    vi.mocked(fetchPublishedTimetable).mockResolvedValue({
+      combinedReleaseIndex,
+      sourceReview,
+    });
+    await workflow('').run();
     const retained = await rows();
     expect(retained).toHaveLength(2);
     const row = retained.find(
