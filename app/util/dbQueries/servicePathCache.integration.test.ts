@@ -2628,6 +2628,58 @@ describe.skipIf(!url)('service-path range cache with PostGIS', () => {
     ).toEqual([['station-1'], ['station-2']]);
   });
 
+  it('shows the first scope reported after an occurrence ended', async () => {
+    vi.stubEnv('REDIS_URL', undefined);
+    await pool.query(
+      "insert into issues (id,type,title,title_meta,hash) select 'retrospective','infra',title,title_meta,hash from issues where id='issue'",
+    );
+    await pool.query(
+      "insert into impact_events (id,ts,issue_id,type) values ('retrospective-period','2026-11-18T11:00:00+08:00','retrospective','periods.set')",
+    );
+    await pool.query(
+      "insert into impact_event_periods (impact_event_id,index,start_ts,end_ts) values ('retrospective-period',0,'2026-11-18T10:00:00+08:00','2026-11-18T10:30:00+08:00')",
+    );
+    await pool.query(
+      "insert into impact_event_entity_facilities (impact_event_id,station_id,line_id,kind) values ('retrospective-period','station-1','line','lift')",
+    );
+
+    const issue = (await buildDataset(now, db, ['retrospective'])).allIssues
+      .retrospective;
+    expect(issue.intervals[0].branchesAffected?.[0].stationIds).toEqual([
+      'station-1',
+    ]);
+  });
+
+  it('loads service references from an earlier occurrence without service scopes', async () => {
+    vi.stubEnv('REDIS_URL', undefined);
+    await pool.query(
+      "insert into issues (id,type,title,title_meta,hash) select 'legacy','maintenance',title,title_meta,hash from issues where id='issue'",
+    );
+    await pool.query(
+      `insert into impact_events (id,ts,issue_id,type) values
+        ('legacy-period','2026-11-18T10:00:00+08:00','legacy','periods.set'),
+        ('legacy-old','2026-11-18T10:05:00+08:00','legacy','service_effects.set'),
+        ('legacy-new','2026-11-18T11:00:00+08:00','legacy','service_effects.set')`,
+    );
+    await pool.query(
+      `insert into impact_event_periods (impact_event_id,index,start_ts,end_ts) values
+        ('legacy-period',0,'2026-11-18T10:00:00+08:00','2026-11-18T10:30:00+08:00'),
+        ('legacy-period',1,'2026-11-18T11:30:00+08:00','2026-11-18T13:00:00+08:00')`,
+    );
+    await pool.query(
+      "insert into impact_event_entity_services (impact_event_id,service_id) values ('legacy-old','service'),('legacy-new','service')",
+    );
+
+    const issue = (await buildDataset(now, db, ['legacy'])).allIssues.legacy;
+    expect(
+      issue.intervals.map((interval) => interval.branchesAffected?.[0].lineId),
+    ).toEqual(['line', 'line']);
+    const baseline = await range();
+    vi.stubEnv('REDIS_URL', 'redis://unused');
+    await publishRangeSnapshot('a'.repeat(64));
+    expect(await range()).toEqual(baseline);
+  });
+
   it('keeps historical line coverage out of current line status', async () => {
     vi.stubEnv('REDIS_URL', undefined);
     await pool.query(

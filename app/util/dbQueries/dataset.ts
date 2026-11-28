@@ -588,12 +588,19 @@ export async function readDatasetInputs(
   const serviceScopeEventIds = impactEventRows
     .filter((event) => event.type === 'service_scopes.set')
     .map((event) => event.id);
+  const serviceEffectEventIds = impactEventRows
+    .filter((event) => event.type === 'service_effects.set')
+    .map((event) => event.id);
   const entityEventIds = inputs.includeHistoricalIssueReferences
     ? impactEventRows.map((event) => event.id)
     : selectedStateEventIds;
   const facilityEntityEventIds = impactEventRows.map((event) => event.id);
   const serviceEntityEventIds = [
-    ...new Set([...entityEventIds, ...serviceScopeEventIds]),
+    ...new Set([
+      ...entityEventIds,
+      ...serviceScopeEventIds,
+      ...serviceEffectEventIds,
+    ]),
   ];
   const [
     impactEventPeriodRows,
@@ -1549,6 +1556,9 @@ export function assembleDataset(
         issueEvents,
         interval,
         referenceNow,
+        (event) =>
+          (serviceRowsByImpactEventId[event.id]?.length ?? 0) > 0 ||
+          (facilityRowsByImpactEventId[event.id]?.length ?? 0) > 0,
       );
       interval.affectedScopeAt = snapshot.referenceAt;
       interval.branchesAffected = buildAffectedBranches(

@@ -18,6 +18,7 @@ export function selectIssueScopeSnapshot<T extends { ts: string }>(
   events: readonly T[],
   interval: { startAt: string; endAt: string | null },
   referenceNow: DateTime,
+  hasScope: (event: T) => boolean = () => true,
 ) {
   const start = parseDateTime(interval.startAt);
   const end = interval.endAt != null ? parseDateTime(interval.endAt) : null;
@@ -28,9 +29,37 @@ export function selectIssueScopeSnapshot<T extends { ts: string }>(
         ? end.minus({ milliseconds: 1 })
         : referenceNow;
   const cutoff = scopeAt < referenceNow ? scopeAt : referenceNow;
+  const selectedEvents = events.filter(
+    (event) => parseDateTime(event.ts) <= cutoff,
+  );
+  // A retrospectively reported occurrence can end before its first scope event.
+  // Use only the first recorded scope, never a later revision of that scope.
+  const firstLateScopeAt =
+    end != null && end <= referenceNow && !selectedEvents.some(hasScope)
+      ? events.reduce<DateTime | null>((first, event) => {
+          const eventAt = parseDateTime(event.ts);
+          return hasScope(event) &&
+            eventAt > cutoff &&
+            eventAt <= referenceNow &&
+            (first == null || eventAt < first)
+            ? eventAt
+            : first;
+        }, null)
+      : null;
   return {
     referenceAt: isoDateTime(scopeAt),
-    events: events.filter((event) => parseDateTime(event.ts) <= cutoff),
+    events:
+      firstLateScopeAt == null
+        ? selectedEvents
+        : [
+            ...selectedEvents,
+            ...events.filter(
+              (event) =>
+                hasScope(event) &&
+                parseDateTime(event.ts).toMillis() ===
+                  firstLateScopeAt.toMillis(),
+            ),
+          ],
   };
 }
 

@@ -60,6 +60,36 @@ describe('selectIssueScopeSnapshot', () => {
     expect(snapshot.events).toHaveLength(1);
     expect(snapshot.referenceAt).toBe('2025-05-10T08:00:00.000+08:00');
   });
+
+  it('uses the first scope reported after a past occurrence ended', () => {
+    const events = [
+      { ts: '2025-04-23T10:00:00+08:00', scope: false, id: 'period' },
+      { ts: '2025-04-23T10:01:00+08:00', scope: true, id: 'first' },
+      { ts: '2025-04-24T10:00:00+08:00', scope: true, id: 'revision' },
+    ];
+    const interval = {
+      startAt: '2025-04-23T07:00:00+08:00',
+      endAt: '2025-04-23T09:00:00+08:00',
+    };
+    const hasScope = (event: (typeof events)[number]) => event.scope;
+
+    expect(
+      selectIssueScopeSnapshot(events, interval, now, hasScope).events.map(
+        (event) => event.id,
+      ),
+    ).toEqual(['first']);
+    expect(
+      selectIssueScopeSnapshot(
+        [
+          { ts: '2025-04-23T08:00:00+08:00', scope: true, id: 'earlier' },
+          ...events,
+        ],
+        interval,
+        now,
+        hasScope,
+      ).events.map((event) => event.id),
+    ).toEqual(['earlier']);
+  });
 });
 
 describe('deriveServiceScopeStationIds', () => {
