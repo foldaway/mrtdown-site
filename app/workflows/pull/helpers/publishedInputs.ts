@@ -81,11 +81,14 @@ export async function canSkipPublishedCanonicalPull(params: PullParams) {
   const departures = await arrivalDepartureStore.manifest.read({
     verifyPayload: true,
   });
-  return Boolean(
+  const ready = Boolean(
     departures &&
       departures.value.fingerprint === fingerprint &&
       departures.value.generation === arrivals.value.generation &&
       departures.inputs.arrivalInputsSha256 === arrivals.value.sha256 &&
       (await arrivalDepartureStore.ready(departures)),
   );
+  return ready
+    ? { combinedReleaseIndex: published.combinedReleaseIndex ?? null }
+    : false;
 }

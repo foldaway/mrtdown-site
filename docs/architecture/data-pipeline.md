@@ -8,10 +8,12 @@ or completed published serving inputs, as described below.
 
 The authenticated `POST /internal/api/tasks/pull` queues an import and returns
 its workflow run ID. `GET` on the same route with `workflowRunId` reports that
-exact canonical pull's state. A successful new pull also returns its requested
-`combinedReleaseIndex` after the import, cache publication and lease release
-finish. Publishers must match both the run and release identity before advancing
-their baseline; HTTP 202 alone only means queued. Responses are uncached and omit
+exact canonical pull's state. A successful pull returns the
+`combinedReleaseIndex` it observed, including when the published cache checkpoint
+shows the pull is already current. The receipt follows import, cache publication
+and lease release when those steps are needed. Publishers must match both the
+run and release identity before advancing their baseline; HTTP 202 alone only
+means queued. Responses are uncached and omit
 workflow steps, payloads and headers. Pre-existing runs without the new receipt
 cannot confirm an exact release to an automated publisher.
 

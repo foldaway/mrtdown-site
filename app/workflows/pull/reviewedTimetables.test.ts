@@ -98,7 +98,7 @@ import './index';
 const state = vi.hoisted(() => ({
   execute: undefined as
     | undefined
-    | ((context: WorkflowContext<PullParams>) => Promise<void>),
+    | ((context: WorkflowContext<PullParams>) => Promise<unknown>),
   failure: undefined as
     | undefined
     | ((args: { context: WorkflowContext<PullParams> }) => Promise<void>),
@@ -427,8 +427,9 @@ afterEach(async () => {
 });
 
 describe('published zero-SQL range inputs', () => {
-  function healthyArrivalHeads() {
-    const fingerprint = getCanonicalManifestFingerprint(manifest);
+  function healthyArrivalHeads(
+    fingerprint = getCanonicalManifestFingerprint(manifest),
+  ) {
     vi.mocked(reportReferenceSnapshotStore.read).mockResolvedValue({
       value: { fingerprint, generation: 'complete' },
     } as never);
@@ -452,6 +453,34 @@ describe('published zero-SQL range inputs', () => {
     } as never);
     vi.mocked(arrivalDepartureStore.ready).mockResolvedValue(true);
   }
+  it('returns the discovered release on a healthy empty pull without SQL', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://unused');
+    advertiseCombined();
+    const fingerprint = getCanonicalManifestFingerprint(
+      combined.snapshot.manifest,
+      combined.index,
+    );
+    healthyArrivalHeads(fingerprint);
+    vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
+    vi.mocked(getDb).mockImplementation(() => {
+      throw Error('SQL must stay asleep');
+    });
+    expect(await workflow('').run()).toEqual({
+      combinedReleaseIndex: combined.index,
+    });
+    expect(fetchArchive).not.toHaveBeenCalled();
+    expect(getDb).not.toHaveBeenCalled();
+  });
+  it('preserves an older saved boolean preflight result', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://unused');
+    const pull = workflow({ combinedReleaseIndex: combined.index });
+    pull.outputs.set('check-published-range-inputs', true);
+    expect(await pull.run()).toEqual({
+      combinedReleaseIndex: combined.index,
+    });
+    expect(fetchPublishedTimetable).not.toHaveBeenCalled();
+    expect(getDb).not.toHaveBeenCalled();
+  });
   it('keeps unchanged polls SQL-free when cold verifications cannot share a command deadline', async () => {
     vi.stubEnv('REDIS_URL', 'redis://unused');
     vi.mocked(rangeSnapshotStore.isCurrent).mockResolvedValue(true);
@@ -945,6 +974,27 @@ describe('range-reference publication workflow', () => {
 });
 
 describe('pull timetable admission', () => {
+  it('resumes an older saved manifest step with its original release index', async () => {
+    advertiseCombined();
+    const pull = workflow('');
+    pull.outputs.set('manifest', {
+      manifest: combined.snapshot.manifest,
+      dataUrl: 'https://data.example.com',
+      importInstant: '2026-11-28T00:00:00Z',
+      pinnedIndex: combined.index,
+    });
+    state.fingerprint = getCanonicalManifestFingerprint(
+      combined.snapshot.manifest,
+      combined.index,
+    );
+    vi.mocked(fetchPublishedTimetable).mockRejectedValue(
+      Error('Must not select a newer public release'),
+    );
+    expect(await pull.run()).toEqual({ combinedReleaseIndex: combined.index });
+    expect(fetchPublishedTimetable).not.toHaveBeenCalled();
+    expect(fetchArchive).not.toHaveBeenCalled();
+  });
+
   it('requires a trusted index even when the combined archive contains its own index', async () => {
     advertiseCombined();
     vi.mocked(fetchPublishedTimetable).mockResolvedValue({
@@ -1208,9 +1258,17 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     vi.mocked(truncateStagingTables).mockRejectedValueOnce(
       new Error('callback did not finish'),
     );
-    await expect(
-      workflow({ combinedReleaseIndex: combined.index, sourceReview }).run(),
-    ).rejects.toThrow('callback did not finish');
+    const firstPull = workflow({
+      combinedReleaseIndex: combined.index,
+      sourceReview,
+    });
+    firstPull.outputs.set('manifest', {
+      manifest: combined.snapshot.manifest,
+      dataUrl: 'https://data.example.com',
+      importInstant: '2026-11-03T00:00:00Z',
+      pinnedIndex: combined.index,
+    });
+    await expect(firstPull.run()).rejects.toThrow('callback did not finish');
     const retained = await rows();
     const completed = await projections();
     expect(completed).toHaveLength(1);
@@ -1239,7 +1297,9 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
     // The public index supplies the identity for an empty recurring pull.
     const replay = workflow('');
     try {
-      await replay.run();
+      expect(await replay.run()).toEqual({
+        combinedReleaseIndex: combined.index,
+      });
     } finally {
       await pool.query('DROP FUNCTION reject_departure_write() CASCADE');
     }
@@ -1319,7 +1379,9 @@ describe.skipIf(!url)('pull PostgreSQL admission and projection', () => {
       combinedReleaseIndex,
       sourceReview,
     });
-    await workflow('').run();
+    expect(await workflow('').run()).toEqual({
+      combinedReleaseIndex,
+    });
     const retained = await rows();
     expect(retained).toHaveLength(2);
     const row = retained.find(
