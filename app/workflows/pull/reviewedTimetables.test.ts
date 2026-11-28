@@ -320,10 +320,12 @@ const manifest: Manifest = {
   rights: { licenseData: 'test', sourceRegistry: 'test' },
 };
 function advertise(bundle = baseline, snapshot = canonical.archive()) {
-  vi.mocked(fetchPublishedTimetable).mockResolvedValue({
-    combinedReleaseIndex: undefined,
-    sourceReview: undefined,
-  });
+  vi.mocked(fetchPublishedTimetable).mockImplementation(
+    async (_url, params) => ({
+      combinedReleaseIndex: undefined,
+      sourceReview: params.sourceReview,
+    }),
+  );
   vi.mocked(fetchManifest).mockResolvedValue({
     ...snapshot.manifest,
     scheduledTimetable: bundle.entry,
@@ -346,10 +348,12 @@ function advertiseCombined({
   snapshot = combined.snapshot,
   releaseBytes = combined.files.releaseBytes,
 } = {}) {
-  vi.mocked(fetchPublishedTimetable).mockResolvedValue({
-    combinedReleaseIndex: combined.index,
-    sourceReview: undefined,
-  });
+  vi.mocked(fetchPublishedTimetable).mockImplementation(
+    async (_url, params) => ({
+      combinedReleaseIndex: combined.index,
+      sourceReview: params.sourceReview,
+    }),
+  );
   vi.mocked(fetchManifest).mockResolvedValue(snapshot.manifest);
   vi.mocked(fetchArchive).mockResolvedValue(
     Buffer.from(
@@ -405,10 +409,12 @@ beforeEach(() => {
   vi.mocked(arrivalDepartureStore.ready).mockResolvedValue(false);
   vi.mocked(getDb).mockReturnValue({} as ReturnType<typeof getDb>);
   vi.mocked(fetchManifest).mockResolvedValue(manifest);
-  vi.mocked(fetchPublishedTimetable).mockResolvedValue({
-    combinedReleaseIndex: undefined,
-    sourceReview: undefined,
-  });
+  vi.mocked(fetchPublishedTimetable).mockImplementation(
+    async (_url, params) => ({
+      combinedReleaseIndex: undefined,
+      sourceReview: params.sourceReview,
+    }),
+  );
   vi.mocked(fetchArchive).mockResolvedValue(Buffer.from(zipSync({})));
 });
 afterEach(async () => {
