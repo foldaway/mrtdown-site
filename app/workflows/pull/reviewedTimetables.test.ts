@@ -974,6 +974,23 @@ describe('range-reference publication workflow', () => {
 });
 
 describe('pull timetable admission', () => {
+  it('resumes an older canonical-only manifest step without a persisted pin', async () => {
+    const pull = workflow('');
+    pull.outputs.set('manifest', {
+      manifest,
+      dataUrl: 'https://data.example.com',
+      importInstant: '2026-11-28T00:00:00Z',
+    });
+    state.fingerprint = getCanonicalManifestFingerprint(manifest);
+    vi.mocked(fetchPublishedTimetable).mockRejectedValue(
+      Error('Must not select a newer public release'),
+    );
+    expect(await pull.run()).toEqual({ combinedReleaseIndex: null });
+    expect(fetchManifest).not.toHaveBeenCalled();
+    expect(fetchPublishedTimetable).not.toHaveBeenCalled();
+    expect(fetchArchive).not.toHaveBeenCalled();
+  });
+
   it('resumes an older saved manifest step with its original release index', async () => {
     advertiseCombined();
     const pull = workflow('');

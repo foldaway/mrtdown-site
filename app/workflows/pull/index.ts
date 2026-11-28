@@ -230,10 +230,11 @@ async function executePull(
   const { manifest, dataUrl, importInstant } = snapshot;
   // In-flight QStash runs may resume a manifest step saved by the previous
   // deployment. Keep its selected index instead of fetching current Pages.
-  const published = snapshot.published ?? {
-    combinedReleaseIndex: snapshot.pinnedIndex ?? params.combinedReleaseIndex,
-    sourceReview: params.sourceReview,
-  };
+  const published: Awaited<ReturnType<typeof fetchPublishedTimetable>> =
+    snapshot.published ?? {
+      combinedReleaseIndex: snapshot.pinnedIndex ?? params.combinedReleaseIndex,
+      sourceReview: params.sourceReview,
+    };
   const { combinedReleaseIndex, sourceReview } = published;
   const { rebuildScheduledTimetableProjection } = params;
   if (combinedReleaseIndex && manifest.scheduledTimetable) {
