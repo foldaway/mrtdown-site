@@ -1,67 +1,8 @@
-import type { DateTime } from 'luxon';
 import type {
   impactEventServiceScopesTable,
   impactEventsTable,
 } from '~/db/schema';
-import type { IssueInterval } from '~/types';
-import { isoDateTime, parseDateTime } from './dateTime';
-
-/** Keep the issue's current station scope while a later occurrence is planned. */
-export function selectOperationalScopeInterval(
-  intervals: readonly IssueInterval[],
-) {
-  return intervals.findLast((interval) => interval.status === 'ongoing');
-}
-
-/** Use the last instant of a past occurrence; an end-time update belongs after it. */
-export function selectIssueScopeSnapshot<T extends { ts: string }>(
-  events: readonly T[],
-  interval: { startAt: string; endAt: string | null },
-  referenceNow: DateTime,
-  hasScope: (event: T) => boolean = () => true,
-) {
-  const start = parseDateTime(interval.startAt);
-  const end = interval.endAt != null ? parseDateTime(interval.endAt) : null;
-  const scopeAt =
-    start > referenceNow
-      ? start
-      : end != null && end <= referenceNow
-        ? end.minus({ milliseconds: 1 })
-        : referenceNow;
-  const cutoff = scopeAt < referenceNow ? scopeAt : referenceNow;
-  const selectedEvents = events.filter(
-    (event) => parseDateTime(event.ts) <= cutoff,
-  );
-  // A retrospectively reported occurrence can end before its first scope event.
-  // Use only the first recorded scope, never a later revision of that scope.
-  const firstLateScopeAt =
-    end != null && end <= referenceNow && !selectedEvents.some(hasScope)
-      ? events.reduce<DateTime | null>((first, event) => {
-          const eventAt = parseDateTime(event.ts);
-          return hasScope(event) &&
-            eventAt > cutoff &&
-            eventAt <= referenceNow &&
-            (first == null || eventAt < first)
-            ? eventAt
-            : first;
-        }, null)
-      : null;
-  return {
-    referenceAt: isoDateTime(scopeAt),
-    events:
-      firstLateScopeAt == null
-        ? selectedEvents
-        : [
-            ...selectedEvents,
-            ...events.filter(
-              (event) =>
-                hasScope(event) &&
-                parseDateTime(event.ts).toMillis() ===
-                  firstLateScopeAt.toMillis(),
-            ),
-          ],
-  };
-}
+import { parseDateTime } from './dateTime';
 
 type ImpactEventServiceScopeRow = Pick<
   typeof impactEventServiceScopesTable.$inferSelect,
@@ -124,46 +65,40 @@ export function deriveServiceScopeStationIds(
   return scopedStationIds.length > 0 ? scopedStationIds : [...branchStationIds];
 }
 
-/** Keep separate scoped stretches separate even when they share one service. */
+/** Preserve separate scopes and their travel order for the card summary. */
 export function deriveServiceScopeStationStretches(
-  branchStationIds: readonly string[],
-  scopeRows: readonly ImpactEventServiceScopeRow[],
-  wholeServiceStationIds: readonly string[] = branchStationIds,
+  path: readonly string[],
+  scopes: readonly ImpactEventServiceScopeRow[],
+  isLoop = false,
 ) {
-  if (scopeRows.length === 0) return [[...branchStationIds]];
-  if (scopeRows.some((scope) => scope.type === 'service.whole')) {
-    return [[...wholeServiceStationIds]];
+  if (
+    scopes.length === 0 ||
+    scopes.some((scope) => scope.type === 'service.whole')
+  ) {
+    return [[...path]];
   }
-
-  const ranges: Array<{ start: number; end: number }> = [];
-  for (const scope of scopeRows) {
+  const stretches = scopes.flatMap((scope) => {
     if (scope.type === 'service.point' && scope.station_id != null) {
-      const index = branchStationIds.indexOf(scope.station_id);
-      if (index !== -1) ranges.push({ start: index, end: index });
-    } else if (
-      scope.type === 'service.segment' &&
-      scope.from_station_id != null &&
-      scope.to_station_id != null
+      return path.includes(scope.station_id) ? [[scope.station_id]] : [];
+    }
+    if (
+      scope.type !== 'service.segment' ||
+      scope.from_station_id == null ||
+      scope.to_station_id == null
     ) {
-      const from = branchStationIds.indexOf(scope.from_station_id);
-      const to = branchStationIds.indexOf(scope.to_station_id);
-      if (from !== -1 && to !== -1) {
-        ranges.push({ start: Math.min(from, to), end: Math.max(from, to) });
-      }
+      return [];
     }
-  }
-
-  ranges.sort((a, b) => a.start - b.start);
-  const merged: typeof ranges = [];
-  for (const range of ranges) {
-    const previous = merged.at(-1);
-    if (previous != null && range.start <= previous.end + 1) {
-      previous.end = Math.max(previous.end, range.end);
-    } else {
-      merged.push({ ...range });
-    }
-  }
-  return merged.map(({ start, end }) => branchStationIds.slice(start, end + 1));
+    const from = path.indexOf(scope.from_station_id);
+    const to = path.indexOf(scope.to_station_id);
+    if (from < 0 || to < 0) return [];
+    if (from <= to) return [path.slice(from, to + 1)];
+    return [
+      isLoop
+        ? [...path.slice(from), ...path.slice(0, to + 1)]
+        : path.slice(to, from + 1).reverse(),
+    ];
+  });
+  return stretches.length > 0 ? stretches : [[...path]];
 }
 
 type ImpactEventStateRow = Pick<
@@ -228,5 +163,5 @@ export function selectLatestServiceEvents<
     }
   }
 
-  return latestByServiceId;
+  return [...latestByServiceId.values()];
 }

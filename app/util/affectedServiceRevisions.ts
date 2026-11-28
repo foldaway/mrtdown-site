@@ -9,7 +9,6 @@ export type AffectedServiceRevision = {
   endAt: string | null;
   updatedAt: string;
   stationIds: string[];
-  /** True when the ordered service path revisits a station. */
   isLoop?: boolean;
 };
 

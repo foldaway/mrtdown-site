@@ -1,11 +1,7 @@
-import { DateTime } from 'luxon';
 import { isStationMembershipVisibleAt } from '~/helpers/isStationMembershipVisibleAt';
-import type { IssueAffectedBranch, Line, Station } from '~/types';
+import type { IssueAffectedBranch, Station } from '~/types';
 import { selectAffectedServiceRevisionForReferenceAt } from '~/util/affectedServiceRevisions';
-import {
-  selectServiceRevisionForReferenceDate,
-  serviceRevisionIsActiveOn,
-} from '~/util/serviceRevisions';
+import { serviceRevisionIsActiveOn } from '~/util/serviceRevisions';
 
 type StationTopology = Pick<Station, 'id' | 'memberships'>;
 
@@ -14,8 +10,7 @@ export type ResolvedAffectedBranch = {
   stationIds: string[];
   stretchIndex: number;
   coverage: 'whole-service' | 'station-scope' | 'unknown';
-  revisionId: string | null;
-  isLoop: boolean | null;
+  isLoop: boolean;
 };
 
 export type AffectedArea = {
@@ -24,78 +19,37 @@ export type AffectedArea = {
   kind: 'service-path' | 'station-points';
 };
 
-export type AffectedLineArea = {
-  lineId: string;
-  wholeLine: boolean;
-  areas: AffectedArea[];
-  branches: ResolvedAffectedBranch[];
-};
-
-function orderedStationIds(
-  branch: IssueAffectedBranch,
-  stationIds: readonly string[],
-  stations: Record<string, StationTopology>,
-) {
-  return stationIds
-    .map((id, index) => ({ id, index, station: stations[id] }))
-    .filter((entry) => entry.station != null)
-    .sort((first, second) => {
-      const order = (station: StationTopology) =>
-        station.memberships.find(
-          (membership) =>
-            membership.lineId === branch.lineId &&
-            membership.branchId === branch.branchId,
-        )?.sequenceOrder;
-      const firstOrder = order(first.station);
-      const secondOrder = order(second.station);
-      return firstOrder != null && secondOrder != null
-        ? firstOrder - secondOrder
-        : first.index - second.index;
-    })
-    .map((entry) => entry.id);
-}
+export type AffectedLineArea = { lineId: string; areas: AffectedArea[] };
 
 function resolveBranch(
   branch: IssueAffectedBranch,
   stations: Record<string, StationTopology>,
   referenceAt: string,
-  serviceIsLoop: boolean | null,
 ): ResolvedAffectedBranch[] {
-  const selectedRevision =
-    branch.wholeServiceRevisions != null
-      ? selectAffectedServiceRevisionForReferenceAt(
+  const revision =
+    branch.wholeServiceRevisions == null
+      ? undefined
+      : selectAffectedServiceRevisionForReferenceAt(
           branch.wholeServiceRevisions,
           referenceAt,
-        )
-      : undefined;
-  const referenceDate = DateTime.fromISO(referenceAt, { setZone: true })
-    .setZone('Asia/Singapore')
-    .toISODate();
-  const revision =
-    selectedRevision != null &&
-    referenceDate != null &&
+        );
+  const activeRevision =
+    revision != null &&
     serviceRevisionIsActiveOn(
-      { start_at: selectedRevision.startAt, end_at: selectedRevision.endAt },
-      referenceDate,
+      { start_at: revision.startAt, end_at: revision.endAt },
+      referenceAt.slice(0, 10),
     )
-      ? selectedRevision
+      ? revision
       : undefined;
   const stretches =
-    revision != null
-      ? [revision.stationIds]
+    activeRevision != null
+      ? [activeRevision.stationIds]
       : branch.wholeServiceRevisions != null
         ? [[]]
-        : branch.stationStretches?.length === 0
-          ? [[]]
-          : (branch.stationStretches ?? [branch.stationIds]);
+        : (branch.stationStretches ?? [branch.stationIds]);
 
   return stretches.map((sourceIds, stretchIndex) => {
-    const stationIds =
-      revision != null
-        ? sourceIds.filter((id) => stations[id] != null)
-        : branch.stationStretches != null
-          ? sourceIds.filter((id) => stations[id] != null)
-          : orderedStationIds(branch, sourceIds, stations);
+    const stationIds = sourceIds.filter((id) => stations[id] != null);
     const complete =
       sourceIds.length > 0 && stationIds.length === sourceIds.length;
     return {
@@ -104,56 +58,12 @@ function resolveBranch(
       stretchIndex,
       coverage: !complete
         ? 'unknown'
-        : revision != null
+        : activeRevision != null
           ? 'whole-service'
           : 'station-scope',
-      revisionId: revision?.id ?? null,
-      isLoop: revision?.isLoop ?? serviceIsLoop,
+      isLoop: branch.isLoop ?? activeRevision?.isLoop ?? false,
     };
   });
-}
-
-function activeLineServices(line: Line | undefined, referenceAt: string) {
-  if (line?.serviceCoverage == null) return null;
-  if (line.serviceCoverage.some((service) => service.revisions.length === 0)) {
-    return null;
-  }
-  const referenceDate = DateTime.fromISO(referenceAt, { setZone: true })
-    .setZone('Asia/Singapore')
-    .toISODate();
-  if (referenceDate == null) return null;
-
-  return line.serviceCoverage.flatMap((service) => {
-    const revision = selectServiceRevisionForReferenceDate(
-      service.revisions.map((candidate) => ({
-        id: candidate.id,
-        start_at: candidate.startAt,
-        end_at: candidate.endAt,
-        updated_at: candidate.updatedAt,
-        isLoop: candidate.isLoop,
-      })),
-      referenceDate,
-    );
-    return revision == null ||
-      !serviceRevisionIsActiveOn(revision, referenceDate)
-      ? []
-      : [
-          {
-            id: service.id,
-            revisionId: revision.id,
-            isLoop: revision.isLoop ?? null,
-          },
-        ];
-  });
-}
-
-function areaKey(branch: ResolvedAffectedBranch) {
-  if (branch.stationIds.length === 0) {
-    return `unpaired:${branch.branch.branchId}:${branch.stretchIndex}`;
-  }
-  const forward = branch.stationIds.join('\u0000');
-  const reverse = [...branch.stationIds].reverse().join('\u0000');
-  return forward < reverse ? forward : reverse;
 }
 
 function isFacilityPoint(branch: ResolvedAffectedBranch) {
@@ -164,179 +74,99 @@ function isFacilityPoint(branch: ResolvedAffectedBranch) {
   );
 }
 
-function adjacentStations(
+function adjacent(
   firstId: string,
   secondId: string,
   lineId: string,
   stations: Record<string, StationTopology>,
   referenceAt: string,
 ) {
-  const first = stations[firstId];
-  const second = stations[secondId];
-  if (first == null || second == null) return false;
-  return first.memberships.some(
-    (membership) =>
-      membership.lineId === lineId &&
-      isStationMembershipVisibleAt(membership, referenceAt) &&
-      second.memberships.some(
-        (other) =>
-          other.lineId === lineId &&
-          other.branchId === membership.branchId &&
-          isStationMembershipVisibleAt(other, referenceAt) &&
-          Math.abs(other.sequenceOrder - membership.sequenceOrder) === 1,
+  return (stations[firstId]?.memberships ?? []).some(
+    (first) =>
+      first.lineId === lineId &&
+      isStationMembershipVisibleAt(first, referenceAt) &&
+      (stations[secondId]?.memberships ?? []).some(
+        (second) =>
+          second.lineId === lineId &&
+          second.branchId === first.branchId &&
+          isStationMembershipVisibleAt(second, referenceAt) &&
+          Math.abs(second.sequenceOrder - first.sequenceOrder) === 1,
       ),
   );
 }
 
-function mergeAdjacentFacilityPoints(
+function mergeFacilityPoints(
   areas: AffectedArea[],
   lineId: string,
   stations: Record<string, StationTopology>,
   referenceAt: string,
 ) {
-  const pointAreas = areas.filter(
-    (area) =>
-      area.kind === 'station-points' &&
-      area.stationIds.length === 1 &&
-      area.branches.every(isFacilityPoint),
-  );
-  const consumed = new Set<AffectedArea>();
+  const points = areas.filter((area) => area.kind === 'station-points');
+  if (points.length < 2) return areas;
+  points.sort((a, b) => {
+    const order = (area: AffectedArea) =>
+      stations[area.stationIds[0]]?.memberships.find(
+        (membership) => membership.lineId === lineId,
+      )?.sequenceOrder ?? 0;
+    return order(a) - order(b);
+  });
   const merged: AffectedArea[] = [];
-  for (const area of areas) {
-    if (consumed.has(area)) continue;
-    if (!pointAreas.includes(area)) {
-      merged.push(area);
-      continue;
+  for (const point of points) {
+    const last = merged.at(-1);
+    if (
+      last != null &&
+      adjacent(
+        last.stationIds.at(-1) ?? '',
+        point.stationIds[0],
+        lineId,
+        stations,
+        referenceAt,
+      )
+    ) {
+      last.stationIds.push(...point.stationIds);
+      last.branches.push(...point.branches);
+    } else {
+      merged.push({ ...point, stationIds: [...point.stationIds] });
     }
-    const cluster = [area];
-    consumed.add(area);
-    for (let index = 0; index < cluster.length; index++) {
-      for (const candidate of pointAreas) {
-        if (
-          !consumed.has(candidate) &&
-          adjacentStations(
-            cluster[index].stationIds[0],
-            candidate.stationIds[0],
-            lineId,
-            stations,
-            referenceAt,
-          )
-        ) {
-          consumed.add(candidate);
-          cluster.push(candidate);
-        }
-      }
-    }
-    const ordered = [cluster[0]];
-    if (cluster.length > 2) {
-      const endpoint = cluster.find(
-        (candidate) =>
-          cluster.filter(
-            (other) =>
-              other !== candidate &&
-              adjacentStations(
-                candidate.stationIds[0],
-                other.stationIds[0],
-                lineId,
-                stations,
-                referenceAt,
-              ),
-          ).length === 1,
-      );
-      if (endpoint != null) ordered[0] = endpoint;
-    }
-    while (ordered.length < cluster.length) {
-      const next = cluster.find(
-        (candidate) =>
-          !ordered.includes(candidate) &&
-          adjacentStations(
-            ordered.at(-1)?.stationIds[0] ?? '',
-            candidate.stationIds[0],
-            lineId,
-            stations,
-            referenceAt,
-          ),
-      );
-      if (next == null) break;
-      ordered.push(next);
-    }
-    if (ordered.length !== cluster.length) {
-      merged.push(...cluster);
-      continue;
-    }
-    merged.push({
-      kind: 'station-points',
-      stationIds: ordered.map((point) => point.stationIds[0]),
-      branches: ordered.flatMap((point) => point.branches),
-    });
   }
-  return merged;
+  return [...areas.filter((area) => area.kind !== 'station-points'), ...merged];
 }
 
 export function getAffectedLineAreas(
   branches: readonly IssueAffectedBranch[],
-  lines: Record<string, Line>,
   stations: Record<string, StationTopology>,
   referenceAt: string,
 ): AffectedLineArea[] {
-  const byLine = new Map<string, ResolvedAffectedBranch[]>();
-  const activeByLine = new Map<string, ReturnType<typeof activeLineServices>>();
+  const byLine = new Map<string, AffectedArea[]>();
   for (const branch of branches) {
-    if (!activeByLine.has(branch.lineId)) {
-      activeByLine.set(
-        branch.lineId,
-        activeLineServices(lines[branch.lineId], referenceAt),
-      );
+    const areas = byLine.get(branch.lineId) ?? [];
+    for (const resolved of resolveBranch(branch, stations, referenceAt)) {
+      const stationIds = resolved.stationIds;
+      const key = stationIds.join('|');
+      const reverse = [...stationIds].reverse().join('|');
+      const match =
+        stationIds.length > 0
+          ? areas.find(
+              (area) =>
+                area.kind === 'service-path' &&
+                (area.stationIds.join('|') === key ||
+                  area.stationIds.join('|') === reverse),
+            )
+          : undefined;
+      if (match != null) {
+        match.branches.push(resolved);
+      } else {
+        areas.push({
+          branches: [resolved],
+          stationIds,
+          kind: isFacilityPoint(resolved) ? 'station-points' : 'service-path',
+        });
+      }
     }
-    const service = activeByLine
-      .get(branch.lineId)
-      ?.find((candidate) => candidate.id === branch.branchId);
-    const resolved = resolveBranch(
-      branch,
-      stations,
-      referenceAt,
-      service?.isLoop ?? null,
-    );
-    const lineBranches = byLine.get(branch.lineId) ?? [];
-    lineBranches.push(...resolved);
-    byLine.set(branch.lineId, lineBranches);
+    byLine.set(branch.lineId, areas);
   }
-
-  return [...byLine].map(([lineId, lineBranches]) => {
-    const activeServices = activeByLine.get(lineId);
-    const wholeLine =
-      activeServices != null &&
-      activeServices.length > 0 &&
-      activeServices.every((service) =>
-        lineBranches.some(
-          ({ branch, coverage, revisionId }) =>
-            branch.branchId === service.id &&
-            coverage === 'whole-service' &&
-            revisionId === service.revisionId,
-        ),
-      );
-    const areasByKey = new Map<string, AffectedArea>();
-    for (const branch of lineBranches) {
-      const key = areaKey(branch);
-      const area = areasByKey.get(key) ?? {
-        branches: [],
-        stationIds: branch.stationIds,
-        kind: isFacilityPoint(branch) ? 'station-points' : 'service-path',
-      };
-      area.branches.push(branch);
-      if (!isFacilityPoint(branch)) area.kind = 'service-path';
-      areasByKey.set(key, area);
-    }
-    return {
-      lineId,
-      wholeLine,
-      areas: mergeAdjacentFacilityPoints(
-        [...areasByKey.values()],
-        lineId,
-        stations,
-        referenceAt,
-      ),
-      branches: lineBranches,
-    };
-  });
+  return [...byLine].map(([lineId, areas]) => ({
+    lineId,
+    areas: mergeFacilityPoints(areas, lineId, stations, referenceAt),
+  }));
 }

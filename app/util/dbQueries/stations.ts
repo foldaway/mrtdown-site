@@ -319,7 +319,6 @@ async function loadSqlStationProfile(
       : [];
   const dataset = await buildDataset(referenceNow, db, candidateIssueIds, {
     lineIds,
-    completeLineIds: lineIds,
     serviceIds: [
       ...new Set([
         ...initialScope.serviceIds,

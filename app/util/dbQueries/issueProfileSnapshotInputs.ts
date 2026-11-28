@@ -3,7 +3,6 @@ import type { DateTime } from 'luxon';
 import { z } from 'zod';
 import {
   assembleDataset,
-  completeLineIdsFromInputs,
   type DatasetInputs,
   scopeDatasetInputs,
 } from './dataset';
@@ -64,15 +63,13 @@ export function selectIssueProfileSnapshot(
   // An absent ID may have been promoted since publication; retain SQL recovery.
   if (!Object.hasOwn(inputs.updates, issueId)) return null;
   const ids = new Set([issueId]);
-  const dataset = scopeDatasetInputs(
-    inputs.dataset,
-    getIssueScopeFromInputs(inputs.dataset, ids),
-    ids,
-  );
   return {
     issueId,
-    dataset,
-    completeLineIds: completeLineIdsFromInputs(inputs.dataset, dataset),
+    dataset: scopeDatasetInputs(
+      inputs.dataset,
+      getIssueScopeFromInputs(inputs.dataset, ids),
+      ids,
+    ),
     updates: inputs.updates[issueId],
   };
 }
@@ -100,7 +97,7 @@ export function assembleIssueProfileSnapshot(
 ) {
   return assembleIssueProfile(
     inputs.issueId,
-    assembleDataset(now, inputs.dataset, undefined, inputs.completeLineIds),
+    assembleDataset(now, inputs.dataset),
     inputs.updates,
   );
 }

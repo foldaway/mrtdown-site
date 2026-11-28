@@ -1,96 +1,10 @@
-import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
 import {
   deriveServiceScopeStationIds,
   deriveServiceScopeStationStretches,
-  selectIssueScopeSnapshot,
   selectLatestServiceEvents,
-  selectOperationalScopeInterval,
   selectServiceBranchSourceEvents,
 } from './issueState';
-
-describe('selectOperationalScopeInterval', () => {
-  it('uses the active occurrence before a later planned occurrence', () => {
-    const active = {
-      startAt: '2026-11-18T10:00:00+08:00',
-      endAt: '2026-11-18T14:00:00+08:00',
-      status: 'ongoing' as const,
-    };
-    const future = {
-      startAt: '2026-11-19T10:00:00+08:00',
-      endAt: '2026-11-19T14:00:00+08:00',
-      status: 'future' as const,
-    };
-    expect(selectOperationalScopeInterval([active, future])).toBe(active);
-    expect(selectOperationalScopeInterval([future])).toBeUndefined();
-  });
-});
-
-describe('selectIssueScopeSnapshot', () => {
-  const now = DateTime.fromISO('2025-05-01T00:00:00+08:00');
-
-  it('excludes a whole-service update at the end of the April 2025 occurrence', () => {
-    const snapshot = selectIssueScopeSnapshot(
-      [
-        { ts: '2025-04-23T07:20:51+08:00', scope: 'segment' },
-        { ts: '2025-04-23T09:00:51+08:00', scope: 'whole' },
-      ],
-      {
-        startAt: '2025-04-23T07:00:00+08:00',
-        endAt: '2025-04-23T09:00:51+08:00',
-      },
-      now,
-    );
-    expect(snapshot.events.map((event) => event.scope)).toEqual(['segment']);
-    expect(snapshot.referenceAt).toBe('2025-04-23T09:00:50.999+08:00');
-  });
-
-  it('uses planned service topology but only already known events for a future occurrence', () => {
-    const snapshot = selectIssueScopeSnapshot(
-      [
-        { ts: '2025-04-01T00:00:00+08:00' },
-        { ts: '2025-05-02T00:00:00+08:00' },
-      ],
-      {
-        startAt: '2025-05-10T08:00:00+08:00',
-        endAt: '2025-05-10T10:00:00+08:00',
-      },
-      now,
-    );
-    expect(snapshot.events).toHaveLength(1);
-    expect(snapshot.referenceAt).toBe('2025-05-10T08:00:00.000+08:00');
-  });
-
-  it('uses the first scope reported after a past occurrence ended', () => {
-    const events = [
-      { ts: '2025-04-23T10:00:00+08:00', scope: false, id: 'period' },
-      { ts: '2025-04-23T10:01:00+08:00', scope: true, id: 'first' },
-      { ts: '2025-04-24T10:00:00+08:00', scope: true, id: 'revision' },
-    ];
-    const interval = {
-      startAt: '2025-04-23T07:00:00+08:00',
-      endAt: '2025-04-23T09:00:00+08:00',
-    };
-    const hasScope = (event: (typeof events)[number]) => event.scope;
-
-    expect(
-      selectIssueScopeSnapshot(events, interval, now, hasScope).events.map(
-        (event) => event.id,
-      ),
-    ).toEqual(['first']);
-    expect(
-      selectIssueScopeSnapshot(
-        [
-          { ts: '2025-04-23T08:00:00+08:00', scope: true, id: 'earlier' },
-          ...events,
-        ],
-        interval,
-        now,
-        hasScope,
-      ).events.map((event) => event.id),
-    ).toEqual(['earlier']);
-  });
-});
 
 describe('deriveServiceScopeStationIds', () => {
   const BRANCH_STATION_IDS = ['NS1', 'NS2', 'NS3', 'NS4', 'NS5'];
@@ -191,47 +105,27 @@ describe('deriveServiceScopeStationIds', () => {
 });
 
 describe('deriveServiceScopeStationStretches', () => {
-  const path = ['A', 'B', 'C', 'D', 'E', 'F'];
-
-  it('keeps disjoint stretches separate and merges touching scopes', () => {
+  it('keeps disjoint areas separate and preserves a loop boundary', () => {
     expect(
-      deriveServiceScopeStationStretches(path, [
-        {
-          type: 'service.segment',
-          station_id: null,
-          from_station_id: 'A',
-          to_station_id: 'B',
-        },
-        {
-          type: 'service.point',
-          station_id: 'C',
-          from_station_id: null,
-          to_station_id: null,
-        },
-        {
-          type: 'service.segment',
-          station_id: null,
-          from_station_id: 'E',
-          to_station_id: 'F',
-        },
-      ]),
-    ).toEqual([
-      ['A', 'B', 'C'],
-      ['E', 'F'],
-    ]);
-  });
-
-  it('does not substitute a whole path for an unresolvable scope', () => {
-    expect(
-      deriveServiceScopeStationStretches(path, [
-        {
-          type: 'service.segment',
-          station_id: null,
-          from_station_id: 'X',
-          to_station_id: 'Y',
-        },
-      ]),
-    ).toEqual([]);
+      deriveServiceScopeStationStretches(
+        ['A', 'B', 'C', 'D'],
+        [
+          {
+            type: 'service.segment',
+            station_id: null,
+            from_station_id: 'D',
+            to_station_id: 'A',
+          },
+          {
+            type: 'service.point',
+            station_id: 'B',
+            from_station_id: null,
+            to_station_id: null,
+          },
+        ],
+        true,
+      ),
+    ).toEqual([['D', 'A'], ['B']]);
   });
 });
 
@@ -294,17 +188,14 @@ describe('selectLatestServiceEvents', () => {
       { impact_event_id: 'other-issue', service_id: 'northbound' },
     ];
 
-    expect([
-      ...selectLatestServiceEvents(
+    expect(
+      selectLatestServiceEvents(
         events,
         references,
         'issue-1',
         'service_scopes.set',
-      ),
-    ]).toEqual([
-      ['northbound', expect.objectContaining({ id: 'north-latest' })],
-      ['southbound', expect.objectContaining({ id: 'south-latest' })],
-    ]);
+      ).map((event) => event.id),
+    ).toEqual(['north-latest', 'south-latest']);
   });
 
   it('uses event ids as a deterministic timestamp tie-breaker per service', () => {
@@ -332,37 +223,7 @@ describe('selectLatestServiceEvents', () => {
         })),
         'issue-1',
         'service_scopes.set',
-      ).get('northbound')?.id,
-    ).toBe('scope-b');
-  });
-
-  it('keeps an older shared event only for services without a newer update', () => {
-    const events = [
-      {
-        id: 'shared',
-        issue_id: 'issue-1',
-        type: 'service_scopes.set',
-        ts: '2025-01-01T00:00:00+08:00',
-      },
-      {
-        id: 'north-new',
-        issue_id: 'issue-1',
-        type: 'service_scopes.set',
-        ts: '2025-01-02T00:00:00+08:00',
-      },
-    ] as const;
-    const selected = selectLatestServiceEvents(
-      events,
-      [
-        { impact_event_id: 'shared', service_id: 'northbound' },
-        { impact_event_id: 'shared', service_id: 'southbound' },
-        { impact_event_id: 'north-new', service_id: 'northbound' },
-      ],
-      'issue-1',
-      'service_scopes.set',
-    );
-
-    expect(selected.get('northbound')?.id).toBe('north-new');
-    expect(selected.get('southbound')?.id).toBe('shared');
+      ).map((event) => event.id),
+    ).toEqual(['scope-b']);
   });
 });

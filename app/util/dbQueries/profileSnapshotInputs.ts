@@ -1,10 +1,9 @@
 import type { DateTime } from 'luxon';
 import type { PublicCrowdReportSignal } from '~/util/crowdReports';
 import {
-  completeLineIdsFromInputs,
+  scopeDatasetInputs,
   type DatasetInputs,
   type DatasetStaticScope,
-  scopeDatasetInputs,
 } from './dataset';
 import { isoDate } from './dateTime';
 import { getIssueScopeFromInputs } from './readModelScope';
@@ -111,7 +110,6 @@ export function selectLineProfileSnapshot(
   const end = isoDate(referenceNow);
   return {
     dataset,
-    completeLineIds: completeLineIdsFromInputs(rows, dataset),
     uptimeFactRows: inputs.lineUptimeFacts.filter(
       (row) => row.date >= start && row.date <= end,
     ),

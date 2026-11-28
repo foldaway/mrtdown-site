@@ -60,17 +60,10 @@ export function selectIncludedEntities(
       for (const lineId of issue.lineIds) {
         lineIds.add(lineId);
       }
-      const affectedBranches = [
-        ...issue.branchesAffected,
-        ...issue.intervals.flatMap(
-          (interval) => interval.branchesAffected ?? [],
-        ),
-      ];
-      for (const branch of affectedBranches) {
+      for (const branch of issue.branchesAffected) {
         lineIds.add(branch.lineId);
         const affectedStationIds = [
           ...branch.stationIds,
-          ...(branch.stationStretches?.flat() ?? []),
           ...(branch.wholeServiceRevisions?.flatMap(
             (revision) => revision.stationIds,
           ) ?? []),

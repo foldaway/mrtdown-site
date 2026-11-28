@@ -1,6 +1,8 @@
 import { setResponseHeader } from '@tanstack/react-start/server';
-import { eq, inArray, or } from 'drizzle-orm';
 import type { DateTime } from 'luxon';
+import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
+import { selectProfileDatasetInputs } from './profileSnapshotInputs';
+import { eq, inArray, or } from 'drizzle-orm';
 import {
   impactEventEntityFacilitiesTable,
   impactEventEntityServicesTable,
@@ -12,13 +14,8 @@ import {
   stationCodesTable,
 } from '~/db/schema';
 import type { LineSummary, LineSummaryStatus } from '~/types';
-import { stationProfileSnapshotStore } from '~/util/stationProfileSnapshot.server';
 import { getDefaultDb, timeDbQuery } from './database';
-import {
-  assembleDataset,
-  buildDataset,
-  completeLineIdsFromInputs,
-} from './dataset';
+import { assembleDataset, buildDataset } from './dataset';
 import { nowSg, parseDateTime } from './dateTime';
 import { selectIncludedEntities } from './includedEntities';
 import { pickIssueDurationByType, pickIssueTypes } from './issueAnalytics';
@@ -31,7 +28,6 @@ import {
   buildLineSummary,
   buildOperatorUptimeGraph,
 } from './lineAnalytics';
-import { selectProfileDatasetInputs } from './profileSnapshotInputs';
 import { getIssueStaticScope } from './readModelScope';
 
 type OperatorOperationalStatus =
@@ -231,9 +227,6 @@ async function loadSqlOperatorProfile(
         ...stationMembershipRows.map((row) => row.lineId),
       ]),
     ],
-    completeLineIds: [
-      ...new Set([...lineIds, ...(issueScope.completeLineIds ?? [])]),
-    ],
     serviceIds: initialScope.serviceIds,
     stationIds: initialScope.stationIds,
     operatorIds: [operatorId],
@@ -277,19 +270,16 @@ export async function getOperatorProfileReadModel(
           .map((row) => row.station_id),
       ]),
     ];
-    const selected = selectProfileDatasetInputs(rows, {
-      lineIds,
-      serviceIds: [...serviceIds],
-      stationIds,
-      operatorIds: [operatorId],
-    });
     loaded = {
       lineIds,
       dataset: assembleDataset(
         referenceNow,
-        selected,
-        undefined,
-        completeLineIdsFromInputs(rows, selected),
+        selectProfileDatasetInputs(rows, {
+          lineIds,
+          serviceIds: [...serviceIds],
+          stationIds,
+          operatorIds: [operatorId],
+        }),
       ),
     };
   } else {
